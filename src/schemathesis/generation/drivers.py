@@ -195,7 +195,7 @@ class CoverageGenerator:
                 if without_unserializable_payload(case, operation.schema.transport, unserializable) is None:
                     continue
                 adjust_urlencoded_payload(case)
-                auths.set_on_case(case, auth_context, self._auth_storage)
+                auths.set_on_generated_case(case, auth_context, self._auth_storage)
                 for container_name, value in overrides.items():
                     container = getattr(case, container_name)
                     if container is None:

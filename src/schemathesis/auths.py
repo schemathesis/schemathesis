@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -542,6 +542,28 @@ def _should_skip_auth_for_negative_testing(case: Case, param_name: str, param_lo
         return False
 
     return phase_data.parameter == param_name and phase_data.parameter_location == param_location
+
+
+def set_on_generated_case(
+    case: Case,
+    context: AuthContext,
+    auth_storage: AuthStorage | None,
+    supplied: frozenset[tuple[ParameterLocation, str]] = frozenset(),
+) -> None:
+    """Set authentication data on a generated case, dropping credentials generated for unused security requirements."""
+    __tracebackhide__ = True
+    generated = []
+    for location, name in case.operation.schema.alternative_credentials(case.operation):
+        container = case.get_container(location)
+        if (location, name) not in supplied and isinstance(container, MutableMapping) and name in container:
+            generated.append((location, name, container[name]))
+    set_on_case(case, context, auth_storage)
+    # Configured auth satisfies one security requirement; random credentials for the others can only get it rejected.
+    if case._has_explicit_auth:
+        for location, name, value in generated:
+            container = case.get_container(location)
+            if isinstance(container, MutableMapping) and container.get(name) is value:
+                del container[name]
 
 
 def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | None) -> None:

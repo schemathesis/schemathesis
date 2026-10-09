@@ -791,3 +791,70 @@ def test_api(case):
     )
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
+
+
+def test_reactive_reauth_keeps_explicit_api_key(testdir):
+    testdir.makefile(".toml", schemathesis='[generation]\nmode = "positive"\n')
+    testdir.make_test(
+        """
+from flask import Flask, request
+app = Flask(__name__)
+
+consumed = set()
+api_keys = []
+
+@app.route("/items")
+def items():
+    api_keys.append(request.headers.get("X-Api-Key"))
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+    if token and token not in consumed:
+        consumed.add(token)
+        return []
+    return {"error": "Unauthorized"}, 401
+
+@app.route("/openapi.json")
+def openapi():
+    return {
+        "openapi": "3.0.3",
+        "info": {"version": "0.1", "title": "Test API"},
+        "paths": {
+            "/items": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                    "security": [{"ApiKey": []}, {"Bearer": []}],
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "ApiKey": {"type": "apiKey", "in": "header", "name": "X-Api-Key"},
+                "Bearer": {"type": "http", "scheme": "bearer"},
+            }
+        },
+    }
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+counter = {"n": 0}
+
+@schema.auth(retry_on=[401])
+class TokenAuth:
+    def get(self, case, ctx):
+        counter["n"] += 1
+        return f"t{counter['n']}"
+
+    def set(self, case, data, ctx):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+from schemathesis.specs.openapi.checks import ignored_auth
+
+@given(case=schema["/items"]["GET"].as_strategy(headers={"X-Api-Key": "explicit-key"}))
+@settings(max_examples=3)
+def test_api(case):
+    assert case.call_and_validate(excluded_checks=[ignored_auth]).status_code == 200
+    assert set(api_keys) == {"explicit-key"}
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)

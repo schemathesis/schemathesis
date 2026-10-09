@@ -16,6 +16,7 @@
 
 #### Others
 
+- Random credentials for alternative security schemes sent alongside configured auth, breaking re-authentication.
 - False `negative_data_rejection` for unknown query parameters beside `allowEmptyValue` string values like `0`.
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
 - Exploded object query parameters overwriting a declared query parameter of the same name.

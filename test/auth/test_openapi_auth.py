@@ -593,3 +593,78 @@ def test_referenced_security_scheme(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def _api_key_or_bearer_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "security": [{"ApiKey": []}, {"Bearer": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKey": {"type": "apiKey", "name": "X-Api-Key", "in": "header"},
+                "Bearer": {"type": "http", "scheme": "bearer"},
+            }
+        },
+    )
+    api_keys = []
+
+    @app.route("/items")
+    def items():
+        api_keys.append(request.headers.get("X-Api-Key"))
+        if "X-Api-Key" in request.headers or request.headers.get("Authorization") != "Bearer valid-token":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify([])
+
+    return app, api_keys
+
+
+def test_no_alternative_credentials_with_auth_hook(ctx, cli):
+    app, api_keys = _api_key_or_bearer_app(ctx)
+    module = ctx.write_pymodule(
+        """
+@schemathesis.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return "valid-token"
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+"""
+    )
+    cli.run_openapi_app(
+        app,
+        "--phases=coverage,fuzzing",
+        "--mode=positive",
+        "--max-examples=10",
+        "--exclude-checks=ignored_auth",
+        hooks=module,
+    )
+    assert api_keys
+    assert set(api_keys) == {None}
+
+
+def test_no_alternative_credentials_with_openapi_auth_config(ctx, cli):
+    app, api_keys = _api_key_or_bearer_app(ctx)
+    cli.run_openapi_app(
+        app,
+        "--phases=coverage,fuzzing",
+        "--mode=positive",
+        "--max-examples=10",
+        "--exclude-checks=ignored_auth",
+        config={"auth": {"openapi": {"Bearer": {"bearer": "valid-token"}}}},
+    )
+    assert api_keys
+    assert set(api_keys) == {None}
+
+
+def test_alternative_credentials_generated_without_auth(ctx, cli):
+    app, api_keys = _api_key_or_bearer_app(ctx)
+    cli.run_openapi_app(app, "--phases=coverage,fuzzing", "--mode=positive", "--max-examples=10")
+    assert set(api_keys) - {None}
