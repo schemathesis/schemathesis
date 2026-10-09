@@ -666,8 +666,8 @@ def test_additional_properties_hint_skipped_when_branch_forbids_extras(ctx, resp
 
 _EXTRA_PROPERTY_HINT = (
     "\nHint: The request body contains 1 additional property not defined in the schema (`extra`). "
-    "The server likely rejects unexpected fields. "
-    "Add `additionalProperties: false` to your schema to prevent this."
+    "The server appears to reject properties the schema allows. Declare `additionalProperties: false` if extras are "
+    "not accepted, or make the server ignore unknown fields."
 )
 
 
@@ -4310,6 +4310,15 @@ _NAME_PROPERTY = {"type": "object", "properties": {"name": {"type": "string"}}}
             "application/json",
             _EXTRA_PROPERTY_HINT,
             id="boolean-branch",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"application/json": {"schema": {**_NAME_PROPERTY, "additionalProperties": {"type": "string"}}}},
+            {},
+            {"name": "x", "extra": "yes"},
+            "application/json",
+            _EXTRA_PROPERTY_HINT,
+            id="additional-properties-schema",
         ),
         pytest.param(
             "3.0.2",

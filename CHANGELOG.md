@@ -5,6 +5,7 @@
 ### :wrench: Changed
 
 - Suggest the JSON Pointer form for dotted link body expressions like `$response.body.0.id`.
+- Additional-properties hint offers closing the schema or ignoring unknown fields, without blaming the schema.
 
 ### :bug: Fixed
 
