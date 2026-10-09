@@ -8080,6 +8080,46 @@ def test_empty_query_value_is_negative_only_when_the_schema_forbids_it(
 
 
 @pytest.mark.parametrize(
+    "parameter",
+    [
+        {"in": "query", "name": "q", "required": True, "schema": {"type": "string", "nullable": True}},
+        {"in": "query", "name": "q", "required": True, "allowEmptyValue": True, "schema": {"type": "string"}},
+    ],
+    ids=["nullable", "allow-empty-value"],
+)
+def test_string_query_parameter_beside_another_branch_has_no_negatives_valid_as_text(ctx, parameter):
+    # Every text is a string or reads as null, so no value has an incorrect type.
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+
+    assert [
+        (case.meta.phase.data.scenario, case.query.get("q"))
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "q"
+    ] == [(CoverageScenario.MISSING_PARAMETER, None)]
+
+
+@pytest.mark.parametrize(
+    ("schema", "allow_empty_value", "expected"),
+    [
+        ({"type": "integer", "nullable": True}, False, ["AAA", "true"]),
+        ({"type": "boolean", "nullable": True}, False, ["AAA", "0.5"]),
+        ({"type": "boolean"}, True, ["-58800", ["null", "null"], "AAA", "null", "0.5"]),
+    ],
+    ids=["nullable-integer", "nullable-boolean", "allow-empty-value-boolean"],
+)
+def test_query_parameter_beside_another_branch_has_no_negatives_read_as_valid(ctx, schema, allow_empty_value, expected):
+    # Servers read `null` as null and `true` or `0` as booleans.
+    parameter = {"in": "query", "name": "q", "required": True, "allowEmptyValue": allow_empty_value, "schema": schema}
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+
+    assert [
+        case.query.get("q")
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "q" and case.meta.phase.data.scenario != CoverageScenario.MISSING_PARAMETER
+    ] == expected
+
+
+@pytest.mark.parametrize(
     ("parameter", "reports_failure"),
     [(STRING_QUERY_PARAMETER_DISALLOWING_EMPTY, False), (STRING_QUERY_PARAMETER_WITH_MIN_LENGTH, True)],
     ids=["without-min-length", "with-min-length"],

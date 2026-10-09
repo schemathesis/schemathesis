@@ -1612,7 +1612,7 @@ def test_positive_multiple_types(pctx):
                     {"type": "string"},
                 ],
             },
-            [4],
+            [],
         ),
         (
             {
@@ -1621,7 +1621,7 @@ def test_positive_multiple_types(pctx):
                     {"type": "string", "maxLength": 5},
                 ],
             },
-            [4],
+            [],
         ),
         (
             {
@@ -1761,7 +1761,7 @@ def test_ignoring_unknown_formats(pctx, schema, expected):
             {"/required", "/type", "/properties/id/type"},
         ),
         ({"type": "string", "format": "email"}, {"/format", "/type"}),
-        ({"anyOf": [{"type": "string"}, {"type": "number"}]}, {"/anyOf/1/type"}),
+        ({"anyOf": [{"type": "integer"}, {"type": "boolean"}]}, {"/anyOf/0/type"}),
         (
             {"type": "object", "additionalProperties": False},
             {"/additionalProperties", "/type"},

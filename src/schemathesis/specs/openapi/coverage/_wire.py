@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import to_wire_string
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 
@@ -137,6 +138,13 @@ class WireSemantics:
         if self.media_type is not None and is_xml_parts(self.media_type) and value is None:
             return ""
         return str(value)
+
+    def sent_texts(self, value: Any) -> list[str]:
+        """The texts a server reads for a parameter value that travels as text, one per repeated query item."""
+        if self.location == ParameterLocation.BODY or not self.serializes_to_string():
+            return []
+        items = value if self.location == ParameterLocation.QUERY and isinstance(value, list) else [value]
+        return [to_wire_string(item) for item in items if not isinstance(item, (dict, list))]
 
     def serializes_to_string(self) -> bool:
         if self.location in ("query", "path", "header", "cookie"):
