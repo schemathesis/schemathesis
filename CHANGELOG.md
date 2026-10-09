@@ -10,6 +10,7 @@
 - False `negative_data_rejection` for nullable string header and cookie parameters in the coverage phase.
 - False `negative_data_rejection` for unknown query parameters beside string values like `0` of parameters with `allowEmptyValue: true`.
 - False `negative_data_rejection` for `minimum`/`maximum` on string parameters in the coverage phase.
+- False `negative_data_rejection` for string header and cookie parameters with `items` in the coverage phase.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.
 - Exploded object query parameters overwriting a declared query parameter of the same name.
 - False `negative_data_rejection` for `0` sent to boolean header and cookie parameters in the coverage phase.
