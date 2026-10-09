@@ -4,6 +4,7 @@
 
 ### :wrench: Changed
 
+- Report operations answered mostly with `429` as rate-limited, not as a schema validation mismatch.
 - Suggest the JSON Pointer form for dotted link body expressions like `$response.body.0.id`.
 
 ### :bug: Fixed

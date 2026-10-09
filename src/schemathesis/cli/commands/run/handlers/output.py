@@ -1388,6 +1388,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 ],
             )
 
+        if ctx.warnings.rate_limited:
+            self._display_warning_block(
+                title="Rate limited",
+                operations=ctx.warnings.rate_limited,
+                suffix_text=" mostly returned 429 Too Many Requests, leaving the logic behind them untested",
+                tips=["💡 Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m"],
+            )
+
         if ctx.warnings.base_url_mismatch:
             self._display_warning_block(
                 title="Base URL may be missing a path",
@@ -1560,6 +1568,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "Missing authentication",
                 "operation",
                 "returned only 401/403 responses",
+            ),
+            (
+                len(ctx.warnings.rate_limited),
+                "Rate limited",
+                "operation",
+                "mostly returned 429 responses",
             ),
             (
                 len(ctx.warnings.base_url_mismatch),

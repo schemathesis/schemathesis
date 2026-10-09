@@ -19,6 +19,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `constants_extraction` | A registered `@schemathesis.python.constants` source could not be scanned | Return your app or importable modules from the source |
 | `unmatched_filter` | A filter expression matched no API operation | Fix the typo, or update the filter if the operation was renamed |
 | `unresolvable_reference` | A parameter, request body, or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
+| `rate_limited` | Most interactions returned 429 Too Many Requests | Slow requests down with `--rate-limit` |
 | `low_valid_rate` (opt-in) | An operation accepted only a small share of the requests sent to it | Supply real identifiers, or align the schema with the constraints the API enforces |
 
 ## Available Warnings
@@ -198,6 +199,20 @@ Unresolvable references: 1 operation skipped parts of the schema
 A **required request body** with the same problem keeps the operation testable in exactly one way: the coverage phase sends the request without a body, which the schema already declares invalid. No other case can be trusted for that operation — every request would be missing the body — so the other phases skip it and no valid data is ever claimed to have been sent.
 
 Any other **required** parameter with the same problem is a hard schema error instead — a path, query, header, or cookie parameter has no meaningful absent state, so the operation cannot be tested at all and is reported under "Schema Errors".
+
+### `rate_limited`
+
+```
+Rate limited: 1 operation mostly returned 429 Too Many Requests, leaving the logic behind them untested
+
+  - POST /items
+
+💡 Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m
+```
+
+**Trigger**: At least 90% of requests to an operation returned HTTP 429.
+
+The rate limiter answered instead of the API, so the run passes without reaching the operation's logic. These responses are not counted as data rejections, so [`validation_mismatch`](#validation_mismatch) stays silent for them. Set [`rate-limit`](configuration.md#rate-limit) to the rate the API allows, or raise the server's limit for the test client.
 
 ### `low_valid_rate`
 

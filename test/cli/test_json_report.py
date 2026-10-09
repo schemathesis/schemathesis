@@ -73,6 +73,7 @@ def test_report_shape(ctx, cli, json_path):
             "unmatched_filter": [],
             "unresolvable_reference": [],
             "low_valid_rate": [],
+            "rate_limited": [],
         },
         "valid_rates": {
             "GET /api/success": {"fuzzing": {"accepted": 1, "unreachable": 0, "conflicts": 0, "rejected": 0}}
