@@ -746,6 +746,30 @@ def test_spring_parser_ignores_non_string_field_names(make_operation, case_facto
             [(("a",), ParameterLocation.BODY), (("b",), ParameterLocation.BODY)],
             id="multiple-matches-in-one-string",
         ),
+        pytest.param(
+            {
+                "message": 'JSON parse error: Unrecognized field "commitDate" (class com.x.Assignment), '
+                "not marked as ignorable"
+            },
+            [(("commitDate",), ParameterLocation.BODY)],
+            id="spring-boot-jackson-message",
+        ),
+        pytest.param(
+            {
+                "message": 'Unrecognized field "commitDate" (class com.x.Assignment), not marked as ignorable '
+                '(2 known properties: "spender", "value"])'
+            },
+            [(("commitDate",), ParameterLocation.BODY)],
+            id="raw-jackson-message",
+        ),
+        pytest.param(
+            {
+                "detail": 'JSON parse error: Unrecognized field "commitDate" (class com.x.Assignment), '
+                "not marked as ignorable"
+            },
+            [(("commitDate",), ParameterLocation.BODY)],
+            id="problem-detail-jackson-message",
+        ),
     ],
 )
 def test_spring_parser_extracts_unrecognized_field(body, expected, make_operation, case_factory):
