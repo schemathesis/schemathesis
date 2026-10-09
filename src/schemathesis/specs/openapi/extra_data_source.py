@@ -345,6 +345,23 @@ class OpenApiExtraDataSource(ExtraDataSource):
         except TypeError:  # unhashable value
             return False
 
+    def _context_value(self, instance: ResourceInstance, name: str, requirement: ParameterRequirement) -> Any:
+        # Producer and consumer may name the parent differently (`id` vs `project_id`); unbound keys match by name.
+        for key, value in instance.context.items():
+            bound = self.requirements.get((instance.source_operation, ParameterLocation.PATH, key))
+            if bound == requirement or (bound is None and key == name):
+                return value
+        return None
+
+    def _matches_context(
+        self, instance: ResourceInstance, constraints: list[tuple[str, ParameterRequirement, Any]]
+    ) -> bool:
+        """Whether `instance` was recorded under the already chosen parents; unrecorded parents match anything."""
+        return all(
+            self._context_value(instance, name, requirement) in (None, value)
+            for name, requirement, value in constraints
+        )
+
     def get_captured_variants(
         self,
         *,
@@ -429,7 +446,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     if req.resource_name == resource_name:
                         value = instance.data.get(req.resource_field)
                     else:
-                        value = instance.context.get(slot.lookup_key)
+                        value = self._context_value(instance, slot.lookup_key, req)
                     if value is not None and not self._is_tombstoned(req.resource_name, value):
                         filled[slot.lookup_key] = value
                         draws.append(
@@ -453,6 +470,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         # No instance covered every slot; chain picks across resources, each constrained
         # by the context of slots already chosen.
         chosen: dict[str, Any] = {}
+        constraints: list[tuple[str, ParameterRequirement, Any]] = []
         chained_draws: list[PoolDraw] = []
         for slot in slots:
             req = slot.requirement
@@ -463,12 +481,13 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     continue
                 if self._is_tombstoned(req.resource_name, value):
                     continue
-                if any(instance.context.get(k) not in (None, v) for k, v in chosen.items()):
+                if not self._matches_context(instance, constraints):
                     continue
                 best = (value, instance)
                 break
             if best is not None:
                 chosen[slot.lookup_key] = best[0]
+                constraints.append((slot.lookup_key, req, best[0]))
                 chained_draws.append(
                     _build_pool_draw_from_requirement(
                         location=location,
@@ -517,7 +536,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         operation: APIOperation,
         location: ParameterLocation,
         name: str,
-        context_constraints: dict[str, Any] | None = None,
+        context_constraints: list[tuple[str, ParameterRequirement, Any]] | None = None,
     ) -> tuple[Any, ResourceInstance] | None:
         """Return one weighted-selected pool value plus the `ResourceInstance` whose draw won.
 
@@ -536,9 +555,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             if self._is_tombstoned(requirement.resource_name, value):
                 continue
             all_candidates.append((instance, value))
-            if context_constraints and any(
-                instance.context.get(k) not in (None, v) for k, v in context_constraints.items()
-            ):
+            if context_constraints and not self._matches_context(instance, context_constraints):
                 continue
             constrained.append((instance, value))
         candidates = constrained or all_candidates
@@ -586,7 +603,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     if slot.resource.name == resource_name:
                         value = instance.data.get(resource_field)
                     else:
-                        value = instance.context.get(param_name)
+                        value = self._context_value(
+                            instance, param_name, ParameterRequirement(slot.resource.name, resource_field)
+                        )
                     if value is None:
                         break
                     # Same-resource slots and context-only slots both attribute to `instance`:
@@ -612,7 +631,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         values_result: dict[tuple[ParameterLocation, str], Any] = {}
         draws_result: list[PoolDraw] = []
         misses_result: list[tuple[str, str]] = []
-        context_constraints: dict[str, Any] = {}
+        context_constraints: list[tuple[str, ParameterRequirement, Any]] = []
         for slot in slots:
             param_name = slot.parameter_name
             assert isinstance(param_name, str)
@@ -626,7 +645,10 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 value, source_instance = picked
                 values_result[(slot.parameter_location, param_name)] = value
                 draws_result.append(_build_pool_draw(slot, source_instance))
-                context_constraints[param_name] = value
+                assert slot.resource_field is not None
+                context_constraints.append(
+                    (param_name, ParameterRequirement(slot.resource.name, slot.resource_field), value)
+                )
             else:
                 misses_result.append((slot.parameter_location.value, param_name))
         return PoolPick(values=values_result, draws=tuple(draws_result), misses=tuple(misses_result))
