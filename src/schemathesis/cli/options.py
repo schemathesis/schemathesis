@@ -26,7 +26,6 @@ from schemathesis.cli.validation import (
 )
 from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.metrics import METRICS
 
@@ -252,7 +251,7 @@ REQUEST_TIMEOUT = OptionSpec(
     "--request-timeout",
     help="Timeout limit, in seconds, for each network request during tests",
     type=click.FloatRange(min=0.0, min_open=True),
-    default=DEFAULT_RESPONSE_TIMEOUT,
+    default=None,
 )
 
 REQUEST_RETRIES = OptionSpec(
