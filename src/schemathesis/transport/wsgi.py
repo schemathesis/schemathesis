@@ -9,7 +9,6 @@ from urllib.parse import urlsplit, urlunsplit
 from typing_extensions import override
 
 from schemathesis.core import Body, NotSet, media_types
-from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -25,7 +24,12 @@ from schemathesis.transport.prepare import (
     prepare_headers,
     prepare_path,
 )
-from schemathesis.transport.requests import REQUESTS_TRANSPORT, _merge_query_components, prepare_multipart_parts
+from schemathesis.transport.requests import (
+    REQUESTS_TRANSPORT,
+    _merge_query_components,
+    prepare_multipart_parts,
+    prepare_query,
+)
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
@@ -66,25 +70,12 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         if media_type and not isinstance(case.body, NotSet) and not _is_raw_multipart(media_type, extra.get("data")):
             final_headers.setdefault("Content-Type", media_type)
 
-        query_string: dict[str, Any] | str | None = case.query
-        if isinstance(query_string, dict):
-            query_string = dict(query_string)
-            raw_query = None
-            marker_value = query_string.get(RAW_QUERY_STRING_KEY)
-            if isinstance(marker_value, RawQueryString):
-                raw_query = str(query_string.pop(RAW_QUERY_STRING_KEY))
-            delimited_raw, query_string = split_delimited_query(query_string)
-            if delimited_raw:
-                raw_query = delimited_raw if raw_query is None else _merge_query_components(raw_query, delimited_raw)
-            if raw_query is not None:
-                query_string = _merge_query_components(raw_query, query_string)
-
         data = {
             "method": case.method,
             "path": case.operation.schema.get_full_path(prepare_path(case.path, case.path_parameters)),
             # Convert to regular dict for Werkzeug compatibility
             "headers": dict(final_headers),
-            "query_string": query_string,
+            "query_string": prepare_query(case),
             **extra,
         }
 

@@ -87,6 +87,26 @@ def _merge_query_components(left: Any, right: Any) -> str:
     return f"{left_chunk}&{right_chunk}"
 
 
+def prepare_query(case: Case) -> dict[str, Any] | str | None:
+    """Build the query for the wire: raw and delimited parts become a pre-encoded string."""
+    params: dict[str, Any] | str | None = case.query
+    raw_query = None
+    if isinstance(params, Mapping):
+        params = dict(params)
+        marker_value = params.get(RAW_QUERY_STRING_KEY)
+        if isinstance(marker_value, RawQueryString):
+            raw_query = str(params.pop(RAW_QUERY_STRING_KEY))
+        delimited_raw, params = split_delimited_query(params)
+        if delimited_raw:
+            raw_query = delimited_raw if raw_query is None else _merge_query_components(raw_query, delimited_raw)
+    if raw_query is not None:
+        return _merge_query_components(raw_query, params)
+    if isinstance(params, dict):
+        # Empty objects are sent as empty strings, so the parameters are still present in the query string
+        params = {key: "" if value == {} else value for key, value in params.items()}
+    return params
+
+
 class RequestsTransport(BaseTransport["requests.Session"]):
     @override
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
@@ -133,25 +153,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             for key, value in additional_headers.items():
                 final_headers.setdefault(key, value)
 
-        params: dict[str, Any] | str | None = case.query
-        raw_query = None
-        if isinstance(params, Mapping):
-            params = dict(params)
-            marker_value = params.get(RAW_QUERY_STRING_KEY)
-            if isinstance(marker_value, RawQueryString):
-                raw_query = str(params.pop(RAW_QUERY_STRING_KEY))
-            delimited_raw, params = split_delimited_query(params)
-            if delimited_raw:
-                raw_query = delimited_raw if raw_query is None else _merge_query_components(raw_query, delimited_raw)
-        if raw_query is not None:
-            params = _merge_query_components(raw_query, params)
-
-        # Replace empty dictionaries with empty strings, so the parameters actually present in the query string
-        if isinstance(params, Mapping) and any(value == {} for value in (params or {}).values()):
-            params = dict(params)
-            for key, value in params.items():
-                if value == {}:
-                    params[key] = ""
+        params = prepare_query(case)
 
         data = {
             "method": case.method,
