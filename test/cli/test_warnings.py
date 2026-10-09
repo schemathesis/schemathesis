@@ -892,6 +892,47 @@ def test_missing_test_data_ignores_negative_not_found(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--phases=coverage", "-c not_a_server_error") == snapshot_cli
 
 
+# The auth-rejected operation keeps its own warning; only the throttled one is reported as rate-limited.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_rate_limited_operation_warning(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string", "maxLength": 5}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "400": {"description": "Invalid"},
+                        "429": {"description": "Too Many Requests"},
+                    },
+                }
+            },
+            "/profile": {"get": {"responses": {"200": {"description": "OK"}, "401": {"description": "No auth"}}}},
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"detail": "Too Many Requests"}), 429
+
+    @app.route("/profile", methods=["GET"])
+    def profile():
+        return jsonify({"detail": "Unauthorized"}), 401
+
+    assert cli.run_openapi_app(app, "--max-examples=10", "-c not_a_server_error") == snapshot_cli
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_method_not_allowed_warning_hidden_when_not_displayed(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.unimplemented_method()

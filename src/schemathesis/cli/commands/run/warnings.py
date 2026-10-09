@@ -41,10 +41,13 @@ class StatusCodeStatistic:
         return self.counts.get(status_code, 0) / self.total
 
     def _get_4xx_breakdown(self) -> tuple[int, int, int]:
-        """Get breakdown of 4xx responses: (404_count, other_4xx_count, total_4xx_count)."""
+        """Get breakdown of 4xx responses: (404_count, other_4xx_count, total_4xx_count).
+
+        Auth and rate-limit responses say nothing about the data sent, so they are left out.
+        """
         count_404 = self.counts.get(404, 0)
         count_other_4xx = sum(
-            count for code, count in self.counts.items() if 400 <= code < 500 and code not in {401, 403, 404}
+            count for code, count in self.counts.items() if 400 <= code < 500 and code not in {401, 403, 404, 429}
         )
         total_4xx = count_404 + count_other_4xx
         return count_404, count_other_4xx, total_4xx
@@ -88,6 +91,7 @@ class StatusCodeStatistic:
 
 
 AUTH_ERRORS_THRESHOLD = 0.9
+RATE_LIMITED_THRESHOLD = 0.9
 OTHER_CLIENT_ERRORS_THRESHOLD = 0.1
 # Fewer calls than this and the share accepted is noise rather than a rate.
 MIN_CALLS_FOR_VALID_RATE = 10
@@ -381,6 +385,15 @@ class WarningCollector:
                 # Check if this warning should cause test failure
                 if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
                     ctx.exit_code = ExitCode.FAILURES
+
+        if statistic.ratio_for(429) >= RATE_LIMITED_THRESHOLD and warnings.should_display(
+            SchemathesisWarning.RATE_LIMITED
+        ):
+            self._handle_warning(
+                ctx,
+                SchemathesisWarning.RATE_LIMITED,
+                lambda: self.data.rate_limited.add(event.recorder.label),
+            )
 
         # A wrong base URL 404s everything, and those 404s trip other checks - so this must not be
         # gated on the scenario passing, unlike the generic 404 warning below.

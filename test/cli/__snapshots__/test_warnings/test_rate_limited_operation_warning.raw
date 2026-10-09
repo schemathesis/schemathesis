@@ -1,0 +1,68 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ ✅  Coverage (in 0.00s)
+
+     ✅ 2 passed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 2 passed
+
+=================================== WARNINGS ===================================
+
+Authentication failed: 1 operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  - GET /profile
+
+💡 Ensure valid authentication credentials are set via --auth or -H
+
+Rate limited: 1 operation mostly returned 429 Too Many Requests, leaving the logic behind them untested
+
+  - POST /items
+
+💡 Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Warnings:
+  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+  ⚠️ Rate limited: 1 operation mostly returned 429 responses
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================= 2 warnings in 1.00s ==============================

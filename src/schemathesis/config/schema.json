@@ -1087,7 +1087,8 @@
         "constants_extraction",
         "unmatched_filter",
         "unresolvable_reference",
-        "low_valid_rate"
+        "low_valid_rate",
+        "rate_limited"
       ]
     },
     "WarningNameList": {

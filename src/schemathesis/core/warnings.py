@@ -16,6 +16,7 @@ class SchemathesisWarning(str, enum.Enum):
     UNMATCHED_FILTER = "unmatched_filter"
     UNRESOLVABLE_REFERENCE = "unresolvable_reference"
     LOW_VALID_RATE = "low_valid_rate"
+    RATE_LIMITED = "rate_limited"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -32,4 +33,5 @@ class SchemathesisWarning(str, enum.Enum):
             "unmatched_filter": cls.UNMATCHED_FILTER,
             "unresolvable_reference": cls.UNRESOLVABLE_REFERENCE,
             "low_valid_rate": cls.LOW_VALID_RATE,
+            "rate_limited": cls.RATE_LIMITED,
         }[value.lower()]
