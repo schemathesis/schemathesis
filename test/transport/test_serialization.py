@@ -1604,6 +1604,19 @@ def test_string_query_reaches_the_server_over_requests_and_wsgi(ctx):
     ]
 
 
+def test_empty_object_query_value_sent_as_empty_string_over_requests_and_wsgi(ctx):
+    api = ctx.openapi.apps.success()
+    for schema in (
+        schemathesis.openapi.from_url(api.schema_url),
+        schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app),
+    ):
+        schema["/api/success"]["GET"].Case(query={"q": {}, "x": "1"}).call()
+    assert [request.query for request in api.requests if request.path == "/api/success"] == [
+        {"q": "", "x": "1"},
+        {"q": "", "x": "1"},
+    ]
+
+
 @pytest.mark.filterwarnings("error")
 def test_multipart_examples_serialization(ctx, cli, app_runner, snapshot_cli):
     paths = {
