@@ -127,7 +127,6 @@ def _replay_directory(
     """Replay one project's crash directory; returns (has_failing_or_changed, has_error, interrupted)."""
     from schemathesis.cli.commands.replay.executor import (
         ReplayStatus,
-        has_unrestorable_masked_values,
         replay_crash_file,
     )
     from schemathesis.cli.commands.replay.output import render_replay
@@ -194,12 +193,7 @@ def _replay_directory(
     removal_count = 0
     files_to_remove: set[str] = set()
     if not keep and not interrupted:
-        replacement = schema.config.output.sanitization.replacement
         for unit, outcome in zip(units, outcomes, strict=True):
-            # Sanitization stripped values the replay cannot restore, so a `fixed` verdict here says
-            # nothing about the API. Report it, keep the file - same rule as incompatible files.
-            if has_unrestorable_masked_values(unit.crash, replacement):
-                continue
             fixed = {check.name for check in outcome.check_outcomes if check.status is ReplayStatus.FIXED}
             for path, check_name in unit.sources:
                 if check_name in fixed:

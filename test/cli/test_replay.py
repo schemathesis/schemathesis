@@ -2347,7 +2347,8 @@ def test_replay_removes_fixed_crash_once_masked_credentials_are_supplied(cli, ap
     assert not crash_file.exists()
 
 
-def test_replay_keeps_fixed_crash_with_masked_body(cli, app_runner, ctx, crash_factory, tmp_path):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_masked_body_is_errored(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # The masked body value is sent as-is, so a passing replay proves nothing about the recorded request.
     app, _ = ctx.openapi.make_flask_app({"/users": {"post": {"responses": {"201": {"description": "Created"}}}}})
 
@@ -2369,9 +2370,7 @@ def test_replay_keeps_fixed_crash_with_masked_body(cli, app_runner, ctx, crash_f
         media_type="application/json",
     )
 
-    result = cli.main("replay", str(crash_file))
-
-    assert result.exit_code == 0, result.output
+    assert cli.main("replay", str(crash_file)) == snapshot_cli
     assert crash_file.exists()
 
 
@@ -2383,8 +2382,9 @@ def test_replay_keeps_fixed_crash_with_masked_body(cli, app_runner, ctx, crash_f
     ],
     ids=["masked-path-parameter", "partially-masked-header"],
 )
-def test_replay_keeps_fixed_crash_with_unrestorable_masked_value(
-    cli, app_runner, ctx, crash_factory, tmp_path, url_path, step_fields
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_unrestorable_masked_value_is_errored(
+    cli, app_runner, ctx, crash_factory, tmp_path, url_path, step_fields, snapshot_cli
 ):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -2415,10 +2415,7 @@ def test_replay_keeps_fixed_crash_with_unrestorable_masked_value(
         **fields,
     )
 
-    result = cli.main("replay", str(crash_file))
-
-    assert result.exit_code == 0, result.output
-    assert "FIXED" in result.output
+    assert cli.main("replay", str(crash_file)) == snapshot_cli
     assert crash_file.exists()
 
 

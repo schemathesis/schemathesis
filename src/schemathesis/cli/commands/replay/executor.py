@@ -162,19 +162,26 @@ def _replay_with_retries(
             _final_check_outcome(check, failure_counts[check.name], attempts) for check in reported.check_outcomes
         ]
     rejected = rejected_attempt.rejected if rejected_attempt is not None else None
-    return _unverified_without_credentials(
-        replace(reported, status=_case_status(check_outcomes), check_outcomes=check_outcomes, rejected=rejected)
+    return _unverified_without_recorded_values(
+        replace(reported, status=_case_status(check_outcomes), check_outcomes=check_outcomes, rejected=rejected),
+        unrestorable=has_unrestorable_masked_values(crash, schema.config.output.sanitization.replacement),
     )
 
 
-def _unverified_without_credentials(outcome: ReplayOutcome) -> ReplayOutcome:
-    """A pass without the credentials the recorded request carried proves nothing, so it never counts as fixed."""
+def _unverified_without_recorded_values(outcome: ReplayOutcome, *, unrestorable: bool) -> ReplayOutcome:
+    """A pass without the values the recorded request carried proves nothing, so it never counts as fixed."""
     if outcome.unsupplied_masked:
         message = _missing_credentials_message(outcome.unsupplied_masked)
         note = f"{_masked_names(outcome.unsupplied_masked)} masked in the crash file"
     elif outcome.rejected is not None:
         message = _rejected_credentials_message(outcome.rejected, steps=len(outcome.step_outcomes))
         note = f"replay was not authenticated ({outcome.rejected.status_code})"
+    elif unrestorable:
+        message = (
+            "the crash file has masked values that replay cannot restore; "
+            "record it with `output.sanitization.enabled = false` to replay it"
+        )
+        note = "masked values in the crash file"
     else:
         return outcome
     if outcome.status is ReplayStatus.FIXED:
