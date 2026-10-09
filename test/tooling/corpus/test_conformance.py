@@ -191,3 +191,101 @@ def test_content_type_probe_header_is_not_judged(ctx, case_factory, scenario, co
     case = case_factory(operation=operation, method="POST", headers={"Content-Type": content_type}, body={}, _meta=meta)
 
     assert check_conformance(case) is None
+
+
+# Query values reach the server as text, so the string `"5"` reads as the integer a valid case would send.
+@pytest.mark.parametrize(("value", "is_violation"), [("5", True), ("abc", False)])
+def test_negative_container_is_judged_after_serialization(ctx, case_factory, value, is_violation):
+    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    meta = _meta(ParameterLocation.QUERY, mode=GenerationMode.NEGATIVE)
+    meta.raw_containers[ParameterLocation.QUERY] = {"limit": value}
+    case = case_factory(operation=operation, query={"limit": value}, _meta=meta)
+
+    violation = check_conformance(case)
+    assert (violation is not None) is is_violation
+    if violation is not None:
+        assert violation.value == {"limit": 5}
+        assert not violation.expected_valid
+        assert violation.after_serialization
+
+
+def test_positive_container_survives_serialization(ctx, case_factory):
+    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    meta = _meta(ParameterLocation.QUERY)
+    meta.raw_containers[ParameterLocation.QUERY] = {"limit": 5}
+    case = case_factory(operation=operation, query={"limit": 5}, _meta=meta)
+
+    assert check_conformance(case) is None
+
+
+ARRAY_QUERY_OPERATION = {
+    "/data": {
+        "get": {
+            "parameters": [
+                {
+                    "name": "ids",
+                    "in": "query",
+                    "required": True,
+                    "explode": False,
+                    "schema": {"type": "array", "items": {"type": "integer"}},
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+}
+
+
+# A non-exploded array is sent comma-joined, a spelling the scalar reader does not undo.
+def test_serialized_array_is_not_read_as_text(ctx, case_factory):
+    operation = ctx.openapi.load_schema(ARRAY_QUERY_OPERATION)["/data"]["GET"]
+    meta = _meta(ParameterLocation.QUERY)
+    meta.raw_containers[ParameterLocation.QUERY] = {"ids": [1, 2]}
+    case = case_factory(operation=operation, query={"ids": "1,2"}, _meta=meta)
+
+    assert check_conformance(case) is None
+
+
+def _operation(ctx, parameter):
+    path = "/data/{x}" if parameter["in"] == "path" else "/data"
+    paths = {path: {"get": {"parameters": [{"name": "x", **parameter}], "responses": {"200": {"description": "OK"}}}}}
+    return ctx.openapi.load_schema(paths)[path]["GET"]
+
+
+@pytest.mark.parametrize(
+    ("parameter", "mode", "generated", "sent"),
+    [
+        (
+            {"in": "path", "required": True, "schema": {"type": "string", "enum": ["a%20b"]}},
+            GenerationMode.POSITIVE,
+            "a%20b",
+            "a%20b",
+        ),
+        (
+            {
+                "in": "path",
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "string", "maxLength": 3}}},
+            },
+            GenerationMode.POSITIVE,
+            "abc",
+            "%22abc%22",
+        ),
+        (
+            {"in": "query", "schema": {"type": "number", "maximum": 9223372036854776000}},
+            GenerationMode.NEGATIVE,
+            9223372036854776001,
+            9223372036854776001,
+        ),
+    ],
+    ids=["declared-encoded-path-value", "json-encoded-parameter", "integer-beyond-float-precision"],
+)
+def test_wire_reading_keeps_validity(ctx, case_factory, parameter, mode, generated, sent):
+    operation = _operation(ctx, parameter)
+    location = ParameterLocation(parameter["in"])
+    meta = _meta(location, mode=mode)
+    meta.raw_containers[location] = {"x": generated}
+    container = {"path_parameters" if location == ParameterLocation.PATH else "query": {"x": sent}}
+    case = case_factory(operation=operation, _meta=meta, **container)
+
+    assert check_conformance(case) is None
