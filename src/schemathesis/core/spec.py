@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from schemathesis.core import Body, Specification
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.errors import InvalidSchema
-    from schemathesis.core.jsonschema.types import JsonSchemaObject
+    from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.statistic import ApiStatistic, StatefulInference
@@ -230,10 +230,44 @@ class ProbeAdapter(Protocol):
     def adapt_to_path_decoder_rejection(self) -> None: ...  # pragma: no cover
 
 
+class AuthFlowSteps(Protocol):
+    """Operations a sign-up and login flow calls, and where the login response carries the token."""
+
+    @property
+    def register_operation(self) -> str: ...  # pragma: no cover
+
+    @property
+    def login_operation(self) -> str: ...  # pragma: no cover
+
+    @property
+    def login_media_type(self) -> str: ...  # pragma: no cover
+
+    @property
+    def credentials(self) -> tuple[str, ...]: ...  # pragma: no cover
+
+    @property
+    def token_pointer(self) -> str: ...  # pragma: no cover
+
+
+class AuthFlow(Protocol):
+    """A sign-up and login flow the engine runs to authenticate the requests that follow."""
+
+    @property
+    def spec(self) -> AuthFlowSteps: ...  # pragma: no cover
+
+    def is_supplied(self) -> bool: ...  # pragma: no cover
+
+    def sign_up_body(self, operation: APIOperation) -> tuple[dict[str, JsonValue], str] | None: ...  # pragma: no cover
+
+    def authenticate(self, credentials: dict[str, JsonValue], token: str) -> None: ...  # pragma: no cover
+
+
 class AuthBackend(Protocol):
     """Spec-aware authentication for generated cases."""
 
     def apply_auth(self, case: Case, context: AuthContext) -> bool: ...  # pragma: no cover
+
+    def auth_flow(self) -> AuthFlow | None: ...  # pragma: no cover
 
     @property
     def reauth_retry_statuses(self) -> frozenset[int]: ...  # pragma: no cover
