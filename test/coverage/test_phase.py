@@ -8107,6 +8107,39 @@ def test_allow_empty_value_is_not_negative(ctx, parameter):
     assert all(case.query.get("value") != "" for case in collect_cases(operation, GenerationMode.NEGATIVE))
 
 
+@pytest.mark.parametrize(
+    ("parameter", "version", "path", "expected"),
+    [
+        (
+            {"in": "query", "type": "string", "minimum": 1, "maximum": 15},
+            "2.0",
+            "/foo",
+            [(CoverageScenario.MISSING_PARAMETER, None)],
+        ),
+        ({"in": "path", "schema": {"type": "string", "minimum": 1}}, "3.0.2", "/foo/{x}", []),
+        (
+            {"in": "header", "schema": {"type": "string", "exclusiveMinimum": 1, "maximum": 15}},
+            "3.1.0",
+            "/foo",
+            [(CoverageScenario.MISSING_PARAMETER, None)],
+        ),
+    ],
+    ids=["query-swagger", "path", "header-exclusive"],
+)
+def test_numeric_bounds_on_string_parameter_are_not_negated(ctx, parameter, version, path, expected):
+    # Numeric bounds never constrain a string, so the text "0" or "16" is a valid value.
+    operation = load_schema(
+        ctx, parameters=[{**parameter, "name": "x", "required": True}], version=version, path=path, method="get"
+    )[path]["GET"]
+    container = LOCATION_TO_CONTAINER[ParameterLocation(parameter["in"])]
+
+    assert [
+        (case.meta.phase.data.scenario, getattr(case, container).get("x"))
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "x"
+    ] == expected
+
+
 SECOND_REQUIRED_QUERY_PARAMETER = {"in": "query", "name": "kind", "required": True, "schema": {"type": "string"}}
 OPTIONAL_QUERY_PARAMETER = {"in": "query", "name": "extra", "schema": {"type": "string"}}
 # An exploded empty array leaves the wire request identical to one that omits the parameter.
