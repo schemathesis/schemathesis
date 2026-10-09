@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.30.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- Suggest the JSON Pointer form for dotted link body expressions like `$response.body.0.id`.
+
 ### :bug: Fixed
 
 #### False `negative_data_rejection` in the coverage phase

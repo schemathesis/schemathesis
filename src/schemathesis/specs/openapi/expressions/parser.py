@@ -64,6 +64,8 @@ def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> nodes.BodyRequest
                 return nodes.BodyRequest(token.value)
         except StopIteration:
             return nodes.BodyRequest()
+        if token.is_dot:
+            raise _dotted_body_error(tokens, expr, "$request")
     raise RuntimeExpressionError(f"Invalid expression: {expr}")
 
 
@@ -82,7 +84,21 @@ def _parse_response(tokens: lexer.TokenGenerator, expr: str) -> nodes.HeaderResp
                 return nodes.BodyResponse(token.value)
         except StopIteration:
             return nodes.BodyResponse()
+        if token.is_dot:
+            raise _dotted_body_error(tokens, expr, "$response")
     raise RuntimeExpressionError(f"Invalid expression: {expr}")
+
+
+def _dotted_body_error(tokens: lexer.TokenGenerator, expr: str, name: str) -> RuntimeExpressionError:
+    parts = []
+    for token in tokens:
+        if not (token.is_string or token.is_dot):
+            break
+        parts.append(token.value)
+    if not parts:
+        return RuntimeExpressionError(f"Invalid expression: {expr}")
+    pointer = "".join(parts).replace(".", "/")
+    return RuntimeExpressionError(f"Invalid expression `{expr}`. Did you mean `{name}.body#/{pointer}`?")
 
 
 def take_token(tokens: lexer.TokenGenerator, expr: str) -> lexer.Token:
