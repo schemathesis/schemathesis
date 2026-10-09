@@ -134,10 +134,16 @@ def before_call(ctx, case, **kwargs):
 
 
 def test_html_report_failure_outside_tested_operations(ctx, cli, app_runner, report_dir, snapshot_html):
-    app, _ = ctx.openapi.make_flask_app({"/api/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
 
     # Accepting a method the schema does not declare fails on that method, not on a tested operation.
     @app.route("/api/items", methods=["GET", "TRACE"])
+    @app.route("/api/users", methods=["GET", "TRACE"])
     def items():
         return jsonify({})
 
@@ -178,6 +184,92 @@ def test_html_report_some_operations_errored(ctx, cli, app_runner, report_dir, s
         return "{}"
 
     assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
+
+
+def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot_html):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/failure": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/success": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/broken": INVALID_BODY,
+        }
+    )
+
+    @app.route("/api/failure")
+    def failure():
+        return "", 500
+
+    @app.route("/api/success")
+    def success():
+        return "{}"
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
+    assert html == snapshot_html
+
+
+def test_html_report_continue_on_failure(ctx, cli, report_dir, snapshot_html):
+    # Failed operations keep running past their first failure, so their case counts need no explanation.
+    api = ctx.openapi.apps.failure()
+    html = run_with_report(cli, report_dir, api.schema_url, "--continue-on-failure", exit_code=ExitCode.FAILURES)
+    assert html == snapshot_html
+
+
+def test_html_report_skipped_operations(ctx, cli, app_runner, report_dir, snapshot_html):
+    parameter = {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/with-example": {
+                "get": {"parameters": [{**parameter, "example": "pets"}], "responses": {"200": {"description": "OK"}}}
+            },
+            "/api/without-example": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/api/with-example")
+    def with_example():
+        return "{}"
+
+    assert run_with_report(cli, report_dir, app_runner.openapi_url(app), phases="examples") == snapshot_html
+
+
+def test_html_report_fuzz_failures(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success_and_failure()
+    result = cli.main(
+        "fuzz",
+        api.schema_url,
+        "--max-failures=1",
+        "--max-time=5",
+        "--seed=42",
+        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
+    )
+    assert result.exit_code == ExitCode.FAILURES, result.stdout
+    html = (report_dir / "index.html").read_text(encoding="utf-8")
+    # Fuzzing runs operations concurrently, so only the failed row is stable.
+    assert (
+        '<tr class="op-row row-failed"><td class="op-cell"><span class="op"><span class="method get">GET</span>' in html
+    )
+    assert "/api<wbr>/failure" in html
+
+
+def test_html_report_large_api(ctx, cli, app_runner, report_dir, snapshot_html):
+    paths = {f"/api/items/{index}": {"get": {"responses": {"200": {"description": "OK"}}}} for index in range(26)}
+    paths["/api/failure"] = {"get": {"responses": {"200": {"description": "OK"}}}}
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/api/items/<index>")
+    def item(index):
+        return "{}"
+
+    @app.route("/api/failure")
+    def failure():
+        return "", 500
+
+    assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
+
+
+def test_html_report_graphql(ctx, cli, report_dir, snapshot_html):
+    api = ctx.graphql.apps.books()
+    assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
 
 
 @pytest.mark.parametrize(

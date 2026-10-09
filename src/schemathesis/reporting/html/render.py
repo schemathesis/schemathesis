@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 from schemathesis.core.output import escape_surrogates
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
-from schemathesis.reporting.html.model import Verdict
+from schemathesis.reporting.html.model import OperationStatus, Verdict
 
 if TYPE_CHECKING:
-    from schemathesis.reporting.html.model import ReportData
+    from schemathesis.reporting.html.model import OperationRow, ReportData
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
 
@@ -81,7 +81,9 @@ def report_top(*, generated_at: str) -> str:
 
 
 def render_index(data: ReportData) -> str:
-    body = "\n".join([report_top(generated_at=data.meta.generated_at), _hero(data), _target_block(data)])
+    body = "\n".join(
+        [report_top(generated_at=data.meta.generated_at), _hero(data), _target_block(data), _operations_table(data)]
+    )
     return page(title="Schemathesis Report", body=body)
 
 
@@ -266,3 +268,103 @@ def _target_block(data: ReportData) -> str:
     if meta.seed is not None:
         rows.append(_row("Seed", f"<code>{meta.seed}</code>", _copy_button(str(meta.seed), "seed")))
     return f'<section class="target-block">{"".join(rows)}</section>'
+
+
+# Above this many rows a failing run collapses its Passed group so failures stay in view.
+_COLLAPSE_PASSED_ABOVE = 25
+
+
+def _path(path: str) -> str:
+    # Long paths wrap before a `/`, not inside a segment; `<wbr>` adds nothing to copied text.
+    head, *segments = esc(path).split("/")
+    return "<wbr>/".join([head + "/" + segments[0], *segments[1:]]) if segments else head
+
+
+def _operation_cell(row: OperationRow) -> str:
+    method = f'<span class="method {esc(row.method.lower())}">{esc(row.method)}</span>' if row.method else ""
+    return f'<td class="op-cell"><span class="op">{method}<span class="path">{_path(row.path)}</span></span></td>'
+
+
+def _failures_cell(row: OperationRow) -> str:
+    if not row.failures:
+        note = f'<span class="op-note">{esc(row.note)}</span>' if row.note else ""
+        return f'<td class="failures-cell">{note}</td>'
+    first, *rest = row.failures
+    title = f'<span class="failure-title">{esc(first)}</span>'
+    if not rest:
+        return f'<td class="failures-cell">{title}</td>'
+    items = "".join(f"<li>{esc(name)}</li>" for name in rest)
+    return (
+        '<td class="failures-cell"><details class="fails"><summary>'
+        f'{title}<span class="more"><span class="m-closed">+{len(rest)} more</span><span class="m-open">less</span></span>'
+        f'</summary><ul class="more-list">{items}</ul></details></td>'
+    )
+
+
+def _cases_cell(row: OperationRow) -> str:
+    # Zero would read as "ran and found nothing".
+    if not row.cases:
+        return '<td class="numeric na"><span class="none" aria-label="no cases run">-</span></td>'
+    return f'<td class="numeric">{row.cases:,}</td>'
+
+
+def _operation_order(row: OperationRow) -> tuple[int, str, str]:
+    return (-len(row.failures), row.path, row.method)
+
+
+def _group_header(status: OperationStatus, rows: list[OperationRow], *, collapsible: bool) -> str:
+    title = f'<span class="group-title">{esc(status.value)}</span><span class="group-count">{len(rows)}</span>'
+    css = status.css
+    if collapsible:
+        title = (
+            f'<label class="group-toggle"><input type="checkbox" aria-label="Show {len(rows)} passed operations">'
+            f'<span class="chev" aria-hidden="true"></span>{title}<span class="tg-hint" aria-hidden="true"></span></label>'
+        )
+    # Failed operations usually stop at their first failure, which explains their small case counts.
+    if status is OperationStatus.FAILED and all(row.stops_at_first_failure for row in rows):
+        return (
+            f'<tr class="group-row group-{css}"><th colspan="1" scope="rowgroup" id="group-{css}">{title}</th>'
+            '<td colspan="2" class="group-note">until first failure</td></tr>'
+        )
+    return f'<tr class="group-row group-{css}"><th colspan="3" scope="rowgroup" id="group-{css}">{title}</th></tr>'
+
+
+def _operations_table(data: ReportData) -> str:
+    if not data.operations:
+        return ""
+    has_failures = any(row.status is OperationStatus.FAILED for row in data.operations)
+    collapse_passed = has_failures and len(data.operations) > _COLLAPSE_PASSED_ABOVE
+    groups = []
+    for status in OperationStatus:
+        rows = sorted((row for row in data.operations if row.status is status), key=_operation_order)
+        if not rows:
+            continue
+        header = _group_header(status, rows, collapsible=collapse_passed and status is OperationStatus.PASSED)
+        body = "".join(
+            f'<tr class="op-row row-{status.css}">{_operation_cell(row)}{_failures_cell(row)}{_cases_cell(row)}</tr>'
+            for row in rows
+        )
+        groups.append(f'<tbody class="ops-group">{header}{body}</tbody>')
+    footer_rows = []
+    if data.unattributed_failures:
+        items = "".join(
+            f"<li>{esc(title)}" + (f'<span class="fx">x{count}</span>' if count > 1 else "") + "</li>"
+            for title, count in data.unattributed_failures
+        )
+        footer_rows.append(
+            '<tr class="run-level-row"><td colspan="3">'
+            f'<span class="foot-label">Not tied to an operation</span><ul>{items}</ul></td></tr>'
+        )
+    if data.not_run_operations:
+        reason = data.stop_reason.skip_explanation or StopReason.INTERRUPTED.skip_explanation
+        footer_rows.append(
+            '<tr class="not-run-row"><td colspan="3">'
+            f"{esc(plural(data.not_run_operations, 'operation'))} not run: {esc(reason)}</td></tr>"
+        )
+    footer = f"<tfoot>{''.join(footer_rows)}</tfoot>" if footer_rows else ""
+    return (
+        '<section class="ops"><table class="ops-table" aria-label="Operations">'
+        '<thead><tr><th scope="col">Operation</th><th scope="col">Failures</th>'
+        '<th scope="col" class="numeric">Cases</th></tr></thead>'
+        f"{''.join(groups)}{footer}</table></section>"
+    )

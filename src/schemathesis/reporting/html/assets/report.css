@@ -112,3 +112,112 @@ a:hover{color:#fff}
   .target-block{grid-template-columns:minmax(0,1fr);gap:2px;padding:var(--space-md)}
   .target-block .tk:not(:first-child){margin-top:10px}
 }
+
+/* Operations table: one group per outcome, worst first.
+   No overflow:hidden on the wrapper, so the sticky header works and nothing inside gets clipped. */
+.ops{margin:0 0 var(--space-md);background:var(--color-surface-1);border:1px solid var(--color-border);border-radius:var(--radius-md)}
+.ops-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-family:var(--font-family-monospace);font-size:var(--font-size-sm)}
+.ops-table thead th{position:sticky;top:0;z-index:1;padding:10px var(--space-md);text-align:left;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:var(--color-text-secondary);background:var(--color-surface-1);border-bottom:1px solid var(--color-border)}
+.ops-table thead th:first-child{width:46%;border-top-left-radius:var(--radius-md)}
+.ops-table thead th:last-child{width:11%;border-top-right-radius:var(--radius-md)}
+.ops-table .numeric{text-align:right;font-variant-numeric:tabular-nums}
+.ops-table tr:last-child>*{border-bottom:0}
+.ops-table>:last-child>tr:last-child>:first-child{border-bottom-left-radius:var(--radius-md)}
+.ops-table>:last-child>tr:last-child>:last-child{border-bottom-right-radius:var(--radius-md)}
+
+/* Group header: title + count; the Failed group adds a note in the Cases column. */
+.group-row>*{padding:8px var(--space-md);text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;background:var(--color-background);border-bottom:1px solid var(--color-border-subtle)}
+.ops-group+.ops-group .group-row>*,.ops-group+tfoot tr:first-child>*{border-top:1px solid var(--color-border-subtle)}
+.group-count{margin-left:8px;color:var(--color-text-muted);font-weight:500}
+.group-failed .group-title{color:var(--color-brand-danger)}
+.group-passed .group-title{color:var(--color-brand-success)}
+.group-errored .group-title{color:var(--color-brand-warning)}
+.group-skipped .group-title{color:var(--color-text-secondary)}
+.group-row .group-note{white-space:nowrap;text-align:right;font-weight:500;text-transform:none;letter-spacing:0;font-size:11px;color:var(--color-text-muted)}
+
+/* Collapsible group (long tables only). Checkbox + :has(), no script; without :has() support rows simply stay visible. */
+.group-toggle{display:inline-flex;align-items:center;gap:0;cursor:pointer;border-radius:var(--radius-sm)}
+.group-toggle input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.group-toggle:focus-within{outline:2px solid var(--color-text-primary);outline-offset:3px}
+.group-toggle .chev{width:6px;height:6px;margin-right:10px;border-right:1.5px solid var(--color-text-secondary);border-bottom:1.5px solid var(--color-text-secondary);transform:rotate(45deg) translateY(-2px);transition:transform .12s}
+.group-toggle .tg-hint{margin-left:12px;font-weight:500;text-transform:none;letter-spacing:0;font-size:11px;color:var(--color-text-secondary)}
+.group-toggle .tg-hint::before{content:"Hide"}
+.ops-group:has(.group-toggle input:not(:checked)) .op-row{display:none}
+.ops-group:has(.group-toggle input:not(:checked)) .chev{transform:rotate(-45deg)}
+.ops-group:has(.group-toggle input:not(:checked)) .tg-hint::before{content:"Show"}
+.group-toggle:hover .tg-hint{color:var(--color-text-primary)}
+
+.op-row td{padding:9px var(--space-md);border-bottom:1px solid var(--color-border-subtle);vertical-align:baseline}
+.op-row:hover td{background:rgba(255,255,255,0.03)}
+.op-row td:first-child{box-shadow:inset 3px 0 0 0 var(--color-border)}
+.row-failed td:first-child{box-shadow:inset 3px 0 0 0 var(--color-brand-danger)}
+.row-passed td:first-child{box-shadow:inset 3px 0 0 0 rgba(81,205,120,0.45)}
+.row-errored td:first-child{box-shadow:inset 3px 0 0 0 var(--color-brand-warning)}
+.row-skipped td{color:var(--color-text-secondary)}
+.op{display:flex;align-items:baseline;gap:10px;min-width:0}
+/* Paths break before a "/" (the generator emits <wbr>), falling back to anywhere only for a single huge segment. */
+.path{min-width:0;overflow-wrap:anywhere;color:var(--color-text-primary)}
+.row-skipped .path{color:var(--color-text-secondary)}
+.none{color:var(--color-text-muted)}
+
+/* Method badges: one hue per method, from :root tokens. */
+:root{--color-http-get:#60a5fa;--color-http-post:var(--color-brand-success);--color-http-put:var(--color-brand-warning);--color-http-patch:#2dd4bf;--color-http-delete:var(--color-brand-danger);--color-http-head:#a78bfa;--color-http-options:var(--color-text-secondary);--color-http-trace:var(--color-text-secondary)}
+.method{flex:none;min-width:64px;padding:1px 6px;text-align:center;font-size:11px;font-weight:600;border:1px solid currentColor;border-radius:var(--radius-sm);color:var(--color-text-secondary)}
+.method.get{color:var(--color-http-get)}
+.method.post{color:var(--color-http-post)}
+.method.put{color:var(--color-http-put)}
+.method.patch{color:var(--color-http-patch)}
+.method.delete{color:var(--color-http-delete)}
+.method.head{color:var(--color-http-head)}
+.method.options{color:var(--color-http-options)}
+
+/* Failures cell. One failure: plain title. Several: a <details> whose summary is the first title + "+N more";
+   opening it lists the rest under it, inside the row. Works on hover-less touch screens and from the keyboard. */
+.failure-title{color:var(--color-brand-danger)}
+.fx{margin-left:6px;color:var(--color-text-muted);font-size:11px}
+.fails summary{list-style:none;cursor:pointer;border-radius:var(--radius-sm)}
+.fails summary::-webkit-details-marker{display:none}
+.fails summary:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:3px}
+.more{display:inline-block;margin-left:8px;padding:0 6px;font-size:11px;line-height:1.6;white-space:nowrap;color:var(--color-text-secondary);border:1px solid var(--color-border-subtle);border-radius:var(--radius-sm);vertical-align:1px}
+.fails summary:hover .more{color:var(--color-text-primary);border-color:var(--color-border)}
+.more .m-open{display:none}
+.fails[open] .more .m-open{display:inline}
+.fails[open] .more .m-closed{display:none}
+.more-list{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.more-list li{color:var(--color-brand-danger)}
+.op-note{color:var(--color-text-secondary)}
+.row-errored .op-note{color:var(--color-brand-warning)}
+
+/* Footer rows: run-level failures (not tied to any operation), then operations not run. */
+.ops-table tfoot td{padding:10px var(--space-md);font-size:var(--font-size-xs);color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-subtle)}
+.ops-table tfoot tr:last-child td{border-bottom:0}
+.foot-label{display:block;margin-bottom:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--color-text-secondary)}
+.run-level-row ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.run-level-row li{color:var(--color-brand-danger)}
+
+@media (max-width:1000px){
+  .ops-table thead th:first-child{width:50%}
+  .ops-table thead th:last-child{width:72px}
+}
+/* Mobile: each row becomes a 2-line block: [method + path | cases] then failures across the full width. */
+@media (max-width:600px){
+  .ops-table,.ops-table tbody,.ops-table tfoot,.ops-table tr,.ops-table td,.ops-table th{display:block;width:auto}
+  .ops-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .ops-table .group-row{display:flex;align-items:baseline}
+  .group-row>*{display:block;border-top:0}
+  .group-row>:first-child{flex:1}
+  .ops-group+.ops-group .group-row,.ops-group+tfoot{border-top:1px solid var(--color-border-subtle)}
+  .op-row{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:10px 14px;border-bottom:1px solid var(--color-border-subtle);box-shadow:inset 3px 0 0 0 var(--color-border)}
+  .row-failed{box-shadow:inset 3px 0 0 0 var(--color-brand-danger)}
+  .row-passed{box-shadow:inset 3px 0 0 0 rgba(81,205,120,0.45)}
+  .row-errored{box-shadow:inset 3px 0 0 0 var(--color-brand-warning)}
+  .ops-group:last-of-type .op-row:last-child{border-bottom:0}
+  .op-row td{padding:0;border:0;box-shadow:none!important;background:none!important}
+  .op-row .numeric{grid-column:2;grid-row:1;font-size:var(--font-size-xs);color:var(--color-text-secondary)}
+  .op-row .numeric:not(.na)::after{content:" cases"}
+  .op-row .failures-cell{grid-column:1/-1;margin-top:6px;font-size:var(--font-size-xs)}
+  .op-row .failures-cell:empty{display:none}
+  .op{flex-wrap:wrap;row-gap:4px}
+  .method{min-width:0;padding:0 5px;font-size:10px}
+  .group-row .group-note{font-size:10px}
+}

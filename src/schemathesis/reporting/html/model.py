@@ -48,6 +48,41 @@ class NothingTested:
     tip: str | None
 
 
+class OperationStatus(str, Enum):
+    FAILED = "Failed"
+    PASSED = "Passed"
+    ERRORED = "Errored"
+    SKIPPED = "Skipped"
+
+    @property
+    def css(self) -> str:
+        return self.name.lower()
+
+
+@dataclass(slots=True)
+class OperationRow:
+    label: str
+    status: OperationStatus
+    # Distinct failure titles; the run keeps one failure per kind per operation, so titles do not repeat.
+    failures: list[str]
+    cases: int
+    # Why the operation errored or was skipped.
+    note: str | None
+    # False when the operation keeps generating cases after a failure.
+    stops_at_first_failure: bool
+
+    @property
+    def method(self) -> str:
+        method, separator, _ = self.label.partition(" ")
+        # GraphQL labels ("Type.field") have no method.
+        return method if separator else ""
+
+    @property
+    def path(self) -> str:
+        _, separator, path = self.label.partition(" ")
+        return path if separator else self.label
+
+
 @dataclass(slots=True)
 class ReportData:
     meta: ReportMeta
@@ -56,6 +91,9 @@ class ReportData:
     nothing_tested: NothingTested | None
     # The phase running when the run stopped early.
     last_phase: PhaseName | None
+    operations: list[OperationRow]
+    # Failure titles with counts for failures that belong to no operation, e.g. undeclared methods or stateful runs.
+    unattributed_failures: list[tuple[str, int]]
     running_time: float | None
     stop_reason: StopReason
     # `started` is False when the engine never ran (schema failed to load); `complete` is False
