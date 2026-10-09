@@ -4,17 +4,22 @@
 
 ### :bug: Fixed
 
-- False `negative_data_rejection` for nullable and `allowEmptyValue` parameters in the coverage phase.
-- False `negative_data_rejection` for parameter enum entries like `"1"` under `type: boolean` in the coverage phase.
+#### False `negative_data_rejection` in the coverage phase
+
+- Nullable and `allowEmptyValue` parameters.
+- Nullable string header and cookie parameters.
+- String header and cookie parameters with `items`.
+- `minimum`/`maximum` on string parameters.
+- Parameter enum entries like `"1"` under `type: boolean`.
+- Header and cookie enums like `"true"`.
+- `0` sent to boolean header and cookie parameters.
+
+#### Others
+
+- False `negative_data_rejection` for unknown query parameters beside `allowEmptyValue` string values like `0`.
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
-- False `negative_data_rejection` for header and cookie enums like `"true"` in the coverage phase.
-- False `negative_data_rejection` for nullable string header and cookie parameters in the coverage phase.
-- False `negative_data_rejection` for unknown query parameters beside string values like `0` of parameters with `allowEmptyValue: true`.
-- False `negative_data_rejection` for `minimum`/`maximum` on string parameters in the coverage phase.
-- False `negative_data_rejection` for string header and cookie parameters with `items` in the coverage phase.
-- Crash when the cache holds an entry for a method removed from a path still in the schema.
 - Exploded object query parameters overwriting a declared query parameter of the same name.
-- False `negative_data_rejection` for `0` sent to boolean header and cookie parameters in the coverage phase.
+- Crash when the cache holds an entry for a method removed from a path still in the schema.
 
 ## [4.30.0](https://github.com/schemathesis/schemathesis/compare/v4.29.4...v4.30.0) - 2026-10-08
 
