@@ -729,14 +729,7 @@ def _seed_parameters(run: CoverageRun) -> None:
                 if isinstance(inferred, dict):
                     schema = {**schema, **inferred}
                     schema_is_clone = True
-        examples = parameter.examples
-        if examples and schema_is_clone:
-            try:
-                parameter_validator = make_validator(schema, validator_cls)
-            except Exception:
-                parameter_validator = None
-            if parameter_validator is not None:
-                examples = [example for example in examples if parameter_validator.is_valid(example)]
+        examples = filter_schema_valid_examples(parameter.examples, schema, validator_cls)
         if examples:
             if not schema_is_clone:
                 schema = dict(schema)
