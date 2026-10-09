@@ -162,6 +162,8 @@ class WireSemantics:
         """The texts a server reads for a parameter value that travels as text, one per repeated query item."""
         if self.location == ParameterLocation.BODY or not self.serializes_to_string():
             return []
+        if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE):
+            return [self.observed(value)]
         items = value if self.location == ParameterLocation.QUERY and isinstance(value, list) else [value]
         return [to_wire_string(item) for item in items if not isinstance(item, (dict, list))]
 
