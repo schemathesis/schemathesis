@@ -768,8 +768,14 @@ def test_replay_unknown_case_id(cli, ctx, tmp_path, snapshot_cli):
 def test_replay_kitchen_sink_at_scale(cli, ctx, tmp_path):
     api = ctx.openapi.apps.kitchen_sink()
 
-    # /api/flaky is non-deterministic by design, so it is excluded to keep the roundtrip assertion stable.
-    cli.run(api.schema_url, "--max-examples=2", "--phases=fuzzing", "--exclude-path=/api/flaky")
+    # /api/flaky is non-deterministic by design; sanitization would mask the `key` body field, so replay can't restore it.
+    cli.run(
+        api.schema_url,
+        "--max-examples=2",
+        "--phases=fuzzing",
+        "--exclude-path=/api/flaky",
+        "--output-sanitize=false",
+    )
 
     crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert len(crash_files) >= 10, f"Expected many crashes from kitchen sink, got {len(crash_files)}"
