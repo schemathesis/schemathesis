@@ -4179,6 +4179,24 @@ def test_no_short_header_value_when_pattern_needs_non_latin_characters(ctx, app_
     ]
 
 
+@pytest.mark.parametrize("location", ["header", "cookie"])
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "items": {"type": "string"}, "example": ["ok"], "default": ["Āx"]},
+        {"type": "array", "items": {"type": "string"}, "examples": [["a\nb"]]},
+        {"type": "array", "items": {"type": "string"}, "enum": [["Āx"], ["ok"]]},
+        {"type": "object", "properties": {"k": {"type": "string"}}, "example": {"k": "ok"}, "default": {"k": "a\nb"}},
+    ],
+    ids=["array-default", "array-examples", "array-enum", "object-default"],
+)
+def test_positive_header_containers_skip_hints_the_wire_cannot_carry(ctx, location, schema):
+    operation = load_schema(
+        ctx, parameters=[{"name": "X-Key", "in": location, "required": True, "schema": schema}], method="get"
+    )["/foo"]["GET"]
+    run_positive_test(operation, assert_requests_call)
+
+
 def test_max_properties_negative(ctx):
     cases = collect_coverage_cases(
         ctx, {"type": "object", "maxProperties": 2, "additionalProperties": {"type": "string"}}

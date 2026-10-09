@@ -2644,10 +2644,10 @@ def _positive_for_describing_keywords(
 
 def _is_representable(value: Any, ctx: CoverageContext, *, declared: bool = False) -> bool:
     """Whether the location can carry this value, e.g. without blanking a path segment."""
-    if isinstance(value, dict):
-        # `representable` judges a dict by its `repr`, which is not what a path
-        # parameter sends; only an empty object is unrepresentable there.
-        return not (ctx.location == ParameterLocation.PATH and not value)
+    if isinstance(value, dict) and ctx.location == ParameterLocation.PATH:
+        # The path filter judges a dict by its `repr`, which is not what a path parameter sends;
+        # only an empty object is unrepresentable there.
+        return bool(value)
     return ctx.wire.representable(value, declared=declared)
 
 

@@ -97,8 +97,15 @@ class WireSemantics:
         `declared` marks a value the schema author wrote verbatim, where a `/` is intent to send `%2F`
         rather than an artifact of generation, so the path filter judges its encoded form instead.
         """
-        if self.location in ("header", "cookie") and isinstance(value, str):
-            return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
+        if self.location in ("header", "cookie"):
+            if isinstance(value, str):
+                return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
+            # Containers travel as their joined keys and items, so each one must fit the header on its own.
+            if isinstance(value, list):
+                return all(self.representable(item) for item in value)
+            if isinstance(value, dict):
+                return all(self.representable(key) and self.representable(item) for key, item in value.items())
+            return True
         elif self.location == "path":
             if declared and isinstance(value, str):
                 return not is_invalid_path_parameter(quote_path_parameter(value), allow_encoded_slash=True)
