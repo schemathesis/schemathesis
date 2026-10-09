@@ -58,6 +58,9 @@ class SchemaMetadata(Protocol):
     @property
     def specification(self) -> Specification: ...  # pragma: no cover
 
+    @property
+    def title(self) -> str | None: ...  # pragma: no cover
+
     def validate(self) -> None: ...  # pragma: no cover
 
     def get_base_url(self) -> str: ...  # pragma: no cover

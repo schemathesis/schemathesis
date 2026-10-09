@@ -22,7 +22,7 @@ from schemathesis.core.jsonschema import (
 )
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
-from schemathesis.core.mutations import OperatorKind
+from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
@@ -34,7 +34,6 @@ from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
     MutationContext,
-    MutationMetadata,
     MutationTargetDescriptor,
     compute_mutation_targets,
 )

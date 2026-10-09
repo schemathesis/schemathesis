@@ -9,12 +9,12 @@ from hypothesis import HealthCheck, assume, given, reject, settings
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi._hypothesis import _canonical_strategy
 from schemathesis.specs.openapi.coverage._schema import MAX_DRAWN_ARRAY_ITEMS, CoverageContext, cover_schema_iter
 from schemathesis.specs.openapi.formats import get_default_format_strategies
-from schemathesis.specs.openapi.patterns import update_quantifier
 from tools.coverage.caches import clear_internal_caches
 
 DRAFT4 = jsonschema_rs.Draft4Validator

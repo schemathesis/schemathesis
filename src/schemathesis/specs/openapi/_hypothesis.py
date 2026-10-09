@@ -31,6 +31,7 @@ from schemathesis.core.jsonschema.numeric import (
 )
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
+from schemathesis.core.mutations import MutationMetadata
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone, to_wire_string
@@ -80,7 +81,7 @@ from schemathesis.specs.openapi.negative import (
     wrap_flatmap_hook_for_generated_value,
     wrap_map_hook_for_generated_value,
 )
-from schemathesis.specs.openapi.negative.mutations import MutationMetadata, has_negatable_target
+from schemathesis.specs.openapi.negative.mutations import has_negatable_target
 from schemathesis.specs.openapi.negative.utils import is_binary_format
 from schemathesis.transport.serialization import quote_all
 

@@ -11,7 +11,7 @@ from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.summary import WarningData
 from schemathesis.config import ProjectConfig, SchemathesisWarning
-from schemathesis.core import SpecificationKind
+from schemathesis.core import SpecificationFeature, SpecificationKind
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
@@ -241,7 +241,7 @@ def resource_producers(schema: BaseSchema) -> dict[str, set[str]]:
     From the inferred graph, so it reports what was found in the schema, not what the API can do.
     Absent means the operation consumes nothing, or there is no graph; empty means nothing supplies it.
     """
-    if schema.specification.kind is not SpecificationKind.OPENAPI:
+    if not schema.specification.supports_feature(SpecificationFeature.SCHEMA_ANALYSIS):
         return {}
     operations = schema.analysis.dependency_graph.operations  # type: ignore[attr-defined]
     by_resource: dict[str, set[str]] = {}

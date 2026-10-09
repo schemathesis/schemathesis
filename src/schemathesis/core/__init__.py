@@ -57,20 +57,11 @@ class Specification:
 
     @property
     def name(self) -> str:
-        name = {SpecificationKind.GRAPHQL: "GraphQL", SpecificationKind.OPENAPI: "Open API"}[self.kind]
-        return f"{name} {self.version}".strip()
+        return f"{_DISPLAY_NAMES[self.kind]} {self.version}".strip()
 
     def supports_feature(self, feature: SpecificationFeature) -> bool:
         """Check if Schemathesis supports a given feature for this specification."""
-        if self.kind == SpecificationKind.OPENAPI:
-            return feature in {
-                SpecificationFeature.SCHEMA_ANALYSIS,
-                SpecificationFeature.STATEFUL_TESTING,
-                SpecificationFeature.COVERAGE,
-                SpecificationFeature.EXAMPLES,
-                SpecificationFeature.AUTH_BOOTSTRAP,
-            }
-        return feature == SpecificationFeature.STATEFUL_TESTING
+        return feature in _FEATURES[self.kind]
 
 
 class SpecificationKind(str, enum.Enum):
@@ -78,6 +69,25 @@ class SpecificationKind(str, enum.Enum):
 
     OPENAPI = "openapi"
     GRAPHQL = "graphql"
+
+
+# Every kind needs an entry in both tables, so a new kind fails loudly instead of borrowing another's answers.
+_DISPLAY_NAMES: dict[SpecificationKind, str] = {
+    SpecificationKind.OPENAPI: "Open API",
+    SpecificationKind.GRAPHQL: "GraphQL",
+}
+_FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
+    SpecificationKind.OPENAPI: frozenset(
+        {
+            SpecificationFeature.SCHEMA_ANALYSIS,
+            SpecificationFeature.STATEFUL_TESTING,
+            SpecificationFeature.COVERAGE,
+            SpecificationFeature.EXAMPLES,
+            SpecificationFeature.AUTH_BOOTSTRAP,
+        }
+    ),
+    SpecificationKind.GRAPHQL: frozenset({SpecificationFeature.STATEFUL_TESTING}),
+}
 
 
 def string_to_boolean(value: str) -> str | bool:

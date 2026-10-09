@@ -22,7 +22,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_vali
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code, expand_status_codes
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     REQUEST_SHAPE_PROBES,
@@ -55,7 +55,6 @@ from schemathesis.specs.openapi._auth_retry import (
 )
 from schemathesis.specs.openapi.utils import (
     coerce_wire_string,
-    expand_status_codes,
     numeric_wire_value_is_valid,
     parameter_types,
     reads_as_null,

@@ -4,17 +4,11 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from itertools import chain
-from typing import TYPE_CHECKING
 
 from packaging import version
 
 from schemathesis.core import string_to_boolean
 from schemathesis.core.jsonschema.types import JsonSchema, get_type, to_json_type_name
-from schemathesis.core.transport import expand_status_code
-
-if TYPE_CHECKING:
-    from schemathesis.core.transport import StatusCodePattern
 
 _NUMERIC_PREFIX = re.compile(r"\d+(?:\.\d+)*")
 _PATH_PARAMETER = re.compile(r"\{([^{}]+)\}")
@@ -28,10 +22,6 @@ def parse_spec_version(value: str) -> version.Version:
     if match is None:
         return _UNKNOWN_VERSION
     return version.parse(match.group())
-
-
-def expand_status_codes(status_codes: list[StatusCodePattern]) -> set[int]:
-    return set(chain.from_iterable(expand_status_code(code) for code in status_codes))
 
 
 def parameter_types(schema: JsonSchema) -> list[str]:

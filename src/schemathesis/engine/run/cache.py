@@ -367,7 +367,7 @@ def _send_without_auth(ctx: EngineContext, case: Case, operation: APIOperation) 
 
 def _active_project_title(ctx: EngineContext) -> str | None:
     """Return the active project's title if it matches a named [[project]] block."""
-    title = ctx.schema.raw_schema.get("info", {}).get("title")
+    title = ctx.schema.title
     if not isinstance(title, str):
         return None
     parent = ctx.config._get_parent()

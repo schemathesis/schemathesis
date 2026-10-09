@@ -30,6 +30,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
+from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
@@ -153,6 +154,11 @@ class OpenApiSchema(BaseSchema):
     def specification(self) -> Specification:
         return Specification.openapi(version=self._spec_version)
 
+    @property
+    @override
+    def title(self) -> str | None:
+        return self.raw_schema.get("info", {}).get("title")
+
     @cached_property
     def security(self) -> OpenApiSecurity:
         return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.root_resolver)
@@ -206,7 +212,6 @@ class OpenApiSchema(BaseSchema):
     @override
     def get_coverage_capabilities(self) -> CoverageCapabilities:
         from schemathesis.specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
-        from schemathesis.specs.openapi.patterns import update_quantifier
 
         return CoverageCapabilities(
             format_strategies={**get_default_format_strategies(), **STRING_FORMATS},

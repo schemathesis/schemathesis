@@ -122,3 +122,38 @@ def render_mutations(mutations: Sequence[Mutation]) -> list[str]:
         label = mutation.parameter_location.value if spans_locations else None
         lines.append(f"{label}: {description}" if label else description)
     return lines
+
+
+class MutationMetadata:
+    """Per-case metadata: the structured Mutation records applied this case."""
+
+    __slots__ = ("mutations",)
+
+    mutations: tuple[Mutation, ...]
+
+    def __init__(self, mutations: tuple[Mutation, ...]) -> None:
+        self.mutations = mutations
+
+    @property
+    def description(self) -> str | None:
+        lines = render_mutations(self.mutations)
+        if not lines:
+            return None
+        if len(lines) == 1:
+            return lines[0]
+        return "- " + "\n- ".join(lines)
+
+    @property
+    def parameter(self) -> str | None:
+        return self.mutations[0].parameter if len(self.mutations) == 1 else None
+
+    @property
+    def parameter_location(self) -> ParameterLocation | None:
+        locations = {mutation.parameter_location for mutation in self.mutations}
+        return locations.pop() if len(locations) == 1 else None
+
+    @property
+    def location(self) -> str | None:
+        if len(self.mutations) != 1:
+            return None
+        return self.mutations[0].schema_pointer or None

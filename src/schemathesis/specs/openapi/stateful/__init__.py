@@ -29,8 +29,8 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
     _normalize_name,
 )
+from schemathesis.generation.value import prune_overwritten_body_constants
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.adapter.parameters import _prune_overwritten_body_constants
 from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
@@ -477,9 +477,7 @@ def into_step_input(
                     case.body = request_body
                     applied_parameters.append((ParameterLocation.BODY, None))
                 if case._meta is not None:
-                    case._meta.constants_draws = _prune_overwritten_body_constants(
-                        case._meta.constants_draws, case.body
-                    )
+                    case._meta.constants_draws = prune_overwritten_body_constants(case._meta.constants_draws, case.body)
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)

@@ -12,12 +12,10 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import transport
 from schemathesis.core.deserialization import register_deserializer
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.generation.value import GeneratedValue
+from schemathesis.generation.value import MISSING, GeneratedValue, get_at_path
 from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
 from schemathesis.resources import SemanticDraw
 from schemathesis.specs.openapi.adapter.parameters import (
-    _MISSING,
-    _get_at_path,
     _set_at_path,
     build_constants_overlay_strategy,
     build_semantic_overlay,
@@ -2084,11 +2082,11 @@ def test_overlay_records_multiple_substitutions_in_a_single_draw():
     ids=["missing-top-level", "non-dict-intermediate", "missing-last-segment", "empty-target"],
 )
 def test_get_at_path_returns_missing_for_absent_paths(target, path):
-    assert _get_at_path(target, path) is _MISSING
+    assert get_at_path(target, path) is MISSING
 
 
 def test_get_at_path_returns_value_for_present_path():
-    assert _get_at_path({"a": {"b": 42}}, ("a", "b")) == 42
+    assert get_at_path({"a": {"b": 42}}, ("a", "b")) == 42
 
 
 @pytest.mark.parametrize(

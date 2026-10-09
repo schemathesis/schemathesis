@@ -34,7 +34,13 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.generation.value import GeneratedValue
+from schemathesis.generation.value import (
+    MISSING,
+    GeneratedValue,
+    constant_value_at_draw,
+    get_at_path,
+    prune_overwritten_constants,
+)
 from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, ConstantType, ConstantValue, Origin
 from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
@@ -198,8 +204,8 @@ def build_semantic_overlay(
             if not copied:
                 body = deepclone(body)
                 copied = True
-            original = _get_at_path(body, descriptor.path)
-            if original is _MISSING:
+            original = get_at_path(body, descriptor.path)
+            if original is MISSING:
                 continue
             _set_at_path(body, descriptor.path, value)
             if container_validator is not None and not _example_is_valid(body, container_validator):
@@ -234,7 +240,7 @@ def build_semantic_overlay(
             inner_pool_draws,
             combined_semantic,
             inner_dictionary_draws,
-            _prune_overwritten_constants(inner_constants_draws, body),
+            prune_overwritten_constants(inner_constants_draws, body),
         )
 
     return overlaid()
@@ -371,7 +377,7 @@ def build_constants_overlay_strategy(
         new_value: dict[str, Any] | None = None
         new_draws: list[ConstantDraw] = []
         for path, valid_values in candidates.items():
-            if _get_at_path(value, path) is _MISSING:
+            if get_at_path(value, path) is MISSING:
                 continue
             if random.random() >= probability:
                 continue
@@ -523,19 +529,6 @@ def _semantic_cache_key(extra_data_source: ExtraDataSource | None) -> int | None
     return id(extra_data_source.semantic_index)
 
 
-_MISSING: object = object()
-
-
-def _get_at_path(target: object, path: tuple[str, ...]) -> object:
-    """Read the value at path. Returns the ``_MISSING`` sentinel when any segment is absent."""
-    cursor: object = target
-    for segment in path:
-        if not isinstance(cursor, dict) or segment not in cursor:
-            return _MISSING
-        cursor = cursor[segment]
-    return cursor
-
-
 def _set_at_path(target: dict[str, Any], path: tuple[str, ...], value: object) -> bool:
     """Set value at path in target. Returns False when the path is missing from target."""
     if not path:
@@ -551,36 +544,8 @@ def _set_at_path(target: dict[str, Any], path: tuple[str, ...], value: object) -
     return True
 
 
-def _prune_overwritten_constants(
-    constants_draws: tuple[ConstantDraw, ...], value: JsonValue
-) -> tuple[ConstantDraw, ...]:
-    """Drop provenance for constant leaves a later overlay overwrote, so draws match the emitted value."""
-    if not constants_draws:
-        return constants_draws
-    return tuple(draw for draw in constants_draws if _constant_value_at_draw(value, draw) == draw.value)
-
-
-def _prune_overwritten_body_constants(
-    constants_draws: tuple[ConstantDraw, ...], body: JsonValue
-) -> tuple[ConstantDraw, ...]:
-    """Prune only body-location draws against `body`; other locations aren't part of the body."""
-    if not constants_draws:
-        return constants_draws
-    return tuple(
-        draw for draw in constants_draws if draw.location != "body" or _constant_value_at_draw(body, draw) == draw.value
-    )
-
-
-def _constant_value_at_draw(value: object, draw: ConstantDraw) -> object:
-    path = (
-        tuple(segment for segment in draw.body_path.split("/") if segment) if draw.body_path else (draw.parameter_name,)
-    )
-    current = _get_at_path(value, path)
-    return current.data if isinstance(current, Binary) else current
-
-
 def _constant_values_at_draws(constants_draws: tuple[ConstantDraw, ...], value: object) -> tuple[object, ...]:
-    return tuple(_constant_value_at_draw(value, draw) for draw in constants_draws)
+    return tuple(constant_value_at_draw(value, draw) for draw in constants_draws)
 
 
 def _prune_modified_constants(
@@ -589,7 +554,7 @@ def _prune_modified_constants(
     return tuple(
         draw
         for draw, previous in zip(constants_draws, previous_values, strict=True)
-        if _constant_value_at_draw(value, draw) == previous
+        if constant_value_at_draw(value, draw) == previous
     )
 
 
@@ -699,7 +664,7 @@ def build_hybrid_strategy(
             pool_draws=base_pool_draws + pool_draws,
             semantic_draws=base_semantic_draws,
             dictionary_draws=base_dictionary_draws,
-            constants_draws=_prune_overwritten_constants(base_constants_draws, base),
+            constants_draws=prune_overwritten_constants(base_constants_draws, base),
         )
 
     return hybrid()

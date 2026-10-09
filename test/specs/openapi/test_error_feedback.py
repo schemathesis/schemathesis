@@ -53,6 +53,7 @@ from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
 from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.error_feedback.pipeline import FeedbackPipeline, _reset_pipeline_for_tests
 from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.jsonschema.patterns import normalize_regex
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -78,7 +79,6 @@ from schemathesis.specs.openapi.error_feedback import (
     UnexpectedPropertyAdjustment,
     apply_adjustments,
 )
-from schemathesis.specs.openapi.patterns import normalize_regex
 
 # Schema Object meta-validators for each supported spec version. Adjustments must
 # produce schemas that satisfy these so downstream Hypothesis draws against the

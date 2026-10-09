@@ -32,11 +32,11 @@ from schemathesis.core.jsonschema import (
     make_validator_for,
     matches_pattern,
 )
+from schemathesis.core.jsonschema.patterns import normalize_regex, pattern_length_bounds
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
-from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
 from schemathesis.transport.serialization import Binary, contains_binary
 
 if TYPE_CHECKING:

@@ -18,7 +18,7 @@ from schemathesis.core.jsonschema import ALL_KEYWORDS, BUNDLE_STORAGE_KEY, get_t
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_xml
-from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind, render_mutations
+from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.coverage._schema import ANNOTATION_KEYWORDS
@@ -38,41 +38,6 @@ PathSelector: TypeAlias = str | int | None
 MAX_WALK_DEPTH = 32
 # Cap on extra mutation targets per case beyond the always-chosen primary.
 MAX_SECONDARY_TARGETS = 2
-
-
-class MutationMetadata:
-    """Per-case metadata: the structured Mutation records applied this case."""
-
-    __slots__ = ("mutations",)
-
-    mutations: tuple[Mutation, ...]
-
-    def __init__(self, mutations: tuple[Mutation, ...]) -> None:
-        self.mutations = mutations
-
-    @property
-    def description(self) -> str | None:
-        lines = render_mutations(self.mutations)
-        if not lines:
-            return None
-        if len(lines) == 1:
-            return lines[0]
-        return "- " + "\n- ".join(lines)
-
-    @property
-    def parameter(self) -> str | None:
-        return self.mutations[0].parameter if len(self.mutations) == 1 else None
-
-    @property
-    def parameter_location(self) -> ParameterLocation | None:
-        locations = {mutation.parameter_location for mutation in self.mutations}
-        return locations.pop() if len(locations) == 1 else None
-
-    @property
-    def location(self) -> str | None:
-        if len(self.mutations) != 1:
-            return None
-        return self.mutations[0].schema_pointer or None
 
 
 @dataclass(slots=True)

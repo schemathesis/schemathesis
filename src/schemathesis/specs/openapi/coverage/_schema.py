@@ -65,6 +65,14 @@ from schemathesis.core import (
 )
 from schemathesis.core.cache import MISSING
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
+from schemathesis.core.jsonschema.patterns import (
+    matches_every_string,
+    pattern_length_bounds,
+    pattern_length_is_unreachable,
+    pattern_requires_char_outside,
+    pattern_requires_literal,
+    pin_pattern_length,
+)
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type, to_json_type_name
 from schemathesis.core.parameters import ParameterLocation
@@ -87,14 +95,6 @@ from schemathesis.specs.openapi.coverage._wire import (
     jsonify,
 )
 from schemathesis.specs.openapi.formats import format_length_bounds, format_lengths_for
-from schemathesis.specs.openapi.patterns import (
-    matches_every_string,
-    pattern_length_bounds,
-    pattern_length_is_unreachable,
-    pattern_requires_char_outside,
-    pattern_requires_literal,
-    pin_pattern_length,
-)
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.serialization import contains_binary
 

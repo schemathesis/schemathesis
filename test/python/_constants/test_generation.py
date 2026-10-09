@@ -13,17 +13,14 @@ from schemathesis.config import GenerationConfig, SchemathesisConfig
 from schemathesis.generation.body_overrides import build_body_override_overlay_strategy
 from schemathesis.generation.meta import CaseMetadata, CoverageScenario, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.generation.value import GeneratedValue
+from schemathesis.generation.value import GeneratedValue, prune_overwritten_body_constants
 from schemathesis.python._constants.adapters import default_adapters
 from schemathesis.python._constants.orchestrator import extract_all, extract_registered
 from schemathesis.python._constants.pool import ConstantDraw, ConstantEntry, ConstantsPool, Origin
 from schemathesis.python._constants.registry import SourceRegistry
 from schemathesis.specs.graphql.substitution import substitute_constants
 from schemathesis.specs.openapi._hypothesis import _build_form_strategy_with_encoding
-from schemathesis.specs.openapi.adapter.parameters import (
-    _prune_overwritten_body_constants,
-    build_constants_overlay_strategy,
-)
+from schemathesis.specs.openapi.adapter.parameters import build_constants_overlay_strategy
 from schemathesis.specs.openapi.negative import (
     wrap_flatmap_hook_for_generated_value,
     wrap_map_hook_for_generated_value,
@@ -633,7 +630,7 @@ def test_stateful_prune_keeps_non_body_constant_draws():
     kept_body = _constant_draw("a", "AVAL", body_path="/a")
     overwritten_body = _constant_draw("b", "BVAL", body_path="/b")
     body = {"a": "AVAL", "b": "CHANGED"}
-    assert _prune_overwritten_body_constants((query_draw, kept_body, overwritten_body), body) == (query_draw, kept_body)
+    assert prune_overwritten_body_constants((query_draw, kept_body, overwritten_body), body) == (query_draw, kept_body)
 
 
 @pytest.mark.usefixtures("clean_constants_registry")

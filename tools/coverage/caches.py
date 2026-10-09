@@ -4,9 +4,8 @@ from hypothesis.internal import reflection
 from hypothesis.stateful import RuleBasedStateMachine, RuleStrategy
 
 from schemathesis.core import jsonschema
-from schemathesis.core.jsonschema import bundler, resolver
+from schemathesis.core.jsonschema import bundler, patterns, resolver
 from schemathesis.generation import hypothesis
-from schemathesis.specs.openapi import patterns
 from schemathesis.specs.openapi.coverage import _schema
 
 
