@@ -7845,6 +7845,32 @@ def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ct
     assert CoverageScenario.INVALID_ENUM_VALUE in scenarios, scenarios
 
 
+def test_object_parameter_example_out_of_range_as_float32_is_not_a_positive_value(ctx):
+    # `0.99999999` narrows to `1.0` in single precision, which `exclusiveMaximum` rejects.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {
+                "name": "q",
+                "in": "query",
+                "required": True,
+                "style": "deepObject",
+                "explode": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "f": {"type": "number", "format": "float", "maximum": 1, "exclusiveMaximum": True},
+                    },
+                    "required": ["f"],
+                },
+                "example": {"f": 0.99999999},
+            }
+        ],
+    )["/foo"]["post"]
+    values = [case.query["q[f]"] for case in iter_cases(operation, GenerationMode.POSITIVE)]
+    assert "0.99999999" not in values, values
+
+
 def test_multipart_property_with_unregistered_content_type_falls_back_to_schema_generation(ctx):
     # An `encoding.contentType` with no registered strategy contributes nothing custom;
     # the property is generated from its schema like any other.
