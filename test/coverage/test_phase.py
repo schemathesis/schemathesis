@@ -8147,6 +8147,19 @@ def test_string_query_parameter_beside_another_branch_has_no_negatives_valid_as_
     ] == [(CoverageScenario.MISSING_PARAMETER, None)]
 
 
+@pytest.mark.parametrize("location", ["header", "cookie"])
+def test_nullable_string_parameter_has_no_negatives_valid_as_text(ctx, location):
+    # A list of nulls travels as the text `null,null`, which is a valid string.
+    parameter = {"in": location, "name": "q", "required": True, "schema": {"type": "string", "nullable": True}}
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+
+    assert [
+        case.meta.phase.data.scenario
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "q"
+    ] == [CoverageScenario.MISSING_PARAMETER]
+
+
 @pytest.mark.parametrize(
     ("schema", "allow_empty_value", "expected"),
     [
