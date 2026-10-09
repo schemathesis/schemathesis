@@ -1441,8 +1441,12 @@ SPLIT_UUID_PATTERN = r"^([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9
         (r"^([A-Za-z](-|_|.)?)+$", 101),
     ],
 )
-def test_positive_string_reaches_lengths_far_from_what_the_pattern_emits_naturally(pctx, pattern, length):
-    values = cover_schema(pctx, {"type": "string", "pattern": pattern, "minLength": length, "maxLength": length})
+@pytest.mark.parametrize("update_pattern", [update_quantifier, None], ids=["rewrite", "pin-only"])
+def test_positive_string_reaches_lengths_far_from_what_the_pattern_emits_naturally(
+    ctx_factory, pattern, length, update_pattern
+):
+    ctx = ctx_factory(generation_modes=[GenerationMode.POSITIVE], update_pattern=update_pattern)
+    values = cover_schema(ctx, {"type": "string", "pattern": pattern, "minLength": length, "maxLength": length})
     assert values
     for value in values:
         assert len(value) == length, value
@@ -3181,8 +3185,9 @@ def test_positive_integer_with_fractional_multiple_of_stays_on_the_integer_grid(
                 {"type": "object", "properties": {"b": {"type": "null"}}, "required": ["a"]},
             ]
         },
+        {"type": "array", "contains": {"type": "object", "properties": {"x": {"type": "null"}}, "required": ["a"]}},
     ],
-    ids=["additional-properties", "pattern-properties", "all-of"],
+    ids=["additional-properties", "pattern-properties", "all-of", "contains"],
 )
 def test_positive_required_name_outside_properties_takes_its_governing_schema(pctx, schema):
     values = cover_schema(pctx, schema)
