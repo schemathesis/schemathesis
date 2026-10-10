@@ -36,7 +36,7 @@ from schemathesis.cli.output import (
 )
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.output import decode_response_text, prepare_response_payload
+from schemathesis.core.output import format_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -1568,17 +1568,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                     curl = case.as_curl_command(headers=dict(response.request.headers), verify=response.verify)
                     click.echo(f"{indent}[{response.status_code}] {curl}")
 
-                response = failure.response
-
-                if response.content is None or not response.content:
-                    click.echo(f"\n{indent}<EMPTY>")
-                else:
-                    text = decode_response_text(response)
-                    if text is None:
-                        click.echo(f"\n{indent}<BINARY>")
-                    else:
-                        payload = prepare_response_payload(text, config=ctx.config.output)
-                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
+                payload = format_response_payload(failure.response, config=ctx.config.output)
+                click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
 
         click.echo()
 

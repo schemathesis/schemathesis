@@ -194,6 +194,24 @@ class EngineErrorInfo:
             return format_exception(self._error.original_error, with_traceback=True)
         return format_exception(self._error, with_traceback=True)
 
+    @property
+    def details(self) -> list[str]:
+        """Lines shown under the message: error extras, or the traceback when it helps."""
+        if self.extras:
+            return self.extras
+        if self.has_useful_traceback:
+            return split_traceback(self.traceback)
+        return []
+
+    @property
+    def code_sample(self) -> str | None:
+        return self._code_sample
+
+    def suggestion(self, *, bold: Callable[[str], str] = str) -> str | None:
+        if isinstance(self._error, UnsupportedType):
+            return self._error.suggestion
+        return get_runtime_error_suggestion(self._kind, bold=bold)
+
     def format(self, *, bold: Callable[[str], str] = str, indent: str = "    ") -> str:
         """Format error message with optional styling and traceback."""
         message = []
@@ -206,26 +224,15 @@ class EngineErrorInfo:
         body = self.message or str(self._error)
         message.append(body)
 
-        # Extras
-        if self.extras:
-            extras = self.extras
-        elif self.has_useful_traceback:
-            extras = split_traceback(self.traceback)
-        else:
-            extras = []
-
-        if extras:
+        details = self.details
+        if details:
             message.append("")  # Empty line before extras
-            message.extend(f"{indent}{extra}" for extra in extras)
+            message.extend(f"{indent}{extra}" for extra in details)
 
         if self._code_sample is not None:
             message.append(f"\nReproduce with:\n\n    {self._code_sample}")
 
-        # Suggestion
-        if isinstance(self._error, UnsupportedType):
-            suggestion: str | None = self._error.suggestion
-        else:
-            suggestion = get_runtime_error_suggestion(self._kind, bold=bold)
+        suggestion = self.suggestion(bold=bold)
         if suggestion is not None:
             message.append(f"\nTip: {suggestion}")
 

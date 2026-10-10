@@ -8,6 +8,8 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
 
 TRUNCATED = "// Output truncated..."
+EMPTY_PAYLOAD = "<EMPTY>"
+BINARY_PAYLOAD = "<BINARY>"
 
 
 def escape_surrogates(text: str) -> str:
@@ -85,3 +87,13 @@ def prepare_response_payload(payload: str, *, config: OutputConfig) -> str:
     if len(payload) > config.truncation.max_payload_size:
         payload = payload[: config.truncation.max_payload_size] + f" {TRUNCATED}"
     return payload
+
+
+def format_response_payload(response: Response, *, config: OutputConfig) -> str:
+    """Response body as failure output shows it: `<EMPTY>`, `<BINARY>`, or the decoded and truncated text."""
+    if not response.content:
+        return EMPTY_PAYLOAD
+    text = decode_response_text(response)
+    if text is None:
+        return BINARY_PAYLOAD
+    return prepare_response_payload(text, config=config)

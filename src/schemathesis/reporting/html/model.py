@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
 from schemathesis.engine import Status, StopReason
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
-from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 
 if TYPE_CHECKING:
     from schemathesis.cli.summary import FailureGroup, SummaryData
+
+
+def split_label(label: str) -> tuple[str | None, str]:
+    """Split "GET /users" into its method and path; other labels ("Query.users", "Run checks") have no method."""
+    method, separator, path = label.partition(" ")
+    if separator and method.isupper():
+        return method, path
+    return None, label
 
 
 class Verdict(str, Enum):
@@ -38,6 +45,41 @@ class ErrorEntry:
     title: str
     message: str
     tip: str | None
+    # Error extras or the traceback, line by line.
+    details: list[str] = field(default_factory=list)
+    reproduce: str | None = None
+
+
+@dataclass(slots=True)
+class FailureEntry:
+    title: str
+    # One per violation; same-title violations on one response share an entry.
+    messages: list[str]
+
+
+@dataclass(slots=True)
+class Command:
+    curl: str
+    # The request the command sends; unknown when the reproduction and the recorded chain disagree.
+    # GraphQL requests have no method and name the field they call instead of a path.
+    method: str | None
+    path: str | None
+    # True for the request whose response failed the checks.
+    failed: bool
+
+
+@dataclass(slots=True)
+class FailingCase:
+    case_id: str | None
+    failures: list[FailureEntry]
+    status_code: int | None
+    # The body as the terminal shows it, `<EMPTY>` and `<BINARY>` included.
+    body: str | None
+    # One per request the failure needs, oldest first.
+    commands: list[Command]
+    # `st replay <id>` when a crash record exists.
+    replay: str | None
+    auth_identity: str | None
 
 
 @dataclass(slots=True)
@@ -70,17 +112,16 @@ class OperationRow:
     note: str | None
     # False when the operation keeps generating cases after a failure.
     stops_at_first_failure: bool
+    failing_cases: list[FailingCase] = field(default_factory=list)
+    errors: list[ErrorEntry] = field(default_factory=list)
 
     @property
     def method(self) -> str:
-        method, separator, _ = self.label.partition(" ")
-        # GraphQL labels ("Type.field") have no method.
-        return method if separator else ""
+        return split_label(self.label)[0] or ""
 
     @property
     def path(self) -> str:
-        _, separator, path = self.label.partition(" ")
-        return path if separator else self.label
+        return split_label(self.label)[1]
 
 
 @dataclass(slots=True)
@@ -94,6 +135,8 @@ class ReportData:
     operations: list[OperationRow]
     # Failure titles with counts for failures that belong to no operation, e.g. undeclared methods or stateful runs.
     unattributed_failures: list[tuple[str, int]]
+    unattributed_cases: list[tuple[str, FailingCase]]
+    unattributed_errors: list[tuple[str, ErrorEntry]]
     running_time: float | None
     stop_reason: StopReason
     # `started` is False when the engine never ran (schema failed to load); `complete` is False
@@ -130,17 +173,7 @@ class ReportData:
 
     @property
     def failed_operations(self) -> list[str]:
-        # Stateful failures are keyed by a pseudo-label, and unsupported-method probes by a method the schema
-        # never lists; neither is a tested operation.
-        return sorted(
-            {
-                label
-                for group in self.summary.failures
-                if group.type != "UnsupportedMethodResponse"
-                for label in group.operations
-                if label != STATEFUL_TESTS_LABEL
-            }
-        )
+        return [row.label for row in self.operations if row.status is OperationStatus.FAILED]
 
     @property
     def top_failures(self) -> list[FailureGroup]:

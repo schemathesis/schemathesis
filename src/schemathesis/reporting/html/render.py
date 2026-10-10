@@ -5,13 +5,14 @@ from html import escape
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
-from schemathesis.core.output import escape_surrogates
+from schemathesis.core.failures import reason_phrase
+from schemathesis.core.output import TRUNCATED, escape_surrogates
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
-from schemathesis.reporting.html.model import OperationStatus, Verdict
+from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, split_label
 
 if TYPE_CHECKING:
-    from schemathesis.reporting.html.model import OperationRow, ReportData
+    from schemathesis.reporting.html.model import ErrorEntry, FailingCase, OperationRow, ReportData
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
 
@@ -45,6 +46,14 @@ _COPY_SCRIPT = (
     "else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();"
     "try{document.execCommand('copy');done()}catch(e){}a.remove()}})})</script>"
 )
+# A `#hash` link opens the row holding its target, and any `<details>` around it.
+_HASH_SCRIPT = (
+    "<script>(function(){function openTo(){var id=location.hash.slice(1);if(!id)return;"
+    "var el=document.getElementById(id);if(!el)return;var d=el.closest('.detail-row');"
+    "var row=d?d.previousElementSibling:el.closest('.has-details');var box=row&&row.querySelector('.row-open');"
+    "if(box)box.checked=true;for(var p=el;p;p=p.parentElement){if(p.tagName==='DETAILS')p.open=true}}"
+    "window.addEventListener('hashchange',openTo);openTo()})()</script>"
+)
 
 # Command arguments longer than this may break anywhere; shorter ones never break inside.
 _LONG_ARGUMENT = 40
@@ -63,7 +72,7 @@ def page(*, title: str, body: str) -> str:
   <main class="container">
 {body}
   </main>
-{_COPY_SCRIPT}
+{_COPY_SCRIPT}{_HASH_SCRIPT}
 </body>
 </html>
 """
@@ -91,11 +100,14 @@ def _duration(data: ReportData) -> str:
     return humanize_duration(data.running_time) if data.running_time is not None else "-"
 
 
+def _code_spans(text: str) -> str:
+    return re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(text))
+
+
 def _tip(text: str | None) -> str:
     if text is None:
         return ""
-    body = re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(text))
-    return f'<p class="ex-tip"><b>Tip:</b> {body}</p>'
+    return f'<p class="ex-tip"><b>Tip:</b> {_code_spans(text)}</p>'
 
 
 def _hero(data: ReportData) -> str:
@@ -188,7 +200,8 @@ def _verdict_line(data: ReportData) -> tuple[str, str]:
         baseline = data.summary.baseline
         return "", baseline.write_error if baseline is not None and baseline.write_error else "Run failed"
     if data.verdict is Verdict.ERRORED:
-        return "", f"{plural(data.errored_operations, 'operation')} errored"
+        errored = sum(row.status is OperationStatus.ERRORED for row in data.operations)
+        return "", f"{plural(errored, 'operation')} errored" if errored else "Errors not tied to an operation"
     text = "1 tested operation passed" if tested == 1 else f"All {tested} tested operations passed"
     bar = (
         f'<div class="fail-mix-bar" role="img" aria-label="{esc(text)}">'
@@ -280,9 +293,11 @@ def _path(path: str) -> str:
     return "<wbr>/".join([head + "/" + segments[0], *segments[1:]]) if segments else head
 
 
-def _operation_cell(row: OperationRow) -> str:
-    method = f'<span class="method {esc(row.method.lower())}">{esc(row.method)}</span>' if row.method else ""
-    return f'<td class="op-cell"><span class="op">{method}<span class="path">{_path(row.path)}</span></span></td>'
+def _operation_cell(row: OperationRow, toggle: str) -> str:
+    method = _method(row.method) if row.method else ""
+    return (
+        f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span></span></td>'
+    )
 
 
 def _failures_cell(row: OperationRow) -> str:
@@ -301,11 +316,175 @@ def _failures_cell(row: OperationRow) -> str:
     )
 
 
-def _cases_cell(row: OperationRow) -> str:
+_CHEVRON = '<span class="rchev" aria-hidden="true"></span>'
+
+
+def _toggle(target: str, name: str, *, checked: bool) -> str:
+    state = " checked" if checked else ""
+    return (
+        f'<label class="row-toggle"><input type="checkbox" class="row-open" aria-controls="{target}" '
+        f'aria-label="Details for {esc(name)}"{state}></label>'
+    )
+
+
+def _cases_cell(row: OperationRow, chevron: str) -> str:
     # Zero would read as "ran and found nothing".
     if not row.cases:
-        return '<td class="numeric na"><span class="none" aria-label="no cases run">-</span></td>'
-    return f'<td class="numeric">{row.cases:,}</td>'
+        return f'<td class="numeric na"><span class="none" aria-label="no cases run">-</span>{chevron}</td>'
+    # Narrow layouts spell out the unit after the number.
+    one = " one" if row.cases == 1 else ""
+    return f'<td class="numeric{one}">{row.cases:,}{chevron}</td>'
+
+
+def _anchor(label: str, taken: set[str]) -> str:
+    base = "op-" + (re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-") or "operation")
+    anchor, index = base, 2
+    # The detail row's id derives from the anchor, so it must not collide either.
+    while anchor in taken or f"{anchor}-details" in taken:
+        anchor, index = f"{base}-{index}", index + 1
+    taken.update((anchor, f"{anchor}-details"))
+    return anchor
+
+
+def _status(code: int) -> str:
+    return f'<span class="status s{code // 100}xx"><span class="status-code">{code}</span> {esc(reason_phrase(code))}</span>'
+
+
+def _evidence(label: str, content: str, extra: str = "") -> str:
+    return (
+        f'<section class="evidence"><div class="ev-head"><span class="ev-label">{label}</span>{extra}</div>'
+        f"{content}</section>"
+    )
+
+
+_PLACEHOLDERS = ("<EMPTY>", "<BINARY>")
+# Longer one-line bodies read better in a box.
+_INLINE_BODY = 80
+
+
+def _body(body: str) -> str:
+    if body in _PLACEHOLDERS:
+        return f'<span class="body-placeholder">{esc(body)}</span>'
+    if body.endswith(TRUNCATED):
+        return f'<pre class="body">{esc(body[: -len(TRUNCATED)])}<span class="trunc">{TRUNCATED}</span></pre>'
+    if "\n" not in body and len(body) <= _INLINE_BODY:
+        return f'<span class="body-inline">{esc(body)}</span>'
+    return f'<pre class="body">{esc(body)}</pre>'
+
+
+def _method(method: str) -> str:
+    return f'<span class="method {esc(method.lower())}">{esc(method)}</span>'
+
+
+def _reproduce(commands: list[Command], replay: str | None) -> str:
+    curls = [command.curl for command in commands]
+    copy = "\n".join(curls) + (f"\n\n{replay}" if replay is not None else "")
+    if len(commands) == 1:
+        content = f'<pre class="cmd" tabindex="0">{esc(curls[0])}</pre>'
+    else:
+        steps = []
+        for command in commands:
+            label = ""
+            if command.path is not None:
+                failed = '<span class="step-failed">failed here</span>' if command.failed else ""
+                method = _method(command.method) if command.method is not None else ""
+                label = f'<span class="step-req">{method}{esc(command.path)}{failed}</span>'
+            steps.append(f'<li>{label}<pre class="cmd" tabindex="0">{esc(command.curl)}</pre></li>')
+        content = f'<ol class="steps">{"".join(steps)}</ol>'
+    replay_line = f'<p class="replay">or <code>{esc(replay)}</code></p>' if replay is not None else ""
+    return _evidence(
+        "Reproduce", f'<div class="repro">{content}{_copy_button(copy, "reproduction")}</div>{replay_line}'
+    )
+
+
+def _failing_case(case: FailingCase, owner: str = "") -> str:
+    parts = [owner]
+    for failure in case.failures:
+        count = len(failure.messages)
+        violations = f'<span class="violations">{count} violations</span>' if count > 1 else ""
+        messages = "".join(f'<pre class="msg">{esc(message)}</pre>' for message in failure.messages if message)
+        parts.append(
+            f'<div class="finding"><h4 class="finding-title">{esc(failure.title)}{violations}</h4>{messages}</div>'
+        )
+    if case.status_code is not None and case.body is not None:
+        parts.append(_evidence("Response", _body(case.body), _status(case.status_code)))
+    if case.commands:
+        parts.append(_reproduce(case.commands, case.replay))
+    meta = ""
+    case_id = ""
+    if case.case_id is not None:
+        case_id = f' id="case-{esc(case.case_id)}"'
+        identity = (
+            f'<span class="case-identity">as <code>{esc(case.auth_identity)}</code></span>'
+            if case.auth_identity is not None
+            else ""
+        )
+        meta = f'<div class="case-meta"><span class="case-id">{esc(case.case_id)}</span>{identity}</div>'
+    return f'<article class="case"{case_id}><div class="case-body">{"".join(parts)}</div>{meta}</article>'
+
+
+_FRAME = re.compile(r'^\s*File "(?P<path>[^"]+)", line (?P<line>\d+)')
+_FRAMEWORK_FRAME = re.compile(r"[/\\](?:src|site-packages)[/\\]schemathesis[/\\]")
+
+
+def _traceback(lines: list[str]) -> str:
+    frames = [match for match in map(_FRAME.match, lines) if match is not None]
+    summary = "Traceback"
+    if frames:
+        # The last frame outside Schemathesis, or the last frame when every one is inside it.
+        where = ([frame for frame in frames if not _FRAMEWORK_FRAME.search(frame["path"])] or frames)[-1]
+        name = re.split(r"[/\\]", where["path"])[-1]
+        summary = (
+            f"Traceback ({plural(len(frames), 'frame')}), raised in "
+            f'<span class="trace-where"><code>{esc(name)}:{where["line"]}</code></span>'
+        )
+    text = "\n".join(lines)
+    return (
+        f'<details class="trace"><summary><span class="dchev" aria-hidden="true"></span>{summary}</summary>'
+        f'<pre tabindex="0">{esc(text)}</pre></details>'
+    )
+
+
+def _error(error: ErrorEntry, *, with_title: bool, owner: str = "") -> str:
+    lead = "" if with_title else " lead"
+    parts = [f'<h4 class="finding-title">{esc(error.title)}</h4>' if with_title else ""]
+    parts.append(f'<pre class="msg{lead}">{esc(error.message)}</pre>')
+    if error.details and error.details[0].startswith("Traceback"):
+        parts.append(_traceback(error.details))
+    elif error.details:
+        details = "\n".join(error.details)
+        parts.append(f'<pre class="msg msg-detail{lead}">{esc(details)}</pre>')
+    sections = [owner, f'<div class="finding">{"".join(parts)}</div>']
+    if error.reproduce is not None:
+        sections.append(_reproduce([Command(curl=error.reproduce, method=None, path=None, failed=False)], None))
+    if error.tip is not None:
+        sections.append(_evidence("Tip", f'<p class="tip">{_code_spans(error.tip)}</p>'))
+    return f'<article class="case case-error"><div class="case-body">{"".join(sections)}</div></article>'
+
+
+def _case_owner(label: str) -> str:
+    method, path = split_label(label)
+    badge = _method(method) if method is not None else ""
+    return f'<div class="case-owner">{badge}<span class="path">{esc(path)}</span></div>'
+
+
+def _has_details(row: OperationRow) -> bool:
+    return bool(row.failing_cases or row.errors)
+
+
+def _detail_row(items: list[str], anchor: str, css: str) -> str:
+    return (
+        f'<tr class="detail-row detail-{css}" id="{anchor}-details"><td colspan="3">'
+        f'<div class="case-list">{"".join(items)}</div></td></tr>'
+    )
+
+
+def _row_items(row: OperationRow) -> list[str]:
+    items = [_failing_case(case) for case in row.failing_cases]
+    # A lone error on an errored row repeats the title the row already shows.
+    with_title = bool(row.failing_cases) or len(row.errors) > 1
+    items.extend(_error(error, with_title=with_title) for error in row.errors)
+    return items
 
 
 def _operation_order(row: OperationRow) -> tuple[int, str, str]:
@@ -335,25 +514,50 @@ def _operations_table(data: ReportData) -> str:
     has_failures = any(row.status is OperationStatus.FAILED for row in data.operations)
     collapse_passed = has_failures and len(data.operations) > _COLLAPSE_PASSED_ABOVE
     groups = []
+    anchors: set[str] = set()
+    # A single expandable block answers "what broke" with nothing competing for the space, so it starts open.
+    open_details = (
+        sum(map(_has_details, data.operations)) + bool(data.unattributed_cases or data.unattributed_errors) == 1
+    )
     for status in OperationStatus:
         rows = sorted((row for row in data.operations if row.status is status), key=_operation_order)
         if not rows:
             continue
         header = _group_header(status, rows, collapsible=collapse_passed and status is OperationStatus.PASSED)
-        body = "".join(
-            f'<tr class="op-row row-{status.css}">{_operation_cell(row)}{_failures_cell(row)}{_cases_cell(row)}</tr>'
-            for row in rows
-        )
+        body = ""
+        for row in rows:
+            anchor = _anchor(row.label, anchors)
+            if _has_details(row):
+                toggle = _toggle(f"{anchor}-details", row.label, checked=open_details)
+                body += (
+                    f'<tr class="op-row row-{status.css} has-details" id="{anchor}">'
+                    f"{_operation_cell(row, toggle)}{_failures_cell(row)}{_cases_cell(row, _CHEVRON)}</tr>"
+                    f"{_detail_row(_row_items(row), anchor, status.css)}"
+                )
+            else:
+                body += (
+                    f'<tr class="op-row row-{status.css}" id="{anchor}">'
+                    f"{_operation_cell(row, '')}{_failures_cell(row)}{_cases_cell(row, '')}</tr>"
+                )
         groups.append(f'<tbody class="ops-group">{header}{body}</tbody>')
     footer_rows = []
-    if data.unattributed_failures:
+    if data.unattributed_failures or data.unattributed_errors:
+        titles = [*data.unattributed_failures, *((error.title, 1) for _, error in data.unattributed_errors)]
         items = "".join(
             f"<li>{esc(title)}" + (f'<span class="fx">x{count}</span>' if count > 1 else "") + "</li>"
-            for title, count in data.unattributed_failures
+            for title, count in titles
+        )
+        label = f'<span class="foot-label">Not tied to an operation</span><ul>{items}</ul>'
+        toggle = _toggle("run-level-details", "problems not tied to an operation", checked=open_details)
+        cases = [_failing_case(case, owner=_case_owner(owner)) for owner, case in data.unattributed_cases]
+        cases.extend(
+            _error(error, with_title=True, owner=_case_owner(owner)) for owner, error in data.unattributed_errors
         )
         footer_rows.append(
-            '<tr class="run-level-row"><td colspan="3">'
-            f'<span class="foot-label">Not tied to an operation</span><ul>{items}</ul></td></tr>'
+            f'<tr class="run-level-row has-details" id="run-level"><td colspan="2">{toggle}{label}</td>'
+            f'<td class="numeric">{_CHEVRON}</td></tr>'
+            f'<tr class="detail-row detail-failed run-level-details" id="run-level-details"><td colspan="3">'
+            f'<div class="case-list">{"".join(cases)}</div></td></tr>'
         )
     if data.not_run_operations:
         reason = data.stop_reason.skip_explanation or StopReason.INTERRUPTED.skip_explanation

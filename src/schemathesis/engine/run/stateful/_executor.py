@@ -39,7 +39,7 @@ from schemathesis.engine.run.unit._case import BudgetExpired, ServerWentAway
 from schemathesis.engine._baseline import is_known
 from schemathesis.engine._rate_limit_retry import call_and_validate_with_retry
 from schemathesis.engine.run.stateful.context import StatefulContext
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.recorder import ReproductionStep, ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.stateful.state_machine import release_state_machines
 from schemathesis.generation.case import Case
@@ -539,17 +539,18 @@ def validate_response(
         # sibling branch; include it so the reproduce isn't missing the triggering step.
         related_case_ids = failure.related_case_ids()
         # Each step is rendered with the headers it sent itself, so the chain reproduces the run as it happened.
-        commands = [
-            chain_case.as_curl_command(
-                headers=recorder.find_request_headers(case_id=chain_case.id), verify=failure_data.verify
+        steps = [
+            ReproductionStep.from_case(
+                chain_case, headers=recorder.find_request_headers(case_id=chain_case.id), verify=failure_data.verify
             )
             for chain_case in recorder.iter_chain_cases(case_id=failure_data.case.id, related_case_ids=related_case_ids)
         ]
         recorder.record_check_failure(
             name=name,
             case_id=failure_data.case.id,
-            code_sample="\n".join(commands),
+            code_sample="\n".join(step.curl for step in steps),
             failure=failure,
+            steps=steps,
         )
         # Known failures are accepted debt, so they must not spend the `--max-failures` budget.
         if not is_known(failure, name, baseline):

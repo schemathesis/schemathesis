@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.baseline import failure_identity
@@ -11,7 +11,7 @@ from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.engine.recorder import CaseNode, RecordedScenario
+from schemathesis.engine.recorder import CaseNode, RecordedScenario, ReproductionStep
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 
@@ -30,6 +30,8 @@ class GroupedFailures:
     failures: list[Failure]
     response: Response | None
     auth_identity: str | None = None
+    # Requests the failure needs, oldest first; empty when only the code sample is known.
+    steps: list[ReproductionStep] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -161,6 +163,7 @@ class Statistic:
                 failures_by_label.setdefault(label, {})[case_id] = GroupedFailures(
                     case_id=case_id,
                     code_sample=last_failure_info.code_sample,
+                    steps=last_failure_info.steps,
                     failures=current_case_failures,
                     response=recorder.interactions[case_id].response,
                     auth_identity=case.value._auth_identity,

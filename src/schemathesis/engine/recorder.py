@@ -4,8 +4,8 @@ import base64
 import time
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, cast
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from schemathesis.config._output import MAX_RECORDED_PAYLOAD_SIZE
 from schemathesis.core.failures import Failure
@@ -132,13 +132,21 @@ class ScenarioRecorder:
         self.cases.pop(case_id, None)
         self.interactions.pop(case_id, None)
 
-    def record_check_failure(self, *, name: str, case_id: str, code_sample: str, failure: Failure) -> None:
+    def record_check_failure(
+        self,
+        *,
+        name: str,
+        case_id: str,
+        code_sample: str,
+        failure: Failure,
+        steps: list[ReproductionStep] | None = None,
+    ) -> None:
         """Record a failure of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(
             CheckNode(
                 name=name,
                 status=Status.FAILURE,
-                failure_info=CheckFailureInfo(code_sample=code_sample, failure=failure),
+                failure_info=CheckFailureInfo(code_sample=code_sample, failure=failure, steps=steps or []),
             )
         )
 
@@ -286,9 +294,34 @@ class CheckNode:
 
 
 @dataclass(slots=True)
+class ReproductionStep:
+    """One request a failure needs to be reproduced."""
+
+    case_id: str
+    # Label of the operation the request calls.
+    operation: str
+    method: str
+    # Path with parameters filled in.
+    path: str
+    curl: str
+
+    @classmethod
+    def from_case(cls, case: Case, *, headers: dict[str, Any] | None, verify: bool) -> ReproductionStep:
+        return cls(
+            case_id=case.id,
+            operation=case.operation.label,
+            method=case.method,
+            path=case.formatted_path,
+            curl=case.as_curl_command(headers=headers, verify=verify),
+        )
+
+
+@dataclass(slots=True)
 class CheckFailureInfo:
     code_sample: str
     failure: Failure
+    # Requests the failure needs, oldest first; empty when only the code sample is known.
+    steps: list[ReproductionStep] = field(default_factory=list)
 
 
 def serialize_payload(payload: bytes) -> str:
