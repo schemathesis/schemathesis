@@ -16,11 +16,10 @@ EVENT_QUEUE_TIMEOUT = 0.01
 
 
 def _stateful_feedback(engine: EngineContext) -> FeedbackSources:
-    constants_value_source = engine.constants_extraction if not engine.constants_extraction.is_empty() else None
     return FeedbackSources(
         extra_data_source=engine.extra_data_source,
         error_feedback=engine.error_feedback,
-        constants_value_source=constants_value_source,
+        constants_value_source=engine.constants_value_source(),
     )
 
 
