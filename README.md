@@ -116,6 +116,8 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 
 ## See it in action
 
+🏆 **[Trophy case](https://schemathesis.readthedocs.io/en/stable/reference/trophy-case/)**: crashes and schema violations Schemathesis found in vLLM, Qdrant, OpenObserve, Ory Kratos and Formbricks, each with a link to the fix.
+
 🔬 **[Live Benchmarks](https://workbench.schemathesis.io)**: Schemathesis runs for an hour against real-world APIs such as Apache Airflow, Open WebUI and Prefect. For each one:
 
 - Code coverage and API schema coverage: operations, parameters, schema keywords (schema coverage measured with [TraceCov](https://tracecov.sh))
