@@ -719,6 +719,35 @@ def test_html_report_warnings_order(ctx, cli, app_runner, report_dir):
         ("warning", "w-low-valid-input-rate"),
         ("warning note", "w-unmatched-filters"),
     ]
+    assert re.findall(r'<a class="hs-caveat"[^>]*>([^<]*)</a>', html) == ["1 warning affects results"]
+
+
+def test_html_report_caveat_counts_affecting_warnings(ctx, cli, app_runner, report_dir):
+    order_id = {"name": "order_id", "in": "path", "required": True, "schema": {"type": "integer"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/orders/{order_id}": {"get": {"parameters": [order_id], "responses": {"200": {"description": "OK"}}}},
+            "/api/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/api/orders/<order_id>")
+    def order(order_id):
+        return jsonify({"detail": "Not found"}), 404
+
+    @app.route("/api/users")
+    def users():
+        return jsonify({"detail": "Unauthorized"}), 401
+
+    html = run_with_report(
+        cli,
+        report_dir,
+        app_runner.openapi_url(app),
+        "--checks=not_a_server_error",
+        "--mode=positive",
+        "--max-examples=10",
+    )
+    assert re.findall(r'<a class="hs-caveat"[^>]*>([^<]*)</a>', html) == ["2 warnings affect results"]
 
 
 def test_html_report_phases_and_checks(ctx, cli, report_dir, snapshot_html):

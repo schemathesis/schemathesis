@@ -268,7 +268,9 @@ def _caveat(data: ReportData) -> str:
     # One amber line in the verdict cell: the exit note already points at the warnings.
     if not affecting or data.exit_note is not None:
         return ""
-    return f'<a class="hs-caveat" href="#{_warning_id(affecting[0])}">{plural(len(affecting), "warning")}</a>'
+    verb = "affects" if len(affecting) == 1 else "affect"
+    text = f"{plural(len(affecting), 'warning')} {verb} results"
+    return f'<a class="hs-caveat" href="#{_warning_id(affecting[0])}">{text}</a>'
 
 
 def _duration(data: ReportData) -> str:
