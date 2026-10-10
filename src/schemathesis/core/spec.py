@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig, ProjectConfig
     from schemathesis.core import Body, Specification
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
     from schemathesis.core.result import Result
@@ -22,13 +23,14 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import CallOutcome, HttpMethod, Response
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
     from schemathesis.generation import GenerationMode
     from schemathesis.generation.case import Case
+    from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.generation.meta import CaseMetadata
-    from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
     from schemathesis.hooks import HookDispatcher
-    from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool
     from schemathesis.schemas import APIOperation
 
@@ -112,6 +114,7 @@ class CaseFactory(Protocol):
         hooks: HookDispatcher | None = ...,
         auth_storage: AuthStorage | None = ...,
         generation_mode: GenerationMode = ...,
+        feedback: FeedbackSources = ...,
         **kwargs: Any,
     ) -> SearchStrategy[Case]: ...  # pragma: no cover
 
@@ -132,7 +135,7 @@ class CaseFactory(Protocol):
     ) -> Case: ...  # pragma: no cover
 
     def get_strategies_from_examples(
-        self, operation: APIOperation, **kwargs: Any
+        self, operation: APIOperation, feedback: FeedbackSources = ..., **kwargs: Any
     ) -> list[SearchStrategy[Case]]: ...  # pragma: no cover
 
     def get_custom_format_strategies(
@@ -166,10 +169,8 @@ class StatefulBackend(Protocol):
     def _build_state_machine(
         self,
         *,
-        error_feedback: ErrorFeedbackStore | None,
+        feedback: FeedbackSources,
         link_calibration: LinkCalibrationState | None,
-        extra_data_source: ExtraDataSource | None,
-        constants_value_source: ConstantsPool | None = ...,
     ) -> type[APIStateMachine]: ...  # pragma: no cover
 
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference: ...  # pragma: no cover
@@ -185,6 +186,16 @@ class StatefulBackend(Protocol):
     ) -> list[tuple[APIOperation, dict[str, Any]]]: ...  # pragma: no cover
 
     def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]: ...  # pragma: no cover
+
+    def record_link_outcome(
+        self,
+        *,
+        calibration: LinkCalibrationState,
+        response: Response,
+        observations: tuple[Observation, ...],
+        step_input: StepInput,
+        recorder: ScenarioRecorder,
+    ) -> None: ...  # pragma: no cover
 
 
 class TransportShape(Protocol):
@@ -256,6 +267,9 @@ class AuthFlow(Protocol):
     def spec(self) -> AuthFlowSteps: ...  # pragma: no cover
 
     def is_supplied(self) -> bool: ...  # pragma: no cover
+
+    # `schemathesis.toml` lines that authenticate through this flow.
+    def config_lines(self) -> list[str]: ...  # pragma: no cover
 
     def sign_up_body(self, operation: APIOperation) -> tuple[dict[str, JsonValue], str] | None: ...  # pragma: no cover
 

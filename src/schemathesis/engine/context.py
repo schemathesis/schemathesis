@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.auths import ReauthState
 from schemathesis.checks import RunChecks
-from schemathesis.config import ProjectConfig
+from schemathesis.config import CoveragePhaseConfig, ExamplesPhaseConfig, FuzzingPhaseConfig, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.core.error_feedback.collector import record_observations
@@ -18,11 +18,13 @@ from schemathesis.engine.health import HealthState
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.outage import ServerMonitor
+from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.schemas import APIOperation
@@ -216,6 +218,30 @@ class EngineContext:
     def apply_stateful_inference(self) -> StatefulInference:
         """Discover spec-specific stateful transitions; return the counts available."""
         return self.schema.apply_stateful_inference(self.observations)
+
+    def feedback_for(self, *, operation: APIOperation, phase: PhaseName) -> FeedbackSources:
+        """Runtime signals that steer generation for one operation in one phase."""
+        return FeedbackSources(
+            extra_data_source=self._extra_data_source_for(operation=operation, phase=phase),
+            error_feedback=self.error_feedback,
+            constants_value_source=self._constants_value_source(),
+        )
+
+    def _extra_data_source_for(self, *, operation: APIOperation, phase: PhaseName) -> ExtraDataSource | None:
+        # Extra data sources augment generation only when enabled for this phase.
+        phase_config = self.config.phases_for(operation=operation).get_by_name(name=phase.value)
+        if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)) and (
+            phase_config.extra_data_sources.is_enabled and self.extra_data_source is not None
+        ):
+            return self.extra_data_source
+        return None
+
+    def _constants_value_source(self) -> ConstantsPool | None:
+        # The pool is extracted once before the run and is read-only during draws, and value selection uses
+        # Hypothesis's own `st.randoms()`, so strategies stay reproducible. An empty pool is not offered at all.
+        if self.constants_extraction.is_empty():
+            return None
+        return self.constants_extraction
 
     def extract_constants(self) -> ConstantsPool:
         """Force one-time constant extraction so later strategy builds hit a ready pool."""

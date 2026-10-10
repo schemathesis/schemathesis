@@ -14,7 +14,6 @@ import requests
 from requests.exceptions import ChunkedEncodingError
 from urllib3.exceptions import InsecureRequestWarning
 
-from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
@@ -24,6 +23,7 @@ from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._rate_limit_retry import call_with_retry
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis.reporting import FILTER_CASE_EXHAUSTED_MESSAGE, build_unsatisfiable_error
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
     from schemathesis.generation.case import Case
+    from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.schemas import APIOperation
 
 FUZZ_TESTS_LABEL = "Fuzz tests"
@@ -59,30 +60,26 @@ _LINK_BIAS_CHOICES = [True] * 8 + [False] * 2
 def _build_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, object]:
     override = overrides.for_operation(ctx.config, operation=operation)
     # `body` is not part of the parameter override system and is never populated by `for_operation`.
-    kwargs: dict[str, object] = {
+    return {
         loc: getattr(override, loc)
         for loc in ("query", "headers", "cookies", "path_parameters")
         if getattr(override, loc)
     }
-    if ctx.error_feedback is not None:
-        kwargs["error_feedback"] = ctx.error_feedback
-    if (
-        ctx.config.phases_for(operation=operation).fuzzing.extra_data_sources.is_enabled
-        and ctx.extra_data_source is not None
-    ):
-        kwargs["extra_data_source"] = ctx.extra_data_source
-    # The pool is extracted once before this run and is read-only during draws, and value
-    # selection uses Hypothesis's own `st.randoms()` -- so the strategy is reproducible with
-    # no external randomness or mutable state for Hypothesis to flag as flaky.
-    if not ctx.constants_extraction.is_empty():
-        kwargs["constants_value_source"] = ctx.constants_extraction
-    return kwargs
+
+
+def _build_strategy_inputs(
+    ctx: EngineContext, *, operations: list[APIOperation]
+) -> tuple[dict[str, dict[str, object]], dict[str, FeedbackSources]]:
+    strategy_kwargs_by_label = {op.label: _build_strategy_kwargs(ctx, operation=op) for op in operations}
+    feedback_by_label = {op.label: ctx.feedback_for(operation=op, phase=PhaseName.FUZZING) for op in operations}
+    return strategy_kwargs_by_label, feedback_by_label
 
 
 def _preflight_operations(
     *,
     operations: list[APIOperation],
     strategy_kwargs_by_label: dict[str, dict[str, object]],
+    feedback_by_label: dict[str, FeedbackSources],
     generation_modes_by_label: dict[str, list],
     event_queue: queue.Queue[events.EngineEvent],
 ) -> tuple[list[APIOperation], dict[str, list]]:
@@ -97,7 +94,11 @@ def _preflight_operations(
         for mode in generation_modes_by_label[operation.label]:
             try:
                 examples.generate_one(
-                    operation.as_strategy(generation_mode=mode, **strategy_kwargs_by_label[operation.label])
+                    operation.as_strategy(
+                        generation_mode=mode,
+                        feedback=feedback_by_label[operation.label],
+                        **strategy_kwargs_by_label[operation.label],
+                    )
                 )
                 viable_modes.append(mode)
             except Unsatisfiable:
@@ -209,15 +210,14 @@ def _run_forever(
     event_queue: queue.Queue[events.EngineEvent],
 ) -> EventGenerator:
     ctx.apply_stateful_inference()
-    strategy_kwargs_by_label: dict[str, dict[str, object]] = {
-        op.label: _build_strategy_kwargs(ctx, operation=op) for op in operations
-    }
+    strategy_kwargs_by_label, feedback_by_label = _build_strategy_inputs(ctx, operations=operations)
     generation_modes_by_label: dict[str, list] = {
         op.label: ctx.config.generation_for(operation=op).modes for op in operations
     }
     active_operations, active_generation_modes_by_label = _preflight_operations(
         operations=operations,
         strategy_kwargs_by_label=strategy_kwargs_by_label,
+        feedback_by_label=feedback_by_label,
         generation_modes_by_label=generation_modes_by_label,
         event_queue=event_queue,
     )
@@ -234,6 +234,7 @@ def _run_forever(
                 "worker_id": worker_id,
                 "plan": plan,
                 "strategy_kwargs_by_label": strategy_kwargs_by_label,
+                "feedback_by_label": feedback_by_label,
                 "generation_modes_by_label": active_generation_modes_by_label,
                 "scenario_started": scenario_started,
             },
@@ -272,6 +273,7 @@ def _run_forever_thread(
     worker_id: int,
     plan: FuzzPlan,
     strategy_kwargs_by_label: dict[str, dict[str, object]],
+    feedback_by_label: dict[str, FeedbackSources],
     generation_modes_by_label: dict[str, list],
     scenario_started: threading.Event,
 ) -> None:
@@ -342,7 +344,9 @@ def _run_forever_thread(
             try:
                 case = draw(
                     st.one_of(
-                        operation.as_strategy(generation_mode=mode, **merged_kwargs)
+                        operation.as_strategy(
+                            generation_mode=mode, feedback=feedback_by_label[operation.label], **merged_kwargs
+                        )
                         for mode in generation_modes_by_label[operation.label]
                     )
                 )
@@ -413,15 +417,12 @@ def _run_forever_thread(
                 if interaction is None or interaction.response is None:
                     continue
                 case = node.value
-                cached = check_context_cache.get_or_create(operation=case.operation, ctx=ctx, phase=None)
-                check_ctx = CheckContext(
-                    override=cached.override,
-                    auth=cached.auth,
-                    headers=cached.headers,
-                    config=cached.config,
-                    transport_kwargs=cached.transport_kwargs,
+                check_ctx = check_context_cache.get_or_create(
+                    operation=case.operation, ctx=ctx, phase=None
+                ).to_check_context(
                     recorder=recorder,
                     response_checks=response_checks,
+                    phase=None,
                     auth_enforced_operations=ctx.auth_enforced_operations,
                 )
                 continue_on_failure = continue_on_failure_by_label[case.operation.label]

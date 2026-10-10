@@ -37,6 +37,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone, to_wire_string
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import custom_formats_cache
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
 from schemathesis.generation.jsonschema.context import Alphabet
@@ -141,9 +142,7 @@ def openapi_cases(
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
-    extra_data_source: ExtraDataSource | None = None,
-    error_feedback: ErrorFeedbackStore | None = None,
-    constants_value_source: ConstantsPool | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -190,10 +189,10 @@ def openapi_cases(
             hooks,
             _mode_for(location, generation_mode, negated),
             generation_config,
-            extra_data_source=extra_data_source,
-            error_feedback=error_feedback,
+            extra_data_source=feedback.extra_data_source,
+            error_feedback=feedback.error_feedback,
             mix_examples=mix_examples,
-            constants_value_source=constants_value_source,
+            constants_value_source=feedback.constants_value_source,
         )
         for location, explicit in (
             (ParameterLocation.PATH, path_parameters),
@@ -214,10 +213,10 @@ def openapi_cases(
             hooks,
             _mode_for(ParameterLocation.BODY, generation_mode, negated),
             generation_config,
-            extra_data_source=extra_data_source,
-            error_feedback=error_feedback,
+            extra_data_source=feedback.extra_data_source,
+            error_feedback=feedback.error_feedback,
             mix_examples=mix_examples,
-            constants_value_source=constants_value_source,
+            constants_value_source=feedback.constants_value_source,
         )
     else:
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)

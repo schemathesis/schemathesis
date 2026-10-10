@@ -31,6 +31,7 @@ from schemathesis.core.transport import CallOutcome, HttpMethod, HttpMethodSchem
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
+from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
     from schemathesis.core import Specification
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import AuthFlow, Scheduler
     from schemathesis.engine.link_calibration import LinkCalibrationState
@@ -71,7 +73,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
     from schemathesis.generation.hypothesis.reporting import FilterCaseTracker, SlowParameter, UnsatisfiableParameter
-    from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool
 
@@ -348,7 +350,9 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @abstractmethod
-    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, feedback: FeedbackSources = NO_FEEDBACK, **kwargs: Any
+    ) -> list[SearchStrategy[Case]]:
         raise NotImplementedError
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
@@ -476,6 +480,7 @@ class BaseSchema(Mapping):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
+        feedback: FeedbackSources = NO_FEEDBACK,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
         raise NotImplementedError
@@ -498,10 +503,8 @@ class BaseSchema(Mapping):
     def _build_state_machine(
         self,
         *,
-        error_feedback: ErrorFeedbackStore | None,
+        feedback: FeedbackSources,
         link_calibration: LinkCalibrationState | None,
-        extra_data_source: ExtraDataSource | None,
-        constants_value_source: ConstantsPool | None = None,
     ) -> type[APIStateMachine]:
         """Engine-internal variant of `as_state_machine` that wires per-run state."""
         raise NotImplementedError
@@ -600,6 +603,17 @@ class BaseSchema(Mapping):
     ) -> list[tuple[APIOperation, dict[str, Any]]]:
         """Return resolvable (target, overrides) link candidates from a response; empty for specs without links."""
         return []
+
+    def record_link_outcome(
+        self,
+        *,
+        calibration: LinkCalibrationState,
+        response: Response,
+        observations: tuple[Observation, ...],
+        step_input: StepInput,
+        recorder: ScenarioRecorder,
+    ) -> None:
+        """Score the link a stateful step followed by how the step went; a no-op for specs without links."""
 
     def iter_schema_warnings(self) -> list[SchemaWarning]:
         """Return spec-level static-analysis warnings collected from the schema."""
@@ -918,6 +932,8 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     def as_strategy(
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
+        *,
+        feedback: FeedbackSources | None = None,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
         """Create a Hypothesis strategy that generates test cases for this API operation.
@@ -926,6 +942,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
         Args:
             generation_mode: Whether to generate positive or negative test data.
+            feedback: Runtime signals that steer generation; defaults to constants extracted for this schema.
             **kwargs: Extra arguments to the underlying strategy function.
 
         """
@@ -933,20 +950,22 @@ class APIOperation(Generic[P, R, S, SchemaT]):
         from schemathesis.generation.hypothesis import setup
 
         setup()
-        if "constants_value_source" not in kwargs:
+        if feedback is None:
             from schemathesis.python._constants.orchestrator import make_constants_value_source
 
-            kwargs["constants_value_source"] = make_constants_value_source(self.schema)
+            feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
         if self.schema.config.headers:
             headers = kwargs.get("headers")
             if headers is None:
                 headers = kwargs["headers"] = {}
             headers.update(self.schema.config.headers)
-        strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, **kwargs)
+        strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, feedback=feedback, **kwargs)
         return apply_case_hooks(strategy, self, local=kwargs.get("hooks"))
 
-    def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
-        return self.schema.get_strategies_from_examples(self, **kwargs)
+    def get_strategies_from_examples(
+        self, feedback: FeedbackSources = NO_FEEDBACK, **kwargs: Any
+    ) -> list[SearchStrategy[Case]]:
+        return self.schema.get_strategies_from_examples(self, feedback=feedback, **kwargs)
 
     def get_parameter_serializer(self, location: str) -> Callable | None:
         return self.schema.get_parameter_serializer(self, location)

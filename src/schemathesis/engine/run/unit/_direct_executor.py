@@ -3,28 +3,22 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from requests.structures import CaseInsensitiveDict
-
-from schemathesis.checks import CheckContext
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
-from schemathesis.engine.errors import TestingState, UnexpectedError, deduplicate_errors
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.errors import UnexpectedError
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import (
     BudgetExpired,
     ServerWentAway,
-    record_extra_data_from_recorder,
     run_one_case,
 )
 from schemathesis.engine.run.unit._errors import (
     iter_controller_error_events,
     translate_iteration_exception,
 )
-from schemathesis.generation import overrides
+from schemathesis.engine.run.unit._scenario import iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.meta import content_type_probes_first
 
@@ -53,53 +47,16 @@ def run_driver(
     scenario_id: uuid.UUID,
 ) -> events.EventGenerator:
     """Drive a progressive case generator directly, one case at a time."""
-    operation = generator.operation
     errors: list[Exception] = []
     skip_reason: str | None = None
-    started_at = Instant()
-    recorder = ScenarioRecorder(label=operation.label, config=ctx.config.output)
-    state = TestingState()
-
-    def non_fatal_error(error: Exception, code_sample: str | None = None) -> events.NonFatalError:
-        return events.NonFatalError(
-            error=error, phase=phase, label=operation.label, related_to_operation=True, code_sample=code_sample
-        )
-
-    def scenario_finished(status: Status) -> events.ScenarioFinished:
-        return events.ScenarioFinished(
-            id=scenario_id,
-            suite_id=suite_id,
-            phase=phase,
-            label=operation.label,
-            recorder=recorder,
-            status=status,
-            elapsed_time=started_at.elapsed,
-            skip_reason=skip_reason,
-            is_final=False,
-        )
-
-    operation_config = ctx.config.operations.get_for_operation(operation)
-    continue_on_failure = operation_config.continue_on_failure or ctx.config.continue_on_failure or False
-    generation = ctx.config.generation_for(operation=operation, phase=phase.value)
-    override = overrides.for_operation(ctx.config, operation=operation)
-    auth = ctx.config.auth_for(operation=operation)
-    headers = ctx.config.headers_for(operation=operation)
-    transport_kwargs = ctx.get_transport_kwargs(operation=operation)
-    checks_config = ctx.config.checks_config_for(operation=operation, phase=phase.value)
-    check_ctx = CheckContext(
-        override=override,
-        auth=auth,
-        headers=CaseInsensitiveDict(headers) if headers else None,
-        config=checks_config,
-        transport_kwargs=transport_kwargs,
-        recorder=recorder,
-        response_checks=ctx.checks.for_responses(),
-        phase=phase,
-        auth_enforced_operations=ctx.auth_enforced_operations,
+    scenario = start_scenario(
+        operation=generator.operation, ctx=ctx, phase=phase, suite_id=suite_id, scenario_id=scenario_id
     )
-
-    if ctx.error_feedback is not None:
-        ctx.error_feedback.checkpoint()
+    operation = scenario.operation
+    recorder = scenario.recorder
+    state = scenario.state
+    continue_on_failure = scenario.continue_on_failure
+    non_fatal_error = scenario.non_fatal_error
 
     status = Status.SUCCESS
     any_case_ran = False
@@ -126,10 +83,10 @@ def run_driver(
                     run_one_case(
                         case=case,
                         ctx=ctx,
-                        check_ctx=check_ctx,
+                        check_ctx=scenario.check_ctx,
                         recorder=recorder,
-                        generation=generation,
-                        transport_kwargs=transport_kwargs,
+                        generation=scenario.generation,
+                        transport_kwargs=scenario.transport_kwargs,
                         continue_on_failure=continue_on_failure,
                         state=state,
                         errors=errors,
@@ -152,7 +109,7 @@ def run_driver(
             status = Status.ERROR
             yield non_fatal_error(stored.error, code_sample=stored.code_sample)
     except KeyboardInterrupt:
-        yield scenario_finished(Status.INTERRUPTED)
+        yield scenario.finished(Status.INTERRUPTED, skip_reason)
         yield events.Interrupted(phase=phase)
         return
     except AuthenticationError as exc:
@@ -187,11 +144,6 @@ def run_driver(
         status = Status.ERROR
         yield event
 
-    yield from pending_events
+    yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 
-    for error in deduplicate_errors(errors):
-        yield non_fatal_error(error)
-
-    record_extra_data_from_recorder(ctx, operation, recorder)
-
-    yield scenario_finished(status)
+    yield scenario.finished(status, skip_reason)

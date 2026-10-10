@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import secrets
 import string
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 from schemathesis.config import ApiKeyAuthConfig, HttpBearerAuthConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.auth_flow.detection import has_supplied_auth
 from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
@@ -28,6 +30,21 @@ class OpenApiAuthFlow:
 
     def is_supplied(self) -> bool:
         return has_supplied_auth(self.schema, self.spec.target_scheme)
+
+    def config_lines(self) -> list[str]:
+        spec = self.spec
+        payload = ", ".join(
+            f'{name} = "${{LOGIN_{re.sub("[^A-Za-z0-9]", "_", name).upper()}}}"' for name in spec.credentials
+        )
+        lines = [
+            f"[auth.dynamic.openapi.{spec.target_scheme}]",
+            f'path = "{spec.login_path}"',
+            f"payload = {{ {payload} }}",
+        ]
+        if not is_json(spec.login_media_type):
+            lines.append(f'payload_content_type = "{spec.login_media_type}"')
+        lines.append(f'extract_selector = "{spec.token_pointer}"')
+        return lines
 
     def sign_up_body(self, operation: APIOperation) -> tuple[dict[str, JsonValue], str] | None:
         # Servers reject blank profile fields, or issue unusable sessions without optional ones such as a role.

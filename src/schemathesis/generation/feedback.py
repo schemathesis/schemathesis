@@ -20,3 +20,6 @@ class FeedbackSources:
     extra_data_source: ExtraDataSource | None = None
     error_feedback: ErrorFeedbackStore | None = None
     constants_value_source: ConstantsPool | None = None
+
+
+NO_FEEDBACK = FeedbackSources()

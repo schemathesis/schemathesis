@@ -9,6 +9,7 @@ from hypothesis import HealthCheck, given, settings
 
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values, substitute_pool_values
@@ -736,7 +737,8 @@ def _pool_with_captured_book(schema):
 def test_negative_case_keeps_violation_when_pool_has_values(ctx):
     schema = ctx.graphql.load_sdl(_POOL_MODE_SDL)
     strategy = schema["Query"]["book"].as_strategy(
-        generation_mode=GenerationMode.NEGATIVE, extra_data_source=_pool_with_captured_book(schema)
+        generation_mode=GenerationMode.NEGATIVE,
+        feedback=FeedbackSources(extra_data_source=_pool_with_captured_book(schema)),
     )
 
     @given(strategy)
@@ -752,7 +754,9 @@ def test_negative_case_keeps_violation_when_pool_has_values(ctx):
 @pytest.mark.hypothesis_nested
 def test_positive_case_uses_pool_values(ctx):
     schema = ctx.graphql.load_sdl(_POOL_MODE_SDL)
-    strategy = schema["Query"]["book"].as_strategy(extra_data_source=_pool_with_captured_book(schema))
+    strategy = schema["Query"]["book"].as_strategy(
+        feedback=FeedbackSources(extra_data_source=_pool_with_captured_book(schema))
+    )
     bodies = []
 
     @given(strategy)

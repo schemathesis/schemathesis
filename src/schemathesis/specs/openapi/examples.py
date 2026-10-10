@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from itertools import cycle, islice
 from typing import TYPE_CHECKING, Any, cast, overload
@@ -25,6 +25,7 @@ from schemathesis.core.parameters import ContainerName, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
+from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.jsonschema.builder import build
@@ -40,12 +41,12 @@ from schemathesis.specs.openapi._hypothesis import (
     snapped_float32_clone,
 )
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
+from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from schemathesis.specs.openapi.formats import format_lengths_for
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
     from schemathesis.specs.openapi.schemas import OpenApiOperation, OpenApiSchema
 
 
@@ -173,7 +174,7 @@ _RENDERED_LOCATIONS = (
 
 def get_strategies_from_examples(
     operation: OpenApiOperation,
-    extra_data_source: OpenApiExtraDataSource | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     fill_missing: bool = False,
     **kwargs: Any,
 ) -> list[SearchStrategy[Case]]:
@@ -206,7 +207,10 @@ def get_strategies_from_examples(
     schema_examples.extend(extract_from_schemas(operation))
     schema_combos = list(produce_combinations(schema_examples))
 
-    pool_combos = _get_pool_combos(operation, extra_data_source) if extra_data_source is not None else []
+    extra_data_source = feedback.extra_data_source
+    pool_combos = (
+        _get_pool_combos(operation, extra_data_source) if isinstance(extra_data_source, OpenApiExtraDataSource) else []
+    )
 
     if schema_combos and pool_combos:
         # Round-robin merge: schema as base, pool wins for overlapping keys.
@@ -232,11 +236,13 @@ def get_strategies_from_examples(
         all_combos = []
 
     all_combos = _with_defaults(operation, all_combos, fill_missing=fill_missing)
+    # Pool values reach these cases through the combos above; generation only fills what they leave unset.
+    generation_feedback = replace(feedback, extra_data_source=None)
 
     return [
-        openapi_cases(operation=operation, phase=TestPhase.EXAMPLES, **merge_kwargs(combo, kwargs)).map(
-            serialize_components
-        )
+        openapi_cases(
+            operation=operation, phase=TestPhase.EXAMPLES, feedback=generation_feedback, **merge_kwargs(combo, kwargs)
+        ).map(serialize_components)
         for combo in all_combos
     ]
 

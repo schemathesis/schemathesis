@@ -15,6 +15,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.engine import events
 from schemathesis.engine.run import PhaseName
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.hypothesis.builder import generate_example_cases
@@ -4448,7 +4449,7 @@ def test_get_strategies_with_binary_body_and_pool_does_not_crash(ctx):
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"itemId": "abc"})
 
-    strategies = get_strategies_from_examples(upload, extra_data_source=data_source)
+    strategies = get_strategies_from_examples(upload, feedback=FeedbackSources(extra_data_source=data_source))
 
     assert strategies
 
@@ -4514,7 +4515,7 @@ def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
         payload={"id": "9e27bc1b-7ae7-4e3b-a4e5-36153479dc01", "name": "foo"},
     )
 
-    strategies = get_strategies_from_examples(operation, extra_data_source=data_source)
+    strategies = get_strategies_from_examples(operation, feedback=FeedbackSources(extra_data_source=data_source))
     assert strategies
     for strategy in strategies:
         examples.generate_one(strategy)

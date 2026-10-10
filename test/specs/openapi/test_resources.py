@@ -11,6 +11,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
@@ -1704,7 +1705,9 @@ def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
         data_source.repository.record_response(operation="POST /users", status_code=201, payload={"id": value})
 
     operation = schema["/sessions"]["POST"]
-    cases_strategy = openapi_cases(operation=operation, phase=TestPhase.FUZZING, extra_data_source=data_source)
+    cases_strategy = openapi_cases(
+        operation=operation, phase=TestPhase.FUZZING, feedback=FeedbackSources(extra_data_source=data_source)
+    )
 
     # Counts only the form-urlencoded slice: that's the path the form-prep map/filter
     # rewrites. With the pre-fix code, captured-variant draws were filtered out here.
