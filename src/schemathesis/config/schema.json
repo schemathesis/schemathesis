@@ -1093,7 +1093,8 @@
         "unresolvable_reference",
         "low_valid_rate",
         "rate_limited",
-        "dictionary_mismatch"
+        "dictionary_mismatch",
+        "timeout_units"
       ]
     },
     "WarningNameList": {

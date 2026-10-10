@@ -287,6 +287,7 @@ Rules:
     - `unresolvable_reference`: A parameter or response schema names a component that does not exist
     - `rate_limited`: API returns mostly 429 responses, suggesting requests exceed its rate limit
     - `dictionary_mismatch`: Most entries of a dictionary fail the schema of the parameter they are bound to
+    - `timeout_units`: `request-timeout` or `max_response_time` is 1000 seconds or more, likely given in milliseconds
     - `low_valid_rate`: An operation accepted only a small share of the requests sent to it (opt-in; enable it by name)
 
 !!! info "CLI Only"
