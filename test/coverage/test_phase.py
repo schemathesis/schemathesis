@@ -1441,7 +1441,7 @@ def test_underspecified_path_parameters(ctx, cli, app_runner, snapshot_cli, sche
     )
 
 
-def test_path_parameters_arent_missing(ctx, cli, snapshot_cli):
+def test_path_parameters_arent_missing(ctx, cli):
     # When `--mode=negative`, still generate path parameters if they can't be negated
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
@@ -1467,16 +1467,15 @@ def test_path_parameters_arent_missing(ctx, cli, snapshot_cli):
             }
         }
     )
-    assert (
-        cli.run(
-            str(schema_path),
-            f"--url={api.base_url}/api",
-            "--checks=not_a_server_error",
-            "--phases=coverage",
-            "--mode=negative",
-        )
-        == snapshot_cli
+    result = cli.run(
+        str(schema_path),
+        f"--url={api.base_url}/api",
+        "--checks=not_a_server_error",
+        "--phases=coverage",
+        "--mode=negative",
     )
+    assert result.exit_code == 0, result.stdout
+    assert {request.path for request in api.requests} == {"/api/organizations/0/"}
 
 
 @pytest.mark.filterwarnings("error")
