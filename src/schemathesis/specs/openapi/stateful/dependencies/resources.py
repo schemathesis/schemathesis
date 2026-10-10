@@ -8,6 +8,7 @@ from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
+from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -50,6 +51,8 @@ class ExtractedResource:
     extract_object_keys: bool = False
     # Fields this response declares for the resource; `None` when it declares none
     response_fields: frozenset[str] | None = None
+    # Envelope field identifying the wrapped resource (`/bookingid` next to `/booking`)
+    identifier_pointer: str | None = None
 
 
 def extract_resources_from_responses(
@@ -247,13 +250,20 @@ def iter_resources_from_response(
         if canonicalized is not resolved and unwrapped.pointer == ROOT_POINTER and cardinality == Cardinality.ONE:
             # Flattening keeps one `allOf` reference only; the fields of every inherited schema belong to the response
             response_fields = _declared_fields(resolved, current_resolver)
+        identifier_pointer = None
+        if pointer is None and unwrapped.pointer != ROOT_POINTER and cardinality == Cardinality.ONE:
+            identifier_pointer = _envelope_identifier_pointer(canonicalized, resource.name)
         if pointer:
             if unwrapped.pointer != ROOT_POINTER:
                 pointer += unwrapped.pointer
         else:
             pointer = unwrapped.pointer
         yield ExtractedResource(
-            resource=resource, cardinality=cardinality, pointer=pointer, response_fields=response_fields
+            resource=resource,
+            cardinality=cardinality,
+            pointer=pointer,
+            response_fields=response_fields,
+            identifier_pointer=identifier_pointer,
         )
         parent_cardinality = cardinality
         # Look for sub-resources. When the unwrapped schema is an array (MANY producer),
@@ -346,6 +356,18 @@ def _envelope_wrapper_field(properties: Mapping[str, Any]) -> str | None:
         return None
     if all(name == wrappers[0] or name.lower() in ENVELOPE_METADATA_FIELDS for name in properties):
         return wrappers[0]
+    return None
+
+
+def _envelope_identifier_pointer(envelope: Mapping[str, Any], resource_name: str) -> str | None:
+    # `{bookingid: 1, booking: {...}}`: the identifier of the wrapped booking sits next to it
+    properties = envelope.get("properties")
+    if not isinstance(properties, dict):
+        return None
+    identifier = naming.normalize_for_matching(resource_name) + "id"
+    for name in properties:
+        if naming.normalize_for_matching(name) == identifier:
+            return f"/{encode_pointer(name)}"
     return None
 
 
