@@ -675,6 +675,11 @@ _EXTRA_PROPERTY_HINT = (
     ("error_body", "hint"),
     [
         pytest.param(b'{"name": ["This field may not be blank."]}', "", id="declared-field-blamed"),
+        pytest.param(
+            b'{"detail":[{"msg":"Input should be a valid string","loc":["parsed_body","name"],"type":"value_error"}]}',
+            "",
+            id="declared-field-blamed-by-flattened-pydantic-error",
+        ),
         pytest.param(b'{"extra": ["This field may not be blank."]}', _EXTRA_PROPERTY_HINT, id="extra-property-blamed"),
         pytest.param(b'{"detail": "Bad request"}', _EXTRA_PROPERTY_HINT, id="no-field-blamed"),
     ],
