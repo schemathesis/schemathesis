@@ -128,6 +128,19 @@ class OperationRow:
 
 
 @dataclass(slots=True)
+class ExtractionNote:
+    """A link that could not take the data it needs from a response."""
+
+    link: str
+    case_id: str
+    reason: list[str]
+    # Requests that led to the response, oldest first.
+    commands: list[Command]
+    status_code: int
+    body: str
+
+
+@dataclass(slots=True)
 class ReportData:
     meta: ReportMeta
     summary: SummaryData
@@ -143,6 +156,14 @@ class ReportData:
     warnings: list[WarningBlock]
     # Problems with the invocation itself, e.g. a timeout given in milliseconds.
     startup_warnings: list[str]
+    # Each test phase as (name, kind, outcome): ("Fuzzing", "passed", "passed"), ("Coverage", "skipped", "disabled").
+    phases: list[tuple[str, str, str]]
+    # Checks enabled for the run.
+    checks: list[str]
+    reauth_count: int
+    # Authentication stopped working mid-run.
+    reauth_broke: bool
+    extraction_failures: list[ExtractionNote]
     running_time: float | None
     stop_reason: StopReason
     # `started` is False when the engine never ran (schema failed to load); `complete` is False
@@ -203,8 +224,22 @@ class ReportData:
         # Filters that match nothing exit non-zero, yet nothing failed.
         if not self.tested_operations and not self.summary.failures and not self.summary.errors:
             return Verdict.EMPTY
-        if self.exit_code == 0:
-            return Verdict.PASSED
-        if self.summary.failures or not self.summary.errors:
+        # The verdict comes from the tests; other reasons for a non-zero exit show next to it.
+        if self.summary.failures:
             return Verdict.FAILED
-        return Verdict.ERRORED
+        if self.summary.errors:
+            return Verdict.ERRORED
+        return Verdict.PASSED
+
+    @property
+    def exit_note(self) -> tuple[str, str] | None:
+        """Why the run exits non-zero although its verdict passed, and where the details are."""
+        if self.exit_code == 0 or self.verdict is not Verdict.PASSED:
+            return None
+        baseline = self.summary.baseline
+        if baseline is not None and baseline.write_error:
+            return f"Exit code {self.exit_code}: baseline not saved", "note-baseline"
+        # Rendering links this to the first warning.
+        if self.warnings:
+            return f"Exit code {self.exit_code}: warnings fail the run", "warnings"
+        return f"Exit code {self.exit_code}", ""

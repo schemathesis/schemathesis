@@ -1117,6 +1117,41 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
     assert state["issued"] >= 2
 
 
+def test_reauth_count_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_html):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"OAuth2": OAUTH2_SCHEME}},
+    )
+    _register_single_use_token(app)
+    report_dir = tmp_path / "report"
+
+    _run_cli(
+        cli,
+        app_runner,
+        app,
+        "--include-path=/protected",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 4",
+        "--seed=42",
+        config={
+            "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
+            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
+        },
+        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
+    )
+    assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
+
+
 # A negated-security case's 401 is the expected outcome, not an expired token - the hook must not re-authenticate for it.
 def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner):
     app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})

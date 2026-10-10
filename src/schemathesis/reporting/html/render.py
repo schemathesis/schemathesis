@@ -98,6 +98,7 @@ def render_index(data: ReportData) -> str:
         _warnings(data, anchors),
         _target_block(data),
         _operations_table(data, anchors),
+        _extraction_failures(data),
     ]
     body = "\n".join(part for part in parts if part)
     return page(title="Schemathesis Report", body=body)
@@ -163,9 +164,109 @@ def _at_risk(data: ReportData) -> str:
     return " at-risk" if _affecting_warnings(data) else ""
 
 
+def _exit_note(data: ReportData) -> str:
+    note = data.exit_note
+    if note is None:
+        return ""
+    text, target = note
+    if target == "warnings":
+        target = _warning_id(min(data.warnings, key=lambda block: not block.affects_verdict))
+    href = f' href="#{target}"' if target else ""
+    tag = "a" if target else "span"
+    return f'<{tag} class="hs-exit"{href}>{esc(text)}</{tag}>'
+
+
+# The default run enables over a dozen checks; the row shows the first few, like the Failures cell.
+_CHECKS_SHOWN = 5
+
+
+def _checks(names: list[str]) -> str:
+    shown, rest = names[:_CHECKS_SHOWN], names[_CHECKS_SHOWN:]
+    first = "".join(f"<code>{esc(name)}</code>" for name in shown)
+    if not rest:
+        return f'<span class="checks-inline">{first}</span>'
+    more = f'<span class="more"><span class="m-closed">+{len(rest)} more</span><span class="m-open">less</span></span>'
+    others = "".join(f"<code>{esc(name)}</code>" for name in rest)
+    return (
+        f'<details class="fails checks"><summary><span class="checks-inline">{first}{more}</span></summary>'
+        f'<span class="checks-inline checks-rest">{others}</span></details>'
+    )
+
+
+def _note_rows(data: ReportData) -> list[str]:
+    rows = []
+    baseline = data.summary.baseline
+    if baseline is not None:
+        facts = [("Known failures", str(baseline.known))]
+        if baseline.recorded is not None:
+            facts.append(("Recorded", str(baseline.recorded)))
+        if baseline.pruned is not None:
+            facts.append(("Pruned", str(len(baseline.pruned))))
+        if baseline.unobserved:
+            facts.append(("Unobserved entries", str(baseline.unobserved)))
+        if baseline.expired_ids:
+            facts.append(("Expired entries", f"{len(baseline.expired_ids)} ({', '.join(baseline.expired_ids)})"))
+        items = "".join(
+            f'<li><span class="k">{esc(key)}</span><span class="v">{esc(value)}</span></li>' for key, value in facts
+        )
+        error = f'<p class="note-error">{esc(baseline.write_error)}</p>' if baseline.write_error else ""
+        rows.append(_note_row("Baseline", "note-baseline", f'<ul class="rn-facts">{items}</ul>{error}'))
+    if data.summary.filtered:
+        rows.append(
+            _note_row(
+                "Filtered failures",
+                "note-filtered",
+                f"<p>{plural(data.summary.filtered, 'failure')} dropped by <code>filter_failure</code></p>",
+            )
+        )
+    if data.reauth_count or data.reauth_broke:
+        parts = []
+        if data.reauth_count:
+            parts.append(f"<p>Re-authenticated {plural(data.reauth_count, 'time')}</p>")
+        if data.reauth_broke:
+            parts.append(
+                '<p class="note-error">Authentication stopped working mid-run - credentials likely invalidated</p>'
+            )
+        rows.append(_note_row("Authentication", "note-reauth", "".join(parts)))
+    return rows
+
+
+def _note_row(key: str, anchor: str, value: str) -> str:
+    return (
+        f'<span class="tk" id="{anchor}">{key}</span>'
+        f'<span class="tv"><span class="tv-text tv-note">{value}</span></span>'
+    )
+
+
+def _extraction_failures(data: ReportData) -> str:
+    if not data.extraction_failures:
+        return ""
+    cards = []
+    for failure in data.extraction_failures:
+        title, *messages = failure.reason
+        details = "".join(f'<pre class="msg">{_code_spans(message)}</pre>' for message in messages)
+        parts = [
+            f'<div class="case-owner"><span class="ex-link">{esc(failure.link)}</span></div>',
+            f'<div class="finding"><h4 class="finding-title">{_code_spans(title)}</h4>{details}</div>',
+            _evidence("Response", _body(failure.body), _status(failure.status_code)),
+        ]
+        if failure.commands:
+            parts.append(_reproduce(failure.commands, None))
+        cards.append(
+            f'<article class="case" id="case-{esc(failure.case_id)}"><div class="case-body">{"".join(parts)}</div>'
+            f'<div class="case-meta"><span class="case-id">{esc(failure.case_id)}</span></div></article>'
+        )
+    return (
+        '<section class="run-notes" id="note-extraction" aria-labelledby="note-extraction-h">'
+        '<h2 class="rn-title" id="note-extraction-h">Failed to extract data from response</h2>'
+        f'<div class="case-list">{"".join(cards)}</div></section>'
+    )
+
+
 def _caveat(data: ReportData) -> str:
     affecting = _affecting_warnings(data)
-    if not affecting:
+    # One amber line in the verdict cell: the exit note already points at the warnings.
+    if not affecting or data.exit_note is not None:
         return ""
     return f'<a class="hs-caveat" href="#{_warning_id(affecting[0])}">{plural(len(affecting), "warning")}</a>'
 
@@ -227,7 +328,7 @@ def _message(data: ReportData) -> str:
     return (
         f'<section class="hero-strip is-message verdict-{verdict.css}{_at_risk(data)}">'
         f'<div class="hs-cell hs-verdict"><h1 class="hero-status-label">{esc(verdict.value)}</h1>'
-        f'<div class="hs-sub">{esc(subtitle)}</div>{_caveat(data)}</div>'
+        f'<div class="hs-sub">{esc(subtitle)}</div>{_caveat(data)}{_exit_note(data)}</div>'
         f'<div class="hs-cell hs-explain"><div class="ex-title">{esc(title)}</div>{detail_html}{tip}</div>'
         "</section>"
     )
@@ -270,9 +371,6 @@ def _verdict_line(data: ReportData) -> tuple[str, str]:
         return bar, text
     if data.summary.failures:
         return "", "Failures not attributed to a tested operation"
-    if data.verdict is Verdict.FAILED:
-        baseline = data.summary.baseline
-        return "", baseline.write_error if baseline is not None and baseline.write_error else "Run failed"
     if data.verdict is Verdict.ERRORED:
         errored = sum(row.status is OperationStatus.ERRORED for row in data.operations)
         return "", f"{plural(errored, 'operation')} errored" if errored else "Errors not tied to an operation"
@@ -308,7 +406,7 @@ def _result(data: ReportData) -> str:
     return (
         f'<section class="hero-strip verdict-{verdict.css}{_at_risk(data)}">'
         f'<div class="hs-cell hs-verdict"><h1 class="hero-status-label">{esc(verdict.value)}</h1>'
-        f'{bar}<div class="hs-sub">{esc(text)}</div>{_stop_note(data)}{_caveat(data)}</div>'
+        f'{bar}<div class="hs-sub">{esc(text)}</div>{_stop_note(data)}{_caveat(data)}{_exit_note(data)}</div>'
         f"{_second_cell(data)}"
         f"{_metric('Cases run', f'{data.summary.test_cases.generated:,}', cases_subtitle)}"
         f"{_metric('Operations', str(data.selected_operations), ', '.join(operations_parts))}"
@@ -354,6 +452,16 @@ def _target_block(data: ReportData) -> str:
     rows.append(_row("Command", _command(meta.command), _copy_button(meta.command, "command")))
     if meta.seed is not None:
         rows.append(_row("Seed", f"<code>{meta.seed}</code>", _copy_button(str(meta.seed), "seed")))
+    if data.phases:
+        phases = "".join(
+            f'<li class="phase phase-{kind}"><span class="ph-name">{esc(name)}</span>'
+            f'<span class="ph-outcome">{esc(outcome)}</span></li>'
+            for name, kind, outcome in data.phases
+        )
+        rows.append(_row("Phases", f'<ol class="phases">{phases}</ol>'))
+    if data.checks:
+        rows.append(_row("Checks", _checks(data.checks)))
+    rows.extend(_note_rows(data))
     return f'<section class="target-block">{"".join(rows)}</section>'
 
 
