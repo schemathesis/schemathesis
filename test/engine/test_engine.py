@@ -20,6 +20,7 @@ import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.errors import HookExecutionError
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.recorder import Request
@@ -598,20 +599,24 @@ def test_exceptions(ctx):
     assert any(event.status == Status.ERROR for event in stream.find_all(events.ScenarioFinished))
 
 
-def test_internal_exceptions(ctx, mocker):
+def test_internal_exceptions(ctx):
     # GH: #236
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
     api = ctx.openapi.apps.multipart()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    mocker.patch("schemathesis.Case.call", side_effect=ValueError)
+
+    @schemathesis.hook
+    def before_call(context, case, kwargs):
+        raise ValueError
+
     stream = execute(schema, max_examples=3)
     # Then the execution result should indicate errors
     stream.assert_errors()
     # And an error from the buggy code should be collected
-    exceptions = [error.value.__class__.__name__ for error in stream.find_all(events.NonFatalError)]
-    assert "ValueError" in exceptions
-    assert len(exceptions) == 1
+    assert [(type(error.value), type(error.value.__cause__)) for error in stream.find_all(events.NonFatalError)] == [
+        (HookExecutionError, ValueError)
+    ]
 
 
 def test_positive_data_acceptance_multipart_binary(ctx, app_runner):
@@ -1297,14 +1302,17 @@ def test_interrupted_in_test(ctx):
     assert scenario_finished.recorder.interactions
 
 
-def test_interrupted_outside_test(ctx, mocker):
+def test_interrupted_outside_test(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
+
     # See GH-1325
     # When an interrupt happens outside a test body
-    mocker.patch("schemathesis.engine.events.ScenarioFinished.__init__", side_effect=KeyboardInterrupt)
+    @schemathesis.hook
+    def before_generate_case(context, strategy):
+        raise KeyboardInterrupt
 
-    stream = EventStream(schema).execute()
+    stream = EventStream(schema, phases=[PhaseName.FUZZING]).execute()
     try:
         interrupted = stream.find(events.Interrupted)
         # Then the `Interrupted` event should be emitted

@@ -5,7 +5,7 @@ import socket
 
 import pytest
 import requests
-from flask import jsonify, request
+from flask import Flask, jsonify, request
 
 import schemathesis.openapi
 from schemathesis.auths import (
@@ -173,15 +173,15 @@ def test_get_401_message_is_actionable_without_common_causes(auth_operation):
     )
 
 
-def test_fetch_http_forwards_tls_config(ctx, app_runner, mocker):
-    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+def test_fetch_http_forwards_tls_config(ctx, app_runner):
+    app = Flask(__name__)
 
     @app.route("/api/auth", methods=["POST"])
     def auth():
         return jsonify({"access_token": "test-token"})
 
-    spy = mocker.patch("requests.request", wraps=requests.request)
-    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema.config.update(base_url=f"https://127.0.0.1:{app_runner.run_https_flask_app(app)}")
     schema.config.tls_verify = False
     operation = schema["/data"]["GET"]
     provider = DynamicTokenAuthProvider(
@@ -193,7 +193,6 @@ def test_fetch_http_forwards_tls_config(ctx, app_runner, mocker):
         _applier=HttpBearerAuthProvider(bearer=""),
     )
     assert provider.get(operation.Case(), AuthContext(operation=operation, app=None)) == "test-token"
-    assert spy.call_args[1]["verify"] is False
 
 
 def test_get_raises_on_connection_error(ctx, cli, app_runner):

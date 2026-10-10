@@ -1,10 +1,10 @@
-import http.client
 import json
 import os
 import pathlib
 import platform
 import re
 import shutil
+import socket
 import ssl
 import subprocess
 import sys
@@ -37,7 +37,6 @@ from schemathesis.core.shell import ShellType
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.engine.run.unit._pool import DefaultScheduler
-from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
@@ -820,13 +819,24 @@ def test_chunked_encoding_error(ctx, mocker, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--phases=fuzzing") == snapshot_cli
 
 
-def test_remote_disconnected_error(ctx, mocker, cli, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    mocker.patch(
-        "http.client.HTTPResponse.begin",
-        side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
-    )
-    assert cli.run(api.schema_url) == snapshot_cli
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
+)
+def test_remote_disconnected_error(cli, snapshot_cli):
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def close_without_response():
+        while True:
+            try:
+                connection, _ = listener.accept()
+            except OSError:
+                return
+            with connection:
+                connection.recv(65536)
+
+    threading.Thread(target=close_without_response, daemon=True).start()
+    with listener:
+        assert cli.run(f"http://127.0.0.1:{listener.getsockname()[1]}/openapi.json") == snapshot_cli
 
 
 def test_remote_disconnected_error_with_empty_header(ctx, mocker, cli, snapshot_cli):
@@ -961,31 +971,10 @@ def test_register_check(ctx, new_check, cli, snapshot_cli):
 
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.filterwarnings("ignore:Exception in thread")
-def test_keyboard_interrupt(ctx, cli, mocker, swagger_20, workers, snapshot_cli):
-    # When a Schemathesis run in interrupted by keyboard or via SIGINT
+def test_keyboard_interrupt(ctx, cli, workers, snapshot_cli):
     api = ctx.openapi.apps.success()
-    operation = APIOperation(
-        "/api/success",
-        "GET",
-        {},
-        swagger_20,
-        base_url=api.base_url,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
-    original = operation.Case().call
-    counter = 0
-
-    def mocked(*args, **kwargs):
-        nonlocal counter
-        counter += 1
-        if counter > 1:
-            # For threaded case it emulates SIGINT for the worker thread
-            raise KeyboardInterrupt
-        return original(*args, **kwargs)
-
-    mocker.patch("schemathesis.Case.call", wraps=mocked)
-    result = cli.run(api.schema_url, f"--workers={workers}", "--mode=positive")
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
+    result = cli.run(api.schema_url, f"--workers={workers}", "--mode=positive", hooks=module)
     if workers == 1:
         assert result == snapshot_cli
     else:
@@ -1010,11 +999,17 @@ def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
     assert cli.run(api.schema_url, "--workers=2", "--generation-deterministic") == snapshot_cli
 
 
-def test_keyboard_interrupt_during_schema_loading(ctx, cli, mocker, snapshot_cli):
+def test_keyboard_interrupt_during_schema_loading(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
-    mocker.patch("schemathesis.core.loaders.make_request", side_effect=KeyboardInterrupt)
-    assert cli.run(api.schema_url) == snapshot_cli
+    module = ctx.write_pymodule(INTERRUPT_ON_SCHEMA_LOAD)
+    assert cli.run(api.schema_url, hooks=module) == snapshot_cli
 
+
+INTERRUPT_ON_SCHEMA_LOAD = """
+@schemathesis.hook
+def before_load_schema(context, raw_schema):
+    raise KeyboardInterrupt
+"""
 
 INTERRUPT_ON_SECOND_RESPONSE = """
 calls = 0
@@ -1074,13 +1069,7 @@ def test_keyboard_interrupt_exit_code(ctx, cli, app_runner, tmp_path, command, s
 
 def test_keyboard_interrupt_exit_code_during_schema_loading(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def before_load_schema(context, raw_schema):
-    raise KeyboardInterrupt
-"""
-    )
+    module = ctx.write_pymodule(INTERRUPT_ON_SCHEMA_LOAD)
     report_path = tmp_path / "report.json"
     result = cli.main("run", api.schema_url, f"--report-json-path={report_path}", hooks=module)
     report = json.loads(report_path.read_text())
@@ -2830,8 +2819,7 @@ def test_output_sanitization_via_config(ctx, cli, hypothesis_max_examples, enabl
 
 
 @flaky(max_runs=5, min_passes=1)
-def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, snapshot_cli):
-    api = ctx.openapi.apps.success()
+def test_multiple_failures_in_single_check(ctx, app_runner, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -2846,9 +2834,16 @@ def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, s
             },
         }
     )
-    response = response_factory.requests(content_type=None, status_code=200)
-    mocker.patch("requests.Session.request", return_value=response)
-    assert cli.run(str(schema_path), f"--url={api.base_url}", "--checks=all", "--mode=positive") == snapshot_cli
+    app = Flask(__name__)
+
+    @app.route("/success")
+    def success():
+        response = Response(b"{}")
+        del response.headers["Content-Type"]
+        return response
+
+    base_url = app_runner.openapi_url(app, path="")
+    assert cli.run(str(schema_path), f"--url={base_url}", "--checks=all", "--mode=positive") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)

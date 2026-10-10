@@ -495,25 +495,38 @@ def test_fuzz_all_operations_have_schema_errors(cli, app_runner, ctx, snapshot_c
 
 
 @pytest.mark.parametrize(
-    ("config", "expected"),
+    "config",
     [
-        ({"fuzz": {"max-time": 2}}, 2),
-        ({"max-time": 5}, 5),
-        ({"max-time": 5, "fuzz": {"max-time": 2}}, 2),
+        {"fuzz": {"max-time": 1}},
+        {"max-time": 1},
+        {"max-time": 60, "fuzz": {"max-time": 1}},
     ],
     ids=["fuzz-section", "root", "fuzz-section-over-root"],
 )
-def test_fuzz_max_time_from_config(cli, ctx, app_runner, monkeypatch, config, expected):
-    url = _make_fuzz_app(ctx, app_runner)
-    captured = {}
+def test_fuzz_max_time_from_config(cli, ctx, app_runner, tmp_path, config):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
 
-    def fake_execute(**kwargs):
-        captured["fuzz_config"] = kwargs["fuzz_config"]
+    @app.route("/users")
+    def users():
+        return jsonify([])
 
-    monkeypatch.setattr(fuzz_executor, "execute", fake_execute)
-    result = cli.main("fuzz", url, "--mode=positive", config=config)
-    assert result.exit_code == 0, result.output
-    assert captured["fuzz_config"].max_time == expected
+    report_path = tmp_path / "report.json"
+    result = cli.main(
+        "fuzz", app_runner.openapi_url(app), "--mode=positive", f"--report-json-path={report_path}", config=config
+    )
+    report = json.loads(report_path.read_text())
+    assert (result.exit_code, report["stop_reason"], report["running_time"] < 30) == (0, "max_time", True), (
+        result.output
+    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

@@ -7,11 +7,13 @@ from django.core.wsgi import get_wsgi_application
 from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import path
-from flask import Flask, jsonify, redirect
+from flask import Flask, jsonify, redirect, request
 
 import schemathesis
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.transport import USER_AGENT
+from test.apps.catalog.graphql import bookstore
+from test.apps.catalog.openapi import basic
 from test.utils import graphql_url, openapi_url
 
 
@@ -50,21 +52,21 @@ def test_base_url_override(ctx, loader, make_url, base_url):
 
 
 @pytest.mark.parametrize(
-    ("target", "loader"),
+    ("app", "path", "loader"),
     [
-        ("requests.get", schemathesis.openapi.from_url),
-        ("requests.post", schemathesis.graphql.from_url),
+        (basic.success, "/openapi.json", schemathesis.openapi.from_url),
+        (bookstore.books, "/graphql", schemathesis.graphql.from_url),
     ],
+    ids=["openapi", "graphql"],
 )
-def test_uri_loader_custom_kwargs(mocker, target, loader):
-    # All custom kwargs are passed to `requests` as is
-    mocked = mocker.patch(target)
-    try:
-        loader("http://127.0.0.1:8000", verify=False, headers={"X-Test": "foo"})
-    except Exception:
-        pass
-    assert mocked.call_args[1]["verify"] is False
-    assert mocked.call_args[1]["headers"] == {"X-Test": "foo", "User-Agent": USER_AGENT}
+# The server's TLS certificate is untrusted, so loading succeeds only if `verify=False` is forwarded.
+def test_uri_loader_custom_kwargs(app_runner, app, path, loader):
+    server = app().server
+    received = []
+    server.before_request(lambda: received.append(dict(request.headers)))
+    port = app_runner.run_https_flask_app(server)
+    loader(f"https://127.0.0.1:{port}{path}", verify=False, headers={"X-Test": "foo"})
+    assert [(headers["X-Test"], headers["User-Agent"]) for headers in received] == [("foo", USER_AGENT)]
 
 
 def test_auth_loader_options(ctx):
