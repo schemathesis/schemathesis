@@ -34,6 +34,7 @@ class LoadingFinished(events.EngineEvent):
     specification: Specification
     statistic: ApiStatistic
     schema: dict
+    title: str | None
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None]
 
@@ -47,6 +48,7 @@ class LoadingFinished(events.EngineEvent):
         "specification",
         "statistic",
         "schema",
+        "title",
         "config",
         "find_operation_by_label",
     )
@@ -61,6 +63,7 @@ class LoadingFinished(events.EngineEvent):
         specification: Specification,
         statistic: ApiStatistic,
         schema: dict,
+        title: str | None,
         config: ProjectConfig,
         find_operation_by_label: Callable[[str], APIOperation | None],
     ) -> None:
@@ -72,6 +75,7 @@ class LoadingFinished(events.EngineEvent):
         self.specification = specification
         self.statistic = statistic
         self.schema = schema
+        self.title = title
         self.base_path = base_path
         self.config = config
         self.find_operation_by_label = find_operation_by_label

@@ -15,15 +15,7 @@ from schemathesis.reporting.crashes import CrashWriter, build_crashes_from_recor
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.config import ProjectConfig, SanitizationConfig
-
-
-def _project_title(raw_schema: dict, config: ProjectConfig) -> str | None:
-    info = raw_schema.get("info")
-    title = info.get("title") if isinstance(info, dict) else None
-    if isinstance(title, str) and title in config._get_parent().projects.named:
-        return title
-    return None
+    from schemathesis.config import SanitizationConfig
 
 
 class CrashHandler(EventHandler):
@@ -48,7 +40,7 @@ class CrashHandler(EventHandler):
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
-            self._start_worker(_project_title(event.schema, event.config))
+            self._start_worker(event.config.named_project_title(event.title))
         elif isinstance(event, (events.ScenarioFinished, events.FuzzScenarioFinished)) and event.status in (
             Status.FAILURE,
             Status.ERROR,

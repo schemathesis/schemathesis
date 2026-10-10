@@ -575,6 +575,12 @@ class ProjectConfig(DiffBase):
             **kwargs,
         )
 
+    def named_project_title(self, title: str | None) -> str | None:
+        """Return `title` when it names a `[[project]]` block."""
+        if title is not None and title in self._get_parent().projects.named:
+            return title
+        return None
+
     def _get_parent(self) -> SchemathesisConfig:
         if self._parent is None:
             from schemathesis.config import SchemathesisConfig

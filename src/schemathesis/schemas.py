@@ -356,7 +356,8 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
-        raise NotImplementedError
+        # Specs without per-location serialization rules send values as generated.
+        return None
 
     def parametrize(self) -> Callable:
         """Return a decorator that marks a test function for `pytest` parametrization.

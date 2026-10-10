@@ -93,7 +93,7 @@ def _run(ctx: EngineContext) -> CacheReport | None:
     if not cache_config.enabled:
         return None
 
-    directory = effective_directory(cache_config.directory, _active_project_title(ctx))
+    directory = effective_directory(cache_config.directory, ctx.config.named_project_title(ctx.schema.title))
     manifest_path = directory / MANIFEST_FILENAME
     try:
         manifest_present = manifest_path.is_file()
@@ -156,7 +156,7 @@ def _flush(ctx: EngineContext, writer: CacheWriter) -> None:
     if not writer.has_pending and not identities:
         return
 
-    directory = effective_directory(ctx.config.cache.directory, _active_project_title(ctx))
+    directory = effective_directory(ctx.config.cache.directory, ctx.config.named_project_title(ctx.schema.title))
 
     loaded = load(directory)
     if loaded is None:
@@ -363,14 +363,3 @@ def _send_without_auth(ctx: EngineContext, case: Case, operation: APIOperation) 
         return case.call(**kwargs)
     except requests.RequestException:
         return None
-
-
-def _active_project_title(ctx: EngineContext) -> str | None:
-    """Return the active project's title if it matches a named [[project]] block."""
-    title = ctx.schema.title
-    if not isinstance(title, str):
-        return None
-    parent = ctx.config._get_parent()
-    if title in parent.projects.named:
-        return title
-    return None

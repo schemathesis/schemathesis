@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig, ProjectConfig
     from schemathesis.core.mutations import MutationMetadata
     from schemathesis.python._constants.pool import ConstantDraw
-    from schemathesis.specs.openapi.schemas import OpenApiOperation
+    from schemathesis.schemas import APIOperation
 
 
 def _eligible_for_mode(matches_schema: bool, mode: GenerationMode) -> bool:
@@ -90,7 +90,7 @@ class _ResolvedBinding:
 
 def resolve_parameter_bindings(
     *,
-    operation: OpenApiOperation,
+    operation: APIOperation,
     location: ParameterLocation,
     properties: dict[str, JsonSchema],
     generation_config: GenerationConfig,
@@ -271,7 +271,7 @@ class _ResolvedBodyBinding:
 
 def resolve_body_bindings(
     *,
-    operation: OpenApiOperation,
+    operation: APIOperation,
     body_schema: JsonSchema,
     generation_config: GenerationConfig,
 ) -> list[_ResolvedBodyBinding]:

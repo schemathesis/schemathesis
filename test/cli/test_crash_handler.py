@@ -11,10 +11,9 @@ from flask import jsonify, request
 from schemathesis.cli.commands.run.handlers.crashes import (
     _find_failing_case_ids,
     _Process,
-    _project_title,
     _run,
 )
-from schemathesis.config import SanitizationConfig, SchemathesisConfig
+from schemathesis.config import SanitizationConfig
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -24,13 +23,6 @@ from test.utils import crash_cache_dir
 
 def _failure() -> Failure:
     return Failure(operation="GET /x", title="Server error", message="boom")
-
-
-def test_project_title_tolerates_non_dict_info():
-    # A malformed `info` (null or a non-object) must not abort the run.
-    config = SchemathesisConfig().projects.get_default()
-    assert _project_title({"info": None}, config) is None
-    assert _project_title({"info": "oops"}, config) is None
 
 
 def _failing_recorder(case_factory, *, label: str = "GET /users") -> ScenarioRecorder:
