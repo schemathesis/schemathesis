@@ -196,6 +196,11 @@ def test_invalid_parameter_schema_type(ctx):
         _ = operation.query[0].optimized_schema
 
 
+@pytest.mark.parametrize("info", [None, "oops", {"title": ["API"]}], ids=["null", "string", "non-string-title"])
+def test_malformed_info_has_no_title(info):
+    assert schemathesis.openapi.from_dict({"openapi": "3.0.0", "info": info, "paths": {}}).title is None
+
+
 def test_no_paths_on_openapi_3_1(ctx):
     schema = ctx.openapi.load_schema(None, version="3.1.0")
     assert list(schema.get_all_operations()) == []

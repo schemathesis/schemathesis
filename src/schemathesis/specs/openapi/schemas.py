@@ -162,7 +162,9 @@ class OpenApiSchema(BaseSchema):
     @property
     @override
     def title(self) -> str | None:
-        return self.raw_schema.get("info", {}).get("title")
+        info = self.raw_schema.get("info")
+        title = info.get("title") if isinstance(info, dict) else None
+        return title if isinstance(title, str) else None
 
     @cached_property
     def security(self) -> OpenApiSecurity:
