@@ -23,6 +23,7 @@
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
+- Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
 - Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
 - Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
