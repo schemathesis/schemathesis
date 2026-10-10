@@ -220,6 +220,37 @@ def test_stale_example_evicted_after_format_inference_on_query_param(ctx):
     assert not stale, f"Stale `token`: {len(stale)}/{len(fuzzing_token_values)} fuzzing draws"
 
 
+def test_example_of_rejected_query_parameter_not_sent(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [{"name": "legacy", "in": "query", "schema": {"type": "string"}, "example": "STALE"}],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/api/items")
+    def items():
+        if "legacy" in request.args:
+            return jsonify({"message": 'parameter name "legacy" is not allowed', "fieldErrors": []}), 400
+        return jsonify([])
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["examples", "coverage", "fuzzing"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=30)
+
+    fuzzing_queries = []
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
+            fuzzing_queries.extend(case_node.value.query for case_node in event.recorder.cases.values())
+    assert fuzzing_queries, "No fuzzing draws collected"
+    assert [query for query in fuzzing_queries if query and "legacy" in query] == []
+
+
 def test_stale_body_example_evicted_in_coverage_after_examples_observations(ctx):
     api = ctx.openapi.apps.commit_date_with_examples()
     schema = schemathesis.openapi.from_url(api.schema_url)
