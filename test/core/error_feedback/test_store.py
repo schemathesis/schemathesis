@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from schemathesis.core.error_feedback import (
@@ -105,3 +107,109 @@ def test_observation_counts_keep_growing_past_the_bucket_cap():
         store.record(_make(kind=ObservationKind.MUST_NOT_BE_BLANK, payload=None, path=(f"f{index}",)))
 
     assert store.observation_counts() == {"POST /v1/foo": MAX_ENTRIES_PER_BUCKET * 2}
+
+
+def _obs(field: str, *, op: str = "POST /api/users") -> Observation:
+    return Observation(
+        operation_label=op,
+        location=ParameterLocation.BODY,
+        parameter_path=(field,),
+        kind=ObservationKind.MUST_NOT_BE_BLANK,
+        raw_message=f"{field} - must not be blank",
+    )
+
+
+def test_store_dedups_identical_observations_into_one_entry():
+    store = ErrorFeedbackStore()
+    for _ in range(1553):
+        store.record(_obs("email"))
+    assert len(store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)) == 1
+
+
+def test_store_evicts_lowest_count_entry_when_bucket_full():
+    store = ErrorFeedbackStore()
+    for i in range(MAX_ENTRIES_PER_BUCKET):
+        store.record(_obs(f"f{i}"))
+        store.record(_obs(f"f{i}"))
+    for _ in range(50):
+        store.record(_obs("f0"))
+    store.record(_obs("new_field"))
+    store.record(_obs("new_field"))
+
+    paths = {
+        o.parameter_path for o in store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)
+    }
+    assert ("f0",) in paths
+    assert ("new_field",) in paths
+    assert len(paths) == MAX_ENTRIES_PER_BUCKET
+
+
+def test_store_observations_surface_on_first_record():
+    # Parsers only emit observations on a specific framework-string match, so a single
+    # occurrence is conclusive — observations propagate to the next phase immediately
+    # rather than waiting for a duplicate confirmation.
+    store = ErrorFeedbackStore()
+    store.record(_obs("email"))
+    out = store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)
+    assert len(out) == 1
+    assert out[0].parameter_path == ("email",)
+
+
+def test_store_checkpoint_bumps_generation_and_keeps_observations():
+    store = ErrorFeedbackStore()
+    store.record(_obs("email"))
+    store.record(_obs("email"))
+    assert store.generation == 0
+
+    store.checkpoint()
+    assert store.generation == 1
+    assert len(store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)) == 1
+
+    store.checkpoint()
+    assert store.generation == 2
+
+
+def test_store_record_does_not_bump_generation():
+    store = ErrorFeedbackStore()
+    store.record(_obs("email"))
+    store.record(_obs("email"))
+    store.record(_obs("email"))
+    assert store.generation == 0
+
+
+def test_store_keeps_min_and_max_numeric_bounds_for_same_path():
+    store = ErrorFeedbackStore()
+    min_payload = NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=True)
+    max_payload = NumericBoundPayload(bound=100.0, direction=BoundDirection.MAX, exclusive=False)
+    for payload in (min_payload, min_payload, max_payload, max_payload):
+        store.record(
+            Observation(
+                operation_label="POST /api/users",
+                location=ParameterLocation.BODY,
+                parameter_path=("qty",),
+                kind=ObservationKind.NUMERIC_BOUND,
+                raw_message="",
+                payload=payload,
+            )
+        )
+    out = store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)
+    assert sorted((o.payload.direction, o.payload.bound) for o in out) == [
+        (BoundDirection.MAX, 100.0),
+        (BoundDirection.MIN, 0.0),
+    ]
+
+
+def test_store_concurrent_inserts_are_safe():
+    store = ErrorFeedbackStore()
+
+    def worker(field_index: int) -> None:
+        ob = _obs(f"f{field_index}")
+        for _ in range(100):
+            store.record(ob)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(worker, range(8)))
+
+    out = store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)
+    paths = sorted(o.parameter_path for o in out)
+    assert paths == sorted((f"f{i}",) for i in range(8))
