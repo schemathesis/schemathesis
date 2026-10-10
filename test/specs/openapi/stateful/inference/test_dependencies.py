@@ -3533,6 +3533,59 @@ def test_no_link_reads_field_from_binary_response(ctx):
     ]
 
 
+@pytest.mark.parametrize("parameter", ["id", "bookingid"])
+def test_create_links_item_operations_through_identifier_next_to_wrapped_resource(ctx, parameter):
+    # `{bookingid, booking: Booking}`: the id of the created booking sits next to it, not inside it
+    booking = {"type": "object", "$ref": "#/definitions/Booking"}
+    item_parameters = [{"name": parameter, "in": "path", "required": True, "type": "integer"}]
+    item_response = {"200": {"description": "OK", "schema": booking}}
+    paths = {
+        "/booking": {
+            "post": {
+                "parameters": [{"in": "body", "name": "body", "required": True, "schema": booking}],
+                "responses": {
+                    "200": {"description": "OK", "schema": {"type": "object", "$ref": "#/definitions/BookingResponse"}}
+                },
+            }
+        },
+        f"/booking/{{{parameter}}}": {
+            "get": {"parameters": item_parameters, "responses": item_response},
+            "put": {
+                "parameters": [*item_parameters, {"in": "body", "name": "body", "required": True, "schema": booking}],
+                "responses": item_response,
+            },
+            "delete": {"parameters": item_parameters, "responses": {"201": {"description": "Created"}}},
+        },
+    }
+    definitions = {
+        "Booking": {
+            "type": "object",
+            "properties": {"firstname": {"type": "string"}, "totalprice": {"type": "integer"}},
+        },
+        "BookingResponse": {
+            "type": "object",
+            "properties": {
+                "bookingid": {"type": "integer"},
+                "booking": {"type": "object", "$ref": "#/definitions/Booking"},
+            },
+        },
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="2.0", definitions=definitions)
+    item = f"#/paths/~1booking~1{{{parameter}}}"
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1booking/post",
+            "200",
+            {
+                "operationRef": f"{item}/{method}",
+                "parameters": {f"path.{parameter}": "$response.body#/bookingid"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+        for method in ("get", "put", "delete")
+    ]
+
+
 def test_list_links_nested_foreign_key_declared_through_all_of(ctx):
     paths = {
         **operation(

@@ -18,6 +18,7 @@ from schemathesis.specs.openapi.stateful.dependencies.naming import (
     KeyKind,
     from_path,
     key_kind,
+    normalize_for_matching,
     strip_version_prefix,
 )
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
@@ -43,6 +44,8 @@ class DependencyGraph:
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
+                if output.get("identifier_pointer") is None:
+                    output.pop("identifier_pointer", None)
                 if output.get("path_parameter") is None:
                     output.pop("path_parameter", None)
                 if output.get("body_field") is None:
@@ -180,11 +183,16 @@ class DependencyGraph:
                                 output_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES
                                 and input_slot.resource_field not in declared
                             ):
-                                continue
-                            body_pointer = extend_pointer(
-                                output_slot.pointer, input_slot.resource_field, output_slot.cardinality
-                            )
-                            value_expr = f"$response.body#{body_pointer}"
+                                if output_slot.identifier_pointer is None or not _names_identifier(
+                                    input_slot.resource_field, output_slot.resource.name
+                                ):
+                                    continue
+                                value_expr = f"$response.body#{output_slot.identifier_pointer}"
+                            else:
+                                body_pointer = extend_pointer(
+                                    output_slot.pointer, input_slot.resource_field, output_slot.cardinality
+                                )
+                                value_expr = f"$response.body#{body_pointer}"
                         else:
                             # No resource field means use the whole resource
                             value_expr = f"$response.body#{output_slot.pointer}"
@@ -604,6 +612,11 @@ def _takes_confirmed_value(input_slot: InputSlot, confirmed: InputSlot) -> bool:
     }
 
 
+def _names_identifier(field: str, resource_name: str) -> bool:
+    # `id` or `<resource>Id`: the field that identifies the resource itself, not one it refers to
+    return normalize_for_matching(field) in ("id", normalize_for_matching(resource_name) + "id")
+
+
 def _key_kind(parameter_name: str | int) -> KeyKind | None:
     if isinstance(parameter_name, int):
         return None
@@ -799,6 +812,9 @@ class OutputSlot:
     # Fields the response declares at `pointer`; `None` when it declares none.
     # Resources are shared by name, so this can differ from `resource.fields`.
     response_fields: frozenset[str] | None = None
+    # Envelope field identifying the resource when the resource itself declares no identifier
+    # (`/bookingid` in `{bookingid: 1, booking: {...}}`).
+    identifier_pointer: str | None = None
 
 
 @dataclass(slots=True)

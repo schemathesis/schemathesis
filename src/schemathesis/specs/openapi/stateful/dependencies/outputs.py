@@ -57,6 +57,7 @@ def extract_outputs(
             is_primitive_identifier=extracted.is_primitive_identifier,
             extract_object_keys=extracted.extract_object_keys,
             response_fields=extracted.response_fields,
+            identifier_pointer=extracted.identifier_pointer,
         )
 
     yield from _path_keyed_outputs(
