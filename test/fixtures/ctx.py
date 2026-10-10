@@ -15,27 +15,19 @@ from schemathesis.checks import CHECKS
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
-from test.apps.catalog.openapi import ajv as openapi_ajv
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.catalog.openapi import confluent as openapi_confluent
+from test.apps.catalog.openapi import envelopes as openapi_envelopes
 from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
-from test.apps.catalog.openapi import flask_rest as openapi_flask_rest
-from test.apps.catalog.openapi import go_validator as openapi_go_validator
-from test.apps.catalog.openapi import laravel as openapi_laravel
-from test.apps.catalog.openapi import litestar as openapi_litestar
-from test.apps.catalog.openapi import marshmallow as openapi_marshmallow
 from test.apps.catalog.openapi import nested as openapi_nested
-from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import restler as openapi_restler
 from test.apps.catalog.openapi import sign_up as openapi_sign_up
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
 from test.apps.catalog.openapi import swagger_v2 as openapi_swagger_v2
-from test.apps.catalog.openapi import symfony as openapi_symfony
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi import wfc as openapi_wfc
-from test.apps.catalog.openapi import zod as openapi_zod
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
 
 if TYPE_CHECKING:
@@ -221,11 +213,11 @@ class OpenAPIApps:
     def kitchen_sink(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.kitchen_sink())
 
-    def rails_planted_bug(self, *, envelope: openapi_rails.Envelope) -> OpenAPIServer:
-        return _start(self.parent, openapi_rails.planted_bug(envelope))
+    def rails_planted_bug(self, *, envelope: openapi_envelopes.RailsEnvelope) -> OpenAPIServer:
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.RAILS[envelope]))
 
     def laravel_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_laravel.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.LARAVEL))
 
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
@@ -243,7 +235,7 @@ class OpenAPIApps:
         return _start(self.parent, openapi_users.crud_with_failure())
 
     def aspnet_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.aspnet_planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.ASPNET))
 
     def under_declared_security(
         self, *modifiers: Modifier[openapi_under_declared_security.UnderDeclaredSecurityStore]
@@ -254,7 +246,7 @@ class OpenAPIApps:
         return _start(self.parent, openapi_sign_up.sign_up_and_login(behavior))
 
     def zod_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_zod.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.ZOD))
 
     def unimplemented_method(self) -> OpenAPIServer:
         return _start(self.parent, openapi_supervisor.unimplemented_method())
@@ -377,25 +369,25 @@ class OpenAPIApps:
         return _start(self.parent, openapi_error_feedback.token_with_examples())
 
     def ajv_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_ajv.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.AJV))
 
     def go_validator_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_go_validator.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.GO_VALIDATOR))
 
     def symfony_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_symfony.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.SYMFONY))
 
     def marshmallow_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_marshmallow.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.MARSHMALLOW))
 
     def confluent_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_confluent.planted_bug())
 
     def flask_rest_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_flask_rest.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.FLASK_REST))
 
     def litestar_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_litestar.planted_bug())
+        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.LITESTAR))
 
     def restler_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_restler.planted_bug())
