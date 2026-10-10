@@ -6,26 +6,19 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 from warnings import catch_warnings
 
-from requests.structures import CaseInsensitiveDict
-
-from schemathesis.checks import CheckContext
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
-from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.errors import TestingState, deduplicate_errors
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import (
     BudgetExpired,
     ServerWentAway,
-    record_extra_data_from_recorder,
 )
 from schemathesis.engine.run.unit._errors import classify_test_exception, iter_mark_error_events
-from schemathesis.generation import overrides
+from schemathesis.engine.run.unit._scenario import iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
@@ -44,54 +37,12 @@ def run_test(
     """A single test run with all error handling needed."""
     errors: list[Exception] = []
     skip_reason = None
-    error: Exception
-    started_at = Instant()
-    recorder = ScenarioRecorder(label=operation.label, config=ctx.config.output)
-    state = TestingState()
-
-    def non_fatal_error(error: Exception, code_sample: str | None = None) -> events.NonFatalError:
-        return events.NonFatalError(
-            error=error, phase=phase, label=operation.label, related_to_operation=True, code_sample=code_sample
-        )
-
-    def scenario_finished(status: Status) -> events.ScenarioFinished:
-        return events.ScenarioFinished(
-            id=scenario_id,
-            suite_id=suite_id,
-            phase=phase,
-            label=operation.label,
-            recorder=recorder,
-            status=status,
-            elapsed_time=started_at.elapsed,
-            skip_reason=skip_reason,
-            is_final=False,
-        )
-
-    phase_name = phase.value
-    assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
-
-    operation_config = ctx.config.operations.get_for_operation(operation)
-    continue_on_failure = operation_config.continue_on_failure or ctx.config.continue_on_failure or False
-    generation = ctx.config.generation_for(operation=operation, phase=phase_name)
-    override = overrides.for_operation(ctx.config, operation=operation)
-    auth = ctx.config.auth_for(operation=operation)
-    headers = ctx.config.headers_for(operation=operation)
-    transport_kwargs = ctx.get_transport_kwargs(operation=operation)
-    checks_config = ctx.config.checks_config_for(operation=operation, phase=phase_name)
-    check_ctx = CheckContext(
-        override=override,
-        auth=auth,
-        headers=CaseInsensitiveDict(headers) if headers else None,
-        config=checks_config,
-        transport_kwargs=transport_kwargs,
-        recorder=recorder,
-        response_checks=ctx.checks.for_responses(),
-        phase=phase,
-        auth_enforced_operations=ctx.auth_enforced_operations,
-    )
-
-    if ctx.error_feedback is not None:
-        ctx.error_feedback.checkpoint()
+    assert phase.value in ("examples", "coverage", "fuzzing", "stateful")
+    scenario = start_scenario(operation=operation, ctx=ctx, phase=phase, suite_id=suite_id, scenario_id=scenario_id)
+    recorder = scenario.recorder
+    state = scenario.state
+    generation = scenario.generation
+    non_fatal_error = scenario.non_fatal_error
 
     pending_events: list[events.EngineEvent] = []
     try:
@@ -101,11 +52,11 @@ def run_test(
                 ctx=ctx,
                 state=state,
                 errors=errors,
-                check_ctx=check_ctx,
+                check_ctx=scenario.check_ctx,
                 recorder=recorder,
                 generation=generation,
-                transport_kwargs=transport_kwargs,
-                continue_on_failure=continue_on_failure,
+                transport_kwargs=scenario.transport_kwargs,
+                continue_on_failure=scenario.continue_on_failure,
                 pending_events=pending_events,
             )
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
@@ -139,7 +90,7 @@ def run_test(
         else:
             status = Status.SUCCESS
     except KeyboardInterrupt:
-        yield scenario_finished(Status.INTERRUPTED)
+        yield scenario.finished(Status.INTERRUPTED, skip_reason)
         yield events.Interrupted(phase=phase)
         return
     except (Exception, BaseExceptionGroup) as exc:
@@ -158,14 +109,9 @@ def run_test(
         status = Status.ERROR
         yield event
 
-    yield from pending_events
+    yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 
-    for error in deduplicate_errors(errors):
-        yield non_fatal_error(error)
-
-    record_extra_data_from_recorder(ctx, operation, recorder)
-
-    yield scenario_finished(status)
+    yield scenario.finished(status, skip_reason)
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation, generation: GenerationConfig) -> None:

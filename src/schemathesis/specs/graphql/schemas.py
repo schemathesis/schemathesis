@@ -31,6 +31,7 @@ from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
+from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -72,8 +73,8 @@ if TYPE_CHECKING:
     from schemathesis.engine.run import Phase
     from schemathesis.generation.dictionaries import DictionaryDraw
     from schemathesis.generation.stateful.state_machine import APIStateMachine
-    from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
-    from schemathesis.resources import ExtraDataSource, ResourcePool
+    from schemathesis.python._constants.pool import ConstantDraw
+    from schemathesis.resources import ResourcePool
 
 
 # Reused on every per-draw call; allocating once avoids ~600ns of `LazyStrategy` construction.
@@ -189,13 +190,10 @@ class GraphQLSchema(BaseSchema):
     def _build_state_machine(
         self,
         *,
-        error_feedback: ErrorFeedbackStore | None,
+        feedback: FeedbackSources,
         link_calibration: LinkCalibrationState | None,
-        extra_data_source: ExtraDataSource | None,
-        constants_value_source: ConstantsPool | None = None,
     ) -> type[APIStateMachine]:
-        # `error_feedback`, `link_calibration`, `extra_data_source`, and `constants_value_source`
-        # are OpenAPI-specific; GraphQL strategies and stateful transitions don't consume them.
+        # GraphQL stateful transitions consume neither feedback nor link calibration.
         return self.as_state_machine()
 
     @override
@@ -379,6 +377,7 @@ class GraphQLSchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
+        feedback: FeedbackSources = NO_FEEDBACK,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
         return graphql_cases(
@@ -386,11 +385,14 @@ class GraphQLSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
+            feedback=feedback,
             **kwargs,
         )
 
     @override
-    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, feedback: FeedbackSources = NO_FEEDBACK, **kwargs: Any
+    ) -> list[SearchStrategy[Case]]:
         return []
 
     @override
@@ -542,10 +544,8 @@ def graphql_cases(
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
-    # Not supported for GraphQL, passed here to unify interfaces
-    extra_data_source: ExtraDataSource | None = None,
-    error_feedback: ErrorFeedbackStore | None = None,
-    constants_value_source: ConstantsPool | None = None,
+    # GraphQL draws from the resource pool and extracted constants; it has no use for error feedback.
+    feedback: FeedbackSources = NO_FEEDBACK,
     mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], None] | None = None,
 ) -> Any:
     import graphql
@@ -605,13 +605,13 @@ def graphql_cases(
     if operation_node is not None:
         # A captured identifier would overwrite the argument the negative strategy deliberately
         # corrupted, turning the query valid and making the server's acceptance look like a bug.
-        if isinstance(extra_data_source, GraphQLResourcePool) and effective_mode.is_positive:
+        if isinstance(feedback.extra_data_source, GraphQLResourcePool) and effective_mode.is_positive:
             random_source = draw(st.randoms())
             if random_source.random() < SUBSTITUTION_PROBABILITY:
                 substitute_pool_values(
                     operation_node=operation_node,
                     client_schema=operation.schema.client_schema,
-                    pool=extra_data_source,
+                    pool=feedback.extra_data_source,
                     random=random_source,
                     schema_index=operation.schema.analysis.schema_index,
                 )
@@ -629,12 +629,12 @@ def graphql_cases(
                         random=draw(st.randoms()),
                     )
                 )
-        if constants_value_source is not None and effective_mode.is_positive:
+        if feedback.constants_value_source is not None and effective_mode.is_positive:
             constants_draws = tuple(
                 substitute_constants(
                     operation_node=operation_node,
                     client_schema=operation.schema.client_schema,
-                    pool=constants_value_source,
+                    pool=feedback.constants_value_source,
                     random=draw(st.randoms()),
                     skip=frozenset(
                         tuple(draw_.body_path.lstrip("/").split("/"))

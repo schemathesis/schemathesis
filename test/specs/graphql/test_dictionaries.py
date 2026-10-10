@@ -10,6 +10,7 @@ from hypothesis import HealthCheck, given, settings
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.dictionaries import DictionaryDraw
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.meta import TestPhase
 from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
 from schemathesis.specs.graphql.dictionaries import resolve_bindings, substitute_dictionaries
@@ -382,7 +383,11 @@ def test_dictionary_entry_survives_the_constants_pool(ctx):
     pool.add(ConstantEntry(value="HARVESTED", type="string", origins=(Origin(source="s", module="m", adapter=None),)))
     bodies = []
 
-    @given(case=graphql_cases(operation=schema["Query"]["bookByTitle"], constants_value_source=pool))
+    @given(
+        case=graphql_cases(
+            operation=schema["Query"]["bookByTitle"], feedback=FeedbackSources(constants_value_source=pool)
+        )
+    )
     @settings(max_examples=20, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
     def run(case):
         bodies.append(case.body)

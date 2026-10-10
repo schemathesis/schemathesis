@@ -35,7 +35,7 @@ from schemathesis.cli.output import (
     print_lines,
 )
 from schemathesis.config import ProjectConfig, ReportFormat
-from schemathesis.core import SpecificationKind
+from schemathesis.core import SpecificationFeature
 from schemathesis.core.output import decode_response_text, prepare_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
@@ -126,8 +126,10 @@ def _unvalidated_responses(by_media_type: dict[str, dict[str, set[str]]]) -> str
     return f"responses in {len(by_media_type)} media types"
 
 
-def _is_graphql(ctx: ExecutionContext) -> bool:
-    return ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRAPHQL
+def _status_codes_are_uninformative(ctx: ExecutionContext) -> bool:
+    return ctx.specification is not None and not ctx.specification.supports_feature(
+        SpecificationFeature.STATUS_CODE_ANALYSIS
+    )
 
 
 # Methods that most often create a resource, in the order they are preferred when several
@@ -1293,7 +1295,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
     def _display_missing_test_data_block(self, ctx: ExecutionContext) -> None:
         """Display operations nothing ever served, grouped by what would actually make them reachable."""
-        if _is_graphql(ctx):
+        if _status_codes_are_uninformative(ctx):
             self._print_warning_header(
                 "Missing test data",
                 len(ctx.warnings.missing_test_data),
@@ -1362,7 +1364,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                             fg="yellow",
                         )
                     )
-        if _is_graphql(ctx):
+        if _status_codes_are_uninformative(ctx):
             tip = "💡 Most requests came back with errors; supply argument values via a fuzz dictionary"
         elif unreachable_dominates:
             tip = "💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
@@ -1595,7 +1597,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 len(ctx.warnings.missing_test_data),
                 "Missing valid test data",
                 "operation",
-                "never returned data" if _is_graphql(ctx) else "repeatedly returned 404 responses",
+                "never returned data" if _status_codes_are_uninformative(ctx) else "repeatedly returned 404 responses",
             ),
             (
                 len(ctx.warnings.validation_mismatch),

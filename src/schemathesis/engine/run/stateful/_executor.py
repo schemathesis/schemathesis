@@ -51,7 +51,6 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
-from schemathesis.specs.openapi.stateful.link_calibration import record_link_outcome
 
 if TYPE_CHECKING:
     from schemathesis.baseline import Baseline
@@ -377,7 +376,13 @@ def execute_state_machine_loop(
 
             # Record this step's outcome against the link's score.
             if current_input is not None and engine.link_calibration is not None:
-                record_link_outcome(engine.link_calibration, response, observations, current_input, self.recorder)
+                engine.schema.record_link_outcome(
+                    calibration=engine.link_calibration,
+                    response=response,
+                    observations=observations,
+                    step_input=current_input,
+                    recorder=self.recorder,
+                )
             ctx.current_response = response
 
             if engine.error_feedback is not None:
@@ -389,14 +394,9 @@ def execute_state_machine_loop(
                     transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
                 )
 
-            cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")
-
-            check_ctx = CheckContext(
-                override=cached.override,
-                auth=cached.auth,
-                headers=cached.headers,
-                config=cached.config,
-                transport_kwargs=cached.transport_kwargs,
+            check_ctx = check_context_cache.get_or_create(
+                operation=case.operation, ctx=engine, phase="stateful"
+            ).to_check_context(
                 recorder=self.recorder,
                 response_checks=engine.checks.for_responses(),
                 phase=PhaseName.STATEFUL_TESTING,

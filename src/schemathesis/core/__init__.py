@@ -40,6 +40,8 @@ class SpecificationFeature(str, enum.Enum):
     COVERAGE = "coverage_tests"
     EXAMPLES = "example_tests"
     AUTH_BOOTSTRAP = "auth_bootstrap"
+    # Telling served requests from refused ones by the response status code.
+    STATUS_CODE_ANALYSIS = "status_code_analysis"
 
 
 @dataclass(slots=True)
@@ -84,6 +86,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.COVERAGE,
             SpecificationFeature.EXAMPLES,
             SpecificationFeature.AUTH_BOOTSTRAP,
+            SpecificationFeature.STATUS_CODE_ANALYSIS,
         }
     ),
     SpecificationKind.GRAPHQL: frozenset({SpecificationFeature.STATEFUL_TESTING}),

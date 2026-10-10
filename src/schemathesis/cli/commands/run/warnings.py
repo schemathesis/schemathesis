@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -11,9 +10,8 @@ from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.summary import WarningData
 from schemathesis.config import ProjectConfig, SchemathesisWarning
-from schemathesis.core import SpecificationFeature, SpecificationKind
+from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import RefResolutionError
-from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import CallOutcome
@@ -209,28 +207,12 @@ def takes_input(operation: APIOperation) -> bool:
 
 def auth_flow_suggestion(schema: BaseSchema) -> str | None:
     """Config that logs in through the sign-up and login operations the schema declares, if any."""
-    from schemathesis.specs.openapi.auth_flow.detection import has_supplied_auth
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-    if not isinstance(schema, OpenApiSchema):
+    flow = schema.auth_flow()
+    if flow is None or flow.is_supplied():
         return None
-    flow = schema.analysis.auth_flow
-    if flow is None or has_supplied_auth(schema, flow.target_scheme):
-        return None
-    payload = ", ".join(
-        f'{name} = "${{LOGIN_{re.sub("[^A-Za-z0-9]", "_", name).upper()}}}"' for name in flow.credentials
-    )
-    lines = [
-        f"[auth.dynamic.openapi.{flow.target_scheme}]",
-        f'path = "{flow.login_path}"',
-        f"payload = {{ {payload} }}",
-    ]
-    if not is_json(flow.login_media_type):
-        lines.append(f'payload_content_type = "{flow.login_media_type}"')
-    lines.append(f'extract_selector = "{flow.token_pointer}"')
-    snippet = "\n".join(f"    {line}" for line in lines)
+    snippet = "\n".join(f"    {line}" for line in flow.config_lines())
     return (
-        f"💡 {flow.register_operation} and {flow.login_operation} look like a sign-up and login flow. "
+        f"💡 {flow.spec.register_operation} and {flow.spec.login_operation} look like a sign-up and login flow. "
         f"Register an account, then add to schemathesis.toml:\n\n{snippet}"
     )
 
@@ -443,9 +425,11 @@ class WarningCollector:
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
                 )
-            # GraphQL answers the same status whether it served the query or refused it, so the two
-            # checks above stay silent; the response bodies are the only evidence either way.
-            if operation is not None and operation.schema.specification.kind is SpecificationKind.GRAPHQL:
+            # Where the status is the same whether the request was served or refused, the two checks above
+            # stay silent; the response bodies are the only evidence either way.
+            if operation is not None and not operation.schema.specification.supports_feature(
+                SpecificationFeature.STATUS_CODE_ANALYSIS
+            ):
                 self._handle_warning(
                     ctx,
                     SchemathesisWarning.MISSING_TEST_DATA,

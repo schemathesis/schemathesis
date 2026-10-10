@@ -30,7 +30,7 @@ from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case, adjust_urlencoded_payload, find_invalid_headers
-from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
@@ -83,13 +83,13 @@ def create_test(
     strategy_kwargs = {
         "hooks": hook_dispatcher,
         "auth_storage": auth_storage,
-        "extra_data_source": config.feedback.extra_data_source,
-        "error_feedback": config.feedback.error_feedback,
-        "constants_value_source": config.feedback.constants_value_source,
         **config.as_strategy_kwargs,
     }
     generation = config.project.generation_for(operation=operation, phase=HypothesisTestMode.FUZZING.value)
-    strategy = st.one_of(operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in generation.modes)
+    strategy = st.one_of(
+        operation.as_strategy(generation_mode=mode, feedback=config.feedback, **strategy_kwargs)
+        for mode in generation.modes
+    )
 
     hypothesis_test = create_base_test(
         test_function=test_func,
@@ -188,7 +188,9 @@ def create_test(
         if config.given_kwargs:
             # Check if there are actually examples to add
             try:
-                example_strategies = list(operation.get_strategies_from_examples(**strategy_kwargs))
+                example_strategies = list(
+                    operation.get_strategies_from_examples(feedback=config.feedback, **strategy_kwargs)
+                )
             except Exception:
                 # If we can't get examples (invalid schema, etc), let add_examples handle it
                 example_strategies = []
@@ -203,6 +205,7 @@ def create_test(
             operation,
             fill_missing=phases_config.examples.fill_missing,
             hook_dispatcher=hook_dispatcher,
+            feedback=config.feedback,
             **strategy_kwargs,
         )
 
@@ -294,10 +297,16 @@ def add_examples(
     operation: APIOperation,
     fill_missing: bool,
     hook_dispatcher: HookDispatcher | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     **kwargs: Any,
 ) -> Callable:
     for example in generate_example_cases(
-        test=test, operation=operation, fill_missing=fill_missing, hook_dispatcher=hook_dispatcher, **kwargs
+        test=test,
+        operation=operation,
+        fill_missing=fill_missing,
+        hook_dispatcher=hook_dispatcher,
+        feedback=feedback,
+        **kwargs,
     ):
         test = hypothesis.example(case=example)(test)
 
@@ -310,6 +319,7 @@ def generate_example_cases(
     operation: APIOperation,
     fill_missing: bool,
     hook_dispatcher: HookDispatcher | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     **kwargs: Any,
 ) -> Generator[Case]:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
@@ -317,6 +327,7 @@ def generate_example_cases(
         result: list[Case] = [
             examples.generate_one(strategy)
             for strategy in operation.get_strategies_from_examples(
+                feedback=feedback,
                 fill_missing=fill_missing,
                 **kwargs,
             )

@@ -14,11 +14,6 @@ from typing import TYPE_CHECKING, Any
 from hypothesis.errors import InvalidArgument
 from jsonschema_rs import ValidationError
 
-from schemathesis.config import (
-    CoveragePhaseConfig,
-    ExamplesPhaseConfig,
-    FuzzingPhaseConfig,
-)
 from schemathesis.core.errors import (
     AuthenticationError,
     HookExecutionError,
@@ -41,6 +36,7 @@ from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, Hyp
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
+    from schemathesis.config import PhasesConfig, SchemathesisWarning
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
     from schemathesis.schemas import APIOperation
@@ -256,49 +252,24 @@ def worker_task(
                     operation = result.ok()
                     ctx.take_operation_slice()
                     phases = ctx.config.phases_for(operation=operation)
-                    # Skip tests if this phase is disabled
-                    if (
-                        (phase == PhaseName.EXAMPLES and not phases.examples.enabled)
-                        or (phase == PhaseName.FUZZING and not phases.fuzzing.enabled)
-                        or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
-                    ):
-                        scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
-                        events_queue.put(scenario_started)
-                        events_queue.put(
-                            events.ScenarioFinished(
-                                id=scenario_started.id,
-                                suite_id=suite_id,
-                                phase=phase,
-                                label=operation.label,
-                                status=Status.SKIP,
-                                recorder=ScenarioRecorder(label=operation.label),
-                                elapsed_time=0.0,
-                                skip_reason="Disabled for this operation",
-                                is_final=True,
-                            )
+                    if _is_phase_disabled(phases, phase):
+                        _put_skipped_scenario(
+                            events_queue, operation, phase, suite_id, skip_reason="Disabled for this operation"
                         )
                         continue
                     verdict = ctx.supervisor.verdict(operation.label)
                     if verdict.directive is SchedulingDirective.SKIP:
-                        scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
-                        events_queue.put(scenario_started)
-                        events_queue.put(
-                            events.ScenarioFinished(
-                                id=scenario_started.id,
-                                suite_id=suite_id,
-                                phase=phase,
-                                label=operation.label,
-                                status=Status.SKIP,
-                                recorder=ScenarioRecorder(label=operation.label),
-                                elapsed_time=0.0,
-                                skip_reason=verdict.reason,
-                                skip_warning=verdict.warning,
-                                is_final=True,
-                            )
+                        _put_skipped_scenario(
+                            events_queue,
+                            operation,
+                            phase,
+                            suite_id,
+                            skip_reason=verdict.reason,
+                            skip_warning=verdict.warning,
                         )
                         continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation, phase=phase)
-                    feedback = build_feedback_sources(ctx, operation=operation, phase=phase)
+                    feedback = ctx.feedback_for(operation=operation, phase=phase)
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
 
                     if phase == PhaseName.COVERAGE:
@@ -366,6 +337,41 @@ def worker_task(
             events_queue.put(events.Interrupted(phase=phase))
 
 
+def _is_phase_disabled(phases: PhasesConfig, phase: PhaseName) -> bool:
+    return (
+        (phase == PhaseName.EXAMPLES and not phases.examples.enabled)
+        or (phase == PhaseName.FUZZING and not phases.fuzzing.enabled)
+        or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
+    )
+
+
+def _put_skipped_scenario(
+    events_queue: Queue,
+    operation: APIOperation,
+    phase: PhaseName,
+    suite_id: uuid.UUID,
+    *,
+    skip_reason: str | None,
+    skip_warning: SchemathesisWarning | None = None,
+) -> None:
+    scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
+    events_queue.put(scenario_started)
+    events_queue.put(
+        events.ScenarioFinished(
+            id=scenario_started.id,
+            suite_id=suite_id,
+            phase=phase,
+            label=operation.label,
+            status=Status.SKIP,
+            recorder=ScenarioRecorder(label=operation.label),
+            elapsed_time=0.0,
+            skip_reason=skip_reason,
+            skip_warning=skip_warning,
+            is_final=True,
+        )
+    )
+
+
 def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> dict[str, Any]:
     kwargs = {}
     override = overrides.for_operation(ctx.config, operation=operation)
@@ -378,22 +384,3 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
         kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
 
     return kwargs
-
-
-def build_feedback_sources(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> FeedbackSources:
-    extra_data_source = None
-    # Extra data sources augment generation only when enabled for this phase.
-    phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.value)
-    if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)) and (
-        phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None
-    ):
-        extra_data_source = ctx.extra_data_source
-    constants_value_source = None
-    # Inject constants value source only when the pool is non-empty.
-    if not ctx.constants_extraction.is_empty():
-        constants_value_source = ctx.constants_extraction
-    return FeedbackSources(
-        extra_data_source=extra_data_source,
-        error_feedback=ctx.error_feedback,
-        constants_value_source=constants_value_source,
-    )

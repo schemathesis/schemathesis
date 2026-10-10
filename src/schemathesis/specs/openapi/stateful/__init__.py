@@ -19,6 +19,7 @@ from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCa
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.control import TransitionController
@@ -37,10 +38,7 @@ from schemathesis.specs.openapi.stateful.links import OpenApiLink
 if TYPE_CHECKING:
     from random import Random
 
-    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful.state_machine import StepOutput
-    from schemathesis.python._constants.pool import ConstantsPool
-    from schemathesis.resources import ExtraDataSource
     from schemathesis.specs.openapi.schemas import OpenApiSchema
     from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, OperationNode
 
@@ -166,9 +164,7 @@ def _step_case_strategy(
     target: APIOperation,
     modes: list[GenerationMode],
     *,
-    error_feedback: ErrorFeedbackStore | None,
-    extra_data_source: ExtraDataSource | None,
-    constants_value_source: ConstantsPool | None,
+    feedback: FeedbackSources,
     path_parameters: dict[str, object] | None = None,
     query: dict[str, object] | None = None,
     headers: dict[str, object] | None = None,
@@ -179,9 +175,7 @@ def _step_case_strategy(
         mode: target.as_strategy(
             generation_mode=mode,
             phase=TestPhase.STATEFUL,
-            error_feedback=error_feedback,
-            extra_data_source=extra_data_source,
-            constants_value_source=constants_value_source,
+            feedback=feedback,
             path_parameters=path_parameters,
             query=query,
             headers=headers,
@@ -208,10 +202,8 @@ def _unique_rule_name(name: str, taken: Container[str]) -> str:
 def create_state_machine(
     schema: OpenApiSchema,
     *,
-    error_feedback: ErrorFeedbackStore | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     link_calibration: LinkCalibrationState | None = None,
-    extra_data_source: ExtraDataSource | None = None,
-    constants_value_source: ConstantsPool | None = None,
 ) -> type[APIStateMachine]:
     operations = [
         result.ok()
@@ -282,10 +274,8 @@ def create_state_machine(
                                 target=target,
                                 link=link,
                                 modes=config.modes,
-                                error_feedback=error_feedback,
+                                feedback=feedback,
                                 link_calibration=link_calibration,
-                                extra_data_source=extra_data_source,
-                                constants_value_source=constants_value_source,
                             )
                         ),
                     )
@@ -294,9 +284,7 @@ def create_state_machine(
                 case_strategy = _step_case_strategy(
                     target,
                     config.modes,
-                    error_feedback=error_feedback,
-                    extra_data_source=extra_data_source,
-                    constants_value_source=constants_value_source,
+                    feedback=feedback,
                 )
                 rules[name] = transition(
                     name=name,
@@ -360,10 +348,8 @@ def into_step_input(
     target: APIOperation,
     link: OpenApiLink,
     modes: list[GenerationMode],
-    error_feedback: ErrorFeedbackStore | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     link_calibration: LinkCalibrationState | None = None,
-    extra_data_source: ExtraDataSource | None = None,
-    constants_value_source: ConstantsPool | None = None,
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
     """A single transition between API operations."""
 
@@ -445,9 +431,7 @@ def into_step_input(
                 _step_case_strategy(
                     target,
                     modes,
-                    error_feedback=error_feedback,
-                    extra_data_source=extra_data_source,
-                    constants_value_source=constants_value_source,
+                    feedback=feedback,
                     path_parameters=overrides.get("path_parameters"),
                     query=overrides.get("query"),
                     headers=overrides.get("headers"),
