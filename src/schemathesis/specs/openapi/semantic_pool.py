@@ -242,13 +242,13 @@ class IngestionLeaf(NamedTuple):
     value: PoolValue
 
 
-def _resolve_ref(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaObject:
+def resolve_ref(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaObject:
     """Follow a bundled ``$ref`` (e.g. ``#/x-bundled/Foo``) by splicing ``root``'s bundle into the fragment."""
     # `schema_with_bundle` preserves shape: dict in, dict out.
     return maybe_resolve_bundled(cast("JsonSchemaObject", schema_with_bundle(schema, root)))
 
 
-def _resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaObject:
+def resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaObject:
     """Merge ``allOf`` branches; for ``oneOf``/``anyOf``, pick the first branch with declared ``properties``."""
     if "allOf" in schema:
         merged: JsonSchemaObject = {}
@@ -256,7 +256,7 @@ def _resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> Jso
         for branch in schema["allOf"]:
             if not isinstance(branch, dict):
                 continue
-            resolved_branch = _resolve_combinator(_resolve_ref(branch, root), root)
+            resolved_branch = resolve_combinator(resolve_ref(branch, root), root)
             for key, value in resolved_branch.items():
                 if key == "properties" and isinstance(value, dict):
                     merged_properties.update(value)
@@ -279,12 +279,12 @@ def _resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> Jso
         for branch in branches:
             if not isinstance(branch, dict):
                 continue
-            resolved = _resolve_ref(branch, root)
+            resolved = resolve_ref(branch, root)
             if isinstance(resolved.get("properties"), dict):
-                return _resolve_combinator(resolved, root)
+                return resolve_combinator(resolved, root)
         for branch in branches:
             if isinstance(branch, dict):
-                return _resolve_combinator(_resolve_ref(branch, root), root)
+                return resolve_combinator(resolve_ref(branch, root), root)
     return schema
 
 
@@ -365,8 +365,8 @@ def _walk_ingestion(
     if body is None:
         return
     if isinstance(schema, dict):
-        schema = _resolve_ref(schema, root)
-        schema = _resolve_combinator(schema, root)
+        schema = resolve_ref(schema, root)
+        schema = resolve_combinator(schema, root)
         type_token = _normalize_type(schema)
         if type_token == "object" or (type_token is None and isinstance(body, dict)):
             properties = schema.get("properties")
@@ -392,7 +392,7 @@ def _walk_ingestion(
             items = schema.get("items")
             if not isinstance(items, dict) or not isinstance(body, list):
                 return
-            items = _resolve_combinator(_resolve_ref(items, root), root)
+            items = resolve_combinator(resolve_ref(items, root), root)
             if _normalize_type(items) == "object" or "properties" in items:
                 element_name = name
             elif name is not None:
@@ -521,8 +521,8 @@ def _walk_consumer(
     budget.nodes_left -= 1
     if not isinstance(schema, dict):
         return
-    schema = _resolve_ref(schema, root)
-    schema = _resolve_combinator(schema, root)
+    schema = resolve_ref(schema, root)
+    schema = resolve_combinator(schema, root)
     type_token = _normalize_type(schema)
     properties = schema.get("properties")
     if type_token == "object" or (type_token is None and isinstance(properties, dict)):

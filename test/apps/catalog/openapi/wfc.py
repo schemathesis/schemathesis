@@ -382,3 +382,76 @@ def wfc_accounts_seeded_later() -> OpenAPIApp:
         return jsonify({"name": current})
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+_ORDER = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}, "item": {"type": "string"}, "owner": {"type": "string"}},
+    "required": ["id", "item", "owner"],
+}
+_ORDER_RESPONSE = {"content": {"application/json": {"schema": _ORDER}}}
+_OWNED_ORDERS = {
+    "/api/orders": {
+        "post": {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object", "properties": {"item": {"type": "string"}}, "required": ["item"]}
+                    }
+                },
+            },
+            "responses": {"201": {"description": "Created", **_ORDER_RESPONSE}},
+        }
+    },
+    "/api/orders/{order_id}": {
+        "get": {
+            "parameters": [{"name": "order_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK", **_ORDER_RESPONSE}, "404": {"description": "Not found"}},
+        }
+    },
+}
+
+
+def wfc_owned_orders(policy: str) -> OpenAPIApp:
+    """Orders owned by the caller; `policy` decides what another caller sees."""
+    spec = build_schema(
+        _OWNED_ORDERS,
+        components={"securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "Authorization"}}},
+        security=[{"apiKey": []}],
+    )
+    app = make_flask_app_from_schema(spec)
+    orders: dict[int, dict[str, object]] = {}
+
+    def caller() -> str | None:
+        return (request.headers.get("Authorization") or "").removeprefix("ApiKey ").strip() or None
+
+    @app.route("/api/orders", methods=["POST"])
+    def create_order() -> object:
+        user = caller()
+        body = request.get_json(silent=True)
+        if user is None:
+            return jsonify({"detail": "unauthorized"}), 401
+        if not isinstance(body, dict) or not isinstance(body.get("item"), str):
+            return jsonify({"detail": "invalid"}), 400
+        order = {"id": len(orders) + 1, "item": body["item"], "owner": user}
+        orders[len(orders) + 1] = order
+        return jsonify(order), 201
+
+    @app.route("/api/orders/<int:order_id>", methods=["GET"])
+    def get_order(order_id: int) -> object:
+        user = caller()
+        order = orders.get(order_id)
+        if user is None and policy != "fully_public":
+            return jsonify({"detail": "unauthorized"}), 401
+        if order is None:
+            return jsonify({"detail": "not found"}), 404
+        if user == order["owner"] or policy in ("vulnerable", "fully_public"):
+            return jsonify(order)
+        if policy == "public_view":
+            return jsonify({**order, "item": "<hidden>"})
+        if policy == "peer_html":
+            return "<html>Sign in as the owner</html>", 200, {"Content-Type": "text/html"}
+        return jsonify({"detail": "not found"}), 404
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

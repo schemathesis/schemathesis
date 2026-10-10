@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from json import JSONDecodeError
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import decode_response_text, escape_surrogates, prepare_response_payload
@@ -58,6 +58,8 @@ class Failure(AssertionError):
     """API check failure."""
 
     __slots__ = ("operation", "title", "message", "case_id", "severity")
+    # Whether rerunning as the identity that sent the request reproduces the failure.
+    reproducible_by_identity: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -426,7 +428,7 @@ def format_failures(
             else:
                 payload = prepare_response_payload(text, config=config)
                 output += textwrap.indent(f"\n`{payload}`", prefix="    ")
-    if auth_identity is not None:
+    if auth_identity is not None and all(failure.reproducible_by_identity for failure in failures):
         output += formatter(
             MessageBlock.STATUS, f"\nIdentity: {auth_identity} (reproduce with --auth-wfc-user {auth_identity})"
         )

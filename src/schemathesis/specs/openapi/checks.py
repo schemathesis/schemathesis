@@ -41,6 +41,7 @@ from schemathesis.openapi.checks import (
     MissingContentType,
     MissingHeaderNotRejected,
     MissingHeaders,
+    ObjectLevelAuthorizationViolation,
     RejectedPositiveData,
     UndefinedContentType,
     UndefinedStatusCode,
@@ -1552,21 +1553,14 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
-            kwargs = build_retry_transport_kwargs(ctx._transport_kwargs, security_parameters)
-            if case.operation.app is not None:
-                kwargs.setdefault("app", case.operation.app)
-            ctx._record_case(parent_id=case.id, case=no_auth_case)
-            no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
-            ctx._record_response(case_id=no_auth_case.id, response=no_auth_response)
+            no_auth_response = _send_probe(ctx, case, no_auth_case)
             if not _enforces_auth(no_auth_response, response):
                 _raise_no_auth_error(no_auth_response, no_auth_case, AuthScenario.NO_AUTH)
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 invalid_auth_case = remove_auth(case, security_parameters)
                 set_auth_for_case(invalid_auth_case, parameter)
-                ctx._record_case(parent_id=case.id, case=invalid_auth_case)
-                invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
-                ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
+                invalid_auth_response = _send_probe(ctx, case, invalid_auth_case)
                 if not _enforces_auth(invalid_auth_response, response):
                     _raise_no_auth_error(invalid_auth_response, invalid_auth_case, AuthScenario.INVALID_AUTH)
             if enforced is not None:
@@ -1579,6 +1573,88 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Successful response when there is no auth
             _raise_no_auth_error(response, case, AuthScenario.NO_AUTH)
     return None
+
+
+@schemathesis.check
+@requires_openapi_schema
+def object_level_authorization(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    """Check that one identity cannot read an object another identity created."""
+    from schemathesis.specs.openapi.extra_data_source import declared_response_schema
+    from schemathesis.specs.openapi.object_authorization import (
+        apply_as,
+        owner_provider,
+        strip_credentials,
+        value_paths,
+    )
+    from schemathesis.wfc.escalation import escalating_provider
+
+    # Replaying a write as another identity would change the owner's data.
+    if case.method != "GET" or not 200 <= response.status_code < 300 or case.meta is None:
+        return None
+    provider = escalating_provider(case.operation.schema)
+    owner = case._auth_identity
+    if provider is None or owner not in provider.peers or not _requires_authentication(case.operation):
+        return None
+    content_types = response.headers.get("content-type")
+    content_type = content_types[0] if content_types else None
+    # Without declared fields no body is equivalent.
+    schema = declared_response_schema(case.operation, response.status_code, content_type) or {}
+    owner_body = _json_body(response)
+    for draw in case.meta.pool_draws:
+        if draw.source_identity != owner:
+            continue
+        container = case.get_container(ParameterLocation(draw.location))
+        value = container.get(draw.parameter_name) if isinstance(container, Mapping) else None
+        if value is None or not value_paths(owner_body, value):
+            continue
+        for peer in provider.peers:
+            if peer == owner or not provider.claim_probe((case.operation.label, draw.resource_name, peer)):
+                continue
+            peer_case = apply_as(case, provider.provider_for(peer), peer)
+            peer_response = _send_probe(ctx, case, peer_case)
+            if not _equivalent_response(peer_response, owner_body, value, schema):
+                continue
+            anonymous_response = _send_probe(ctx, case, strip_credentials(case, owner_provider(case)))
+            # A body anyone gets is public; an unenforced declared scheme is `ignored_auth`'s to report.
+            if _equivalent_response(anonymous_response, owner_body, value, schema):
+                continue
+            raise ObjectLevelAuthorizationViolation(
+                operation=case.operation.label,
+                message=(
+                    f"`{peer}` received the `{draw.resource_name}` that `{owner}` created\n\n"
+                    f"Owner: {case.method} {case.formatted_path} as {owner} -> {response.status_code}\n"
+                    f"Peer:  {peer_case.method} {peer_case.formatted_path} as {peer} -> "
+                    f"{peer_response.status_code} (equivalent body)"
+                ),
+                owner=owner,
+                peer=peer,
+                owner_case_id=case.id,
+                case_id=peer_case.id,
+            )
+    return None
+
+
+def _send_probe(ctx: CheckContext, parent: Case, probe: Case) -> Response:
+    kwargs = build_retry_transport_kwargs(ctx._transport_kwargs, get_security_parameters(parent.operation))
+    if parent.operation.app is not None:
+        kwargs.setdefault("app", parent.operation.app)
+    ctx._record_case(parent_id=parent.id, case=probe)
+    probe_response = parent.operation.schema.transport.send(probe, **kwargs)
+    ctx._record_response(case_id=probe.id, response=probe_response)
+    return probe_response
+
+
+def _json_body(response: Response) -> object:
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def _equivalent_response(response: Response, owner_body: object, value: object, schema: dict[str, Any]) -> bool:
+    from schemathesis.specs.openapi.object_authorization import is_equivalent
+
+    return 200 <= response.status_code < 300 and is_equivalent(owner_body, _json_body(response), value, schema)
 
 
 def _has_undeclared_explicit_authorization(

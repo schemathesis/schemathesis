@@ -1030,6 +1030,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     ```toml
     [auth.wfc]
     path = "./market-auth.yaml"
+    peers = ["alice", "bob"]
     ```
 
     | Field | Default | Description |
@@ -1037,6 +1038,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     | `path` | required | Path to a WFC authentication file (`.json`, `.yaml`, or `.yml`) |
     | `user` | `null` | Name of the auth entry to use. When omitted and the file lists more than one entry, Schemathesis tries each entry in document order per operation, moving on from the ones an operation rejects with `403` |
     | `refresh_interval` | `300` | Seconds to cache login credentials before re-authenticating |
+    | `peers` | `null` | At least two users whose objects must stay private to each other; enables the [`object_level_authorization`](checks.md#object_level_authorization) check |
 
     Corresponds to the `--auth-wfc` and `--auth-wfc-user` CLI options.
 
@@ -1096,6 +1098,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
       - `ensure_resource_availability`
       - `missing_required_header`
       - `ignored_auth`
+      - `object_level_authorization`
       - `unsupported_method`
       - `allow_header_conformance`
 

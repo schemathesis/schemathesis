@@ -164,7 +164,7 @@ $ st run [OPTIONS] SCHEMA
 
     **Type**: `Comma-separated list`  
     **Default**: All checks enabled  
-    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `all`  
+    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `object_level_authorization`, `all`  
 
     Specifies which checks to run against API responses. See the [Checks reference](checks.md) for what each one validates.
 
@@ -178,7 +178,7 @@ $ st run [OPTIONS] SCHEMA
 
     **Type**: `Comma-separated list`  
     **Default**: `[]`  
-    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `all`  
+    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `object_level_authorization`, `all`  
 
     Specifies which checks to skip during testing.
 
