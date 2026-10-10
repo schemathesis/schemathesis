@@ -1607,13 +1607,17 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
         if not value_paths(owner_body, value):
             continue
         for peer in provider.peers:
-            if peer == owner or not provider.claim_probe((case.operation.label, resource, peer)):
+            if peer == owner:
                 continue
             peer_provider = provider.provider_for(peer)
             # An id the owner only listed is theirs when the same list, sent by the peer, does not show it.
-            if source_listing is not None and value_paths(
-                _json_body(_send_probe(ctx, case, apply_as(source_listing, peer_provider, peer))), value
+            # Each listed value is checked once and, when not owned, leaves the operation free for the next one.
+            if source_listing is not None and (
+                not provider.claim_probe((case.operation.label, f"{resource}={value}", peer))
+                or value_paths(_json_body(_send_probe(ctx, case, apply_as(source_listing, peer_provider, peer))), value)
             ):
+                continue
+            if not provider.claim_probe((case.operation.label, resource, peer)):
                 continue
             peer_case = apply_as(case, peer_provider, peer)
             peer_response = _send_probe(ctx, case, peer_case)

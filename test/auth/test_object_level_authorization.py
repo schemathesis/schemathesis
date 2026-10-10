@@ -209,6 +209,32 @@ def test_object_listed_only_to_the_owner_is_owned(ctx, tmp_path, listing, expect
         object_level_authorization(check_context(), case.call(), case)
 
 
+# A listed id the peer also sees proves nothing, so it must not use up the one probe per operation and peer.
+def test_object_listed_to_the_peer_does_not_block_a_later_owned_one(ctx, tmp_path):
+    api, peer_order = _owner_case(
+        ctx,
+        tmp_path,
+        "GET",
+        "/api/orders/{order_id}",
+        "path",
+        "order_id",
+        "alice",
+        source_operation="GET /api/orders",
+        listing="own",
+        path_parameters={"order_id": 2},
+    )
+    requests.post(f"{api.base_url}/api/orders", json={"item": "book"}, headers={"Authorization": "ApiKey bob"})
+    assert object_level_authorization(check_context(), peer_order.call(), peer_order) is None
+    assert object_level_authorization(check_context(), peer_order.call(), peer_order) is None
+    assert [r.path for r in api.requests if r.headers.get("Authorization") == "ApiKey bob" and r.method == "GET"] == [
+        "/api/orders"
+    ]
+    owned_order = peer_order.operation.Case(_meta=peer_order.meta, path_parameters={"order_id": 1})
+    owned_order.operation.schema.auth.set(owned_order, AuthContext(operation=owned_order.operation, app=None))
+    with pytest.raises(ObjectLevelAuthorizationViolation, match=OWNED_ORDER):
+        object_level_authorization(check_context(), owned_order.call(), owned_order)
+
+
 @pytest.mark.parametrize(
     ("listing", "expectation"),
     [("own", pytest.raises(ObjectLevelAuthorizationViolation, match=OWNED_ORDER)), ("ids", nullcontext())],
