@@ -98,6 +98,7 @@ class _SuiteProgress:
 
     status: Status | None = None
     is_executed: bool = False
+    checks_ran: bool = False
 
 
 def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> events.EventGenerator:
@@ -196,6 +197,7 @@ def _fold_event(engine: EngineContext, phase: PhaseName, event: events.EngineEve
         progress.status = Status.ERROR
     if isinstance(event, events.ScenarioFinished):
         progress.status = _record_scenario_outcome(engine, phase, event, progress.status)
+        progress.checks_ran = progress.checks_ran or any(event.recorder.checks.values())
     if isinstance(event, events.Interrupted) or engine.is_interrupted:
         progress.status = Status.INTERRUPTED
         engine.stop()
@@ -226,6 +228,9 @@ def _final_status(phase: Phase, progress: _SuiteProgress) -> Status:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
         return Status.SKIP
     if progress.status is None:
+        return Status.SKIP
+    if progress.status == Status.SUCCESS and not progress.checks_ran:
+        phase.skip_reason = PhaseSkipReason.NO_CHECKS_RAN
         return Status.SKIP
     return progress.status
 
