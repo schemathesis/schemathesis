@@ -714,8 +714,9 @@ class ProjectsConfig(DiffBase):
         configs = []
         if not isinstance(self._override, NotSet):
             configs.append(self._override)
-        title = schema.get("info", {}).get("title")
-        if title is not None:
+        info = schema.get("info")
+        title = info.get("title") if isinstance(info, dict) else None
+        if isinstance(title, str):
             named = self.named.get(title)
             if named is not None:
                 configs.append(named)

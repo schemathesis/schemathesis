@@ -15,6 +15,7 @@
 ### :bug: Fixed
 
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
+- Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 
