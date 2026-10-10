@@ -43,7 +43,7 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json \
   --report junit
 ```
 
-All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
+All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, `html`. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
 
 ## 3. Put the settings in a config file
 

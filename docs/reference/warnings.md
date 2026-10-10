@@ -29,12 +29,12 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 ### `missing_auth`
 
 ```
-Missing authentication: 1 operation returned authentication errors
+Authentication failed: 1 operation returned authentication errors
 
 401 Unauthorized (1 operation):
   - GET /basic
 
-💡 Use --auth or -H to provide authentication credentials
+💡 Ensure valid authentication credentials are set via `--auth` or `-H`
 ```
 
 **Trigger**: At least 90% of requests returned HTTP 401 or 403.

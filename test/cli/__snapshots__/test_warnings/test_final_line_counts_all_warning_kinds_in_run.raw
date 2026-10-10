@@ -57,7 +57,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Warnings:
-  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+  ⚠️ Authentication failed: 1 operation returned only 401/403 responses
   ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
 
 Test cases:

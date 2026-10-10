@@ -512,7 +512,7 @@ These options control the reporting and output format of test results:
 !!! note ""
 
     **Type**: `Comma-separated list`  
-    **Possible values**: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`, `html`  
+    **Possible values**: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, `html`  
 
     Generate test reports in specified formats as a comma-separated list.
 
