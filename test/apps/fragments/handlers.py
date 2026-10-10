@@ -372,19 +372,6 @@ def register_header_constraint_bug(app: Flask) -> None:
         return jsonify({"ok": True}), 200
 
 
-def register_query_array_items_bug(app: Flask) -> None:
-    @app.route("/api/query_array_items_bug", methods=["GET"])
-    def query_array_items_bug_endpoint() -> Any:
-        ids = request.args.getlist("ids")
-        if not ids:
-            return jsonify({"error": "ids required"}), 400
-        try:
-            [int(x) for x in ids]
-        except ValueError:
-            return jsonify({"error": "ids must be integers"}), 400
-        return jsonify({"ok": True}), 200
-
-
 def register_one_of_branch_bug(app: Flask) -> None:
     @app.route("/api/one_of_branch_bug", methods=["POST"])
     def one_of_branch_bug_endpoint() -> Any:

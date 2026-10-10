@@ -179,9 +179,6 @@ class OpenAPIApps:
     def slow(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.slow())
 
-    def success_and_slow(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.success_and_slow())
-
     def headers(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.headers())
 
@@ -466,17 +463,11 @@ class OpenAPIApps:
     def swagger_v2_and_security(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.and_security())
 
-    def swagger_v2_kitchen_sink(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.kitchen_sink())
-
     def deep_leaf_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_nested.deep_leaf_bug())
 
     def header_constraint_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_nested.header_constraint_bug())
-
-    def query_array_items_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_nested.query_array_items_bug())
 
     def one_of_branch_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_nested.one_of_branch_bug())

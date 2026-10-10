@@ -9,12 +9,6 @@ from schemathesis.schemas import PayloadAlternatives
 from ..utils import assert_requests_call, integer
 
 
-@pytest.fixture
-def reload_profile():
-    yield
-    settings.load_profile("default")
-
-
 def test_parametrization(testdir):
     # When `schema.parametrize` is specified on a test function
     testdir.make_test(

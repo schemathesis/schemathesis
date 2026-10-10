@@ -102,6 +102,7 @@ def test_unsatisfiable_body_schema_does_not_abort_generation(data):
 
 
 @given(data=st.data())
+# The violating draw is rare, so fewer examples would let a regression pass.
 @settings(deadline=None, suppress_health_check=_SUPPRESSED, max_examples=100)
 def test_value_channel_does_not_emit_still_valid_bodies(data):
     # A permissive sibling (`minLength: 0`) next to a format field must not let a still-valid body slip through.
@@ -136,6 +137,7 @@ def test_value_channel_does_not_emit_still_valid_bodies(data):
 
 
 @given(data=st.data())
+# The violating draw is rare, so fewer examples would let a regression pass.
 @settings(deadline=None, suppress_health_check=_SUPPRESSED, max_examples=100)
 def test_value_channel_falls_back_when_violator_is_a_noop_with_binary_sibling(data):
     # `contains_binary` must not skip no-op revalidation: a binary+permissive-sibling body
@@ -266,5 +268,6 @@ def test_value_channel_base_body_is_valid():
                 validator_cls=jsonschema_rs.Draft202012Validator,
             ),
             is_invalid_before_mutation,
+            # The excluded value is rare, so a small budget would pass without looking.
             settings=settings(max_examples=1000, database=None, deadline=None, suppress_health_check=_SUPPRESSED),
         )

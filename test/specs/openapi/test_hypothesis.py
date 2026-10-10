@@ -618,6 +618,7 @@ def test_header_values_never_start_with_whitespace():
         find(
             formats.header_values(exclude_characters=formats.INVALID_HEADER_CHARS),
             lambda value: value[:1].strip() != value[:1],
+            # The excluded value is rare, so a small budget would pass without looking.
             settings=settings(max_examples=1000, database=None),
         )
 

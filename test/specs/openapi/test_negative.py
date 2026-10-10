@@ -381,6 +381,7 @@ def test_no_unsatisfiable_schemas(data):
 
 
 @given(data=st.data())
+# The crashing mutation is rare, so the sweep needs many draws.
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=100, derandomize=True)
 def test_mutated_body_with_shared_ref_does_not_crash(data):
     schema = {
@@ -429,6 +430,7 @@ def test_mutated_body_with_shared_ref_does_not_crash(data):
 
 
 @given(data=st.data())
+# The crashing mutation is rare, so the sweep needs many draws.
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=100, derandomize=True)
 def test_mutated_body_with_bundled_ref_and_inline_enum_does_not_crash(data):
     keywords = {
@@ -691,6 +693,7 @@ def test_allow_empty_value_is_not_generated_as_negative(ctx, parameter_schema):
         find(
             schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE),
             lambda case: case.query == {"filter": ""},
+            # The excluded value is rare, so a small budget would pass without looking.
             settings=settings(max_examples=100, deadline=None),
         )
 
@@ -1310,6 +1313,7 @@ def test_path_parameters_never_contain_slash(ctx):
     operation = schema["/api/groups/{id}"]["GET"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(deadline=None, max_examples=250, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         for value in case.path_parameters.values():
@@ -1337,6 +1341,7 @@ def test_path_boolean_param_is_not_coerced_to_int_alongside_integer_param(ctx):
     operation = schema["/items/{id}/{flag}"]["GET"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(deadline=None, max_examples=100, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         flag = case.path_parameters["flag"]
@@ -1408,6 +1413,7 @@ def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_exampl
 
     @seed(8)
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(deadline=None, max_examples=80, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         for value in case.path_parameters.values():
@@ -1521,6 +1527,7 @@ def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, ap
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",
+        # The mutation behind the false positive is rare, so the run needs many cases to reach it.
         "--max-examples=200",
         exit_code=ExitCode.OK,
     )
@@ -1571,6 +1578,7 @@ def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli
             "--checks=negative_data_rejection",
             "--mode=negative",
             "--phases=fuzzing",
+            # The mutation behind the false positive is rare, so the run needs many cases to reach it.
             "--max-examples=200",
             "--seed=42",
         )
@@ -1966,6 +1974,7 @@ def test_omitting_required_header_next_to_explicit_one_is_negative(ctx):
     find(
         strategy,
         lambda case: "X-Token" not in case.headers and isinstance(case.body, dict) and "kind" in case.body,
+        # Ceiling for a search that stops at the first match.
         settings=settings(max_examples=100, database=None, suppress_health_check=list(HealthCheck)),
     )
 
@@ -2091,6 +2100,7 @@ def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
     validator = make_validator(body.unoptimized_schema, schema.adapter.jsonschema_validator_cls)
 
     @given(body.get_strategy(operation, GenerationConfig(), GenerationMode.NEGATIVE))
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=300, deadline=None, database=None, suppress_health_check=list(HealthCheck))
     def test(value):
         if isinstance(value, GeneratedValue):
@@ -2337,6 +2347,7 @@ def test_negative_declines_unbuildable_negated_body(ctx):
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @seed(1)
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=200, deadline=None, suppress_health_check=list(HealthCheck), phases=[Phase.generate])
     def test(case):
         pass

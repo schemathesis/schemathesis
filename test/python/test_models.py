@@ -491,9 +491,7 @@ def test_response_from_requests(ctx, app_runner):
 
     @app.route("/api/cookies")
     def set_cookies():
-        from flask import make_response
-
-        response = make_response("")
+        response = flask.make_response("")
         response.set_cookie("foo", "bar")
         response.set_cookie("baz", "spam")
         return response

@@ -390,7 +390,7 @@ def test_curl_command_validity(curl, loose_schema):
 )
 def test_shell_aware_escaping(curl, monkeypatch, shell_type, case_kwargs, expected_command):
     if shell_type is not None:
-        monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", shell_type)
+        monkeypatch.setenv("SHELL", f"/bin/{shell_type.value}")
 
     case = schema["/users"]["GET"].Case(**case_kwargs)
     command = case.as_curl_command()
@@ -406,7 +406,7 @@ def test_shell_aware_escaping(curl, monkeypatch, shell_type, case_kwargs, expect
 )
 def test_truncated_printable_body_is_quoted(monkeypatch, shell_type):
     # Unquoted, the truncation marker's `<` would be read as a shell redirect
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", shell_type)
+    monkeypatch.setenv("SHELL", f"/bin/{shell_type.value}")
     body = "a" * (MAX_SHELL_SCAN_BYTES + 1)
     case = schema["/users"]["GET"].Case(body=body, media_type="text/plain")
     command = case.as_curl_command()
@@ -500,7 +500,7 @@ RAW_MULTIPART_PATHS = {
     ids=["header-without-boundary", "no-boundary-in-body"],
 )
 def test_raw_multipart_bytes_body_boundary(ctx, monkeypatch, body, expected):
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
+    monkeypatch.setenv("SHELL", "/bin/bash")
     schema = ctx.openapi.load_schema(RAW_MULTIPART_PATHS)
     case = schema["/upload"]["POST"].Case(
         body=body, media_type="multipart/form-data", headers={"Content-Type": "multipart/mixed"}
@@ -561,7 +561,7 @@ def multipart_schema(ctx, app_runner):
     ids=["dict-body", "non-dict-body"],
 )
 def test_multipart_boundary_matches_between_header_and_body(multipart_schema, monkeypatch, path, body):
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
+    monkeypatch.setenv("SHELL", "/bin/bash")
     case = multipart_schema[path]["POST"].Case(body=body, media_type="multipart/form-data")
     response = case.call()
     command = case.as_curl_command(headers=dict(response.request.headers))
@@ -579,7 +579,7 @@ def test_multipart_curl_command_is_stable(multipart_schema, path, body):
 
 
 def test_empty_multipart_curl_body_keeps_closing_delimiter(multipart_schema, monkeypatch):
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
+    monkeypatch.setenv("SHELL", "/bin/bash")
     case = multipart_schema["/upload"]["POST"].Case(body={}, media_type="multipart/form-data")
     command = case.as_curl_command()
     boundary = HEADER_BOUNDARY.search(command)[1]

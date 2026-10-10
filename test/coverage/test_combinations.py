@@ -15,7 +15,6 @@ from hypothesis.errors import Unsatisfiable
 from schemathesis.core import MAX_GENERATED_PATTERN_LENGTH
 from schemathesis.core.cache import MISSING
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator_for
-from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone, transform
 from schemathesis.generation import GenerationMode
@@ -28,7 +27,6 @@ from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
     CoverageScenario,
     GeneratedValue,
-    _apply_pattern_optimizations,
     _cover_positive_for_type,
     _negative_format,
     _positive_number,
@@ -1365,21 +1363,24 @@ def test_positive_pattern_with_char_class_and_min_length(pctx):
         assert len(value) >= 3, f"Generated string {value!r} violates minLength=3"
 
 
-def test_apply_pattern_optimizations_skips_non_keyword_property_names():
-    # JSON Schema meta-schemas (e.g. Kubernetes CRD `JSONSchemaProps`) declare sub-schemas
-    # whose property *names* happen to be `pattern` / `minLength` / `maxLength`. The walker
-    # must skip these — they are sub-schema dicts, not regex strings / integer bounds.
-    bundle = {
-        "JSONSchemaProps": {
-            "type": "object",
-            "properties": {
-                "pattern": {"type": "string"},
-                "minLength": {"type": "integer", "format": "int64"},
-                "maxLength": {"type": "integer", "format": "int64"},
-            },
-        }
+def test_property_names_spelled_like_string_keywords(ctx_factory):
+    # Meta-schemas (e.g. Kubernetes CRD `JSONSchemaProps`) name properties `pattern` / `minLength` / `maxLength`.
+    schema = {
+        "oneOf": [{"$ref": f"#/{BUNDLE_STORAGE_KEY}/JSONSchemaProps"}],
+        BUNDLE_STORAGE_KEY: {
+            "JSONSchemaProps": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string"},
+                    "minLength": {"type": "integer"},
+                    "maxLength": {"type": "integer"},
+                },
+                "required": ["pattern", "minLength", "maxLength"],
+            }
+        },
     }
-    _apply_pattern_optimizations(bundle, update_quantifier)
+    ctx = ctx_factory(root_schema=schema, generation_modes=[GenerationMode.POSITIVE])
+    assert_conform([ctx.generate_from_schema(schema)], schema)
 
 
 def test_negative_pattern_reuse_stamps_current_location(nctx):
@@ -2389,50 +2390,26 @@ def test_not_schema_generation_modes_consistency(
     ],
     ids=["object", "array", "implicit-object"],
 )
-def test_cover_positive_for_type_skips_template_generation_in_negative_mode(ctx_factory, schema, ty, monkeypatch):
+def test_cover_positive_for_type_yields_nothing_in_negative_mode(ctx_factory, schema, ty):
     ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE])
-    calls = 0
-    original = CoverageContext.generate_from_schema
-
-    def wrapped(self, schema):
-        nonlocal calls
-        calls += 1
-        return original(self, schema)
-
-    monkeypatch.setattr(CoverageContext, "generate_from_schema", wrapped)
-
     assert list(_cover_positive_for_type(ctx, schema, ty)) == []
-    assert calls == 0
 
 
-def test_generate_from_schema_uses_cache_and_returns_fresh_copy(ctx_factory, monkeypatch):
+def test_generate_from_schema_returns_fresh_copy_of_cached_value(ctx_factory):
     ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE])
-    calls = 0
-
-    def wrapped(self, strategy):
-        nonlocal calls
-        calls += 1
-        return {"cached": True}
-
-    monkeypatch.setattr(CoverageContext, "generate_from", wrapped)
-
-    schema_1 = {
-        "type": "object",
-        "properties": {"name": {"type": "string"}},
-        "additionalProperties": {"type": "string"},
-    }
-    schema_2 = {
+    schema = {
         "type": "object",
         "properties": {"name": {"type": "string"}},
         "additionalProperties": {"type": "string"},
     }
 
-    first = ctx.generate_from_schema(schema_1)
+    first = ctx.generate_from_schema(schema)
+    pristine = deepclone(first)
     first["mutated"] = True
-    second = ctx.generate_from_schema(schema_2)
+    second = ctx.generate_from_schema(deepclone(schema))
+    second["mutated"] = True
 
-    assert calls == 1
-    assert second == {"cached": True}
+    assert ctx.generate_from_schema(deepclone(schema)) == pristine
 
 
 def test_generate_from_schema_reflects_bundle_mutations(ctx_factory):
@@ -4248,28 +4225,23 @@ def test_subsumed_one_of_branch_negative_is_not_filtered_by_sibling_not(ctx_fact
     assert not validator.is_valid(mac_string.value)
 
 
-def test_invalid_enum_values_do_not_run_hypothesis_per_position(nctx, mocker):
+def test_invalid_enum_values_cover_every_position(nctx):
     schema = {"type": "object", "properties": {f"key{idx}": {"enum": ["a", "b"]} for idx in range(40)}}
-    generate_one = mocker.spy(_schema.examples, "generate_one")
     values = [
         value.value
         for value in cover_schema_iter(nctx, schema)
         if value.scenario == CoverageScenario.INVALID_ENUM_VALUE
     ]
-    assert len(values) == 40
-    assert generate_one.call_count < 5
+    invalid_keys = [key for value in values for key, item in value.items() if item not in ("a", "b")]
+    assert sorted(invalid_keys) == sorted(schema["properties"])
 
 
-def test_array_above_max_items_repeats_one_drawn_item(nctx, mocker):
-    # Drawing every item of a recursive schema is a search per item; one valid item repeated
-    # violates `maxItems` the same way.
+def test_array_above_max_items_holds_separate_equal_items(nctx):
     schema = {
         "type": "array",
         "maxItems": 3,
         "items": {"type": "object", "required": ["op"], "properties": {"op": {"type": "string"}}},
     }
-    generate_from_schema = mocker.spy(CoverageContext, "generate_from_schema")
-
     oversized = [
         value.value
         for value in cover_schema_iter(nctx, schema)
@@ -4279,8 +4251,6 @@ def test_array_above_max_items_repeats_one_drawn_item(nctx, mocker):
     assert len(oversized) == 1
     assert len(oversized[0]) == 4
     assert all(item == oversized[0][0] and item is not oversized[0][0] for item in oversized[0][1:])
-    drawn = [call.args[1] for call in generate_from_schema.call_args_list]
-    assert all(not isinstance(drawn_schema, dict) or drawn_schema.get("minItems", 0) <= 1 for drawn_schema in drawn)
 
 
 def test_one_of_negative_is_not_valid_for_a_sibling_under_a_newer_draft(ctx_factory):

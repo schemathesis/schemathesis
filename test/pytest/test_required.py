@@ -81,6 +81,7 @@ def test_without_required(ctx, testdir, version, param):
             path["parameters"] = [param]
             location = param["in"]
         schema = ctx.openapi.build_schema({"/users": {"post": path}})
+    # The inner test must hit a rare draw with the parameter missing, so it gets a large budget.
     testdir.make_test(
         f"""
 @schema.parametrize()

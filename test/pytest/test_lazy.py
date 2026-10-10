@@ -1,15 +1,10 @@
 import re
+import subprocess
+import sys
 
 import pytest
-from hypothesis import settings
 
 from schemathesis.generation.modes import GenerationMode
-
-
-@pytest.fixture
-def reload_profile():
-    yield
-    settings.load_profile("default")
 
 
 def test_default(testdir):
@@ -846,9 +841,6 @@ class TestAPI:
 def test_checks_available_with_from_fixture(tmp_path):
     # When using from_fixture, checks should be accessible without AttributeError
     # Run in subprocess to avoid test pre-loading modules
-    import subprocess
-    import sys
-
     test_file = tmp_path / "test_isolated.py"
     test_file.write_text("""
 import pytest

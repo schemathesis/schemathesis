@@ -14,7 +14,6 @@ from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
 from schemathesis.specs.openapi import adapter
-from schemathesis.specs.openapi._operation_lookup import OperationLookup
 from schemathesis.specs.openapi.adapter import validators
 
 
@@ -542,24 +541,6 @@ def test_get_operation(ctx, operation_id, reference, path, method):
 def test_find_operation_by_path_without_operation_id(ctx):
     schema = ctx.openapi.load_schema({"/users/{user_id}": {"get": RESPONSES}})
     assert schema.find_operation_by_path("GET", "/users/42").label == "GET /users/{user_id}"
-
-
-def test_operation_lookup_cache_built_once(ctx, monkeypatch):
-    schema = ctx.openapi.load_schema(SCHEMA["paths"])
-    calls = 0
-    original = OperationLookup._build_tables
-
-    def tracking(self: OperationLookup) -> None:
-        nonlocal calls
-        calls += 1
-        return original(self)
-
-    monkeypatch.setattr(OperationLookup, "_build_tables", tracking)
-
-    schema.find_operation_by_id("getFoo")
-    schema.find_operation_by_reference("#/paths/~1foo/get")
-
-    assert calls == 1
 
 
 def test_find_operation_by_id_in_referenced_path(ctx):

@@ -349,14 +349,6 @@ def slow() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
-def success_and_slow() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.slow()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_slow(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
-
-
 def headers() -> OpenAPIApp:
     spec = build_schema(schemas.headers(), components=_API_KEY_SCHEME)
     app = make_flask_app_from_schema(spec)

@@ -44,25 +44,11 @@ class EscapeResult:
     """Which shell type the escaping is for."""
 
 
-_DETECTED_SHELL: ShellType | None = None
-
-
 def detect_shell() -> ShellType:
     """Detect the current shell type from $SHELL environment variable."""
-    global _DETECTED_SHELL
-
-    if _DETECTED_SHELL is not None:
-        return _DETECTED_SHELL
-
-    # Check $SHELL environment variable
     shell_path = os.environ.get("SHELL", "")
     if shell_path:
-        shell_name = os.path.basename(shell_path).lower()
-        detected = _parse_shell_name(shell_name)
-        _DETECTED_SHELL = detected
-        return detected
-
-    _DETECTED_SHELL = ShellType.UNKNOWN
+        return _parse_shell_name(os.path.basename(shell_path).lower())
     return ShellType.UNKNOWN
 
 

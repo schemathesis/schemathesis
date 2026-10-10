@@ -4,6 +4,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 from schemathesis.config import SchemathesisConfig
+from schemathesis.generation import GenerationMode
 
 
 def _load_schema(ctx, config: dict, paths: dict, *, version: str = "3.0.2"):
@@ -265,8 +266,6 @@ def test_literal_skipped_when_path_does_not_resolve(ctx):
 
 @pytest.mark.hypothesis_nested
 def test_override_drops_stale_mutation_on_same_path(ctx):
-    from schemathesis.generation import GenerationMode
-
     schema = _load_schema(
         ctx,
         {

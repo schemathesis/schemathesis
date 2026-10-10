@@ -109,6 +109,7 @@ schema.config.update(base_url="{api.base_url}")
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
+    # The bug needs a specific call sequence, which takes many scenarios to reach.
     max_examples=2000,
     deadline=None,
     suppress_health_check=list(HealthCheck),
@@ -174,6 +175,7 @@ def test_hidden_failure_app(transport, factory):
     with pytest.raises(TypeError, match="can only concatenate str"):
         state_machine.run(
             settings=settings(
+                # The bug needs a specific call sequence, which takes many scenarios to reach.
                 max_examples=2000,
                 deadline=None,
                 suppress_health_check=list(HealthCheck),
@@ -260,6 +262,7 @@ def test_dynamic_body(merge_body, ctx):
 
     state_machine.run(
         settings=settings(
+            # The linked call that carries the dynamic body is one step among many scenarios.
             max_examples=100,
             deadline=None,
             suppress_health_check=list(HealthCheck),

@@ -1,7 +1,9 @@
 import datetime
 import json
 import re
+import subprocess
 import sys
+import textwrap
 import uuid
 from base64 import b64decode
 from fractions import Fraction
@@ -123,6 +125,7 @@ def test_negative_case_can_negate_the_body_alone(ctx):
     find(
         strategy,
         lambda case: case.path_parameters["kind"] in ("a", "b") and not isinstance(case.body, str),
+        # Ceiling for a search that stops at the first match.
         settings=settings(max_examples=100, database=None),
     )
 
@@ -157,6 +160,7 @@ def test_explicit_value_differing_in_case_leaves_location_negatable(ctx, paramet
     find(
         strategy,
         lambda case: location in case.meta.components and case.meta.components[location].mode.is_negative,
+        # Ceiling for a search that stops at the first match.
         settings=settings(max_examples=100, database=None),
     )
 
@@ -637,10 +641,6 @@ def test_non_schema_property_value(ctx):
 
 def test_as_strategy_example_resolves_bundled_refs(tmp_path):
     # The public Python API path must work without prior CLI/pytest imports.
-    import subprocess
-    import sys
-    import textwrap
-
     script = tmp_path / "probe.py"
     script.write_text(
         textwrap.dedent("""
@@ -1330,6 +1330,7 @@ def test_positive_integers_stay_within_format_range(ctx, format, minimum, maximu
     )
 
     @given(schema["/x"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=250, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert minimum <= case.body["value"] <= maximum, f"Out of {format} range: {case.body['value']}"
@@ -2816,6 +2817,7 @@ def test_canonical_dynamic_recursion_is_drawn_at_any_depth(validator_cls, schema
     def depth(value):
         return 1 + depth(value["child"]) if isinstance(value, dict) and "child" in value else 0
 
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
 
 
@@ -2892,6 +2894,7 @@ def test_canonical_one_of_branches_naming_draft_4_definitions():
 
     test()
 
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
     find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
 
@@ -2927,6 +2930,7 @@ def test_canonical_array_shorter_than_the_positions_it_names():
 
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: value == [], settings=settings(max_examples=1000, database=None))
     find(built, lambda value: len(value) == 1, settings=settings(max_examples=1000, database=None))
     find(built, lambda value: len(value) == 2, settings=settings(max_examples=1000, database=None))
@@ -3006,6 +3010,7 @@ def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):
 
     test()
 
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: len(value) > 1, settings=settings(max_examples=1000, database=None))
 
 
@@ -3017,6 +3022,7 @@ def test_canonical_pattern_non_whitespace_class_draws_no_validator_whitespace(pa
     is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
 
     with pytest.raises(NoSuchExample):
+        # The excluded value is rare, so a small budget would pass without looking.
         find(built, lambda value: not is_valid(value), settings=settings(max_examples=1000, database=None))
 
 
@@ -3166,6 +3172,7 @@ def test_canonical_content_string_generation(schema, reaches):
 
     test()
     for predicate in reaches:
+        # Ceiling for a search that stops at the first match.
         find(built, predicate, settings=settings(max_examples=1000, database=None))
 
 
@@ -3193,6 +3200,7 @@ def test_canonical_number_excluding_integers_under_draft4():
         assert is_valid(value), value
 
     test()
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: value > 4, settings=settings(max_examples=1000, database=None))
 
 
@@ -3380,6 +3388,7 @@ def test_canonical_number_never_spells_a_rejected_bound(schema, rejected):
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
     @given(built)
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=100, deadline=None, database=None)
     def test(value):
         assert is_valid(value), value
@@ -3463,6 +3472,7 @@ def test_canonical_closed_object_reaches_every_admitted_name():
     }
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: set(value) == {"a", "b"}, settings=settings(max_examples=1000, database=None))
 
 
@@ -3572,6 +3582,7 @@ def test_canonical_typed_group_keeps_the_type():
 
     test()
 
+    # Ceiling for a search that stops at the first match.
     find(built, lambda value: value == 2, settings=settings(max_examples=1000, database=None))
 
 
@@ -3785,6 +3796,7 @@ def test_canonical_array_unique_items_separates_booleans_from_numbers():
     find(
         built,
         lambda value: any(item is True for item in value) and 1 in value,
+        # Ceiling for a search that stops at the first match.
         settings=settings(max_examples=2000, database=None),
     )
 
@@ -4142,14 +4154,17 @@ def assert_generation_is_sound(
 
 
 def test_canonical_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(ANY_SCHEMA, max_examples=300, floor=50)
 
 
 def test_canonical_number_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(numeric_schemas(), max_examples=500, floor=100)
 
 
 def test_canonical_string_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(string_schemas(), max_examples=500, floor=100)
 
 
@@ -4171,20 +4186,24 @@ def content_string_schemas(draw):
 
 
 def test_canonical_content_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(
         content_string_schemas(), max_examples=300, floor=50, validator_cls=jsonschema_rs.Draft7Validator
     )
 
 
 def test_canonical_object_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(object_schemas(ANY_SCHEMA), max_examples=400, floor=50)
 
 
 def test_canonical_array_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(array_schemas(ANY_SCHEMA), max_examples=300, floor=50)
 
 
 def test_canonical_pointer_generation_soundness():
+    # Unsound shapes are rare among random schemas, so the sweep needs breadth.
     assert_generation_is_sound(pointer_schemas(ANY_SCHEMA), max_examples=300, floor=50)
 
 

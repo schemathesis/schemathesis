@@ -58,6 +58,7 @@ def test_max_failures(ctx, cli, snapshot_cli):
         cli.run(
             api.schema_url,
             "--no-shrink",
+            # The bug needs a specific call sequence, which takes many scenarios to reach.
             "--max-examples=80",
             "--max-failures=2",
             "-c not_a_server_error",
@@ -108,6 +109,7 @@ def test_junit(ctx, tmp_path, cli):
         api.schema_url,
         "--phases=stateful",
         "--no-shrink",
+        # The bug needs a specific call sequence, which takes many scenarios to reach.
         "--max-examples=80",
         "--max-failures=1",
         "--seed=1",
@@ -138,6 +140,7 @@ def test_stateful_only(ctx, cli, snapshot_cli):
             "--phases=stateful",
             "--mode=positive",
             "--no-shrink",
+            # The bug needs a specific call sequence, which takes many scenarios to reach.
             "--max-examples=200",
             "-c not_a_server_error",
         )
@@ -447,6 +450,7 @@ def test_non_json_response(ctx, cli, snapshot_cli, content):
         cli.run(
             api.schema_url,
             "--phases=stateful",
+            # The bug needs a specific call sequence, which takes many scenarios to reach.
             "-n 80",
             "-c not_a_server_error",
             "--mode=positive",

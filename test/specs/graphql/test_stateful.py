@@ -100,6 +100,7 @@ def test_stateful_finds_tombstone_bugs(ctx, cli, snapshot_cli, make_api):
         cli.run(
             api.schema_url,
             "--no-shrink",
+            # The bug needs a specific call sequence, which takes many scenarios to reach.
             "--max-examples=75",
             "--seed=1",
             "--phases=stateful",

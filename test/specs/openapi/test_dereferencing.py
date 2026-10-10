@@ -2,6 +2,7 @@ import gc
 import json
 import platform
 from pathlib import Path
+from typing import Any
 
 import pytest
 from flask import Flask, jsonify
@@ -12,10 +13,12 @@ from werkzeug.exceptions import InternalServerError
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema.resolver import load_file_uri, resolve_reference
+from schemathesis.core.jsonschema import Bundler
+from schemathesis.core.jsonschema.resolver import load_file_uri, make_root_resolver, resolve_reference
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import get_template_fields
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.stateful import dependencies
 from test.utils import as_param, get_schema_path, integer
 
@@ -1679,3 +1682,23 @@ def test_top_level_body_ref_siblings(ctx, version, accepts_body_without_extra):
 
     assert body.is_valid({"a": "x"}) is accepts_body_without_extra
     assert [value for value in bodies if not body.is_valid(value)] == []
+
+
+def _strip_remote_refs(value: Any) -> Any:
+    if isinstance(value, dict):
+        ref = value.get("$ref")
+        if isinstance(ref, str) and ref.startswith(("http://", "https://")):
+            return {}
+        return {key: _strip_remote_refs(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_strip_remote_refs(item) for item in value]
+    return value
+
+
+@pytest.mark.parametrize("schema", [SWAGGER_20, OPENAPI_30, OPENAPI_31])
+def test_bundles_open_api_schemas(schema):
+    # Smoke test: official meta-schemas bundle without errors. Remote refs are stripped
+    # so the test stays offline.
+    schema = _strip_remote_refs(schema)
+    resolver = make_root_resolver(schema)
+    Bundler().bundle(schema, resolver)

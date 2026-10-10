@@ -138,12 +138,6 @@ def test_escape_for_shell(input_value, shell_type, expected_escaped, expected_wa
         assert result.original_bytes == b"0\x1f"
 
 
-def test_detect_shell_caches_result():
-    shell1 = detect_shell()
-    shell2 = detect_shell()
-    assert shell1 == shell2
-
-
 @pytest.mark.parametrize(
     ("shell_name", "expected"),
     [
@@ -199,7 +193,6 @@ def test_parse_shell_name(shell_name, expected):
     ],
 )
 def test_detect_shell_from_environment(monkeypatch, shell_env, expected, delete_env):
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", None)
     if delete_env:
         monkeypatch.delenv("SHELL", raising=False)
     else:

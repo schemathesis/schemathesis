@@ -3119,8 +3119,6 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
 
 def test_body_example_violating_schema_is_not_used_in_positive_generation(ctx):
     # A schema's own `example` may not match its `schema`; positive generation must filter it out.
-    from schemathesis.generation.modes import GenerationMode
-
     schema = ctx.openapi.load_schema(
         {
             "/items": {
@@ -5176,6 +5174,7 @@ def test_examples_with_the_same_name_are_paired_in_fuzzing(ctx):
     seen = []
 
     @given(case=schema["/search"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    # Every expected variant must appear at least once, which takes many draws.
     @settings(max_examples=200, deadline=None, phases=[Phase.generate], suppress_health_check=list(HealthCheck))
     def test(case):
         seen.append((case.query["region"], case.query["currency"]))
