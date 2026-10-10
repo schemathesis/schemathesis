@@ -14,6 +14,7 @@
 
 ### :bug: Fixed
 
+- Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
