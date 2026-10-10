@@ -15,6 +15,9 @@ import httpx
 import httpx2
 import pytest
 import requests
+
+# Import eagerly: on Windows `rich` loads its console bindings on the first console, which `pytester` can race.
+import rich._windows  # noqa: F401
 import yaml
 from hypothesis import settings
 from urllib3 import HTTPResponse
