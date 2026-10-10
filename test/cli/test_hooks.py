@@ -137,6 +137,23 @@ def before_init_operation(context, operation):
     assert cli.main("run", api.schema_url, hooks=module) == snapshot_cli
 
 
+@pytest.mark.parametrize("invalid_schema", [{"pattern": "["}, {"minLength": "x"}], ids=["regex", "non-regex"])
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_traceback=True)
+def test_before_generate_case_validation_error(ctx, cli, snapshot_cli, invalid_schema):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        f"""
+import jsonschema_rs
+
+@schemathesis.hook
+def before_generate_case(context, strategy):
+    jsonschema_rs.Draft202012Validator({invalid_schema!r})
+    return strategy
+"""
+    )
+    assert cli.main("run", api.schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
+
+
 def test_hooks_file_path(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
     # When SCHEMATHESIS_HOOKS points to an absolute file path

@@ -3463,6 +3463,16 @@ def test_create_does_not_link_to_read_by_a_sent_field(ctx, method, create_body, 
     assert [link[0] for link in inferred_links(graph)] == ["#/paths/~1books/get"]
 
 
+def test_create_without_success_response_does_not_link_sent_key_to_read(ctx):
+    create_body = {"type": "object", "properties": {"book_title": {"type": "string"}}}
+    paths = {
+        **operation_with_body("post", "/books", "400", create_body, MESSAGE),
+        **operation("get", "/books/{book_title}", "200", BOOK, parameters=[path_param("book_title")]),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == []
+
+
 def test_path_param_without_matching_resource_field_does_not_link_to_missing_field(ctx):
     paths = {
         **CREATE_PROJECT,
@@ -3703,6 +3713,9 @@ def test_create_links_item_operations_through_identifier_next_to_wrapped_resourc
             },
         ]
         for method in ("get", "put", "delete")
+    ]
+    assert [output["identifier_pointer"] for output in graph.serialize()["operations"]["POST /booking"]["outputs"]] == [
+        "/bookingid"
     ]
 
 

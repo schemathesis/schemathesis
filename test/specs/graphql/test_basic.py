@@ -72,6 +72,10 @@ def test_graphql_schema_has_no_spec_specific_coverage_or_format_hooks(ctx):
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
+def test_graphql_operations_need_no_parameter_serializers(ctx):
+    assert _books_schema(ctx)["Query"]["getBooks"].get_parameter_serializers() == {}
+
+
 @pytest.mark.parametrize(
     ("type_name", "field_name", "is_query", "is_mutation"),
     [("Query", "getBooks", True, False), ("Mutation", "addBook", False, True)],

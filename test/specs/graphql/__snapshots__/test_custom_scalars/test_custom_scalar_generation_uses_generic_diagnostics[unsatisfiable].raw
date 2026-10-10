@@ -1,0 +1,60 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.gql (in 0.00s)
+
+     Base URL:         http://127.0.0.1/graphql
+     Specification:    GraphQL
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+_________________________________ Query.search _________________________________
+Schema Error
+
+Cannot generate test data for this operation
+
+Unable to identify the specific parameter. Common causes:
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for
+
+Tip: Review all parameters and request body schemas for conflicting constraints.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

@@ -1152,6 +1152,35 @@ def test_reauth_count_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_ht
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 
 
+def test_reauth_failure_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_html):
+    app = _protected_app(ctx, "OAuth2", OAUTH2_SCHEME)
+    auth_calls = itertools.count()
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        if next(auth_calls) == 0:
+            return jsonify({"access_token": "expired"})
+        return jsonify({"error": "invalid credentials"}), 401
+
+    @app.route("/protected")
+    def protected():
+        return jsonify({"error": "unauthorized"}), 401
+
+    report_dir = tmp_path / "report"
+    _run_cli(
+        cli,
+        app_runner,
+        app,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 1",
+        "--seed=42",
+        f"--report-html-path={report_dir}",
+        config={"auth": _dynamic_auth("OAuth2", retry_on=[401])},
+    )
+    assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
+
+
 # A negated-security case's 401 is the expected outcome, not an expired token - the hook must not re-authenticate for it.
 def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner):
     app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})

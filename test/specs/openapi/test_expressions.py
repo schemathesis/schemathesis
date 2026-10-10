@@ -200,6 +200,13 @@ def test_dotted_body_path_suggests_pointer(output, expr, suggestion):
         expressions.evaluate(expr, output)
 
 
+@pytest.mark.parametrize("expr", ["$request.body$method", "$response.body$statusCode", "$request.body."])
+def test_invalid_body_suffix_has_plain_error(output, expr):
+    with pytest.raises(RuntimeExpressionError) as exc:
+        expressions.evaluate(expr, output)
+    assert str(exc.value) == f"Invalid expression: {expr}"
+
+
 @given(expr=(st.text() | (st.lists(st.sampled_from([".", "}", "{", "$"]) | st.text()).map("".join))))
 @settings(deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_random_expression(expr, output):
