@@ -177,6 +177,8 @@ _PRODUCERS = (
 
 
 def write_charts(run: RunMetrics, charts_dir: Path) -> None:
+    # Charts only go to files; a GUI backend leaves Tk objects that fail when collected outside the main thread.
+    pyplot.switch_backend("agg")
     seaborn.set_theme(style="whitegrid", palette="muted")
     charts_dir.mkdir(parents=True, exist_ok=True)
     for producer in _PRODUCERS:
