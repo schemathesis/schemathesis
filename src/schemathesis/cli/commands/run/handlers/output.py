@@ -115,6 +115,17 @@ def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: 
     return default
 
 
+def phase_status_icon(status: Status, stats: dict[Status, int]) -> str | None:
+    """Icon for a finished phase whose status its scenario counts do not convey."""
+    # A phase errors without any operation erroring once the server stops responding.
+    if status == Status.ERROR:
+        return "🚫"
+    # Scenarios that passed without any check applied to them leave the phase skipped.
+    if status == Status.SKIP and stats[Status.SUCCESS]:
+        return "⏭ "
+    return None
+
+
 def bold(option: str) -> str:
     return click.style(option, bold=True)
 
@@ -1428,8 +1439,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         from rich.padding import Padding
         from rich.text import Text
 
-        # A phase errors without any operation erroring once the server stops responding.
-        icon = "🚫" if status == Status.ERROR else None
+        icon = phase_status_icon(status, manager.stats)
         self.console.print(Padding(Text(manager.get_completion_message(icon), style="white"), BLOCK_PADDING))
         self.console.print()
 
@@ -1439,7 +1449,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         from rich.table import Table
         from rich.text import Text
 
-        title, summary = manager.get_completion_message("🚫" if status == Status.ERROR else None)
+        title, summary = manager.get_completion_message(phase_status_icon(status, manager.stats))
         self.console.print(Padding(Text(title, style="bright_white"), BLOCK_PADDING))
 
         table = Table(show_header=False, box=None, padding=(0, 4), collapse_padding=True)

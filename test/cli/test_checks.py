@@ -2307,3 +2307,25 @@ def test_ignored_auth_probes_each_operation_until_enforcement_is_confirmed(ctx, 
     unauthorized = [request for request in api.requests if request.headers.get("Authorization") != "Basic dGVzdDp0ZXN0"]
     assert len(authorized) > 1
     assert len(unauthorized) == 2
+
+
+@pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_phase_without_checks_is_skipped(ctx, cli, snapshot_cli, phase):
+    api = ctx.openapi.apps.users_crud()
+    assert (
+        cli.run(api.schema_url, f"--phases={phase}", "--max-examples=1", config={"checks": {"enabled": False}})
+        == snapshot_cli
+    )
+
+
+def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
+    api = ctx.openapi.apps.success()
+    cli.run(
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=5",
+        "--max-time=1",
+        config={"checks": {"enabled": False}},
+    )
+    assert len([request for request in api.requests if request.path.startswith("/api/")]) > 5
