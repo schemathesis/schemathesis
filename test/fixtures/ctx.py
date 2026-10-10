@@ -281,8 +281,8 @@ class OpenAPIApps:
     def wfc_accounts_seeded_later(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_accounts_seeded_later())
 
-    def wfc_owned_orders(self, policy: str) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_owned_orders(policy))
+    def wfc_owned_orders(self, policy: str, listing: str | None = None) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_owned_orders(policy, listing))
 
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())

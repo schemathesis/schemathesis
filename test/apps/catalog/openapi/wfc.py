@@ -413,10 +413,28 @@ _OWNED_ORDERS = {
 }
 
 
-def wfc_owned_orders(policy: str) -> OpenAPIApp:
-    """Orders owned by the caller; `policy` decides what another caller sees."""
+def wfc_owned_orders(policy: str, listing: str | None = None) -> OpenAPIApp:
+    """Orders owned by the caller; `policy` decides what another caller sees.
+
+    `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only.
+    """
+    paths = _OWNED_ORDERS
+    if listing is not None:
+        listed = {
+            "type": "array",
+            "items": _ORDER if listing != "ids" else {"type": "object", "properties": {"id": {"type": "integer"}}},
+        }
+        paths = {
+            **_OWNED_ORDERS,
+            "/api/orders": {
+                **_OWNED_ORDERS["/api/orders"],
+                "get": {
+                    "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": listed}}}}
+                },
+            },
+        }
     spec = build_schema(
-        _OWNED_ORDERS,
+        paths,
         components={"securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "Authorization"}}},
         security=[{"apiKey": []}],
     )
@@ -442,6 +460,17 @@ def wfc_owned_orders(policy: str) -> OpenAPIApp:
         }
         orders[order["id"]] = order
         return jsonify(order), 201
+
+    @app.route("/api/orders", methods=["GET"])
+    def list_orders() -> object:
+        user = caller()
+        if user is None:
+            return jsonify({"detail": "unauthorized"}), 401
+        if listing == "own":
+            return jsonify([order for order in orders.values() if order["owner"] == user])
+        if listing == "ids":
+            return jsonify([{"id": order["id"]} for order in orders.values()])
+        return jsonify(list(orders.values()))
 
     @app.route("/api/orders/<int:order_id>", methods=["GET"])
     def get_order(order_id: int) -> object:

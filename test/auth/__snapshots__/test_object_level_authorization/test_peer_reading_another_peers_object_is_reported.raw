@@ -28,7 +28,7 @@ __________________________ GET /api/orders/{order_id} __________________________
 
 - Object-level authorization bypass
 
-    `bob` received the `Order` that `alice` created
+    `bob` received the `Order` that `alice` owns
 
     Owner: GET /api/orders/1 as alice -> 200
     Peer:  GET /api/orders/1 as bob -> 200 (equivalent body)

@@ -12,13 +12,14 @@ from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, Generat
 from schemathesis.openapi.checks import ObjectLevelAuthorizationViolation
 from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.checks import object_level_authorization
-from schemathesis.specs.openapi.object_authorization import is_equivalent
+from schemathesis.specs.openapi.object_authorization import is_equivalent, listing_case
 from test.utils import check_context
 
 ORDER_SCHEMA = {
     "type": "object",
     "properties": {"id": {"type": "integer"}, "item": {"type": "string"}, "owner": {"type": "string"}},
 }
+OWNED_ORDER = "`bob` received the `Order` that `alice` owns"
 PEERS_AUTH = {
     "auth": [
         {"name": "alice", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey alice"}]},
@@ -71,10 +72,31 @@ def test_correct_or_public_access_is_not_reported(cli, ctx, tmp_path, policy, ph
     assert (result.exit_code, bool(_peer_reads(api))) == (0, True), result.stdout
 
 
+@pytest.mark.parametrize("phases", ["fuzzing", "stateful"])
+@pytest.mark.parametrize(
+    ("listing", "exit_code"),
+    [("all", 0), ("own", 1), ("ids", 1)],
+    ids=["listed-to-everyone", "listed-to-owner", "only-ids-listed-to-everyone"],
+)
+def test_object_every_user_can_list_is_not_reported(cli, ctx, tmp_path, phases, listing, exit_code):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable", listing)
+    result = _run(cli, api, tmp_path, phases=phases)
+    assert (result.exit_code, bool(_peer_reads(api))) == (exit_code, True), result.stdout
+
+
 def _owner_case(
-    ctx, tmp_path, method, path, location, parameter, source, source_operation="POST /api/orders", **kwargs
+    ctx,
+    tmp_path,
+    method,
+    path,
+    location,
+    parameter,
+    source,
+    source_operation="POST /api/orders",
+    listing=None,
+    **kwargs,
 ):
-    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable", listing)
     requests.post(f"{api.base_url}/api/orders", json={"item": "book"}, headers={"Authorization": "ApiKey alice"})
     config = schemathesis.Config.from_dict({"auth": {"wfc": {"path": _auth_file(tmp_path), "peers": ["alice", "bob"]}}})
     schema = schemathesis.openapi.from_url(api.schema_url, config=config)
@@ -164,8 +186,58 @@ def test_listed_object_is_not_owned(ctx, tmp_path):
     assert [r for r in api.requests if r.headers.get("Authorization") == "ApiKey bob"] == []
 
 
-def test_stateful_owner_read_in_the_linked_step_is_not_owned(ctx, tmp_path):
+# A list scoped to its caller shows only their objects, so an id the peer does not see there is the owner's.
+@pytest.mark.parametrize(
+    ("listing", "expectation"),
+    [("own", pytest.raises(ObjectLevelAuthorizationViolation, match=OWNED_ORDER)), ("ids", nullcontext())],
+    ids=["listed-to-owner-only", "listed-to-peer"],
+)
+def test_object_listed_only_to_the_owner_is_owned(ctx, tmp_path, listing, expectation):
     _, case = _owner_case(
+        ctx,
+        tmp_path,
+        "GET",
+        "/api/orders/{order_id}",
+        "path",
+        "order_id",
+        "alice",
+        source_operation="GET /api/orders",
+        listing=listing,
+        path_parameters={"order_id": 1},
+    )
+    with expectation:
+        object_level_authorization(check_context(), case.call(), case)
+
+
+@pytest.mark.parametrize(
+    ("listing", "expectation"),
+    [("own", pytest.raises(ObjectLevelAuthorizationViolation, match=OWNED_ORDER)), ("ids", nullcontext())],
+    ids=["listed-to-owner-only", "listed-to-peer"],
+)
+def test_stateful_object_listed_only_to_the_owner_is_owned(ctx, tmp_path, listing, expectation):
+    _, case = _owner_case(
+        ctx,
+        tmp_path,
+        "GET",
+        "/api/orders/{order_id}",
+        "path",
+        "order_id",
+        None,
+        listing=listing,
+        path_parameters={"order_id": 1},
+    )
+    parent = case.operation.schema["/api/orders"]["GET"].Case()
+    parent._auth_identity = "alice"
+    recorder = ScenarioRecorder(label="test")
+    recorder.record_case(parent_id=None, case=parent, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=parent.id, response=parent.call(headers={"Authorization": "ApiKey alice"}))
+    recorder.record_case(parent_id=parent.id, case=case, transition=None, is_transition_applied=False)
+    with expectation:
+        object_level_authorization(check_context(recorder=recorder), case.call(), case)
+
+
+def test_stateful_owner_read_in_the_linked_step_is_not_owned(ctx, tmp_path):
+    api, case = _owner_case(
         ctx, tmp_path, "GET", "/api/orders/{order_id}", "path", "order_id", None, path_parameters={"order_id": 1}
     )
     parent = case.operation.Case(path_parameters={"order_id": 1})
@@ -175,6 +247,7 @@ def test_stateful_owner_read_in_the_linked_step_is_not_owned(ctx, tmp_path):
     recorder.record_response(case_id=parent.id, response=parent.call(headers={"Authorization": "ApiKey alice"}))
     recorder.record_case(parent_id=parent.id, case=case, transition=None, is_transition_applied=False)
     assert object_level_authorization(check_context(recorder=recorder), case.call(), case) is None
+    assert [r for r in api.requests if r.headers.get("Authorization") == "ApiKey bob"] == []
 
 
 def test_stateful_owner_sent_the_id_in_the_linked_request(ctx, tmp_path, response_factory):
@@ -246,3 +319,24 @@ def test_equivalence_of_identical_bodies(body, schema, expected):
 @pytest.mark.parametrize("schema", [{}, {"type": "array", "items": ORDER_SCHEMA}], ids=["undeclared", "shape-mismatch"])
 def test_undescribed_fields_must_all_match(schema):
     assert is_equivalent({"id": 1, "item": "a", "at": "t1"}, {"id": 1, "item": "a", "at": "t2"}, 1, schema) is False
+
+
+def test_nested_collection_without_the_parent_value_is_not_listed(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users/{user}/orders": {
+                "get": {
+                    "parameters": [{"name": "user", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/orders/{order_id}": {
+                "get": {
+                    "parameters": [{"name": "order_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    case = schema["/orders/{order_id}"]["GET"].Case(path_parameters={"order_id": 1})
+    assert listing_case(case, schema["/users/{user}/orders"]["GET"]) is None

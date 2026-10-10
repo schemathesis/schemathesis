@@ -1583,6 +1583,8 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
     from schemathesis.specs.openapi.extra_data_source import declared_response_schema
     from schemathesis.specs.openapi.object_authorization import (
         apply_as,
+        listings,
+        lists_equivalent,
         owner_provider,
         strip_credentials,
         value_paths,
@@ -1601,13 +1603,19 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
     # Without a declared schema, every field of the body counts.
     schema = declared_response_schema(case.operation, response.status_code, content_type) or {}
     owner_body = _json_body(response)
-    for resource, value in _owned_values(ctx, case, case.meta, owner):
+    for resource, value, source_listing in _owned_values(ctx, case, case.meta, owner):
         if not value_paths(owner_body, value):
             continue
         for peer in provider.peers:
             if peer == owner or not provider.claim_probe((case.operation.label, resource, peer)):
                 continue
-            peer_case = apply_as(case, provider.provider_for(peer), peer)
+            peer_provider = provider.provider_for(peer)
+            # An id the owner only listed is theirs when the same list, sent by the peer, does not show it.
+            if source_listing is not None and value_paths(
+                _json_body(_send_probe(ctx, case, apply_as(source_listing, peer_provider, peer))), value
+            ):
+                continue
+            peer_case = apply_as(case, peer_provider, peer)
             peer_response = _send_probe(ctx, case, peer_case)
             if not _equivalent_response(peer_response, owner_body, value, schema):
                 continue
@@ -1615,10 +1623,21 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
             # A body anyone gets is public; an unenforced declared scheme is `ignored_auth`'s to report.
             if _equivalent_response(anonymous_response, owner_body, value, schema):
                 continue
+            # An object the peer can list in full is shared by design.
+            if any(
+                lists_equivalent(
+                    _json_body(_send_probe(ctx, case, apply_as(listing, peer_provider, peer))),
+                    owner_body,
+                    value,
+                    schema,
+                )
+                for listing in listings(case)
+            ):
+                continue
             raise ObjectLevelAuthorizationViolation(
                 operation=case.operation.label,
                 message=(
-                    f"`{peer}` received the `{resource}` that `{owner}` created\n\n"
+                    f"`{peer}` received the `{resource}` that `{owner}` owns\n\n"
                     f"Owner: {case.method} {case.formatted_path} as {owner} -> {response.status_code}\n"
                     f"Peer:  {peer_case.method} {peer_case.formatted_path} as {peer} -> "
                     f"{peer_response.status_code} (equivalent body)"
@@ -1631,29 +1650,36 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
     return None
 
 
-def _owned_values(ctx: CheckContext, case: Case, meta: CaseMetadata, owner: str) -> Iterator[tuple[str, object]]:
-    """Resource names and values in `case` that an earlier write by `owner` produced."""
-    from schemathesis.specs.openapi.object_authorization import value_paths
+def _owned_values(
+    ctx: CheckContext, case: Case, meta: CaseMetadata, owner: str
+) -> Iterator[tuple[str, object, Case | None]]:
+    """Resource names and values in `case` that `owner` created or listed, with the list they came from."""
+    from schemathesis.specs.openapi.object_authorization import is_collection, listing_case, path_resource, value_paths
 
-    # A read shows other users' objects too, so only a write proves who created one.
+    # A read shows other users' objects too, so it proves ownership only through a list the peer is then shown.
     for draw in meta.pool_draws:
         container = case.get_container(ParameterLocation(draw.location))
-        if (
-            draw.source_identity == owner
-            and draw.source_operation.split(" ", 1)[0] not in SAFE_METHODS
-            and isinstance(container, Mapping)
-            and draw.parameter_name in container
-        ):
-            yield draw.resource_name, container[draw.parameter_name]
+        if draw.source_identity != owner or not isinstance(container, Mapping) or draw.parameter_name not in container:
+            continue
+        if draw.source_operation.split(" ", 1)[0] not in SAFE_METHODS:
+            yield draw.resource_name, container[draw.parameter_name], None
+            continue
+        source = listing_case(case, case.operation.schema.find_operation_by_label(draw.source_operation))
+        if source is not None:
+            yield draw.resource_name, container[draw.parameter_name], source
     # Stateful steps get ids through links: the previous step either returned them or sent them.
     parent = ctx._find_parent(case_id=case.id)
-    if parent is None or parent._auth_identity != owner or parent.method.upper() in SAFE_METHODS:
+    if parent is None or parent._auth_identity != owner:
         return
+    is_read = parent.method.upper() in SAFE_METHODS
+    if is_read and not is_collection(parent.operation):
+        return
+    source = parent if is_read else None
     parent_response = ctx._find_response(case_id=parent.id)
     parent_body = _json_body(parent_response) if parent_response is not None else None
     for name, value in (case.path_parameters or {}).items():
         if value_paths(parent_body, value) or value_paths(parent.body, value):
-            yield name, value
+            yield path_resource(case, name), value, source
 
 
 def _send_probe(ctx: CheckContext, parent: Case, probe: Case) -> Response:

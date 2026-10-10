@@ -5,14 +5,17 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 from schemathesis.auths import AuthContext
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi._auth_retry import clone_case, remove_auth_from_cookie_header
 from schemathesis.specs.openapi.semantic_pool import resolve_combinator, resolve_ref
+from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.wfc.escalation import escalating_provider
 
 if TYPE_CHECKING:
     from schemathesis.auths import AuthProvider
     from schemathesis.core.jsonschema.types import JsonSchemaObject
     from schemathesis.generation.case import Case
+    from schemathesis.schemas import APIOperation
 
 
 def _apply(case: Case, provider: AuthProvider) -> None:
@@ -109,3 +112,53 @@ def is_equivalent(owner: object, peer: object, value: object, schema: JsonSchema
         return False
     # An id alone is what a stub or an empty shell returns too.
     return bool(shared - shared_id)
+
+
+def is_collection(operation: APIOperation) -> bool:
+    return operation.method.upper() == "GET" and naming.trailing_path_parameter(operation.path) is None
+
+
+def listing_case(case: Case, operation: APIOperation | None) -> Case | None:
+    """A request to the collection `operation` with the path values `case` already has, sent as its owner."""
+    if operation is None or not is_collection(operation):
+        return None
+    names = [parameter.name for parameter in operation.path_parameters]
+    if any(name not in (case.path_parameters or {}) for name in names):
+        return None
+    listing = operation.Case(path_parameters={name: case.path_parameters[name] for name in names})
+    listing._auth_identity = case._auth_identity
+    return listing
+
+
+def path_resource(case: Case, parameter: str) -> str:
+    """The resource the path parameter `parameter` of `case` takes, or the parameter name when none is inferred."""
+    node = case.operation.schema.analysis.dependency_graph.operations.get(case.operation.label)
+    for slot in node.inputs if node is not None else ():
+        if slot.parameter_location == ParameterLocation.PATH and slot.parameter_name == parameter:
+            return slot.resource.name
+    return parameter
+
+
+def listings(case: Case) -> Iterator[Case]:
+    """Requests to the collections that list what the path parameters of `case` point to."""
+    graph = case.operation.schema.analysis.dependency_graph
+    node = graph.operations.get(case.operation.label)
+    if node is None:
+        return
+    resources = {slot.resource.name for slot in node.inputs if slot.parameter_location == ParameterLocation.PATH}
+    for label, other in graph.operations.items():
+        if any(output.resource.name in resources for output in other.outputs):
+            listing = listing_case(case, case.operation.schema.find_operation_by_label(label))
+            if listing is not None:
+                yield listing
+
+
+def lists_equivalent(listed: object, owner: object, value: object, schema: JsonSchemaObject) -> bool:
+    """Whether `listed` holds an entry that is the same object as `owner`."""
+    for path in value_paths(listed, value):
+        entry = listed
+        for key in path[:-1]:
+            entry = entry[key]  # type: ignore[index]  # `path` was found by walking `listed`
+        if is_equivalent(owner, entry, value, schema):
+            return True
+    return False
