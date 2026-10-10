@@ -3170,6 +3170,22 @@ def test_parameter_overrides(ctx, cli, verify_overrides):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
+def test_header_parameter_override_with_configured_headers(ctx, cli):
+    api = ctx.openapi.apps.header_constraint_bug()
+    cli.run(
+        api.schema_url,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--max-examples=5",
+        config={"headers": {"X-Custom": "value"}, "parameters": {"X-Token": "ABCDEFGH"}},
+    )
+    assert {
+        (request.headers.get("X-Token"), request.headers.get("X-Custom"))
+        for request in api.requests
+        if request.path.startswith("/api/")
+    } == {("ABCDEFGH", "value")}
+
+
 @pytest.mark.parametrize(
     ["args", "config"],
     (

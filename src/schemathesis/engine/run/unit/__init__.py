@@ -381,6 +381,9 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
             kwargs[location] = entry
     headers = ctx.config.headers_for(operation=operation)
     if headers:
-        kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
+        kwargs["headers"] = {
+            **kwargs.get("headers", {}),
+            **{key: value for key, value in headers.items() if key.lower() != "user-agent"},
+        }
 
     return kwargs
