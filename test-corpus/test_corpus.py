@@ -198,12 +198,16 @@ def _check_conformance_violation(case):
         details.append(f"Scenario: {phase.data.scenario.value}")
     if violation.media_type is not None:
         details.append(f"Media type: {violation.media_type}")
+    if violation.after_serialization:
+        details.append(f"Generated: {case.meta.raw_containers.get(violation.location)!r}")
     details.append(f"Value: {violation.value!r}")
     if violation.expected_valid:
         details.append(f"Errors: {list(violation.errors)}")
         headline = "Positive case produced invalid data."
     else:
         headline = "Negative case produced valid data (mutation had no effect)."
+    if violation.after_serialization:
+        headline = f"{headline[:-1]} once read back from the wire."
     raise AssertionError("\n".join([headline, *details]))
 
 
