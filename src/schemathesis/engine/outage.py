@@ -158,6 +158,10 @@ class ServerMonitor:
         """Whether this error is the one that revealed the outage, rather than one that came after it."""
         return self._confirmed_by is exc
 
+    def is_after_outage(self, exc: Exception) -> bool:
+        """Whether this error just hit the dead server; only the reset that revealed the outage may have caused it."""
+        return not (is_unrecoverable_network_error(exc) and self.confirmed_by(exc))
+
     def take_report(self, phase: PhaseName | None) -> events.NonFatalError | None:
         """The outage error, or nothing while the server is still answering."""
         if self._message is None:

@@ -3,7 +3,7 @@ from __future__ import annotations  # noqa: I001
 import queue
 import time
 import unittest
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn, TypeGuard
 from warnings import catch_warnings, filterwarnings
 
 import hypothesis
@@ -217,6 +217,95 @@ def _unrecoverable_network_error(
     )
 
 
+def _raise_if_stopped(engine: EngineContext) -> None:
+    """Stop the scenario as soon as possible once the engine is told to stop."""
+    if engine.has_to_stop:
+        # Say which one stopped it: a spent budget is a planned finish, Ctrl-C is not.
+        if engine.has_reached_time_limit and not engine.is_interrupted:
+            raise BudgetExpired
+        raise KeyboardInterrupt
+
+
+def _reject_unusable_operation(engine: EngineContext, operation_label: str) -> None:
+    use_probability = engine.health.frozen_use_probability(operation_label)
+    # Always draw - keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
+    if not current_build_context().data.draw_boolean(p=use_probability):
+        reject()
+    if engine.health.is_unresponsive(operation_label):
+        reject()
+
+
+def _replay_cached_outcome(ctx: StatefulContext, case: Case) -> bool:
+    """Re-raise the error this input produced before; `True` when it already passed."""
+    cached = ctx.get_step_outcome(case)
+    if isinstance(cached, BaseException):
+        raise cached
+    return cached is None
+
+
+def _send_step(machine: APIStateMachine, case: Case, *, engine: EngineContext, event_queue: queue.Queue) -> Response:
+    """Send the step's request and validate the response, waiting out rate limits when configured."""
+    machine.before_call(case)
+    kwargs = machine.get_call_kwargs(case)
+
+    def call() -> Response:
+        response = engine.server.track(case, lambda: machine.call(case, **kwargs), transport_kwargs=kwargs)
+        machine.after_call(response, case)
+        return response
+
+    return call_and_validate_with_retry(
+        call_fn=call,
+        validate_fn=lambda response: machine.validate_response(response, case),
+        auto_mode=engine.config.rate_limit_for(operation=case.operation) == "auto",
+        on_delay=lambda delay, retries_left: event_queue.put(
+            events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left)
+        ),
+    )
+
+
+def _detect_outage(exc: Exception, engine: EngineContext) -> bool:
+    """Whether the server went away; an error that only hit the already dead server stops the scenario at once."""
+    outage = isinstance(exc, requests.ConnectionError) and engine.detect_server_outage(exc)
+    if outage and engine.server.is_after_outage(exc):
+        raise ServerWentAway from None
+    return outage
+
+
+def _is_connection_failure(
+    exc: Exception,
+) -> TypeGuard[requests.ConnectionError | ChunkedEncodingError | requests.Timeout]:
+    return isinstance(exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)) and (
+        is_unrecoverable_network_error(exc)
+    )
+
+
+def _absorb_transport_failure(
+    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout,
+    *,
+    case: Case,
+    engine: EngineContext,
+    event_queue: queue.Queue,
+) -> NoReturn:
+    """Skip the step, reporting the operation once when it stops answering."""
+    if engine.health.mark_unresponsive(case.operation.label):
+        event_queue.put(_unresponsive_operation_error(exc, case=case, engine=engine))
+    raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
+
+
+def _record_network_error(
+    exc: Exception, *, case: Case, engine: EngineContext, state: TestingState, event_queue: queue.Queue
+) -> None:
+    """Keep a connection-level failure for the suite report; a timeout the health monitor absorbs skips the step."""
+    # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level failures
+    # (reset, chunked-encoding break) usually mean the server crashed; surface those on the first occurrence.
+    if not _is_connection_failure(exc):
+        return
+    network_error = _unrecoverable_network_error(exc, case=case, engine=engine)
+    if network_error is None:
+        _absorb_transport_failure(exc, case=case, engine=engine, event_queue=event_queue)
+    state.store_unrecoverable_network_error(network_error)
+
+
 def execute_state_machine_loop(
     *,
     state_machine: type[APIStateMachine],
@@ -275,53 +364,13 @@ def execute_state_machine_loop(
             # _current_input is set here and consumed once in validate_response(), then cleared.
             # validate_response() is called at most once per step by the Hypothesis state machine.
             self._current_input = input
-            # Checking the stop event once inside `step` is sufficient as it is called frequently
-            # The idea is to stop the execution as soon as possible
-            if engine.has_to_stop:
-                # Say which one stopped it: a spent budget is a planned finish, Ctrl-C is not.
-                if engine.has_reached_time_limit and not engine.is_interrupted:
-                    raise BudgetExpired
-                raise KeyboardInterrupt
-
-            operation_label = input.case.operation.label
-            use_probability = engine.health.frozen_use_probability(operation_label)
-            # Always draw — keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
-            if not current_build_context().data.draw_boolean(p=use_probability):
-                reject()
-            if engine.health.is_unresponsive(operation_label):
-                reject()
-
+            _raise_if_stopped(engine)
+            _reject_unusable_operation(engine, input.case.operation.label)
             try:
-                if generation.unique_inputs:
-                    cached = ctx.get_step_outcome(input.case)
-                    if isinstance(cached, BaseException):
-                        raise cached
-                    elif cached is None:
-                        return None
-                self.before_call(input.case)
-                kwargs = self.get_call_kwargs(input.case)
-                auto_mode = engine.config.rate_limit_for(operation=input.case.operation) == "auto"
-
-                def call_fn() -> Response:
-                    r = engine.server.track(
-                        input.case, lambda: self.call(input.case, **kwargs), transport_kwargs=kwargs
-                    )
-                    self.after_call(r, input.case)
-                    return r
-
-                final_response = call_and_validate_with_retry(
-                    call_fn=call_fn,
-                    validate_fn=lambda r: self.validate_response(r, input.case),
-                    auto_mode=auto_mode,
-                    on_delay=lambda delay, retries_left: event_queue.put(
-                        events.RateLimitRetry(
-                            operation=input.case.operation.label,
-                            delay=delay,
-                            retries_left=retries_left,
-                        )
-                    ),
-                )
-                result = StepOutput(final_response, input.case)
+                if generation.unique_inputs and _replay_cached_outcome(ctx, input.case):
+                    return None
+                response = _send_step(self, input.case, engine=engine, event_queue=event_queue)
+                result = StepOutput(response, input.case)
                 ctx.step_succeeded()
             except UnsatisfiedAssumption:
                 raise
@@ -331,23 +380,8 @@ def execute_state_machine_loop(
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                outage = isinstance(exc, requests.ConnectionError) and engine.detect_server_outage(exc)
-                # Only the reset that revealed the outage may have caused it; later ones just hit the dead server.
-                if outage and not (is_unrecoverable_network_error(exc) and engine.server.confirmed_by(exc)):
-                    raise ServerWentAway from None
-                # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level
-                # failures (reset, chunked-encoding break) usually mean the server crashed; surface
-                # those immediately on the first occurrence.
-                if isinstance(
-                    exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
-                ) and is_unrecoverable_network_error(exc):
-                    network_error = _unrecoverable_network_error(exc, case=input.case, engine=engine)
-                    if network_error is None:
-                        if engine.health.mark_unresponsive(operation_label):
-                            event_queue.put(_unresponsive_operation_error(exc, case=input.case, engine=engine))
-                        raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
-                    state.store_unrecoverable_network_error(network_error)
-
+                outage = _detect_outage(exc, engine)
+                _record_network_error(exc, case=input.case, engine=engine, state=state, event_queue=event_queue)
                 remember_step_outcome(input.case, exc)
                 ctx.step_errored()
                 if outage:

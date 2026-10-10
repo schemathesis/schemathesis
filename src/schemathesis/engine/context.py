@@ -224,7 +224,7 @@ class EngineContext:
         return FeedbackSources(
             extra_data_source=self._extra_data_source_for(operation=operation, phase=phase),
             error_feedback=self.error_feedback,
-            constants_value_source=self._constants_value_source(),
+            constants_value_source=self.constants_value_source(),
         )
 
     def _extra_data_source_for(self, *, operation: APIOperation, phase: PhaseName) -> ExtraDataSource | None:
@@ -236,7 +236,7 @@ class EngineContext:
             return self.extra_data_source
         return None
 
-    def _constants_value_source(self) -> ConstantsPool | None:
+    def constants_value_source(self) -> ConstantsPool | None:
         # The pool is extracted once before the run and is read-only during draws, and value selection uses
         # Hypothesis's own `st.randoms()`, so strategies stay reproducible. An empty pool is not offered at all.
         if self.constants_extraction.is_empty():

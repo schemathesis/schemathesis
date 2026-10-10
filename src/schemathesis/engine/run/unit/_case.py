@@ -132,8 +132,7 @@ def run_one_case(
             code_sample = build_code_sample(case, exc.request, transport_kwargs)
             network_error = UnrecoverableNetworkError(error=exc, code_sample=code_sample)
         outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
-        # Only the reset that revealed the outage may have caused it; later ones just hit the dead server.
-        if outage and not (network_error is not None and ctx.server.confirmed_by(exc)):
+        if outage and ctx.server.is_after_outage(exc):
             # A check's own request may be the refused one; the case itself was answered then.
             if recorder.find_response(case_id=case.id) is None:
                 recorder.forget_case(case_id=case.id)
