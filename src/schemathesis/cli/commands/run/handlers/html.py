@@ -141,6 +141,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             | self.errors.keys()
             | self.skip_reasons.keys()
         )
+        known = Counter(operation for operation, *_ in statistic.known_failures)
         stopped_early = self.finished is None or self.finished.stop_reason is not StopReason.COMPLETED
         rows = []
         for label in labels:
@@ -181,6 +182,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                     stops_at_first_failure=label in failed_directly and not continue_on_failure,
                     failing_cases=cases,
                     errors=errors,
+                    known_failures=known[label],
                 )
             )
         unattributed_errors = [
