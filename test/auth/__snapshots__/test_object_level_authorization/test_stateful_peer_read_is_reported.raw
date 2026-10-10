@@ -30,7 +30,7 @@ ________________________________ Stateful tests ________________________________
 
 - Object-level authorization bypass
 
-    `bob` received the `order_id` that `alice` created
+    `bob` received the `Order` that `alice` owns
 
     Owner: GET /api/orders/1 as alice -> 200
     Peer:  GET /api/orders/1 as bob -> 200 (equivalent body)
