@@ -385,6 +385,13 @@ def execute_state_machine_loop(
                     recorder=self.recorder,
                 )
             ctx.current_response = response
+            engine.supervisor.record_response(
+                operation_label=case.operation.label,
+                status_code=response.status_code,
+                is_documented_status=case.operation.responses.find_by_status_code(response.status_code) is not None,
+                case=case,
+                cache_writer=engine.cache.writer,
+            )
 
             if engine.error_feedback is not None:
                 engine.record_error_feedback(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from flask import jsonify
 
 import schemathesis
 from schemathesis.core.warnings import SchemathesisWarning
@@ -126,3 +127,60 @@ def test_stateful_skips_supervisor_blocked_operations(ctx):
         f"Stateful sent {stateful_missing_hits} requests to POST /missing despite the SKIP verdict"
     )
     assert store.hits["items_id"] > 0, "Stateful did not chain GET /items/{itemId} from the link"
+
+
+def test_stateful_only_run_stops_calling_persistently_405_operations(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                            "links": {
+                                "DeleteItem": {
+                                    "operationId": "deleteItem",
+                                    "parameters": {"itemId": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{itemId}": {
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "Deleted"}},
+                }
+            },
+        }
+    )
+    hits = {"delete": 0}
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/items/<item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        hits["delete"] += 1
+        return jsonify({"error": "Method Not Allowed"}), 405
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["stateful"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=50)
+
+    list(from_schema(schema).execute())
+
+    assert hits["delete"] == METHOD_NOT_ALLOWED_THRESHOLD
