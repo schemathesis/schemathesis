@@ -1,4 +1,5 @@
 import itertools
+import json
 import re
 import time
 
@@ -47,6 +48,24 @@ def test_html_report_schema_not_loaded(ctx, cli, report_dir, snapshot_html):
     # Serves JSON that is not an API schema.
     url = f"{api.base_url}/api/success"
     assert run_with_report(cli, report_dir, url, exit_code=ExitCode.ERROR) == snapshot_html
+
+
+# A custom handler that fails on start aborts the run before the schema location is known.
+def test_html_report_handler_error_before_loading(ctx, cli, report_dir, snapshot_html):
+    module = ctx.write_pymodule(
+        """
+from schemathesis import cli
+
+
+@cli.handler()
+class BrokenHandler(cli.EventHandler):
+    def start(self, ctx):
+        raise RuntimeError("broken handler")
+"""
+    )
+    api = ctx.openapi.apps.success()
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.ERROR, hooks=module)
+    assert html == snapshot_html
 
 
 def test_html_report_no_operations_selected(ctx, cli, report_dir, snapshot_html):
@@ -742,6 +761,28 @@ def test_html_report_known_failures_from_baseline(ctx, cli, tmp_path, report_dir
     assert run_with_report(cli, report_dir, api.schema_url, config={"baseline": baseline}) == snapshot_html
 
 
+def test_html_report_baseline_pruned_unobserved_expired_and_max_response_time(
+    ctx, cli, tmp_path, report_dir, snapshot_html
+):
+    server_error = {"check": "not_a_server_error", "failure": "ServerError", "signature": "500"}
+    entries = [
+        {**server_error, "operation": "GET /api/success"},
+        {**server_error, "operation": "GET /api/missing", "expires": "2020-01-01"},
+    ]
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps({"format_version": 1, "entries": entries}), encoding="utf-8")
+    html = run_with_report(
+        cli,
+        report_dir,
+        ctx.openapi.apps.success().schema_url,
+        "--checks=not_a_server_error",
+        "--max-response-time=100",
+        "--baseline-prune",
+        config={"baseline": str(baseline)},
+    )
+    assert html == snapshot_html
+
+
 def test_html_report_filtered_failures(ctx, cli, report_dir, snapshot_html):
     api = ctx.openapi.apps.failure()
     module = ctx.write_pymodule(
@@ -808,6 +849,24 @@ def test_html_report_warnings_fail_the_run(ctx, cli, report_dir, snapshot_html):
         exit_code=ExitCode.FAILURES,
         config={"warnings": {"fail-on": True}},
     )
+    assert html == snapshot_html
+
+
+def test_html_report_handler_error_after_passed_run(ctx, cli, report_dir, snapshot_html):
+    module = ctx.write_pymodule(
+        """
+from schemathesis import cli, engine
+
+
+@cli.handler()
+class BrokenHandler(cli.EventHandler):
+    def handle_event(self, ctx, event):
+        if isinstance(event, engine.events.EngineFinished):
+            raise RuntimeError("broken handler")
+"""
+    )
+    api = ctx.openapi.apps.success()
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.ERROR, hooks=module)
     assert html == snapshot_html
 
 

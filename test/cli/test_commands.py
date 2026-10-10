@@ -4892,6 +4892,29 @@ def test_network_error_reported_when_suite_ends_with_failure(ctx, cli, snapshot_
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_flaky_replay_keeps_network_error(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+    counter = count()
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        if next(counter) == 0:
+
+            def broken_body():
+                yield '{"id": '
+                raise RuntimeError("broken body")
+
+            return Response(broken_body())
+        return jsonify({"id": user_id}), 200
+
+    assert cli.run_openapi_app(app, "--phases=stateful", "--seed=4", "--checks=not_a_server_error") == snapshot_cli
+
+
 # Every repeated stateful pass folds into the single block reported at the end.
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):

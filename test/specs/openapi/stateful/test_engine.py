@@ -167,6 +167,16 @@ def test_internal_error_in_check(engine_factory, kwargs):
     assert isinstance(result.errors[0].value, ZeroDivisionError)
 
 
+@pytest.mark.usefixtures("restore_checks")
+def test_assumption_in_check_skips_step(engine_factory):
+    @schemathesis.check
+    def skip_reads(ctx, response, case):
+        hypothesis.assume(case.method != "GET")
+
+    result = collect_result(engine_factory(checks=[skip_reads], max_examples=10))
+    assert (result.events[-1].status, result.errors, result.failures) == (Status.SUCCESS, [], [])
+
+
 @pytest.mark.parametrize("exception_args", [(), ("Oops!",)])
 @pytest.mark.usefixtures("restore_checks")
 def test_custom_assertion_in_check(engine_factory, exception_args):
