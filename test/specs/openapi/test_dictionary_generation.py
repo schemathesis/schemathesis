@@ -493,6 +493,7 @@ def test_probability_below_one_takes_both_substitute_and_skip_branches(ctx):
     skipped = 0
 
     @given(case=operation.as_strategy())
+    # Every expected variant must appear at least once, which takes many draws.
     @settings(max_examples=60, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
     def collect(case):
         nonlocal substituted, skipped

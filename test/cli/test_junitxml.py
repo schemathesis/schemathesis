@@ -153,8 +153,6 @@ def test_binary_response(ctx, cli, app_runner, tmp_path):
 
     @app.route("/api/binary")
     def binary():
-        from flask import Response
-
         return Response(
             b"\xa7\xf5=\x18H\xc7\xff'\xf0\xeep\x06M-RX",
             content_type="application/octet-stream",

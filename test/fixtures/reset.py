@@ -10,6 +10,7 @@ from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
 from schemathesis.core.jsonschema import _validator_failure_cache, validator_cache
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
+from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION
 from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
 from schemathesis.specs.openapi import media_types
 from schemathesis.specs.openapi.formats import STRING_FORMATS
@@ -61,6 +62,4 @@ def reset_hooks():
     canonical_strategy_cache.clear()
     validator_cache.clear()
     _validator_failure_cache.clear()
-    from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION
-
     DEFAULT_GENERATION_SESSION.close()

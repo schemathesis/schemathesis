@@ -26,6 +26,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.events import EngineFinished
 from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
+from test.apps.fragments.schemas import linked_users
 from test.utils import assert_cli_snapshot
 
 
@@ -727,8 +728,6 @@ def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
 
     @app.route("/audit", methods=["POST"])
     def audit_product():
-        from flask import request
-
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
             return "", 400
@@ -801,33 +800,9 @@ def test_fuzz_deadline_does_not_flake_strategy(cli, app_runner, ctx):
     assert result.exit_code == 0
 
 
-LINKED_USERS_PATHS = {
-    "/users": {
-        "post": {
-            "responses": {
-                "201": {
-                    "description": "OK",
-                    "content": {
-                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
-                    },
-                    "links": {"GetUser": {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}}},
-                }
-            }
-        }
-    },
-    "/users/{userId}": {
-        "get": {
-            "operationId": "getUser",
-            "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
-            "responses": {"200": {"description": "OK"}},
-        }
-    },
-}
-
-
 def test_fuzz_inherits_the_root_time_limit(cli, app_runner, ctx, tmp_path):
     # The root budget covers both commands, so fuzzing stops before the failure this app starts serving.
-    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    app, _ = ctx.openapi.make_flask_app(linked_users())
     started = time.monotonic()
 
     @app.route("/users", methods=["POST"])

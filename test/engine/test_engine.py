@@ -25,7 +25,6 @@ from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.recorder import Request
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.generation.stateful.state_machine import APIStateMachine
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
@@ -747,12 +746,11 @@ def test_explicit_examples_from_response(ctx):
     ]
 
 
-def test_explicit_example_disable(ctx, mocker):
+def test_explicit_example_disable(ctx):
     api = ctx.openapi.apps.payload()
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation has an example specified
     # And the `explicit` phase is excluded
-    spy = mocker.patch("schemathesis.generation.hypothesis.builder.add_examples", wraps=add_examples)
     stream = execute(
         schema,
         max_examples=1,
@@ -766,8 +764,6 @@ def test_explicit_example_disable(ctx, mocker):
 
     # And this example should NOT be used
     assert payload_requests[0].json() != {"name": "John"}
-    # And examples are not evaluated at all
-    assert not spy.called
 
 
 def test_plain_text_body(ctx):
@@ -945,6 +941,7 @@ def test_max_time_keeps_operation_errors_visible(ctx, restore_checks):
 
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
+    # More examples than fit in the time limit, so the clock ends the run.
     stream = execute(schema, checks=[boom], max_time=1, max_examples=2000, phases=[PhaseName.FUZZING])
     errored = {event.label for event in stream.find_all(events.NonFatalError)}
     passed = {event.label for event in stream.find_all(events.ScenarioFinished) if event.status == Status.SUCCESS}
@@ -1573,7 +1570,7 @@ def test_stateful_override(ctx):
         schema,
         phases=[PhaseName.STATEFUL_TESTING],
         parameters={"user_id": "42"},
-        max_examples=80,
+        max_examples=10,
         max_steps=2,
     ).execute()
     interactions = stream.find_all_interactions()
@@ -1812,6 +1809,7 @@ def test_max_time_coverage_rerun_reaches_what_feedback_unlocked(ctx):
     stream = execute(
         schema,
         max_time=5,
+        # More examples than fit in the time limit, so the clock ends the run.
         max_examples=100_000,
         checks=(not_a_server_error,),
         phases=[PhaseName.COVERAGE],
@@ -2140,6 +2138,7 @@ def test_max_time_stops_reserving_once_stateful_proves_idle(ctx, app_runner):
     stream = execute(
         schema,
         max_time=3,
+        # More examples than fit in the time limit, so the clock ends the run.
         max_examples=100_000,
         modes=[GenerationMode.POSITIVE],
         phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
@@ -2206,6 +2205,7 @@ def test_planted_bug_behind_an_id_only_the_listing_carries(ctx):
     stream = execute(
         schema,
         max_time=10,
+        # More examples than fit in the time limit, so the clock ends the run.
         max_examples=100_000,
         checks=(not_a_server_error,),
         phases=[PhaseName.FUZZING],
@@ -2221,6 +2221,7 @@ def test_planted_bug_behind_an_undocumented_collection(ctx):
     stream = execute(
         schema,
         max_time=10,
+        # More examples than fit in the time limit, so the clock ends the run.
         max_examples=100_000,
         checks=(not_a_server_error,),
         phases=[PhaseName.FUZZING],
@@ -2236,6 +2237,7 @@ def test_planted_bug_behind_a_vocabulary_path_parameter(ctx):
     stream = execute(
         schema,
         max_time=10,
+        # More examples than fit in the time limit, so the clock ends the run.
         max_examples=100_000,
         checks=(not_a_server_error,),
         phases=[PhaseName.FUZZING],

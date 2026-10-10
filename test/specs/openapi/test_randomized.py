@@ -25,6 +25,7 @@ from schemathesis.generation.jsonschema.builder import build
 from schemathesis.specs.openapi import definitions
 from schemathesis.specs.openapi.formats import get_default_format_strategies
 from schemathesis.specs.openapi.schemas import OpenApiSchema
+from test.apps.builders import build_schema, make_permissive_flask_app
 
 IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, hypothesis.errors.FailedHealthCheck)
 config = SchemathesisConfig.from_dict({})
@@ -376,14 +377,19 @@ def _is_rejection(error: Exception) -> bool:
     return isinstance(error, InvalidSchema)
 
 
+@pytest.fixture(scope="module")
+def catch_all_url(app_runner):
+    return app_runner.openapi_url(make_permissive_flask_app(build_schema({})), path="")
+
+
 @pytest.mark.parametrize("version", sorted(SPECS))
 @given(data=st.data())
 @settings(phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
-@pytest.mark.usefixtures("mocked_call")
-def test_random_schemas(version, data):
+def test_random_schemas(catch_all_url, version, data):
     raw = data.draw(openapi_documents(version))
     assert SPECS[version].validator.is_valid(raw), raw
     schema = schemathesis.openapi.from_dict(raw, config=config)
+    schema.config.update(base_url=catch_all_url)
     for event in schemathesis.engine.from_schema(schema).execute():
         assert not isinstance(event, events.FatalError), repr(event)
         if isinstance(event, events.NonFatalError) and not _is_rejection(event.value):

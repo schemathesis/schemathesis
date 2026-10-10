@@ -718,6 +718,7 @@ def _patterns_with_properties(draw: st.DrawFn) -> str:
 
 
 @given(_patterns_with_properties())
+# The violating draw is rare, so fewer examples would let a regression pass.
 @settings(suppress_health_check=list(HealthCheck), max_examples=200)
 def test_normalize_regex_never_produces_nested_classes(pattern: str) -> None:
     result = normalize_regex(pattern)
@@ -1015,6 +1016,7 @@ def test_serialize_escaped_literal(pattern, should_match):
 
 
 @given(pattern=st.text(min_size=1, max_size=80).filter(is_valid_regex))
+# Serialization bugs hide in rare random patterns, so the sweep needs breadth.
 @settings(max_examples=500, suppress_health_check=list(HealthCheck), deadline=None)
 def test_serialize_random_pattern(pattern):
     parsed = sre_parse.parse(pattern)

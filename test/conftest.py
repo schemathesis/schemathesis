@@ -27,7 +27,6 @@ import schemathesis.generation.value  # noqa: F401
 import schemathesis.specs.openapi.schemas  # noqa: F401
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
-from schemathesis.core.transport import Response
 from schemathesis.python._constants.registry import default_registry
 
 from .utils import make_schema
@@ -512,21 +511,6 @@ def case_factory(swagger_20):
         return operation.Case(**kwargs)
 
     return factory
-
-
-RESPONSE = Response(
-    status_code=200,
-    headers={},
-    content=b"",
-    request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
-    elapsed=0.1,
-    verify=False,
-)
-
-
-@pytest.fixture
-def mocked_call(mocker):
-    mocker.patch("schemathesis.Case.call", return_value=RESPONSE)
 
 
 @pytest.fixture

@@ -1,5 +1,4 @@
 import pytest
-from hypothesis import settings
 
 from schemathesis.generation.modes import GenerationMode
 
@@ -22,13 +21,6 @@ def testdir(request, testdir):
     testdir.param = request.param  # `request.param` is not available in test for some reason
 
     return testdir
-
-
-@pytest.fixture
-def reload_profile():
-    # Setting Hypothesis profile in a pytester-style test leads to overriding it globally
-    yield
-    settings.load_profile("default")
 
 
 @pytest.mark.usefixtures("reload_profile")

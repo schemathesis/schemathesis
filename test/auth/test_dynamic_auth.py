@@ -1119,11 +1119,13 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
 
 
 # A negated-security case's 401 is the expected outcome, not an expired token - the hook must not re-authenticate for it.
-def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
+def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner):
     app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})
+    token_requests = []
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
+        token_requests.append(request.path)
         return jsonify({"access_token": "valid-token"})
 
     @app.route("/protected")
@@ -1131,8 +1133,6 @@ def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
         if request.headers.get("X-API-Key", "") != "valid-token":
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
-
-    spy = mocker.spy(schemathesis.auths, "refresh_auth")
 
     _run_cli(
         cli,
@@ -1144,7 +1144,7 @@ def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
         "-n 15",
         config={"auth": _dynamic_auth("ApiKeyAuth", retry_on=[401])},
     )
-    assert spy.call_count == 0
+    assert token_requests == ["/api/auth"]
 
 
 def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):

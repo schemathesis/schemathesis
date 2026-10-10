@@ -45,6 +45,7 @@ def test_range_slightly_invalid_values_all_patterns():
     values = []
 
     @given(range_slightly_invalid_values())
+    # Every expected variant must appear at least once, which takes many draws.
     @settings(max_examples=100)
     def inner(value):
         values.append(value)
@@ -96,6 +97,7 @@ def test_negative_mode_range_has_three_tiers():
     values = []
 
     @given(strategies["_range_header"])
+    # Every expected variant must appear at least once, which takes many draws.
     @settings(max_examples=200, suppress_health_check=list(HealthCheck))
     def inner(value):
         values.append(value)

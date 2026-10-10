@@ -91,6 +91,7 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
         cli.run(
             api.schema_url,
             "--no-shrink",
+            # Feedback must adapt generation before the planted bug surfaces, which takes many cases.
             "--max-examples=80",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -196,6 +197,7 @@ def test_stale_example_evicted_after_format_inference(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     schema.config.phases.update(phases=["coverage", "fuzzing"])
+    # A stale example that survives feedback shows up only across many draws.
     schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=100)
 
     fuzzing_commit_dates = _collect_body_dates(schema, phase=PhaseName.FUZZING)
@@ -209,6 +211,7 @@ def test_stale_example_evicted_after_format_inference_on_query_param(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     schema.config.phases.update(phases=["examples", "coverage", "fuzzing"])
+    # A stale example that survives feedback shows up only across many draws.
     schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=100)
 
     fuzzing_token_values = _collect_query_tokens(schema, phase=PhaseName.FUZZING)

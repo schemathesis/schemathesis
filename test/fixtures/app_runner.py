@@ -6,9 +6,9 @@ import subprocess
 import sys
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, sleep, time
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -167,9 +167,17 @@ def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wa
     return port
 
 
+@dataclass(frozen=True)
+class AppRunner:
+    run_flask_app: Callable[..., int]
+    run_asgi_app: Callable[..., int]
+    unused_port: Callable[[], int]
+    openapi_url: Callable[..., str]
+
+
 @pytest.fixture(scope="session")
 def app_runner():
-    return SimpleNamespace(
+    return AppRunner(
         run_flask_app=run_flask_app,
         run_asgi_app=run_asgi_app,
         unused_port=unused_port,

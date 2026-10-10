@@ -96,6 +96,7 @@ def test_registered_constants_apply_to_direct_operation_strategy():
             case._meta is not None
             and any(draw.value == graphql_string_pool.TOKEN for draw in case._meta.constants_draws)
         ),
+        # Ceiling for a search that stops at the first match.
         settings=settings(max_examples=200, database=None),
     )
 
@@ -1271,6 +1272,7 @@ def test_stateful_body_merge_prunes_overwritten_constant_provenance():
 
     Workflow.run(
         settings=settings(
+            # The merged request needs a specific call sequence, which takes many scenarios to reach.
             max_examples=100,
             database=None,
             deadline=None,

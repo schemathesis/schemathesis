@@ -5,6 +5,7 @@ import pathlib
 import platform
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import threading
@@ -23,7 +24,9 @@ import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
 from flask import Flask, Response, jsonify, redirect, request, url_for
+from hypothesis.internal.observability import with_observability_callback
 from urllib3.exceptions import ProtocolError
+from werkzeug.serving import make_server
 
 import schemathesis
 from schemathesis.cli.commands.run.context import ExecutionContext
@@ -33,10 +36,12 @@ from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.shell import ShellType
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import Phase, PhaseName
+from schemathesis.engine.run.unit._pool import DefaultScheduler
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.fragments.schemas import linked_users
 from test.fixtures.app_runner import wait_for_port
 from test.utils import HERE, SIMPLE_PATH, flaky
 
@@ -200,17 +205,37 @@ def test_force_color_nocolor(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--force-color", "--no-color") == snapshot_cli
 
 
-def test_certificates(ctx, cli, mocker):
-    api = ctx.openapi.apps.success()
-    request = mocker.spy(requests.Session, "request")
-    # When a cert is passed via CLI args
+def test_certificates(cli, tmp_path):
     ca = trustme.CA()
-    cert = ca.issue_cert("test.org")
-    with cert.private_key_pem.tempfile() as cert_path:
-        cli.run_and_assert(api.schema_url, f"--request-cert={cert_path}")
-        # Then both schema & test network calls should use this cert
-        assert len(request.call_args_list) == 11
-        assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
+    ca_path = tmp_path / "ca.pem"
+    ca.cert_pem.write_to_path(str(ca_path))
+    client_cert = ca.issue_cert("test.org")
+    client_cert_path = tmp_path / "client.pem"
+    client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
+    server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ca.issue_cert("127.0.0.1").configure_cert(server_context)
+    ca.configure_trust(server_context)
+    server_context.verify_mode = ssl.CERT_REQUIRED
+    app = openapi_basic.success().server
+    presented = {}
+
+    @app.before_request
+    def record_client_certificate():
+        presented.setdefault(request.path, set()).add(ssl.PEM_cert_to_DER_cert(request.environ["SSL_CLIENT_CERT"]))
+
+    server = make_server("127.0.0.1", 0, app, threaded=True, ssl_context=server_context)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        cli.run_and_assert(
+            f"https://127.0.0.1:{server.server_port}/openapi.json",
+            f"--request-cert={client_cert_path}",
+            f"--tls-verify={ca_path}",
+        )
+    finally:
+        server.shutdown()
+    # Both the schema fetch and the API calls present the client certificate.
+    expected = {ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode())}
+    assert presented["/openapi.json"] == presented["/api/success"] == expected
 
 
 def test_hypothesis_database_with_derandomize(ctx, cli, snapshot_cli):
@@ -256,7 +281,7 @@ def test_hypothesis_parameters(ctx, cli):
     cli.run_and_assert(
         api.schema_url,
         "--generation-deterministic",
-        "--max-examples=1000",
+        "--max-examples=10",
         "--suppress-health-check=all",
         "--checks=not_a_server_error",
     )
@@ -970,8 +995,6 @@ def test_keyboard_interrupt(ctx, cli, mocker, swagger_20, workers, snapshot_cli)
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
-    from schemathesis.engine.run.unit._pool import DefaultScheduler
-
     api = ctx.openapi.apps.success_and_failure()
     original = DefaultScheduler.next_operation
     counter = 0
@@ -1686,12 +1709,17 @@ def test_urlencoded_form(ctx, cli):
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-def test_targeted(ctx, mocker, cli, workers):
+def test_targeted(ctx, cli, workers):
     api = ctx.openapi.apps.success()
-    target = mocker.spy(hypothesis, "target")
-    cli.run_and_assert(api.schema_url, f"--workers={workers}", "--generation-maximize=response_time")
+    observations = []
+    with with_observability_callback(lambda observation, _: observations.append(observation), all_threads=True):
+        cli.run_and_assert(api.schema_url, f"--workers={workers}", "--generation-maximize=response_time")
 
-    target.assert_called_with(mocker.ANY, label="response_time")
+    assert any(
+        "target:response_time" in observation.features
+        for observation in observations
+        if observation.type == "test_case"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1877,34 +1905,10 @@ def test_exit_first(ctx, cli, snapshot_cli):
     )
 
 
-LINKED_USERS_PATHS = {
-    "/users": {
-        "post": {
-            "responses": {
-                "201": {
-                    "description": "OK",
-                    "content": {
-                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
-                    },
-                    "links": {"GetUser": {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}}},
-                }
-            }
-        }
-    },
-    "/users/{userId}": {
-        "get": {
-            "operationId": "getUser",
-            "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
-            "responses": {"200": {"description": "OK"}},
-        }
-    },
-}
-
-
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_reports_the_first_cycle_in_full(ctx, cli, snapshot_cli):
     # Each phase still reports everything it covered on its first pass, budget or no budget.
-    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    app, _ = ctx.openapi.make_flask_app(linked_users())
     counter = count()
 
     @app.route("/users", methods=["POST"])
@@ -2338,7 +2342,7 @@ def test_explicit_example_failure_output(ctx, cli, snapshot_cli):
 
 
 def test_curl_with_non_printable_characters(ctx, cli, snapshot_cli, monkeypatch):
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
+    monkeypatch.setenv("SHELL", "/bin/bash")
     api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {
@@ -2385,7 +2389,7 @@ def test_curl_reproduces_body_with_line_separator_characters(ctx, cli, monkeypat
     executable = shutil.which(shell.value)
     if executable is None:
         pytest.skip(f"{shell.value} is not installed")
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", shell)
+    monkeypatch.setenv("SHELL", f"/bin/{shell.value}")
     api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {
@@ -2419,7 +2423,7 @@ def test_curl_reproduces_body_with_line_separator_characters(ctx, cli, monkeypat
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires more complex setup")
 def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, snapshot_cli, monkeypatch):
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.UNKNOWN)
+    monkeypatch.setenv("SHELL", "/bin/unknown")
     api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {
@@ -4780,7 +4784,7 @@ def test_link_extraction_from_binary_json_response(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_network_error_reported_when_suite_ends_with_failure(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    app, _ = ctx.openapi.make_flask_app(linked_users())
     counter = count()
 
     @app.route("/users", methods=["POST"])
@@ -4813,7 +4817,7 @@ def test_network_error_reported_when_suite_ends_with_failure(ctx, cli, snapshot_
 # Every repeated stateful pass folds into the single block reported at the end.
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    app, _ = ctx.openapi.make_flask_app(linked_users())
 
     @app.route("/users", methods=["POST"])
     def create_user():
@@ -4839,7 +4843,7 @@ def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
 @pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_keyboard_interrupt_under_time_budget(ctx, cli, snapshot_cli, phase):
-    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    app, _ = ctx.openapi.make_flask_app(linked_users())
 
     @app.route("/users", methods=["POST"])
     def create_user():

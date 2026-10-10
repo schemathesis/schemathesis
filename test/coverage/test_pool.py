@@ -5,8 +5,8 @@ from flask import jsonify, request
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.resources import PoolDraw, PoolPick
-from test.coverage.helpers import body_operation, iter_cases, make_request_body
+from schemathesis.resources import PoolDraw
+from test.coverage.helpers import iter_cases, make_request_body
 
 # Consumer responses declare `name` as required; the planted-bug handlers return it as null for known ids.
 PLANTED_BUG_RESPONSES = {
@@ -469,68 +469,99 @@ def test_coverage_pool_overlay_respects_destination_format(cli, snapshot_cli, ct
     assert cli.run_openapi_app(app, "--phases=coverage", "-c positive_data_acceptance") == snapshot_cli
 
 
+def _id_producer(path, resource, id_schema):
+    # `POST <path>` returns an `id`, which the pool offers to `<resource>_id` slots elsewhere.
+    return {
+        path: {
+            "post": {
+                "operationId": f"create{resource}",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"id": id_schema}, "required": ["id"]}
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    }
+
+
+def _body_consumer(body_schema):
+    return {
+        "/foo": {"post": {"requestBody": make_request_body(body_schema), "responses": {"200": {"description": "OK"}}}}
+    }
+
+
 def test_coverage_pool_overlays_reach_top_level_and_nested_body_slots(ctx):
     # A pooled value the property schema rejects must not displace generated ones.
-    operation = body_operation(
-        ctx,
+    schema = ctx.openapi.load_schema(
         {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "count": {"type": "integer"},
-                "shipping": {
+            **_id_producer("/users", "User", {"type": "string"}),
+            **_id_producer("/orders", "Order", {"type": "string"}),
+            **_id_producer("/locations", "Location", {"type": "string"}),
+            **_id_producer("/priorities", "Priority", {"type": "string"}),
+            **_body_consumer(
+                {
                     "type": "object",
-                    "properties": {"location_id": {"type": "string"}, "priority": {"type": "integer"}},
-                },
-            },
-            "required": ["name", "shipping"],
-        },
-    )
-
-    class _FakeDataSource:
-        def pick_correlated_values(self, *, operation):
-            return PoolPick(
-                values={
-                    (ParameterLocation.BODY, "name"): "pooled-name",
-                    (ParameterLocation.BODY, "count"): "not-an-integer",
-                    (ParameterLocation.BODY, "shipping/location_id"): "loc-7",
-                    (ParameterLocation.BODY, "shipping/priority"): "not-an-integer",
+                    "properties": {
+                        "user_id": {"type": "string"},
+                        "order_id": {"type": "integer"},
+                        "shipping": {
+                            "type": "object",
+                            "properties": {"location_id": {"type": "string"}, "priority_id": {"type": "integer"}},
+                        },
+                    },
+                    "required": ["user_id", "shipping"],
                 }
-            )
+            ),
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    for operation, value in (
+        ("POST /users", "pooled-user"),
+        ("POST /orders", "not-an-integer"),
+        ("POST /locations", "loc-7"),
+        ("POST /priorities", "not-an-integer"),
+    ):
+        data_source.repository.record_response(operation=operation, status_code=201, payload={"id": value})
 
-    cases = iter_cases(operation, GenerationMode.POSITIVE, extra_data_source=_FakeDataSource())
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
     bodies = [case.body for case in cases if isinstance(case.body, dict)]
-    assert any(body.get("name") == "pooled-name" for body in bodies), bodies
+    assert any(body.get("user_id") == "pooled-user" for body in bodies), bodies
     assert any(
         isinstance(body.get("shipping"), dict) and body["shipping"].get("location_id") == "loc-7" for body in bodies
     ), bodies
-    assert all(body.get("count") != "not-an-integer" for body in bodies), bodies
+    assert all(body.get("order_id") != "not-an-integer" for body in bodies), bodies
     assert all(
-        not isinstance(body.get("shipping"), dict) or body["shipping"].get("priority") != "not-an-integer"
+        not isinstance(body.get("shipping"), dict) or body["shipping"].get("priority_id") != "not-an-integer"
         for body in bodies
     ), bodies
 
 
 def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
-    # Pool object value for "address" contains "country", absent from the property schema.
-    operation = body_operation(
-        ctx,
+    # Pool object value for "address_id" contains "country", absent from the property schema.
+    address = {"type": "object", "properties": {"city": {"type": "string"}}}
+    schema = ctx.openapi.load_schema(
         {
-            "type": "object",
-            "properties": {"address": {"type": "object", "properties": {"city": {"type": "string"}}}},
-        },
+            **_id_producer("/addresses", "Address", address),
+            **_body_consumer({"type": "object", "properties": {"address_id": address}}),
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation="POST /addresses", status_code=201, payload={"id": {"city": "London", "country": "UK"}}
     )
 
-    class _FakeDataSource:
-        def pick_correlated_values(self, *, operation):
-            return PoolPick(values={(ParameterLocation.BODY, "address"): {"city": "London", "country": "UK"}})
-
-    cases = iter_cases(operation, GenerationMode.POSITIVE, extra_data_source=_FakeDataSource())
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
     assert [case.body for case in cases] == [
-        {"address": {"city": "London", "country": "UK"}},
+        {"address_id": {"city": "London", "country": "UK"}},
         {},
-        {"address": {"city": "London"}},
-        {"address": {}},
+        {"address_id": {"city": "London"}},
+        {"address_id": {}},
     ]
 
 

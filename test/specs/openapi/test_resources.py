@@ -1622,6 +1622,7 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
     pool_hits = 0
 
     @given(strategy)
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=100, database=None, deadline=None)
     def collect(value):
         nonlocal pool_hits_with_note, pool_hits
@@ -2128,6 +2129,7 @@ def test_pool_overlay_respects_max_properties(ctx):
     oversized = []
 
     @given(strategy)
+    # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=200, database=None, deadline=None)
     def collect(value):
         nonlocal pool_hits

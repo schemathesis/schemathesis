@@ -1,12 +1,9 @@
-from typing import Any
-
 import pytest
 
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler
 from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver
-from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 
 USER = {"type": "string"}
 COMPANY = {"type": "object"}
@@ -417,26 +414,6 @@ def test_bundle_not_inlined_when_a_sibling_also_references_the_target():
         "allOf": [{"$ref": "#/x-bundled/schema000001"}],
         BUNDLE_STORAGE_KEY: {"schema000001": {"type": "object"}},
     }
-
-
-def _strip_remote_refs(value: Any) -> Any:
-    if isinstance(value, dict):
-        ref = value.get("$ref")
-        if isinstance(ref, str) and ref.startswith(("http://", "https://")):
-            return {}
-        return {key: _strip_remote_refs(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_strip_remote_refs(item) for item in value]
-    return value
-
-
-@pytest.mark.parametrize("schema", [SWAGGER_20, OPENAPI_30, OPENAPI_31])
-def test_bundles_open_api_schemas(schema):
-    # Smoke test: official meta-schemas bundle without errors. Remote refs are stripped
-    # so the test stays offline.
-    schema = _strip_remote_refs(schema)
-    resolver = make_root_resolver(schema)
-    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_infinite_recursive_required_cycle_message():

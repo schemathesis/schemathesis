@@ -807,24 +807,6 @@ def header_constraint_bug() -> dict[str, Any]:
     }
 
 
-def query_array_items_bug() -> dict[str, Any]:
-    return {
-        "/api/query_array_items_bug": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": "ids",
-                        "in": "query",
-                        "required": True,
-                        "schema": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 99}},
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
-            }
-        }
-    }
-
-
 def one_of_branch_bug() -> dict[str, Any]:
     return {
         "/api/one_of_branch_bug": {
@@ -936,4 +918,33 @@ def basic_with_query() -> dict[str, Any]:
                 "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
             }
         }
+    }
+
+
+def linked_users() -> dict[str, Any]:
+    return {
+        "/users": {
+            "post": {
+                "responses": {
+                    "201": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                            }
+                        },
+                        "links": {
+                            "GetUser": {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}}
+                        },
+                    }
+                }
+            }
+        },
+        "/users/{userId}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
     }

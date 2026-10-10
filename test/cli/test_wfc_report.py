@@ -93,7 +93,6 @@ curl -X GET {api.base_url}/api/failure
 
 def test_failure_report_uses_detected_shell(ctx, cli, tmp_path, monkeypatch):
     monkeypatch.setenv("SHELL", "/usr/bin/fish")
-    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", None)
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {

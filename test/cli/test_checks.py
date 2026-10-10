@@ -154,6 +154,7 @@ def test_negative_data_rejection_path_parameter_type_mutation(ctx, cli, snapshot
             "--checks=negative_data_rejection",
             "--mode=negative",
             "--phases=fuzzing",
+            # The mutation behind the false positive is rare, so the run needs many cases to reach it.
             "--max-examples=200",
         )
         == snapshot_cli
@@ -189,6 +190,7 @@ def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, cli, s
             "--checks=negative_data_rejection",
             "--mode=negative",
             "--phases=fuzzing",
+            # The mutation behind the false positive is rare, so the run needs many cases to reach it.
             "--max-examples=200",
         )
         == snapshot_cli
@@ -282,6 +284,7 @@ def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=stateful,fuzzing",
+        # The mutation behind the false positive is rare, so the run needs many cases to reach it.
         "--max-examples=200",
         exit_code=ExitCode.OK,
     )
@@ -402,6 +405,7 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, cli
             "--checks=negative_data_rejection",
             "--mode=negative",
             "--phases=fuzzing",
+            # The mutation behind the false positive is rare, so the run needs many cases to reach it.
             "--max-examples=200",
         )
         == snapshot_cli
@@ -453,6 +457,7 @@ def test_negative_data_rejection_number_body_field_accepts_integer_no_false_posi
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",
+        # The mutation behind the false positive is rare, so the run needs many cases to reach it.
         "--max-examples=200",
         exit_code=ExitCode.OK,
     )
@@ -624,6 +629,7 @@ def test_negative_data_rejection_boolean_query_param_accepts_coercible_no_false_
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",
+        # The mutation behind the false positive is rare, so the run needs many cases to reach it.
         "--max-examples=200",
         exit_code=ExitCode.OK,
         config={"generation": {"allow-extra-parameters": False}},
