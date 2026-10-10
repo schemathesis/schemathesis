@@ -15,6 +15,7 @@ from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.core.control import SkipTest
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
@@ -107,7 +108,7 @@ def _network_nonfatal_error(stored: UnrecoverableNetworkError) -> events.NonFata
 
 
 def _classify_suite_error(
-    exc: Exception | KeyboardInterrupt | FailureGroup,
+    exc: Exception | KeyboardInterrupt | FailureGroup | SkipTest,
     *,
     ctx: StatefulContext,
     engine: EngineContext,
@@ -130,7 +131,7 @@ def _classify_suite_error(
         # Therefore, set the stop event to cover the latter case
         engine.stop()
         return Status.INTERRUPTED, False, [events.Interrupted(phase=PhaseName.STATEFUL_TESTING)]
-    if isinstance(exc, unittest.case.SkipTest):
+    if isinstance(exc, (SkipTest, unittest.case.SkipTest)):
         # If `explicit` phase is used and there are no examples
         return Status.SKIP, False, []
     if isinstance(exc, FailureGroup):
@@ -482,7 +483,7 @@ def execute_state_machine_loop(
                 with catch_warnings(), ignore_hypothesis_output():
                     filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
                     InstrumentedStateMachine.run(settings=hypothesis_settings)
-            except (Exception, KeyboardInterrupt, FailureGroup) as exc:
+            except (Exception, KeyboardInterrupt, FailureGroup, SkipTest) as exc:
                 suite_status, retry, error_events = _classify_suite_error(
                     exc, ctx=ctx, engine=engine, state=state, settings=hypothesis_settings
                 )

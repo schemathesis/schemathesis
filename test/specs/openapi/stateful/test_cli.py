@@ -1181,3 +1181,101 @@ def map_query(context, query):
     )
     assert "Unexpected error during testing of this API operation: Rejected by hook" in result.stdout
     assert "Invalid `operationRef` definition" not in result.stdout
+
+
+# An exception leaking out of the stateful thread is printed as a traceback.
+@pytest.mark.filterwarnings("error::pytest.PytestUnhandledThreadExceptionWarning")
+def test_negative_only_steps_without_negatable_parameters_still_run(ctx, cli):
+    # Neither the root step nor the link-filled step has anything left to negate.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"itemId": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    fetched = []
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 42}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        fetched.append(item_id)
+        return jsonify({}), 200
+
+    cli.run_openapi_app(
+        app,
+        "--phases=stateful",
+        "--mode=negative",
+        "-c negative_data_rejection",
+        "--max-examples=10",
+        "--seed=1",
+    )
+    assert "42" in fetched
+
+
+@pytest.mark.filterwarnings("error::pytest.PytestUnhandledThreadExceptionWarning")
+def test_skip_raised_during_stateful_skips_the_suite(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"itemId": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 42}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 200
+
+    module = ctx.write_pymodule(
+        """
+from schemathesis.core.control import SkipTest
+
+@schemathesis.hook
+def before_call(context, case, **kwargs):
+    raise SkipTest("Skipped by hook")
+"""
+    )
+    result = cli.run_openapi_app(app, "--phases=stateful", "--max-examples=10", "--seed=1", hooks=module)
+    assert "⏭  Stateful" in result.stdout

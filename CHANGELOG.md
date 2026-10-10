@@ -14,6 +14,7 @@
 
 ### :bug: Fixed
 
+- Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09

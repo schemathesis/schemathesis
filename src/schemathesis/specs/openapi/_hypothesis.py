@@ -221,13 +221,16 @@ def openapi_cases(
     else:
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
 
-    # If we need to generate negative cases but no generated values were negated, then skip the whole test
-    if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
+    # If we need to generate negative cases but no generated values were negated, then skip the whole test.
+    # Skipping or rejecting a stateful step discards the whole scenario, so the step is sent as a positive one instead.
+    if (
+        generation_mode.is_negative
+        and phase != TestPhase.STATEFUL
+        and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_])
+    ):
         if generation_config.modes == [GenerationMode.NEGATIVE]:
             raise SkipTest("Impossible to generate negative test cases")
-        # Rejecting a stateful step discards the whole scenario, so the step is sent as a positive one instead.
-        if phase != TestPhase.STATEFUL:
-            reject()
+        reject()
 
     effective_generation_mode, phase_data = _describe_generation(
         generation_mode, phase, (query_, cookies_, headers_, path_parameters_, body_)
