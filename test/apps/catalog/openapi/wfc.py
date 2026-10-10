@@ -434,8 +434,13 @@ def wfc_owned_orders(policy: str) -> OpenAPIApp:
             return jsonify({"detail": "unauthorized"}), 401
         if not isinstance(body, dict) or not isinstance(body.get("item"), str):
             return jsonify({"detail": "invalid"}), 400
-        order = {"id": len(orders) + 1, "item": body["item"], "owner": user}
-        orders[len(orders) + 1] = order
+        # One fixed order per caller keeps reported ids and bodies independent of generated data.
+        order = next((order for order in orders.values() if order["owner"] == user), None) or {
+            "id": len(orders) + 1,
+            "item": "book",
+            "owner": user,
+        }
+        orders[order["id"]] = order
         return jsonify(order), 201
 
     @app.route("/api/orders/<int:order_id>", methods=["GET"])

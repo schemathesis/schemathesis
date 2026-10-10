@@ -323,7 +323,7 @@ The check gives no verdict when an explicitly configured `Authorization` header 
 
 Verifies that one user cannot read an object another user created (OWASP API1, BOLA). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists `peers`: users whose objects must stay private to each other.
 
-When a peer sends a `GET` request with an identifier that its own earlier request produced, Schemathesis repeats it as each other peer. The check fails when another peer gets a `2xx` response describing the same object: the identifier sits at the same place, and every field declared in the response schema matches. A different body, such as a redacted view or an empty list, passes. So does a body an unauthenticated request also gets, which marks the object as public.
+When a peer sends a `GET` request with an identifier that its own earlier write (e.g. a `POST`) produced, Schemathesis repeats it as each other peer. The check fails when another peer gets a `2xx` response describing the same object: the identifier sits at the same place, and every field declared in the response schema matches (every field, where the schema does not describe the body). A different body, such as a redacted view or an empty list, passes. So does a body an unauthenticated request also gets, which marks the object as public.
 
 ```text
 - Object-level authorization bypass
