@@ -7,10 +7,12 @@ import time
 import uuid
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from warnings import catch_warnings
 
 import requests
+from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
+from hypothesis.strategies import one_of, sampled_from
 from requests.exceptions import ChunkedEncodingError
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -30,7 +32,9 @@ from schemathesis.generation.hypothesis.reporting import FILTER_CASE_EXHAUSTED_M
 
 if TYPE_CHECKING:
     import hypothesis
+    from hypothesis.strategies import DrawFn
 
+    from schemathesis.checks import ResponseChecks
     from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
@@ -202,6 +206,21 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
         yield from _run_forever(ctx, config, operations=operations, event_queue=event_queue)
 
 
+def _relay_events(
+    ctx: EngineContext, *, event_queue: queue.Queue[events.EngineEvent], threads: list[threading.Thread]
+) -> EventGenerator:
+    """Yield worker events, counting failed scenarios, until every worker has exited."""
+    while True:
+        try:
+            event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
+            if isinstance(event, events.FuzzScenarioFinished) and event.status in (Status.FAILURE, Status.ERROR):
+                ctx.control.count_failure(event.id)
+            yield event
+        except queue.Empty:
+            if not any(t.is_alive() for t in threads):
+                break
+
+
 def _run_forever(
     ctx: EngineContext,
     config: FuzzConfig,
@@ -246,15 +265,7 @@ def _run_forever(
     for thread in threads:
         thread.start()
     try:
-        while True:
-            try:
-                event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
-                if isinstance(event, events.FuzzScenarioFinished) and event.status in (Status.FAILURE, Status.ERROR):
-                    ctx.control.count_failure(event.id)
-                yield event
-            except queue.Empty:
-                if not any(t.is_alive() for t in threads):
-                    break
+        yield from _relay_events(ctx, event_queue=event_queue, threads=threads)
     except KeyboardInterrupt:
         ctx.stop()
         yield events.Interrupted(phase=None)
@@ -267,6 +278,221 @@ def _run_forever(
     outage = ctx.server.take_report(None)
     if outage is not None:
         yield outage
+
+
+def _report_once(
+    exc: Exception, *, label: str, seen_labels: set[str], event_queue: queue.Queue[events.EngineEvent]
+) -> None:
+    """Report an operation's error the first time this worker sees one for it."""
+    if label not in seen_labels:
+        seen_labels.add(label)
+        event_queue.put(events.NonFatalError(error=exc, phase=None, label=label, related_to_operation=True))
+
+
+def _draw_operation(
+    draw: DrawFn,
+    ctx: EngineContext,
+    *,
+    last_step: tuple[APIOperation, Case, Response] | None,
+    weighted_operations: list[APIOperation],
+    operations_by_label: dict[str, APIOperation],
+    excluded_operations: set[str],
+) -> tuple[APIOperation, dict[str, object]]:
+    """Mostly follow a link from the previous step, otherwise pick a weighted-random operation."""
+    candidates: list[tuple[APIOperation, dict[str, object]]] = []
+    if last_step is not None:
+        previous_operation, previous_case, previous_response = last_step
+        candidates = ctx.schema.iter_link_candidates(
+            operation=previous_operation,
+            case=previous_case,
+            response=previous_response,
+            operations_by_label=operations_by_label,
+            excluded_labels=excluded_operations,
+        )
+    if candidates and draw(sampled_from(_LINK_BIAS_CHOICES)):
+        return draw(sampled_from(candidates))
+    return draw(sampled_from(weighted_operations)), {}
+
+
+def _draw_case(
+    draw: DrawFn,
+    operation: APIOperation,
+    *,
+    strategy_kwargs: dict[str, object],
+    link_overrides: dict[str, object],
+    feedback: FeedbackSources,
+    generation_modes: list,
+    excluded_operations: set[str],
+    seen_error_labels: set[str],
+    event_queue: queue.Queue[events.EngineEvent],
+) -> Case | None:
+    """Draw a case in any viable generation mode; `None` excludes an operation that fails to generate."""
+    merged_kwargs = {**strategy_kwargs, **link_overrides}
+    try:
+        return draw(
+            one_of(
+                operation.as_strategy(generation_mode=mode, feedback=feedback, **merged_kwargs)
+                for mode in generation_modes
+            )
+        )
+    except UnsatisfiedAssumption:
+        # Let Hypothesis handle filtered examples normally.
+        raise
+    except Exception as exc:
+        excluded_operations.add(operation.label)
+        _report_once(exc, label=operation.label, seen_labels=seen_error_labels, event_queue=event_queue)
+        return None
+
+
+def _send_step(
+    ctx: EngineContext,
+    case: Case,
+    *,
+    operation: APIOperation,
+    event_queue: queue.Queue[events.EngineEvent],
+    seen_error_labels: set[str],
+) -> Response | None:
+    """Send the step's request, waiting out rate limits; `None` when a transport error skips the step."""
+    auto_mode = ctx.config.rate_limit_for(operation=operation) == "auto"
+    transport_kwargs = ctx.get_transport_kwargs(operation=operation)
+
+    def call() -> Response:
+        return ctx.server.track(case, lambda: case.call(**transport_kwargs), transport_kwargs=transport_kwargs)
+
+    def on_delay(delay: float, retries_left: int) -> None:
+        event_queue.put(events.RateLimitRetry(operation=operation.label, delay=delay, retries_left=retries_left))
+
+    try:
+        _, response = call_with_retry(call_fn=call, auto_mode=auto_mode, on_delay=on_delay)
+    except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
+        if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
+            raise _StopFuzzing from None
+        _report_once(exc, label=operation.label, seen_labels=seen_error_labels, event_queue=event_queue)
+        return None
+    return response
+
+
+def _validate_scenario(
+    ctx: EngineContext,
+    recorder: ScenarioRecorder,
+    *,
+    response_checks: ResponseChecks,
+    check_context_cache: CheckContextCache,
+    continue_on_failure_by_label: dict[str, bool],
+) -> Status:
+    """Run all checks against every answered step; raises on the first failure unless it may continue."""
+    for case_id, node in recorder.cases.items():
+        interaction = recorder.interactions.get(case_id)
+        if interaction is None or interaction.response is None:
+            continue
+        case = node.value
+        check_ctx = check_context_cache.get_or_create(operation=case.operation, ctx=ctx, phase=None).to_check_context(
+            recorder=recorder,
+            response_checks=response_checks,
+            phase=None,
+            auth_enforced_operations=ctx.auth_enforced_operations,
+        )
+        validate_response(
+            case=case,
+            ctx=check_ctx,
+            response=interaction.response,
+            continue_on_failure=continue_on_failure_by_label[case.operation.label],
+            recorder=recorder,
+            baseline=ctx.config.load_baseline(),
+        )
+    # Failures under `continue_on_failure` were recorded without raising.
+    if has_new_failures(recorder, ctx.config.load_baseline()):
+        return Status.FAILURE
+    return Status.SUCCESS
+
+
+def _suite_error(exc: Exception) -> events.NonFatalError:
+    return events.NonFatalError(error=exc, phase=None, label=FUZZ_TESTS_LABEL, related_to_operation=False)
+
+
+def _explain_unsatisfiable(exc: Exception, operations: list[APIOperation]) -> Exception:
+    """Blame a filter hook when one rejected cases; otherwise keep Hypothesis's own error."""
+    rejecting_hook = any(
+        operation.filter_case_tracker is not None and operation.filter_case_tracker.rejected > 0
+        for operation in operations
+    )
+    return Unsatisfiable(FILTER_CASE_EXHAUSTED_MESSAGE) if rejecting_hook else exc
+
+
+def _must_stop_worker(
+    ctx: EngineContext, *, weighted_operations: list[APIOperation], scenario_started: threading.Event
+) -> bool:
+    # A budget too small to survive startup would otherwise buy nothing at all.
+    return not weighted_operations or (ctx.has_to_stop and scenario_started.is_set())
+
+
+def _start_scenario(
+    cell: Cell,
+    *,
+    started_at: float,
+    suite_id: uuid.UUID,
+    worker_id: int,
+    event_queue: queue.Queue[events.EngineEvent],
+) -> None:
+    """Announce the scenario and hand its identity and start time to the test body."""
+    started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
+    event_queue.put(started)
+    cell.value = ActiveScenario(scenario_id=started.id, started_at=started_at)
+
+
+def _status_for(exc: FailureGroup | Exception | KeyboardInterrupt) -> Status:
+    # A failure without `continue-on-failure` stops checking remaining steps and stops the campaign.
+    if isinstance(exc, FailureGroup):
+        return Status.FAILURE
+    if isinstance(exc, KeyboardInterrupt):
+        return Status.INTERRUPTED
+    return Status.ERROR
+
+
+def _finish_scenario(
+    active: ActiveScenario,
+    recorder: ScenarioRecorder,
+    *,
+    status: Status,
+    suite_id: uuid.UUID,
+    worker_id: int,
+    event_queue: queue.Queue[events.EngineEvent],
+) -> None:
+    event_queue.put(
+        events.FuzzScenarioFinished(
+            id=active.scenario_id,
+            suite_id=suite_id,
+            worker_id=worker_id,
+            recorder=recorder,
+            status=status,
+            elapsed_time=time.monotonic() - active.started_at,
+        )
+    )
+
+
+def _handle_session_end(
+    ctx: EngineContext,
+    exc: FailureGroup | Exception | KeyboardInterrupt,
+    *,
+    operations: list[APIOperation],
+    event_queue: queue.Queue[events.EngineEvent],
+) -> None:
+    """React to whatever ended this worker's Hypothesis session."""
+    if isinstance(exc, _StopFuzzing):
+        # Natural thread completion: no work left, other workers keep running.
+        return
+    if isinstance(exc, KeyboardInterrupt):
+        ctx.stop()
+    elif isinstance(exc, FailureGroup):
+        # Failures are already captured; without `continue-on-failure` the first one ends the whole run.
+        ctx.control.reach_failure_limit()
+    elif isinstance(exc, Flaky) and ctx.has_to_stop:
+        # Deadline-induced data-tree noise; campaign already stopping, suppress.
+        return
+    elif isinstance(exc, Unsatisfiable):
+        event_queue.put(_suite_error(_explain_unsatisfiable(exc, operations)))
+    else:
+        event_queue.put(_suite_error(exc))
 
 
 def _run_forever_thread(
@@ -282,7 +508,6 @@ def _run_forever_thread(
 ) -> None:
     import hypothesis
     import hypothesis.strategies as st
-    from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
 
     from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
@@ -302,18 +527,10 @@ def _run_forever_thread(
     # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
     seen_error_labels: set[str] = set()
 
-    def _report_once(exc: Exception, *, label: str) -> None:
-        if label not in seen_error_labels:
-            seen_error_labels.add(label)
-            event_queue.put(events.NonFatalError(error=exc, phase=None, label=label, related_to_operation=True))
-
     @st.composite  # type: ignore[untyped-decorator]
     def scheduler(draw: hypothesis.strategies.DrawFn) -> ScenarioRecorder:
         """Compose a scenario: weighted-random producers, then link-biased follow-ups."""
-        if not weighted_operations:
-            raise _StopFuzzing
-        # A budget too small to survive startup would otherwise buy nothing at all.
-        if ctx.has_to_stop and scenario_started.is_set():
+        if _must_stop_worker(ctx, weighted_operations=weighted_operations, scenario_started=scenario_started):
             raise _StopFuzzing
         scenario_started.set()
 
@@ -328,36 +545,26 @@ def _run_forever_thread(
             if step > 0 and ctx.has_to_stop:
                 # Outer `except Flaky` swallows any data-tree fallout from this mid-draw break.
                 break
-            link_overrides: dict[str, Any] = {}
-            candidates: list[tuple[APIOperation, dict[str, Any]]] = []
-            if last_step is not None:
-                previous_operation, previous_case, previous_response = last_step
-                candidates = ctx.schema.iter_link_candidates(
-                    operation=previous_operation,
-                    case=previous_case,
-                    response=previous_response,
-                    operations_by_label=operations_by_label,
-                    excluded_labels=excluded_operations,
-                )
-            if candidates and draw(st.sampled_from(_LINK_BIAS_CHOICES)):
-                operation, link_overrides = draw(st.sampled_from(candidates))
-            else:
-                operation = draw(st.sampled_from(weighted_operations))
-            merged_kwargs = {**strategy_kwargs_by_label[operation.label], **link_overrides}
-            try:
-                case = draw(
-                    st.one_of(
-                        operation.as_strategy(
-                            generation_mode=mode, feedback=feedback_by_label[operation.label], **merged_kwargs
-                        )
-                        for mode in generation_modes_by_label[operation.label]
-                    )
-                )
-            except UnsatisfiedAssumption:
-                raise  # let Hypothesis handle filtered examples normally
-            except Exception as exc:
-                excluded_operations.add(operation.label)
-                _report_once(exc, label=operation.label)
+            operation, link_overrides = _draw_operation(
+                draw,
+                ctx,
+                last_step=last_step,
+                weighted_operations=weighted_operations,
+                operations_by_label=operations_by_label,
+                excluded_operations=excluded_operations,
+            )
+            case = _draw_case(
+                draw,
+                operation,
+                strategy_kwargs=strategy_kwargs_by_label[operation.label],
+                link_overrides=link_overrides,
+                feedback=feedback_by_label[operation.label],
+                generation_modes=generation_modes_by_label[operation.label],
+                excluded_operations=excluded_operations,
+                seen_error_labels=seen_error_labels,
+                event_queue=event_queue,
+            )
+            if case is None:
                 continue
             recorder.record_case(
                 parent_id=None,
@@ -365,39 +572,21 @@ def _run_forever_thread(
                 transition=None,
                 is_transition_applied=False,
             )
-            auto_mode = ctx.config.rate_limit_for(operation=operation) == "auto"
-            transport_kwargs = ctx.get_transport_kwargs(operation=operation)
-            operation_label = operation.label
-
-            def _call(_case: Case = case, _kwargs: dict[str, Any] = transport_kwargs) -> Response:
-                return ctx.server.track(_case, lambda: _case.call(**_kwargs), transport_kwargs=_kwargs)
-
-            def _on_delay(delay: float, retries_left: int, _label: str = operation_label) -> None:
-                event_queue.put(
-                    events.RateLimitRetry(
-                        operation=_label,
-                        delay=delay,
-                        retries_left=retries_left,
-                    )
-                )
-
-            try:
-                _, response = call_with_retry(
-                    call_fn=_call,
-                    auto_mode=auto_mode,
-                    on_delay=_on_delay,
-                )
-            except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
-                if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
-                    raise _StopFuzzing from None
-                _report_once(exc, label=operation.label)
+            response = _send_step(
+                ctx, case, operation=operation, event_queue=event_queue, seen_error_labels=seen_error_labels
+            )
+            if response is None:
                 continue
             recorder.record_response(case_id=case.id, response=response)
             last_step = (operation, case, response)
 
-        started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
-        event_queue.put(started)
-        scenario_cell.value = ActiveScenario(scenario_id=started.id, started_at=scenario_started_at)
+        _start_scenario(
+            scenario_cell,
+            started_at=scenario_started_at,
+            suite_id=suite_id,
+            worker_id=worker_id,
+            event_queue=event_queue,
+        )
         return recorder
 
     # Any seed takes precedence over `derandomize`, so deterministic mode skips a generated one.
@@ -411,103 +600,27 @@ def _run_forever_thread(
         """Validate all responses in the drawn scenario and emit FuzzScenarioFinished."""
         active = scenario_cell.value
         assert active is not None
-        scenario_id = active.scenario_id
-        start_time = active.started_at
         status = Status.SUCCESS
         response_checks = ctx.checks.for_responses()
         try:
-            # Run all checks against every recorded response in the scenario.
-            for case_id, node in recorder.cases.items():
-                interaction = recorder.interactions.get(case_id)
-                if interaction is None or interaction.response is None:
-                    continue
-                case = node.value
-                check_ctx = check_context_cache.get_or_create(
-                    operation=case.operation, ctx=ctx, phase=None
-                ).to_check_context(
-                    recorder=recorder,
-                    response_checks=response_checks,
-                    phase=None,
-                    auth_enforced_operations=ctx.auth_enforced_operations,
-                )
-                continue_on_failure = continue_on_failure_by_label[case.operation.label]
-                validate_response(
-                    case=case,
-                    ctx=check_ctx,
-                    response=interaction.response,
-                    continue_on_failure=continue_on_failure,
-                    recorder=recorder,
-                    baseline=ctx.config.load_baseline(),
-                )
-            # If any case used continue_on_failure=True, failures were recorded without raising.
-            # Check the recorder to set the correct scenario status.
-            if has_new_failures(recorder, ctx.config.load_baseline()):
-                status = Status.FAILURE
-        except FailureGroup:
-            # continue_on_failure=False: stop checking remaining steps and stop the campaign.
-            status = Status.FAILURE
-            raise
-        except KeyboardInterrupt:
-            status = Status.INTERRUPTED
-            raise
-        except Exception:
-            status = Status.ERROR
+            status = _validate_scenario(
+                ctx,
+                recorder,
+                response_checks=response_checks,
+                check_context_cache=check_context_cache,
+                continue_on_failure_by_label=continue_on_failure_by_label,
+            )
+        except (FailureGroup, Exception, KeyboardInterrupt) as exc:
+            status = _status_for(exc)
             raise
         finally:
-            event_queue.put(
-                events.FuzzScenarioFinished(
-                    id=scenario_id,
-                    suite_id=suite_id,
-                    worker_id=worker_id,
-                    recorder=recorder,
-                    status=status,
-                    elapsed_time=time.monotonic() - start_time,
-                )
+            _finish_scenario(
+                active, recorder, status=status, suite_id=suite_id, worker_id=worker_id, event_queue=event_queue
             )
 
     try:
         with catch_warnings(), ignore_hypothesis_output():
             warnings.filterwarnings("ignore", category=InsecureRequestWarning)
             fuzz_test()
-    except _StopFuzzing:
-        # natural thread completion — no work left, don't touch other workers
-        pass
-    except KeyboardInterrupt:
-        ctx.stop()
-    except FailureGroup:
-        # Failures are already captured; without `continue-on-failure` the first one ends the whole run.
-        ctx.control.reach_failure_limit()
-    except Flaky as exc:
-        if ctx.has_to_stop:
-            # Deadline-induced data-tree noise; campaign already stopping, suppress.
-            return
-        event_queue.put(
-            events.NonFatalError(
-                error=exc,
-                phase=None,
-                label=FUZZ_TESTS_LABEL,
-                related_to_operation=False,
-            )
-        )
-    except Unsatisfiable as exc:
-        rejecting_hook = any(
-            operation.filter_case_tracker is not None and operation.filter_case_tracker.rejected > 0
-            for operation in plan.operations
-        )
-        event_queue.put(
-            events.NonFatalError(
-                error=Unsatisfiable(FILTER_CASE_EXHAUSTED_MESSAGE) if rejecting_hook else exc,
-                phase=None,
-                label=FUZZ_TESTS_LABEL,
-                related_to_operation=False,
-            )
-        )
-    except Exception as exc:
-        event_queue.put(
-            events.NonFatalError(
-                error=exc,
-                phase=None,
-                label=FUZZ_TESTS_LABEL,
-                related_to_operation=False,
-            )
-        )
+    except (FailureGroup, Exception, KeyboardInterrupt) as exc:
+        _handle_session_end(ctx, exc, operations=plan.operations, event_queue=event_queue)
