@@ -21,6 +21,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `unresolvable_reference` | A parameter, request body, or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
 | `rate_limited` | Most interactions returned 429 Too Many Requests | Slow requests down with `--rate-limit` |
 | `dictionary_mismatch` | Most entries of a dictionary fail the schema of the parameter they are bound to | Fix the entries, or bind the dictionary to a matching parameter |
+| `timeout_units` | `request-timeout` or `max_response_time` is 1000 seconds or more | Give the value in seconds |
 | `low_valid_rate` (opt-in) | An operation accepted only a small share of the requests sent to it | Supply real identifiers, or align the schema with the constraints the API enforces |
 
 ## Available Warnings
@@ -228,6 +229,16 @@ Dictionary mismatch: 1 dictionary binding with entries that mostly fail the boun
 **Trigger**: More than half of the entries a [fuzz dictionary](../guides/fuzz-dictionary.md) supplies to a parameter fail that parameter's schema. Reported once per dictionary and parameter, before any request is sent.
 
 Positive cases use only the entries that match the schema, so such a dictionary is barely used and the run does not say why. A dictionary meant for negative testing mismatches on purpose; leave `dictionary_mismatch` out of `display` under `[warnings]` to silence it.
+
+### `timeout_units`
+
+```
+⚠️  `--request-timeout=2000` is 33 minutes; Schemathesis takes seconds. Did you mean `--request-timeout=2`?
+```
+
+**Trigger**: [`request-timeout`](configuration.md#request-timeout) or the `max_response_time` check limit is 1000 seconds or more. Shown right after the header, before the schema is loaded.
+
+Schemathesis 3 took these values in milliseconds, so a value this large is usually a leftover. Long timeouts are legitimate for slow or streaming endpoints; leave `timeout_units` out of `display` under `[warnings]` to silence it. This warning never fails the run, even with `fail-on`.
 
 ### `low_valid_rate`
 

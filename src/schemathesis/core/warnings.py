@@ -18,6 +18,7 @@ class SchemathesisWarning(str, enum.Enum):
     LOW_VALID_RATE = "low_valid_rate"
     RATE_LIMITED = "rate_limited"
     DICTIONARY_MISMATCH = "dictionary_mismatch"
+    TIMEOUT_UNITS = "timeout_units"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -36,4 +37,5 @@ class SchemathesisWarning(str, enum.Enum):
             "low_valid_rate": cls.LOW_VALID_RATE,
             "rate_limited": cls.RATE_LIMITED,
             "dictionary_mismatch": cls.DICTIONARY_MISMATCH,
+            "timeout_units": cls.TIMEOUT_UNITS,
         }[value.lower()]

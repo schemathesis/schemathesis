@@ -689,6 +689,8 @@ class StatefulProgressManager:
 @dataclass
 class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     config: ProjectConfig
+    # Problems with the invocation itself, shown before the schema is loaded.
+    startup_warnings: list[str] = field(default_factory=list)
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
@@ -742,6 +744,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
+        for message in self.startup_warnings:
+            click.secho(f"⚠️  {message}\n", fg="yellow")
 
     def shutdown(self, ctx: ExecutionContext) -> None:
         if self.cycle_live is not None:

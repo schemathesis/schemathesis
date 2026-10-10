@@ -1884,6 +1884,52 @@ def test_max_response_time_valid(ctx, cli):
     cli.run_and_assert(api.schema_url, "--max-response-time=200")
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_timeouts_given_in_milliseconds_warning(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+
+    assert (
+        cli.run(
+            api.schema_url,
+            "--request-timeout=2000",
+            "--phases=fuzzing",
+            "--max-examples=1",
+            config={"checks": {"max_response_time": 30000}},
+        )
+        == snapshot_cli
+    )
+
+
+def test_no_timeout_units_warning_below_1000_seconds(ctx, cli):
+    api = ctx.openapi.apps.success()
+
+    result = cli.run(
+        api.schema_url, "--request-timeout=999", "--max-response-time=999", "--phases=fuzzing", "--max-examples=1"
+    )
+
+    assert "Schemathesis takes seconds" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "args, config",
+    [
+        (("--warnings=off",), None),
+        (("--warnings=missing_auth",), None),
+        ((), {"warnings": {"enabled": False}}),
+        ((), {"warnings": {"display": ["missing_auth"]}}),
+    ],
+    ids=["cli-off", "cli-other-kind", "config-disabled", "config-other-kind"],
+)
+def test_timeout_units_warning_can_be_disabled(ctx, cli, args, config):
+    api = ctx.openapi.apps.success()
+
+    result = cli.run(
+        api.schema_url, "--request-timeout=2000", "--phases=fuzzing", "--max-examples=1", *args, config=config
+    )
+
+    assert "Schemathesis takes seconds" not in result.stdout
+
+
 @pytest.mark.snapshot(remove_last_line=True)
 def test_exit_first(ctx, cli, snapshot_cli):
     # When the `--max-failures=1` CLI option is passed

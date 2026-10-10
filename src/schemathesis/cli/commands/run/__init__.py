@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import IO, Any
 
 import click
+from click.core import ParameterSource
 
 from schemathesis.checks import load_all_checks
 from schemathesis.cli.commands.run import executor
@@ -75,6 +76,7 @@ from schemathesis.cli.validation import CONFLICTING_URL_MESSAGE, validate_auth_o
 from schemathesis.config import (
     DEFAULT_REPORT_DIRECTORY,
     HealthCheck,
+    ProjectConfig,
     ReportFormat,
     SchemathesisConfig,
     SchemathesisWarning,
@@ -86,6 +88,8 @@ from schemathesis.generation.metrics import MetricFunction
 load_all_checks()
 
 DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
+# Timeouts this long are almost always milliseconds, the unit Schemathesis 3 took.
+LIKELY_MILLISECONDS = 1000
 
 
 @click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
@@ -389,4 +393,28 @@ def run(
         config=config.projects.get_default(),
         args=ctx.args,
         params=ctx.params,
+        startup_warnings=list(_iter_timeouts_in_milliseconds(ctx, config.projects.get_default())),
     )
+
+
+def _iter_timeouts_in_milliseconds(ctx: click.Context, config: ProjectConfig) -> Iterator[str]:
+    if not config.warnings.should_display(SchemathesisWarning.TIMEOUT_UNITS):
+        return
+    for value, parameter, option, key in (
+        (config.request_timeout, "request_timeout", "--request-timeout", "request-timeout"),
+        (config.checks.max_response_time.limit, "max_response_time", "--max-response-time", "max_response_time"),
+    ):
+        if value is None or value < LIKELY_MILLISECONDS:
+            continue
+        if ctx.get_parameter_source(parameter) is ParameterSource.DEFAULT:
+            given, suggested = f"{key} = {value:g}", f"{key} = {value / 1000:g}"
+        else:
+            given, suggested = f"{option}={value:g}", f"{option}={value / 1000:g}"
+        yield f"`{given}` is {_describe_duration(value)}; Schemathesis takes seconds. Did you mean `{suggested}`?"
+
+
+def _describe_duration(seconds: float) -> str:
+    if seconds < 3600:
+        return f"{round(seconds / 60)} minutes"
+    hours = round(seconds / 3600)
+    return f"{hours} hour" if hours == 1 else f"{hours} hours"
