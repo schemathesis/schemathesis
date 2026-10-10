@@ -639,7 +639,11 @@ class AdditionalPropertiesAdjustment:
             root = schema if not path else _walk_to_property(schema, path)
             if not isinstance(root, dict):
                 continue
+            # A closed `allOf` branch would forbid the properties its siblings declare.
+            all_of = maybe_resolve_bundled(root).get("allOf")
+            siblings = {id(branch) for branch in all_of} if isinstance(all_of, list) else set()
             for target in _collect_object_targets(root):
-                target["additionalProperties"] = False
+                if id(target) not in siblings:
+                    target["additionalProperties"] = False
 
         return schema
