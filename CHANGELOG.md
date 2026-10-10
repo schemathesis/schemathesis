@@ -11,6 +11,10 @@
 
 - Reject `phases.coverage.generation.max-examples`; the coverage phase has no case cap.
 
+### :bug: Fixed
+
+- Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
+
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
 ### :wrench: Changed
