@@ -637,6 +637,9 @@ def _collect_parameter_examples(
     for param in items:
         if param.name in exclude_key or not param.examples:
             continue
+        # A parameter the API rejected as unknown is gone from the adjusted schema; so are its examples.
+        if isinstance(adjusted_properties, dict) and param.name not in adjusted_properties:
+            continue
         # Splice inferred constraints (format / min / max etc.) onto each parameter's
         # validation schema so examples the API has demonstrated to be invalid get evicted.
         validation_schema = param.validation_schema
