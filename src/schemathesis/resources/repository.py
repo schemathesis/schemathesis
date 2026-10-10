@@ -38,6 +38,8 @@ class ResourceInstance:
     context: dict[str, Any]
     # Taken from a response example in the spec rather than from the API itself.
     from_example: bool = False
+    # Identity whose request produced the resource; `None` outside multi-identity auth.
+    identity: str | None = None
 
 
 class ResourceRepository:
@@ -127,6 +129,7 @@ class ResourceRepository:
         payload: Any,
         context: dict[str, Any] | None = None,
         from_example: bool = False,
+        identity: str | None = None,
     ) -> None:
         """Capture resources from an API response based on configured descriptors."""
         descriptors = self._descriptors_by_operation.get(operation, [])
@@ -146,6 +149,7 @@ class ResourceRepository:
                     status_code=status_code,
                     context=context or {},
                     from_example=from_example,
+                    identity=identity,
                 )
 
     def seed_input_values(self, by_resource: dict[str, dict[str, Any]], *, source: str) -> None:
@@ -172,6 +176,7 @@ class ResourceRepository:
         case: Case,
         status_code: int,
         context: dict[str, Any] | None = None,
+        identity: str | None = None,
     ) -> None:
         """Capture identifier values from a successful request.
 
@@ -192,6 +197,7 @@ class ResourceRepository:
                 source_operation=operation,
                 status_code=status_code,
                 context=context or {},
+                identity=identity,
             )
 
     def _extract_payload(self, payload: object, descriptor: ResourceDescriptor) -> Iterable[dict[str, Any]]:
@@ -240,6 +246,7 @@ class ResourceRepository:
         status_code: int,
         context: dict[str, Any],
         from_example: bool = False,
+        identity: str | None = None,
     ) -> None:
         """Store a resource instance with context-aware eviction.
 
@@ -258,6 +265,7 @@ class ResourceRepository:
             status_code=status_code,
             context=context,
             from_example=from_example,
+            identity=identity,
         )
 
         with self._lock:

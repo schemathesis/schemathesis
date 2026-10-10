@@ -2146,3 +2146,38 @@ def test_pool_overlay_respects_max_properties(ctx):
 
     assert pool_hits > 0, "Pool's Category.categoryId values never landed in the body"
     assert not oversized, f"`maxProperties` exceeded: {oversized[0]!r}"
+
+
+def test_pool_draw_names_the_identity_that_produced_the_resource(user_schema_builder):
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    nested = {
+        "/users/{user_id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": user_schema}}}},
+            }
+        }
+    }
+    schema = user_schema_builder(response_schema=user_schema, extra_endpoints=nested)
+    data_source = schema.create_extra_data_source()
+    operation = schema["/users"]["POST"]
+    case = operation.Case()
+    case._auth_identity = "alice"
+    response = Response(
+        status_code=CREATED,
+        headers={"content-type": ["application/json"]},
+        content=b'{"id": "1", "name": "Alice"}',
+        request=requests.Request("POST", "http://test.example/users").prepare(),
+        elapsed=0.1,
+        verify=True,
+    )
+    data_source.record_response(operation=operation, response=response, case=case)
+
+    picked = data_source.pick_correlated_values(operation=schema["/users/{user_id}"]["GET"])
+
+    assert [draw.source_identity for draw in picked.draws] == ["alice"]

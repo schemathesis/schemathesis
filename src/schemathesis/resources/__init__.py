@@ -23,6 +23,8 @@ class PoolDraw:
     resource_field: str
     source_operation: str
     source_status: int
+    # Identity whose request produced the resource; `None` outside multi-identity auth.
+    source_identity: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
