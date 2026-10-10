@@ -184,6 +184,7 @@ def _build_pool_draw(slot: InputSlot, instance: ResourceInstance) -> PoolDraw:
         resource_field=slot.resource_field or "",
         source_operation=instance.source_operation,
         source_status=instance.status_code,
+        source_identity=instance.identity,
     )
 
 
@@ -202,6 +203,7 @@ def _build_pool_draw_from_requirement(
         resource_field=requirement.resource_field,
         source_operation=instance.source_operation,
         source_status=instance.status_code,
+        source_identity=instance.identity,
     )
 
 
@@ -689,6 +691,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             case=case,
             status_code=status_code,
             context=case.path_parameters or {},
+            identity=case._auth_identity,
         )
 
     def record_response(
@@ -728,6 +731,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 status_code=response.status_code,
                 payload=payload,
                 context=case.path_parameters or {},
+                identity=case._auth_identity,
             )
         if semantic_active:
             response_def = operation.responses.find_by_status_code(response.status_code)
