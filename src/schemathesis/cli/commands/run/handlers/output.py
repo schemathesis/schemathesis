@@ -167,7 +167,7 @@ def _missing_test_data_advice(
         return (
             "This operation declares no parameters, so an empty request was all there was to send",
             "These operations declare no parameters, so an empty request was all there was to send",
-            "💡 Check `--url`, and whether the schema describes everything these operations need",
+            "Check `--url`, and whether the schema describes everything these operations need",
         )
     if label not in linked:
         # The inferred graph knows more than the declared links do.
@@ -177,34 +177,331 @@ def _missing_test_data_advice(
             return (
                 f"No links point to this operation - {producer} appears to supply the data it needs",
                 f"No links point to these operations - {producer} appears to supply the data they need",
-                f"💡 Add a link from {producer}, or supply the identifiers it returns in your config file",
+                f"Add a link from {producer}, or supply the identifiers it returns in your config file",
             )
         if candidates is not None:
             return (
                 "No links point to this operation - nothing in the schema appears to supply the data it needs",
                 "No links point to these operations - nothing in the schema appears to supply the data they need",
-                "💡 Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file",
+                "Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file",
             )
         return (
             "No links point to this operation",
             "No links point to these operations",
-            "💡 Provide realistic parameter values in your config file so tests can access existing resources",
+            "Provide realistic parameter values in your config file so tests can access existing resources",
         )
     if not stateful_ran:
         cause = "Reachable via links, but stateful testing did not run"
-        return (cause, cause, "💡 Enable the `stateful` phase so declared links can supply real identifiers")
+        return (cause, cause, "Enable the `stateful` phase so declared links can supply real identifiers")
     if label not in exercised:
         return (
             "Reachable via links, but stateful testing never reached it",
             "Reachable via links, but stateful testing never reached them",
-            "💡 Raise `phases.stateful.max-steps` or run longer so stateful testing reaches these operations",
+            "Raise `phases.stateful.max-steps` or run longer so stateful testing reaches these operations",
         )
     cause = "Reached via links, but the linked data was not usable"
     return (
         cause,
         cause,
-        "💡 Check the operations that create this data - their responses do not yield usable identifiers",
+        "Check the operations that create this data - their responses do not yield usable identifiers",
     )
+
+
+@dataclass(slots=True)
+class WarningItem:
+    text: str
+    # Lines shown under the item, e.g. the patterns an operation could not use.
+    details: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class WarningGroup:
+    items: list[WarningItem]
+    heading: str | None = None
+    # `None` when the tips that apply follow a later group.
+    tips: list[str] | None = None
+
+
+@dataclass(slots=True)
+class WarningBlock:
+    title: str
+    count: int
+    entity: str
+    # Completes the sentence that starts with the count, e.g. " returned authentication errors".
+    suffix: str
+    groups: list[WarningGroup]
+
+    @property
+    def summary(self) -> str:
+        plural = "" if self.count == 1 else "s"
+        return f"{self.count} {self.entity}{plural}{self.suffix}"
+
+
+def _items(values: set[str]) -> list[WarningItem]:
+    return [WarningItem(text=value) for value in sorted(values)]
+
+
+def _list_block(title: str, values: set[str], suffix: str, tips: list[str], entity: str = "operation") -> WarningBlock:
+    return WarningBlock(
+        title=title,
+        count=len(values),
+        entity=entity,
+        suffix=suffix,
+        groups=[WarningGroup(items=_items(values), tips=tips)],
+    )
+
+
+def _detailed_block(title: str, warnings: dict[str, set[str]], suffix: str, tip: str) -> WarningBlock:
+    items = [WarningItem(text=label, details=sorted(messages)) for label, messages in sorted(warnings.items())]
+    return WarningBlock(
+        title=title,
+        count=len(warnings),
+        entity="operation",
+        suffix=suffix,
+        groups=[WarningGroup(items=items, tips=[tip])],
+    )
+
+
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}{'' if count == 1 else 's'}"
+
+
+def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
+    missing_auth = ctx.warnings.missing_auth
+    groups = [
+        WarningGroup(
+            heading=f"{status_code} {'Unauthorized' if status_code == 401 else 'Forbidden'} "
+            f"({_plural(len(labels), 'operation')})",
+            items=_items(labels),
+        )
+        for status_code, labels in missing_auth.items()
+    ]
+    groups[-1].tips = [
+        ctx.warnings.auth_flow_suggestion or "Ensure valid authentication credentials are set via --auth or -H"
+    ]
+    return WarningBlock(
+        title="Authentication failed",
+        count=sum(len(labels) for labels in missing_auth.values()),
+        entity="operation",
+        suffix=" returned authentication errors",
+        groups=groups,
+    )
+
+
+def _missing_deserializer_block(ctx: ExecutionContext) -> WarningBlock:
+    warnings = ctx.warnings.missing_deserializer
+    groups = [
+        WarningGroup(
+            heading=f"{media_type} ({_plural(len(operations), 'operation')})",
+            items=_items({f"{label} ({', '.join(sorted(details))})" for label, details in operations.items()}),
+        )
+        for media_type, operations in sorted(warnings.items())
+    ]
+    groups[-1].tips = ["Register a deserializer with @schemathesis.deserializer() to enable validation"]
+    return WarningBlock(
+        title="Schema validation skipped",
+        count=len({label for operations in warnings.values() for label in operations}),
+        entity="operation",
+        suffix=f" cannot validate {_unvalidated_responses(warnings)} due to missing deserializers",
+        groups=groups,
+    )
+
+
+def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
+    """Operations nothing ever served, grouped by what would actually make them reachable."""
+    missing = ctx.warnings.missing_test_data
+    if _status_codes_are_uninformative(ctx):
+        return _list_block(
+            "Missing test data",
+            missing,
+            " never returned data, preventing tests from reaching your API's core logic",
+            ["Supply argument values via a fuzz dictionary so queries can return data"],
+        )
+    linked = ctx.warnings.linked_operations or set()
+    stateful_ran = ctx.phases[PhaseName.STATEFUL_TESTING][0] != Status.SKIP
+    labels_by_advice: dict[tuple[str, str, str], set[str]] = {}
+    for label in missing:
+        advice = _missing_test_data_advice(
+            label,
+            linked=linked,
+            stateful_ran=stateful_ran,
+            exercised=ctx.warnings.stateful_exercised,
+            producers=ctx.warnings.resource_producers or {},
+            parameterless=ctx.warnings.parameterless,
+        )
+        labels_by_advice.setdefault(advice, set()).add(label)
+    if len(labels_by_advice) == 1:
+        (_, _, tip), labels = next(iter(labels_by_advice.items()))
+        groups = [WarningGroup(items=_items(labels), tips=[tip])]
+    else:
+        groups = [
+            # The list that follows says how many there are when there is more than one.
+            WarningGroup(
+                heading=one if len(labels) == 1 else f"{many} ({len(labels)} operations)",
+                items=_items(labels),
+                tips=[tip],
+            )
+            for (one, many, tip), labels in sorted(labels_by_advice.items())
+        ]
+    return WarningBlock(
+        title="Missing test data",
+        count=len(missing),
+        entity="operation",
+        suffix=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
+        groups=groups,
+    )
+
+
+def _low_valid_rate_block(ctx: ExecutionContext) -> WarningBlock:
+    """The share of requests each operation accepted, and what turned the rest away."""
+    reported = ctx.warnings.low_valid_rate_reported
+    unreachable_dominates = False
+    conflicts_dominate = False
+    items = []
+    for label in sorted(reported):
+        for phase, rate in sorted(ctx.warnings.valid_rates.get(label, {}).items()):
+            if rate.accepted and rate.rate < ctx.config.warnings.low_valid_rate.threshold:
+                if rate.unreachable > max(rate.rejected, rate.conflicts):
+                    unreachable_dominates = True
+                    cause = f"{rate.unreachable} not found"
+                elif rate.conflicts > rate.rejected:
+                    conflicts_dominate = True
+                    cause = f"{rate.conflicts} conflicts"
+                else:
+                    cause = f"{rate.rejected} rejected"
+                items.append(
+                    WarningItem(
+                        text=f"{label} ({phase}): {rate.rate:.0%} accepted ({rate.accepted}/{rate.total}, {cause})"
+                    )
+                )
+    if _status_codes_are_uninformative(ctx):
+        tip = "Most requests came back with errors; supply argument values via a fuzz dictionary"
+    elif unreachable_dominates:
+        tip = "Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
+    elif conflicts_dominate:
+        tip = (
+            "Most requests collided with existing resources, often with values repeated across cases; "
+            "a `before_call` hook can give unique fields fresh values"
+        )
+    else:
+        tip = "Most requests were refused on their data; the schema likely omits constraints the API enforces"
+    return WarningBlock(
+        title="Low valid-input rate",
+        count=len(reported),
+        entity="operation",
+        suffix=" accepted few of the requests sent to it, leaving the logic behind them untested",
+        groups=[WarningGroup(items=items, tips=[tip])],
+    )
+
+
+def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
+    """Every warning the run raised, in the order the terminal shows them."""
+    warnings = ctx.warnings
+    blocks = []
+    if warnings.missing_auth:
+        blocks.append(_missing_auth_block(ctx))
+    if warnings.rate_limited:
+        blocks.append(
+            _list_block(
+                "Rate limited",
+                warnings.rate_limited,
+                " mostly returned 429 Too Many Requests, leaving the logic behind them untested",
+                ["Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m"],
+            )
+        )
+    if warnings.base_url_mismatch:
+        blocks.append(
+            _list_block(
+                "Base URL may be missing a path",
+                warnings.base_url_mismatch,
+                " returned only 404 Not Found",
+                [f"The schema declares a base path; try --url {warnings.base_url_suggestion}"],
+            )
+        )
+    if warnings.missing_test_data:
+        blocks.append(_missing_test_data_block(ctx))
+    if warnings.validation_mismatch:
+        blocks.append(
+            _list_block(
+                "Schema validation mismatch",
+                warnings.validation_mismatch,
+                " mostly rejected generated data due to validation errors, "
+                "indicating schema constraints don't match API validation",
+                ["Check your schema constraints - API validation may be stricter than documented"],
+            )
+        )
+    if warnings.missing_deserializer:
+        blocks.append(_missing_deserializer_block(ctx))
+    if warnings.unused_openapi_auth:
+        blocks.append(
+            _list_block(
+                "Unused OpenAPI auth",
+                warnings.unused_openapi_auth,
+                " not defined in the schema",
+                [],
+                entity="configured auth scheme",
+            )
+        )
+    if warnings.dictionary_mismatch:
+        blocks.append(
+            _list_block(
+                "Dictionary mismatch",
+                warnings.dictionary_mismatch,
+                " with entries that mostly fail the bound parameter's schema",
+                ["Fix the entries, or bind the dictionary to a parameter whose schema they match"],
+                entity="dictionary binding",
+            )
+        )
+    if warnings.unmatched_filter:
+        blocks.append(
+            _list_block(
+                "Unmatched filters",
+                warnings.unmatched_filter,
+                " matched no API operations",
+                [UNMATCHED_FILTER_TIP],
+                entity="filter",
+            )
+        )
+    if warnings.method_not_allowed:
+        blocks.append(
+            _list_block(
+                "Method Not Allowed",
+                warnings.method_not_allowed,
+                " consistently returned `405 Method Not Allowed` — skipped from later phases",
+                ["Verify the server actually accepts these methods, or remove them from the schema if unsupported"],
+            )
+        )
+    if warnings.unsupported_regex:
+        blocks.append(
+            _detailed_block(
+                "Unsupported regex patterns",
+                warnings.unsupported_regex,
+                " contain regex patterns Schemathesis cannot use as written",
+                "Supply examples for these operations, or narrow the pattern",
+            )
+        )
+    if warnings.low_valid_rate_reported:
+        blocks.append(_low_valid_rate_block(ctx))
+    if warnings.unresolvable_reference:
+        blocks.append(
+            _detailed_block(
+                "Unresolvable references",
+                warnings.unresolvable_reference,
+                " skipped parts of the schema",
+                "Resolve these references so the skipped parts get tested",
+            )
+        )
+    if warnings.constants_extraction:
+        blocks.append(
+            _list_block(
+                "Constant reuse skipped",
+                warnings.constants_extraction,
+                " could not be scanned for constant reuse",
+                ["Check that each @schemathesis.python.constants source returns your app or modules"],
+                entity="registered source",
+            )
+        )
+    return blocks
 
 
 TRUNCATION_PLACEHOLDER = "[...]"
@@ -1206,293 +1503,27 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             wait_for_schema=self.config.wait_for_schema,
         )
 
-    def _print_warning_header(self, title: str, count: int, entity_name: str, suffix_text: str) -> None:
-        """Print warning block header."""
-        plural = "" if count == 1 else "s"
-        click.echo(_style(f"{title}: {count} {entity_name}{plural}{suffix_text}\n", fg="yellow"))
-
-    def _print_warning_tips(self, tips: list[str]) -> None:
-        """Print warning tips and footer."""
-        click.echo()
-        for tip in tips:
-            click.echo(_style(tip, fg="yellow"))
-        if tips:
-            click.echo()
-
-    def _print_items(self, items: set[str]) -> None:
-        """Print all items."""
-        for item in sorted(items):
-            click.echo(_style(f"  - {item}", fg="yellow"))
-
-    def _display_warning_block(
-        self,
-        title: str,
-        operations: set[str] | dict[int, set[str]],
-        tips: list[str],
-        suffix_text: str = "",
-        entity_name: str = "operation",
-    ) -> None:
-        """Display warnings for operations (simple list or grouped by status code)."""
-        if isinstance(operations, dict):
-            # Status code grouped: dict[int, set[str]]
-            total = sum(len(ops) for ops in operations.values())
-            self._print_warning_header(title, total, entity_name, suffix_text)
-
-            for status_code, ops in operations.items():
-                status_text = "Unauthorized" if status_code == 401 else "Forbidden"
-                count = len(ops)
-                plural = "" if count == 1 else "s"
-                click.echo(_style(f"{status_code} {status_text} ({count} {entity_name}{plural}):", fg="yellow"))
-                self._print_items(ops)
-        else:
-            # Simple set of operations
-            self._print_warning_header(title, len(operations), entity_name, suffix_text)
-            self._print_items(operations)
-
-        self._print_warning_tips(tips)
-
-    def _display_grouped_detail_block(
-        self,
-        title: str,
-        warnings: dict[str, dict[str, set[str]]],
-        entity_name: str,
-        suffix_text: str,
-        tips: list[str],
-    ) -> None:
-        """Display warnings grouped by a shared cause, with per-operation details."""
-        total = len({label for operations in warnings.values() for label in operations})
-        self._print_warning_header(title, total, entity_name, suffix_text)
-
-        for group, operations in sorted(warnings.items()):
-            count = len(operations)
-            plural = "" if count == 1 else "s"
-            click.echo(_style(f"{group} ({count} {entity_name}{plural}):", fg="yellow"))
-            self._print_items({f"{label} ({', '.join(sorted(details))})" for label, details in operations.items()})
-
-        self._print_warning_tips(tips)
-
-    def _display_detailed_warning_block(
-        self,
-        title: str,
-        warnings: dict[str, set[str]],
-        entity_name: str,
-        suffix_text: str,
-        tips: list[str],
-    ) -> None:
-        """Display warnings with detailed messages per entity."""
-        self._print_warning_header(title, len(warnings), entity_name, suffix_text)
-
-        for idx, (entity_label, messages) in enumerate(sorted(warnings.items())):
-            click.echo(_style(f"  - {entity_label}", fg="yellow"))
-            for message in sorted(messages):
-                click.echo(_style(f"    {message}", fg="yellow"))
-
-            # Add spacing between entities (but not after the last one)
-            if idx < len(warnings) - 1:
-                click.echo()
-
-        self._print_warning_tips(tips)
-
-    def _display_missing_test_data_block(self, ctx: ExecutionContext) -> None:
-        """Display operations nothing ever served, grouped by what would actually make them reachable."""
-        if _status_codes_are_uninformative(ctx):
-            self._print_warning_header(
-                "Missing test data",
-                len(ctx.warnings.missing_test_data),
-                "operation",
-                " never returned data, preventing tests from reaching your API's core logic",
-            )
-            self._print_items(ctx.warnings.missing_test_data)
-            self._print_warning_tips(["💡 Supply argument values via a fuzz dictionary so queries can return data"])
-            return
-        linked = ctx.warnings.linked_operations or set()
-        stateful_ran = ctx.phases[PhaseName.STATEFUL_TESTING][0] != Status.SKIP
-        groups: dict[tuple[str, str, str], set[str]] = {}
-        for label in ctx.warnings.missing_test_data:
-            advice = _missing_test_data_advice(
-                label,
-                linked=linked,
-                stateful_ran=stateful_ran,
-                exercised=ctx.warnings.stateful_exercised,
-                producers=ctx.warnings.resource_producers or {},
-                parameterless=ctx.warnings.parameterless,
-            )
-            groups.setdefault(advice, set()).add(label)
-
-        self._print_warning_header(
-            "Missing test data",
-            len(ctx.warnings.missing_test_data),
-            "operation",
-            " repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
-        )
-        if len(groups) == 1:
-            (_, _, tip), labels = next(iter(groups.items()))
-            self._print_items(labels)
-            self._print_warning_tips([tip])
-            return
-        for (one, many, tip), labels in sorted(groups.items()):
-            # The list that follows says how many there are when there is more than one.
-            heading = f"{one}:" if len(labels) == 1 else f"{many} ({len(labels)} operations):"
-            click.echo(_style(heading, fg="yellow"))
-            self._print_items(labels)
-            self._print_warning_tips([tip])
-
-    def _display_low_valid_rate_block(self, ctx: ExecutionContext) -> None:
-        """Report the share of requests each operation accepted, and what turned the rest away."""
-        self._print_warning_header(
-            "Low valid-input rate",
-            len(ctx.warnings.low_valid_rate_reported),
-            "operation",
-            " accepted few of the requests sent to it, leaving the logic behind them untested",
-        )
-        unreachable_dominates = False
-        conflicts_dominate = False
-        for label in sorted(ctx.warnings.low_valid_rate_reported):
-            for phase, rate in sorted(ctx.warnings.valid_rates.get(label, {}).items()):
-                if rate.accepted and rate.rate < ctx.config.warnings.low_valid_rate.threshold:
-                    if rate.unreachable > max(rate.rejected, rate.conflicts):
-                        unreachable_dominates = True
-                        cause = f"{rate.unreachable} not found"
-                    elif rate.conflicts > rate.rejected:
-                        conflicts_dominate = True
-                        cause = f"{rate.conflicts} conflicts"
-                    else:
-                        cause = f"{rate.rejected} rejected"
-                    click.echo(
-                        _style(
-                            f"  - {label} ({phase}): {rate.rate:.0%} accepted ({rate.accepted}/{rate.total}, {cause})",
-                            fg="yellow",
-                        )
-                    )
-        if _status_codes_are_uninformative(ctx):
-            tip = "💡 Most requests came back with errors; supply argument values via a fuzz dictionary"
-        elif unreachable_dominates:
-            tip = "💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
-        elif conflicts_dominate:
-            tip = (
-                "💡 Most requests collided with existing resources, often with values repeated across cases; "
-                "a `before_call` hook can give unique fields fresh values"
-            )
-        else:
-            tip = "💡 Most requests were refused on their data; the schema likely omits constraints the API enforces"
-        self._print_warning_tips([tip])
-
     def display_warnings(self, ctx: ExecutionContext) -> None:
         display_section_name("WARNINGS")
         click.echo()
-        if ctx.warnings.missing_auth:
-            self._display_warning_block(
-                title="Authentication failed",
-                operations=ctx.warnings.missing_auth,
-                suffix_text=" returned authentication errors",
-                tips=[
-                    ctx.warnings.auth_flow_suggestion
-                    or "💡 Ensure valid authentication credentials are set via --auth or -H"
-                ],
-            )
-
-        if ctx.warnings.rate_limited:
-            self._display_warning_block(
-                title="Rate limited",
-                operations=ctx.warnings.rate_limited,
-                suffix_text=" mostly returned 429 Too Many Requests, leaving the logic behind them untested",
-                tips=["💡 Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m"],
-            )
-
-        if ctx.warnings.base_url_mismatch:
-            self._display_warning_block(
-                title="Base URL may be missing a path",
-                operations=ctx.warnings.base_url_mismatch,
-                suffix_text=" returned only 404 Not Found",
-                tips=[f"💡 The schema declares a base path; try --url {ctx.warnings.base_url_suggestion}"],
-            )
-
-        if ctx.warnings.missing_test_data:
-            self._display_missing_test_data_block(ctx)
-
-        if ctx.warnings.validation_mismatch:
-            self._display_warning_block(
-                title="Schema validation mismatch",
-                operations=ctx.warnings.validation_mismatch,
-                suffix_text=" mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation",
-                tips=["💡 Check your schema constraints - API validation may be stricter than documented"],
-            )
-
-        if ctx.warnings.missing_deserializer:
-            self._display_grouped_detail_block(
-                title="Schema validation skipped",
-                warnings=ctx.warnings.missing_deserializer,
-                entity_name="operation",
-                suffix_text=f" cannot validate {_unvalidated_responses(ctx.warnings.missing_deserializer)} due to missing deserializers",
-                tips=["💡 Register a deserializer with @schemathesis.deserializer() to enable validation"],
-            )
-
-        if ctx.warnings.unused_openapi_auth:
-            self._display_warning_block(
-                title="Unused OpenAPI auth",
-                operations=ctx.warnings.unused_openapi_auth,
-                suffix_text=" not defined in the schema",
-                tips=[],
-                entity_name="configured auth scheme",
-            )
-
-        if ctx.warnings.dictionary_mismatch:
-            self._display_warning_block(
-                title="Dictionary mismatch",
-                operations=ctx.warnings.dictionary_mismatch,
-                suffix_text=" with entries that mostly fail the bound parameter's schema",
-                tips=["💡 Fix the entries, or bind the dictionary to a parameter whose schema they match"],
-                entity_name="dictionary binding",
-            )
-
-        if ctx.warnings.unmatched_filter:
-            self._display_warning_block(
-                title="Unmatched filters",
-                operations=ctx.warnings.unmatched_filter,
-                suffix_text=" matched no API operations",
-                tips=[f"💡 {UNMATCHED_FILTER_TIP}"],
-                entity_name="filter",
-            )
-
-        if ctx.warnings.method_not_allowed:
-            self._display_warning_block(
-                title="Method Not Allowed",
-                operations=ctx.warnings.method_not_allowed,
-                suffix_text=" consistently returned `405 Method Not Allowed` — skipped from later phases",
-                tips=[
-                    "💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported"
-                ],
-            )
-
-        if ctx.warnings.unsupported_regex:
-            self._display_detailed_warning_block(
-                title="Unsupported regex patterns",
-                warnings=ctx.warnings.unsupported_regex,
-                entity_name="operation",
-                suffix_text=" contain regex patterns Schemathesis cannot use as written",
-                tips=["💡 Supply examples for these operations, or narrow the pattern"],
-            )
-
-        if ctx.warnings.low_valid_rate_reported:
-            self._display_low_valid_rate_block(ctx)
-
-        if ctx.warnings.unresolvable_reference:
-            self._display_detailed_warning_block(
-                title="Unresolvable references",
-                warnings=ctx.warnings.unresolvable_reference,
-                entity_name="operation",
-                suffix_text=" skipped parts of the schema",
-                tips=["💡 Resolve these references so the skipped parts get tested"],
-            )
-
-        if ctx.warnings.constants_extraction:
-            self._display_warning_block(
-                title="Constant reuse skipped",
-                operations=ctx.warnings.constants_extraction,
-                suffix_text=" could not be scanned for constant reuse",
-                tips=["💡 Check that each @schemathesis.python.constants source returns your app or modules"],
-                entity_name="registered source",
-            )
+        for block in warning_blocks(ctx):
+            click.echo(_style(f"{block.title}: {block.summary}\n", fg="yellow"))
+            for group in block.groups:
+                if group.heading is not None:
+                    click.echo(_style(f"{group.heading}:", fg="yellow"))
+                for index, item in enumerate(group.items):
+                    click.echo(_style(f"  - {item.text}", fg="yellow"))
+                    for detail in item.details:
+                        click.echo(_style(f"    {detail}", fg="yellow"))
+                    # Items with details read as separate paragraphs.
+                    if item.details and index < len(group.items) - 1:
+                        click.echo()
+                if group.tips is not None:
+                    click.echo()
+                    for tip in group.tips:
+                        click.echo(_style(f"💡 {tip}", fg="yellow"))
+                    if group.tips:
+                        click.echo()
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")

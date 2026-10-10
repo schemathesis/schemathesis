@@ -1054,7 +1054,7 @@ def _sign_up_then_log_in(ctx, *, login_media_type="application/json", credential
 
 def test_auth_flow_suggestion_for_form_login(ctx):
     assert auth_flow_suggestion(_sign_up_then_log_in(ctx, login_media_type="application/x-www-form-urlencoded")) == (
-        "💡 POST /auth/register and POST /auth/login look like a sign-up and login flow. "
+        "POST /auth/register and POST /auth/login look like a sign-up and login flow. "
         "Register an account, then add to schemathesis.toml:\n\n"
         "    [auth.dynamic.openapi.bearerAuth]\n"
         '    path = "/auth/login"\n'
