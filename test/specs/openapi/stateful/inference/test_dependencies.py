@@ -9547,3 +9547,45 @@ def test_created_id_links_to_both_item_and_path_named_consumers(ctx):
         "#/paths/~1entity/put": (None, {"id": "$response.body#/"}),
         "#/paths/~1entity~1{id}/delete": ({"path.id": "$response.body#/"}, None),
     }
+
+
+NUMERIC_ID_AND_STRING_UUID = {"id": {"type": "number"}, "uuid": {"type": "string"}, "slug": {"type": "integer"}}
+
+
+@pytest.mark.parametrize(
+    ["parameter", "parameter_schema", "properties", "field"],
+    [
+        ("vehicleId", {"type": "string", "format": "uuid"}, NUMERIC_ID_AND_STRING_UUID, "uuid"),
+        ("vehicleId", {"type": "string"}, NUMERIC_ID_AND_STRING_UUID, "uuid"),
+        ("vehicleId", {"type": "integer"}, NUMERIC_ID_AND_STRING_UUID, "id"),
+        ("vehicleId", {"type": "string"}, {"id": {"type": "number"}, "vin": {"type": "string"}}, "id"),
+        ("vehicleSlug", {"type": "string"}, NUMERIC_ID_AND_STRING_UUID, "slug"),
+        ("vehicleUuid", {"type": "string"}, {"id": {"type": "string"}, "uuid": {"type": "string"}}, "uuid"),
+    ],
+    ids=["uuid-string", "string", "integer", "no-string-identifier", "not-an-identifier", "compatible-match"],
+)
+def test_path_param_binds_to_identifier_field_of_matching_type(ctx, parameter, parameter_schema, properties, field):
+    vehicle = {"type": "object", "properties": properties}
+    paths = {
+        **operation("get", "/vehicles", "200", {"type": "array", "items": vehicle}, operation_id="listVehicles"),
+        **operation(
+            "get",
+            f"/vehicles/{{{parameter}}}/location",
+            "200",
+            {"type": "object", "properties": {"latitude": {"type": "string"}}},
+            [{"name": parameter, "in": "path", "required": True, "schema": parameter_schema}],
+            "getVehicleLocation",
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1vehicles/get",
+            "200",
+            {
+                "operationRef": f"#/paths/~1vehicles~1{{{parameter}}}~1location/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {f"path.{parameter}": f"$response.body#/*/{field}"},
+            },
+        ]
+    ]

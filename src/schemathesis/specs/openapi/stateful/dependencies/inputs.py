@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
-from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
@@ -31,7 +31,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import (
 )
 
 if TYPE_CHECKING:
-    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
     from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
@@ -76,6 +76,7 @@ def extract_inputs(
     for param in operation.iter_parameters():
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
+            parameter_types=_parameter_types(param),
             parameter_location=param.location,
             operation=operation,
             resources=resources,
@@ -122,9 +123,17 @@ def extract_inputs(
         )
 
 
+def _parameter_types(parameter: OpenApiParameter) -> list[str]:
+    try:
+        return get_type(parameter.raw_schema)
+    except InvalidSchema:
+        return []
+
+
 def _resolve_parameter_dependency(
     *,
     parameter_name: str,
+    parameter_types: list[str],
     parameter_location: ParameterLocation,
     operation: APIOperation,
     resources: ResourceMap,
@@ -198,7 +207,9 @@ def _resolve_parameter_dependency(
                 resources[resource_name] = resource
             field = parameter_name
     else:
-        field = _match_field(parameter_name, resource_name, resource.fields)
+        field = _prefer_string_identifier(
+            _match_field(parameter_name, resource_name, resource.fields), resource, parameter_types
+        )
 
     return InputSlot(
         resource=resource,
@@ -615,6 +626,21 @@ def _match_field(parameter_name: str, resource_name: str, fields: list[str]) -> 
         return "id"
     # Without an `id` field, use the parameter name so peer captures reach this slot.
     return parameter_name
+
+
+def _prefer_string_identifier(field: str, resource: ResourceDefinition, parameter_types: list[str]) -> str:
+    # A string parameter carries the resource's string identifier (`uuid`), not a numeric one (`id`).
+    if (
+        parameter_types != ["string"]
+        or naming.normalize_for_matching(field) not in naming.ID_FIELD_NAMES
+        or "string" in resource.types.get(field, {"string"})
+    ):
+        return field
+    for identifier in naming.ID_FIELD_NAMES:
+        for candidate in resource.fields:
+            if naming.normalize_for_matching(candidate) == identifier and "string" in resource.types.get(candidate, ()):
+                return candidate
+    return field
 
 
 def update_input_field_bindings(resource_name: str, operations: OperationMap) -> None:
