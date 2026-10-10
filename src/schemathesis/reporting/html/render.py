@@ -487,6 +487,8 @@ def _operation_cell(row: OperationRow, toggle: str) -> str:
             f'<a class="row-warn" href="#{_warning_id(first)}" aria-label="Warning: {esc(titles)}">'
             f"{esc(first.title)}{more}</a>"
         )
+    if row.known_failures:
+        warned += f'<a class="row-known" href="#note-baseline">{plural(row.known_failures, "known failure")}</a>'
     return (
         f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span>'
         f"{warned}</span></td>"

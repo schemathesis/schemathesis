@@ -117,6 +117,8 @@ class OperationRow:
     errors: list[ErrorEntry] = field(default_factory=list)
     # Warnings that name this operation.
     warnings: list[WarningBlock] = field(default_factory=list)
+    # Failures the baseline suppressed.
+    known_failures: int = 0
 
     @property
     def method(self) -> str:
