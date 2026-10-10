@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -13,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import requests
+import trustme
 import uvicorn
 from werkzeug.serving import make_server
 
@@ -143,6 +145,15 @@ def run_flask_app(app: Flask, port: int | None = None, timeout: float = 5.0, wai
     return server.server_port
 
 
+def run_https_flask_app(app: Flask) -> int:
+    """Start `app` over HTTPS with a certificate from an untrusted CA, so only unverified clients get through."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    trustme.CA().issue_cert("127.0.0.1").configure_cert(context)
+    server = make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server.server_port
+
+
 def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
     """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
     port = run_flask_app(app, wait=wait)
@@ -170,6 +181,7 @@ def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wa
 @dataclass(frozen=True)
 class AppRunner:
     run_flask_app: Callable[..., int]
+    run_https_flask_app: Callable[[Flask], int]
     run_asgi_app: Callable[..., int]
     unused_port: Callable[[], int]
     openapi_url: Callable[..., str]
@@ -179,6 +191,7 @@ class AppRunner:
 def app_runner():
     return AppRunner(
         run_flask_app=run_flask_app,
+        run_https_flask_app=run_https_flask_app,
         run_asgi_app=run_asgi_app,
         unused_port=unused_port,
         openapi_url=openapi_url,

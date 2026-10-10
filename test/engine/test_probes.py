@@ -1,3 +1,4 @@
+import _thread
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -176,7 +177,13 @@ def test_detect_unsafe_path_decoder_success(engine_ctx, null_byte_strict_url):
     assert path_result.outcome == probes.ProbeOutcome.SUCCESS
 
 
-def test_ctrl_c(ctx, cli, mocker, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    mocker.patch("schemathesis.engine.run.probes.send", side_effect=KeyboardInterrupt)
-    assert cli.run(api.schema_url) == snapshot_cli
+# Ctrl-C lands while a probe waits for the base URL to respond.
+def test_ctrl_c(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/")
+    def root():
+        _thread.interrupt_main()
+        return ""
+
+    assert cli.run_openapi_app(app) == snapshot_cli

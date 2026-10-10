@@ -1,6 +1,7 @@
 import copy
 import json
 import re
+import time
 from unittest.mock import ANY
 
 import flask
@@ -738,52 +739,54 @@ def test_operation_survives_deepcopy_as_the_same_object(ctx):
     assert copy.deepcopy(operation) is operation  # noqa: TID251
 
 
-def _assert_override(spy, arg, original, overridden):
-    # Then it should override generated value
-    # And keep other values of the same kind intact
-    for key, value in {**original, **overridden}.items():
-        kwargs = spy.call_args[1]
-        assert kwargs[arg][key] == value
-        assert all(key not in kwargs for key in overridden)
+@pytest.fixture
+def echo_app(ctx):
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/users")
+    def users():
+        time.sleep(float(flask.request.args.get("delay", 0)))
+        return flask.jsonify(
+            {"headers": dict(flask.request.headers), "cookies": flask.request.cookies, "query": flask.request.args}
+        )
+
+    return app
 
 
 @pytest.mark.parametrize("arg", ["headers", "cookies"])
-def test_call_overrides(mocker, arg, openapi_30):
-    spy = mocker.patch("requests.Session.request", side_effect=ValueError)
+def test_call_overrides(app_runner, echo_app, arg):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
     original = {"A": "X", "B": "X"}
-    case = openapi_30["/users"]["GET"].Case(headers=original, cookies=original, query=original)
-    # When user passes header / cookie / query explicitly
-    overridden = {"B": "Y"}
-    try:
-        case.call(**{arg: overridden}, base_url="http://127.0.0.1")
-    except ValueError:
-        pass
-    _assert_override(spy, arg, original, overridden)
+    case = schema["/users"]["GET"].Case(headers=original, cookies=original, query=original)
+    received = case.call(**{arg: {"B": "Y"}}).json()[arg]
+    assert {key: received[key] for key in original} == {"A": "X", "B": "Y"}
 
 
 @pytest.mark.parametrize("with_config", [True, False])
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"verify": False},
-        {"cert": "abc"},
-        {"timeout": 42},
-    ],
-)
-def test_call_transport_overrides(mocker, with_config, kwargs, openapi_30):
-    spy = mocker.patch("requests.Session.request", side_effect=ValueError)
+def test_call_verify_override(app_runner, echo_app, with_config):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
     if with_config:
-        # Config should be overridden anyway
-        openapi_30.config.tls_verify = "/tmp"
+        schema.config.tls_verify = "/tmp"
+    assert schema["/users"]["GET"].Case().call(verify=False).verify is False
+
+
+# The client certificate is loaded before connecting, so no server is needed.
+@pytest.mark.parametrize("with_config", [True, False])
+def test_call_cert_override(openapi_30, with_config):
+    if with_config:
         openapi_30.config.request_cert = "/tmp"
-        openapi_30.config.request_timeout = 0.5
     case = openapi_30["/users"]["GET"].Case()
-    try:
-        case.call(**kwargs, base_url="http://127.0.0.1")
-    except ValueError:
-        pass
-    for key, value in kwargs.items():
-        assert spy.call_args[1][key] == value
+    with pytest.raises(OSError, match="invalid path: abc"):
+        case.call(cert="abc", base_url="https://127.0.0.1:1")
+
+
+@pytest.mark.parametrize("with_config", [True, False])
+def test_call_timeout_override(app_runner, echo_app, with_config):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
+    if with_config:
+        schema.config.request_timeout = 0.05
+    case = schema["/users"]["GET"].Case(query={"delay": "0.2"})
+    assert case.call(timeout=42).status_code == 200
 
 
 def test_merge_at():
@@ -792,20 +795,13 @@ def test_merge_at():
     assert data == {"params": {"A": 1, "B": 2}}
 
 
-@pytest.mark.parametrize(("call_arg", "client_arg"), [("headers", "headers"), ("params", "query_string")])
-def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
-    spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
+@pytest.mark.parametrize(("call_arg", "received_as"), [("headers", "headers"), ("params", "query")])
+def test_call_overrides_wsgi(echo_app, call_arg, received_as):
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", echo_app)
     original = {"A": "X", "B": "X"}
-    openapi_30.app = 42
-    case = openapi_30["/users"]["GET"].Case(headers=original, query=original)
-    # NOTE: Werkzeug does not accept cookies, so no override
-    # When user passes header / query explicitly
-    overridden = {"B": "Y"}
-    try:
-        case.call(**{call_arg: overridden}, base_url="http://127.0.0.1", app=42)
-    except ValueError:
-        pass
-    _assert_override(spy, client_arg, original, overridden)
+    case = schema["/users"]["GET"].Case(headers=original, query=original)
+    received = case.call(**{call_arg: {"B": "Y"}}).json()[received_as]
+    assert {key: received[key] for key in original} == {"A": "X", "B": "Y"}
 
 
 @pytest.mark.parametrize(

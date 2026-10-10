@@ -190,13 +190,16 @@ def test_proxy_error(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_keyboard_interrupt(ctx, cli, mocker, snapshot_cli):
-    def mocked(*args, **kwargs):
-        raise KeyboardInterrupt
-
+def test_keyboard_interrupt(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud_with_success()
-    mocker.patch("schemathesis.Case.call", wraps=mocked)
-    assert cli.run(api.schema_url, "--phases=stateful") == snapshot_cli
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    raise KeyboardInterrupt
+"""
+    )
+    assert cli.run(api.schema_url, "--phases=stateful", hooks=module) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

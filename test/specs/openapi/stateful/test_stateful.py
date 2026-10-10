@@ -14,6 +14,7 @@ import schemathesis
 from schemathesis.config import OperationConfig
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
@@ -506,22 +507,16 @@ def test_state_machine_is_public_api_state_machine(ctx):
     assert issubclass(schema.as_state_machine(), schemathesis.stateful.APIStateMachine)
 
 
-def test_passing_transport_kwargs(ctx, mocker):
+# The server ignores the token, so the auth check re-sends requests without it and must keep the other options.
+def test_passing_transport_kwargs(ctx):
     api = ctx.openapi.apps.users_crud()
-    schema = schemathesis.openapi.from_dict(api.spec)
+    raw_schema = deepclone(api.spec)
+    raw_schema["components"]["securitySchemes"] = {"token": {"type": "apiKey", "in": "query", "name": "token"}}
+    raw_schema["security"] = [{"token": []}]
+    schema = schemathesis.openapi.from_dict(raw_schema)
     schema.config.update(base_url=api.base_url)
+    kwargs = {"params": {"token": "valid", "trace": "1"}}
 
-    mocker.patch(
-        "schemathesis.specs.openapi.checks.get_security_parameters",
-        return_value=[{"name": "token", "required": True, "in": "query"}],
-    )
-    mocked = mocker.patch("schemathesis.specs.openapi.checks._contains_auth")
-
-    # Not `Authorization`: credentials in a header the schema does not declare skip the auth check entirely
-    headers = {"X-Token": "SECRET!", "Content-Type": "application/json"}
-    kwargs = {"verify": False, "headers": headers}
-
-    # State machine should properly pass transport kwargs to `validate_response`
     class APIWorkflow(schema.as_state_machine()):
         def before_call(self, case) -> None:
             case.body = {"first_name": "foo", "last_name": "bar"}
@@ -535,7 +530,7 @@ def test_passing_transport_kwargs(ctx, mocker):
     except FailureGroup:
         pass
 
-    assert mocked.call_args.args[0]._transport_kwargs == kwargs
+    assert [request.query for request in api.requests if "token" not in request.query] == [{"trace": "1"}]
 
 
 @pytest.mark.parametrize(

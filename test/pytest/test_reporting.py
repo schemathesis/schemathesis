@@ -146,12 +146,13 @@ def test_vcr_report_no_interactions_when_call_raises(testdir, ctx):
 schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(vcr_path=r"{cassette_path}")
 
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    raise ConnectionError("simulated network failure")
+
 @schema.parametrize()
 @settings(max_examples=1)
-def test_api(case, monkeypatch):
-    def fail(*args, **kwargs):
-        raise ConnectionError("simulated network failure")
-    monkeypatch.setattr("schemathesis.generation.case.Case.call", fail)
+def test_api(case):
     case.call()
 """,
     )
