@@ -31,7 +31,7 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_report
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.engine import Status
-from schemathesis.generation import derive_operation_seed, overrides
+from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
@@ -49,6 +49,7 @@ from schemathesis.generation.hypothesis.reporting import (
 from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest import _subtests
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
+from schemathesis.pytest._strategy_kwargs import strategy_kwargs_from_config
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.reporting import PytestReportOutcome
@@ -182,22 +183,7 @@ class SchemathesisCase(PyCollector):
             if self.is_invalid_test:
                 funcobj = self.test_function
             else:
-                as_strategy_kwargs = {}
-
-                auth = self.schema.config.auth_for(operation=operation)
-                if auth is not None:
-                    from requests.auth import _basic_auth_str
-
-                    as_strategy_kwargs["headers"] = {"Authorization": _basic_auth_str(*auth)}
-                headers = self.schema.config.headers_for(operation=operation)
-                if headers:
-                    as_strategy_kwargs["headers"] = headers
-
-                override = overrides.for_operation(operation=operation, config=self.schema.config)
-                if override is not None:
-                    for location, entry in override.items():
-                        if entry:
-                            as_strategy_kwargs[location.container_name] = entry
+                as_strategy_kwargs = strategy_kwargs_from_config(self.schema.config, operation)
                 modes = []
                 phases = self.schema.config.phases_for(operation=operation)
                 if phases.examples.enabled:

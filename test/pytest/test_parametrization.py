@@ -1002,3 +1002,47 @@ def test_seed_reproduces_per_operation_inputs(ctx, testdir, is_lazy):
     first = _queries_per_path(testdir, api, is_lazy=is_lazy)
     assert first == _queries_per_path(testdir, api, is_lazy=is_lazy)
     assert first.keys() == {"/api/twin_a", "/api/twin_b"}
+
+
+@pytest.mark.parametrize("is_lazy", [False, True], ids=["parametrize", "from_fixture"])
+def test_operation_headers_with_header_parameter_override(ctx, testdir, is_lazy):
+    api = ctx.openapi.apps.header_constraint_bug()
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[parameters]
+X-Token = "ABCDEFGH"
+
+[[operations]]
+include-name = "GET /api/header_constraint_bug"
+headers = { X-Custom = "value" }
+""",
+    )
+    load = f"schemathesis.openapi.from_url('{api.schema_url}')"
+    if is_lazy:
+        setup = f"""
+@pytest.fixture
+def api_schema():
+    return {load}
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+"""
+    else:
+        setup = f"schema = {load}"
+    testdir.make_test(
+        f"""
+{setup}
+
+@schema.parametrize()
+@settings(max_examples=5, phases=[Phase.generate])
+def test_(case):
+    case.call()
+"""
+    )
+    seen = len(api.requests)
+    testdir.runpytest().assert_outcomes(passed=1)
+    assert {
+        (request.headers.get("X-Token"), request.headers.get("X-Custom"))
+        for request in api.requests[seen:]
+        if request.path.startswith("/api/")
+    } == {("ABCDEFGH", "value")}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
+from functools import partial
 from inspect import signature
 from typing import TYPE_CHECKING, Any
 from unittest import SkipTest
@@ -14,7 +15,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import FailureGroup, as_reported_failure
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.generation import derive_operation_seed, overrides
+from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
@@ -29,6 +30,7 @@ from schemathesis.generation.hypothesis.given import (
     validate_given_args,
 )
 from schemathesis.pytest._keys import track_schema
+from schemathesis.pytest._strategy_kwargs import strategy_kwargs_from_config
 from schemathesis.pytest._subtests import make_subtests
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
@@ -247,32 +249,12 @@ class LazySchema:
                 node_id = request.node._nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
 
-                def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
-                    as_strategy_kwargs: dict[str, Any] = {}
-
-                    auth = schema.config.auth_for(operation=_operation)
-                    if auth is not None:
-                        from requests.auth import _basic_auth_str
-
-                        as_strategy_kwargs["headers"] = {"Authorization": _basic_auth_str(*auth)}
-
-                    headers = schema.config.headers_for(operation=_operation)
-                    if headers:
-                        as_strategy_kwargs["headers"] = headers
-
-                    override = overrides.for_operation(config=schema.config, operation=_operation)
-                    for location, entry in override.items():
-                        if entry:
-                            as_strategy_kwargs[location.container_name] = entry
-
-                    return as_strategy_kwargs
-
                 tests = list(
                     get_all_tests(
                         schema=schema,
                         test_func=test_func,
                         settings=settings,
-                        as_strategy_kwargs=as_strategy_kwargs,
+                        as_strategy_kwargs=partial(strategy_kwargs_from_config, schema.config),
                         given_kwargs=given_kwargs,
                         seed=schema.config.seed,
                     )
