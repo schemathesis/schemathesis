@@ -12,7 +12,7 @@ from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, Generat
 from schemathesis.openapi.checks import ObjectLevelAuthorizationViolation
 from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.checks import object_level_authorization
-from schemathesis.specs.openapi.object_authorization import is_equivalent, listing_case
+from schemathesis.specs.openapi.object_authorization import is_equivalent, listing_case, listings, path_resource
 from test.utils import check_context
 
 ORDER_SCHEMA = {
@@ -340,3 +340,36 @@ def test_nested_collection_without_the_parent_value_is_not_listed(ctx):
     )
     case = schema["/orders/{order_id}"]["GET"].Case(path_parameters={"order_id": 1})
     assert listing_case(case, schema["/users/{user}/orders"]["GET"]) is None
+
+
+def test_dependency_candidates_skip_unrelated_slots_and_operations(ctx):
+    parameter = {"in": "path", "required": True, "schema": {"type": "integer"}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/parents/{parent_id}/orders/{order_id}/{opaque}": {
+                "get": {
+                    "parameters": [
+                        {**parameter, "name": "parent_id"},
+                        {**parameter, "name": "order_id"},
+                        {**parameter, "name": "opaque"},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/orders": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "array", "items": ORDER_SCHEMA}}},
+                        }
+                    }
+                }
+            },
+        }
+    )
+    case = schema["/parents/{parent_id}/orders/{order_id}/{opaque}"]["GET"].Case(
+        path_parameters={"parent_id": 1, "order_id": 2, "opaque": 3}
+    )
+    assert (path_resource(case, "order_id"), path_resource(case, "opaque")) == ("Order", "opaque")
+    assert [listing.operation.label for listing in listings(case)] == ["GET /orders"]
