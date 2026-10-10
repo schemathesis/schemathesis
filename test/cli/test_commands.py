@@ -442,6 +442,8 @@ def test_openapi_auth_skips_malformed_security_requirements(cli, ctx):
     )
 
     assert result.exit_code == ExitCode.OK, result.stdout
+    # The coverage phase also sends one request without credentials.
+    assert {request.headers.get("X-Api-Key") for request in api.requests} == {None, "secret"}
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -2213,7 +2215,7 @@ def test_no_color(ctx, monkeypatch, cli, kind):
         args += ("--no-color",)
     result = cli.run_and_assert(*args, color=True)
 
-    assert "36m" not in result.stdout
+    assert "\x1b[" not in result.stdout
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="ANSI colors are not properly supported in Windows tests")
@@ -2566,7 +2568,9 @@ def test_wait_for_schema_503_exhausted(cli, app_runner, snapshot_cli):
 
 def test_rate_limit(ctx, cli):
     api = ctx.openapi.apps.success()
+    start = time.perf_counter()
     assert cli.run(api.schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
+    assert time.perf_counter() - start >= len(api.requests) - 1
 
 
 def test_invalid_tls_verify(ctx, cli, snapshot_cli):

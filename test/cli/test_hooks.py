@@ -25,11 +25,12 @@ def test_before_call_no_kwargs_unpacking(ctx, cli):
         """
 @schemathesis.hook
 def before_call(context, case, kwargs):
-    kwargs["allow_redirects"] = False
+    kwargs["auth"] = ("hook", "called")
         """
     )
     result = cli.main("run", api.schema_url, hooks=module)
     assert result.exit_code == ExitCode.OK, result.stdout
+    assert {request.headers.get("Authorization") for request in api.requests} == {"Basic aG9vazpjYWxsZWQ="}
 
 
 @pytest.mark.parametrize("phase", ["fuzzing", "stateful"])

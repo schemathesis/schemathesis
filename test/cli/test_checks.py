@@ -41,7 +41,7 @@ def test_negative_data_rejection(ctx, cli):
             }
         }
     )
-    cli.run_and_assert(
+    result = cli.run_and_assert(
         str(schema_path),
         f"--url={api.base_url}/api",
         "--checks",
@@ -51,6 +51,7 @@ def test_negative_data_rejection(ctx, cli):
         "--max-examples=5",
         exit_code=ExitCode.TESTS_FAILED,
     )
+    assert "- API accepted schema-violating request\n" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -1871,6 +1872,12 @@ def test_positive_data_acceptance_no_additional_properties_hint_for_nul(
 
 
 def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runner):
+    example = {
+        "request": {
+            "payment": {"SupplierAccount": "5411707635"},
+            "audit": {"requestedSystem": "a22c6ad7"},
+        }
+    }
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/payments": {
@@ -1883,16 +1890,7 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runn
                                 "schema": {"$ref": "#/components/schemas/PaymentsRequest"},
                                 # OAS3 Examples Object should be a dict, but some schemas use a list here.
                                 # Each element is an OAS3-style Example Object with a "value" key.
-                                "examples": [
-                                    {
-                                        "value": {
-                                            "request": {
-                                                "payment": {"SupplierAccount": "5411707635"},
-                                                "audit": {"requestedSystem": "a22c6ad7"},
-                                            }
-                                        }
-                                    }
-                                ],
+                                "examples": [{"value": example}],
                             }
                         },
                     },
@@ -1924,9 +1922,12 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runn
         },
     )
 
+    bodies = []
+
     @app.route("/api/payments", methods=["POST"])
     def payments_list_examples():
         body = request.get_json(silent=True)
+        bodies.append(body)
         if not isinstance(body, dict) or "request" not in body:
             return (
                 jsonify(
@@ -1947,6 +1948,7 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runn
         "--phases=examples",
         exit_code=ExitCode.OK,
     )
+    assert bodies == [example]
     cli.run_and_assert(
         schema_url,
         "--checks=positive_data_acceptance",

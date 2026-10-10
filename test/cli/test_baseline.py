@@ -167,6 +167,7 @@ def test_known_failure_does_not_fail_a_flaky_stateful_suite(ctx, cli, tmp_path):
     )
 
     assert result.exit_code == ExitCode.OK, result.stdout
+    assert "Known failures: 1\n" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

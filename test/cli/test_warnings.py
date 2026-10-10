@@ -212,8 +212,7 @@ def test_warnings_multiple_types_via_cli(ctx, cli):
     result = cli.run(api.schema_url, "--warnings=missing_auth,missing_test_data", "--max-examples=1")
 
     # Then warnings can still be triggered for specified types
-    # (This just validates the flag is parsed correctly - actual warnings depend on test conditions)
-    assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED)
+    assert "Missing authentication: 1 operation returned only 401/403 responses" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
