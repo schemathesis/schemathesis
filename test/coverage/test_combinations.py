@@ -1351,7 +1351,7 @@ def test_positive_pattern_with_wildcard_prefix_and_digit_limit(pctx):
     # causing the hook to see a schema-conformant value while the URL carried an
     # invalid one.
     schema = {"type": "string", "pattern": r"^.*Id,([0-9]{1,10})$"}
-    assert_conform(cover_schema(pctx, schema), schema)
+    assert cover_schema(pctx, schema) == ["Id,0"]
 
 
 def test_positive_pattern_with_char_class_and_min_length(pctx):
@@ -2479,8 +2479,7 @@ def test_positive_string_skips_infeasible_boundary_lengths(pctx):
         "maxLength": 1024,
     }
     covered = list(_positive_string(pctx, schema))
-    for value in covered:
-        assert isinstance(value.value, str)
+    assert [len(value.value) for value in covered] == [30, 1024, 1023]
     assert_conform(covered, schema)
 
 
@@ -2578,6 +2577,7 @@ def test_anyof_oneof_with_items_as_list(nctx, keyword):
         },
     }
     covered = cover_schema(nctx, schema)
+    assert covered
     assert_unique(covered)
     assert_not_conform(covered, schema)
 
@@ -2615,7 +2615,9 @@ def test_negative_oneof_with_binary_format_items(ctx_factory):
             {"type": "string"},
         ]
     }
-    assert_unique(cover_schema(ctx, schema))
+    covered = cover_schema(ctx, schema)
+    assert covered
+    assert_unique(covered)
 
 
 def test_anyof_with_required_constraints(pctx):
@@ -3068,7 +3070,9 @@ def test_positive_number_boundary_respects_sibling_not(pctx):
     ids=["number", "boolean", "multi-type", "array", "object-required", "object-min-properties"],
 )
 def test_positive_values_respect_sibling_not(pctx, schema):
-    assert_conform(cover_schema(pctx, schema), schema)
+    values = cover_schema(pctx, schema)
+    assert values
+    assert_conform(values, schema)
 
 
 @pytest.mark.parametrize(
@@ -3084,12 +3088,16 @@ def test_positive_values_respect_sibling_not(pctx, schema):
     ids=["string", "number", "array", "boolean", "one-of-string", "one-of-array"],
 )
 def test_positive_values_respect_sibling_combinators(pctx, schema):
-    assert_conform(cover_schema(pctx, schema), schema)
+    values = cover_schema(pctx, schema)
+    assert values
+    assert_conform(values, schema)
 
 
 def test_negative_pattern_with_min_length_above_max_length_skips_pattern_violation(nctx):
     schema = {"type": "string", "minLength": 1, "maxLength": 0, "pattern": "^[a-z]+$"}
-    assert_not_conform(cover_schema(nctx, schema), schema)
+    values = cover_schema(nctx, schema)
+    assert values
+    assert_not_conform(values, schema)
 
 
 # Past 2**53 a unit step vanishes in float arithmetic, leaving the "violating" value equal to the bound.
@@ -3103,13 +3111,15 @@ def test_negative_pattern_with_min_length_above_max_length_skips_pattern_violati
     ids=["untyped-minimum", "number-maximum", "integer-float-spelled-maximum"],
 )
 def test_negative_numeric_boundary_steps_past_large_float_bounds(nctx, schema):
-    assert_not_conform(cover_schema(nctx, schema), schema)
+    values = cover_schema(nctx, schema)
+    assert values
+    assert_not_conform(values, schema)
 
 
 def test_positive_integer_past_exclusive_float_bound_steps_in_integer_arithmetic(ctx_factory):
     schema = {"type": "integer", "exclusiveMinimum": 9996036847180748.0}
     ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
-    assert_conform(cover_schema(ctx, schema), schema)
+    assert cover_schema(ctx, schema) == [9996036847180749, 9996036847180750]
 
 
 # Bundled names restart per operation, so the same `$ref` names different targets in different operations.
@@ -3123,7 +3133,9 @@ def test_positive_values_follow_each_schema_own_reference_target(ctx_factory):
         ctx = ctx_factory(
             root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE]
         )
-        assert_conform(cover_schema(ctx, schema), schema)
+        values = cover_schema(ctx, schema)
+        assert values
+        assert_conform(values, schema)
 
 
 # Integer multiples of `p/q` are exactly the multiples of `p`; a float step must not leak into the values.
@@ -3477,13 +3489,15 @@ def test_negative_type_for_number_and_integer_union_emits_no_number(nctx):
 
 def test_negative_pattern_with_min_length_past_the_buffer_is_skipped(nctx):
     schema = {"type": "string", "minLength": 57341, "pattern": "^a"}
-    assert_not_conform(cover_schema(nctx, schema), schema)
+    values = cover_schema(nctx, schema)
+    assert values
+    assert_not_conform(values, schema)
 
 
 # Past 2**53 the next multiple may have no float spelling; as an integer it is exact.
 def test_positive_number_multiples_past_float_precision_are_exact(pctx):
     schema = {"type": "number", "multipleOf": 3, "minimum": 9996036847180748.0}
-    assert_conform(cover_schema(pctx, schema), schema)
+    assert cover_schema(pctx, schema) == [9996036847180749, 9996036847180752]
 
 
 def test_negative_boundary_past_the_largest_float_is_skipped(nctx):
@@ -3669,9 +3683,7 @@ def test_float_format_boundary_strictly_satisfies_bound(pctx, keyword, bound):
 @pytest.mark.parametrize("bound", [1e39, 10**1000], ids=["float", "integer"])
 def test_float_format_bound_outside_single_precision_range_does_not_crash(pctx, bound):
     schema = {"type": "number", "format": "float", "exclusiveMaximum": bound}
-    values = cover_schema(pctx, schema)
-    for value in values:
-        assert to_float32(float(value)) < 1e39, value
+    assert cover_schema(pctx, schema) == [3.4028234663852886e38]
 
 
 def test_float_format_unsatisfiable_bound_emits_nothing(pctx):
@@ -3744,9 +3756,10 @@ def test_property_hint_pinned_under_draft4(ctx_factory, hint):
     }
     ctx = ctx_factory(location=ParameterLocation.BODY, validator_cls=jsonschema_rs.Draft4Validator)
     validator = jsonschema_rs.Draft4Validator(schema)
-    for value in cover_schema_iter(ctx, schema):
-        if value.generation_mode == GenerationMode.POSITIVE:
-            assert validator.is_valid(value.value), value.value
+    values = [
+        value.value for value in cover_schema_iter(ctx, schema) if value.generation_mode == GenerationMode.POSITIVE
+    ]
+    assert values and all(validator.is_valid(value) for value in values), values
 
 
 def test_all_of_keeps_the_tightest_upper_bound(pctx):
@@ -3926,8 +3939,10 @@ def test_maximum_items_array_of_costly_elements_stays_valid(pctx):
     size = MAX_DRAWN_ARRAY_ITEMS * 4
     schema = {"type": "array", "items": {"type": "string", "pattern": UUID_PATTERN}, "maxItems": size}
     validator = make_validator_for(schema)
+    values = list(cover_schema_iter(pctx, schema))
 
-    for value in cover_schema_iter(pctx, schema):
+    assert values
+    for value in values:
         assert validator.is_valid(value.value), value.value[:3]
 
 
@@ -3947,11 +3962,12 @@ def test_repeated_object_elements_are_independent(pctx):
         "maxItems": size,
     }
 
-    for value in cover_schema_iter(pctx, schema):
-        if len(value.value) < 2:
-            continue
-        value.value[0]["name"] = "edited"
-        assert value.value[1]["name"] != "edited", value.value[:2]
+    arrays = [value.value for value in cover_schema_iter(pctx, schema) if len(value.value) >= 2]
+
+    assert arrays
+    for array in arrays:
+        array[0]["name"] = "edited"
+        assert array[1]["name"] != "edited", array[:2]
 
 
 def test_unique_items_array_is_not_filled_by_repetition(pctx):
@@ -3959,8 +3975,11 @@ def test_unique_items_array_is_not_filled_by_repetition(pctx):
     size = MAX_DRAWN_ARRAY_ITEMS * 4
     schema = {"type": "array", "items": {"type": "integer"}, "maxItems": size, "uniqueItems": True}
 
-    for value in cover_schema_iter(pctx, schema):
-        assert len(set(value.value)) == len(value.value), value.value[:3]
+    values = [value.value for value in cover_schema_iter(pctx, schema)]
+
+    assert size in {len(value) for value in values}
+    for value in values:
+        assert len(set(value)) == len(value), value[:3]
 
 
 # Draft 4 reads `1.0` as a number; a spec-provided value still answers to the operation's draft.
@@ -4089,23 +4108,21 @@ def test_negative_multiple_of_stays_numeric_beside_pattern(ctx_factory):
 
 # Under Draft 2020-12 the first positions belong to `prefixItems`; `items` values must not land there.
 @pytest.mark.parametrize(
-    "schema",
+    ("schema", "expected"),
     [
-        {"items": {}, "prefixItems": [False]},
-        {"type": "array", "items": {"type": "integer"}, "prefixItems": [{"type": "string"}]},
+        ({"items": {}, "prefixItems": [False]}, [[]]),
+        ({"type": "array", "items": {"type": "integer"}, "prefixItems": [{"type": "string"}]}, [["", 0], []]),
     ],
     ids=["forbidden-first", "typed-first"],
 )
-def test_positive_array_items_covering_respects_prefix_items(ctx_factory, schema):
+def test_positive_array_items_covering_respects_prefix_items(ctx_factory, schema, expected):
     ctx = ctx_factory(
         root_schema=schema,
         location=ParameterLocation.BODY,
         generation_modes=[GenerationMode.POSITIVE],
         validator_cls=jsonschema_rs.Draft202012Validator,
     )
-    validator = jsonschema_rs.Draft202012Validator(schema)
-    for value in cover_schema(ctx, schema):
-        assert validator.is_valid(value), value
+    assert cover_schema(ctx, schema) == expected
 
 
 def test_negative_prefix_items_covered_for_raw_keyword(ctx_factory):
@@ -4135,9 +4152,7 @@ def test_positive_all_of_merged_property_keeps_nested_required(ctx_factory):
         ]
     }
     ctx = ctx_factory(root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
-    validator = jsonschema_rs.Draft4Validator(schema)
-    for value in cover_schema(ctx, schema):
-        assert validator.is_valid(value), value
+    assert cover_schema(ctx, schema) == [{}]
 
 
 # Registry churn past the pin bound frees old ids; values keyed with their tokens must not survive.
@@ -4160,9 +4175,7 @@ def test_positive_array_items_covering_keeps_item_required(ctx_factory):
         "minItems": 1,
     }
     ctx = ctx_factory(root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
-    validator = jsonschema_rs.Draft4Validator(schema)
-    for value in cover_schema(ctx, schema):
-        assert validator.is_valid(value), value
+    assert cover_schema(ctx, schema) == [[{"b": None}], [{"b": None}, {"b": None}], [{"a": None, "b": None}]]
 
 
 def test_positive_one_of_branch_fully_subsumed_by_sibling_covers_its_property_as_negative(ctx_factory):
