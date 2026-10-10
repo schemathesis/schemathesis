@@ -1,124 +1,85 @@
 # Contributing to Schemathesis
 
-Welcome! Thank you for considering contributing to Schemathesis. Your feedback and contributions are invaluable to us!
-
-## Prerequisites for Code Contributions
-
-**For code contributions**: Make sure you have the following installed:
-
-- Python 3.10 or higher
-- `prek`
-- `tox`
-- `curl` (required by some integration tests; install via your OS package manager, e.g., `apt install curl` or `brew install curl`)
-
-```bash
-uv pip install prek tox
-```
-
-**Optional but recommended**: Install [`just`](https://github.com/casey/just) for convenient development commands:
-
-```bash
-# macOS
-brew install just
-
-# Linux
-cargo install just
-# or use your package manager
-```
-
-See `just --list` for all available commands like `just test`, `just check`, `just docs`, etc.
-
-**For documentation contributions**: No specific prerequisites are required.
-
-## Feature Requests and Feedback
-
-If you'd like to suggest a feature or provide feedback, feel free to [submit an issue](https://github.com/schemathesis/schemathesis/issues). When submitting your issue, it helps to provide:
-
-- **Title**: Write a simple and descriptive title to identify your suggestion.
-- **Details**: Provide as many details as possible. Explain your context and how you envision the feature working.
-- **Usefulness**: Explain why this feature or improvement would be beneficial.
-- **Scope**: Keep the scope of the feature narrow to make it easier to implement. For example, focus on a specific use-case rather than a broad feature set.
+Thanks for helping out! This page covers issues, pull requests and docs changes.
 
 ## Reporting Bugs
 
-If you encounter a bug, please report it in the [issue tracker](https://github.com/schemathesis/schemathesis/issues). When filing a bug report, please include:
+Open an issue in the [issue tracker](https://github.com/schemathesis/schemathesis/issues) with:
 
-- **Title**: Write a simple and descriptive title to identify the problem.
-- **Reproduction Steps**: Describe the exact steps to reproduce the problem in as much detail as possible.
-- **Observed Behavior**: Describe the behavior you observed and what makes it a problem.
-- **Expected Behavior**: Explain which behavior you expected to see instead and why.
-- **Versions**: Include Python and Schemathesis versions. Also, confirm if the issue persists in the latest version of Schemathesis.
-- **Additional Context**: Logs, error messages, or screenshots are often very helpful.
+- **Title**: the problem in one line.
+- **Reproduction steps**: the schema (or a minimal part of it), the command you ran and any config.
+- **Observed behavior**: what happened, with logs or the full error message.
+- **Expected behavior**: what you expected instead, and why.
+- **Versions**: Python and Schemathesis (`st --version`). Check that the bug still happens on the latest Schemathesis release.
 
-**What happens next?**: After you submit an issue, we aim to review and respond as soon as possible.
-If you don't receive a response within a few days, feel free to add a new comment to the thread to bring it to our attention again.
+## Suggesting Features
+
+Open an [issue](https://github.com/schemathesis/schemathesis/issues) that describes:
+
+- **Your use case**: what you are testing and where Schemathesis falls short.
+- **The behavior you want**: how the feature would work from your side, e.g. a CLI flag or a config option.
+- **Scope**: one concrete use case rather than a broad feature set.
+
+I try to answer every issue within a few days. If you hear nothing, comment on the issue.
 
 ## Submitting Pull Requests
 
-We welcome contributions to the codebase! If you'd like to submit a pull request (PR), please follow these steps:
+You need Python 3.10+, [uv](https://docs.astral.sh/uv/) and `curl`. The tests run the curl commands Schemathesis generates, so install `curl` with your OS package manager, e.g. `apt install curl` or `brew install curl`.
 
-1. **Fork the Repository**: Fork the Schemathesis repository on GitHub.
-2. **Install Development Tools**: Install the development dependencies using the following command:
+[`just`](https://github.com/casey/just) is optional. It wraps the commands below, and `just --list` shows them all.
 
-```bash
-uv pip install -e ".[dev]"
-```
+1. Fork the repository and clone your fork.
+2. Create a branch from `master`.
+3. Install the development dependencies:
 
-This will install all the necessary packages for development, including those for documentation and tests.
+    ```bash
+    uv venv --python 3.10    # any version from 3.10 up works
+    source .venv/bin/activate    # fish: .venv/bin/activate.fish
+    uv pip install -e ".[dev]"
+    ```
 
-3. **Set Up Pre-commit Hooks**: Enable [prek](https://github.com/j178/prek).
+    The `dev` extra includes test, lint and docs dependencies. Run every command below inside the activated venv.
 
-```bash
-prek install
-```
+4. Install the [prek](https://github.com/j178/prek) Git hooks. They run `ruff` and `mypy` on every commit:
 
-4. **Branching**: Create a new branch and switch to it. Target your pull request to the `master` branch of the main repository.
-5. **Coding Standards**: Follow [PEP-8](https://pep8.org/) for naming conventions and use [ruff](https://github.com/astral-sh/ruff) for code formatting.
-6. **Write Tests**: Preferably, write integration tests that run the whole Schemathesis CLI.
-7. **Run Tests**:
+    ```bash
+    uvx prek install
+    ```
 
-```bash
-# Using tox
-tox -e py311
+5. Write a test that fails without your change, next to the existing tests for that area (`test/cli/` for CLI behavior, `test/specs/openapi/` for OpenAPI handling). CLI tests run the real `st run` command through the `cli` fixture and compare the output with the `snapshot_cli` fixture. Test servers come from `ctx.openapi.apps` (defined in `test/apps/catalog/`); see `test/cli/test_auth_bootstrap.py` for an example.
+6. Run the tests and checks:
 
-# Or using just
-just test
-```
+    ```bash
+    just test-dist    # or: python -m pytest test/ -n auto --ignore=test/tooling --snapshot-warn-unused
+    just check        # or: uvx prek run --all-files
+    ```
 
-8. **Update Changelog**: Add a corresponding entry to `CHANGELOG.md` located in the repository root.
-9. **Commit Your Changes**: Use the [Conventional Commits](https://www.conventionalcommits.org/en/) format. For example, features could be `feat: add new validation feature` and bug fixes could be `fix: resolve issue with validation`.
+    If your change alters CLI output, update the snapshots and review the diff:
 
-**What happens next?**: After submitting, your pull request will be reviewed.
-If you don't hear back within a few days, feel free to add a comment to the pull request to draw our attention.
+    ```bash
+    just snapshot-update    # or: python -m pytest test/ -n auto --ignore=test/tooling --snapshot-update
+    ```
+
+7. Add an entry to `CHANGELOG.md` under `Unreleased`, in the `Added`, `Changed` or `Fixed` section. Describe what users see in up to 15 words. Docs-only and test-only changes need no entry.
+8. Write the commit message in [Conventional Commits](https://www.conventionalcommits.org/en/) format, with a capitalized description, e.g. `fix: Crash on schemas whose info is not an object` or `feat: Add the --request-retries option`.
+9. Open the pull request against `master`.
+
+I review pull requests within a few days. If you hear nothing, comment on the pull request.
 
 ## Contributing to Documentation
 
-We recommend installing Schemathesis with the "dev" extra for all the dependencies needed for documentation:
-
-```bash
-uv pip install -e ".[dev]"
-```
-
-To preview your changes:
+The docs live in `docs/` and build with MkDocs. Follow steps 1-3 of [Submitting Pull Requests](#submitting-pull-requests), then run:
 
 ```bash
 mkdocs serve
 ```
 
-Then open the URL shown in the terminal (typically `http://127.0.0.1:8000/`) in your browser.
+Open the URL from the terminal output (usually `http://127.0.0.1:8000/`) to preview your changes.
 
 ## Community and Support
 
-For more informal discussions or questions, join us on [Discord](https://discord.gg/R9ASRAmHnA).
+Ask questions and discuss ideas on [Discord](https://discord.gg/R9ASRAmHnA). Write in English, in issues and on Discord.
 
 ## Maintainers
 
-At present, the core developers are:
-
 - Dmitry Dygalo ([@Stranger6667](https://github.com/Stranger6667))
-
-## Preferred communication language
-
-We prefer to keep all communications in English.
-
-Thanks!
