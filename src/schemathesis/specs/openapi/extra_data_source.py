@@ -207,6 +207,23 @@ def _build_pool_draw_from_requirement(
     )
 
 
+def declared_response_schema(
+    operation: APIOperation, status_code: int, content_type: str | None
+) -> dict[str, Any] | None:
+    """Response schema for `status_code`, or `None` when it is missing, malformed or boolean."""
+    response_def = operation.responses.find_by_status_code(status_code)
+    if response_def is None:
+        return None
+    # Callers run outside the response-schema check path; an unresolvable `$ref` or other malformed
+    # response schema must not fail the operation when only non-schema checks are enabled.
+    try:
+        schema = response_def.get_schema(content_type).schema
+    except (BundleError, InvalidSchema, MalformedMediaType):
+        return None
+    # A boolean JSON Schema (true/false) carries no leaf info.
+    return schema if isinstance(schema, dict) else None
+
+
 def build_parameter_requirements(graph: DependencyGraph) -> dict[RequirementKey, ParameterRequirement]:
     """Index resource inputs by operation / location / parameter name."""
     requirements: dict[RequirementKey, ParameterRequirement] = {}
@@ -734,19 +751,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 identity=case._auth_identity,
             )
         if semantic_active:
-            response_def = operation.responses.find_by_status_code(response.status_code)
-            response_schema: dict[str, Any] | None = None
-            if response_def is not None:
-                # Recording runs outside the response-schema check path; an unresolvable
-                # `$ref` or other malformed response schema must not fail the operation
-                # when only non-schema checks are enabled. Fall back to a schemaless walk.
-                try:
-                    resolved_schema = response_def.get_schema(content_type).schema
-                except (BundleError, InvalidSchema, MalformedMediaType):
-                    resolved_schema = None
-                # A boolean JSON Schema (true/false) carries no leaf info; treat as schemaless.
-                if isinstance(resolved_schema, dict):
-                    response_schema = resolved_schema
+            # Without a usable schema, fall back to a schemaless walk.
+            response_schema = declared_response_schema(operation, response.status_code, content_type)
             # Normalize so a response echoing `user_id` is excluded when the path declares `userId`.
             excluded = (
                 frozenset(normalize_for_matching(name) for name in case.path_parameters)

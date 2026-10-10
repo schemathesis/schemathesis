@@ -318,3 +318,21 @@ Expected 401 or 403, got `200 OK` for `GET /protected-resource`
     For each operation, this check sends one request without credentials and one with invalid credentials per security scheme, until the operation rejects them once.
 
 The check gives no verdict when an explicitly configured `Authorization` header (e.g. `-H 'Authorization: ...'`) carries credentials the schema's security schemes do not declare: the probes cannot remove them, so a successful response proves nothing. While such a header is configured, an API that ignores the declared scheme entirely is not reported for that operation.
+
+### `object_level_authorization`
+
+Verifies that one user cannot read an object another user created (OWASP API1, BOLA). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists `peers`: users whose objects must stay private to each other.
+
+When a peer sends a `GET` request with an identifier that its own earlier request produced, Schemathesis repeats it as each other peer. The check fails when another peer gets a `2xx` response describing the same object: the identifier sits at the same place, and every field declared in the response schema matches. A different body, such as a redacted view or an empty list, passes. So does a body an unauthenticated request also gets, which marks the object as public.
+
+```text
+- Object-level authorization bypass
+
+    `bob` received the `Order` that `alice` created
+
+    Owner: GET /api/orders/1 as alice -> 200
+    Peer:  GET /api/orders/1 as bob -> 200 (equivalent body)
+```
+
+!!! warning "Additional requests"
+    For each operation and resource, this check sends one request per other peer, plus one unauthenticated request when a peer receives the object.

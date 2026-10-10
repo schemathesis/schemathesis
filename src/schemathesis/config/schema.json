@@ -501,6 +501,9 @@
         "ignored_auth": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
+        "object_level_authorization": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
         "unsupported_method": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
