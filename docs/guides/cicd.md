@@ -66,6 +66,8 @@ The JUnit report is written to `schemathesis-report/junit-<timestamp>.xml` by de
 
 Allure reports are also supported — see [Allure Integration](allure.md).
 
+`--report html` writes a page to `schemathesis-report/html-<timestamp>/index.html` with the verdict, warnings, and every failure with a command to reproduce it. The page works offline, and the artifact upload above already includes it.
+
 ## GitLab CI
 
 Use the official Docker image for consistent environments. Store the token as a masked CI/CD variable named `API_TOKEN` (**Settings > CI/CD > Variables**, with **Mask variable** checked); GitLab exposes it to the job as `$API_TOKEN`.

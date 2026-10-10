@@ -24,8 +24,8 @@ def run_with_report(cli, report_dir, *args, exit_code=ExitCode.OK, phases="fuzzi
         "--max-examples=1",
         f"--phases={phases}",
         "--seed=42",
+        f"--report-html-path={report_dir}",
         exit_code=exit_code,
-        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
         **kwargs,
     )
     return (report_dir / "index.html").read_text(encoding="utf-8")
@@ -248,7 +248,7 @@ def test_html_report_fuzz_failures(ctx, cli, report_dir, snapshot_html):
         "--max-failures=1",
         "--max-time=5",
         "--seed=42",
-        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
+        f"--report-html-path={report_dir}",
     )
     assert result.exit_code == ExitCode.FAILURES, result.stdout
     html = (report_dir / "index.html").read_text(encoding="utf-8")
@@ -308,8 +308,8 @@ def before_call(ctx, case, **kwargs):
         api.schema_url,
         "--max-time=2",
         "--seed=42",
+        f"--report-html-path={report_dir}",
         hooks=module,
-        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
     )
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
@@ -541,8 +541,8 @@ def test_html_report_graphql_stateful_steps(ctx, cli, report_dir):
         "--mode=positive",
         "--checks=not_a_server_error",
         "--seed=42",
+        f"--report-html-path={report_dir}",
         exit_code=ExitCode.FAILURES,
-        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
     )
     html = (report_dir / "index.html").read_text(encoding="utf-8")
     steps = re.findall(r'<span class="step-req">([^<]*)', html)
@@ -710,7 +710,7 @@ def test_html_report_warnings_order(ctx, cli, app_runner, report_dir):
         "--include-path-regex=^/api/orders",
         "--include-name=GET /api/missing",
         "--warnings=low_valid_rate,unmatched_filter,timeout_units",
-        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
+        f"--report-html-path={report_dir}",
     )
     html = (report_dir / "index.html").read_text(encoding="utf-8")
     entries = re.findall(r'<li class="(warning[^"]*)">(?:<span>|<details id="([^"]+)")', html)
@@ -809,3 +809,40 @@ def test_html_report_warnings_fail_the_run(ctx, cli, report_dir, snapshot_html):
         config={"warnings": {"fail-on": True}},
     )
     assert html == snapshot_html
+
+
+def test_html_report_default_location(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    result = cli.run(
+        api.schema_url, "--report=html", f"--report-dir={tmp_path}", "--max-examples=1", "--phases=fuzzing"
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    (index,) = tmp_path.glob("html-*/index.html")
+    assert (index.parent / "assets" / "report.css").is_file()
+    assert f"HTML: {index}" in result.stdout
+
+
+def test_html_report_via_config(ctx, cli, report_dir):
+    api = ctx.openapi.apps.success()
+    cli.run_and_assert(
+        api.schema_url,
+        "--max-examples=1",
+        "--phases=fuzzing",
+        config={"reports": {"html": {"path": str(report_dir)}}},
+    )
+    assert (report_dir / "index.html").is_file()
+
+
+def test_html_report_for_fuzz_command(ctx, cli, report_dir):
+    api = ctx.openapi.apps.success()
+    result = cli.main("fuzz", api.schema_url, "--max-time=1", f"--report-html-path={report_dir}")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert (report_dir / "index.html").is_file()
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_html_report_unwritable_path(ctx, cli, tmp_path, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    parent = tmp_path / "file"
+    parent.write_text("", encoding="utf-8")
+    assert cli.run(api.schema_url, f"--report-html-path={parent / 'report'}") == snapshot_cli

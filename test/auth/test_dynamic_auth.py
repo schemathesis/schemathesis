@@ -1143,11 +1143,11 @@ def test_reauth_count_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_ht
         "--mode=positive",
         "-n 4",
         "--seed=42",
+        f"--report-html-path={report_dir}",
         config={
             "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
             "auth": _dynamic_auth("OAuth2", retry_on=[401]),
         },
-        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
     )
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 

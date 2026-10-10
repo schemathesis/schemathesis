@@ -1756,13 +1756,18 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 (ReportFormat.JSON, reports.json),
                 (ReportFormat.WFC, reports.wfc),
                 (ReportFormat.ALLURE, reports.allure),
+                (ReportFormat.HTML, reports.html),
             )
             if report.enabled
         ]
         if enabled:
             click.echo(_style("Reports:", bold=True))
             for format, _ in enabled:
-                click.echo(_style(f"  - {format.value.upper()}: {reports.get_path(format)}"))
+                path = reports.get_path(format)
+                # Point at the page itself so it opens in one click.
+                if format == ReportFormat.HTML:
+                    path = path / "index.html"
+                click.echo(_style(f"  - {format.value.upper()}: {path}"))
             click.echo()
 
     def display_seed(self) -> None:
