@@ -343,6 +343,12 @@ class WarningCollector:
                     warning.kind,
                     self._record_unresolvable_reference_warning(warning.operation_label, warning.message),
                 )
+            elif warning.kind is SchemathesisWarning.DICTIONARY_MISMATCH:
+                self._handle_warning(
+                    ctx,
+                    warning.kind,
+                    self._record_dictionary_mismatch_warning(warning.message),
+                )
             elif warning.kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
                 self._handle_warning(
                     ctx,
@@ -560,6 +566,12 @@ class WarningCollector:
     def _record_unmatched_filter(self, message: str) -> Callable[[], None]:
         def record() -> None:
             self.data.unmatched_filter.add(message)
+
+        return record
+
+    def _record_dictionary_mismatch_warning(self, message: str) -> Callable[[], None]:
+        def record() -> None:
+            self.data.dictionary_mismatch.add(message)
 
         return record
 

@@ -1,0 +1,54 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+     Configuration:    /tmp/config.toml
+     Dictionaries:     1 dictionary / 10 entries
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+=================================== WARNINGS ===================================
+
+Dictionary mismatch: 1 dictionary binding with entries that mostly fail the bound parameter's schema
+
+  - `ids` bound to `path.item_id`: 9 of 10 entries do not match the parameter schema and are used only in negative cases. Example: "a" is not of type "integer"
+
+💡 Fix the entries, or bind the dictionary to a parameter whose schema they match
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
+  ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Dictionary mismatch: 1 dictionary binding with entries that mostly fail the parameter schema
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 1 warning in 1.00s ==============================

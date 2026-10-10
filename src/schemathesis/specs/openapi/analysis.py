@@ -22,6 +22,7 @@ from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 from schemathesis.specs.openapi.warnings import (
+    detect_dictionary_mismatches,
     detect_missing_deserializers,
     detect_unresolvable_references,
     detect_unsupported_regex,
@@ -244,4 +245,4 @@ class OpenAPIAnalysis:
 
     def _collect_schema_warnings(self) -> Sequence[SchemaWarning]:
         """Collect schema-level warnings."""
-        return detect_unused_openapi_auth(self.schema)
+        return [*detect_unused_openapi_auth(self.schema), *detect_dictionary_mismatches(self.schema)]
