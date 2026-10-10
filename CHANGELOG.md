@@ -32,6 +32,7 @@
 - Missing inferred stateful links from `POST /books` to `GET /books/{title}` when the request body sends `title`.
 - Inferred stateful links sending a numeric `id` to string path parameters when a string `uuid` exists.
 - Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
+- Positive cases treated as negative when an auth hook adds an undeclared or differently-cased header.
 
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 

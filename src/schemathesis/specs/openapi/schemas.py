@@ -32,6 +32,7 @@ from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
@@ -82,7 +83,6 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.jsonschema.types import JsonValue
-    from schemathesis.core.parameters import ParameterLocation
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema, Scheduler
     from schemathesis.engine.observations import Observations
@@ -307,6 +307,10 @@ class OpenApiSchema(BaseSchema):
         for location in list(meta._dirty):
             value = case.get_container(location)
             current_hash = case._hash_container(value)
+            if location == ParameterLocation.HEADER and isinstance(value, Mapping):
+                # Header names are case-insensitive, and undeclared headers like auth never make the input invalid.
+                declared = {parameter.name.lower(): parameter.name for parameter in case.operation.headers}
+                value = {declared[name.lower()]: item for name, item in value.items() if name.lower() in declared}
             raw = meta.raw_containers.get(location)
             # When the container still equals its generated form, validate the typed
             # snapshot — coverage stringifies query/path values for the wire and the

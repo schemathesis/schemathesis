@@ -595,6 +595,48 @@ def test_referenced_security_scheme(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_auth_hook_header_keeps_positive_cases_positive(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "authorization", "in": "header", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({"error": "rejected"}), 400
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return "valid-token"
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+"""
+    )
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--mode=positive",
+            "--max-examples=5",
+            "--checks=positive_data_acceptance",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
+
+
 def _api_key_or_bearer_app(ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
