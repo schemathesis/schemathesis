@@ -20,6 +20,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `unmatched_filter` | A filter expression matched no API operation | Fix the typo, or update the filter if the operation was renamed |
 | `unresolvable_reference` | A parameter, request body, or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
 | `rate_limited` | Most interactions returned 429 Too Many Requests | Slow requests down with `--rate-limit` |
+| `dictionary_mismatch` | Most entries of a dictionary fail the schema of the parameter they are bound to | Fix the entries, or bind the dictionary to a matching parameter |
 | `low_valid_rate` (opt-in) | An operation accepted only a small share of the requests sent to it | Supply real identifiers, or align the schema with the constraints the API enforces |
 
 ## Available Warnings
@@ -213,6 +214,20 @@ Rate limited: 1 operation mostly returned 429 Too Many Requests, leaving the log
 **Trigger**: At least 90% of requests to an operation returned HTTP 429.
 
 The rate limiter answered instead of the API, so the run passes without reaching the operation's logic. These responses are not counted as data rejections, so [`validation_mismatch`](#validation_mismatch) stays silent for them. Set [`rate-limit`](configuration.md#rate-limit) to the rate the API allows, or raise the server's limit for the test client.
+
+### `dictionary_mismatch`
+
+```
+Dictionary mismatch: 1 dictionary binding with entries that mostly fail the bound parameter's schema
+
+  - `ids` bound to `path.item_id`: 9 of 10 entries do not match the parameter schema and are used only in negative cases. Example: "a" is not of type "integer"
+
+💡 Fix the entries, or bind the dictionary to a parameter whose schema they match
+```
+
+**Trigger**: More than half of the entries a [fuzz dictionary](../guides/fuzz-dictionary.md) supplies to a parameter fail that parameter's schema. Reported once per dictionary and parameter, before any request is sent.
+
+Positive cases use only the entries that match the schema, so such a dictionary is barely used and the run does not say why. A dictionary meant for negative testing mismatches on purpose; leave `dictionary_mismatch` out of `display` under `[warnings]` to silence it.
 
 ### `low_valid_rate`
 

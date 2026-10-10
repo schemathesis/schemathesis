@@ -5,18 +5,22 @@ from __future__ import annotations
 import difflib
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
+from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.jsonschema.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
 from schemathesis.core.jsonschema.resolver import find_unresolvable_reference
 from schemathesis.core.jsonschema.types import get_type
+from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.result import Ok
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
+    from schemathesis.specs.openapi.schemas import OpenApiOperation, OpenApiSchema
 
 
 @dataclass(slots=True)
@@ -107,6 +111,98 @@ class UnusedOpenAPIAuthWarning:
     @property
     def group(self) -> str | None:
         return None
+
+
+@dataclass(slots=True, frozen=True)
+class DictionaryMismatch:
+    """A parameter binding whose entries mostly fail the parameter schema."""
+
+    dictionary: str
+    # The bound parameter, as `<location>.<name>`.
+    parameter: str
+    mismatched: int
+    total: int
+    # Validation error for the first entry that fails.
+    example: str
+
+
+def find_dictionary_mismatches(operation: OpenApiOperation) -> list[DictionaryMismatch]:
+    """Bindings of the operation's parameters where more than half of the entries fail the parameter schema."""
+    from schemathesis.generation.dictionaries import resolve_parameter_bindings
+
+    generation_config = operation.schema.config.generation_for(operation=operation)
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    mismatches: list[DictionaryMismatch] = []
+    for location in (
+        ParameterLocation.PATH,
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+    ):
+        properties = cast("OpenApiParameterSet", operation.get_parameter_set(location)).schema.get("properties", {})
+        bindings = resolve_parameter_bindings(
+            operation=operation, location=location, properties=properties, generation_config=generation_config
+        )
+        for parameter_name, binding in bindings.items():
+            schema = properties.get(parameter_name)
+            if not isinstance(schema, dict) or not binding.entries:
+                continue
+            validator = make_validator(schema, validator_cls)
+            failing = [value for _, value in binding.entries if not validator.is_valid(value)]
+            if len(failing) * 2 > len(binding.entries):
+                mismatches.append(
+                    DictionaryMismatch(
+                        dictionary=binding.dictionary.name,
+                        parameter=f"{location.value}.{parameter_name}",
+                        mismatched=len(failing),
+                        total=len(binding.entries),
+                        example=next(validator.iter_errors(failing[0])).message,
+                    )
+                )
+    return mismatches
+
+
+@dataclass(slots=True)
+class DictionaryMismatchWarning:
+    """Warning for a dictionary binding whose entries mostly fail the schema of the bound parameter."""
+
+    operation_label: str | None
+    """Always None: one binding is reported once, however many operations it applies to."""
+
+    mismatch: DictionaryMismatch
+
+    @property
+    def kind(self) -> SchemathesisWarning:
+        return SchemathesisWarning.DICTIONARY_MISMATCH
+
+    @property
+    def message(self) -> str:
+        mismatch = self.mismatch
+        return (
+            f"`{mismatch.dictionary}` bound to `{mismatch.parameter}`: {mismatch.mismatched} of {mismatch.total} "
+            f"entries do not match the parameter schema and are used only in negative cases. "
+            f"Example: {mismatch.example}"
+        )
+
+    @property
+    def group(self) -> str | None:
+        return None
+
+
+def detect_dictionary_mismatches(schema: OpenApiSchema) -> list[DictionaryMismatchWarning]:
+    """Report each dictionary binding once per parameter when most of its entries fail the parameter schema."""
+    if not schema.config.dictionaries:
+        return []
+    warnings: dict[tuple[str, str], DictionaryMismatchWarning] = {}
+    for result in schema.get_all_operations():
+        if not isinstance(result, Ok):
+            continue
+        for mismatch in find_dictionary_mismatches(result.ok()):
+            warnings.setdefault(
+                (mismatch.dictionary, mismatch.parameter),
+                DictionaryMismatchWarning(operation_label=None, mismatch=mismatch),
+            )
+    return list(warnings.values())
 
 
 def detect_unused_openapi_auth(schema: OpenApiSchema) -> list[UnusedOpenAPIAuthWarning]:

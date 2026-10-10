@@ -1092,7 +1092,8 @@
         "unmatched_filter",
         "unresolvable_reference",
         "low_valid_rate",
-        "rate_limited"
+        "rate_limited",
+        "dictionary_mismatch"
       ]
     },
     "WarningNameList": {

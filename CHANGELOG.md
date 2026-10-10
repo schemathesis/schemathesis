@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - `auth.auto-signup` config option to disable automatic sign-up.
+- Warning when most entries of a dictionary fail the schema of their parameter.
 
 ### :wrench: Changed
 

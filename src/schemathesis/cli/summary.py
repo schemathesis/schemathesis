@@ -41,6 +41,8 @@ class WarningData:
     low_valid_rate: set[str]
     # Operations answered mostly with `429 Too Many Requests`.
     rate_limited: set[str]
+    # Dictionary bindings whose entries mostly fail the bound parameter's schema.
+    dictionary_mismatch: set[str]
     # Acceptance counts for every operation and phase, keyed by label then phase, for reporting.
     valid_rates: dict[str, dict[str, ValidRate]]
     # Operations the stateful phase actually sent a request for.
@@ -69,6 +71,7 @@ class WarningData:
         unresolvable_reference: dict[str, set[str]] | None = None,
         low_valid_rate: set[str] | None = None,
         rate_limited: set[str] | None = None,
+        dictionary_mismatch: set[str] | None = None,
         valid_rates: dict[str, dict[str, ValidRate]] | None = None,
         stateful_exercised: set[str] | None = None,
         linked_operations: set[str] | None = None,
@@ -90,6 +93,7 @@ class WarningData:
         self.unresolvable_reference = unresolvable_reference or {}
         self.low_valid_rate = low_valid_rate or set()
         self.rate_limited = rate_limited or set()
+        self.dictionary_mismatch = dictionary_mismatch or set()
         self.valid_rates = valid_rates or {}
         self.stateful_exercised = stateful_exercised or set()
         self.linked_operations = linked_operations
@@ -125,6 +129,7 @@ class WarningData:
             SchemathesisWarning.UNRESOLVABLE_REFERENCE.value: sorted(self.unresolvable_reference),
             SchemathesisWarning.LOW_VALID_RATE.value: sorted(self.low_valid_rate_reported),
             SchemathesisWarning.RATE_LIMITED.value: sorted(self.rate_limited),
+            SchemathesisWarning.DICTIONARY_MISMATCH.value: sorted(self.dictionary_mismatch),
         }
 
     @property
@@ -143,6 +148,7 @@ class WarningData:
             or self.unresolvable_reference
             or self.low_valid_rate_reported
             or self.rate_limited
+            or self.dictionary_mismatch
         )
 
     @property
@@ -164,6 +170,7 @@ class WarningData:
                 self.unresolvable_reference,
                 self.low_valid_rate_reported,
                 self.rate_limited,
+                self.dictionary_mismatch,
             )
             if warnings
         )

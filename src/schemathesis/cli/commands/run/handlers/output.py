@@ -1434,6 +1434,15 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 entity_name="configured auth scheme",
             )
 
+        if ctx.warnings.dictionary_mismatch:
+            self._display_warning_block(
+                title="Dictionary mismatch",
+                operations=ctx.warnings.dictionary_mismatch,
+                suffix_text=" with entries that mostly fail the bound parameter's schema",
+                tips=["💡 Fix the entries, or bind the dictionary to a parameter whose schema they match"],
+                entity_name="dictionary binding",
+            )
+
         if ctx.warnings.unmatched_filter:
             self._display_warning_block(
                 title="Unmatched filters",
@@ -1611,6 +1620,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "Unsupported regex",
                 "operation",
                 "had unusable regex patterns",
+            ),
+            (
+                len(ctx.warnings.dictionary_mismatch),
+                "Dictionary mismatch",
+                "dictionary binding",
+                "with entries that mostly fail the parameter schema",
             ),
             (
                 len(ctx.warnings.unmatched_filter),
