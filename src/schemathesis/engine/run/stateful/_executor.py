@@ -54,6 +54,8 @@ from schemathesis.generation.stateful.state_machine import (
 from schemathesis.generation.metrics import MetricCollector
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from schemathesis.baseline import Baseline
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.resources import ResourceRecorder
@@ -67,18 +69,19 @@ def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: 
     """
     for recorder in recorders:
         for case_id, interaction in recorder.interactions.items():
-            response = interaction.response
-            if response is None:
-                continue
-            case = recorder.cases[case_id].value
-            operation = case.operation
-            if extra_data_source.should_record(operation=operation.label):
-                extra_data_source.record_response(operation=operation, response=response, case=case)
-            if extra_data_source.should_record_request(operation=operation.label):
-                extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
-            if 200 <= response.status_code < 300 or response.status_code == 404:
-                extra_data_source.record_successful_delete(operation=operation, case=case)
-            response.clear_cache()
+            if interaction.response is not None:
+                _record_into_pool(extra_data_source, recorder.cases[case_id].value, interaction.response)
+
+
+def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response: Response) -> None:
+    operation = case.operation
+    if extra_data_source.should_record(operation=operation.label):
+        extra_data_source.record_response(operation=operation, response=response, case=case)
+    if extra_data_source.should_record_request(operation=operation.label):
+        extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
+    if 200 <= response.status_code < 300 or response.status_code == 404:
+        extra_data_source.record_successful_delete(operation=operation, case=case)
+    response.clear_cache()
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -107,6 +110,48 @@ def _network_nonfatal_error(stored: UnrecoverableNetworkError) -> events.NonFata
     )
 
 
+# The suite status, whether to re-run the suite, and the events to emit.
+SuiteOutcome = tuple[Status, bool, list[events.EngineEvent]]
+
+
+def _network_error_outcome(state: TestingState) -> SuiteOutcome | None:
+    """End the suite with the stored transport failure, if there is one."""
+    stored = state.unrecoverable_network_error
+    if stored is None:
+        return None
+    return Status.ERROR, False, [_network_nonfatal_error(stored)]
+
+
+def _classify_failure_group(
+    exc: FailureGroup, *, ctx: StatefulContext, engine: EngineContext, state: TestingState
+) -> SuiteOutcome:
+    # When a check fails, the state machine is stopped
+    # The failure is already sent to the queue by the state machine
+    # Here we need to either exit or re-run the state machine with this failure marked as known
+    stored = state.take_unrecoverable_network_error()
+    network_events: list[events.EngineEvent] = [_network_nonfatal_error(stored)] if stored is not None else []
+    if engine.has_reached_the_failure_limit:
+        return Status.FAILURE, False, network_events
+    for failure in exc.exceptions:
+        ctx.mark_as_seen_in_run(failure)
+    return Status.FAILURE, True, network_events
+
+
+def _classify_flaky(*, ctx: StatefulContext, engine: EngineContext, state: TestingState) -> SuiteOutcome:
+    # A replay that cannot reproduce the failure does not unreport it: the suite already showed it.
+    found = Status.FAILURE if ctx.has_new_failures_in_suite else Status.SUCCESS
+    if engine.has_reached_the_failure_limit:
+        return found, False, []
+    # Flakiness caused by a transient transport failure: surface it and stop rather than
+    # restarting the whole suite - a replayed drop won't reproduce, so re-running is wasted.
+    network_outcome = _network_error_outcome(state)
+    if network_outcome is not None:
+        return network_outcome
+    # Mark all failures in this suite as seen to prevent them being re-discovered
+    ctx.mark_current_suite_as_seen_in_run()
+    return found, True, []
+
+
 def _classify_suite_error(
     exc: Exception | KeyboardInterrupt | FailureGroup | SkipTest,
     *,
@@ -114,17 +159,14 @@ def _classify_suite_error(
     engine: EngineContext,
     state: TestingState,
     settings: hypothesis.settings,
-) -> tuple[Status, bool, list[events.EngineEvent]]:
+) -> SuiteOutcome:
     """Map a state machine failure into the suite status, whether to re-run it, and the events to emit."""
     if isinstance(exc, BudgetExpired):
         # The clock ended the suite. A failure found before it surfaces as its own group, so there is
         # nothing left to report here; the engine reports the limit itself.
         return Status.SUCCESS, False, []
     if isinstance(exc, ServerWentAway):
-        stored = state.unrecoverable_network_error
-        if stored is not None:
-            return Status.ERROR, False, [_network_nonfatal_error(stored)]
-        return Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS, False, []
+        return _network_error_outcome(state) or (Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS, False, [])
     if isinstance(exc, KeyboardInterrupt):
         # Raised in the state machine when the stop event is set or it is raised by the user's code
         # that is placed in the base class of the state machine.
@@ -135,29 +177,9 @@ def _classify_suite_error(
         # If `explicit` phase is used and there are no examples
         return Status.SKIP, False, []
     if isinstance(exc, FailureGroup):
-        # When a check fails, the state machine is stopped
-        # The failure is already sent to the queue by the state machine
-        # Here we need to either exit or re-run the state machine with this failure marked as known
-        stored = state.take_unrecoverable_network_error()
-        network_events: list[events.EngineEvent] = [_network_nonfatal_error(stored)] if stored is not None else []
-        if engine.has_reached_the_failure_limit:
-            return Status.FAILURE, False, network_events
-        for failure in exc.exceptions:
-            ctx.mark_as_seen_in_run(failure)
-        return Status.FAILURE, True, network_events
+        return _classify_failure_group(exc, ctx=ctx, engine=engine, state=state)
     if isinstance(exc, Flaky) or is_inconsistent_replay(exc):
-        # A replay that cannot reproduce the failure does not unreport it: the suite already showed it.
-        found = Status.FAILURE if ctx.has_new_failures_in_suite else Status.SUCCESS
-        if engine.has_reached_the_failure_limit:
-            return found, False, []
-        stored = state.unrecoverable_network_error
-        if stored is not None:
-            # Flakiness caused by a transient transport failure: surface it and stop rather than
-            # restarting the whole suite — a replayed drop won't reproduce, so re-running is wasted.
-            return Status.ERROR, False, [_network_nonfatal_error(stored)]
-        # Mark all failures in this suite as seen to prevent them being re-discovered
-        ctx.mark_current_suite_as_seen_in_run()
-        return found, True, []
+        return _classify_flaky(ctx=ctx, engine=engine, state=state)
     if isinstance(exc, Unsatisfiable) and not isinstance(exc, UnsatisfiableSchema) and ctx.completed_scenarios > 0:
         # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
         # values are possible to generate based on the previous observations, we retry the generation,
@@ -165,10 +187,7 @@ def _classify_suite_error(
         return Status.SUCCESS, ctx.completed_scenarios < settings.max_examples, []
     clear_hypothesis_notes(exc)
     # Any other exception is an inner error and the test run should be stopped
-    stored = state.unrecoverable_network_error
-    if stored is not None:
-        return Status.ERROR, False, [_network_nonfatal_error(stored)]
-    return (
+    return _network_error_outcome(state) or (
         Status.ERROR,
         False,
         [
@@ -306,6 +325,197 @@ def _record_network_error(
     state.store_unrecoverable_network_error(network_error)
 
 
+def _remember_step_outcome(
+    ctx: StatefulContext, case: Case, outcome: BaseException | None, *, unique_inputs: bool
+) -> None:
+    if unique_inputs:
+        ctx.store_step_outcome(case, outcome)
+
+
+def _remember_failures(
+    ctx: StatefulContext, case: Case, failures: Sequence[BaseException], *, unique_inputs: bool
+) -> None:
+    for failure in failures:
+        _remember_step_outcome(ctx, case, failure, unique_inputs=unique_inputs)
+
+
+def _parse_step_observations(engine: EngineContext, case: Case, response: Response) -> tuple[Observation, ...]:
+    """Parse the 4xx body once, for both link calibration and error feedback."""
+    if engine.error_feedback is None and engine.link_calibration is None:
+        return ()
+    return parse_observations(case.operation, case, response)
+
+
+def _calibrate_link(
+    engine: EngineContext,
+    response: Response,
+    *,
+    observations: tuple[Observation, ...],
+    step_input: StepInput | None,
+    recorder: ScenarioRecorder,
+) -> None:
+    """Record this step's outcome against the score of the link that produced it."""
+    if step_input is None or engine.link_calibration is None:
+        return
+    engine.schema.record_link_outcome(
+        calibration=engine.link_calibration,
+        response=response,
+        observations=observations,
+        step_input=step_input,
+        recorder=recorder,
+    )
+
+
+def _supervise_response(engine: EngineContext, case: Case, response: Response) -> None:
+    engine.supervisor.record_response(
+        operation_label=case.operation.label,
+        status_code=response.status_code,
+        is_documented_status=case.operation.responses.find_by_status_code(response.status_code) is not None,
+        case=case,
+        cache_writer=engine.cache.writer,
+    )
+
+
+def _feed_error_feedback(
+    engine: EngineContext,
+    case: Case,
+    response: Response,
+    *,
+    observations: tuple[Observation, ...],
+    recorder: ScenarioRecorder,
+) -> None:
+    if engine.error_feedback is None:
+        return
+    engine.record_error_feedback(
+        case=case,
+        response=response,
+        recorder=recorder,
+        observations=observations,
+        transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
+    )
+
+
+def _validate_step_response(
+    response: Response,
+    case: Case,
+    *,
+    step_input: StepInput | None,
+    recorder: ScenarioRecorder,
+    additional_checks: tuple[CheckFunction, ...],
+    engine: EngineContext,
+    ctx: StatefulContext,
+    check_context_cache: CheckContextCache,
+) -> None:
+    """Feed the response to link calibration, the supervisor and error feedback, then run the checks."""
+    ctx.collect_metric(case, response)
+    observations = _parse_step_observations(engine, case, response)
+    _calibrate_link(engine, response, observations=observations, step_input=step_input, recorder=recorder)
+    ctx.current_response = response
+    _supervise_response(engine, case, response)
+    _feed_error_feedback(engine, case, response, observations=observations, recorder=recorder)
+    check_ctx = check_context_cache.get_or_create(
+        operation=case.operation, ctx=engine, phase="stateful"
+    ).to_check_context(
+        recorder=recorder,
+        response_checks=engine.checks.for_responses(),
+        phase=PhaseName.STATEFUL_TESTING,
+        auth_enforced_operations=engine.auth_enforced_operations,
+    )
+    validate_response(
+        response=response,
+        case=case,
+        stateful_ctx=ctx,
+        check_ctx=check_ctx,
+        checks=check_ctx._checks,
+        control=engine.control,
+        recorder=recorder,
+        additional_checks=additional_checks,
+        baseline=engine.config.load_baseline(),
+    )
+
+
+def _begin_suite(engine: EngineContext, suite_recorders: list[ScenarioRecorder]) -> None:
+    """Promote observations from the previous suite into the stable read state."""
+    if engine.link_calibration is not None:
+        engine.link_calibration.begin_iteration()
+    engine.health.begin_iteration()
+    suite_recorders.clear()
+    if engine.error_feedback is not None:
+        engine.error_feedback.checkpoint()
+
+
+def _drain_suite_recorders(engine: EngineContext, suite_recorders: list[ScenarioRecorder]) -> None:
+    """Feed the suite's recorders into the pool before the next suite builds its strategies."""
+    # Mirrors `record_extra_data_from_recorder` in the unit phase.
+    if engine.extra_data_source is not None and suite_recorders:
+        _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
+
+
+def _close_suite_early(engine: EngineContext, event_queue: queue.Queue, suite_started: events.SuiteStarted) -> bool:
+    """Finish the suite before any scenario when the run is interrupted or out of time."""
+    if engine.is_interrupted:
+        event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
+        event_queue.put(
+            events.SuiteFinished(id=suite_started.id, phase=PhaseName.STATEFUL_TESTING, status=Status.INTERRUPTED)
+        )
+        return True
+    if engine.has_reached_time_limit:
+        # No scenario ran, so there is nothing this suite can vouch for.
+        event_queue.put(events.SuiteFinished(id=suite_started.id, phase=PhaseName.STATEFUL_TESTING, status=Status.SKIP))
+        return True
+    return False
+
+
+def _suite_seed(engine: EngineContext, settings: hypothesis.settings) -> int | None:
+    """A fresh seed per suite: a retry or a later cycle must not replay an earlier suite."""
+    # Deterministic mode skips a generated seed, since any seed takes precedence over `derandomize`.
+    return engine.next_stateful_seed() if not settings.derandomize or engine.config.has_explicit_seed else None
+
+
+def _run_step(
+    machine: APIStateMachine,
+    case: Case,
+    *,
+    engine: EngineContext,
+    ctx: StatefulContext,
+    state: TestingState,
+    event_queue: queue.Queue,
+    unique_inputs: bool,
+) -> StepOutput | None:
+    """Send one scenario step and record its outcome; `None` when this input already passed."""
+    _raise_if_stopped(engine)
+    _reject_unusable_operation(engine, case.operation.label)
+    try:
+        if unique_inputs and _replay_cached_outcome(ctx, case):
+            return None
+        response = _send_step(machine, case, engine=engine, event_queue=event_queue)
+        result = StepOutput(response, case)
+        ctx.step_succeeded()
+    except UnsatisfiedAssumption:
+        raise
+    except FailureGroup as exc:
+        _remember_failures(ctx, case, exc.exceptions, unique_inputs=unique_inputs)
+        ctx.step_failed()
+        raise
+    except Exception as exc:
+        outage = _detect_outage(exc, engine)
+        _record_network_error(exc, case=case, engine=engine, state=state, event_queue=event_queue)
+        _remember_step_outcome(ctx, case, exc, unique_inputs=unique_inputs)
+        ctx.step_errored()
+        if outage:
+            raise ServerWentAway from None
+        raise
+    except KeyboardInterrupt:
+        ctx.step_interrupted()
+        raise
+    except BaseException as exc:
+        _remember_step_outcome(ctx, case, exc, unique_inputs=unique_inputs)
+        raise exc
+    else:
+        _remember_step_outcome(ctx, case, None, unique_inputs=unique_inputs)
+    return result
+
+
 def execute_state_machine_loop(
     *,
     state_machine: type[APIStateMachine],
@@ -326,10 +536,6 @@ def execute_state_machine_loop(
     # suite (so Hypothesis shrinking sees a stable strategy); writes are replayed once the
     # suite finishes, before the next iteration's strategies are built.
     suite_recorders: list[ScenarioRecorder] = []
-
-    def remember_step_outcome(case: Case, outcome: BaseException | None) -> None:
-        if generation.unique_inputs:
-            ctx.store_step_outcome(case, outcome)
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -364,96 +570,30 @@ def execute_state_machine_loop(
             # _current_input is set here and consumed once in validate_response(), then cleared.
             # validate_response() is called at most once per step by the Hypothesis state machine.
             self._current_input = input
-            _raise_if_stopped(engine)
-            _reject_unusable_operation(engine, input.case.operation.label)
-            try:
-                if generation.unique_inputs and _replay_cached_outcome(ctx, input.case):
-                    return None
-                response = _send_step(self, input.case, engine=engine, event_queue=event_queue)
-                result = StepOutput(response, input.case)
-                ctx.step_succeeded()
-            except UnsatisfiedAssumption:
-                raise
-            except FailureGroup as exc:
-                for failure in exc.exceptions:
-                    remember_step_outcome(input.case, failure)
-                ctx.step_failed()
-                raise
-            except Exception as exc:
-                outage = _detect_outage(exc, engine)
-                _record_network_error(exc, case=input.case, engine=engine, state=state, event_queue=event_queue)
-                remember_step_outcome(input.case, exc)
-                ctx.step_errored()
-                if outage:
-                    raise ServerWentAway from None
-                raise
-            except KeyboardInterrupt:
-                ctx.step_interrupted()
-                raise
-            except BaseException as exc:
-                remember_step_outcome(input.case, exc)
-                raise exc
-            else:
-                remember_step_outcome(input.case, None)
-            return result
+            return _run_step(
+                self,
+                input.case,
+                engine=engine,
+                ctx=ctx,
+                state=state,
+                event_queue=event_queue,
+                unique_inputs=generation.unique_inputs,
+            )
 
         def validate_response(
             self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
         ) -> None:
-            ctx.collect_metric(case, response)
-            current_input = self._current_input
+            step_input = self._current_input
             self._current_input = None
-
-            # Parse 4xx body once — reused by calibration and error-feedback.
-            observations: tuple[Observation, ...] = ()
-            if engine.error_feedback is not None or engine.link_calibration is not None:
-                observations = parse_observations(case.operation, case, response)
-
-            # Record this step's outcome against the link's score.
-            if current_input is not None and engine.link_calibration is not None:
-                engine.schema.record_link_outcome(
-                    calibration=engine.link_calibration,
-                    response=response,
-                    observations=observations,
-                    step_input=current_input,
-                    recorder=self.recorder,
-                )
-            ctx.current_response = response
-            engine.supervisor.record_response(
-                operation_label=case.operation.label,
-                status_code=response.status_code,
-                is_documented_status=case.operation.responses.find_by_status_code(response.status_code) is not None,
-                case=case,
-                cache_writer=engine.cache.writer,
-            )
-
-            if engine.error_feedback is not None:
-                engine.record_error_feedback(
-                    case=case,
-                    response=response,
-                    recorder=self.recorder,
-                    observations=observations,
-                    transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
-                )
-
-            check_ctx = check_context_cache.get_or_create(
-                operation=case.operation, ctx=engine, phase="stateful"
-            ).to_check_context(
-                recorder=self.recorder,
-                response_checks=engine.checks.for_responses(),
-                phase=PhaseName.STATEFUL_TESTING,
-                auth_enforced_operations=engine.auth_enforced_operations,
-            )
-            validate_response(
-                response=response,
-                case=case,
-                stateful_ctx=ctx,
-                check_ctx=check_ctx,
-                checks=check_ctx._checks,
-                control=engine.control,
+            _validate_step_response(
+                response,
+                case,
+                step_input=step_input,
                 recorder=self.recorder,
                 additional_checks=additional_checks,
-                baseline=engine.config.load_baseline(),
+                engine=engine,
+                ctx=ctx,
+                check_context_cache=check_context_cache,
             )
 
         def teardown(self) -> None:
@@ -479,47 +619,18 @@ def execute_state_machine_loop(
 
     try:
         while True:
-            # Promote observations from the previous run into the stable read state.
-            if engine.link_calibration is not None:
-                engine.link_calibration.begin_iteration()
-            engine.health.begin_iteration()
-            suite_recorders.clear()
             # This loop is running until no new failures are found in a single iteration
-            if engine.error_feedback is not None:
-                engine.error_feedback.checkpoint()
+            _begin_suite(engine, suite_recorders)
             suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
             suite_id = suite_started.id
             event_queue.put(suite_started)
-            if engine.is_interrupted:
-                event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
-                event_queue.put(
-                    events.SuiteFinished(
-                        id=suite_started.id,
-                        phase=PhaseName.STATEFUL_TESTING,
-                        status=Status.INTERRUPTED,
-                    )
-                )
-                break
-            if engine.has_reached_time_limit:
-                # No scenario ran, so there is nothing this suite can vouch for.
-                event_queue.put(
-                    events.SuiteFinished(
-                        id=suite_started.id,
-                        phase=PhaseName.STATEFUL_TESTING,
-                        status=Status.SKIP,
-                    )
-                )
+            if _close_suite_early(engine, event_queue, suite_started):
                 break
             suite_status = Status.SUCCESS
             retry = False
-            # A fresh seed per suite: a retry or a later cycle must not replay an earlier suite.
-            # Deterministic mode skips a generated seed, since any seed takes precedence over `derandomize`.
-            seed = (
-                engine.next_stateful_seed()
-                if not hypothesis_settings.derandomize or engine.config.has_explicit_seed
-                else None
+            InstrumentedStateMachine = hypothesis.seed(_suite_seed(engine, hypothesis_settings))(
+                _InstrumentedStateMachine
             )
-            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
             try:
                 with catch_warnings(), ignore_hypothesis_output():
                     filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
@@ -531,10 +642,7 @@ def execute_state_machine_loop(
                 for error_event in error_events:
                     event_queue.put(error_event)
             finally:
-                # Drain this suite's recorders into the pool before the next iteration's strategies
-                # are built; mirrors `record_extra_data_from_recorder` in the unit phase.
-                if engine.extra_data_source is not None and suite_recorders:
-                    _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
+                _drain_suite_recorders(engine, suite_recorders)
                 event_queue.put(
                     events.SuiteFinished(
                         id=suite_started.id,
