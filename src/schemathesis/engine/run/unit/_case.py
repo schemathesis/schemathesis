@@ -278,7 +278,9 @@ def _record_response_signals(
     response: Response,
     transport_kwargs: dict[str, Any],
 ) -> None:
-    """Feed the response to error feedback, the supervisor, auth escalation and DELETE decay."""
+    """Feed the response to credential removals, error feedback, the supervisor, auth escalation and DELETE decay."""
+    if case.operation.schema.omits_sole_credential(case):
+        ctx.credential_removals.record(case.operation.label, response.status_code)
     if ctx.error_feedback is not None:
         ctx.record_error_feedback(
             case=case,

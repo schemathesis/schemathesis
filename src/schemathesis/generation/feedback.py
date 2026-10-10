@@ -5,6 +5,8 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Container
+
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource
@@ -44,6 +46,8 @@ class FeedbackSources:
     auth_header_log: AuthHeaderLog | None = None
     # Fixed for the whole Hypothesis run; a strategy that changes under a run fails it as flaky.
     auth_headers: frozenset[str] = frozenset()
+    # Operations whose request without their only credential the server rejected and this run leaves out.
+    answered_credential_removals: Container[str] | None = None
 
     def for_examples(self) -> FeedbackSources:
         # The examples phase never draws from extracted constants.

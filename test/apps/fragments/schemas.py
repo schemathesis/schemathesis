@@ -948,3 +948,12 @@ def linked_users() -> dict[str, Any]:
             }
         },
     }
+
+
+def basic_linked_to_query() -> dict[str, Any]:
+    paths = {**basic(), **basic_with_query()}
+    paths["/api/basic_query"]["get"]["operationId"] = "basicQuery"
+    paths["/api/basic"]["get"]["responses"]["200"]["links"] = {
+        "BasicQuery": {"operationId": "basicQuery", "parameters": {"q": "$response.body#/secret"}}
+    }
+    return paths
