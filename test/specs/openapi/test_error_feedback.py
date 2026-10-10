@@ -1818,6 +1818,23 @@ def test_apply_adjustments_bounds_an_untyped_property(case_factory):
             },
             id="oneof-branches",
         ),
+        # Closing each `allOf` branch would forbid the properties the other branches declare.
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"a": {}}, "required": ["a"]},
+                    {"type": "object", "properties": {"b": {}}, "required": ["b"]},
+                ]
+            },
+            (),
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"a": {}}, "required": ["a"]},
+                    {"type": "object", "properties": {"b": {}}, "required": ["b"]},
+                ]
+            },
+            id="allof-branches-untouched",
+        ),
         pytest.param(
             {"type": "object", "properties": {"address": {"type": "object", "properties": {"city": {}}}}},
             ("address",),
@@ -2210,6 +2227,57 @@ def test_unexpected_property_adjustment_drops_empty_required(case_factory):
         UnexpectedPropertyAdjustment(), input_schema, _build_unexpected_property_observations(("shadow",)), case_factory
     )
     assert "required" not in out
+
+
+@pytest.mark.parametrize(
+    ("rejected", "expected_properties"),
+    [
+        ("extra", {"a": {"type": "string"}, "b": {"type": "integer"}}),
+        ("b", {"a": {"type": "string"}}),
+    ],
+    ids=["undeclared", "declared"],
+)
+def test_jackson_unrecognized_field_closes_body(ctx, case_factory, response_factory, rejected, expected_properties):
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"a": {"type": "string"}, "b": {"type": "integer"}},
+                                    "required": ["a"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/items"]["POST"]
+    store = ErrorFeedbackStore()
+    _record(
+        store,
+        operation=operation,
+        case=case_factory(operation=operation),
+        body={
+            "message": f'JSON parse error: Unrecognized field "{rejected}" (class com.x.Item), not marked as ignorable'
+        },
+        response_factory=response_factory,
+    )
+    schema = operation.body[0].optimized_schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
+    _assert_valid_schema_object(schema, adjusted)
+    assert adjusted == {
+        "type": "object",
+        "properties": expected_properties,
+        "required": ["a"],
+        "additionalProperties": False,
+    }
 
 
 def _record_body_observation(store, operation, *, kind, parameter_path):

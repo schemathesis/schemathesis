@@ -441,6 +441,14 @@ class SpringParser:
                     kind=ObservationKind.UNEXPECTED_PROPERTY,
                     raw_message=message,
                 )
+                # The server rejects unknown keys, so invented extras would be refused too.
+                yield Observation(
+                    operation_label=operation.label,
+                    location=ParameterLocation.BODY,
+                    parameter_path=(),
+                    kind=ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES,
+                    raw_message=message,
+                )
             for match in _UNEXPECTED_PARAMETER.finditer(message):
                 yield Observation(
                     operation_label=operation.label,

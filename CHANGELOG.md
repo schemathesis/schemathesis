@@ -8,6 +8,7 @@
 - Warning when most entries of a dictionary fail the schema of their parameter.
 - Warning when `--request-timeout` or `max_response_time` is 1000 seconds or more.
 - `object_level_authorization` check: one WFC peer reading an object another peer created.
+- Error feedback stops sending unknown body fields after a Jackson `Unrecognized field` rejection.
 
 ### :wrench: Changed
 
@@ -21,6 +22,7 @@
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
+- Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
 
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
