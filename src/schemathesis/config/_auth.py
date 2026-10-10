@@ -133,11 +133,16 @@ class WFCAuthConfig(DiffBase):
     path: str
     user: str | None
     refresh_interval: int
+    # Users that must not see each other's objects.
+    peers: list[str] | None
 
-    def __init__(self, *, path: str, user: str | None = None, refresh_interval: int = 300) -> None:
+    def __init__(
+        self, *, path: str, user: str | None = None, refresh_interval: int = 300, peers: list[str] | None = None
+    ) -> None:
         self.path = path
         self.user = user
         self.refresh_interval = refresh_interval
+        self.peers = peers
 
 
 @dataclass(repr=False, slots=True)

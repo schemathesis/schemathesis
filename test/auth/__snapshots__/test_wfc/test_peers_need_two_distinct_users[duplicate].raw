@@ -1,0 +1,14 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Error in [auth.wfc] section:
+  Duplicate values:
+
+  - 'peers' -> 'alice' is listed more than once.

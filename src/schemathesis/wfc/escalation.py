@@ -54,9 +54,19 @@ class EscalatingAuthProvider:
         "_refused_early",
         "_checks_credentials",
         "_lock",
+        "peers",
+        "_pinned",
+        "_probed",
     )
 
-    def __init__(self, providers: list[AuthProvider], names: list[str]) -> None:
+    def __init__(
+        self,
+        providers: list[AuthProvider],
+        names: list[str],
+        *,
+        peers: tuple[str, ...] = (),
+        pinned: str | None = None,
+    ) -> None:
         # Credentials an operation rejects are worse than none: a stack that refuses a bad
         # `Authorization` header serves the same request once it is absent. Second in line, so a
         # document whose credentials never work costs one request to find out rather than all of them.
@@ -74,9 +84,27 @@ class EscalatingAuthProvider:
         # Operations that answered a 401, so a success on them means the credentials were checked.
         self._checks_credentials: set[str] = set()
         self._lock = threading.Lock()
+        # Identities that must not see each other's objects.
+        self.peers = peers
+        # A pinned identity keeps every operation; the others stay loaded only for peer probes.
+        self._pinned = self.names.index(pinned) if pinned is not None else None
+        self._probed: set[tuple[str, str, str]] = set()
 
     def index_for(self, label: str) -> int:
+        if self._pinned is not None:
+            return self._pinned
         return self._assigned.get(label, 0)
+
+    def provider_for(self, name: str) -> AuthProvider:
+        return self.providers[self.names.index(name)]
+
+    def claim_probe(self, key: tuple[str, str, str]) -> bool:
+        """Whether `key` is probed for the first time in this run."""
+        with self._lock:
+            if key in self._probed:
+                return False
+            self._probed.add(key)
+            return True
 
     def get(self, case: Case, context: AuthContext) -> Any:
         return self.providers[self.index_for(context.operation.label)].get(case, context)
@@ -88,6 +116,8 @@ class EscalatingAuthProvider:
 
     def record(self, label: str, identity: str | None, status_code: int) -> None:
         """Fold one response, sent as `identity`, into the assignment for `label`."""
+        if self._pinned is not None:
+            return
         # Anonymous cases are never tagged, and neither are cases whose credentials were left out on purpose;
         # both went out without credentials.
         sent = self.names.index(identity if identity is not None else ANONYMOUS)
@@ -145,6 +175,8 @@ class EscalatingAuthProvider:
 
     def restore(self, assignments: dict[str, str]) -> None:
         """Start from where a previous run settled; escalation still corrects it if the API changed."""
+        if self._pinned is not None:
+            return
         index_by_name = {name: index for index, name in enumerate(self.names)}
         with self._lock:
             for label, name in assignments.items():
@@ -153,25 +185,25 @@ class EscalatingAuthProvider:
                     self._assigned[label] = index
 
 
-def _escalating_provider(schema: SchemaMetadata) -> EscalatingAuthProvider | None:
+def escalating_provider(schema: SchemaMetadata) -> EscalatingAuthProvider | None:
     """`[auth.wfc]` registers at most one, so there is nothing to merge across providers."""
     return next((p for p in schema.auth.providers if isinstance(p, EscalatingAuthProvider)), None)
 
 
 def identity_assignments(schema: SchemaMetadata) -> dict[str, str]:
     """Per-operation identities settled on so far, for persistence."""
-    provider = _escalating_provider(schema)
+    provider = escalating_provider(schema)
     return provider.snapshot() if provider is not None else {}
 
 
 def restore_identity_assignments(schema: SchemaMetadata, assignments: dict[str, str]) -> None:
-    provider = _escalating_provider(schema)
+    provider = escalating_provider(schema)
     if provider is not None:
         provider.restore(assignments)
 
 
 def record_auth_outcome(case: Case, status_code: int) -> None:
     """Let an escalating provider learn from this response."""
-    provider = _escalating_provider(case.operation.schema)
+    provider = escalating_provider(case.operation.schema)
     if provider is not None:
         provider.record(case.operation.label, case._auth_identity, status_code)

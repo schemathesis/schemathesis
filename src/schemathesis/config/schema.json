@@ -325,6 +325,15 @@
           "type": "integer",
           "description": "Seconds to cache login credentials before re-authenticating.",
           "minimum": 0
+        },
+        "peers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "uniqueItems": true,
+          "description": "WFC users that must not see each other's objects."
         }
       }
     },
