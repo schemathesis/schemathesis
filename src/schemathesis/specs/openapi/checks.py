@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     import jsonschema_rs
 
     from schemathesis.engine.recorder import RecordedScenario
+    from schemathesis.generation.meta import CaseMetadata
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -1597,18 +1598,14 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
         return None
     content_types = response.headers.get("content-type")
     content_type = content_types[0] if content_types else None
-    # Without declared fields no body is equivalent.
+    # Without a declared schema, every field of the body counts.
     schema = declared_response_schema(case.operation, response.status_code, content_type) or {}
     owner_body = _json_body(response)
-    for draw in case.meta.pool_draws:
-        if draw.source_identity != owner:
-            continue
-        container = case.get_container(ParameterLocation(draw.location))
-        value = container.get(draw.parameter_name) if isinstance(container, Mapping) else None
-        if value is None or not value_paths(owner_body, value):
+    for resource, value in _owned_values(ctx, case, case.meta, owner):
+        if not value_paths(owner_body, value):
             continue
         for peer in provider.peers:
-            if peer == owner or not provider.claim_probe((case.operation.label, draw.resource_name, peer)):
+            if peer == owner or not provider.claim_probe((case.operation.label, resource, peer)):
                 continue
             peer_case = apply_as(case, provider.provider_for(peer), peer)
             peer_response = _send_probe(ctx, case, peer_case)
@@ -1621,7 +1618,7 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
             raise ObjectLevelAuthorizationViolation(
                 operation=case.operation.label,
                 message=(
-                    f"`{peer}` received the `{draw.resource_name}` that `{owner}` created\n\n"
+                    f"`{peer}` received the `{resource}` that `{owner}` created\n\n"
                     f"Owner: {case.method} {case.formatted_path} as {owner} -> {response.status_code}\n"
                     f"Peer:  {peer_case.method} {peer_case.formatted_path} as {peer} -> "
                     f"{peer_response.status_code} (equivalent body)"
@@ -1632,6 +1629,31 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
                 case_id=peer_case.id,
             )
     return None
+
+
+def _owned_values(ctx: CheckContext, case: Case, meta: CaseMetadata, owner: str) -> Iterator[tuple[str, object]]:
+    """Resource names and values in `case` that an earlier write by `owner` produced."""
+    from schemathesis.specs.openapi.object_authorization import value_paths
+
+    # A read shows other users' objects too, so only a write proves who created one.
+    for draw in meta.pool_draws:
+        container = case.get_container(ParameterLocation(draw.location))
+        if (
+            draw.source_identity == owner
+            and draw.source_operation.split(" ", 1)[0] not in SAFE_METHODS
+            and isinstance(container, Mapping)
+            and draw.parameter_name in container
+        ):
+            yield draw.resource_name, container[draw.parameter_name]
+    # Stateful steps get ids through links: the previous step either returned them or sent them.
+    parent = ctx._find_parent(case_id=case.id)
+    if parent is None or parent._auth_identity != owner or parent.method.upper() in SAFE_METHODS:
+        return
+    parent_response = ctx._find_response(case_id=parent.id)
+    parent_body = _json_body(parent_response) if parent_response is not None else None
+    for name, value in (case.path_parameters or {}).items():
+        if value_paths(parent_body, value) or value_paths(parent.body, value):
+            yield name, value
 
 
 def _send_probe(ctx: CheckContext, parent: Case, probe: Case) -> Response:

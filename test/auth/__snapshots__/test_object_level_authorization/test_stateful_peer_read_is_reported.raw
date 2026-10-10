@@ -17,18 +17,20 @@ Schemathesis dev
 
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
+ ❌  Stateful (in 0.00s)
 
- ❌  Fuzzing (in 0.00s)
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total (1 inferred)
 
-     ✅ 1 passed  ❌ 1 failed
+     ✅ N passed  ❌ 1 failed
 
 =================================== FAILURES ===================================
-__________________________ GET /api/orders/{order_id} __________________________
+________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Object-level authorization bypass
 
-    `bob` received the `Order` that `alice` created
+    `bob` received the `order_id` that `alice` created
 
     Owner: GET /api/orders/1 as alice -> 200
     Peer:  GET /api/orders/1 as bob -> 200 (equivalent body)
@@ -52,8 +54,8 @@ API Operations:
 Test Phases:
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
-  ❌ Fuzzing
-  ⏭  Stateful (disabled)
+  ⏭  Fuzzing (disabled)
+  ❌ Stateful
 
 Failures:
   ❌ Object-level authorization bypass: 1
