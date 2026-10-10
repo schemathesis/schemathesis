@@ -252,6 +252,27 @@ def build_inputs_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
     return inputs_by_label
 
 
+def build_created_keys_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
+    """Index request body fields that name what a create makes, e.g. a client-chosen `title`.
+
+    Recorded after a 2xx like inputs, but never drawn: a create needs a fresh key.
+    """
+    created: dict[str, list[InputSlot]] = {}
+    for label, operation in graph.operations.items():
+        bound = {slot.parameter_name for slot in operation.inputs if slot.parameter_location == ParameterLocation.BODY}
+        for output in operation.outputs:
+            if output.body_field is not None and output.body_field not in bound:
+                created.setdefault(label, []).append(
+                    InputSlot(
+                        resource=output.resource,
+                        resource_field=output.body_field,
+                        parameter_name=output.body_field,
+                        parameter_location=ParameterLocation.BODY,
+                    )
+                )
+    return created
+
+
 def _build_property_validator(
     prop_schema: object, container_schema: JsonSchema, validator_cls: type
 ) -> jsonschema_rs.Validator | None:
@@ -330,6 +351,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
     repository: ResourceRepository
     requirements: dict[RequirementKey, ParameterRequirement]
     inputs_by_label: dict[str, list[InputSlot]]
+    created_keys_by_label: dict[str, list[InputSlot]]
     usage_tracker: VariantUsageTracker
     semantic_index: SemanticValueIndex | None
     semantic_eligible_operations: frozenset[str]
@@ -343,10 +365,12 @@ class OpenApiExtraDataSource(ExtraDataSource):
         usage_tracker: VariantUsageTracker | None = None,
         semantic_index: SemanticValueIndex | None = None,
         semantic_eligible_operations: frozenset[str] = frozenset(),
+        created_keys_by_label: dict[str, list[InputSlot]] | None = None,
     ) -> None:
         self.repository = repository
         self.requirements = requirements
         self.inputs_by_label = inputs_by_label if inputs_by_label is not None else {}
+        self.created_keys_by_label = created_keys_by_label if created_keys_by_label is not None else {}
         self.usage_tracker = usage_tracker if usage_tracker is not None else VariantUsageTracker()
         self.semantic_index = semantic_index
         self.semantic_eligible_operations = semantic_eligible_operations
@@ -680,7 +704,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
     def should_record_request(self, *, operation: str) -> bool:
         """Check if request inputs should be captured for this operation."""
-        return operation in self.inputs_by_label
+        return operation in self.inputs_by_label or operation in self.created_keys_by_label
 
     def record_request(
         self,
@@ -690,7 +714,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         status_code: int,
     ) -> None:
         """Capture path-parameter and body-field values from a successful request."""
-        slots = self.inputs_by_label.get(operation.label)
+        slots = [*self.inputs_by_label.get(operation.label, ()), *self.created_keys_by_label.get(operation.label, ())]
         if not slots:
             return
         if case.meta is not None:

@@ -13,6 +13,7 @@ from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 from schemathesis.specs.openapi.auth_jwt import seed_pool_from_basic_auth, seed_pool_from_headers
 from schemathesis.specs.openapi.extra_data_source import (
     OpenApiExtraDataSource,
+    build_created_keys_by_label,
     build_inputs_by_label,
     build_parameter_requirements,
 )
@@ -122,8 +123,9 @@ class OpenAPIAnalysis:
             descriptors = self.resource_descriptors
             requirements = build_parameter_requirements(self.dependency_graph)
             inputs_by_label = build_inputs_by_label(self.dependency_graph)
+            created_keys_by_label = build_created_keys_by_label(self.dependency_graph)
             semantic_eligible = _collect_semantic_eligible_operations(self.schema)
-            if not descriptors and not inputs_by_label and not semantic_eligible:
+            if not descriptors and not inputs_by_label and not created_keys_by_label and not semantic_eligible:
                 self._extra_data_source = None
             else:
                 repository = ResourceRepository(descriptors)
@@ -138,6 +140,7 @@ class OpenAPIAnalysis:
                     repository=repository,
                     requirements=requirements,
                     inputs_by_label=inputs_by_label,
+                    created_keys_by_label=created_keys_by_label,
                     semantic_index=SemanticValueIndex() if semantic_eligible else None,
                     semantic_eligible_operations=semantic_eligible,
                 )

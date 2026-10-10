@@ -950,6 +950,110 @@ def test_record_request_captures_path_value_only_for_bound_operations(ctx):
     assert [instance.data for instance in data_source.repository.iter_instances("Item")] == [{"id": "from-request"}]
 
 
+BOOK = {"type": "object", "properties": {"book_title": {"type": "string"}, "owner": {"type": "string"}}}
+MESSAGE_RESPONSE = {
+    "200": {
+        "description": "OK",
+        "content": {"application/json": {"schema": {"type": "object", "properties": {"message": {"type": "string"}}}}},
+    }
+}
+CLIENT_KEYED_BOOKS = {
+    "/books": {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object", "properties": {"Books": {"type": "array", "items": BOOK}}}
+                        }
+                    },
+                }
+            }
+        },
+        "post": {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"book_title": {"type": "string"}, "secret": {"type": "string"}},
+                        }
+                    }
+                }
+            },
+            "responses": MESSAGE_RESPONSE,
+        },
+    },
+    "/books/{book_title}": {
+        "get": {
+            "parameters": [{"name": "book_title", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": BOOK}}}},
+        }
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [(200, [({"book_title": "mine"}, "POST /books", "alice")]), (400, [])],
+    ids=["created", "rejected"],
+)
+def test_record_request_captures_client_chosen_key_of_create(ctx, status_code, expected):
+    schema = ctx.openapi.load_schema(CLIENT_KEYED_BOOKS)
+    data_source = schema.create_extra_data_source()
+    create = schema["/books"]["POST"]
+    case = create.Case(body={"book_title": "mine", "secret": "s"})
+    case._auth_identity = "alice"
+    if data_source.should_record_request(operation=create.label):
+        data_source.record_request(operation=create, case=case, status_code=status_code)
+    assert [
+        (instance.data, instance.source_operation, instance.identity)
+        for instance in data_source.repository.iter_instances("Book")
+    ] == expected
+
+
+def test_record_request_captures_required_create_key_once(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/sessions": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["sessionId"],
+                                    "properties": {"sessionId": {"type": "string"}},
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+            "/sessions/{sessionId}": {
+                "get": {
+                    "parameters": [{"name": "sessionId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    create = schema["/sessions"]["POST"]
+    data_source.record_request(operation=create, case=create.Case(body={"sessionId": "s1"}), status_code=201)
+    assert [instance.data for instance in data_source.repository.iter_instances("Session")] == [{"sessionId": "s1"}]
+
+
+def test_create_never_draws_existing_keys(ctx):
+    schema = ctx.openapi.load_schema(CLIENT_KEYED_BOOKS)
+    data_source = schema.create_extra_data_source()
+    create = schema["/books"]["POST"]
+    data_source.record_request(operation=create, case=create.Case(body={"book_title": "mine"}), status_code=200)
+    assert data_source.pick_correlated_values(operation=create).values == {}
+
+
 def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):
     schema = ctx.openapi.load_schema(
         {
