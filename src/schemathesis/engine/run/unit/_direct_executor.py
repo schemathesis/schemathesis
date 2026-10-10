@@ -12,6 +12,7 @@ from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import (
     BudgetExpired,
     ServerWentAway,
+    raise_if_stopped,
     run_one_case,
 )
 from schemathesis.engine.run.unit._errors import (
@@ -24,6 +25,7 @@ from schemathesis.generation.meta import content_type_probes_first
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
     from schemathesis.generation.drivers import CaseGenerator
 
@@ -48,7 +50,6 @@ def run_driver(
 ) -> events.EventGenerator:
     """Drive a progressive case generator directly, one case at a time."""
     errors: list[Exception] = []
-    skip_reason: str | None = None
     scenario = start_scenario(
         operation=generator.operation, ctx=ctx, phase=phase, suite_id=suite_id, scenario_id=scenario_id
     )
@@ -71,13 +72,7 @@ def run_driver(
             for case in reversed(content_type_probes_first(_collect_within_budget(generator, ctx))):
                 # One snapshot: reading the clock twice lets the deadline pass in between and turn a
                 # spent budget into a phantom interrupt.
-                stop_reason = ctx.stop_reason
-                if stop_reason is StopReason.MAX_TIME:
-                    raise BudgetExpired
-                if stop_reason is StopReason.SERVER_UNAVAILABLE:
-                    raise ServerWentAway
-                if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
-                    raise KeyboardInterrupt
+                raise_if_stopped(ctx.stop_reason)
                 any_case_ran = True
                 try:
                     run_one_case(
@@ -109,7 +104,7 @@ def run_driver(
             status = Status.ERROR
             yield non_fatal_error(stored.error, code_sample=stored.code_sample)
     except KeyboardInterrupt:
-        yield scenario.finished(Status.INTERRUPTED, skip_reason)
+        yield scenario.finished(Status.INTERRUPTED, None)
         yield events.Interrupted(phase=phase)
         return
     except AuthenticationError as exc:
@@ -124,16 +119,14 @@ def run_driver(
             non_fatal_error=non_fatal_error,
         )
 
-    if status == Status.SUCCESS:
-        if not any_case_ran:
-            status = Status.SKIP
-            skip_reason = "Time limit reached" if budget_expired else "No examples in schema"
-        elif any_case_errored:
-            status = Status.ERROR
-        elif server_went_away and not recorder.has_responses():
-            status = Status.SKIP
-            skip_reason = StopReason.SERVER_UNAVAILABLE.skip_explanation
-
+    status, skip_reason = _settle_status(
+        status,
+        any_case_ran=any_case_ran,
+        any_case_errored=any_case_errored,
+        budget_expired=budget_expired,
+        server_went_away=server_went_away,
+        recorder=recorder,
+    )
     if status == Status.SUCCESS and continue_on_failure and has_new_failures(recorder, ctx.config.load_baseline()):
         status = Status.FAILURE
 
@@ -147,3 +140,24 @@ def run_driver(
     yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 
     yield scenario.finished(status, skip_reason)
+
+
+def _settle_status(
+    status: Status,
+    *,
+    any_case_ran: bool,
+    any_case_errored: bool,
+    budget_expired: bool,
+    server_went_away: bool,
+    recorder: ScenarioRecorder,
+) -> tuple[Status, str | None]:
+    """Turn a scenario that raised nothing into a skip or an error when its cases did not really run."""
+    if status != Status.SUCCESS:
+        return status, None
+    if not any_case_ran:
+        return Status.SKIP, "Time limit reached" if budget_expired else "No examples in schema"
+    if any_case_errored:
+        return Status.ERROR, None
+    if server_went_away and not recorder.has_responses():
+        return Status.SKIP, StopReason.SERVER_UNAVAILABLE.skip_explanation
+    return status, None

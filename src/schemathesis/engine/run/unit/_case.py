@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import requests
 from requests.exceptions import ChunkedEncodingError
@@ -52,6 +52,16 @@ class ServerWentAway(KeyboardInterrupt):
     """Raised once the server stopped responding, so no refusal is reported per operation."""
 
 
+def raise_if_stopped(stop_reason: StopReason) -> None:
+    """Raise the interrupt that matches why the run stops, if it does."""
+    if stop_reason is StopReason.MAX_TIME:
+        raise BudgetExpired
+    if stop_reason is StopReason.SERVER_UNAVAILABLE:
+        raise ServerWentAway
+    if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
+        raise KeyboardInterrupt
+
+
 def run_one_case(
     *,
     case: Case,
@@ -67,46 +77,28 @@ def run_one_case(
 ) -> None:
     """Run one case end-to-end: call, record, validate, classify."""
     try:
-        # One snapshot: reading the clock twice lets the deadline pass in between and turn a spent
-        # budget into a phantom interrupt.
-        stop_reason = ctx.stop_reason
         # A slice may be shorter than a single case takes. Let the first one through anyway, so an
         # operation is never selected and then left with nothing to show for it.
-        if stop_reason is StopReason.MAX_TIME or (ctx.is_operation_slice_expired and recorder.interactions):
+        if ctx.is_operation_slice_expired and recorder.interactions:
             raise BudgetExpired
-        if stop_reason is StopReason.SERVER_UNAVAILABLE:
-            raise ServerWentAway
-        if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
-            raise KeyboardInterrupt
+        # One snapshot: reading the clock twice lets the deadline pass in between and turn a spent
+        # budget into a phantom interrupt.
+        raise_if_stopped(ctx.stop_reason)
         # Honor a supervisor SKIP verdict that flipped mid-scenario; without this,
         # cases already drawn or queued would still hit the server.
-        if (
-            _is_ordinary_request(case)
-            and ctx.supervisor.verdict(case.operation.label).directive is SchedulingDirective.SKIP
-        ):
+        if _is_skipped_by_supervisor(case, ctx):
             return
         if generation.unique_inputs:
-            cached = ctx.get_cached_outcome(case)
-            if isinstance(cached, BaseException):
-                raise cached
-            if cached is None:
-                return
-            try:
-                _do_call_and_validate(
-                    case=case,
-                    ctx=ctx,
-                    check_ctx=check_ctx,
-                    recorder=recorder,
-                    generation=generation,
-                    transport_kwargs=transport_kwargs,
-                    continue_on_failure=continue_on_failure,
-                    pending_events=pending_events,
-                )
-            except BaseException as exc:
-                ctx.cache_outcome(case, exc)
-                raise
-            else:
-                ctx.cache_outcome(case, None)
+            _call_and_validate_once(
+                case=case,
+                ctx=ctx,
+                check_ctx=check_ctx,
+                recorder=recorder,
+                generation=generation,
+                transport_kwargs=transport_kwargs,
+                continue_on_failure=continue_on_failure,
+                pending_events=pending_events,
+            )
         else:
             _do_call_and_validate(
                 case=case,
@@ -121,31 +113,95 @@ def run_one_case(
     except (KeyboardInterrupt, Failure):
         raise
     except Exception as exc:
-        if isinstance(exc, MalformedMediaType) and case.media_type is not None:
-            exc = InvalidSchema.from_malformed_media_type(
-                exc, case.media_type, path=case.operation.path, method=case.operation.method
-            )
-        network_error = None
-        if isinstance(
-            exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
-        ) and is_unrecoverable_network_error(exc):
-            code_sample = build_code_sample(case, exc.request, transport_kwargs)
-            network_error = UnrecoverableNetworkError(error=exc, code_sample=code_sample)
-        outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
-        if outage and ctx.server.is_after_outage(exc):
-            # A check's own request may be the refused one; the case itself was answered then.
-            if recorder.find_response(case_id=case.id) is None:
-                recorder.forget_case(case_id=case.id)
+        _raise_case_error(
+            exc, case=case, ctx=ctx, recorder=recorder, transport_kwargs=transport_kwargs, state=state, errors=errors
+        )
+
+
+def _is_skipped_by_supervisor(case: Case, ctx: EngineContext) -> bool:
+    return (
+        _is_ordinary_request(case)
+        and ctx.supervisor.verdict(case.operation.label).directive is SchedulingDirective.SKIP
+    )
+
+
+def _call_and_validate_once(
+    *,
+    case: Case,
+    ctx: EngineContext,
+    check_ctx: CheckContext,
+    recorder: ScenarioRecorder,
+    generation: GenerationConfig,
+    transport_kwargs: dict[str, Any],
+    continue_on_failure: bool,
+    pending_events: list[events.EngineEvent],
+) -> None:
+    """Send an input only the first time it is seen; later copies repeat the first outcome."""
+    cached = ctx.get_cached_outcome(case)
+    if isinstance(cached, BaseException):
+        raise cached
+    if cached is None:
+        return
+    try:
+        _do_call_and_validate(
+            case=case,
+            ctx=ctx,
+            check_ctx=check_ctx,
+            recorder=recorder,
+            generation=generation,
+            transport_kwargs=transport_kwargs,
+            continue_on_failure=continue_on_failure,
+            pending_events=pending_events,
+        )
+    except BaseException as exc:
+        ctx.cache_outcome(case, exc)
+        raise
+    else:
+        ctx.cache_outcome(case, None)
+
+
+def _raise_case_error(
+    exc: Exception,
+    *,
+    case: Case,
+    ctx: EngineContext,
+    recorder: ScenarioRecorder,
+    transport_kwargs: dict[str, Any],
+    state: TestingState,
+    errors: list[Exception],
+) -> NoReturn:
+    """Classify an error the case raised: a server outage, an unrecoverable network error or a per-case error."""
+    if isinstance(exc, MalformedMediaType) and case.media_type is not None:
+        exc = InvalidSchema.from_malformed_media_type(
+            exc, case.media_type, path=case.operation.path, method=case.operation.method
+        )
+    network_error = _as_unrecoverable_network_error(exc, case, transport_kwargs)
+    outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
+    if outage and ctx.server.is_after_outage(exc):
+        # A check's own request may be the refused one; the case itself was answered then.
+        if recorder.find_response(case_id=case.id) is None:
+            recorder.forget_case(case_id=case.id)
+        raise ServerWentAway from None
+    if network_error is not None:
+        # Server likely has crashed and does not accept any connections at all
+        # Don't report these error - only the original crash should be reported
+        state.store_unrecoverable_network_error(network_error)
+        if outage:
             raise ServerWentAway from None
-        if network_error is not None:
-            # Server likely has crashed and does not accept any connections at all
-            # Don't report these error - only the original crash should be reported
-            state.store_unrecoverable_network_error(network_error)
-            if outage:
-                raise ServerWentAway from None
-            raise
-        errors.append(exc)
-        raise UnexpectedError from None
+        raise
+    errors.append(exc)
+    raise UnexpectedError from None
+
+
+def _as_unrecoverable_network_error(
+    exc: Exception, case: Case, transport_kwargs: dict[str, Any]
+) -> UnrecoverableNetworkError | None:
+    if isinstance(
+        exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
+    ) and is_unrecoverable_network_error(exc):
+        code_sample = build_code_sample(case, exc.request, transport_kwargs)
+        return UnrecoverableNetworkError(error=exc, code_sample=code_sample)
+    return None
 
 
 def _do_call_and_validate(
@@ -160,6 +216,34 @@ def _do_call_and_validate(
     pending_events: list[events.EngineEvent],
 ) -> None:
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+    response = _call_with_reauth(
+        case=case, ctx=ctx, recorder=recorder, transport_kwargs=transport_kwargs, pending_events=pending_events
+    )
+    recorder.record_response(case_id=case.id, response=response)
+    _record_response_signals(
+        case=case, ctx=ctx, recorder=recorder, response=response, transport_kwargs=transport_kwargs
+    )
+    metrics.maximize(generation.maximize, case=case, response=response)
+    validate_response(
+        case=case,
+        ctx=check_ctx,
+        response=response,
+        continue_on_failure=continue_on_failure,
+        recorder=recorder,
+        baseline=ctx.config.load_baseline(),
+    )
+    response.clear_cache()
+
+
+def _call_with_reauth(
+    *,
+    case: Case,
+    ctx: EngineContext,
+    recorder: ScenarioRecorder,
+    transport_kwargs: dict[str, Any],
+    pending_events: list[events.EngineEvent],
+) -> Response:
+    """Call the server, retrying on rate limits and replaying once with fresh credentials when auth expired."""
     auto_mode = ctx.config.rate_limit_for(operation=case.operation) == "auto"
 
     def _call() -> Response:
@@ -183,8 +267,18 @@ def _do_call_and_validate(
 
     response = _perform_call()
     # Replay through `_perform_call` so it keeps rate-limit and network-error handling.
-    response = reauth_and_replay(case, response, ctx.reauth, _perform_call)
-    recorder.record_response(case_id=case.id, response=response)
+    return reauth_and_replay(case, response, ctx.reauth, _perform_call)
+
+
+def _record_response_signals(
+    *,
+    case: Case,
+    ctx: EngineContext,
+    recorder: ScenarioRecorder,
+    response: Response,
+    transport_kwargs: dict[str, Any],
+) -> None:
+    """Feed the response to error feedback, the supervisor, auth escalation and DELETE decay."""
     if ctx.error_feedback is not None:
         ctx.record_error_feedback(
             case=case,
@@ -210,16 +304,6 @@ def _do_call_and_validate(
         status = response.status_code
         if 200 <= status < 300 or status == 404:
             ctx.extra_data_source.record_successful_delete(operation=case.operation, case=case)
-    metrics.maximize(generation.maximize, case=case, response=response)
-    validate_response(
-        case=case,
-        ctx=check_ctx,
-        response=response,
-        continue_on_failure=continue_on_failure,
-        recorder=recorder,
-        baseline=ctx.config.load_baseline(),
-    )
-    response.clear_cache()
 
 
 def record_extra_data_from_recorder(ctx: EngineContext, operation: APIOperation, recorder: ScenarioRecorder) -> None:
