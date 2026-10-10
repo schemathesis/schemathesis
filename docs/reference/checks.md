@@ -321,9 +321,21 @@ The check gives no verdict when an explicitly configured `Authorization` header 
 
 ### `object_level_authorization`
 
-Verifies that one user cannot read an object another user created (OWASP API1, BOLA). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists `peers`: users whose objects must stay private to each other.
+Verifies that one user cannot read an object another user owns (OWASP API1, Broken Object Level Authorization). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists at least two `peers`: users whose objects must stay private to each other.
 
-When a peer sends a `GET` request with an identifier that its own earlier write (e.g. a `POST`) produced, Schemathesis repeats it as each other peer. An identifier taken from a list counts too, once the same list, sent by the other peer, does not contain it. The check fails when another peer gets a `2xx` response describing the same object: the identifier sits at the same place, and every field declared in the response schema matches (every field, where the schema does not describe the body). A different body, such as a redacted view or an empty list, passes. So does a body an unauthenticated request also gets, which marks the object as public, and an object the other peer can read in full from a list, which marks it as shared.
+A peer owns an identifier when:
+
+- its own earlier write (e.g. a `POST`) returned it, or
+- a list it requested returned it, and the same list requested by another peer does not.
+
+When a `GET` with an owned identifier succeeds, Schemathesis repeats it as each other peer. The check fails when another peer gets a `2xx` response with the same object: the identifier sits at the same place in both bodies, every field present in both bodies has the same value, and at least one such field is not the identifier. A field only one body holds is ignored. Only fields the response schema declares count; where it declares none, every field counts.
+
+The check passes when the other peer gets:
+
+- different field values, e.g. masked ones, or an empty list
+- only the identifier
+- the same body as an unauthenticated request, which makes the object public
+- the full object from a list it can request, which makes the object shared
 
 ```text
 - Object-level authorization bypass

@@ -623,7 +623,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String (directory path)`  
 
-    Directory for the HTML report: an `index.html` page with the verdict, warnings, failures with commands to reproduce them, and the run's settings. It works offline, so it can be stored as a CI artifact and opened from the file system.
+    Directory for the HTML report: an `index.html` page with the verdict, warnings, failures with commands to reproduce them, and the run's settings. The page works offline: store it as a CI artifact and open it from the file system.
 
     ```console
     $ st run openapi.yaml --report-html-path ./html-report

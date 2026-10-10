@@ -399,23 +399,23 @@ def test_drf_parser_parse_list_with_failing_index(make_operation, case_factory):
     )
 
 
-# Verbatim from /tmp/drf-corpus capture — CharField required + min_length=3 (multi-error)
+# DRF response: CharField required + min_length=3 (multi-error)
 _DRF_MULTI_ERROR_BODY = {"username": ["This field may not be blank.", "Ensure this field has at least 3 characters."]}
 
 
-# Verbatim from /tmp/drf-corpus capture — Django MaxLengthValidator bridge
+# DRF response: Django MaxLengthValidator bridge
 _DRF_DJANGO_BRIDGE_BODY = {"email": ["Ensure this value has at most 20 characters (it has 25)."]}
 
 
-# Verbatim from /tmp/drf-corpus capture — ListSerializer with bad item at index 2
+# DRF response: ListSerializer with bad item at index 2
 _DRF_LIST_INDEX_BODY = {"emails": [{}, {}, {"value": ["Enter a valid email address."]}]}
 
 
-# Verbatim from /tmp/drf-corpus capture — nested Serializer
+# DRF response: nested Serializer
 _DRF_NESTED_BODY = {"address": {"zipcode": ["This field is required."], "country": ["Enter a valid value."]}}
 
 
-# Verbatim from /tmp/drf-corpus capture — IntegerField with min_value=0
+# DRF response: IntegerField with min_value=0
 _DRF_INTEGER_BODY = {"age": ["Ensure this value is greater than or equal to 0."]}
 
 

@@ -16,8 +16,7 @@ docker run ghcr.io/schemathesis/schemathesis:stable \
 
 !!! tip "Free-threaded Python"
     The image uses free-threaded Python (3.14t). `-w auto` lets Schemathesis use all available CPUs in parallel.
-    Setting `PYTHON_GIL=1` removes this parallel speedup. Keep it unset unless a crash forces you to use it as a
-    workaround.
+    `PYTHON_GIL=1` removes this speedup. Set it only to work around a crash.
 
 ## Image Tags
 

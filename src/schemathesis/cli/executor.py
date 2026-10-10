@@ -28,8 +28,6 @@ if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
     from schemathesis.engine.events import EngineEvent, EventGenerator
 
-# Private until the HTML report is complete.
-
 
 class ExecutionContext(Protocol):
     exit_code: int
