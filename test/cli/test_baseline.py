@@ -351,6 +351,14 @@ def test_baseline_under_a_file_is_reported(ctx, cli, tmp_path, snapshot_cli):
     assert run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", "--baseline=file/baseline.json") == snapshot_cli
 
 
+# Every test passes, yet the run exits non-zero because the baseline could not be written.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unsaved_baseline_is_named_in_the_final_line(ctx, cli, tmp_path, snapshot_cli):
+    (tmp_path / "file").touch()
+
+    assert run(cli, ctx.openapi.apps.success(), "--phases=fuzzing", "--baseline=file/baseline.json") == snapshot_cli
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_baseline_in_read_only_directory_is_reported(ctx, cli, tmp_path, snapshot_cli):
