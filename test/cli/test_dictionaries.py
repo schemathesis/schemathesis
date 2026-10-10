@@ -57,6 +57,39 @@ def test_dictionary_mismatch_warning(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_dictionary_mismatch_warning_for_false_schema(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "disabled", "in": "query", "schema": False}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify([])
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--mode=positive",
+            "--max-examples=5",
+            config={
+                "dictionaries": {"flags": {"values": ["on", "off"]}},
+                "parameters": {"query.disabled": {"dictionary": "flags"}},
+            },
+        )
+        == snapshot_cli
+    )
+
+
 def test_no_dictionary_mismatch_warning_when_most_entries_match(ctx, cli):
     result = cli.run_openapi_app(
         _items_app(ctx),

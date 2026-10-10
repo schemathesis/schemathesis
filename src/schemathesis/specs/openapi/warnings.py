@@ -145,7 +145,7 @@ def find_dictionary_mismatches(operation: OpenApiOperation) -> list[DictionaryMi
         )
         for parameter_name, binding in bindings.items():
             schema = properties.get(parameter_name)
-            if not isinstance(schema, dict) or not binding.entries:
+            if not isinstance(schema, (dict, bool)):
                 continue
             validator = make_validator(schema, validator_cls)
             failing = [value for _, value in binding.entries if not validator.is_valid(value)]
