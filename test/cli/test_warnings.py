@@ -1102,7 +1102,10 @@ def test_missing_auth_warning_keeps_generic_tip_when_credentials_are_supplied(ct
         "-c not_a_server_error",
         *credentials,
     ).stdout
-    assert ("💡 Ensure valid authentication credentials are set via --auth or -H" in stdout, "sign-up" in stdout) == (
+    assert (
+        "💡 Ensure valid authentication credentials are set via `--auth` or `-H`" in stdout,
+        "sign-up" in stdout,
+    ) == (
         True,
         False,
     )

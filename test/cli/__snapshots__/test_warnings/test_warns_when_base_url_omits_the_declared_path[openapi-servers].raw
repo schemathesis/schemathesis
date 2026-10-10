@@ -46,7 +46,7 @@ Base URL may be missing a path: 1 operation returned only 404 Not Found
 
   - GET /users
 
-💡 The schema declares a base path; try --url http://127.0.0.1/api
+💡 The schema declares a base path; try `--url http://127.0.0.1/api`
 
 =================================== SUMMARY ====================================
 

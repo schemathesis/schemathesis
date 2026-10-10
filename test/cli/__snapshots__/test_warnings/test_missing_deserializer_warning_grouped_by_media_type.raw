@@ -85,7 +85,7 @@ text/html (2 operations):
   - GET /orders (200, 404)
   - GET /users (200, 404)
 
-💡 Register a deserializer with @schemathesis.deserializer() to enable validation
+💡 Register a deserializer with `@schemathesis.deserializer()` to enable validation
 
 =================================== SUMMARY ====================================
 

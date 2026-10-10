@@ -42,9 +42,10 @@ def _execute(
         config=config,
         args=args,
         params=params,
-        output_handler=OutputHandler(config=config, startup_warnings=startup_warnings),
+        output_handler=OutputHandler(config=config),
         context_factory=lambda cfg: ExecutionContext(
             config=cfg,
+            startup_warnings=startup_warnings,
             baseline_update=params.get("baseline_update", False),
             baseline_prune=params.get("baseline_prune", False),
         ),

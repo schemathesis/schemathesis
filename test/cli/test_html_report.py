@@ -1,3 +1,4 @@
+import itertools
 import re
 import time
 
@@ -625,3 +626,96 @@ def test_html_report_run_level_error(ctx, cli, app_runner, report_dir, snapshot_
         cli, report_dir, app_runner.openapi_url(app), phases="fuzzing,stateful", exit_code=ExitCode.FAILURES
     )
     assert html == snapshot_html
+
+
+def test_html_report_warning_on_passed_run(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.basic()
+    html = run_with_report(
+        cli, report_dir, api.schema_url, "--checks=not_a_server_error", "--mode=positive", "--max-examples=10"
+    )
+    assert html == snapshot_html
+
+
+def test_html_report_warning_grouped_by_cause(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.users_crud()
+    html = run_with_report(
+        cli,
+        report_dir,
+        api.schema_url,
+        f"--url={api.base_url}/v4/",
+        "--checks=not_a_server_error",
+        "--mode=positive",
+        "--max-examples=10",
+        phases="fuzzing,stateful",
+    )
+    assert html == snapshot_html
+
+
+def test_html_report_warning_with_details(ctx, cli, app_runner, report_dir, snapshot_html):
+    body = {"type": "array", "items": {"type": "string", "pattern": r"\p{Tibetan}"}, "maxItems": 3}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/tags": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/api/tags", methods=["POST"])
+    def tags():
+        return jsonify({})
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app), "--checks=not_a_server_error")
+    assert html == snapshot_html
+
+
+def test_html_report_unmatched_filter_warning(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success()
+    html = run_with_report(
+        cli, report_dir, api.schema_url, "--include-name=GET /api/success", "--include-name=GET /api/missing"
+    )
+    assert html == snapshot_html
+
+
+def test_html_report_startup_warning(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success()
+    assert run_with_report(cli, report_dir, api.schema_url, "--request-timeout=2000") == snapshot_html
+
+
+# Startup warnings come first, then warnings that affect the verdict, then setup notes.
+def test_html_report_warnings_order(ctx, cli, app_runner, report_dir):
+    order_id = {"name": "order_id", "in": "path", "required": True, "schema": {"type": "integer"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {"/api/orders/{order_id}": {"get": {"parameters": [order_id], "responses": {"200": {"description": "OK"}}}}}
+    )
+    calls = itertools.count()
+
+    @app.route("/api/orders/<order_id>")
+    def order(order_id):
+        if next(calls) % 10 == 0:
+            return jsonify({"id": order_id})
+        return jsonify({"detail": "Not found"}), 404
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=not_a_server_error",
+        "--mode=positive",
+        "--max-examples=10",
+        "--phases=fuzzing",
+        "--seed=42",
+        "--request-timeout=2000",
+        "--include-path-regex=^/api/orders",
+        "--include-name=GET /api/missing",
+        "--warnings=low_valid_rate,unmatched_filter,timeout_units",
+        env={"SCHEMATHESIS_HTML_REPORT_DIR": str(report_dir)},
+    )
+    html = (report_dir / "index.html").read_text(encoding="utf-8")
+    entries = re.findall(r'<li class="(warning[^"]*)">(?:<span>|<details id="([^"]+)")', html)
+    assert entries == [
+        ("warning startup", ""),
+        ("warning", "w-low-valid-input-rate"),
+        ("warning note", "w-unmatched-filters"),
+    ]

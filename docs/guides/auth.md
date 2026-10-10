@@ -19,7 +19,7 @@ Authentication failed: 4 operations returned authentication errors
   - POST /auth/token
   - POST /users
 
-💡 Ensure valid authentication credentials are set via --auth or -H
+💡 Ensure valid authentication credentials are set via `--auth` or `-H`
 ```
 
 Once authentication works, the operations you authenticated disappear from that list.

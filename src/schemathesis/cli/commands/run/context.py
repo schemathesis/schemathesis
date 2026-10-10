@@ -40,6 +40,8 @@ class ExecutionContext(BaseExecutionContext):
     warning_collector: WarningCollector | None = None
     baseline_update: bool = False
     baseline_prune: bool = False
+    # Problems with the invocation itself, shown before the schema is loaded.
+    startup_warnings: list[str] = field(default_factory=list)
     baseline_recorded: int | None = None
     baseline_pruned: list[str] | None = None
     baseline_write_error: str | None = None

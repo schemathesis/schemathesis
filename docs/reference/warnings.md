@@ -49,7 +49,7 @@ Base URL may be missing a path: 12 operations returned only 404 Not Found
   - GET /users
   - POST /users
 
-💡 The schema declares a base path; try --url http://localhost:8080/api
+💡 The schema declares a base path; try `--url http://localhost:8080/api`
 ```
 
 `--url` is the complete base URL - Schemathesis does not merge `basePath` or `servers` from the
@@ -140,7 +140,7 @@ See the [Authentication Guide](../guides/auth.md#openapi-aware-authentication) f
 ### `method_not_allowed`
 
 ```
-Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` — skipped from later phases
+Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed`, skipped from later phases
 
   - POST /missing
 
@@ -160,7 +160,7 @@ Constant reuse skipped: 1 registered source could not be scanned
 
   - `my_constants` resolved to no modules to scan
 
-💡 Check that each @schemathesis.python.constants source returns your app or modules
+💡 Check that each `@schemathesis.python.constants` source returns your app or modules
 ```
 
 **Trigger**: A source registered with `@schemathesis.python.constants` either raised while running or resolved to nothing importable, so no literals could be harvested from it.
@@ -209,7 +209,7 @@ Rate limited: 1 operation mostly returned 429 Too Many Requests, leaving the log
 
   - POST /items
 
-💡 Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m
+💡 Send requests no faster than the API allows with `--rate-limit`, e.g. `--rate-limit=100/m`
 ```
 
 **Trigger**: At least 90% of requests to an operation returned HTTP 429.

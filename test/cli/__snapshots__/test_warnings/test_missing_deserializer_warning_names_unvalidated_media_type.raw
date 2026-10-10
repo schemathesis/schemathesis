@@ -74,7 +74,7 @@ Schema validation skipped: 1 operation cannot validate text/csv responses due to
 text/csv (1 operation):
   - GET /users (200)
 
-💡 Register a deserializer with @schemathesis.deserializer() to enable validation
+💡 Register a deserializer with `@schemathesis.deserializer()` to enable validation
 
 =================================== SUMMARY ====================================
 

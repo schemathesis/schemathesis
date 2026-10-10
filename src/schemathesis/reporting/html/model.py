@@ -8,6 +8,7 @@ from schemathesis.engine import Status, StopReason
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
 
 if TYPE_CHECKING:
+    from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.summary import FailureGroup, SummaryData
 
 
@@ -114,6 +115,8 @@ class OperationRow:
     stops_at_first_failure: bool
     failing_cases: list[FailingCase] = field(default_factory=list)
     errors: list[ErrorEntry] = field(default_factory=list)
+    # Warnings that name this operation.
+    warnings: list[WarningBlock] = field(default_factory=list)
 
     @property
     def method(self) -> str:
@@ -137,6 +140,9 @@ class ReportData:
     unattributed_failures: list[tuple[str, int]]
     unattributed_cases: list[tuple[str, FailingCase]]
     unattributed_errors: list[tuple[str, ErrorEntry]]
+    warnings: list[WarningBlock]
+    # Problems with the invocation itself, e.g. a timeout given in milliseconds.
+    startup_warnings: list[str]
     running_time: float | None
     stop_reason: StopReason
     # `started` is False when the engine never ran (schema failed to load); `complete` is False
