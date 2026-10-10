@@ -1742,6 +1742,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
             nothing_tested_reason=ctx.nothing_tested_reason,
+            exit_code=ctx.exit_code,
+            baseline_not_saved=ctx.baseline_write_error is not None,
         )
 
     def display_reports(self) -> None:

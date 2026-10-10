@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
+from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.summary import (
     BaselineSummary,
@@ -89,6 +89,8 @@ def display_final_line(
     running_time: float,
     total_cases: int,
     nothing_tested_reason: str | None = None,
+    exit_code: int = 0,
+    baseline_not_saved: bool = False,
 ) -> None:
     parts = []
     if failures:
@@ -104,9 +106,21 @@ def display_final_line(
     if nothing_tested_reason is not None:
         message = nothing_tested_reason
         color = "red"
+    elif failures or errors:
+        message = f"{', '.join(parts)} in {running_time:.2f}s"
+        color = "red"
+    elif baseline_not_saved:
+        reason = ", ".join([*parts, "baseline not saved"]) if parts else "Baseline not saved"
+        message = f"{reason} in {running_time:.2f}s"
+        color = "red"
+    # Without failures or errors, a failing exit code comes from warnings configured with `fail-on`.
+    # `fail-on` may name only some of the shown warnings, so the line does not count them.
+    elif warnings and exit_code == ExitCode.FAILURES:
+        message = f"Warnings fail the run in {running_time:.2f}s"
+        color = "red"
     elif parts:
         message = f"{', '.join(parts)} in {running_time:.2f}s"
-        color = "red" if (failures or errors) else "yellow"
+        color = "yellow"
     elif total_cases == 0:
         message = "Empty test suite"
         color = "yellow"

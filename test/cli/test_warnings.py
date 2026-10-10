@@ -54,6 +54,36 @@ fail-on = ["missing_auth"]
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_warnings_failing_the_run_are_named_in_the_final_line(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.basic()
+
+    assert (
+        cli.run(
+            api.schema_url,
+            "--checks=not_a_server_error",
+            "--phases=fuzzing",
+            "--max-examples=1",
+            config={"warnings": {"fail-on": True}},
+        )
+        == snapshot_cli
+    )
+
+
+def test_final_line_does_not_count_warnings_that_do_not_fail_the_run(ctx, cli):
+    api = ctx.openapi.apps.basic()
+    result = cli.run(
+        api.schema_url,
+        "--checks=not_a_server_error",
+        "--phases=fuzzing",
+        "--max-examples=1",
+        "--include-path=/api/basic",
+        "--include-path=/api/nope",
+        config={"warnings": {"fail-on": ["missing_auth"]}},
+    )
+    assert result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0] == "Warnings fail the run"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_deserializer_warning_grouped_by_media_type(cli, ctx, snapshot_cli):
     html = {"text/html": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}
     msgpack = {"application/msgpack": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}

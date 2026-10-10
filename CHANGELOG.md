@@ -18,6 +18,7 @@
 ### :bug: Fixed
 
 - Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
+- Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
