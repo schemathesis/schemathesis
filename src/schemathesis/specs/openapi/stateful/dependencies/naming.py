@@ -529,6 +529,10 @@ def to_plural(word: str) -> str:
     return word + "s"
 
 
+# Common identifier field names in priority order
+ID_FIELD_NAMES = ["id", "uuid", "guid", "uid"]
+
+
 def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> str | None:
     """Find which resource field matches the parameter name."""
     if not fields:
@@ -577,8 +581,6 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
     parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
     suffix_normalized = normalize_for_matching(parameter_suffix)
 
-    # Common identifier field names in priority order
-    ID_FIELD_NAMES = ["id", "uuid", "guid", "uid"]
     SLUG_FIELD_NAMES = ["slug"]
 
     # Handle composite suffixes like `_id_or_slug` - try ID fields first, then slug
