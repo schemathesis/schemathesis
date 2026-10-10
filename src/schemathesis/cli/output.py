@@ -287,6 +287,13 @@ def failure_formatter(block: MessageBlock, content: str) -> str:
     return _style(content.replace("Reproduce with", click.style("Reproduce with", bold=True)))
 
 
+def replay_command(group: GroupedFailures, *, record_crashes: bool) -> str | None:
+    # Only hint `st replay` when a crash file was actually recorded for this case.
+    if record_crashes and group.case_id and any(is_reproducible_failure(failure) for failure in group.failures):
+        return f"st replay {group.case_id}"
+    return None
+
+
 def display_failures_for_single_test(
     config: OutputConfig, label: str, checks: Iterable[GroupedFailures], *, record_crashes: bool
 ) -> None:
@@ -294,17 +301,13 @@ def display_failures_for_single_test(
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
         case_id = f"{idx}. Test Case ID: {group.case_id}" if group.case_id is not None else None
-        # Only hint `st replay` when a crash file was actually recorded for this case.
-        if record_crashes and any(is_reproducible_failure(failure) for failure in group.failures):
-            reproduce = append_replay_command(group.code_sample, group.case_id)
-        else:
-            reproduce = group.code_sample
+        replay = replay_command(group, record_crashes=record_crashes)
         click.echo(
             format_failures(
                 case_id=case_id,
                 response=group.response,
                 failures=group.failures,
-                curl=reproduce,
+                curl=group.code_sample if replay is None else append_replay_command(group.code_sample, group.case_id),
                 auth_identity=group.auth_identity,
                 formatter=failure_formatter,
                 config=config,

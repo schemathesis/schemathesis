@@ -2,24 +2,31 @@ from __future__ import annotations
 
 import datetime
 from collections import Counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.output import UNMATCHED_FILTER_TIP
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
-from schemathesis.cli.output import LOADER_ERROR_SUGGESTIONS
+from schemathesis.cli.output import LOADER_ERROR_SUGGESTIONS, replay_command
 from schemathesis.cli.summary import running_time
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.failures import group_failures, reproducible_by_identity
+from schemathesis.core.output import format_response_payload
 from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import EngineErrorInfo
+from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.reporting.html.model import (
+    Command,
     ErrorEntry,
+    FailingCase,
+    FailureEntry,
     NothingTested,
     OperationRow,
     OperationStatus,
     ReportData,
     ReportMeta,
+    split_label,
 )
 
 if TYPE_CHECKING:
@@ -27,9 +34,11 @@ if TYPE_CHECKING:
 
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
-    from schemathesis.config import SanitizationConfig
-    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.config import OutputConfig, SanitizationConfig
+    from schemathesis.engine.recorder import RecordedScenario, ReproductionStep
     from schemathesis.engine.run import PhaseName
+    from schemathesis.engine.statistic import GroupedFailures
+    from schemathesis.schemas import APIOperation
 
 
 class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
@@ -56,8 +65,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         self.last_phase: PhaseName | None = None
         self.cases: Counter[str] = Counter()
         self.skip_reasons: dict[str, set[str]] = {}
-        # The first error title per operation.
-        self.errors: dict[str, str] = {}
+        # The first error of each exception type per label, the way the terminal lists them.
+        self.errors: dict[str, dict[type, ErrorEntry]] = {}
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         # A failed load never reaches `LoadingFinished`, so the location is recorded as soon as it is known.
@@ -71,28 +80,53 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         elif isinstance(event, events.PhaseStarted):
             self.last_phase = event.phase.name
         elif isinstance(event, events.ScenarioFinished):
-            self._count_cases(event.recorder)
+            self._record(event.recorder)
             if event.status == Status.SKIP and event.skip_reason is not None and event.label is not None:
                 self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
         elif isinstance(event, events.FuzzScenarioFinished):
-            self._count_cases(event.recorder)
+            self._record(event.recorder)
         elif isinstance(event, events.NonFatalError):
-            # Errors outside any operation never become rows: their label names no operation.
-            self.errors.setdefault(event.label, event.info.title)
+            entries = self.errors.setdefault(event.label, {})
+            if type(event.value) not in entries:
+                entries[type(event.value)] = _error_entry(event.info)
         elif isinstance(event, events.FatalError):
             self.fatal_error = _fatal_entry(event.exception, wait_for_schema=ctx.config.wait_for_schema)
         elif isinstance(event, events.EngineFinished):
             self.finished = event
 
-    def _count_cases(self, recorder: ScenarioRecorder) -> None:
+    def _record(self, recorder: RecordedScenario) -> None:
         for node in recorder.cases.values():
             self.cases[node.value.operation.label] += 1
 
-    def _operation_rows(self, ctx: BaseExecutionContext) -> tuple[list[OperationRow], list[tuple[str, int]]]:
+    def _operation_rows(self, ctx: BaseExecutionContext) -> Rows:
         statistic = ctx.statistic
+
+        def find_operation(label: str) -> APIOperation | None:
+            return ctx.find_operation_by_label(label) if ctx.find_operation_by_label is not None else None
+
+        failing_cases: dict[str, list[FailingCase]] = {}
+        # Operations with failures from their own cases, not only from stateful sequences.
+        failed_directly: set[str] = set()
+        unattributed_cases = []
+        unattributed: Counter[str] = Counter()
+        for label, groups in statistic.failures.items():
+            for group in groups.values():
+                case = _failing_case(group, config=ctx.config.output, record_crashes=ctx.config.cache.enabled)
+                owner = label
+                # Stateful failures are keyed by the scenario; the row is the operation whose request failed.
+                if label == STATEFUL_TESTS_LABEL:
+                    owner = next((step.operation for step in group.steps if step.case_id == group.case_id), label)
+                else:
+                    failed_directly.add(label)
+                # Run-level and undeclared-method failures carry labels that name no operation.
+                if find_operation(owner) is None:
+                    unattributed_cases.append((label, case))
+                    unattributed.update(failure.title for failure in group.failures)
+                else:
+                    failing_cases.setdefault(owner, []).append(case)
         labels = (
             self.cases.keys()
-            | statistic.failures.keys()
+            | failing_cases.keys()
             | statistic.tested_operations
             | statistic.errored_operations
             | self.errors.keys()
@@ -100,26 +134,21 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         )
         stopped_early = self.finished is None or self.finished.stop_reason is not StopReason.COMPLETED
         rows = []
-        unattributed: Counter[str] = Counter()
         for label in labels:
-            failures = sorted(
-                {failure.title for group in statistic.failures.get(label, {}).values() for failure in group.failures}
-            )
-            operation = ctx.find_operation_by_label(label) if ctx.find_operation_by_label is not None else None
-            # Stateful, run-level and undeclared-method failures carry labels that name no operation.
+            operation = find_operation(label)
             if operation is None:
-                unattributed.update(
-                    failure.title for group in statistic.failures.get(label, {}).values() for failure in group.failures
-                )
                 continue
+            cases = failing_cases.get(label, [])
+            failures = sorted({failure.title for case in cases for failure in case.failures})
+            errors = list(self.errors.get(label, {}).values())
             note = None
             if failures:
                 status = OperationStatus.FAILED
+            elif errors or (label in statistic.errored_operations and label not in statistic.tested_operations):
+                status = OperationStatus.ERRORED
+                note = errors[0].title if errors else None
             elif label in statistic.tested_operations:
                 status = OperationStatus.PASSED
-            elif label in self.errors or label in statistic.errored_operations:
-                status = OperationStatus.ERRORED
-                note = self.errors.get(label)
             elif stopped_early:
                 # The footer counts these as not run, matching the operations count in the hero.
                 continue
@@ -140,10 +169,23 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                     failures=failures,
                     cases=self.cases[label],
                     note=note,
-                    stops_at_first_failure=not continue_on_failure,
+                    stops_at_first_failure=label in failed_directly and not continue_on_failure,
+                    failing_cases=cases,
+                    errors=errors,
                 )
             )
-        return rows, _by_count(unattributed)
+        unattributed_errors = [
+            (label, error)
+            for label, errors in sorted(self.errors.items())
+            if find_operation(label) is None
+            for error in errors.values()
+        ]
+        return Rows(
+            operations=rows,
+            unattributed_failures=_by_count(unattributed),
+            unattributed_cases=unattributed_cases,
+            unattributed_errors=unattributed_errors,
+        )
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         from schemathesis.reporting._command import get_command_representation
@@ -152,7 +194,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         sanitization = ctx.config.output.sanitization
         sanitization_config = sanitization if sanitization.enabled else None
         summary = ctx.summary()
-        operations, unattributed_failures = self._operation_rows(ctx)
+        rows = self._operation_rows(ctx)
         data = ReportData(
             meta=ReportMeta(
                 generated_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -165,8 +207,10 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             fatal_error=self.fatal_error,
             nothing_tested=_nothing_tested(ctx.nothing_tested_reason, summary),
             last_phase=self.last_phase,
-            operations=operations,
-            unattributed_failures=unattributed_failures,
+            operations=rows.operations,
+            unattributed_failures=rows.unattributed_failures,
+            unattributed_cases=rows.unattributed_cases,
+            unattributed_errors=rows.unattributed_errors,
             running_time=running_time(self.started_at, self.finished),
             stop_reason=self.finished.stop_reason if self.finished is not None else StopReason.INTERRUPTED,
             started=self.started_at is not None,
@@ -174,6 +218,41 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             exit_code=ctx.exit_code,
         )
         write_report(data, self.output_dir)
+
+
+class Rows(NamedTuple):
+    operations: list[OperationRow]
+    unattributed_failures: list[tuple[str, int]]
+    unattributed_cases: list[tuple[str, FailingCase]]
+    unattributed_errors: list[tuple[str, ErrorEntry]]
+
+
+def _failing_case(group: GroupedFailures, *, config: OutputConfig, record_crashes: bool) -> FailingCase:
+    response = group.response
+    return FailingCase(
+        case_id=group.case_id,
+        failures=[
+            FailureEntry(title=title, messages=[failure.message for failure in failures])
+            for title, failures in group_failures(group.failures)
+        ],
+        status_code=response.status_code if response is not None else None,
+        body=format_response_payload(response, config=config) if response is not None else None,
+        commands=_commands(group),
+        replay=replay_command(group, record_crashes=record_crashes),
+        auth_identity=group.auth_identity if reproducible_by_identity(group.failures) else None,
+    )
+
+
+def _commands(group: GroupedFailures) -> list[Command]:
+    if group.steps:
+        commands = []
+        for step in group.steps:
+            method, path = _request_name(step)
+            commands.append(Command(curl=step.curl, method=method, path=path, failed=step.case_id == group.case_id))
+        return commands
+    if group.code_sample is None:
+        return []
+    return [Command(curl=group.code_sample, method=None, path=None, failed=False)]
 
 
 def _by_count(counts: Counter[str]) -> list[tuple[str, int]]:
@@ -191,6 +270,23 @@ def _fatal_entry(exception: Exception, *, wait_for_schema: float | int | None) -
         )
     info = EngineErrorInfo(error=exception)
     return ErrorEntry(title=info.title, message=info.message, tip=None)
+
+
+def _request_name(step: ReproductionStep) -> tuple[str | None, str]:
+    # Without a method in the label (GraphQL), every request goes to the same URL, so the step names the field.
+    if split_label(step.operation)[0] is None:
+        return None, step.operation
+    return step.method, step.path
+
+
+def _error_entry(info: EngineErrorInfo) -> ErrorEntry:
+    return ErrorEntry(
+        title=info.title,
+        message=info.message or str(info),
+        tip=info.suggestion(),
+        details=info.details,
+        reproduce=info.code_sample,
+    )
 
 
 def _nothing_tested(reason: str | None, summary: SummaryData) -> NothingTested | None:

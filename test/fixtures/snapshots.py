@@ -490,6 +490,14 @@ def snapshot_html(snapshot):
             data = re.sub(r"127\.0\.0\.1:\d+", "127.0.0.1:<PORT>", data)
             data = re.sub(r'(Duration</span><span class="m-value">)[^<]+', r"\1<DURATION>", data)
             data = re.sub(r"(Finished in |Stopped by user after )[^<]+", r"\1<DURATION>", data)
+            data = re.sub(r'(class="case-id">)[^<]+', r"\1<CASE-ID>", data)
+            data = re.sub(r'id="case-\w+"', 'id="case-<CASE-ID>"', data)
+            data = re.sub(r"st replay \w+", "st replay <CASE-ID>", data)
+            data = re.sub(r"X-Schemathesis-TestCaseId: \w+", "X-Schemathesis-TestCaseId: <CASE-ID>", data)
+            data = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<UUID>", data)
+            data = re.sub(r"File &quot;[^&]+&quot;, line \d+", "File &quot;<PATH>&quot;, line <LINE>", data)
+            # Python 3.11+ underlines the failing expression; older versions do not.
+            data = re.sub(r"(?m)^[ ~^]*[~^][ ~^]*\n", "", data)
             # In-process runs report the pytest command line.
             data = re.sub(
                 r'<span class="tk">Command</span>.*?aria-label="Copy command">Copy</button></span>',

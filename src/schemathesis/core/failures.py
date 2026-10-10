@@ -12,7 +12,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from schemathesis.core.compat import BaseExceptionGroup
-from schemathesis.core.output import decode_response_text, escape_surrogates, prepare_response_payload
+from schemathesis.core.output import (
+    BINARY_PAYLOAD,
+    EMPTY_PAYLOAD,
+    escape_surrogates,
+    format_response_payload,
+)
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
@@ -384,6 +389,19 @@ def failure_report_title(failures: Sequence[Failure]) -> str:
     return message
 
 
+def group_failures(failures: Sequence[Failure]) -> list[tuple[str, list[Failure]]]:
+    """Collapse runs of same-title same-class failures (e.g. several `JsonSchemaError`s on one response)."""
+    return [
+        (title, list(group))
+        for (_, title), group in itertools.groupby(failures, key=lambda failure: (type(failure), failure.title))
+    ]
+
+
+def reproducible_by_identity(failures: Sequence[Failure]) -> bool:
+    """Whether replaying as the identity that sent the request reproduces every failure."""
+    return all(failure.reproducible_by_identity for failure in failures)
+
+
 def format_failures(
     *,
     case_id: str | None,
@@ -402,10 +420,7 @@ def format_failures(
     else:
         output = ""
 
-    # Failures — collapse the title for runs of same-title same-class failures
-    # (e.g. multiple `JsonSchemaError`s on one response) into one header.
-    for (_, title), group_iter in itertools.groupby(failures, key=lambda f: (type(f), f.title)):
-        group = list(group_iter)
+    for title, group in group_failures(failures):
         suffix = f" ({len(group)} violations)" if len(group) > 1 else ""
         output += formatter(MessageBlock.FAILURE, f"\n- {title}{suffix}")
         for failure in group:
@@ -418,17 +433,12 @@ def format_failures(
     if isinstance(response, Response):
         reason = reason_phrase(response.status_code)
         output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
-        # Response payload
-        if response.content is None or not response.content:
-            output += "\n    <EMPTY>"
+        payload = format_response_payload(response, config=config)
+        if payload in (EMPTY_PAYLOAD, BINARY_PAYLOAD):
+            output += f"\n    {payload}"
         else:
-            text = decode_response_text(response)
-            if text is None:
-                output += "\n    <BINARY>"
-            else:
-                payload = prepare_response_payload(text, config=config)
-                output += textwrap.indent(f"\n`{payload}`", prefix="    ")
-    if auth_identity is not None and all(failure.reproducible_by_identity for failure in failures):
+            output += textwrap.indent(f"\n`{payload}`", prefix="    ")
+    if auth_identity is not None and reproducible_by_identity(failures):
         output += formatter(
             MessageBlock.STATUS, f"\nIdentity: {auth_identity} (reproduce with --auth-wfc-user {auth_identity})"
         )
