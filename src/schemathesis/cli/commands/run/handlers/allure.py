@@ -62,7 +62,7 @@ class AllureHandler(EventHandler):
                     tags=None,
                 )
         elif isinstance(event, LoadingFinished):
-            self.writer.api_title = event.schema.get("info", {}).get("title")
+            self.writer.api_title = event.title
         elif isinstance(event, events.NonFatalError):
             self.writer.record_error(label=event.label, message=event.info.format())
         elif isinstance(event, events.EngineFinished):

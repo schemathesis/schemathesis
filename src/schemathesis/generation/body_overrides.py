@@ -14,10 +14,10 @@ from schemathesis.generation.value import GeneratedValue
 if TYPE_CHECKING:
     import jsonschema_rs
 
-    from schemathesis.specs.openapi.schemas import OpenApiOperation
+    from schemathesis.schemas import APIOperation
 
 
-def resolve_body_overrides(*, operation: OpenApiOperation, body_schema: JsonSchema) -> dict[str, JsonValue]:
+def resolve_body_overrides(*, operation: APIOperation, body_schema: JsonSchema) -> dict[str, JsonValue]:
     # Operation-scope vetoes global entries under the same key regardless of form; unresolved paths drop.
     config = operation.schema.config
     operation_config = config.operations.get_for_operation(operation)

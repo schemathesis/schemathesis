@@ -75,6 +75,7 @@ def into_event_stream(
         specification=schema.specification,
         statistic=schema.statistic,
         schema=schema.raw_schema,
+        title=schema.title,
         config=schema.config,
         base_path=schema.base_path,
         find_operation_by_label=schema.find_operation_by_label,
