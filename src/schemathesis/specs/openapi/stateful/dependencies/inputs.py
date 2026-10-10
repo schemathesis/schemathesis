@@ -587,7 +587,7 @@ def rebind_inherited_suffix_matches(operations: OperationMap, resources: Resourc
     Once every operation is known, the resource the parameter names wins if the API refers to it,
     and otherwise a field named after the parameter itself (`ReservationDetailProperties.reservationId`).
     """
-    produced = {output.resource.name for operation in operations.values() for output in operation.outputs}
+    produced = _produced_resource_names(operations)
     for operation in operations.values():
         for input_slot in operation.inputs:
             parameter_name = input_slot.parameter_name
@@ -778,7 +778,7 @@ def bind_echoed_body_fields(operations: OperationMap, writable_body_fields: dict
         if reader is None:
             continue
         # Only creation tells client-set fields apart from server-set ones; client-set fields keep generated values.
-        settable = writable_body_fields.get(labels.get(("post", update.path.rstrip("/").rsplit("/", 1)[0]), ""))
+        settable = writable_body_fields.get(labels.get(("post", naming.collection_path(update.path)), ""))
         if settable is None:
             continue
         bound = {slot.parameter_name for slot in update.inputs if slot.parameter_location == ParameterLocation.BODY}
@@ -824,7 +824,7 @@ def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -
     own response describes a parent resource carrying the same field, the slot is
     really a self-FK (`spouse_id` on `POST /contacts`, `?sequence_id=` on `GET /events`).
     """
-    producer_resources = {output.resource.name for operation in operations.values() for output in operation.outputs}
+    producer_resources = _produced_resource_names(operations)
     for operation in operations.values():
         parent_name = naming.from_path(operation.path)
         if parent_name is None:
@@ -849,12 +849,11 @@ def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -
                 input_slot.resource_field = input_slot.parameter_name
 
 
-def disambiguate_module_variants(operations: OperationMap, resources: ResourceMap) -> None:
-    """Swap to a same-module sibling for spec-suffixed duplicates (`Group` / `Group1`).
+def _produced_resource_names(operations: OperationMap) -> set[str]:
+    return {output.resource.name for operation in operations.values() for output in operation.outputs}
 
-    Without this, every consumer in the second module binds to the first module's
-    variant via the path-derived lookup.
-    """
+
+def _producer_modules(operations: OperationMap) -> dict[str, set[str]]:
     producer_modules: dict[str, set[str]] = {}
     for operation in operations.values():
         module = _module_of(operation.path)
@@ -862,6 +861,16 @@ def disambiguate_module_variants(operations: OperationMap, resources: ResourceMa
             continue
         for output in operation.outputs:
             producer_modules.setdefault(output.resource.name, set()).add(module)
+    return producer_modules
+
+
+def disambiguate_module_variants(operations: OperationMap, resources: ResourceMap) -> None:
+    """Swap to a same-module sibling for spec-suffixed duplicates (`Group` / `Group1`).
+
+    Without this, every consumer in the second module binds to the first module's
+    variant via the path-derived lookup.
+    """
+    producer_modules = _producer_modules(operations)
 
     by_stem: dict[str, set[str]] = {}
     for resource_name in producer_modules:
@@ -904,13 +913,7 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
     `KeyDateResource` instead of `ResourceItem`. This pass corrects only when the
     consumer's path-derived name picks both the current and a same-module sibling.
     """
-    producer_modules: dict[str, set[str]] = {}
-    for operation in operations.values():
-        module = _module_of(operation.path)
-        if not module:
-            continue
-        for output in operation.outputs:
-            producer_modules.setdefault(output.resource.name, set()).add(module)
+    producer_modules = _producer_modules(operations)
 
     for operation in operations.values():
         consumer_module = _module_of(operation.path)
@@ -920,10 +923,7 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
         # Limit to operations where the rebinding parameter is the leaf — otherwise
         # `/images/{imageId}/regionproposals` would rebind {imageId} to the response
         # type instead of Image.
-        segments = [segment for segment in operation.path.split("/") if segment]
-        leaf_param = (
-            segments[-1][1:-1] if segments and segments[-1].startswith("{") and segments[-1].endswith("}") else None
-        )
+        leaf_param = naming.trailing_path_parameter(operation.path)
         for input_slot in operation.inputs:
             if input_slot.parameter_location != ParameterLocation.PATH:
                 continue
@@ -1066,7 +1066,7 @@ def bind_created_item_keys(
                 and input_slot.parameter_name == parameter_name
                 and input_slot.resource_field is not None
             ):
-                collection = operation.path.rstrip("/").rsplit("/", 1)[0]
+                collection = naming.collection_path(operation.path)
                 item_slots.setdefault(collection, {})[input_slot.resource.name] = input_slot
     for label, fields in writable_body_fields.items():
         create = operations[label]
@@ -1094,7 +1094,7 @@ def bind_created_item_keys(
             continue
         declared = schema.find_operation_by_label(label)
         assert declared is not None
-        status_code = next((response.status_code for response in declared.responses.iter_successful_responses()), None)
+        status_code = declared.responses.first_successful_status_code()
         if status_code is None:
             continue
         # An output, not an input: a create needs a fresh key, never one taken from existing objects.

@@ -110,10 +110,7 @@ def _path_keyed_outputs(
     if matching.resource.name in already_extracted:
         return
 
-    success_status = next(
-        (response.status_code for response in operation.responses.iter_successful_responses()),
-        None,
-    )
+    success_status = operation.responses.first_successful_status_code()
     if success_status is None:
         return
 
@@ -174,10 +171,7 @@ def _body_keyed_outputs(
     if matching.resource.name in already_extracted:
         return
 
-    success_status = next(
-        (response.status_code for response in operation.responses.iter_successful_responses()),
-        None,
-    )
+    success_status = operation.responses.first_successful_status_code()
     if success_status is None:
         return
 

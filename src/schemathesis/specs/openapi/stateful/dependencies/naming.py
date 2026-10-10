@@ -80,6 +80,10 @@ def trailing_path_parameter(path: str) -> str | None:
     return None
 
 
+def collection_path(path: str) -> str:
+    return path.rstrip("/").rsplit("/", 1)[0]
+
+
 @lru_cache(maxsize=2048)
 def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> str | None:
     parameter = parameter.strip()
@@ -537,93 +541,97 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
     """Find which resource field matches the parameter name."""
     if not fields:
         return None
-
-    # Exact match
     if parameter in fields:
         return parameter
-
-    # Normalize for fuzzy matching
-    parameter_normalized = normalize_for_matching(parameter)
     resource_normalized = normalize_for_matching(resource)
-
-    # Normalized exact match
-    # `brandId` -> `Brand.BrandId`
-    for field in fields:
-        if normalize_for_matching(field) == parameter_normalized:
+    prefix, suffix = _split_parameter_name(parameter)
+    for strategy in _FIELD_MATCHING_STRATEGIES:
+        field = strategy(fields, parameter, prefix, suffix, resource_normalized)
+        if field is not None:
             return field
-
-    # Extract parameter components
-    parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
-    parameter_prefix_normalized = normalize_for_matching(parameter_prefix)
-
-    # Parameter has resource prefix, field might not
-    # Example: `channelId` - `Channel.id`
-    if parameter_prefix and parameter_prefix_normalized == resource_normalized:
-        suffix_normalized = normalize_for_matching(parameter_suffix)
-
-        for field in fields:
-            field_normalized = normalize_for_matching(field)
-            if field_normalized == suffix_normalized:
-                return field
-
-    # Parameter has no prefix, field might have resource prefix
-    # Example: `id` - `Channel.channelId`
-    if not parameter_prefix and parameter_suffix:
-        expected_field_normalized = resource_normalized + normalize_for_matching(parameter_suffix)
-
-        for field in fields:
-            field_normalized = normalize_for_matching(field)
-            if field_normalized == expected_field_normalized:
-                return field
-
-    # ID field synonym matching (for identifier parameters)
-    # Match parameter like 'conversation_id' or 'id' with fields like 'uuid', 'guid', 'uid'
-    parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
-    suffix_normalized = normalize_for_matching(parameter_suffix)
-
-    SLUG_FIELD_NAMES = ["slug"]
-
-    # Handle composite suffixes like `_id_or_slug` - try ID fields first, then slug
-    if suffix_normalized == "idorslug":
-        for id_name in ID_FIELD_NAMES + SLUG_FIELD_NAMES:
-            for field in fields:
-                if normalize_for_matching(field) == id_name:
-                    return field
-    elif suffix_normalized in ("identifier", "pk"):
-        for field in fields:
-            if normalize_for_matching(field) == "id":
-                return field
-    elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
-        # Try to match with any identifier field, preferring exact match first
-        for id_name in ID_FIELD_NAMES:
-            for field in fields:
-                if normalize_for_matching(field) == id_name:
-                    return field
-
-    # Resource-hint matching for underscore-separated parameters
-    # Example: file_name -> BackupFile.name (resource ends with prefix)
-    # Example: group_slug -> GroupSummary.slug (resource starts with prefix)
-    # The parameter prefix hints at the resource type, suffix is the field name
-    if "_" in parameter:
-        last_underscore = parameter.rfind("_")
-        if last_underscore > 0:  # Ensure there's actually a prefix
-            param_prefix = parameter[:last_underscore]
-            param_suffix = parameter[last_underscore + 1 :]
-
-            # Conservative: require minimum prefix length (3 chars) to avoid spurious matches
-            if len(param_prefix) >= 3 and param_suffix:
-                prefix_normalized = normalize_for_matching(param_prefix)
-                suffix_normalized = normalize_for_matching(param_suffix)
-
-                # Check if resource name ends with OR starts with the prefix
-                # Suffix: "BackupFile" ends with "file" for parameter "file_name"
-                # Prefix: "GroupSummary" starts with "group" for parameter "group_slug"
-                if resource_normalized.endswith(prefix_normalized) or resource_normalized.startswith(prefix_normalized):
-                    for field in fields:
-                        if normalize_for_matching(field) == suffix_normalized:
-                            return field
-
     return None
+
+
+def _field_normalized_as(fields: list[str], expected: str) -> str | None:
+    for field in fields:
+        if normalize_for_matching(field) == expected:
+            return field
+    return None
+
+
+def _match_normalized(
+    fields: list[str], parameter: str, prefix: str, suffix: str, resource_normalized: str
+) -> str | None:
+    # `brandId` -> `Brand.BrandId`
+    return _field_normalized_as(fields, normalize_for_matching(parameter))
+
+
+def _match_resource_prefixed_parameter(
+    fields: list[str], parameter: str, prefix: str, suffix: str, resource_normalized: str
+) -> str | None:
+    # `channelId` -> `Channel.id`
+    if prefix and normalize_for_matching(prefix) == resource_normalized:
+        return _field_normalized_as(fields, normalize_for_matching(suffix))
+    return None
+
+
+def _match_resource_prefixed_field(
+    fields: list[str], parameter: str, prefix: str, suffix: str, resource_normalized: str
+) -> str | None:
+    # `id` -> `Channel.channelId`
+    if not prefix and suffix:
+        return _field_normalized_as(fields, resource_normalized + normalize_for_matching(suffix))
+    return None
+
+
+def _match_identifier_synonym(
+    fields: list[str], parameter: str, prefix: str, suffix: str, resource_normalized: str
+) -> str | None:
+    # `conversation_id` or `id` -> `uuid`, `guid`, `uid`
+    suffix_normalized = normalize_for_matching(suffix)
+    # Composite suffixes like `_id_or_slug` try identifier fields first, then slug.
+    if suffix_normalized == "idorslug":
+        names = [*ID_FIELD_NAMES, "slug"]
+    elif suffix_normalized in ("identifier", "pk"):
+        names = ["id"]
+    elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
+        names = ID_FIELD_NAMES
+    else:
+        return None
+    for name in names:
+        field = _field_normalized_as(fields, name)
+        if field is not None:
+            return field
+    return None
+
+
+def _match_resource_hint(
+    fields: list[str], parameter: str, prefix: str, suffix: str, resource_normalized: str
+) -> str | None:
+    # `file_name` -> `BackupFile.name`, `group_slug` -> `GroupSummary.slug`: the part before the last underscore
+    # hints at the resource, the rest is the field name.
+    last_underscore = parameter.rfind("_")
+    if last_underscore <= 0:
+        return None
+    hint = parameter[:last_underscore]
+    field_name = parameter[last_underscore + 1 :]
+    # A hint shorter than 3 characters produces spurious matches.
+    if len(hint) < 3 or not field_name:
+        return None
+    hint_normalized = normalize_for_matching(hint)
+    if resource_normalized.endswith(hint_normalized) or resource_normalized.startswith(hint_normalized):
+        return _field_normalized_as(fields, normalize_for_matching(field_name))
+    return None
+
+
+# Priority order: the first strategy that finds a field wins.
+_FIELD_MATCHING_STRATEGIES = (
+    _match_normalized,
+    _match_resource_prefixed_parameter,
+    _match_resource_prefixed_field,
+    _match_identifier_synonym,
+    _match_resource_hint,
+)
 
 
 @lru_cache(maxsize=4096)

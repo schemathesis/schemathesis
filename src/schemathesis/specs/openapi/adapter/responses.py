@@ -319,6 +319,9 @@ class OpenApiResponses:
             if default is not None:
                 yield default
 
+    def first_successful_status_code(self) -> str | None:
+        return next((response.status_code for response in self.iter_successful_responses()), None)
+
     def iter_examples(self) -> Iterator[tuple[str, object]]:
         """Iterate over all examples for all responses."""
         for response in self.iter_successful_responses():
