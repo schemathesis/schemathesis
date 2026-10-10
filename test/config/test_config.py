@@ -297,6 +297,24 @@ def test_generation_mode_all_and_maximize_list():
     )
 
 
+def test_coverage_generation_rejects_max_examples():
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_str("[phases.coverage.generation]\nmax-examples = 5\n")
+
+    assert str(exc.value) == (
+        "`max-examples` has no effect in the coverage phase: it generates every case the schema defines."
+    )
+
+
+def test_max_examples_loads_for_bounded_generation():
+    assert (
+        SchemathesisConfig.from_str("[generation]\nmax-examples = 5\n").projects.default.generation.max_examples,
+        SchemathesisConfig.from_str(
+            "[phases.fuzzing.generation]\nmax-examples = 5\n"
+        ).projects.default.phases.fuzzing.generation.max_examples,
+    ) == (5, 5)
+
+
 def test_warnings_disabled_in_table_form_hide_and_never_fail():
     warnings = SchemathesisConfig.from_str("[warnings]\nenabled = false\nfail-on = true\n").projects.default.warnings
 

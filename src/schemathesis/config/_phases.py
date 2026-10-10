@@ -275,6 +275,10 @@ class CoveragePhaseConfig(DiffBase):
         *,
         dictionaries: dict[str, DictionaryDefinition] | None = None,
     ) -> CoveragePhaseConfig:
+        if "max-examples" in data.get("generation", {}):
+            raise ConfigError(
+                "`max-examples` has no effect in the coverage phase: it generates every case the schema defines."
+            )
         return cls(
             enabled=data.get("enabled", True),
             generate_duplicate_query_parameters=data.get("generate-duplicate-query-parameters", False),
