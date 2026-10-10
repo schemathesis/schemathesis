@@ -523,6 +523,49 @@ def test_header_case_insensitive_dict_hash(ctx):
     _ = case.meta.generation.mode
 
 
+@pytest.fixture
+def header_operation(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "authorization", "in": "header", "schema": {"type": "string"}},
+                        {
+                            "name": "x-count",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "^[0-9]+$"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    return schema["/items"]["GET"]
+
+
+@pytest.mark.parametrize("name", ["Authorization", "X-Other"], ids=["declared-in-other-case", "undeclared"])
+def test_header_added_by_hook_keeps_case_positive(header_operation, name):
+    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case.headers = case.headers or {}
+    case.headers[name] = "Bearer token"
+    assert case.meta.generation.mode == GenerationMode.POSITIVE
+    assert case.meta.components[ParameterLocation.HEADER].mode == GenerationMode.POSITIVE
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [{"X-Count": "abc"}, {"Authorization": "Bearer token"}],
+    ids=["invalid-value", "missing-required"],
+)
+def test_header_replaced_by_hook_with_invalid_value_is_negative(header_operation, headers):
+    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case.headers = headers
+    assert case.meta.generation.mode == GenerationMode.NEGATIVE
+
+
 def test_case_hash_is_case_insensitive_for_headers(ctx):
     schema = ctx.openapi.load_schema(
         {
