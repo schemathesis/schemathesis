@@ -185,6 +185,8 @@ def _do_call_and_validate(
     # Replay through `_perform_call` so it keeps rate-limit and network-error handling.
     response = reauth_and_replay(case, response, ctx.reauth, _perform_call)
     recorder.record_response(case_id=case.id, response=response)
+    if case.operation.schema.omits_sole_credential(case):
+        ctx.credential_removals.record(case.operation.label)
     if ctx.error_feedback is not None:
         ctx.record_error_feedback(
             case=case,

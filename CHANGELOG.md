@@ -15,6 +15,10 @@
 
 - Reject `phases.coverage.generation.max-examples`; the coverage phase has no case cap.
 
+### :wrench: Changed
+
+- Negative testing stops repeating the request that leaves out an operation's only credential.
+
 ### :bug: Fixed
 
 - Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.

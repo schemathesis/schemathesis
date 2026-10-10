@@ -1,4 +1,5 @@
 import pytest
+from _pytest.main import ExitCode
 from flask import jsonify, request
 
 AUTH_CONFIGS = {
@@ -668,3 +669,31 @@ def test_alternative_credentials_generated_without_auth(ctx, cli):
     app, api_keys = _api_key_or_bearer_app(ctx)
     cli.run_openapi_app(app, "--phases=coverage,fuzzing", "--mode=positive", "--max-examples=10")
     assert set(api_keys) - {None}
+
+
+def _requests_without_credential(api, path):
+    return [request for request in api.requests if request.path == path and "Authorization" not in request.headers]
+
+
+@pytest.mark.parametrize(
+    ("phase", "expected"), [("fuzzing", (2, 7)), ("stateful", (6, 105)), ("coverage,fuzzing,stateful", (1, 124))]
+)
+def test_request_without_sole_credential_is_not_repeated(ctx, cli, phase, expected):
+    # Leaving out the only credential is one fixed request; with a query parameter it still varies.
+    api = ctx.openapi.apps.basic_linked_to_query()
+
+    result = cli.run(
+        api.schema_url,
+        "--auth=test:test",
+        f"--phases={phase}",
+        "--mode=negative",
+        "--checks=not_a_server_error",
+        "--max-examples=50",
+        "--seed=1",
+    )
+
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert (
+        len(_requests_without_credential(api, "/api/basic")),
+        len(_requests_without_credential(api, "/api/basic_query")),
+    ) == expected
