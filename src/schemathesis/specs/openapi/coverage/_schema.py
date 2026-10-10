@@ -2437,6 +2437,19 @@ def _negative_not(
     yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen), description=description)
 
 
+_ALL_TYPES = ("null", "boolean", "string", "number", "array", "object")
+
+
+def _admits_every_type(schema: JsonSchemaObject) -> bool:
+    # A keyword constrains only values of its own type, so without `type` every other type passes it untouched.
+    return (
+        "type" not in schema
+        and not any(key in schema for key in _SINGLE_PASS_KEYWORDS)
+        and not _implies_object_type(schema)
+        and not _implies_array_type(schema)
+    )
+
+
 def cover_schema_iter(
     ctx: CoverageContext, schema: JsonSchema, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -2501,13 +2514,15 @@ def cover_schema_iter(
             return
 
     if schema is True:
-        types = ["null", "boolean", "string", "number", "array", "object"]
+        types = list(_ALL_TYPES)
         schema = {}
     elif schema is False:
         types = []
         schema = {"not": {}}
-    elif not any(k in ALL_KEYWORDS for k in schema):
-        types = ["null", "boolean", "string", "number", "array", "object"]
+    elif not any(k in ALL_KEYWORDS for k in schema) or (
+        GenerationMode.POSITIVE in ctx.generation_modes and _admits_every_type(schema)
+    ):
+        types = list(_ALL_TYPES)
     else:
         types = schema.get("type", [])
     push_examples_to_properties(schema)
@@ -2889,6 +2904,9 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
 
 _FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
 
+
+# An untyped schema covers these keywords positively in one pass or per combinator branch, not per type.
+_SINGLE_PASS_KEYWORDS = ("enum", "const", "not", *_FOLDED_KEYS)
 
 _OBJECT_ONLY_KEYWORDS = ("properties", "required", "patternProperties", "propertyNames", "dependencies")
 
