@@ -30,11 +30,20 @@ def strip_version_prefix(path: str) -> str:
     start = 1
     while start < len(segments):
         seg = segments[start]
-        if seg == "api" or (len(seg) > 1 and seg[0] == "v" and seg[1:].isdigit()):
+        if seg == "api" or _is_version_segment(seg):
             start += 1
         else:
             break
     return "/" + "/".join(segments[start:])
+
+
+def _is_version_segment(segment: str) -> bool:
+    return len(segment) > 1 and segment[0] == "v" and segment[1:].isdigit()
+
+
+def _resource_segments(path: str) -> list[str]:
+    # Version segments name no resource wherever they appear (`/books/v1/{title}` is a book collection).
+    return [s for s in path.split("/") if s and not _is_version_segment(s)]
 
 
 class KeyKind(enum.Enum):
@@ -186,7 +195,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
 @lru_cache(maxsize=512)
 def from_path(path: str, parameter_name: str | None = None) -> str | None:
     """Detect resource name from OpenAPI path."""
-    segments = [s for s in path.split("/") if s]
+    segments = _resource_segments(path)
 
     if not segments:
         # API Root
@@ -215,7 +224,7 @@ def from_path(path: str, parameter_name: str | None = None) -> str | None:
 @lru_cache(maxsize=512)
 def owning_resource(parameter: str, path: str) -> str | None:
     """Resource named by the static segment right before `{parameter}` (`/api/projects/{code}` -> `Project`)."""
-    return _owning_segment_resource([s for s in strip_version_prefix(path).split("/") if s], parameter)
+    return _owning_segment_resource(_resource_segments(strip_version_prefix(path)), parameter)
 
 
 def _owning_segment_resource(segments: list[str], parameter: str) -> str | None:

@@ -3306,6 +3306,48 @@ def test_path_param_named_after_collection_links_create_to_read(ctx):
     ]
 
 
+BOOK = {"type": "object", "properties": {"book_title": {"type": "string"}, "owner": {"type": "string"}}}
+
+
+@pytest.mark.parametrize(
+    ["collection", "pointer"],
+    [
+        ("/books", "~1books"),
+        ("/books/v1", "~1books~1v1"),
+        ("/api/books/v2", "~1api~1books~1v2"),
+    ],
+    ids=["plain", "version-after-collection", "api-prefix-and-version-after-collection"],
+)
+def test_version_segment_after_collection_links_list_to_read(ctx, collection, pointer):
+    paths = {
+        **operation(
+            "get",
+            collection,
+            "200",
+            {"type": "object", "properties": {"Books": {"type": "array", "items": BOOK}}},
+        ),
+        **operation(
+            "get",
+            f"{collection}/{{book_title}}",
+            "200",
+            {"type": "array", "items": BOOK},
+            parameters=[path_param("book_title")],
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            f"#/paths/{pointer}/get",
+            "200",
+            {
+                "operationRef": f"#/paths/{pointer}~1{{book_title}}/get",
+                "parameters": {"path.book_title": "$response.body#/Books/*/book_title"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
 PROJECT_WITHOUT_ID = {
     "type": "object",
     "properties": {"idx": {"type": "integer"}, "code": {"type": "string"}, "title": {"type": "string"}},
