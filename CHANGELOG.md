@@ -6,6 +6,10 @@
 
 - `auth.auto-signup` config option to disable automatic sign-up.
 
+### :wrench: Changed
+
+- Reject `phases.coverage.generation.max-examples`; the coverage phase has no case cap.
+
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
 ### :wrench: Changed
