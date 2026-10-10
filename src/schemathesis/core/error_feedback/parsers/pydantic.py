@@ -35,12 +35,30 @@ _LOC_PREFIX_TO_LOCATION: dict[str, ParameterLocation] = {
     "header": ParameterLocation.HEADER,
     "cookie": ParameterLocation.COOKIE,
     "form": ParameterLocation.BODY,
+    # Some frameworks name the segment after the handler argument.
+    "parsed_body": ParameterLocation.BODY,
+    "parsed_query": ParameterLocation.QUERY,
+    "parsed_path": ParameterLocation.PATH,
+    "parsed_headers": ParameterLocation.HEADER,
+    "parsed_cookies": ParameterLocation.COOKIE,
 }
 
 # `ctx.expected` for `enum`/`literal_error` is a human-readable string like
 # "'USER' or 'ADMIN'". Pydantic switches quote style for values containing the
 # other quote (e.g. `"O'Brien" or 'Smith'`), so accept both forms.
 _EXPECTED_TOKEN = re.compile(r"'([^']+)'|\"([^\"]+)\"")
+
+# Some frameworks report every error under one generic `type` and drop `ctx`, leaving only Pydantic's message.
+_TYPE_MESSAGE = re.compile(r"Input should be a valid (\w+)")
+_MESSAGE_TYPE_TO_JSON_TYPE: dict[str, str] = {
+    "integer": "integer",
+    "number": "number",
+    "string": "string",
+    "boolean": "boolean",
+    "list": "array",
+    "array": "array",
+    "dictionary": "object",
+}
 
 
 HandlerResult = tuple[ObservationKind, ObservationPayload] | tuple[None, None]
@@ -58,6 +76,16 @@ def _parse_expected(text: object) -> tuple[str, ...] | None:
         return None
     values = tuple(match.group(1) or match.group(2) for match in _EXPECTED_TOKEN.finditer(text))
     return values or None
+
+
+def _type_mismatch_from_message(message: object) -> HandlerResult:
+    if not isinstance(message, str):
+        return None, None
+    match = _TYPE_MESSAGE.match(message)
+    type_name = _MESSAGE_TYPE_TO_JSON_TYPE.get(match.group(1)) if match else None
+    if type_name is None:
+        return None, None
+    return ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=type_name)
 
 
 def _missing(_context: dict) -> HandlerResult:
@@ -233,13 +261,13 @@ class PydanticParser:
                     )
                 )
                 continue
+            location, path = _split_loc(loc)
             handler = _TYPE_CODE_HANDLERS.get(type_code)
             if handler is None:
-                continue
-            location, path = _split_loc(loc)
-            raw_context = entry.get("ctx")
-            context = raw_context if isinstance(raw_context, dict) else {}
-            kind, payload = handler(context)
+                kind, payload = _type_mismatch_from_message(entry.get("msg"))
+            else:
+                raw_context = entry.get("ctx")
+                kind, payload = handler(raw_context if isinstance(raw_context, dict) else {})
             if kind is None:
                 continue
             if not path and not (loc == ["body"] and kind is ObservationKind.MUST_NOT_BE_BLANK):
