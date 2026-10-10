@@ -3880,6 +3880,23 @@ def test_positive_number_multiple_above_large_minimum(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
 
 
+# A keyword constrains only its own type, so a schema without `type` admits values of every other type too.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"maximum": 0},
+        {"minProperties": 3},
+        {"minLength": 2},
+        {"minItems": 2},
+        {"minProperties": 65, "maximum": 0},
+    ],
+    ids=["numeric", "object", "string", "array", "mixed"],
+)
+def test_positive_untyped_schema_with_keywords(ctx, schema):
+    operation = body_operation(ctx, schema)
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
+
+
 def test_positive_number_boundary_respects_exclusive_bounds(ctx):
     # Boolean `exclusiveMinimum: true` + `exclusiveMaximum: true` combined with `minimum: 0`
     # / `maximum: 1` (legacy OpenAPI 3.0 form). The boundary generator's `+= 1` / `-= 1`
@@ -9858,7 +9875,7 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
             {"type": "string", "minLength": 2, "not": {"maxLength": 1}},
             None,
             ["000", "00"],
-            [{}, [None, None], None, False, 0],
+            [[], "0", True, {}, [None, None], None, False, 0],
         ),
         ("3.0.2", {"type": "array", "maxItems": 40000}, None, [[]], [{}, "AAA", None, False, 0]),
         (
