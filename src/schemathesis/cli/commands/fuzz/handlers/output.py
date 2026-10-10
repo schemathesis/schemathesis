@@ -57,6 +57,7 @@ _STOP_REASON_LABELS = {
     StopReason.FAILURE_LIMIT: "Failure limit reached",
     StopReason.COMPLETED: "Completed",
     StopReason.INTERRUPTED: "Interrupted",
+    StopReason.SERVER_UNAVAILABLE: "Server stopped responding",
 }
 
 

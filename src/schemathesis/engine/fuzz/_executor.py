@@ -264,6 +264,9 @@ def _run_forever(
         # that bounded cleanup — important for Python API callers where the process doesn't exit.
         for thread in threads:
             thread.join()
+    outage = ctx.server.take_report(None)
+    if outage is not None:
+        yield outage
 
 
 def _run_forever_thread(
@@ -367,7 +370,7 @@ def _run_forever_thread(
             operation_label = operation.label
 
             def _call(_case: Case = case, _kwargs: dict[str, Any] = transport_kwargs) -> Response:
-                return _case.call(**_kwargs)
+                return ctx.server.track(_case, lambda: _case.call(**_kwargs), transport_kwargs=_kwargs)
 
             def _on_delay(delay: float, retries_left: int, _label: str = operation_label) -> None:
                 event_queue.put(
@@ -385,6 +388,8 @@ def _run_forever_thread(
                     on_delay=_on_delay,
                 )
             except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
+                if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
+                    raise _StopFuzzing from None
                 _report_once(exc, label=operation.label)
                 continue
             recorder.record_response(case_id=case.id, response=response)
