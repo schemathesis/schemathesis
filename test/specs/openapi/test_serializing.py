@@ -11,7 +11,6 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.examples import get_strategies_from_examples
 from schemathesis.specs.openapi.serialization import (
     _schema_has_nested_object_properties,
@@ -942,13 +941,12 @@ def examples_rendered(operation, render):
 
 
 def coverage_rendered(operation, render):
+    operation.schema.config.phases.coverage.unexpected_methods = set()
     return {
         render(case)
-        for case in iter_coverage_cases(
-            operation=operation,
+        for case in operation.schema.iter_coverage_cases(
+            operation,
             generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
             generation_config=operation.schema.config.generation,
         )
     }

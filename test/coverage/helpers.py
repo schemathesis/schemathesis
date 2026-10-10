@@ -16,7 +16,6 @@ from schemathesis.generation.drivers import CoverageGenerator
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
-from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import cover_schema_iter
 from test.utils import assert_requests_call
 
@@ -137,25 +136,35 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
     return cases
 
 
-def iter_cases(operation, *generation_modes, **kwargs):
+def iter_cases(operation, *generation_modes, extra_data_source=None, error_feedback=None):
+    disable_coverage_extras(operation)
     return [
         case
-        for case in iter_coverage_cases(
-            operation=operation,
+        for case in operation.schema.iter_coverage_cases(
+            operation,
             generation_modes=list(generation_modes),
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
             generation_config=operation.schema.config.generation,
-            **kwargs,
+            extra_data_source=extra_data_source,
+            error_feedback=error_feedback,
         )
         if case.meta.phase.data.scenario not in CONTENT_TYPE_PROBES
     ]
 
 
 def generate_cases(operation, generation_mode):
-    coverage_config = operation.schema.config.phases.coverage
-    coverage_config.generate_duplicate_query_parameters = False
-    coverage_config.unexpected_methods = set()
+    disable_coverage_extras(operation)
+    return list(
+        operation.schema.iter_coverage_cases(
+            operation,
+            generation_modes=[generation_mode],
+            generation_config=operation.schema.config.generation,
+        )
+    )
+
+
+def generate_hooked_cases(operation, generation_mode):
+    # Schema hooks run in the phase driver, not in the schema's case iterator.
+    disable_coverage_extras(operation)
     return list(
         CoverageGenerator(
             operation=operation,
@@ -166,6 +175,12 @@ def generate_cases(operation, generation_mode):
             generation_config=operation.schema.config.generation,
         )
     )
+
+
+def disable_coverage_extras(operation):
+    coverage_config = operation.schema.config.phases.coverage
+    coverage_config.generate_duplicate_query_parameters = False
+    coverage_config.unexpected_methods = set()
 
 
 def optimized_body_schema(operation, media_type="application/json"):

@@ -27,7 +27,6 @@ from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocatio
 from schemathesis.core.result import Ok
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
-from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
@@ -44,6 +43,7 @@ from test.coverage.helpers import (
     collect_cases,
     collect_coverage_cases,
     generate_cases,
+    generate_hooked_cases,
     iter_cases,
     load_schema,
     make_request_body,
@@ -3083,13 +3083,12 @@ def test_unexpected_methods_ignore_invalid_operation_on_templated_sibling(ctx):
         }
     )
     operation = schema["/items/headers"]["GET"]
+    schema.config.phases.coverage.unexpected_methods = {"patch"}
     assert [
         case.method
-        for case in iter_coverage_cases(
-            operation=operation,
+        for case in schema.iter_coverage_cases(
+            operation,
             generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods={"patch"},
             generation_config=schema.config.generation,
         )
         if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
@@ -3109,13 +3108,12 @@ def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx):
         }
     )
     operation = schema["/items/headers"]["GET"]
+    schema.config.phases.coverage.unexpected_methods = {"patch"}
     assert [
         case.method
-        for case in iter_coverage_cases(
-            operation=operation,
+        for case in schema.iter_coverage_cases(
+            operation,
             generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods={"patch"},
             generation_config=schema.config.generation,
         )
         if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
@@ -5443,13 +5441,13 @@ def test_filter_case_hook_applied_in_coverage_phase(ctx):
     )
     operation = loaded["/foo"]["get"]
 
-    assert generate_cases(operation, GenerationMode.POSITIVE), "Expected coverage cases before filtering"
+    assert generate_hooked_cases(operation, GenerationMode.POSITIVE), "Expected coverage cases before filtering"
 
     @loaded.hook
     def filter_case(context, case):
         return False  # reject everything
 
-    assert generate_cases(operation, GenerationMode.POSITIVE) == [], (
+    assert generate_hooked_cases(operation, GenerationMode.POSITIVE) == [], (
         "filter_case hook should suppress all coverage cases"
     )
 
@@ -5468,7 +5466,7 @@ def test_map_case_hook_applied_in_coverage_phase(ctx):
         return case
 
     operation = loaded["/foo"]["get"]
-    cases = generate_cases(operation, GenerationMode.POSITIVE)
+    cases = generate_hooked_cases(operation, GenerationMode.POSITIVE)
 
     assert cases, "Expected at least one coverage case"
     assert all(c.query is None or c.query.get("injected") == "yes" for c in cases), (
@@ -6911,15 +6909,14 @@ def test_undeclared_method_probes_dedup_across_operations(ctx):
         },
     )
     unexpected_methods = {"options", "patch", "trace", "query"}
+    schema.config.phases.coverage.unexpected_methods = unexpected_methods
 
     seen: list[tuple[str, str]] = []
     seen_dedup: set[tuple[str, str]] = set()
     for declared in ("GET", "POST", "PUT", "DELETE"):
-        for case in iter_coverage_cases(
-            operation=schema["/items"][declared],
+        for case in schema.iter_coverage_cases(
+            schema["/items"][declared],
             generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=unexpected_methods,
             generation_config=schema.config.generation,
             unexpected_methods_seen=seen_dedup,
         ):
