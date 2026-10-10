@@ -65,7 +65,7 @@ Failures:
   ❌ Undocumented HTTP status code: 1
 
 Warnings:
-  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+  ⚠️ Authentication failed: 1 operation returned only 401/403 responses
 
 Test cases:
   N generated, N found N unique failures

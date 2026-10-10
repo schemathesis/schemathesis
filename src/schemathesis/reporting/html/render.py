@@ -372,7 +372,7 @@ def _verdict_line(data: ReportData) -> tuple[str, str]:
         )
         return bar, text
     if data.summary.failures:
-        return "", "Failures not attributed to a tested operation"
+        return "", "Failures not tied to an operation"
     if data.verdict is Verdict.ERRORED:
         errored = sum(row.status is OperationStatus.ERRORED for row in data.operations)
         return "", f"{plural(errored, 'operation')} errored" if errored else "Errors not tied to an operation"

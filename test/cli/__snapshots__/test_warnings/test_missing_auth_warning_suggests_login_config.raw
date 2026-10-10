@@ -55,7 +55,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Missing authentication: 2 operations returned only 401/403 responses
+  ⚠️ Authentication failed: 2 operations returned only 401/403 responses
 
 Test cases:
   N generated, N passed

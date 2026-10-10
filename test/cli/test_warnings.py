@@ -212,7 +212,7 @@ def test_warnings_multiple_types_via_cli(ctx, cli):
     result = cli.run(api.schema_url, "--warnings=missing_auth,missing_test_data", "--max-examples=1")
 
     # Then warnings can still be triggered for specified types
-    assert "Missing authentication: 1 operation returned only 401/403 responses" in result.stdout
+    assert "Authentication failed: 1 operation returned only 401/403 responses" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -577,7 +577,7 @@ def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app
     schema_url = _serve_schema(ctx, cli, app_runner, schema, [("GET", "/thing", thing)])
     result = cli.run(schema_url, "-c not_a_server_error", "--max-examples=5", "--phases=examples,fuzzing")
 
-    assert "Missing authentication" not in result.stdout
+    assert "Authentication failed" not in result.stdout
 
 
 ORDERS = {

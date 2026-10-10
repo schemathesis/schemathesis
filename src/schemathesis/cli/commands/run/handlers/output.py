@@ -1641,7 +1641,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         entries = (
             (
                 sum(len(operations) for operations in ctx.warnings.missing_auth.values()),
-                "Missing authentication",
+                "Authentication failed",
                 "operation",
                 "returned only 401/403 responses",
             ),
