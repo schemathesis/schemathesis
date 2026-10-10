@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.handlers.output import UNMATCHED_FILTER_TIP, warning_blocks
+from schemathesis.cli.commands.run.handlers.output import (
+    UNMATCHED_FILTER_TIP,
+    extraction_failure_reason,
+    extraction_failure_steps,
+    warning_blocks,
+)
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import LOADER_ERROR_SUGGESTIONS, replay_command
 from schemathesis.cli.summary import running_time
@@ -16,10 +21,12 @@ from schemathesis.core.output import format_response_payload
 from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import EngineErrorInfo
+from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.reporting.html.model import (
     Command,
     ErrorEntry,
+    ExtractionNote,
     FailingCase,
     FailureEntry,
     NothingTested,
@@ -37,9 +44,9 @@ if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
     from schemathesis.config import OutputConfig, SanitizationConfig
-    from schemathesis.engine.recorder import RecordedScenario, ReproductionStep
-    from schemathesis.engine.run import PhaseName
+    from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures
+    from schemathesis.generation.stateful.state_machine import ExtractionFailure
     from schemathesis.schemas import APIOperation
 
 
@@ -197,6 +204,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         sanitization_config = sanitization if sanitization.enabled else None
         summary = ctx.summary()
         rows = self._operation_rows(ctx)
+        payload = self.finished.payload if self.finished is not None else None
         # `st fuzz` collects no warnings.
         warnings = warning_blocks(ctx) if isinstance(ctx, ExecutionContext) else []
         nothing_tested = _nothing_tested(ctx.nothing_tested_reason, summary)
@@ -227,6 +235,21 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             unattributed_errors=rows.unattributed_errors,
             warnings=warnings,
             startup_warnings=ctx.startup_warnings if isinstance(ctx, ExecutionContext) else [],
+            phases=_phases(ctx) if isinstance(ctx, ExecutionContext) else [],
+            checks=_enabled_checks(ctx),
+            reauth_count=payload.reauth_count if payload is not None else 0,
+            reauth_broke=payload.reauth_broke if payload is not None else False,
+            extraction_failures=[
+                ExtractionNote(
+                    link=failure.id,
+                    case_id=failure.case_id,
+                    reason=extraction_failure_reason(failure),
+                    commands=_extraction_commands(failure),
+                    status_code=failure.response.status_code,
+                    body=format_response_payload(failure.response, config=ctx.config.output),
+                )
+                for failure in ctx.statistic.extraction_failures
+            ],
             running_time=running_time(self.started_at, self.finished),
             stop_reason=self.finished.stop_reason if self.finished is not None else StopReason.INTERRUPTED,
             started=self.started_at is not None,
@@ -263,12 +286,43 @@ def _commands(group: GroupedFailures) -> list[Command]:
     if group.steps:
         commands = []
         for step in group.steps:
-            method, path = _request_name(step)
+            method, path = _request_name(step.operation, step.method, step.path)
             commands.append(Command(curl=step.curl, method=method, path=path, failed=step.case_id == group.case_id))
         return commands
     if group.code_sample is None:
         return []
     return [Command(curl=group.code_sample, method=None, path=None, failed=False)]
+
+
+_PHASE_OUTCOMES = {
+    Status.SUCCESS: "passed",
+    Status.FAILURE: "failed",
+    Status.ERROR: "errored",
+    Status.INTERRUPTED: "interrupted",
+}
+
+
+def _phases(ctx: ExecutionContext) -> list[tuple[str, str, str]]:
+    phases = []
+    for phase in PhaseName:
+        if phase in INTERNAL_PHASES:
+            continue
+        status, skip_reason = ctx.phases[phase]
+        if status == Status.SKIP:
+            phases.append((phase.display, "skipped", skip_reason.display if skip_reason is not None else "skipped"))
+        else:
+            phases.append((phase.display, _PHASE_OUTCOMES[status], _PHASE_OUTCOMES[status]))
+    return phases
+
+
+def _enabled_checks(ctx: BaseExecutionContext) -> list[str]:
+    from schemathesis.checks import CHECKS, max_response_time
+
+    config = ctx.config.checks_config_for()
+    names = [check.__name__ for check in CHECKS.get_all() if config.get_by_name(name=check.__name__).enabled]
+    if config.max_response_time.enabled:
+        names.append(max_response_time.__name__)
+    return sorted(names)
 
 
 def _by_count(counts: Counter[str]) -> list[tuple[str, int]]:
@@ -288,11 +342,19 @@ def _fatal_entry(exception: Exception, *, wait_for_schema: float | int | None) -
     return ErrorEntry(title=info.title, message=info.message, tip=None)
 
 
-def _request_name(step: ReproductionStep) -> tuple[str | None, str]:
+def _extraction_commands(failure: ExtractionFailure) -> list[Command]:
+    commands = []
+    for (case, _), (_, curl) in zip(reversed(failure.history), extraction_failure_steps(failure), strict=True):
+        method, path = _request_name(case.operation.label, case.method, case.formatted_path)
+        commands.append(Command(curl=curl, method=method, path=path, failed=False))
+    return commands
+
+
+def _request_name(operation: str, method: str, path: str) -> tuple[str | None, str]:
     # Without a method in the label (GraphQL), every request goes to the same URL, so the step names the field.
-    if split_label(step.operation)[0] is None:
-        return None, step.operation
-    return step.method, step.path
+    if split_label(operation)[0] is None:
+        return None, operation
+    return method, path
 
 
 def _error_entry(info: EngineErrorInfo) -> ErrorEntry:

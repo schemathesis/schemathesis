@@ -26,6 +26,8 @@
 }
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;background:var(--color-background);color:var(--color-text-primary);font-family:var(--font-family-default);font-size:var(--font-size-base);line-height:1.5;-webkit-text-size-adjust:100%}
+/* Fonts like JetBrains Mono draw `->` as an arrow; the `font` shorthand resets this, hence `!important`. */
+*{font-variant-ligatures:none!important}
 h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit}
 a{color:var(--color-text-primary)}
 a:hover{color:#fff}
@@ -350,4 +352,46 @@ a.w-op:hover .path{text-decoration:underline}
   .warnings{padding:10px 14px 12px}
   .w-body{margin-left:0}
   .startup{flex-direction:column;gap:2px}
+}
+.hs-exit{align-self:flex-start;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:12px/1.4 var(--font-family-monospace);color:var(--color-brand-warning);text-decoration:none;border-bottom:1px dotted var(--color-brand-warning)}
+.hs-exit:hover{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary)}
+
+.phases{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 24px}
+.phase{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+.phase::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;transform:translateY(-1px);background:var(--color-text-muted)}
+.ph-name{color:var(--color-text-primary)}
+.ph-outcome{color:var(--color-text-secondary)}
+.phase-passed::before{background:var(--color-brand-success)}
+.phase-failed::before{background:var(--color-brand-danger)}
+.phase-errored::before{background:var(--color-brand-warning)}
+.phase-failed .ph-outcome{color:var(--color-brand-danger)}
+.phase-errored .ph-outcome{color:var(--color-brand-warning)}
+.phase-skipped::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--color-border)}
+.phase-skipped .ph-name,.phase-skipped .ph-outcome{color:var(--color-text-muted)}
+
+.checks-inline{display:flex;flex-wrap:wrap;gap:2px 14px}
+.checks-inline code{color:var(--color-text-primary);white-space:nowrap}
+.checks-inline .more{margin-left:0}
+.checks-rest{margin-top:4px}
+
+.tk[id]{scroll-margin-top:16px}
+.tv-note{display:flex;flex-direction:column;gap:4px}
+.tv-note p{margin:0}
+.rn-facts{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:2px 24px}
+.rn-facts .k{color:var(--color-text-secondary)}
+.rn-facts .v{margin-left:6px;color:var(--color-text-primary);font-variant-numeric:tabular-nums}
+.note-error{display:flex;gap:8px;align-items:baseline;color:var(--color-brand-warning);overflow-wrap:anywhere}
+.note-error::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--color-brand-warning);transform:translateY(-1px)}
+.run-notes{margin:var(--space-md) 0;scroll-margin-top:16px}
+.rn-title{margin:0 0 8px;font:600 var(--font-size-sm) var(--font-family-default);color:var(--color-text-primary)}
+.run-notes .finding-title::before{background:var(--color-text-muted)}
+.run-notes .case-list{background:var(--color-surface-1);border:1px solid var(--color-border);border-radius:var(--radius-md)}
+.run-notes .repro,.run-notes .body{background:var(--color-background)}
+.ex-link{font:12px/1.5 var(--font-family-monospace);color:var(--color-text-primary);overflow-wrap:anywhere}
+
+@media (max-width:600px){
+  .phases{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px}
+  .phase{flex-wrap:wrap;column-gap:6px;white-space:normal}
+  .ph-name{white-space:nowrap}
+  .ph-outcome{flex-basis:100%;padding-left:13px}
 }

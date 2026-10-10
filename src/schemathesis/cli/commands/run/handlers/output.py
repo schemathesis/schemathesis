@@ -532,6 +532,30 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
     return blocks
 
 
+def extraction_failure_reason(failure: ExtractionFailure) -> list[str]:
+    """Why a link could not take the data it needs from a response."""
+    if failure.error:
+        if isinstance(failure.error, (JSONDecodeError, UnicodeDecodeError)):
+            return ["Failed to parse JSON from response"]
+        return [f"{failure.error.__class__.__name__}: {failure.error}"]
+    if failure.parameter_name == "body":
+        lines = [f"Could not resolve request body via {failure.expression}"]
+    else:
+        lines = [f"Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"]
+    prefix = "$response.body"
+    if failure.expression.startswith(prefix):
+        lines.append(f"Path `{failure.expression[len(prefix) :]}` not found in response")
+    return lines
+
+
+def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]]:
+    """Requests that led to the response, oldest first, as (status code, curl command)."""
+    return [
+        (response.status_code, case.as_curl_command(headers=dict(response.request.headers), verify=response.verify))
+        for case, response in reversed(failure.history)
+    ]
+
+
 TRUNCATION_PLACEHOLDER = "[...]"
 
 
@@ -1573,26 +1597,11 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 click.echo(f"    {transition_id}")
 
                 indent = "        "
-                if failure.error:
-                    if isinstance(failure.error, (JSONDecodeError, UnicodeDecodeError)):
-                        click.echo(f"\n{indent}Failed to parse JSON from response")
-                    else:
-                        click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
-                else:
-                    if failure.parameter_name == "body":
-                        description = f"\n{indent}Could not resolve request body via {failure.expression}"
-                    else:
-                        description = f"\n{indent}Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"
-                    prefix = "$response.body"
-                    if failure.expression.startswith(prefix):
-                        description += f"\n{indent}Path `{failure.expression[len(prefix) :]}` not found in response"
-                    click.echo(description)
-
+                click.echo("\n" + "\n".join(f"{indent}{line}" for line in extraction_failure_reason(failure)))
                 click.echo()
 
-                for case, response in reversed(failure.history):
-                    curl = case.as_curl_command(headers=dict(response.request.headers), verify=response.verify)
-                    click.echo(f"{indent}[{response.status_code}] {curl}")
+                for status_code, curl in extraction_failure_steps(failure):
+                    click.echo(f"{indent}[{status_code}] {curl}")
 
                 payload = format_response_payload(failure.response, config=ctx.config.output)
                 click.echo(textwrap.indent(f"\n{payload}", prefix=indent))

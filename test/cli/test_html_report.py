@@ -3,7 +3,7 @@ import re
 import time
 
 import pytest
-from flask import jsonify
+from flask import Response, jsonify
 from hypothesis import strategies as st
 
 import schemathesis
@@ -719,3 +719,93 @@ def test_html_report_warnings_order(ctx, cli, app_runner, report_dir):
         ("warning", "w-low-valid-input-rate"),
         ("warning note", "w-unmatched-filters"),
     ]
+
+
+def test_html_report_phases_and_checks(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success()
+    html = run_with_report(
+        cli,
+        report_dir,
+        api.schema_url,
+        "--checks=not_a_server_error,status_code_conformance",
+        phases="examples,fuzzing",
+    )
+    assert html == snapshot_html
+
+
+def test_html_report_known_failures_from_baseline(ctx, cli, tmp_path, report_dir, snapshot_html):
+    api = ctx.openapi.apps.failure()
+    baseline = str(tmp_path / "baseline.yaml")
+    run_with_report(
+        cli, report_dir, api.schema_url, "--baseline-update", exit_code=ExitCode.FAILURES, config={"baseline": baseline}
+    )
+    assert run_with_report(cli, report_dir, api.schema_url, config={"baseline": baseline}) == snapshot_html
+
+
+def test_html_report_filtered_failures(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.failure()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_failure(context, failure, case, response):
+    return response.status_code != 500
+"""
+    )
+    html = run_with_report(cli, report_dir, api.schema_url, "--checks=not_a_server_error", hooks=module)
+    assert html == snapshot_html
+
+
+def test_html_report_extraction_failures(ctx, cli, app_runner, report_dir, snapshot_html):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/api/items", methods=["POST"])
+    def create_item():
+        return Response(b"not json", status=201, content_type="application/json")
+
+    @app.route("/api/items/<int:item_id>")
+    def get_item(item_id):
+        return jsonify({})
+
+    html = run_with_report(
+        cli, report_dir, app_runner.openapi_url(app), "--checks=not_a_server_error", phases="stateful"
+    )
+    assert html == snapshot_html
+
+
+# Warnings configured to fail the run make the exit code non-zero while every test passes.
+def test_html_report_warnings_fail_the_run(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.basic()
+    html = run_with_report(
+        cli,
+        report_dir,
+        api.schema_url,
+        "--checks=not_a_server_error",
+        "--mode=positive",
+        exit_code=ExitCode.FAILURES,
+        config={"warnings": {"fail-on": True}},
+    )
+    assert html == snapshot_html
