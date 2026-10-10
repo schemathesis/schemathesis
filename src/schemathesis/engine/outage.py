@@ -158,7 +158,7 @@ class ServerMonitor:
         """Whether this error is the one that revealed the outage, rather than one that came after it."""
         return self._confirmed_by is exc
 
-    def take_report(self, phase: PhaseName) -> events.NonFatalError | None:
+    def take_report(self, phase: PhaseName | None) -> events.NonFatalError | None:
         """The outage error, or nothing while the server is still answering."""
         if self._message is None:
             return None

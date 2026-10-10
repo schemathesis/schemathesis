@@ -3908,6 +3908,23 @@ def test_crash_found_before_the_outage_is_still_reported_per_operation(subproces
     )
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, cli):
+    port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": "refuse", "CRASH_AFTER": "5"})
+    result = cli.main(
+        "fuzz",
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=not_a_server_error",
+        "--mode=positive",
+        "--max-time=20",
+    )
+    assert "Stop reason: Server stopped responding" in result.stdout, result.stdout
+    assert "Runtime Error" not in result.stdout, result.stdout
+    # The request that crashed the server leads the list.
+    assert int(re.findall(r"""'\{"size": (\d+)\}'""", result.stdout.split("before it went away:")[1])[0]) > 50000
+
+
 ONE_SHOT_SERVER = (
     STOP_LISTENING
     + """

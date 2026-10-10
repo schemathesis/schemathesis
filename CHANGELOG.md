@@ -19,6 +19,7 @@
 - Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
+- `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
