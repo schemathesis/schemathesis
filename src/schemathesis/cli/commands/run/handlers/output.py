@@ -479,6 +479,9 @@ class UnitTestProgressManager:
         self._update_stats_display()
 
     def interrupt(self) -> None:
+        # Workers may each report the same interrupt.
+        if self.is_interrupted:
+            return
         self.is_interrupted = True
         # A repeat walks the operations again, so what is left is what never reported at all.
         self.stats[Status.SKIP] += max(self.total - len(self.outcomes), 0)

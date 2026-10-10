@@ -4872,3 +4872,19 @@ def test_custom_handler_error_under_time_budget(ctx, cli, snapshot_cli):
 
     api = ctx.openapi.apps.success()
     assert cli.run(api.schema_url, "--max-time=10", "--phases=fuzzing") == snapshot_cli
+
+
+INTERRUPT_ON_EVERY_EXAMPLES_SETUP = """
+@schemathesis.hook
+def before_add_examples(context, examples):
+    raise KeyboardInterrupt
+"""
+
+
+@pytest.mark.parametrize("workers", ["1", "2"])
+def test_interrupt_counts_each_operation_once(ctx, cli, workers):
+    # Workers can report the interrupt more than once; each operation must still be counted once.
+    api = ctx.openapi.apps.success_and_failure()
+    module = ctx.write_pymodule(INTERRUPT_ON_EVERY_EXAMPLES_SETUP)
+    result = cli.main("run", api.schema_url, f"--workers={workers}", "--phases=examples", hooks=module)
+    assert re.findall(r"⏭\s+(\d+) skipped", result.stdout) == ["2"]
