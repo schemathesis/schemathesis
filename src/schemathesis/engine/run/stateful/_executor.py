@@ -84,6 +84,10 @@ def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response:
     response.clear_cache()
 
 
+class CredentialRemovalAnswered(Exception):
+    """Ends a suite whose strategies still offer a request the run already has an answer to."""
+
+
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
     """Get the settings that should be overridden to match the defaults for API state machines."""
     kwargs = {}
@@ -165,6 +169,8 @@ def _classify_suite_error(
         # The clock ended the suite. A failure found before it surfaces as its own group, so there is
         # nothing left to report here; the engine reports the limit itself.
         return Status.SUCCESS, False, []
+    if isinstance(exc, CredentialRemovalAnswered):
+        return Status.SUCCESS, True, []
     if isinstance(exc, ServerWentAway):
         return _network_error_outcome(state) or (Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS, False, [])
     if isinstance(exc, KeyboardInterrupt):
@@ -439,6 +445,7 @@ def _begin_suite(engine: EngineContext, suite_recorders: list[ScenarioRecorder])
     if engine.link_calibration is not None:
         engine.link_calibration.begin_iteration()
     engine.health.begin_iteration()
+    engine.credential_removals.begin_iteration()
     suite_recorders.clear()
     if engine.error_feedback is not None:
         engine.error_feedback.checkpoint()
@@ -550,6 +557,9 @@ def execute_state_machine_loop(
             self.control.supervisor = engine.supervisor
 
         def setup(self) -> None:
+            # Generation only sees answers from before this suite, so a new suite stops offering newly answered requests.
+            if engine.credential_removals.has_new_answers():
+                raise CredentialRemovalAnswered
             self._current_input: StepInput | None = None
             scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
             self._started_at = Instant()
@@ -583,6 +593,8 @@ def execute_state_machine_loop(
         def validate_response(
             self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
         ) -> None:
+            if case.operation.schema.omits_sole_credential(case):
+                engine.credential_removals.record(case.operation.label)
             step_input = self._current_input
             self._current_input = None
             _validate_step_response(

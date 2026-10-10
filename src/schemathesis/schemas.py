@@ -126,6 +126,10 @@ class BaseSchema(Mapping):
         # Generated credentials that only some of the accepted security requirements need.
         return []
 
+    def omits_sole_credential(self, case: Case) -> bool:
+        """Whether the case leaves out the credential that is its operation's only input."""
+        return False
+
     def _security_auth_providers(self) -> Iterator[AuthProvider]:
         # Auth providers bound to declared security schemes. Only OpenAPI has them.
         return iter(())

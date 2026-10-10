@@ -51,6 +51,7 @@ from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
+from schemathesis.transport.prepare import get_exclude_headers
 
 from ...generation import GenerationMode
 from ...hooks import (
@@ -59,7 +60,7 @@ from ...hooks import (
     dispatch_before_process_path,
 )
 from ...schemas import APIOperation, APIOperationMap, BaseSchema
-from ._hypothesis import jsonify_python_specific_types, openapi_cases
+from ._hypothesis import get_sole_credential, jsonify_python_specific_types, openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader
@@ -204,6 +205,14 @@ class OpenApiSchema(BaseSchema):
             for parameter in operation.iter_parameters()
             if not parameter.is_required and ORIGINAL_SECURITY_TYPE_KEY in parameter.definition
         ]
+
+    @override
+    def omits_sole_credential(self, case: Case) -> bool:
+        credential = get_sole_credential(case.operation)
+        if credential is None:
+            return False
+        name = credential.name.lower()
+        return any(header.lower() == name for header in get_exclude_headers(case))
 
     @override
     def _security_auth_providers(self) -> Iterator[AuthProvider]:

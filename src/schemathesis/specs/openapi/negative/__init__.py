@@ -520,6 +520,22 @@ def _with_syntax_fuzzing(mutated_strategy: st.SearchStrategy, location: Paramete
     return with_syntax_fuzzing()
 
 
+def without_required_parameters(location: ParameterLocation, required: list[str]) -> st.SearchStrategy[GeneratedValue]:
+    """A parameter object with no parameters in it, recorded as the same `required` violation a mutation reports."""
+    mutation = Mutation(
+        path=(),
+        parameter_location=location,
+        schema_pointer="",
+        channel=MutationChannel.SCHEMA,
+        operator=OperatorKind.NEGATE_CONSTRAINTS,
+        keywords=("required",),
+        parameter=required[0] if len(required) == 1 else None,
+        original_value=list(required),
+        new_value=None,
+    )
+    return st.builds(GeneratedValue, st.builds(dict), st.just(MutationMetadata(mutations=(mutation,))))
+
+
 def is_non_empty_query(query: dict[str, Any]) -> bool:
     # Whether this query parameters will be encoded to a non-empty query string
     result = []

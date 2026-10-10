@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -119,6 +120,15 @@ CONSTANTS_OVERLAY_PROBABILITY = 0.15
 
 # Keywords that settle a parameter's type on their own; a default beside them would narrow it.
 _TYPE_DECIDING_KEYWORDS = ("anyOf", "oneOf", "allOf", "not", "$ref")
+
+
+class CredentialRemoval(enum.Enum):
+    """Negative generation for a header set holding nothing but the operation's credential."""
+
+    # The run has not yet seen an answer to the request without the credential.
+    PENDING = enum.auto()
+    # That request always looks the same, and the run already has an answer to it.
+    ANSWERED = enum.auto()
 
 
 def _variant_key(variant: dict[str, Any]) -> str:
@@ -2296,7 +2306,7 @@ class OpenApiParameterSet(ParameterSet):
         self._validation_schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
         self._strategy_cache: dict[
-            tuple[frozenset[str], GenerationMode, StrategyCacheKey | None], st.SearchStrategy
+            tuple[frozenset[str], GenerationMode, StrategyCacheKey | None, CredentialRemoval | None], st.SearchStrategy
         ] = {}
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
@@ -2401,13 +2411,14 @@ class OpenApiParameterSet(ParameterSet):
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
         constants_value_source: ConstantsPool | None = None,
+        credential_removal: CredentialRemoval | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         overlay_key = _strategy_cache_key(
             operation, extra_data_source, mix_examples, error_feedback, constants_value_source
         )
-        cache_key = (exclude_key, generation_mode, overlay_key)
+        cache_key = (exclude_key, generation_mode, overlay_key, credential_removal)
         if overlay_key is not None and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
 
@@ -2436,6 +2447,7 @@ class OpenApiParameterSet(ParameterSet):
                 captured,
                 mix_examples=mix_examples,
                 constants_value_source=constants_value_source,
+                credential_removal=credential_removal,
             )
 
         if overlay_key is not None:
@@ -2454,10 +2466,13 @@ class OpenApiParameterSet(ParameterSet):
         *,
         mix_examples: bool,
         constants_value_source: ConstantsPool | None,
+        credential_removal: CredentialRemoval | None = None,
     ) -> st.SearchStrategy:
         from hypothesis import strategies as st
 
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
+        from schemathesis.specs.openapi.negative import without_required_parameters
+        from schemathesis.specs.openapi.negative.mutations import compute_mutation_targets
 
         if generation_mode.is_negative and not schema.get("properties"):
             # Nothing to negate - all properties were excluded
@@ -2468,6 +2483,10 @@ class OpenApiParameterSet(ParameterSet):
             if generation_mode.is_negative
             else None
         )
+        target_descriptors = None
+        if credential_removal is not None:
+            # Only the root drops the credential; every target below it changes the credential's value.
+            target_descriptors = tuple(descriptor for descriptor in compute_mutation_targets(schema) if descriptor.walk)
         strategy = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode](
             schema,
             operation.label,
@@ -2477,6 +2496,7 @@ class OpenApiParameterSet(ParameterSet):
             operation.schema.adapter.jsonschema_validator_cls,
             self.name_to_uri,
             validation_schema=validation_schema,
+            target_descriptors=target_descriptors,
         )
         if strategy is EMPTY_STRATEGY:
             # Every overlay below decorates a drawn value, so there is nothing for them to act on.
@@ -2494,7 +2514,7 @@ class OpenApiParameterSet(ParameterSet):
             mix_examples=mix_examples,
             constants_value_source=constants_value_source,
         )
-        return _serialize_for_location(
+        strategy = _serialize_for_location(
             strategy,
             self.location,
             generation_mode.is_negative,
@@ -2502,6 +2522,11 @@ class OpenApiParameterSet(ParameterSet):
             schema,
             self.items,
         )
+        if generation_mode.is_negative and credential_removal is CredentialRemoval.PENDING:
+            # This branch draws nothing and no filter retries into it, so a run with no other input to vary
+            # tries it only once.
+            strategy = st.one_of(without_required_parameters(self.location, list(schema.get("required", ()))), strategy)
+        return strategy
 
     def _apply_overlays(
         self,
