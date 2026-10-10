@@ -32,7 +32,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import (
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
-    from schemathesis.specs.openapi.schemas import APIOperation
+    from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
 def extract_inputs(
@@ -1025,6 +1025,62 @@ def align_created_identifiers(operations: OperationMap) -> None:
             and output.cardinality == Cardinality.ONE
             and output.resource is not target
         ]
+
+
+def bind_created_item_keys(
+    schema: OpenApiSchema, operations: OperationMap, writable_body_fields: dict[str, dict[str, JsonSchema]]
+) -> None:
+    """Link the key a client sends to `POST /things` to what `/things/{key}` takes, e.g. a chosen `title`."""
+    item_slots: dict[str, dict[str, InputSlot]] = {}
+    for operation in operations.values():
+        parameter_name = naming.trailing_path_parameter(operation.path)
+        for input_slot in operation.inputs:
+            if (
+                input_slot.parameter_location == ParameterLocation.PATH
+                and input_slot.parameter_name == parameter_name
+                and input_slot.resource_field is not None
+            ):
+                collection = operation.path.rstrip("/").rsplit("/", 1)[0]
+                item_slots.setdefault(collection, {})[input_slot.resource.name] = input_slot
+    for label, fields in writable_body_fields.items():
+        create = operations[label]
+        slots = item_slots.get(create.path.rstrip("/"), {})
+        if create.method.lower() != "post" or len(slots) != 1:
+            continue
+        (item_slot,) = slots.values()
+        key = item_slot.parameter_name
+        assert isinstance(key, str)
+        if (
+            key not in fields
+            or not _is_scalar(fields[key])
+            or any(
+                slot.parameter_location == ParameterLocation.BODY and slot.parameter_name == key
+                for slot in create.inputs
+            )
+        ):
+            continue
+        # A server-issued id is the identity, not the key the client sent.
+        if any(
+            naming.key_kind(field) == naming.KeyKind.IDENTIFIER
+            for output in create.outputs
+            for field in output.response_fields or ()
+        ):
+            continue
+        declared = schema.find_operation_by_label(label)
+        assert declared is not None
+        status_code = next((response.status_code for response in declared.responses.iter_successful_responses()), None)
+        if status_code is None:
+            continue
+        # An output, not an input: a create needs a fresh key, never one taken from existing objects.
+        create.outputs.append(
+            OutputSlot(
+                resource=item_slot.resource,
+                pointer="",
+                cardinality=Cardinality.ONE,
+                status_code=status_code,
+                body_field=key,
+            )
+        )
 
 
 def bind_id_fields_to_returned_resources(operations: OperationMap) -> None:

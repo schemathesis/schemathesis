@@ -3385,6 +3385,84 @@ def test_path_param_named_after_field_of_unrelated_resource_is_not_bound(ctx):
     assert inferred_links(graph) == []
 
 
+BOOKS = {"type": "object", "properties": {"Books": {"type": "array", "items": BOOK}}}
+MESSAGE = {"type": "object", "properties": {"message": {"type": "string"}, "status": {"type": "string"}}}
+
+
+@pytest.mark.parametrize(
+    ["collection", "pointer", "parameters", "create_response"],
+    [
+        ("/books", "~1books", [], MESSAGE),
+        ("/books/v1", "~1books~1v1", [], MESSAGE),
+        ("/books", "~1books", [], None),
+        ("/shelves/{shelf}/books", "~1shelves~1{shelf}~1books", [path_param("shelf")], MESSAGE),
+    ],
+    ids=["plain", "version-segment", "no-response-body", "nested"],
+)
+def test_create_sending_the_item_key_links_to_read(ctx, collection, pointer, parameters, create_response):
+    # The client picks the key and the create answers only with a message.
+    create_body = {"type": "object", "properties": {"book_title": {"type": "string"}, "secret": {"type": "string"}}}
+    paths = {
+        collection: {
+            **operation("get", collection, "200", BOOKS, parameters=parameters)[collection],
+            **operation_with_body("post", collection, "200", create_body, create_response, parameters=parameters)[
+                collection
+            ],
+        },
+        **operation(
+            "get", f"{collection}/{{book_title}}", "200", BOOK, parameters=[*parameters, path_param("book_title")]
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    parents = {f"path.{parameter['name']}": f"$request.path.{parameter['name']}" for parameter in parameters}
+    assert inferred_links(graph) == [
+        [
+            f"#/paths/{pointer}/get",
+            "200",
+            {
+                "operationRef": f"#/paths/{pointer}~1{{book_title}}/get",
+                "parameters": {"path.book_title": "$response.body#/Books/*/book_title", **parents},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            f"#/paths/{pointer}/post",
+            "200",
+            {
+                "operationRef": f"#/paths/{pointer}~1{{book_title}}/get",
+                "parameters": {"path.book_title": "$request.body#/book_title", **parents},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+@pytest.mark.parametrize(
+    ["method", "create_body", "create_response"],
+    [
+        ("post", {"type": "object", "properties": {"secret": {"type": "string"}}}, MESSAGE),
+        ("post", {"type": "object", "properties": {"book_title": {"type": "object"}}}, MESSAGE),
+        (
+            "post",
+            {"type": "object", "properties": {"book_title": {"type": "string"}}},
+            {"type": "object", "properties": {"id": {"type": "string"}, "message": {"type": "string"}}},
+        ),
+        ("put", {"type": "object", "properties": {"book_title": {"type": "string"}}}, MESSAGE),
+    ],
+    ids=["no-key-sent", "non-scalar-key", "server-issues-id", "not-a-create"],
+)
+def test_create_does_not_link_to_read_by_a_sent_field(ctx, method, create_body, create_response):
+    paths = {
+        "/books": {
+            **operation("get", "/books", "200", BOOKS)["/books"],
+            **operation_with_body(method, "/books", "200", create_body, create_response)["/books"],
+        },
+        **operation("get", "/books/{book_title}", "200", BOOK, parameters=[path_param("book_title")]),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert [link[0] for link in inferred_links(graph)] == ["#/paths/~1books/get"]
+
+
 def test_path_param_without_matching_resource_field_does_not_link_to_missing_field(ctx):
     paths = {
         **CREATE_PROJECT,

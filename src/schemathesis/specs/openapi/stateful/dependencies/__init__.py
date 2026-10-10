@@ -18,6 +18,7 @@ from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     align_created_identifiers,
+    bind_created_item_keys,
     bind_echoed_body_fields,
     bind_id_fields_to_returned_resources,
     bind_item_parameters_to_collections,
@@ -238,6 +239,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # A bare id `POST /things` returns is what `/things/{id}` takes, whatever each response names its schema.
     align_created_identifiers(operations)
+
+    # A key the client chooses on `POST /things` is what `/things/{key}` takes when the response does not echo it.
+    bind_created_item_keys(schema, operations, writable_body_fields)
 
     # `fromAirportId` names what responses return under `fromAirport` (`AirportResponse.id`).
     bind_id_fields_to_returned_resources(operations)
