@@ -212,7 +212,7 @@ def auth_flow_suggestion(schema: BaseSchema) -> str | None:
         return None
     snippet = "\n".join(f"    {line}" for line in flow.config_lines())
     return (
-        f"💡 {flow.spec.register_operation} and {flow.spec.login_operation} look like a sign-up and login flow. "
+        f"{flow.spec.register_operation} and {flow.spec.login_operation} look like a sign-up and login flow. "
         f"Register an account, then add to schemathesis.toml:\n\n{snippet}"
     )
 
