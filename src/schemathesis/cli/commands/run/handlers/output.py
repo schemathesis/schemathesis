@@ -212,6 +212,8 @@ class WarningItem:
     text: str
     # Lines shown under the item, e.g. the patterns an operation could not use.
     details: list[str] = field(default_factory=list)
+    # Label of the operation the item is about, if it is about one.
+    operation: str | None = None
 
 
 @dataclass(slots=True)
@@ -230,6 +232,8 @@ class WarningBlock:
     # Completes the sentence that starts with the count, e.g. " returned authentication errors".
     suffix: str
     groups: list[WarningGroup]
+    # Whether the results may not mean what the verdict says, e.g. every response was 401.
+    affects_verdict: bool = False
 
     @property
     def summary(self) -> str:
@@ -237,22 +241,34 @@ class WarningBlock:
         return f"{self.count} {self.entity}{plural}{self.suffix}"
 
 
-def _items(values: set[str]) -> list[WarningItem]:
-    return [WarningItem(text=value) for value in sorted(values)]
+def _items(values: set[str], *, operations: bool = True) -> list[WarningItem]:
+    return [WarningItem(text=value, operation=value if operations else None) for value in sorted(values)]
 
 
-def _list_block(title: str, values: set[str], suffix: str, tips: list[str], entity: str = "operation") -> WarningBlock:
+def _list_block(
+    title: str,
+    values: set[str],
+    suffix: str,
+    tips: list[str],
+    entity: str = "operation",
+    *,
+    affects_verdict: bool = False,
+) -> WarningBlock:
     return WarningBlock(
         title=title,
         count=len(values),
         entity=entity,
         suffix=suffix,
-        groups=[WarningGroup(items=_items(values), tips=tips)],
+        groups=[WarningGroup(items=_items(values, operations=entity == "operation"), tips=tips)],
+        affects_verdict=affects_verdict,
     )
 
 
 def _detailed_block(title: str, warnings: dict[str, set[str]], suffix: str, tip: str) -> WarningBlock:
-    items = [WarningItem(text=label, details=sorted(messages)) for label, messages in sorted(warnings.items())]
+    items = [
+        WarningItem(text=label, details=sorted(messages), operation=label)
+        for label, messages in sorted(warnings.items())
+    ]
     return WarningBlock(
         title=title,
         count=len(warnings),
@@ -277,7 +293,7 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
         for status_code, labels in missing_auth.items()
     ]
     groups[-1].tips = [
-        ctx.warnings.auth_flow_suggestion or "Ensure valid authentication credentials are set via --auth or -H"
+        ctx.warnings.auth_flow_suggestion or "Ensure valid authentication credentials are set via `--auth` or `-H`"
     ]
     return WarningBlock(
         title="Authentication failed",
@@ -285,6 +301,7 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
         entity="operation",
         suffix=" returned authentication errors",
         groups=groups,
+        affects_verdict=True,
     )
 
 
@@ -293,11 +310,14 @@ def _missing_deserializer_block(ctx: ExecutionContext) -> WarningBlock:
     groups = [
         WarningGroup(
             heading=f"{media_type} ({_plural(len(operations), 'operation')})",
-            items=_items({f"{label} ({', '.join(sorted(details))})" for label, details in operations.items()}),
+            items=[
+                WarningItem(text=f"{label} ({', '.join(sorted(details))})", operation=label)
+                for label, details in sorted(operations.items())
+            ],
         )
         for media_type, operations in sorted(warnings.items())
     ]
-    groups[-1].tips = ["Register a deserializer with @schemathesis.deserializer() to enable validation"]
+    groups[-1].tips = ["Register a deserializer with `@schemathesis.deserializer()` to enable validation"]
     return WarningBlock(
         title="Schema validation skipped",
         count=len({label for operations in warnings.values() for label in operations}),
@@ -316,6 +336,7 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
             missing,
             " never returned data, preventing tests from reaching your API's core logic",
             ["Supply argument values via a fuzz dictionary so queries can return data"],
+            affects_verdict=True,
         )
     linked = ctx.warnings.linked_operations or set()
     stateful_ran = ctx.phases[PhaseName.STATEFUL_TESTING][0] != Status.SKIP
@@ -349,6 +370,7 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
         entity="operation",
         suffix=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
         groups=groups,
+        affects_verdict=True,
     )
 
 
@@ -371,7 +393,8 @@ def _low_valid_rate_block(ctx: ExecutionContext) -> WarningBlock:
                     cause = f"{rate.rejected} rejected"
                 items.append(
                     WarningItem(
-                        text=f"{label} ({phase}): {rate.rate:.0%} accepted ({rate.accepted}/{rate.total}, {cause})"
+                        text=f"{label} ({phase}): {rate.rate:.0%} accepted ({rate.accepted}/{rate.total}, {cause})",
+                        operation=label,
                     )
                 )
     if _status_codes_are_uninformative(ctx):
@@ -391,6 +414,7 @@ def _low_valid_rate_block(ctx: ExecutionContext) -> WarningBlock:
         entity="operation",
         suffix=" accepted few of the requests sent to it, leaving the logic behind them untested",
         groups=[WarningGroup(items=items, tips=[tip])],
+        affects_verdict=True,
     )
 
 
@@ -406,7 +430,8 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 "Rate limited",
                 warnings.rate_limited,
                 " mostly returned 429 Too Many Requests, leaving the logic behind them untested",
-                ["Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m"],
+                ["Send requests no faster than the API allows with `--rate-limit`, e.g. `--rate-limit=100/m`"],
+                affects_verdict=True,
             )
         )
     if warnings.base_url_mismatch:
@@ -415,7 +440,8 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 "Base URL may be missing a path",
                 warnings.base_url_mismatch,
                 " returned only 404 Not Found",
-                [f"The schema declares a base path; try --url {warnings.base_url_suggestion}"],
+                [f"The schema declares a base path; try `--url {warnings.base_url_suggestion}`"],
+                affects_verdict=True,
             )
         )
     if warnings.missing_test_data:
@@ -428,6 +454,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 " mostly rejected generated data due to validation errors, "
                 "indicating schema constraints don't match API validation",
                 ["Check your schema constraints - API validation may be stricter than documented"],
+                affects_verdict=True,
             )
         )
     if warnings.missing_deserializer:
@@ -467,8 +494,9 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             _list_block(
                 "Method Not Allowed",
                 warnings.method_not_allowed,
-                " consistently returned `405 Method Not Allowed` — skipped from later phases",
+                " consistently returned `405 Method Not Allowed`, skipped from later phases",
                 ["Verify the server actually accepts these methods, or remove them from the schema if unsupported"],
+                affects_verdict=True,
             )
         )
     if warnings.unsupported_regex:
@@ -476,7 +504,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             _detailed_block(
                 "Unsupported regex patterns",
                 warnings.unsupported_regex,
-                " contain regex patterns Schemathesis cannot use as written",
+                " with regex patterns Schemathesis cannot use as written",
                 "Supply examples for these operations, or narrow the pattern",
             )
         )
@@ -497,7 +525,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 "Constant reuse skipped",
                 warnings.constants_extraction,
                 " could not be scanned for constant reuse",
-                ["Check that each @schemathesis.python.constants source returns your app or modules"],
+                ["Check that each `@schemathesis.python.constants` source returns your app or modules"],
                 entity="registered source",
             )
         )
@@ -989,8 +1017,6 @@ class StatefulProgressManager:
 @dataclass
 class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     config: ProjectConfig
-    # Problems with the invocation itself, shown before the schema is loaded.
-    startup_warnings: list[str] = field(default_factory=list)
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
@@ -1044,7 +1070,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
-        for message in self.startup_warnings:
+        for message in ctx.startup_warnings:
             click.secho(f"⚠️  {message}\n", fg="yellow")
 
     def shutdown(self, ctx: ExecutionContext) -> None:

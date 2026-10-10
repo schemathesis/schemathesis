@@ -36,13 +36,13 @@ Authentication failed: 1 operation returned authentication errors
 401 Unauthorized (1 operation):
   - GET /profile
 
-💡 Ensure valid authentication credentials are set via --auth or -H
+💡 Ensure valid authentication credentials are set via `--auth` or `-H`
 
 Rate limited: 1 operation mostly returned 429 Too Many Requests, leaving the logic behind them untested
 
   - POST /items
 
-💡 Send requests no faster than the API allows with --rate-limit, e.g. --rate-limit=100/m
+💡 Send requests no faster than the API allows with `--rate-limit`, e.g. `--rate-limit=100/m`
 
 =================================== SUMMARY ====================================
 

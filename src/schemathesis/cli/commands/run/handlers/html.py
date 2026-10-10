@@ -4,8 +4,9 @@ import datetime
 from collections import Counter
 from typing import TYPE_CHECKING, NamedTuple
 
+from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.handlers.output import UNMATCHED_FILTER_TIP
+from schemathesis.cli.commands.run.handlers.output import UNMATCHED_FILTER_TIP, warning_blocks
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import LOADER_ERROR_SUGGESTIONS, replay_command
 from schemathesis.cli.summary import running_time
@@ -32,6 +33,7 @@ from schemathesis.reporting.html.model import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
     from schemathesis.config import OutputConfig, SanitizationConfig
@@ -195,6 +197,18 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         sanitization_config = sanitization if sanitization.enabled else None
         summary = ctx.summary()
         rows = self._operation_rows(ctx)
+        # `st fuzz` collects no warnings.
+        warnings = warning_blocks(ctx) if isinstance(ctx, ExecutionContext) else []
+        nothing_tested = _nothing_tested(ctx.nothing_tested_reason, summary)
+        if nothing_tested is not None and nothing_tested.filters:
+            # The verdict already lists the filters that matched nothing, with the same tip.
+            warnings = [block for block in warnings if block.entity != "filter"]
+        warned: dict[str, list[WarningBlock]] = {}
+        for block in warnings:
+            for label in sorted({item.operation for group in block.groups for item in group.items if item.operation}):
+                warned.setdefault(label, []).append(block)
+        for row in rows.operations:
+            row.warnings = warned.get(row.label, [])
         data = ReportData(
             meta=ReportMeta(
                 generated_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -205,12 +219,14 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             ),
             summary=summary,
             fatal_error=self.fatal_error,
-            nothing_tested=_nothing_tested(ctx.nothing_tested_reason, summary),
+            nothing_tested=nothing_tested,
             last_phase=self.last_phase,
             operations=rows.operations,
             unattributed_failures=rows.unattributed_failures,
             unattributed_cases=rows.unattributed_cases,
             unattributed_errors=rows.unattributed_errors,
+            warnings=warnings,
+            startup_warnings=ctx.startup_warnings if isinstance(ctx, ExecutionContext) else [],
             running_time=running_time(self.started_at, self.finished),
             stop_reason=self.finished.stop_reason if self.finished is not None else StopReason.INTERRUPTED,
             started=self.started_at is not None,

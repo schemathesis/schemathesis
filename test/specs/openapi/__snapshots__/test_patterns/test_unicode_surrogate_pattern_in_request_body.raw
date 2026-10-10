@@ -43,7 +43,7 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Unsupported regex patterns: 1 operation contain regex patterns Schemathesis cannot use as written
+Unsupported regex patterns: 1 operation with regex patterns Schemathesis cannot use as written
 
   - POST /test
     Dropped `[\uD800-\uDBFF]` - generated values may not match it

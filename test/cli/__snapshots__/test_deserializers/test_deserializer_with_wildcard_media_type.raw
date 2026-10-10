@@ -38,7 +38,7 @@ application/vnd.api+custom (1 operation):
 application/vnd.other+custom (1 operation):
   - GET /data2 (200)
 
-💡 Register a deserializer with @schemathesis.deserializer() to enable validation
+💡 Register a deserializer with `@schemathesis.deserializer()` to enable validation
 
 =================================== SUMMARY ====================================
 

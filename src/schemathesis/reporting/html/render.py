@@ -12,6 +12,7 @@ from schemathesis.engine import StopReason
 from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, split_label
 
 if TYPE_CHECKING:
+    from schemathesis.cli.commands.run.handlers.output import WarningBlock, WarningGroup, WarningItem
     from schemathesis.reporting.html.model import ErrorEntry, FailingCase, OperationRow, ReportData
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
@@ -90,10 +91,83 @@ def report_top(*, generated_at: str) -> str:
 
 
 def render_index(data: ReportData) -> str:
-    body = "\n".join(
-        [report_top(generated_at=data.meta.generated_at), _hero(data), _target_block(data), _operations_table(data)]
-    )
+    anchors = _operation_anchors(data.operations)
+    parts = [
+        report_top(generated_at=data.meta.generated_at),
+        _hero(data),
+        _warnings(data, anchors),
+        _target_block(data),
+        _operations_table(data, anchors),
+    ]
+    body = "\n".join(part for part in parts if part)
     return page(title="Schemathesis Report", body=body)
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def _warning_id(block: WarningBlock) -> str:
+    return f"w-{_slug(block.title)}"
+
+
+def _warning_item(item: WarningItem, anchors: dict[str, str]) -> str:
+    details = "\n".join(item.details)
+    extra = f'<pre class="w-details">{esc(details)}</pre>' if details else ""
+    anchor = anchors.get(item.operation) if item.operation is not None else None
+    if item.operation is None or anchor is None:
+        return f"<li><code>{esc(item.text)}</code>{extra}</li>"
+    method, path = split_label(item.operation)
+    badge = _method(method) if method is not None else ""
+    # Text after the label, e.g. "(fuzzing): 10% accepted".
+    rest = item.text[len(item.operation) :].strip()
+    note = f'<span class="w-item-note">{esc(rest)}</span>' if rest else ""
+    return f'<li><a class="w-op" href="#{anchor}">{badge}<span class="path">{esc(path)}</span></a>{note}{extra}</li>'
+
+
+def _warning_group(group: WarningGroup, anchors: dict[str, str]) -> str:
+    heading = f'<h4 class="w-group-title">{esc(group.heading)}</h4>' if group.heading is not None else ""
+    items = "".join(_warning_item(item, anchors) for item in group.items)
+    tips = "".join(f'<p class="w-tip"><b>Tip:</b> {_code_spans(tip)}</p>' for tip in group.tips or [])
+    return f'<div class="w-group">{heading}<ul class="w-items">{items}</ul>{tips}</div>'
+
+
+def _affecting_warnings(data: ReportData) -> list[WarningBlock]:
+    return [block for block in data.warnings if block.affects_verdict]
+
+
+def _warnings(data: ReportData, anchors: dict[str, str]) -> str:
+    if not data.warnings and not data.startup_warnings:
+        return ""
+    entries = [
+        f'<li class="warning startup"><span>{_code_spans(message)}</span></li>' for message in data.startup_warnings
+    ]
+    # Warnings that change how the verdict reads come first and start open.
+    for block in sorted(data.warnings, key=lambda block: not block.affects_verdict):
+        opened = " open" if block.affects_verdict else ""
+        note = "" if block.affects_verdict else " note"
+        groups = "".join(_warning_group(group, anchors) for group in block.groups)
+        entries.append(
+            f'<li class="warning{note}"><details id="{_warning_id(block)}"{opened}><summary>'
+            f'<span class="dchev" aria-hidden="true"></span><span class="w-title">{esc(block.title)}</span>'
+            f'<span class="w-summary">{_code_spans(block.summary)}</span></summary>'
+            f'<div class="w-body">{groups}</div></details></li>'
+        )
+    return (
+        f'<section class="warnings" aria-labelledby="w-heading"><h2 class="w-heading" id="w-heading">Warnings</h2>'
+        f'<ul class="w-list">{"".join(entries)}</ul></section>'
+    )
+
+
+def _at_risk(data: ReportData) -> str:
+    return " at-risk" if _affecting_warnings(data) else ""
+
+
+def _caveat(data: ReportData) -> str:
+    affecting = _affecting_warnings(data)
+    if not affecting:
+        return ""
+    return f'<a class="hs-caveat" href="#{_warning_id(affecting[0])}">{plural(len(affecting), "warning")}</a>'
 
 
 def _duration(data: ReportData) -> str:
@@ -151,9 +225,9 @@ def _message(data: ReportData) -> str:
             detail = esc("\n".join(f"{group.title}: {group.count}" for group in data.summary.errors))
     detail_html = f'<p class="ex-detail">{detail}</p>' if detail else ""
     return (
-        f'<section class="hero-strip is-message verdict-{verdict.css}">'
+        f'<section class="hero-strip is-message verdict-{verdict.css}{_at_risk(data)}">'
         f'<div class="hs-cell hs-verdict"><h1 class="hero-status-label">{esc(verdict.value)}</h1>'
-        f'<div class="hs-sub">{esc(subtitle)}</div></div>'
+        f'<div class="hs-sub">{esc(subtitle)}</div>{_caveat(data)}</div>'
         f'<div class="hs-cell hs-explain"><div class="ex-title">{esc(title)}</div>{detail_html}{tip}</div>'
         "</section>"
     )
@@ -232,9 +306,9 @@ def _result(data: ReportData) -> str:
         if count:
             operations_parts.append(f"{count} {word}")
     return (
-        f'<section class="hero-strip verdict-{verdict.css}">'
+        f'<section class="hero-strip verdict-{verdict.css}{_at_risk(data)}">'
         f'<div class="hs-cell hs-verdict"><h1 class="hero-status-label">{esc(verdict.value)}</h1>'
-        f'{bar}<div class="hs-sub">{esc(text)}</div>{_stop_note(data)}</div>'
+        f'{bar}<div class="hs-sub">{esc(text)}</div>{_stop_note(data)}{_caveat(data)}</div>'
         f"{_second_cell(data)}"
         f"{_metric('Cases run', f'{data.summary.test_cases.generated:,}', cases_subtitle)}"
         f"{_metric('Operations', str(data.selected_operations), ', '.join(operations_parts))}"
@@ -295,8 +369,19 @@ def _path(path: str) -> str:
 
 def _operation_cell(row: OperationRow, toggle: str) -> str:
     method = _method(row.method) if row.method else ""
+    warned = ""
+    if row.warnings:
+        # Name the warning that matters most; the label lists them all.
+        first = next((block for block in row.warnings if block.affects_verdict), row.warnings[0])
+        more = f" +{len(row.warnings) - 1}" if len(row.warnings) > 1 else ""
+        titles = ", ".join(block.title for block in row.warnings)
+        warned = (
+            f'<a class="row-warn" href="#{_warning_id(first)}" aria-label="Warning: {esc(titles)}">'
+            f"{esc(first.title)}{more}</a>"
+        )
     return (
-        f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span></span></td>'
+        f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span>'
+        f"{warned}</span></td>"
     )
 
 
@@ -336,8 +421,18 @@ def _cases_cell(row: OperationRow, chevron: str) -> str:
     return f'<td class="numeric{one}">{row.cases:,}{chevron}</td>'
 
 
+def _operation_anchors(operations: list[OperationRow]) -> dict[str, str]:
+    # Same order as the table, so a suffix for a colliding slug is stable.
+    taken: set[str] = set()
+    return {
+        row.label: _anchor(row.label, taken)
+        for status in OperationStatus
+        for row in sorted((row for row in operations if row.status is status), key=_operation_order)
+    }
+
+
 def _anchor(label: str, taken: set[str]) -> str:
-    base = "op-" + (re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-") or "operation")
+    base = "op-" + (_slug(label) or "operation")
     anchor, index = base, 2
     # The detail row's id derives from the anchor, so it must not collide either.
     while anchor in taken or f"{anchor}-details" in taken:
@@ -508,13 +603,12 @@ def _group_header(status: OperationStatus, rows: list[OperationRow], *, collapsi
     return f'<tr class="group-row group-{css}"><th colspan="3" scope="rowgroup" id="group-{css}">{title}</th></tr>'
 
 
-def _operations_table(data: ReportData) -> str:
+def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
     if not data.operations:
         return ""
     has_failures = any(row.status is OperationStatus.FAILED for row in data.operations)
     collapse_passed = has_failures and len(data.operations) > _COLLAPSE_PASSED_ABOVE
     groups = []
-    anchors: set[str] = set()
     # A single expandable block answers "what broke" with nothing competing for the space, so it starts open.
     open_details = (
         sum(map(_has_details, data.operations)) + bool(data.unattributed_cases or data.unattributed_errors) == 1
@@ -526,7 +620,7 @@ def _operations_table(data: ReportData) -> str:
         header = _group_header(status, rows, collapsible=collapse_passed and status is OperationStatus.PASSED)
         body = ""
         for row in rows:
-            anchor = _anchor(row.label, anchors)
+            anchor = anchors[row.label]
             if _has_details(row):
                 toggle = _toggle(f"{anchor}-details", row.label, checked=open_details)
                 body += (

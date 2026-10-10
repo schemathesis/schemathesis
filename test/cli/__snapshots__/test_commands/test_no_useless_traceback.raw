@@ -55,7 +55,7 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Unsupported regex patterns: 1 operation contain regex patterns Schemathesis cannot use as written
+Unsupported regex patterns: 1 operation with regex patterns Schemathesis cannot use as written
 
   - POST /success
     No value can be generated for `^[\p{Tibetan}]+$`
