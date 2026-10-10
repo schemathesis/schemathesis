@@ -56,6 +56,7 @@ from schemathesis.cli.options import (
     REPORT_ALLURE_PATH,
     REPORT_DIR,
     REPORT_HAR_PATH,
+    REPORT_HTML_PATH,
     REPORT_JSON_PATH,
     REPORT_JUNIT_PATH,
     REPORT_NDJSON_PATH,
@@ -154,6 +155,7 @@ LIKELY_MILLISECONDS = 1000
 @grouped_option(*REPORT_JSON_PATH.args, **REPORT_JSON_PATH.kwargs)
 @grouped_option(*REPORT_WFC_PATH.args, **REPORT_WFC_PATH.kwargs)
 @grouped_option(*REPORT_ALLURE_PATH.args, **REPORT_ALLURE_PATH.kwargs)
+@grouped_option(*REPORT_HTML_PATH.args, **REPORT_HTML_PATH.kwargs)
 @grouped_option(*REPORT_PRESERVE_BYTES.args, **REPORT_PRESERVE_BYTES.kwargs)
 @grouped_option(*OUTPUT_SANITIZE.args, **OUTPUT_SANITIZE.kwargs)
 @grouped_option(*OUTPUT_TRUNCATE.args, **OUTPUT_TRUNCATE.kwargs)
@@ -244,6 +246,7 @@ def run(
     report_json_path: IO[str] | None = None,
     report_wfc_path: IO[str] | None = None,
     report_allure_path: str | None = None,
+    report_html_path: str | None = None,
     report_preserve_bytes: bool | None = None,
     output_sanitize: bool | None = None,
     output_truncate: bool | None = None,
@@ -308,6 +311,7 @@ def run(
         json_path=report_json_path.name if report_json_path else None,
         wfc_path=report_wfc_path.name if report_wfc_path else None,
         allure_path=report_allure_path,
+        html_path=report_html_path,
         directory=Path(report_directory),
         preserve_bytes=report_preserve_bytes,
     )

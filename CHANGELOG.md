@@ -9,6 +9,7 @@
 - Warning when `--request-timeout` or `max_response_time` is 1000 seconds or more.
 - `object_level_authorization` check: one WFC peer reading an object another peer created.
 - Error feedback stops sending unknown body fields after a Jackson `Unrecognized field` rejection.
+- `--report html` writes an offline HTML report with failures, warnings and reproduction commands.
 
 ### :wrench: Changed
 

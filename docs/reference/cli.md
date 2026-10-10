@@ -512,7 +512,7 @@ These options control the reporting and output format of test results:
 !!! note ""
 
     **Type**: `Comma-separated list`  
-    **Possible values**: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`  
+    **Possible values**: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`, `html`  
 
     Generate test reports in specified formats as a comma-separated list.
 
@@ -615,6 +615,18 @@ These options control the reporting and output format of test results:
 
     ```console
     $ st run openapi.yaml --report-allure-path ./allure-results
+    ```
+
+#### `--report-html-path DIRECTORY`
+
+!!! note ""
+
+    **Type**: `String (directory path)`  
+
+    Directory for the HTML report: an `index.html` page with the verdict, warnings, failures with commands to reproduce them, and the run's settings. It works offline, so it can be stored as a CI artifact and opened from the file system.
+
+    ```console
+    $ st run openapi.yaml --report-html-path ./html-report
     ```
 
 #### `--report-preserve-bytes`
