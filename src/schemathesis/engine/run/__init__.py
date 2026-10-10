@@ -53,6 +53,8 @@ class PhaseSkipReason(str, enum.Enum):
     FAILURE_LIMIT_REACHED = "failure_limit_reached"
     SERVER_UNAVAILABLE = "server_unavailable"
     NOTHING_TO_TEST = "nothing_to_test"
+    # Cases ran, but no selected check applied to any of them
+    NO_CHECKS_RAN = "no_checks_ran"
 
     @property
     def display(self) -> str:

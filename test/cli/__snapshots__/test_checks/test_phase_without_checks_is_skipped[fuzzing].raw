@@ -1,0 +1,56 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+     Configuration:    /tmp/config.toml
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Fuzzing (in 0.00s)
+
+     ✅ 3 passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /users/{user_id}
+  - PATCH /users/{user_id}
+
+💡 Enable the `stateful` phase so declared links can supply real identifiers
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 0
+  Skipped: 3
+    - No checks ran
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (no checks ran)
+  ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
+
+Test cases:
+  N generated
+
+Seed: 42
+
+============================== 1 warning in 1.00s ==============================

@@ -198,7 +198,12 @@ class ExecutionPlan:
                     for event in self._run_phase(engine, phase):
                         if isinstance(event, events.ScenarioFinished):
                             executed += 1
-                        elif isinstance(event, events.PhaseFinished) and event.status == Status.SKIP:
+                        elif (
+                            isinstance(event, events.PhaseFinished)
+                            and event.status == Status.SKIP
+                            # Requests went out; a later cycle may still reach operations its checks apply to.
+                            and phase.skip_reason is not PhaseSkipReason.NO_CHECKS_RAN
+                        ):
                             idle.append(phase)
                         yield event
                     if not engine.is_interrupted:

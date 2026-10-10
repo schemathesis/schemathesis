@@ -22,13 +22,15 @@ class _RacyPool:
         self.workers = [exited]
 
         started = events.ScenarioStarted(phase=phase, suite_id=suite_id, label="GET /api/success")
+        recorder = ScenarioRecorder(label="GET /api/success")
+        recorder.record_check_success(name="not_a_server_error", case_id="case")
         finished = events.ScenarioFinished(
             id=started.id,
             phase=phase,
             suite_id=suite_id,
             label="GET /api/success",
             status=Status.SUCCESS,
-            recorder=ScenarioRecorder(label="GET /api/success"),
+            recorder=recorder,
             elapsed_time=0.0,
             skip_reason=None,
             is_final=False,
