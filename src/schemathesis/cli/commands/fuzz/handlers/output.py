@@ -12,9 +12,11 @@ from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     BLOCK_PADDING,
     display_api_operations,
+    display_baseline_summary,
     display_errors_summary,
     display_failures,
     display_failures_summary,
+    display_filtered_summary,
     display_final_line,
     display_header,
     display_section_name,
@@ -25,6 +27,7 @@ from schemathesis.cli.output import (
     print_lines,
 )
 from schemathesis.cli.summary import (
+    reduce_baseline,
     reduce_errors,
     reduce_failures,
     reduce_test_cases,
@@ -279,6 +282,13 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
 
         if ctx.statistic.failures:
             display_failures_summary(reduce_failures(ctx.statistic))
+
+        baseline = reduce_baseline(ctx.statistic)
+        if baseline is not None:
+            display_baseline_summary(baseline)
+
+        if ctx.statistic.filtered_failures:
+            display_filtered_summary(ctx.statistic.filtered_failures)
 
         if ctx.errors:
             display_errors_summary(reduce_errors(ctx.errors))

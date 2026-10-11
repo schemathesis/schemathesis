@@ -245,6 +245,21 @@ def filter_failure(context, failure, case, response):
     )
 
 
+def test_filter_failure_is_summarized_in_fuzz(ctx, cli):
+    api = ctx.openapi.apps.failure()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_failure(context, failure, case, response):
+    return response.status_code != 500
+"""
+    )
+
+    result = cli.main("fuzz", api.schema_url, "-c", "not_a_server_error", "--max-time=1", hooks=module)
+
+    assert "Filtered: " in result.stdout, result.stdout
+
+
 def test_filter_failure_keeps_what_it_does_not_reject(ctx, cli):
     api = ctx.openapi.apps.failure()
     module = ctx.write_pymodule(

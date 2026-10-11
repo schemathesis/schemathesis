@@ -376,6 +376,20 @@ def test_unusable_baseline_is_a_usage_error_in_fuzz(ctx, cli, tmp_path, snapshot
     assert cli.main("fuzz", ctx.openapi.apps.failure().schema_url, "--max-time=1", config=WITH_BASELINE) == snapshot_cli
 
 
+def test_known_failure_is_summarized_in_fuzz(ctx, cli, tmp_path):
+    write_baseline(tmp_path, SERVER_ERROR)
+
+    result = cli.main(
+        "fuzz",
+        ctx.openapi.apps.failure().schema_url,
+        "--checks=not_a_server_error",
+        "--max-time=1",
+        config=WITH_BASELINE,
+    )
+
+    assert "Baseline:\n  Known failures: 1\n" in result.stdout, result.stdout
+
+
 def test_existing_baseline_is_left_alone_without_a_flag(ctx, cli, tmp_path):
     # Absorbing a regression into a committed baseline has to be something you ask for.
     write_baseline(tmp_path, {**SERVER_ERROR, "operation": "GET /api/elsewhere"})
