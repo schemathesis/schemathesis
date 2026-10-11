@@ -32,6 +32,7 @@
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
 - Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
 - Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
+- Crash in the examples phase when a response example field holds a list of scalars.
 - Missing inferred stateful links from `POST /books` to `GET /books/{title}` when the request body sends `title`.
 - Inferred stateful links sending a numeric `id` to string path parameters when a string `uuid` exists.
 - Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.

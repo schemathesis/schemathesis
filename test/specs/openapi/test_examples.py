@@ -4086,6 +4086,35 @@ def test_response_derived_parameter_example_violating_schema_is_skipped(ctx):
     assert list(extract_top_level(operation)) == []
 
 
+def test_response_derived_list_field_does_not_crash_examples_phase(ctx, app_runner):
+    paths = {
+        "/orders": {
+            "get": {
+                "parameters": [{"name": "orderId", "in": "query", "schema": {"type": "integer"}}],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Customer"},
+                                "example": {"order": [1, 2]},
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    }
+    raw_schema = ctx.openapi.build_schema(paths, components={"schemas": {"Customer": {"type": "object"}}})
+    app = ctx.openapi.make_permissive_flask_app(raw_schema)
+    schema = ctx.openapi.from_full_schema(raw_schema)
+    schema.config.update(base_url=app_runner.openapi_url(app, path=""))
+
+    stream = EventStream(schema, phases=[PhaseName.EXAMPLES]).execute()
+
+    assert stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES) == []
+
+
 def test_schema_level_parameter_example_violating_pattern_is_skipped(ctx):
     # When the `example` field lives inside the parameter's `schema` object (not on the parameter
     # definition itself), it is processed via an expanded subschema. The expanded subschema must
