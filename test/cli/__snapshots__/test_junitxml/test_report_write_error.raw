@@ -37,7 +37,7 @@ Test cases:
   N generated, N passed
 
 Reports:
-  - JUNIT: /dev/full
+  - JUnit: /dev/full
 
 Seed: 42
 

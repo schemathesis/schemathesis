@@ -73,7 +73,7 @@ Test cases:
   N generated, N found N unique failures
 
 Reports:
-  - JUNIT: /tmp/reports/junit.xml
+  - JUnit: /tmp/reports/junit.xml
 
 Seed: 42
 

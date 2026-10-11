@@ -1329,6 +1329,6 @@ def test_html_report_links_other_reports(ctx, cli, tmp_path, report_dir):
     api = ctx.openapi.apps.success()
     html = run_with_report(cli, report_dir, api.schema_url, f"--report-junit-path={tmp_path / 'junit.xml'}")
     assert re.findall(r'<a href="([^"]+)" target="_blank" rel="noopener">([^<]+)</a>', html) == [
-        ("../junit.xml", "JUNIT"),
+        ("../junit.xml", "JUnit"),
         ("../coverage.html", "Schema coverage"),
     ]

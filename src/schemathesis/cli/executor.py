@@ -81,18 +81,6 @@ except ImportError:
     )
 
 
-_REPORT_NAMES = {
-    ReportFormat.JUNIT: "JUnit",
-    ReportFormat.VCR: "VCR",
-    ReportFormat.HAR: "HAR",
-    ReportFormat.NDJSON: "NDJSON",
-    ReportFormat.JSON: "JSON",
-    ReportFormat.WFC: "WFC",
-    ReportFormat.ALLURE: "Allure",
-    ReportFormat.HTML: "HTML",
-}
-
-
 def is_built_in_handler(handler: EventHandler) -> bool:
     return type(handler) in _BUILT_IN_HANDLERS
 
@@ -165,7 +153,7 @@ def display_handler_error(handler: EventHandler, exc: Exception, config: Project
     if report_format is not None and isinstance(exc, OSError):
         path = config.reports.get_path(report_format)
         click.secho(
-            f"Failed to write {_REPORT_NAMES[report_format]} report to {path}: {exc.strerror or str(exc)}", fg="red"
+            f"Failed to write {report_format.display_name} report to {path}: {exc.strerror or str(exc)}", fg="red"
         )
         return
     is_built_in = is_built_in_handler(handler)

@@ -15,6 +15,7 @@
 
 ### :wrench: Changed
 
+- Readable report names in the terminal Reports list, e.g. `JUnit` instead of `JUNIT`.
 - Summary names the 401/403 warning "Authentication failed", as the warnings block does.
 - Reject `phases.coverage.generation.max-examples`; the coverage phase has no case cap.
 
