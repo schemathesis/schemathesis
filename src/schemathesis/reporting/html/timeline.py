@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, NamedTuple
 from schemathesis.reporting.html.model import AFTER_RUN, plural
 
 if TYPE_CHECKING:
-    from schemathesis.reporting.html.model import ReportData
+    from schemathesis.reporting.html.model import PhaseSpan, ReportData
 
 
 class Marker(NamedTuple):
@@ -158,7 +158,7 @@ def axis_end(total: float, *, stopped: bool) -> str:
 
 class Lane(NamedTuple):
     phase: str
-    # Each pass as (start, end) in seconds from the run start; empty for failures found outside any phase.
+    # Stretches of the phase running, as (start, end) seconds from the run start; empty for failures outside phases.
     passes: list[tuple[float, float]]
     markers: list[Marker]
     errors: int = 0
@@ -166,7 +166,8 @@ class Lane(NamedTuple):
     def details(self) -> str:
         parts = []
         if self.passes:
-            parts.append(short_duration(self.passes[-1][1] - self.passes[0][0]))
+            spent = short_duration(sum(end - start for start, end in self.passes))
+            parts.append(f"{spent} in {len(self.passes)} passes" if len(self.passes) > 1 else spent)
         if self.markers:
             parts.append(f"{failure_count(self.markers)} found")
         if self.errors:
@@ -174,10 +175,22 @@ class Lane(NamedTuple):
         return ", ".join(parts)
 
 
+def phase_blocks(spans: list[PhaseSpan]) -> dict[str, list[tuple[float, float]]]:
+    """Each phase's stretches of running time; back-to-back passes of one phase form a single stretch."""
+    blocks: dict[str, list[tuple[float, float]]] = {}
+    previous = None
+    for span in spans:
+        stretches = blocks.setdefault(span.phase, [])
+        if span.phase == previous:
+            stretches[-1] = (stretches[-1][0], span.end)
+        else:
+            stretches.append((span.start, span.end))
+        previous = span.phase
+    return blocks
+
+
 def build_lanes(data: ReportData, markers: list[Marker]) -> list[Lane]:
-    lanes: dict[str, Lane] = {}
-    for span in data.phase_spans:
-        lanes.setdefault(span.phase, Lane(span.phase, [], [])).passes.append((span.start, span.end))
+    lanes = {phase: Lane(phase, passes, []) for phase, passes in phase_blocks(data.phase_spans).items()}
     for marker in markers:
         lanes.setdefault(marker.phase, Lane(marker.phase, [], [])).markers.append(marker)
     return [lane._replace(errors=data.phase_errors.get(lane.phase, 0)) for lane in lanes.values()]

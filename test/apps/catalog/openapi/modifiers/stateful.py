@@ -169,6 +169,26 @@ class Slowdown:
 
 
 @dataclass(slots=True)
+class FailAfterRequests:
+    # Server answers 500 once it served `count` API requests, so a failure limit ends the run after known work.
+    count: int
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        served = {"count": 0}
+        limit = self.count
+
+        @app.before_request
+        def fail_when_exhausted() -> tuple[str, int] | None:
+            if request.path == "/openapi.json" or "X-Schemathesis-Probe" in request.headers:
+                return None
+            served["count"] += 1
+            if served["count"] > limit:
+                return "Exhausted", 500
+            return None
+
+
+@dataclass(slots=True)
 class MultipleIncomingLinksWithSameStatus:
     priority: int = 0
 

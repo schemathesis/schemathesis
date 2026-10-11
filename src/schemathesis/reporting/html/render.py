@@ -571,12 +571,14 @@ def _tick(group: list[Marker], total: float) -> str:
     )
 
 
-def _lane_bar(lane: Lane, total: float, *, stopped: bool) -> str:
-    if not lane.passes:
-        return ""
-    start, end = lane.passes[0][0], lane.passes[-1][1]
-    classes = "tl-span tl-span-stopped" if stopped else "tl-span"
-    return f'<span class="{classes}" style="left:{position(start, total)};width:{position(end - start, total)}"></span>'
+def _lane_blocks(lane: Lane, total: float, *, stopped: bool) -> str:
+    blocks = []
+    for index, (start, end) in enumerate(lane.passes, 1):
+        classes = "tl-span tl-span-stopped" if stopped and index == len(lane.passes) else "tl-span"
+        blocks.append(
+            f'<span class="{classes}" style="left:{position(start, total)};width:{position(end - start, total)}"></span>'
+        )
+    return "".join(blocks)
 
 
 def _lane_row(lane: Lane, total: float, *, ticks: bool, stopped: bool) -> str:
@@ -584,7 +586,7 @@ def _lane_row(lane: Lane, total: float, *, ticks: bool, stopped: bool) -> str:
     return (
         f'<div class="tl-row"><div class="tl-label"><span class="tl-lane-name">{esc(lane.phase)}</span>'
         f'<span class="tl-sub">{esc(lane.details())}</span></div>'
-        f'<div class="tl-track tl-lane">{_lane_bar(lane, total, stopped=stopped)}{marks}</div></div>'
+        f'<div class="tl-track tl-lane">{_lane_blocks(lane, total, stopped=stopped)}{marks}</div></div>'
     )
 
 
