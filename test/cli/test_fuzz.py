@@ -983,3 +983,16 @@ def fails_in_first_worker(ctx, response, case):
     )
 
     assert "Stop reason: Failure limit reached" in result.stdout, result.stdout
+
+
+def test_fuzz_keyboard_interrupt_is_named_in_the_final_line(ctx, cli):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def after_call(context, case, response):
+    raise KeyboardInterrupt
+"""
+    )
+    result = cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module)
+    assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])

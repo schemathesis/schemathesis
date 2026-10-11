@@ -39,7 +39,7 @@ from schemathesis.core.output import format_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
@@ -1761,6 +1761,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             exit_code=ctx.exit_code,
             baseline_not_saved=ctx.baseline_write_error is not None,
             no_checks_ran=ctx.statistic.no_checks_ran,
+            interrupted=event.stop_reason == StopReason.INTERRUPTED,
         )
 
     def display_reports(self, ctx: ExecutionContext) -> None:
