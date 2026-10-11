@@ -1,8 +1,8 @@
 [
   [
-    "Dataset",
+    "dataset",
     "GET /{source}/datasets",
     "200",
-    "/datasets/dataset"
+    "/datasets/*/dataset"
   ]
 ]
