@@ -13,6 +13,7 @@ from schemathesis.core import NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.drivers import without_unserializable_payload
 from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.transport.serialization import Binary
 from tools.coverage.caches import clear_internal_caches
@@ -95,6 +96,7 @@ def fingerprint_schema(
         return SchemaFingerprint(rows=[], errors=[f"load_failed: {type(exc).__name__}: {exc}"])
     transport = schema.transport
     config = GenerationConfig()
+    unserializable: set[str] = set()
     for result in schema.get_all_operations():
         if not isinstance(result, Ok):
             errors.append(f"operation_build_failed: {result.err()}")
@@ -102,10 +104,10 @@ def fingerprint_schema(
         operation = result.ok()
         try:
             for case in schema.iter_coverage_cases(operation, generation_modes=modes, generation_config=config):
-                # Mirror the runner: cases for media types with no serializer are never sent.
-                if case.media_type and transport.get_first_matching_media_type(case.media_type) is None:
-                    continue
-                rows.append(fingerprint_case(case))
+                # Mirror the runner: an unserializable media type must not forfeit what the case tests outside the payload.
+                sent = without_unserializable_payload(case, transport, unserializable)
+                if sent is not None:
+                    rows.append(fingerprint_case(sent))
         except Exception as exc:
             errors.append(f"{operation.method.upper()} {operation.full_path}: {type(exc).__name__}: {exc}")
     rows.sort()
