@@ -1,4 +1,4 @@
-import time
+import threading
 
 import pytest
 from django.conf import settings
@@ -103,17 +103,20 @@ def test_wait_for_schema_retries_on_read_timeout(ctx, app_runner):
     # the same way connection refused or HTTP 503 is.
     schema = ctx.openapi.build_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
     call_count = [0]
+    retried = threading.Event()
     app = Flask(__name__)
 
     @app.route("/openapi.json")
     def openapi_spec():
         call_count[0] += 1
         if call_count[0] == 1:
-            time.sleep(0.5)
+            retried.wait(timeout=10)
+        else:
+            retried.set()
         return jsonify(schema)
 
     url = app_runner.openapi_url(app)
-    loaded = schemathesis.openapi.from_url(url, wait_for_schema=5, timeout=0.2)
+    loaded = schemathesis.openapi.from_url(url, wait_for_schema=10, timeout=1)
     assert loaded.raw_schema == schema
     assert call_count[0] == 2
 

@@ -1,6 +1,7 @@
 import itertools
 import json
 import re
+import threading
 import time
 
 import pytest
@@ -332,10 +333,12 @@ def test_html_report_operations_errored_after_cases(ctx, cli, app_runner, report
         }
     )
 
+    release = threading.Event()
+
     @app.route("/api/slow")
     def slow():
         if len(request.args.get("q", "")) > 2:
-            time.sleep(0.5)
+            release.wait(timeout=10)
         return jsonify({})
 
     @app.route("/api/success")
@@ -347,11 +350,12 @@ def test_html_report_operations_errored_after_cases(ctx, cli, app_runner, report
         report_dir,
         app_runner.openapi_url(app),
         "--checks=not_a_server_error",
-        "--request-timeout=0.2",
+        "--request-timeout=1",
         "--max-examples=10",
         phases="coverage,fuzzing",
         exit_code=ExitCode.FAILURES,
     )
+    release.set()
     groups = re.findall(r'<span class="group-title">(\w+)</span><span class="group-count">(\d+)</span>', html)
     assert groups == [("Passed", "1"), ("Errored", "2")]
     operations = re.search(r'Operations</span><span class="m-value">(\d+)</span><span class="m-sub">([^<]*)<', html)
