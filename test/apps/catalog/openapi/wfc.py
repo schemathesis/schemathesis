@@ -452,19 +452,24 @@ _KEYED_CREATE = {
 def wfc_owned_orders(policy: str, listing: str | None = None, writes: bool = False) -> OpenAPIApp:
     """Orders owned by the caller; `policy` decides what another caller sees.
 
-    `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only.
+    `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only,
+    `all_renamed` everyone's under a differently named schema.
     `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note writes open to any caller
     that take the order id in the path or query and echo it.
     """
     paths = _OWNED_ORDERS
+    schemas: dict[str, object] = {}
     if writes:
         keyed = {"/api/orders/{order_id}": {**_OWNED_ORDERS["/api/orders/{order_id}"], **_KEYED_CREATE}}
         paths = {**_OWNED_ORDERS, **_ORDER_NOTES, **keyed}
     if listing is not None:
-        listed = {
-            "type": "array",
-            "items": _ORDER if listing != "ids" else {"type": "object", "properties": {"id": {"type": "integer"}}},
-        }
+        items: dict[str, object] = _ORDER
+        if listing == "ids":
+            items = {"type": "object", "properties": {"id": {"type": "integer"}}}
+        elif listing == "all_renamed":
+            schemas = {"OrderSummary": _ORDER}
+            items = {"$ref": "#/components/schemas/OrderSummary"}
+        listed = {"type": "array", "items": items}
         paths = {
             **paths,
             "/api/orders": {
@@ -476,7 +481,10 @@ def wfc_owned_orders(policy: str, listing: str | None = None, writes: bool = Fal
         }
     spec = build_schema(
         paths,
-        components={"securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "Authorization"}}},
+        components={
+            "schemas": schemas,
+            "securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "Authorization"}},
+        },
         security=[{"apiKey": []}],
     )
     app = make_flask_app_from_schema(spec)

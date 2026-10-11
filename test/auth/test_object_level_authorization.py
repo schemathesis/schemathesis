@@ -75,8 +75,13 @@ def test_correct_or_public_access_is_not_reported(cli, ctx, tmp_path, policy, ph
 @pytest.mark.parametrize("phases", ["fuzzing", "stateful"])
 @pytest.mark.parametrize(
     ("listing", "exit_code"),
-    [("all", 0), ("own", 1), ("ids", 1)],
-    ids=["listed-to-everyone", "listed-to-owner", "only-ids-listed-to-everyone"],
+    [("all", 0), ("all_renamed", 0), ("own", 1), ("ids", 1)],
+    ids=[
+        "listed-to-everyone",
+        "listed-to-everyone-as-another-schema",
+        "listed-to-owner",
+        "only-ids-listed-to-everyone",
+    ],
 )
 def test_object_every_user_can_list_is_not_reported(cli, ctx, tmp_path, phases, listing, exit_code):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable", listing)
