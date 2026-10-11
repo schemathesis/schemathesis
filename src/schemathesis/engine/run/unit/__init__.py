@@ -492,9 +492,11 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
             kwargs[location] = entry
     headers = ctx.config.headers_for(operation=operation)
     if headers:
+        # A configured User-Agent replaces the generated one on the wire, so pin it when the schema declares it.
+        declares_user_agent = any(parameter.name.lower() == "user-agent" for parameter in operation.headers)
         kwargs["headers"] = {
             **kwargs.get("headers", {}),
-            **{key: value for key, value in headers.items() if key.lower() != "user-agent"},
+            **{key: value for key, value in headers.items() if declares_user_agent or key.lower() != "user-agent"},
         }
 
     return kwargs
