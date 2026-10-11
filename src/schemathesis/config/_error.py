@@ -4,6 +4,7 @@ import datetime
 import difflib
 import json
 import re
+from collections.abc import Iterator, Mapping
 from typing import TYPE_CHECKING
 
 from jsonschema_rs import ValidationErrorKind
@@ -337,66 +338,116 @@ def _format_anyof_error(error: ValidationError, replaced: dict[InstancePath, obj
 
 
 def _format_oneof_error(error: ValidationError, replaced: dict[InstancePath, object]) -> str:
-    """Format oneOf validation errors, particularly for auth.openapi."""
     schema_path = list(error.schema_path)
     if schema_path[:2] == ["$defs", "DictionaryDefinition"]:
         return _format_dictionary_definition_oneof(error)
-    if list(error.instance_path)[:2] == ["auth", "openapi"] and len(error.instance_path) == 3:
-        section = path_to_section_name(error.instance_path)
 
-        # Try to find the most relevant context error
-        if (
-            isinstance(error.kind, (ValidationErrorKind.OneOfMultipleValid, ValidationErrorKind.OneOfNotValid))
-            and error.kind.context
-            and isinstance(error.instance, dict)
-            and error.instance
-        ):
-            # A wrong value type is more precise than any scheme mismatch
-            for errors in error.kind.context:
-                for one_of_error in errors:
-                    if one_of_error.kind.name == "type" and len(one_of_error.instance_path) > len(error.instance_path):
-                        return _format_type_error(one_of_error, replaced)
-            # Each subschema in `oneOf` may have multiple errors
-            for errors in error.kind.context:
-                for one_of_error in errors:
-                    if one_of_error.kind.name == "required":
-                        variants = resolve_path(CONFIG_SCHEMA, one_of_error.schema_path)
-                        assert isinstance(variants, list)
-                        required_fields = set(variants)
-                        # HTTP Basic auth is the only case where we can provide a helpful hint
-                        if ("username" in error.instance or "password" in error.instance) and required_fields == {
-                            "username",
-                            "password",
-                        }:
-                            missing = sorted(required_fields - set(error.instance.keys()))
-                            missing_list = "\n".join(f"  - '{field}'" for field in missing)
-                            return f"Error in {section} section:\n  Missing required property (HTTP Basic):\n\n{missing_list}\n"
-                    elif one_of_error.kind.name == "additionalProperties":
-                        # Find the invalid property
-                        valid = {"api_key", "username", "password", "bearer"}
-                        invalid = [k for k in error.instance if k not in valid]
-                        if invalid:
-                            return (
-                                f"Error in {section} section:\n  Invalid property:\n\n"
-                                f"  - '{invalid[0]}' is not allowed\n\n"
-                                "Valid properties: 'api_key', 'username', 'password', 'bearer'"
-                            )
+    message = _format_openapi_auth_oneof(error, replaced)
+    if message is not None:
+        return message
 
-        return (
-            f"Error in {section} section:\n  Configuration does not match any valid auth scheme.\n\n"
-            "Valid schemes:\n"
-            "  - apiKey: requires 'api_key'\n"
-            "  - http+basic: requires 'username', 'password'\n"
-            "  - http+bearer: requires 'bearer'"
-        )
-
-    if list(error.instance_path)[-1:] == ["request-retries"]:
-        if isinstance(error.instance, int):
-            return "'request-retries' must be a non-negative integer"
-        if isinstance(error.instance, dict):
-            return "'request-retries' table requires 'max-attempts'"
+    message = _format_request_retries_oneof(error)
+    if message is not None:
+        return message
 
     return error.message  # pragma: no cover
+
+
+def _format_openapi_auth_oneof(error: ValidationError, replaced: dict[InstancePath, object]) -> str | None:
+    if list(error.instance_path)[:2] != ["auth", "openapi"] or len(error.instance_path) != 3:
+        return None
+
+    section = path_to_section_name(error.instance_path)
+    message = _format_openapi_auth_context(error, replaced, section)
+    if message is not None:
+        return message
+
+    return (
+        f"Error in {section} section:\n  Configuration does not match any valid auth scheme.\n\n"
+        "Valid schemes:\n"
+        "  - apiKey: requires 'api_key'\n"
+        "  - http+basic: requires 'username', 'password'\n"
+        "  - http+bearer: requires 'bearer'"
+    )
+
+
+def _format_openapi_auth_context(
+    error: ValidationError, replaced: dict[InstancePath, object], section: str
+) -> str | None:
+    nested_type_error = _first_nested_type_error(error)
+    if nested_type_error is not None:
+        return _format_type_error(nested_type_error, replaced)
+    return _first_openapi_auth_diagnostic(error, section)
+
+
+def _first_openapi_auth_diagnostic(error: ValidationError, section: str) -> str | None:
+    instance = error.instance
+    if not isinstance(instance, dict):
+        return None
+    for nested_error in _iter_nested_oneof_errors(error):
+        message = _missing_basic_auth_message(nested_error, instance, section) or _invalid_auth_property_message(
+            nested_error, instance, section
+        )
+        if message:
+            return message
+    return None
+
+
+def _iter_nested_oneof_errors(error: ValidationError) -> Iterator[ValidationError]:
+    if (
+        isinstance(error.kind, (ValidationErrorKind.OneOfMultipleValid, ValidationErrorKind.OneOfNotValid))
+        and error.kind.context
+        and isinstance(error.instance, dict)
+        and error.instance
+    ):
+        for errors in error.kind.context:
+            yield from errors
+
+
+def _first_nested_type_error(error: ValidationError) -> ValidationError | None:
+    for nested_error in _iter_nested_oneof_errors(error):
+        if nested_error.kind.name == "type" and len(nested_error.instance_path) > len(error.instance_path):
+            return nested_error
+    return None
+
+
+def _missing_basic_auth_message(error: ValidationError, instance: Mapping[str, object], section: str) -> str | None:
+    if error.kind.name != "required":
+        return None
+
+    variants = resolve_path(CONFIG_SCHEMA, error.schema_path)
+    assert isinstance(variants, list)
+    required_fields = set(variants)
+    if ("username" in instance or "password" in instance) and required_fields == {"username", "password"}:
+        missing = sorted(required_fields.difference(instance))
+        missing_list = "\n".join(f"  - '{field}'" for field in missing)
+        return f"Error in {section} section:\n  Missing required property (HTTP Basic):\n\n{missing_list}\n"
+    return None
+
+
+def _invalid_auth_property_message(error: ValidationError, instance: Mapping[str, object], section: str) -> str | None:
+    if error.kind.name != "additionalProperties":
+        return None
+
+    valid = {"api_key", "username", "password", "bearer"}
+    invalid = [key for key in instance if key not in valid]
+    if not invalid:
+        return None
+    return (
+        f"Error in {section} section:\n  Invalid property:\n\n"
+        f"  - '{invalid[0]}' is not allowed\n\n"
+        "Valid properties: 'api_key', 'username', 'password', 'bearer'"
+    )
+
+
+def _format_request_retries_oneof(error: ValidationError) -> str | None:
+    if list(error.instance_path)[-1:] != ["request-retries"]:
+        return None
+    if isinstance(error.instance, int):
+        return "'request-retries' must be a non-negative integer"
+    if isinstance(error.instance, dict):
+        return "'request-retries' table requires 'max-attempts'"
+    return None
 
 
 def _format_dictionary_definition_oneof(error: ValidationError) -> str:
