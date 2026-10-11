@@ -15,7 +15,7 @@ from schemathesis.cli.commands.run.handlers.output import (
 )
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
-    BLOCK_PADDING,
+    Indent,
     display_api_operations,
     display_baseline_summary,
     display_errors_summary,
@@ -234,11 +234,9 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         if isinstance(event, LoadingStarted):
             self._on_loading_started(event)
         elif isinstance(event, LoadingFinished):
-            from rich.padding import Padding
-
             assert self.loading_manager is not None
             self.loading_manager.stop()
-            self.console.print(Padding(self.loading_manager.get_completion_message(), BLOCK_PADDING))
+            self.console.print(Indent(self.loading_manager.get_completion_message()))
             self.console.print()
             self.loading_manager = None
             if ctx.initialization_lines:
@@ -261,7 +259,6 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             self.loading_manager.stop()
 
     def _render_report(self, ctx: FuzzExecutionContext, event: EngineFinished) -> None:
-        from rich.padding import Padding
         from rich.text import Text
 
         is_interrupted = event.stop_reason is StopReason.INTERRUPTED
@@ -269,7 +266,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         message = self.progress_manager.get_completion_message(
             is_interrupted=is_interrupted, without_checks=without_checks
         )
-        self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
+        self.console.print(Indent(Text(message, style="white")))
         self.console.print()
 
         if ctx.errors:

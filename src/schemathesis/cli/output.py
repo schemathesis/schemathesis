@@ -33,8 +33,9 @@ from schemathesis.core.timing import Instant
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from rich.console import Console, Group
+    from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderResult
     from rich.progress import Progress, TaskID
+    from rich.segment import Segment
     from rich.text import Text
 
     from schemathesis.config import OutputConfig, ProjectConfig
@@ -58,7 +59,41 @@ else:
         return click.style(text, **kwargs)
 
 
-BLOCK_PADDING = (0, 1, 0, 1)
+@dataclass
+class Indent:
+    """Shift a renderable right by `left` columns, keeping `right` columns free for wrapping.
+
+    Lines carry no trailing whitespace, so output piped to a file or CI log has no padding to the console width.
+    """
+
+    renderable: RenderableType
+    left: int = 1
+    right: int = 1
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        from rich.segment import Segment
+
+        width = options.max_width - self.left - self.right
+        lines = console.render_lines(self.renderable, options.update_width(width), pad=False)
+        margin = Segment(" " * self.left)
+        for line in lines:
+            stripped = _rstrip_segments(line)
+            if stripped:
+                yield margin
+                yield from stripped
+            yield Segment.line()
+
+
+def _rstrip_segments(line: list[Segment]) -> list[Segment]:
+    from rich.segment import Segment
+
+    end = len(line)
+    while end and not line[end - 1].text.rstrip():
+        end -= 1
+    if not end:
+        return []
+    last = line[end - 1]
+    return [*line[: end - 1], Segment(last.text.rstrip(), last.style, last.control)]
 
 
 def print_lines(lines: list[str | Generator[str, None, None]]) -> None:
@@ -483,7 +518,6 @@ def display_fatal_error(
 
     Handles both loader errors (schema loading failures) and internal execution errors.
     """
-    from rich.padding import Padding
     from rich.text import Text
 
     from schemathesis.core.errors import HookExecutionError, LoaderError, format_exception, split_traceback
@@ -491,15 +525,13 @@ def display_fatal_error(
 
     if isinstance(event.exception, LoaderError):
         assert loading_manager is not None
-        message = Padding(
-            loading_manager.get_error_message("Schema Loading Error", event.exception.message), BLOCK_PADDING
-        )
+        message = Indent(loading_manager.get_error_message("Schema Loading Error", event.exception.message))
         console.print(message)
         console.print()
 
         if event.exception.extras:
             for extra in event.exception.extras:
-                console.print(Padding(Text(extra), (0, 0, 0, 5)))
+                console.print(Indent(Text(extra), left=5, right=0))
             console.print()
 
         if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and wait_for_schema is not None):
@@ -514,10 +546,10 @@ def display_fatal_error(
     if isinstance(event.exception, HookExecutionError):
         assert loading_manager is not None
         info = EngineErrorInfo(event.exception)
-        console.print(Padding(loading_manager.get_error_message(info.title, info.message), BLOCK_PADDING))
+        console.print(Indent(loading_manager.get_error_message(info.title, info.message)))
         console.print()
         for extra in split_traceback(info.traceback):
-            console.print(Padding(Text(extra), (0, 0, 0, 5)))
+            console.print(Indent(Text(extra), left=5, right=0))
         console.print()
         click.echo(f"For more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
         raise click.Abort

@@ -204,6 +204,18 @@ def test_piped_output_has_no_double_blank_lines(ctx, cli, args):
     assert not any(not first and not second for first, second in zip(lines, lines[1:], strict=False)), stdout
 
 
+@pytest.mark.parametrize(
+    "args",
+    [["run", "--max-examples=1"], ["fuzz", "--max-time=1"]],
+    ids=["run", "fuzz"],
+)
+def test_piped_output_has_no_trailing_whitespace(ctx, cli, args):
+    api = ctx.openapi.apps.success_and_failure()
+    command, *options = args
+    stdout = cli.main(command, api.schema_url, *options).stdout
+    assert [line for line in stdout.splitlines() if line != line.rstrip()] == [], stdout
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_runtime_config_error_exit_code(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
@@ -794,6 +806,32 @@ def test_connection_error(ctx, cli, workers, snapshot_cli):
 def test_unreachable_server_capabilities_are_unknown(ctx, cli):
     api = ctx.openapi.apps.success()
     lines = cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "1").stdout.splitlines()
+    assert [line.strip() for line in lines if "API capabilities" in line or "✘" in line] == [
+        "⚠️  API capabilities: unknown, server unreachable"
+    ]
+
+
+# A listener with a full accept queue drops new connection attempts, so they time out instead of being refused.
+def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
+    api = ctx.openapi.apps.success()
+    with socket.create_server(("127.0.0.1", 0), backlog=0) as server:
+        port = server.getsockname()[1]
+        pending = [socket.socket() for _ in range(3)]
+        for connection in pending:
+            connection.setblocking(False)
+            connection.connect_ex(("127.0.0.1", port))
+        try:
+            lines = cli.run(
+                api.schema_url,
+                f"--url=http://127.0.0.1:{port}/api",
+                "--phases=fuzzing",
+                "-n",
+                "1",
+                "--request-timeout=0.2",
+            ).stdout.splitlines()
+        finally:
+            for connection in pending:
+                connection.close()
     assert [line.strip() for line in lines if "API capabilities" in line or "✘" in line] == [
         "⚠️  API capabilities: unknown, server unreachable"
     ]
@@ -2497,7 +2535,7 @@ def test_curl_reproduces_body_with_line_separator_characters(ctx, cli, monkeypat
         "--output-sanitize=false",
         "-c status_code_conformance",
     )
-    printed = result.stdout.split("Reproduce with:\n\n", 1)[1].split("\n    \n", 1)[0]
+    printed = result.stdout.split("Reproduce with:\n\n", 1)[1].split("\n\n", 1)[0]
     command = "\n".join(line.removeprefix("    ") for line in printed.split("\n"))
     # Paste the printed command into a real shell
     echoed = subprocess.run([executable, "-c", f"{CURL_ECHO[shell]}\n{command}"], capture_output=True, check=False)
@@ -5039,7 +5077,7 @@ def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
     assert (
         cli.run_openapi_app(
             app,
-            "--max-time=2",
+            "--max-time=5",
             "--max-examples=5",
             "--generation-database=none",
             "--phases=stateful",

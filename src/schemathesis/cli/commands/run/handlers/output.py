@@ -14,7 +14,7 @@ from schemathesis.cli.commands.run.context import PHASE_STATUS_PRIORITY
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
-    BLOCK_PADDING,
+    Indent,
     LoadingProgressManager,
     _style,
     display_api_operations,
@@ -82,13 +82,15 @@ def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> 
 
 
 def _server_unreachable(probes: list[ProbeRun]) -> bool:
-    """Whether every probe was refused a connection, so none of them reached a server."""
+    """Whether no probe could connect, because the connection was refused or timed out, so none reached a server."""
     import requests
 
     from schemathesis.engine.errors import is_connection_refused
 
     return bool(probes) and all(
-        isinstance(probe.error, requests.ConnectionError) and is_connection_refused(probe.error) for probe in probes
+        isinstance(probe.error, requests.ConnectTimeout)
+        or (isinstance(probe.error, requests.ConnectionError) and is_connection_refused(probe.error))
+        for probe in probes
     )
 
 
@@ -1183,7 +1185,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 manager.server_unavailable = True
 
     def _on_loading_finished(self, ctx: ExecutionContext, event: LoadingFinished) -> None:
-        from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
 
@@ -1192,10 +1193,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         assert self.loading_manager is not None
         self.loading_manager.stop()
 
-        message = Padding(
-            self.loading_manager.get_completion_message(),
-            BLOCK_PADDING,
-        )
+        message = Indent(self.loading_manager.get_completion_message())
         self.console.print(message)
         self.console.print()
         self.loading_manager = None
@@ -1230,7 +1228,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             dict_word = "dictionary" if len(dictionaries) == 1 else "dictionaries"
             table.add_row("Dictionaries:", f"{len(dictionaries)} {dict_word} / {total_values} {entry_word}")
 
-        message = Padding(table, BLOCK_PADDING)
+        message = Indent(table)
         self.console.print(message)
         self.console.print()
 
@@ -1393,7 +1391,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         self.stateful_tests_manager.start(show_live=not in_cycle and self.cycle_live is None)
 
     def _on_phase_finished(self, ctx: ExecutionContext, event: events.PhaseFinished) -> None:
-        from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
         from rich.text import Text
@@ -1419,7 +1416,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                         ("✅  ", Style(color="green")),
                         ("API capabilities:", Style(color="bright_white")),
                     )
-                self.console.print(Padding(header, BLOCK_PADDING))
+                self.console.print(Indent(header))
                 self.console.print()
 
                 table = Table(
@@ -1445,7 +1442,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                     table.add_row("Cache:", cache_row)
 
                 if table.row_count:
-                    self.console.print(Padding(table, BLOCK_PADDING))
+                    self.console.print(Indent(table))
                     self.console.print()
         elif (
             isinstance(event.payload, AuthBootstrapPayload)
@@ -1453,7 +1450,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             # Users who supply credentials gain nothing from hearing that sign-up was skipped.
             and event.status != Status.SKIP
         ):
-            self.console.print(Padding(_auth_bootstrap_line(event.payload, event.payload.spec), BLOCK_PADDING))
+            self.console.print(Indent(_auth_bootstrap_line(event.payload, event.payload.spec)))
             self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             manager = self.stateful_tests_manager
@@ -1502,16 +1499,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.repeat_statuses[phase] = status
 
     def _print_unit_completion(self, manager: UnitTestProgressManager, status: Status) -> None:
-        from rich.padding import Padding
         from rich.text import Text
 
         icon = phase_status_icon(status, manager.stats)
         message = manager.get_completion_message(icon, without_checks=phase_without_checks(status, manager.stats))
-        self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
+        self.console.print(Indent(Text(message, style="white")))
         self.console.print()
 
     def _print_stateful_completion(self, manager: StatefulProgressManager, status: Status) -> None:
-        from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
         from rich.text import Text
@@ -1519,7 +1514,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         title, summary = manager.get_completion_message(
             phase_status_icon(status, manager.stats), without_checks=phase_without_checks(status, manager.stats)
         )
-        self.console.print(Padding(Text(title, style="bright_white"), BLOCK_PADDING))
+        self.console.print(Indent(Text(title, style="bright_white")))
 
         table = Table(show_header=False, box=None, padding=(0, 4), collapse_padding=True)
         table.add_column("Field", style=Style(color="bright_white", bold=True))
@@ -1533,9 +1528,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         table.add_row("API Links:", message)
 
         self.console.print()
-        self.console.print(Padding(table, BLOCK_PADDING))
+        self.console.print(Indent(table))
         self.console.print()
-        self.console.print(Padding(Text(summary, style="bright_white"), (0, 0, 0, 5)))
+        self.console.print(Indent(Text(summary, style="bright_white"), left=5, right=0))
         self.console.print()
 
     def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
@@ -1591,7 +1586,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.cycle_context = ctx
 
     def _on_rate_limit_retry(self, event: events.RateLimitRetry) -> None:
-        from rich.padding import Padding
         from rich.text import Text
 
         retry_word = "retry" if event.retries_left == 1 else "retries"
@@ -1603,10 +1597,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "white",
             ),
         )
-        self.console.print(Padding(message, BLOCK_PADDING))
+        self.console.print(Indent(message))
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
-        from rich.padding import Padding
 
         if self.unit_tests_manager is not None:
             self.unit_tests_manager.interrupt()
@@ -1614,18 +1607,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.stateful_tests_manager.interrupt()
         elif self.loading_manager is not None:
             self.loading_manager.interrupt()
-            message = Padding(
-                self.loading_manager.get_completion_message(),
-                BLOCK_PADDING,
-            )
+            message = Indent(self.loading_manager.get_completion_message())
             self.console.print(message)
             self.console.print()
         elif self.probing_manager is not None:
             self.probing_manager.interrupt()
-            message = Padding(
-                self.probing_manager.get_completion_message(),
-                BLOCK_PADDING,
-            )
+            message = Indent(self.probing_manager.get_completion_message())
             self.console.print(message)
             self.console.print()
             self.probing_manager = None
