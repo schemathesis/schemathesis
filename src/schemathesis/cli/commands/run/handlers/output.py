@@ -678,6 +678,7 @@ class UnitTestProgressManager:
     stats_task_id: TaskID
 
     is_interrupted: bool
+    server_unavailable: bool
 
     def __init__(
         self,
@@ -738,6 +739,7 @@ class UnitTestProgressManager:
             Status.ERROR: 0,
             Status.INTERRUPTED: 0,
         }
+        self.server_unavailable = False
         self._update_stats_display()
 
         self.live = None
@@ -759,6 +761,8 @@ class UnitTestProgressManager:
             parts.append(f"🚫 {self.stats[Status.ERROR]:{width}d} error{suffix}")
         if self.stats[Status.SKIP] or self.stats[Status.INTERRUPTED]:
             parts.append(f"⏭  {self.stats[Status.SKIP] + self.stats[Status.INTERRUPTED]:{width}d} skipped")
+        if self.server_unavailable:
+            parts.append("🚫 server stopped responding")
         if self.suffix and live:
             parts.append(self.suffix)
         return "  ".join(parts)
@@ -915,6 +919,7 @@ class StatefulProgressManager:
     links_covered: set[str]
     stats: dict[Status, int]
     is_interrupted: bool
+    server_unavailable: bool
 
     def __init__(
         self, *, console: Console, title: str, links_selected: int, links_inferred: int, links_total: int
@@ -966,6 +971,7 @@ class StatefulProgressManager:
             Status.SKIP: 0,
         }
         self.is_interrupted = False
+        self.server_unavailable = False
 
     def start(self, *, show_live: bool = True) -> None:
         """Start progress display."""
@@ -1032,6 +1038,8 @@ class StatefulProgressManager:
             parts.append(f"🚫 {self.stats[Status.ERROR]} error{suffix}")
         if self.stats[Status.SKIP]:
             parts.append(f"⏭  {self.stats[Status.SKIP]} skipped")
+        if self.server_unavailable:
+            parts.append("🚫 server stopped responding")
         return "  ".join(parts)
 
     def _update_stats_display(self) -> None:
@@ -1118,6 +1126,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self._on_fatal_error(ctx, event)
         elif isinstance(event, events.RateLimitRetry):
             self._on_rate_limit_retry(event)
+        elif isinstance(event, events.NonFatalError):
+            self._on_non_fatal_error(event)
         elif isinstance(event, LoadingStarted):
             self._on_loading_started(event)
         elif isinstance(event, LoadingFinished):
@@ -1140,6 +1150,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.loading_manager.stop()
         if self.probing_manager is not None:
             self.probing_manager.stop()
+
+    def _on_non_fatal_error(self, event: events.NonFatalError) -> None:
+        from schemathesis.engine.errors import ServerUnavailable
+
+        if isinstance(event.value, ServerUnavailable):
+            manager = self.stateful_tests_manager or self.unit_tests_manager
+            if manager is not None:
+                manager.server_unavailable = True
 
     def _on_loading_finished(self, ctx: ExecutionContext, event: LoadingFinished) -> None:
         from rich.padding import Padding

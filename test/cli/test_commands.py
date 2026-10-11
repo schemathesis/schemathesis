@@ -3922,6 +3922,7 @@ def test_server_stops_accepting_connections_in_generated_phases(subprocess_runne
         "--seed=1",
     )
     assert result == snapshot_cli
+    assert "🚫 server stopped responding" in result.stdout.partition("ERRORS")[0]
     # Generated bodies differ across Python versions; the listed request must still be the one that crashed it.
     assert int(re.findall(r"""'\{"size": (\d+)\}'""", result.stdout.split("before it went away:")[1])[0]) > 50000
 

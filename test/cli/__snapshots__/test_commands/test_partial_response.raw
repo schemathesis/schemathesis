@@ -27,7 +27,7 @@ Schemathesis dev
 
  🚫  Fuzzing (in 0.00s)
 
-     ⏭  1 skipped
+     ⏭  1 skipped  🚫 server stopped responding
 
 ==================================== ERRORS ====================================
 __________________________________ GET /crash __________________________________
