@@ -367,6 +367,43 @@ def test_api_with_auth(case):
     result.assert_outcomes(passed=1)
 
 
+def test_basic_auth_negative_generation_from_toml_config(ctx, testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[generation]
+mode = "negative"
+
+[auth.basic]
+username = "testuser"
+password = "testpass"
+""",
+    )
+    testdir.make_test(
+        """
+schema = schemathesis.openapi.from_dict(raw_schema)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    assert case.headers.get("Authorization") != "Basic dGVzdHVzZXI6dGVzdHBhc3M="
+""",
+        schema=ctx.openapi.build_schema(
+            {
+                "/protected": {
+                    "get": {
+                        "security": [{"BasicAuth": []}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            components={"securitySchemes": {"BasicAuth": {"type": "http", "scheme": "basic"}}},
+        ),
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
 def test_headers_from_fixture_with_toml_config(ctx, testdir):
     api = ctx.openapi.apps.success()
     # When headers are configured in schemathesis.toml
