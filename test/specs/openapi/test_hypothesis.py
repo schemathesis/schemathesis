@@ -537,6 +537,21 @@ def test_configure_headers():
     test()
 
 
+def test_as_strategy_keeps_passed_headers_unchanged(ctx):
+    schema = ctx.openapi.load_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema.config.update(headers={"X-Configured": "global"})
+    headers = {"X-Caller": "local"}
+    strategy = schema["/x"]["GET"].as_strategy(headers=headers)
+    assert headers == {"X-Caller": "local"}
+
+    @given(strategy)
+    @settings(max_examples=1)
+    def test(case):
+        assert case.headers == {"X-Caller": "local", "X-Configured": "global"}
+
+    test()
+
+
 CONSTRAINED_HEADER_SCHEMAS = [
     {"type": "string", "minLength": 5},
     {"type": "string", "minLength": 20, "maxLength": 30},
