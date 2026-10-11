@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.parsers.extractors import parse_number
+from schemathesis.core.error_feedback.parsers.extractors import parse_number, split_field_path
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     FormatPayload,
@@ -13,7 +13,6 @@ from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
     ObservationPayload,
-    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -169,11 +168,6 @@ def _iter_carrier_strings(body: dict) -> Iterable[str]:
                     yield value
 
 
-def _split_path(field: str) -> ParameterPath:
-    # Spring uses dotted paths for nested fields (e.g. `address.street`).
-    return tuple(field.split(".")) if field else ()
-
-
 def _classify(message: str) -> tuple[tuple[ObservationKind, ObservationPayload], ...]:
     if _NON_BLANK.search(message):
         return ((ObservationKind.MUST_NOT_BE_BLANK, None),)
@@ -243,7 +237,7 @@ def _emit(operation: APIOperation, field: str, message: str) -> list[Observation
         Observation(
             operation_label=operation.label,
             location=location,
-            parameter_path=_split_path(field),
+            parameter_path=split_field_path(field),
             kind=kind,
             raw_message=message,
             payload=payload,
