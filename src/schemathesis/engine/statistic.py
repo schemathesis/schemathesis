@@ -114,7 +114,8 @@ class Statistic:
     # Failures `filter_failure` hooks dropped across the run.
     filtered_failures: int
 
-    extraction_failures: set[ExtractionFailure]
+    # Sorted so the report order does not depend on hash randomization.
+    extraction_failures: list[ExtractionFailure]
 
     tested_operations: set[str]
     errored_operations: set[str]
@@ -133,7 +134,7 @@ class Statistic:
         self.known_failures = {}
         self.observed_failures = {}
         self.filtered_failures = 0
-        self.extraction_failures = set()
+        self.extraction_failures = []
         self.tested_operations = set()
         self.errored_operations = set()
         self.operations_without_checks = set()
@@ -234,7 +235,16 @@ class Statistic:
             self.failures[label] = existing
 
         if extraction_failures:
-            self.extraction_failures.update(extraction_failures)
+            self.extraction_failures = sorted(
+                set(self.extraction_failures).union(extraction_failures),
+                key=lambda failure: (
+                    failure.source,
+                    failure.target,
+                    failure.id,
+                    failure.parameter_name,
+                    failure.expression,
+                ),
+            )
 
     def record_run_check_failures(self, failures: list[Failure], *, label: str) -> None:
         """Store failures from class-based checks' `after_run`, which are not tied to any case."""
