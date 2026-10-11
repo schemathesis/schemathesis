@@ -169,6 +169,29 @@ def before_call(context, case, **kwargs):
     assert "division by zero" in result.stdout
 
 
+def test_hooks_file_path_runs_once_per_call(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    calls = tmp_path / "calls.txt"
+    hooks_file = tmp_path / "counting_hooks.py"
+    hooks_file.write_text(f"""
+import schemathesis
+@schemathesis.hook
+def before_call(context, case, **kwargs):
+    with open({str(calls)!r}, "a") as fd:
+        fd.write(".")
+""")
+    result = cli.main(
+        "run",
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=3",
+        env={"SCHEMATHESIS_HOOKS": str(hooks_file)},
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    api_calls = [request for request in api.requests if request.path.startswith("/api/")]
+    assert len(calls.read_text()) == len(api_calls)
+
+
 def test_hooks_file_path_unloadable(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
     # When SCHEMATHESIS_HOOKS points to a file path with an unknown extension

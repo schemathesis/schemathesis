@@ -5,6 +5,8 @@ import sys
 from schemathesis.core.errors import HookError
 
 HOOKS_MODULE_ENV_VAR = "SCHEMATHESIS_HOOKS"
+# Executing a hooks file again would register its hooks again, unlike a cached module import.
+_LOADED_FILES: set[str] = set()
 
 
 def load_from_env() -> None:
@@ -25,8 +27,12 @@ def load_from_path(module_path: str) -> None:
 
 
 def _load_from_file(path: str) -> None:
+    resolved = os.path.realpath(path)
+    if resolved in _LOADED_FILES:
+        return
     spec = importlib.util.spec_from_file_location("_schemathesis_hooks", path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load hooks from: {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    _LOADED_FILES.add(resolved)
