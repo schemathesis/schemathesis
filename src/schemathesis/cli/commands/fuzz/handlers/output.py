@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING
 import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
-from schemathesis.cli.commands.run.handlers.output import get_status_icon
+from schemathesis.cli.commands.run.handlers.output import (
+    display_warning_blocks,
+    get_status_icon,
+    unmatched_filter_block,
+)
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     BLOCK_PADDING,
@@ -280,6 +284,10 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
                         click.echo()
 
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
+
+        unmatched_filter = ctx.warning_collector.data.unmatched_filter
+        if unmatched_filter:
+            display_warning_blocks([unmatched_filter_block(unmatched_filter)])
 
         display_section_name("SUMMARY")
         click.echo()
