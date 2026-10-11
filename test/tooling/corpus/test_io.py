@@ -10,6 +10,7 @@ from tools.corpus.io import (
     iter_corpus_file,
     iter_corpus_streaming,
     load_corpus_entry,
+    parse_schemas,
 )
 
 
@@ -39,6 +40,14 @@ def test_iter_all_corpus_files_reads_every_tarball(tmp_path, make_tarball):
 )
 def test_get_schema_version_detects_supported_versions(raw_schema, expected):
     assert get_schema_version(raw_schema) == expected
+
+
+def test_parse_schemas_skips_schema_without_version(tmp_path):
+    valid_schema = {"openapi": "3.0.3", "info": {"title": "valid", "version": "1"}, "paths": {}}
+    (tmp_path / "valid-openapi.yaml").write_text("openapi: 3.0.3\ninfo: {title: valid, version: '1'}\npaths: {}\n")
+    (tmp_path / "versionless-openapi.yaml").write_text("info: {title: invalid, version: '1'}\npaths: {}\n")
+
+    assert parse_schemas(tmp_path) == {"3.0": {"valid-openapi.yaml": valid_schema}}
 
 
 def test_iter_corpus_streaming_filters_by_name_before_decoding(tmp_path, make_tarball):

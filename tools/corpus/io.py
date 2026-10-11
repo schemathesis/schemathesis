@@ -112,7 +112,7 @@ def parse_schemas(directory: pathlib.Path) -> dict[str, dict[str, Any]]:
                     if version not in schemas:
                         schemas[version] = {}
                     schemas[version][schema_name] = schema
-                except (yaml.YAMLError, KeyError):
+                except (yaml.YAMLError, KeyError, ValueError):
                     print(f"Error parsing {file_path}")  # noqa: T201
 
     return schemas
