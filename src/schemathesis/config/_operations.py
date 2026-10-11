@@ -84,7 +84,7 @@ class OperationsConfig(DiffBase):
 
     @classmethod
     def from_hierarchy(cls, configs: list[OperationsConfig]) -> OperationsConfig:  # type: ignore[override]
-        return cls(operations=sum([config.operations for config in reversed(configs)], []))
+        return cls(operations=sum([config.operations for config in configs], []))
 
     def get_for_operation(self, operation: APIOperation) -> OperationConfig:
         if operation not in self._cache:

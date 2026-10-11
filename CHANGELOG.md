@@ -23,6 +23,7 @@
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
+- Top-level `[[operations]]` overriding `[[project.operations]]` for the same operation.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
