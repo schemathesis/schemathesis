@@ -18,6 +18,18 @@ SERVER_ERROR = {
 }
 
 
+INTERRUPT_ON_SECOND_RESPONSE = """
+calls = 0
+
+@schemathesis.hook
+def after_call(context, case, response):
+    global calls
+    calls += 1
+    if calls > 1:
+        raise KeyboardInterrupt
+"""
+
+
 def write_baseline(tmp_path, *entries):
     (tmp_path / BASELINE).write_text(json.dumps({"format_version": 1, "entries": list(entries)}), encoding="utf-8")
 
@@ -397,6 +409,40 @@ def test_existing_baseline_is_left_alone_without_a_flag(ctx, cli, tmp_path):
 
     run(cli, ctx.openapi.apps.failure(), f"--baseline={BASELINE}", "--phases=fuzzing")
 
+    assert (tmp_path / BASELINE).read_text() == before
+
+
+def test_interrupted_update_run_does_not_create_the_baseline(ctx, cli, tmp_path):
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
+
+    result = cli.run(
+        ctx.openapi.apps.success_and_failure().schema_url,
+        "--checks=not_a_server_error",
+        "--phases=fuzzing",
+        "--baseline-update",
+        config={"baseline": str(tmp_path / BASELINE)},
+        hooks=module,
+    )
+
+    assert result.exit_code == 130, result.stdout
+    assert not (tmp_path / BASELINE).exists()
+
+
+def test_interrupted_prune_run_leaves_the_baseline_unchanged(ctx, cli, tmp_path):
+    write_baseline(tmp_path, {**SERVER_ERROR, "signature": "503"})
+    before = (tmp_path / BASELINE).read_text()
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
+
+    result = cli.run(
+        ctx.openapi.apps.success_and_failure().schema_url,
+        "--checks=not_a_server_error",
+        "--phases=fuzzing",
+        "--baseline-prune",
+        config={"baseline": str(tmp_path / BASELINE)},
+        hooks=module,
+    )
+
+    assert result.exit_code == 130, result.stdout
     assert (tmp_path / BASELINE).read_text() == before
 
 

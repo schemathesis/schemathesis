@@ -110,7 +110,8 @@ class ExecutionContext(BaseExecutionContext):
         return super().all_skipped_reason()
 
     def _write_baseline(self) -> None:
-        if self.config.baseline is None:
+        # An interrupted run never reached some operations, so it would record or prune from partial results.
+        if self.config.baseline is None or self.stop_reason is StopReason.INTERRUPTED:
             return
         path = Path(self.config.baseline)
         # A baseline that does not exist yet is created from this run, the way a lockfile is.
