@@ -1,4 +1,5 @@
 import re
+import time
 import uuid
 import xml.etree.ElementTree as ET
 
@@ -142,12 +143,9 @@ def test_negative_data_rejection_path_parameter_type_mutation(ctx, cli, snapshot
 
     @app.route("/api/run/<path:id>", methods=["POST"])
     def run_endpoint(id):
-        # Server accepts numeric-looking paths (including negative numbers like -1, -42)
-        try:
-            int(id)
+        if re.fullmatch(r"[+-]?[0-9]+", id):
             return "", 200
-        except ValueError:
-            return "", 400
+        return "", 400
 
     assert (
         cli.run_openapi_app(
@@ -179,6 +177,8 @@ def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, cli, s
 
     @app.route("/api/rate/<path:value>", methods=["GET"])
     def rate(value):
+        if not value.isascii() or "_" in value or value != value.strip():
+            return "", 400
         try:
             float(value)
             return "", 200
@@ -538,7 +538,8 @@ def test_negative_data_rejection_body_override_restoring_mutated_field(ctx, cli)
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",
-        "--max-examples=50",
+        # Only a type change of `name` exposes the bug, so the run needs enough cases to always draw one.
+        "--max-examples=100",
         config={
             "operations": [
                 {"include-name": name, "parameters": {"body.token": "confirm-token"}}
@@ -2363,8 +2364,10 @@ def test_phase_without_checks_is_skipped(ctx, cli, snapshot_cli, phase):
     )
 
 
+# Cycling ends at the deadline however slow the runner is; dropping the phase ends the run well before it.
 def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
     api = ctx.openapi.apps.payload()
+    started = time.monotonic()
     cli.run(
         api.schema_url,
         "--phases=fuzzing",
@@ -2372,4 +2375,4 @@ def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
         "--max-time=2",
         config={"checks": {"enabled": False}},
     )
-    assert len([request for request in api.requests if request.path.startswith("/api/")]) > 1
+    assert time.monotonic() - started >= 2
