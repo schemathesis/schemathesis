@@ -291,6 +291,41 @@ def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(
     )
 
 
+def test_negative_data_rejection_configured_user_agent_header_parameter_no_false_positive(ctx, cli, app_runner):
+    # The configured User-Agent replaces any generated value on the wire, so it must not be mutated.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/agent": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "User-Agent",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["ok"]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/api/agent")
+    def agent():
+        return ("", 200) if request.headers.get("User-Agent") == "ok" else ("", 400)
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--header=User-Agent: ok",
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--max-examples=10",
+        "--seed=1",
+        exit_code=ExitCode.OK,
+    )
+
+
 def test_negative_data_rejection_wildcard_media_type_link_body_no_false_positive(ctx, cli, app_runner):
     # A link writes into a body sent under a concrete media type the operation declares only as `*/*`.
     app, _ = ctx.openapi.make_flask_app(
