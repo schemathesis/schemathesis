@@ -46,7 +46,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
   ⚠️ Unmatched filters: 1 filter matched no API operations
 
 Test cases:

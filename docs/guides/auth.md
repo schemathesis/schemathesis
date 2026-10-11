@@ -11,7 +11,7 @@ Configure Schemathesis to send valid credentials, from a static token to a login
 Without valid credentials, Schemathesis lists the rejected operations under `WARNINGS` at the end of the run:
 
 ```
-Authentication failed: 4 operations returned authentication errors
+Authentication failed: 4 operations returned only 401/403 responses
 
 401 Unauthorized (4 operations):
   - DELETE /users/{userId}

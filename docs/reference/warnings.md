@@ -29,7 +29,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 ### `missing_auth`
 
 ```
-Authentication failed: 1 operation returned authentication errors
+Authentication failed: 1 operation returned only 401/403 responses
 
 401 Unauthorized (1 operation):
   - GET /basic

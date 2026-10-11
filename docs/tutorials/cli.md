@@ -67,7 +67,7 @@ Failures:
 
 ...
 Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
   ...
 
 Test cases:

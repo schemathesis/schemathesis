@@ -254,7 +254,7 @@ class WarningBlock:
     title: str
     count: int
     entity: str
-    # Completes the sentence that starts with the count, e.g. " returned authentication errors".
+    # Completes the sentence that starts with the count, e.g. " returned only 401/403 responses".
     suffix: str
     groups: list[WarningGroup]
     # Whether the results may not mean what the verdict says, e.g. every response was 401.
@@ -324,7 +324,7 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
         title="Authentication failed",
         count=sum(len(labels) for labels in missing_auth.values()),
         entity="operation",
-        suffix=" returned authentication errors",
+        suffix=" returned only 401/403 responses",
         groups=groups,
         affects_verdict=True,
     )
@@ -1710,7 +1710,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             ),
             (
                 len(ctx.warnings.missing_test_data),
-                "Missing valid test data",
+                "Missing test data",
                 "operation",
                 "never returned data" if _status_codes_are_uninformative(ctx) else "repeatedly returned 404 responses",
             ),

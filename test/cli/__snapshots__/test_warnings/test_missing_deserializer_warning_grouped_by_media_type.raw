@@ -101,7 +101,7 @@ Failures:
   ❌ Unsupported methods: 2
 
 Warnings:
-  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
+  ⚠️ Missing test data: 2 operations repeatedly returned 404 responses
   ⚠️ Schema validation skipped: 2 operations cannot validate responses in 2 media types
 
 Test cases:

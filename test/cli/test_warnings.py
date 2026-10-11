@@ -19,6 +19,32 @@ def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
     return app_runner.openapi_url(app)
 
 
+def test_warning_titles_match_between_warnings_and_summary(ctx, cli, app_runner):
+    ok = {"200": {"description": "OK"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/private": {"get": {"responses": ok}},
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": ok,
+                }
+            },
+        }
+    )
+    app.add_url_rule("/private", "private", lambda: ({"detail": "Unauthorized"}, 401))
+    app.add_url_rule("/items/<item_id>", "item", lambda item_id: ({"detail": "Not found"}, 404))
+
+    stdout = cli.run(
+        app_runner.openapi_url(app), "--phases=coverage,fuzzing", "--checks=not_a_server_error", "--max-examples=10"
+    ).stdout
+    warnings, summary = stdout.split("WARNINGS", 1)[1].split("SUMMARY", 1)
+    headers = sorted(line.split(" in ", 1)[0] for line in warnings.splitlines() if ": " in line and line[0].isalpha())
+    entries = sorted(line.strip().removeprefix("⚠️ ") for line in summary.splitlines() if "⚠️" in line)
+    assert [line.split(": ", 1)[0] for line in headers] == [line.split(": ", 1)[0] for line in entries]
+    assert "Authentication failed: 1 operation returned only 401/403 responses" in headers, stdout
+
+
 def test_missing_auth_warning_with_fail_on_true(ctx, cli, tmp_path, monkeypatch):
     api = ctx.openapi.apps.basic()
     # Given a config file that fails on all warnings

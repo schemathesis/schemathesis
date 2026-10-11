@@ -55,7 +55,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
   ⚠️ Unresolvable references: 1 operation had parts of the schema skipped
 
 Test cases:

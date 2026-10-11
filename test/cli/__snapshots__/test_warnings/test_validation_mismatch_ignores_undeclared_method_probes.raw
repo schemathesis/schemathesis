@@ -46,7 +46,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
   ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
 
 Test cases:
