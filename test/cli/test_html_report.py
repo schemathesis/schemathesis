@@ -715,6 +715,16 @@ def test_html_report_error_tip(ctx, cli, app_runner, report_dir, snapshot_html):
     assert html == snapshot_html
 
 
+def test_html_report_multiline_warning_tip(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.sign_up_and_login("login-rejects")
+    html = run_with_report(
+        cli, report_dir, api.schema_url, "--max-examples=5", "--checks=not_a_server_error", phases="examples,fuzzing"
+    )
+    assert html == snapshot_html
+    css = (report_dir / "assets" / "report.css").read_text(encoding="utf-8")
+    assert "white-space:pre-wrap" in re.search(r"\.w-tip\{([^}]*)\}", css).group(1)
+
+
 @pytest.fixture
 def book_id_scalar():
     schemathesis.graphql.scalar("BookID", st.uuids().map(str).map(nodes.String))
