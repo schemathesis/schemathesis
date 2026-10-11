@@ -42,7 +42,7 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
-from schemathesis.engine.run.probes import ProbeOutcome
+from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
 
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType
@@ -78,6 +78,17 @@ def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> 
         text += "; continuing without authentication"
     return Text.assemble(
         (icon, Style(color=color)), ("Auth: ", Style(color="bright_white", bold=True)), (text, Style(color=color))
+    )
+
+
+def _server_unreachable(probes: list[ProbeRun]) -> bool:
+    """Whether every probe was refused a connection, so none of them reached a server."""
+    import requests
+
+    from schemathesis.engine.errors import is_connection_refused
+
+    return bool(probes) and all(
+        isinstance(probe.error, requests.ConnectionError) and is_connection_refused(probe.error) for probe in probes
     )
 
 
@@ -1346,15 +1357,18 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             if event.status == Status.SUCCESS:
                 assert isinstance(event.payload, Ok)
                 payload = event.payload.ok()
-                self.console.print(
-                    Padding(
-                        Text.assemble(
-                            ("✅  ", Style(color="green")),
-                            ("API capabilities:", Style(color="bright_white")),
-                        ),
-                        BLOCK_PADDING,
+                unreachable = _server_unreachable(payload.probes)
+                if unreachable:
+                    header = Text.assemble(
+                        ("⚠️  ", Style(color="yellow")),
+                        ("API capabilities: unknown, server unreachable", Style(color="bright_white")),
                     )
-                )
+                else:
+                    header = Text.assemble(
+                        ("✅  ", Style(color="green")),
+                        ("API capabilities:", Style(color="bright_white")),
+                    )
+                self.console.print(Padding(header, BLOCK_PADDING))
                 self.console.print()
 
                 table = Table(
@@ -1365,7 +1379,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 )
                 table.add_column("Capability", style=Style(color="bright_white", bold=True), no_wrap=True)
                 table.add_column("Status", style="cyan")
-                for probe_run in payload.probes:
+                # Without a response, a probe measured nothing about the API.
+                for probe_run in [] if unreachable else payload.probes:
                     icon, style = {
                         ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
                         ProbeOutcome.FAILURE: ("✘", Style(color="red")),
@@ -1378,8 +1393,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 if cache_row is not None:
                     table.add_row("Cache:", cache_row)
 
-                self.console.print(Padding(table, BLOCK_PADDING))
-                self.console.print()
+                if table.row_count:
+                    self.console.print(Padding(table, BLOCK_PADDING))
+                    self.console.print()
         elif (
             isinstance(event.payload, AuthBootstrapPayload)
             and event.payload.spec is not None

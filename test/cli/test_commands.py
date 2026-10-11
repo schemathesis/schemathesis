@@ -778,6 +778,14 @@ def test_connection_error(ctx, cli, workers, snapshot_cli):
     )
 
 
+def test_unreachable_server_capabilities_are_unknown(ctx, cli):
+    api = ctx.openapi.apps.success()
+    lines = cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "1").stdout.splitlines()
+    assert [line.strip() for line in lines if "API capabilities" in line or "✘" in line] == [
+        "⚠️  API capabilities: unknown, server unreachable"
+    ]
+
+
 @pytest.mark.snapshot(replace_test_cases=False)
 def test_connection_error_cases_are_not_reported_as_skipped(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
