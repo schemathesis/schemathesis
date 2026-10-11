@@ -349,6 +349,42 @@ def test_detect_unresolvable_references(ctx, operation, expected):
     ]
 
 
+@pytest.mark.parametrize("first", ["A", "B"])
+def test_unresolvable_reference_behind_a_cycle_is_reported_for_every_response(ctx, first):
+    second = "B" if first == "A" else "A"
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        status: {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": f"#/components/schemas/{name}"}}},
+                        }
+                        for status, name in (("200", first), ("201", second))
+                    }
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "A": {
+                    "properties": {
+                        "b": {"$ref": "#/components/schemas/B"},
+                        "missing": {"$ref": "#/components/schemas/Missing"},
+                    }
+                },
+                "B": {"properties": {"a": {"$ref": "#/components/schemas/A"}}},
+            }
+        },
+    )
+
+    assert [warning.message for warning in schema.iter_schema_warnings()] == [
+        "response `200` - unresolvable reference `#/components/schemas/Missing`",
+        "response `201` - unresolvable reference `#/components/schemas/Missing`",
+    ]
+
+
 # A pattern the validator cannot compile is stripped from the schema, so values are drawn without it.
 @pytest.mark.parametrize(
     ("pattern", "expected"),
