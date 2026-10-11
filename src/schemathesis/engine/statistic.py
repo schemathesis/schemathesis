@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.baseline import failure_identity
 from schemathesis.core.failures import Failure
-from schemathesis.core.result import Err, Ok
+from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
@@ -17,7 +17,7 @@ from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 
 if TYPE_CHECKING:
     from schemathesis.baseline import Baseline, Identity
-    from schemathesis.generation.stateful.state_machine import ExtractionFailure
+    from schemathesis.generation.stateful.state_machine import ExtractedParam, ExtractionFailure, Transition
 
 
 @dataclass(slots=True)
@@ -32,6 +32,68 @@ class GroupedFailures:
     auth_identity: str | None = None
     # Requests the failure needs, oldest first; empty when only the code sample is known.
     steps: list[ReproductionStep] = field(default_factory=list)
+
+
+def _collect_history(recorder: RecordedScenario, node: CaseNode, response: Response) -> list[tuple[Case, Response]]:
+    history = [(node.value, response)]
+    current = node
+    while current.parent_id is not None:
+        current_response = recorder.find_response(case_id=current.parent_id)
+        # We need a response to get there, so it should be present
+        assert current_response is not None
+        current = recorder.cases[current.parent_id]
+        history.append((current.value, current_response))
+    return history
+
+
+def _classify_extraction(extracted: ExtractedParam) -> tuple[bool, Exception | None]:
+    if isinstance(extracted.value, Ok):
+        return extracted.value.ok() is UNRESOLVABLE, None
+    return True, extracted.value.err()
+
+
+def _extraction_failure_inputs(transition: Transition) -> Iterator[tuple[str, str, Exception | None]]:
+    if (
+        transition.request_body is not None
+        and isinstance(transition.request_body.value, Ok)
+        and transition.request_body.value.ok() is UNRESOLVABLE
+    ):
+        yield "body", json.dumps(transition.request_body.definition), None
+
+    for parameters in transition.parameters.values():
+        for parameter, extracted in parameters.items():
+            is_failure, error = _classify_extraction(extracted)
+            if is_failure:
+                yield parameter, extracted.definition, error
+
+
+def _extraction_failures(recorder: RecordedScenario, case_id: str, node: CaseNode) -> Iterator[ExtractionFailure]:
+    from schemathesis.generation.stateful.state_machine import ExtractionFailure
+
+    transition = node.transition
+    if transition is None or transition.is_inferred:
+        return
+
+    parent = recorder.cases[transition.parent_id]
+    response = recorder.find_response(case_id=parent.value.id)
+    # We need a response to get there, so it should be present
+    assert response is not None
+    history = None
+    for parameter, expression, error in _extraction_failure_inputs(transition):
+        # Built once per transition, and only when it has a failure to report.
+        if history is None:
+            history = _collect_history(recorder, parent, response)
+        yield ExtractionFailure(
+            id=transition.id,
+            case_id=case_id,
+            source=parent.value.operation.label,
+            target=node.value.operation.label,
+            parameter_name=parameter,
+            expression=expression,
+            history=history,
+            response=response,
+            error=error,
+        )
 
 
 @dataclass(slots=True)
@@ -84,27 +146,14 @@ class Statistic:
         self, recorder: RecordedScenario, *, failure_label: Callable[[Case], str] | None = None
     ) -> None:
         """Update statistics and store failures from a new batch of checks."""
-        from schemathesis.generation.stateful.state_machine import ExtractionFailure
-
         # Track failures per-label (may differ from recorder.label when method differs)
         failures_by_label: dict[str, dict[str, GroupedFailures]] = {}
 
         self.total_cases += len(recorder.cases)
         self.filtered_failures += sum(recorder.filtered_failures.values())
 
-        extraction_failures = set()
+        extraction_failures: set[ExtractionFailure] = set()
         scenario_errored = any(check.status == Status.ERROR for checks in recorder.checks.values() for check in checks)
-
-        def collect_history(node: CaseNode, response: Response) -> list[tuple[Case, Response]]:
-            history = [(node.value, response)]
-            current = node
-            while current.parent_id is not None:
-                current_response = recorder.find_response(case_id=current.parent_id)
-                # We need a response to get there, so it should be present
-                assert current_response is not None
-                current = recorder.cases[current.parent_id]
-                history.append((current.value, current_response))
-            return history
 
         for case_id, case in recorder.cases.items():
             checks = recorder.checks.get(case_id, [])
@@ -124,7 +173,6 @@ class Statistic:
                 continue
 
             self.tested_operations.add(case.value.operation.label)
-            has_failures = False
             current_case_failures = []
             last_failure_info = None
 
@@ -143,7 +191,6 @@ class Statistic:
                         last_failure_info = check.failure_info
                         self.unique_failures_map[failure] = case_id
                         current_case_failures.append(failure)
-                        has_failures = True
                     else:
                         # This failure was already seen - skip it
                         continue
@@ -169,72 +216,10 @@ class Statistic:
                     auth_identity=case.value._auth_identity,
                 )
 
-            if has_failures:
+            if current_case_failures:
                 self.cases_with_failures += 1
 
-            # Don't report extraction failures for inferred transitions
-            if case.transition is None or case.transition.is_inferred:
-                continue
-            transition = case.transition
-            parent = recorder.cases[transition.parent_id]
-            response = recorder.find_response(case_id=parent.value.id)
-            # We need a response to get there, so it should be present
-            assert response is not None
-
-            history = None
-
-            if (
-                transition.request_body is not None
-                and isinstance(transition.request_body.value, Ok)
-                and transition.request_body.value.ok() is UNRESOLVABLE
-            ):
-                history = collect_history(parent, response)
-                extraction_failures.add(
-                    ExtractionFailure(
-                        id=transition.id,
-                        case_id=case_id,
-                        source=parent.value.operation.label,
-                        target=case.value.operation.label,
-                        parameter_name="body",
-                        expression=json.dumps(transition.request_body.definition),
-                        history=history,
-                        response=response,
-                        error=None,
-                    )
-                )
-
-            for params in transition.parameters.values():
-                for parameter, extracted in params.items():
-                    if isinstance(extracted.value, Ok) and extracted.value.ok() is UNRESOLVABLE:
-                        history = history or collect_history(parent, response)
-                        extraction_failures.add(
-                            ExtractionFailure(
-                                id=transition.id,
-                                case_id=case_id,
-                                source=parent.value.operation.label,
-                                target=case.value.operation.label,
-                                parameter_name=parameter,
-                                expression=extracted.definition,
-                                history=history,
-                                response=response,
-                                error=None,
-                            )
-                        )
-                    elif isinstance(extracted.value, Err):
-                        history = history or collect_history(parent, response)
-                        extraction_failures.add(
-                            ExtractionFailure(
-                                id=transition.id,
-                                case_id=case_id,
-                                source=parent.value.operation.label,
-                                target=case.value.operation.label,
-                                parameter_name=parameter,
-                                expression=extracted.definition,
-                                history=history,
-                                response=response,
-                                error=extracted.value.err(),
-                            )
-                        )
+            extraction_failures.update(_extraction_failures(recorder, case_id, case))
 
         for label, failures in failures_by_label.items():
             for group in failures.values():
