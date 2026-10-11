@@ -34,7 +34,7 @@ from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
-from schemathesis.generation.meta import content_type_probes_first
+from schemathesis.generation.meta import TestPhase, content_type_probes_first
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -348,7 +348,7 @@ def generate_example_cases(
             InvalidRegexMark.set(test, exc)
 
     if fill_missing and not result:
-        strategy = operation.as_strategy()
+        strategy = operation.as_strategy(phase=TestPhase.EXAMPLES, **kwargs)
         add_single_example(strategy, result)
 
     context = HookContext(operation=operation)  # context should be passed here instead
