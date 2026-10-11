@@ -152,6 +152,9 @@ def _is_serialisable_media_type(media_type: str) -> bool:
         return True
 
 
+_REQUEST_BODIES_PREFIX = "#/components/requestBodies/"
+
+
 def _strip_known_unsupported_media_types(raw_schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Return `(filtered_schema, unknown_unsupported_media_types)`."""
     filtered = deepclone(raw_schema)
@@ -174,6 +177,10 @@ def _strip_known_unsupported_media_types(raw_schema: dict[str, Any]) -> tuple[di
             kept.append(media_type)
         return kept
 
+    components = filtered.get("components")
+    request_bodies = components.get("requestBodies") if isinstance(components, dict) else None
+    if not isinstance(request_bodies, dict):
+        request_bodies = {}
     paths = filtered.get("paths")
     if isinstance(paths, dict):
         for path_item in paths.values():
@@ -183,6 +190,13 @@ def _strip_known_unsupported_media_types(raw_schema: dict[str, Any]) -> tuple[di
                 if method not in HTTP_METHODS_SCHEMA or not isinstance(operation, dict):
                     continue
                 body = operation.get("requestBody")
+                reference = body.get("$ref") if isinstance(body, dict) else None
+                if isinstance(reference, str) and reference.startswith(_REQUEST_BODIES_PREFIX):
+                    target = request_bodies.get(reference[len(_REQUEST_BODIES_PREFIX) :])
+                    if isinstance(target, dict):
+                        # Inline a copy so each operation filters and drops its own body.
+                        body = deepclone(target)
+                        operation["requestBody"] = body
                 if isinstance(body, dict) and isinstance(body.get("content"), dict):
                     _filter_content(body["content"])
                     if not body["content"]:
