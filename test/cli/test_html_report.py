@@ -4,7 +4,7 @@ import re
 import time
 
 import pytest
-from flask import Response, jsonify
+from flask import Response, jsonify, request
 from hypothesis import strategies as st
 
 import schemathesis
@@ -12,12 +12,118 @@ from schemathesis.cli.constants import ExitCode
 from schemathesis.engine import events
 from schemathesis.graphql import nodes
 from schemathesis.reporting.html.render import humanize_duration
+from schemathesis.reporting.html.timeline import (
+    BADGE_PX,
+    MAX_TICKS,
+    TICK_GAP_PX,
+    TRACK_PX,
+    Lane,
+    Marker,
+    axis_ticks,
+    mark_classes,
+    tick_groups,
+)
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
 
 
 @pytest.fixture
 def report_dir(tmp_path):
     return tmp_path / "report"
+
+
+def count_of(pattern, text):
+    match = re.search(pattern, text)
+    return int(match.group(1)) if match else 0
+
+
+def assert_phases_match_lanes(html):
+    phases = {
+        name: (kind, outcome)
+        for kind, name, outcome in re.findall(
+            r'<li class="phase phase-(\w+)"><span class="ph-name">([^<]+)</span><span class="ph-outcome">([^<]*)</span>',
+            html,
+        )
+    }
+    if not phases:
+        return
+    lanes = {
+        name: (details, track)
+        for name, details, track in re.findall(
+            r'<span class="tl-lane-name">([^<]+)</span><span class="tl-sub">([^<]*)</span></div>'
+            r'<div class="tl-track tl-lane">(.*?)</div></div>',
+            html,
+        )
+    }
+    ran = {name for name, (kind, outcome) in phases.items() if kind != "skipped" or outcome == "no checks ran"}
+    charted = {name for name, (_, track) in lanes.items() if 'class="tl-span' in track}
+    assert ran == charted, f"Phases that ran {sorted(ran)} vs timeline lanes {sorted(charted)}"
+    for name in ran:
+        kind, outcome = phases[name]
+        details = lanes[name][0]
+        if "failed" in outcome:
+            assert count_of(r"(\d+) found", details) + count_of(r"(\d+) again", details), (name, outcome, details)
+        errors = count_of(r"(\d+) errors?\b", outcome)
+        assert errors == count_of(r"(\d+) errors?\b", details), (name, outcome, details)
+        assert outcome.split(",")[0] in ("passed", "failed", "interrupted", "no checks ran") or re.fullmatch(
+            r"\d+ errors?", outcome
+        ), (name, outcome)
+        stopped = 'class="tl-span tl-span-stopped"' in lanes[name][1]
+        assert stopped == (kind == "interrupted"), (name, outcome)
+    if '<h1 class="hero-status-label">Interrupted</h1>' in html and charted:
+        assert re.search(r'<span class="tl-tick tl-end">[^<]+, stopped</span>', html)
+        assert "interrupted" in [kind for kind, _ in phases.values()]
+
+
+def assert_failure_counts_match(html):
+    lanes = re.findall(r'<span class="tl-lane-name">[^<]+</span><span class="tl-sub">([^<]*)</span>', html)
+    found = sum(count_of(r"(\d+) found", details) for details in lanes)
+    assert (
+        count_of(r'<span class="tl-name">Failures found</span><span class="tl-sub">(\d+) total</span>', html) == found
+    )
+    ticks = re.findall(
+        r'<a class="tl-mark[^"]*"[^>]*>(?:<span class="tl-count" aria-hidden="true">(\d+)</span>)?', html
+    )
+    if ticks:
+        assert sum(int(count or 1) for count in ticks) == found
+
+
+def assert_operation_counts_match(html):
+    hero = re.search(r'Operations</span><span class="m-value">\d+</span><span class="m-sub">([^<]*)</span>', html)
+    if hero is None:
+        return
+    buckets = {word: int(count) for count, word in re.findall(r"(\d+) ([a-z ]+)", hero.group(1))}
+    groups = {
+        title.lower(): int(count)
+        for title, count in re.findall(
+            r'<span class="group-title">(\w+)</span><span class="group-count">(\d+)</span>', html
+        )
+    }
+    not_run = count_of(r'<tr class="not-run-row"><td colspan="3">(\d+) operations? not run', html)
+    assert buckets == {**groups, **({"not run": not_run} if not_run else {})}, (buckets, groups, not_run)
+
+
+def assert_top_failures_match(html):
+    shown = len(re.findall(r'<span class="tf-n">\d+</span>', html))
+    more = count_of(r'<a class="tf-more"[^>]*>\+(\d+) more</a>', html)
+    ops = re.search(r'<section class="ops"[^>]*>.*?</table></section>', html, flags=re.DOTALL)
+    cards = re.findall(r'<article class="case"[^>]*>.*?</article>', ops.group(0) if ops else "", flags=re.DOTALL)
+    kinds = {title for card in cards for title in re.findall(r'<h4 class="finding-title">([^<]+)', card)}
+    assert shown + more == len(kinds), (shown, more, sorted(kinds))
+
+
+def assert_report_consistent(html):
+    assert_phases_match_lanes(html)
+    assert_failure_counts_match(html)
+    assert_operation_counts_match(html)
+    assert_top_failures_match(html)
+    if "No tests ran" in html:
+        assert not re.search(r'<td class="numeric(?: one)?">[\d,]+', html), "No tests ran, yet operations ran cases"
+
+
+def read_report(report_dir):
+    html = (report_dir / "index.html").read_text(encoding="utf-8")
+    assert_report_consistent(html)
+    return html
 
 
 def run_with_report(cli, report_dir, *args, exit_code=ExitCode.OK, phases="fuzzing", **kwargs):
@@ -30,7 +136,7 @@ def run_with_report(cli, report_dir, *args, exit_code=ExitCode.OK, phases="fuzzi
         exit_code=exit_code,
         **kwargs,
     )
-    return (report_dir / "index.html").read_text(encoding="utf-8")
+    return read_report(report_dir)
 
 
 def test_html_report_passed(ctx, cli, report_dir, snapshot_html):
@@ -142,10 +248,7 @@ def before_call(ctx, case, **kwargs):
     assert html == snapshot_html
 
 
-def test_html_report_interrupted_with_results(ctx, cli, report_dir, snapshot_html):
-    api = ctx.openapi.apps.success_and_failure()
-    module = ctx.write_pymodule(
-        """
+INTERRUPT_ON_SECOND_CALL = """
 CALLS = []
 
 
@@ -156,7 +259,11 @@ def before_call(ctx, case, **kwargs):
     if len(CALLS) > 1:
         raise KeyboardInterrupt
 """
-    )
+
+
+def test_html_report_interrupted_with_results(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success_and_failure()
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_CALL)
     html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.INTERRUPTED, hooks=module)
     assert html == snapshot_html
 
@@ -214,6 +321,46 @@ def test_html_report_some_operations_errored(ctx, cli, app_runner, report_dir, s
     assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
 
 
+# Slow requests time out after other cases of the same operation passed; the invalid body errors before any case.
+def test_html_report_operations_errored_after_cases(ctx, cli, app_runner, report_dir):
+    parameter = {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/broken": INVALID_BODY,
+            "/api/slow": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}},
+            "/api/success": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/api/slow")
+    def slow():
+        if len(request.args.get("q", "")) > 2:
+            time.sleep(0.5)
+        return jsonify({})
+
+    @app.route("/api/success")
+    def success():
+        return "{}"
+
+    html = run_with_report(
+        cli,
+        report_dir,
+        app_runner.openapi_url(app),
+        "--checks=not_a_server_error",
+        "--request-timeout=0.2",
+        "--max-examples=10",
+        phases="coverage,fuzzing",
+        exit_code=ExitCode.FAILURES,
+    )
+    groups = re.findall(r'<span class="group-title">(\w+)</span><span class="group-count">(\d+)</span>', html)
+    assert groups == [("Passed", "1"), ("Errored", "2")]
+    operations = re.search(r'Operations</span><span class="m-value">(\d+)</span><span class="m-sub">([^<]*)<', html)
+    assert operations.groups() == ("3", "1 passed, 2 errored")
+    phases = re.findall(r'<span class="ph-name">(\w+)</span><span class="ph-outcome">([^<]*)</span>', html)
+    assert [name for name, _ in phases] == ["Examples", "Coverage", "Fuzzing", "Stateful"]
+    assert all(re.fullmatch(r"\d+ errors?", outcome) for name, outcome in phases if name in ("Coverage", "Fuzzing"))
+
+
 def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot_html):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -233,6 +380,31 @@ def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot
 
     html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
     assert html == snapshot_html
+
+
+def test_html_report_top_failures_count_hidden_kinds(ctx, cli, app_runner, report_dir):
+    header = {"X-Token": {"required": True, "schema": {"type": "string"}}}
+    json_body = {"application/json": {"schema": {"type": "object"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/failure": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/text": {
+                "get": {"responses": {"200": {"description": "OK", "headers": header, "content": json_body}}}
+            },
+        }
+    )
+
+    @app.route("/api/failure")
+    def failure():
+        return "", 500
+
+    @app.route("/api/text")
+    def text():
+        return Response("plain", content_type="text/plain")
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
+    assert len(re.findall(r'<span class="tf-n">', html)) == 3
+    assert re.search(r'<a class="tf-more" href="#operations">\+1 more</a>', html)
 
 
 def test_html_report_continue_on_failure(ctx, cli, report_dir, snapshot_html):
@@ -271,7 +443,7 @@ def test_html_report_fuzz_failures(ctx, cli, report_dir, snapshot_html):
         f"--report-html-path={report_dir}",
     )
     assert result.exit_code == ExitCode.FAILURES, result.stdout
-    html = (report_dir / "index.html").read_text(encoding="utf-8")
+    html = read_report(report_dir)
     # Fuzzing runs operations concurrently, so only the failed row is stable.
     assert '<tr class="op-row row-failed has-details" id="op-get-api-failure">' in html
     assert '<span class="method get">GET</span><span class="path">/api<wbr>/failure</span>' in html
@@ -332,7 +504,7 @@ def before_call(ctx, case, **kwargs):
         hooks=module,
     )
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
+    assert read_report(report_dir) == snapshot_html
 
 
 def test_html_report_baseline_not_written(ctx, cli, tmp_path, report_dir, snapshot_html):
@@ -564,7 +736,7 @@ def test_html_report_graphql_stateful_steps(ctx, cli, report_dir):
         f"--report-html-path={report_dir}",
         exit_code=ExitCode.FAILURES,
     )
-    html = (report_dir / "index.html").read_text(encoding="utf-8")
+    html = read_report(report_dir)
     steps = re.findall(r'<span class="step-req">([^<]*)', html)
     assert steps
     assert all(re.fullmatch(r"(Query|Mutation)\.\w+", step) for step in steps), steps
@@ -618,6 +790,138 @@ def test_html_report_ids_are_unique(ctx, cli, app_runner, report_dir):
     html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
     ids = re.findall(r' id="([^"]+)"', html)
     assert len(ids) == len(set(ids)), sorted(id_ for id_ in ids if ids.count(id_) > 1)
+
+
+def two_failing_operations(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/orders": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/api/users")
+    def users():
+        return "", 500
+
+    @app.route("/api/orders")
+    def orders():
+        return "", 500
+
+    return app
+
+
+# The only failing operation stops at its first failing response, so every failure arrives at one moment.
+def test_html_report_timeline_short_run_has_chart(ctx, cli, report_dir):
+    api = ctx.openapi.apps.failure()
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.FAILURES)
+    assert "tl-compact" not in html
+    assert re.findall(r'<span class="tl-lane-name">([^<]+)</span>', html) == ["Fuzzing"]
+    assert len(re.findall(r'class="tl-mark', html)) == 1
+    assert '<div class="tl-head"><h2 class="tl-heading" id="tl-heading">Timeline</h2></div>' in html
+    assert "title=" not in re.search(r'<section class="timeline".*?</section>', html).group(0)
+
+
+# Each operation's two failures arrive with one response, so every tick carries a count badge.
+def test_html_report_timeline_quiet_tail(ctx, cli, app_runner, report_dir):
+    html = run_with_report(
+        cli,
+        report_dir,
+        app_runner.openapi_url(two_failing_operations(ctx)),
+        "--max-time=2",
+        phases="coverage,fuzzing",
+        exit_code=ExitCode.FAILURES,
+    )
+    assert '<section class="timeline"' in html
+    assert re.search(
+        r'<div class="tl-quiet" style="left:[\d.]+%"><span><span class="tl-q-long">No new failures for</span>'
+        r'<span class="tl-q-short">Quiet</span> [\d.]+m?s</span></div>',
+        html,
+    )
+    counts = re.findall(
+        r'<a class="tl-mark" href="#case-\w+"[^>]*>(?:<span class="tl-count" aria-hidden="true">(\d+)</span>)?',
+        html,
+    )
+    assert "" not in counts
+    assert sum(map(int, counts)) == 4
+
+
+def test_html_report_timeline_counts_match_top_failures(ctx, cli, report_dir, ensure_reachability_module):
+    api = ctx.openapi.apps.success_and_failure()
+    html = run_with_report(
+        cli,
+        report_dir,
+        api.schema_url,
+        "-c",
+        "EnsureReachability",
+        exit_code=ExitCode.FAILURES,
+        hooks=ensure_reachability_module,
+    )
+    top = sum(map(int, re.findall(r'<span class="tf-n">(\d+)</span>', html)))
+    (found,) = re.findall(r'<span class="tl-name">Failures found</span><span class="tl-sub">(\d+) total</span>', html)
+    assert top
+    assert int(found) == top
+
+
+def test_html_report_timeline_for_fuzz_command(ctx, cli, report_dir):
+    api = ctx.openapi.apps.failure()
+    result = cli.main("fuzz", api.schema_url, "--max-failures=1", "--max-time=2", f"--report-html-path={report_dir}")
+    assert result.exit_code == ExitCode.FAILURES, result.stdout
+    html = read_report(report_dir)
+    phases = re.findall(r'tl-lane-name">(\w+)</span><span class="tl-sub">', html)
+    assert phases == ["Fuzzing"]
+
+
+def marker(seconds, phase="Fuzzing", count=1):
+    return Marker(seconds, phase, "case-1", "GET /api/users: Server error", count)
+
+
+def test_timeline_ticks_merge_by_rendered_distance():
+    groups = tick_groups([marker(at) for at in (0, 0.5, 3, 3.5, 6, 30)], 100.0)
+    assert [[item.found_at for item in group] for group in groups] == [[0, 0.5], [3, 3.5], [6], [30]]
+
+
+# 1.2s apart in a 20s run is about 60px on the desktop track.
+def test_timeline_ticks_keep_distinct_times_apart():
+    groups = tick_groups([marker(3.7, count=2), marker(4.9, count=2)], 20.0)
+    assert [[item.found_at for item in group] for group in groups] == [[3.7], [4.9]]
+
+
+# A tick with a count badge keeps the next tick clear of the badge; a plain tick keeps a small gap.
+def test_timeline_ticks_never_overlap():
+    groups = tick_groups([marker(index * 0.5) for index in range(200)], 100.0)
+    for previous, current in itertools.pairwise(groups):
+        gap = (current[0].found_at - previous[0].found_at) / 100.0 * TRACK_PX
+        assert gap >= (BADGE_PX if len(previous) > 1 else TICK_GAP_PX)
+
+
+def test_timeline_lane_details_skip_round_count():
+    assert Lane("Fuzzing", [(0.0, 1.0), (2.0, 3.0)], [marker(0.5)]).details() == "3s, 1 found"
+
+
+def test_timeline_axis_for_long_runs():
+    assert len(axis_ticks(30 * 3600)) <= MAX_TICKS
+
+
+def test_timeline_axis_for_short_runs():
+    assert axis_ticks(0.089) == pytest.approx([0, 0.025, 0.05, 0.075])
+
+
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [(10.0, ""), (85.0, " tl-tip-end"), (98.0, " tl-tip-end tl-mark-end")],
+    ids=["start", "past-80", "past-97"],
+)
+def test_timeline_mark_classes(seconds, expected):
+    assert mark_classes(seconds, 100.0) == expected
+
+
+def test_html_report_timeline_interrupted_run(ctx, cli, report_dir):
+    api = ctx.openapi.apps.success_and_failure()
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_CALL)
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.INTERRUPTED, hooks=module)
+    assert re.search(r'<span class="tl-tick tl-end">[\d.]+m?s, stopped</span>', html)
+    assert len(re.findall(r'class="tl-span tl-span-stopped"', html)) == 1
 
 
 def test_html_report_run_level_error(ctx, cli, app_runner, report_dir, snapshot_html):
@@ -732,7 +1036,7 @@ def test_html_report_warnings_order(ctx, cli, app_runner, report_dir):
         "--warnings=low_valid_rate,unmatched_filter,timeout_units",
         f"--report-html-path={report_dir}",
     )
-    html = (report_dir / "index.html").read_text(encoding="utf-8")
+    html = read_report(report_dir)
     entries = re.findall(r'<li class="(warning[^"]*)">(?:<span>|<details id="([^"]+)")', html)
     assert entries == [
         ("warning startup", ""),
