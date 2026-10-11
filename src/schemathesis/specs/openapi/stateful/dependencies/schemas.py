@@ -297,8 +297,8 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
         array_schema = properties[array_field]
         _, resolved = maybe_resolve_with_resolver(array_schema, resolver)
         pointer = f"/{encode_pointer(array_field)}"
+        ref = array_schema.get("$ref")
 
-        uses_parent_ref = False
         # Try to unwrap one more time
         if resolved.get("type") == "array" or "items" in resolved:
             nested_items = resolved.get("items")
@@ -310,11 +310,15 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
                     nested_properties = resolved_items["properties"][external_tag_]
                     _, resolved = maybe_resolve_with_resolver(nested_properties, resolver)
                     resolved = try_unwrap_composition(resolved, resolver)
+                    if uses_parent_ref:
+                        ref = parent_ref
+                    else:
+                        ref = resolved.get("$ref") or nested_properties.get("$ref") or ref
                     _, resolved = maybe_resolve_with_resolver(resolved, resolver)
-                    pointer += f"/{encode_pointer(external_tag_)}"
+                    # Every list element carries its own tagged resource.
+                    pointer += f"/*/{encode_pointer(external_tag_)}"
 
-        ref = parent_ref if uses_parent_ref else array_schema.get("$ref")
-        return UnwrappedSchema(pointer=pointer, schema=resolved, ref=array_schema.get("$ref"))
+        return UnwrappedSchema(pointer=pointer, schema=resolved, ref=ref)
 
     # External tag
     external_tag = _detect_externally_tagged_pattern(schema, path, parent_ref)
