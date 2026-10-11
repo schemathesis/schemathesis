@@ -1744,6 +1744,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             nothing_tested_reason=ctx.nothing_tested_reason,
             exit_code=ctx.exit_code,
             baseline_not_saved=ctx.baseline_write_error is not None,
+            no_checks_ran=ctx.statistic.no_checks_ran,
         )
 
     def display_reports(self, ctx: ExecutionContext) -> None:

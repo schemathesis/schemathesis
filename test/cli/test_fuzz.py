@@ -66,6 +66,12 @@ def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}}) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_filter_case_rejects_all(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(

@@ -41,6 +41,7 @@
 - Error feedback dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Error feedback ignoring server errors on fields of `$ref` objects nested in the request body.
+- Final line reporting "No issues found" when no checks ran.
 - Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
 - Negative request bodies for `enum` or `const` schemas changing after they were generated.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
