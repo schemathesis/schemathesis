@@ -209,8 +209,8 @@ class JacksonParser:
             if overflow_match is not None:
                 minimum, maximum = _JAVA_INT_BOUNDS[overflow_match.group("size")]
                 for bound, direction in (
-                    (float(minimum), BoundDirection.MIN),
-                    (float(maximum), BoundDirection.MAX),
+                    (minimum, BoundDirection.MIN),
+                    (maximum, BoundDirection.MAX),
                 ):
                     constraints.append(
                         (

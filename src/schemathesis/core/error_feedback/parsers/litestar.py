@@ -4,7 +4,7 @@ import re
 from typing import TYPE_CHECKING, TypedDict, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_method
+from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_method, parse_number
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     NumericBoundPayload,
@@ -87,7 +87,7 @@ def _numeric_classification(match: re.Match[str]) -> ClassificationResult:
     direction = BoundDirection.MIN if op in {">=", ">"} else BoundDirection.MAX
     exclusive = op in {">", "<"}
     return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
-        bound=float(match.group("n")),
+        bound=parse_number(match.group("n")),
         direction=direction,
         exclusive=exclusive,
     )

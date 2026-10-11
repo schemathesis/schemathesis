@@ -11,6 +11,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     location_for_method,
     lowercase_first_letter,
     numeric_bound,
+    parse_number,
     size_bound,
 )
 from schemathesis.core.error_feedback.store import (
@@ -138,8 +139,8 @@ def _classify(message: str) -> tuple[ClassificationResult, ...]:
     for pattern in _INCLUSIVE_RANGE_PATTERNS:
         match = pattern.match(message)
         if match is not None:
-            low = float(match.group(1))
-            high = float(match.group(2))
+            low = parse_number(match.group(1))
+            high = parse_number(match.group(2))
             return (
                 (
                     ObservationKind.NUMERIC_BOUND,

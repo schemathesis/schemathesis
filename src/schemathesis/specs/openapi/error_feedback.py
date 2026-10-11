@@ -287,9 +287,9 @@ class SizeBoundAdjustment:
         return schema
 
 
-def _coerce_numeric_bound(value: float, types: list[str]) -> int | float:
+def _coerce_numeric_bound(value: int | float, types: list[str]) -> int | float:
     """Emit integers when the property is integer-typed and the bound is integral."""
-    if "integer" in types and "number" not in types and value.is_integer():
+    if "integer" in types and "number" not in types and isinstance(value, float) and value.is_integer():
         return int(value)
     return value
 

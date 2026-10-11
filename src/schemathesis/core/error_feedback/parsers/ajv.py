@@ -85,7 +85,7 @@ def _bound_handler(direction: BoundDirection, exclusive: bool) -> KeywordHandler
         return (
             (
                 ObservationKind.NUMERIC_BOUND,
-                NumericBoundPayload(bound=float(limit), direction=direction, exclusive=exclusive),
+                NumericBoundPayload(bound=limit, direction=direction, exclusive=exclusive),
             ),
         )
 

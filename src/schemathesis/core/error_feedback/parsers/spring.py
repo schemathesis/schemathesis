@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
+from schemathesis.core.error_feedback.parsers.extractors import parse_number
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     FormatPayload,
@@ -189,11 +190,15 @@ def _classify(message: str) -> tuple[tuple[ObservationKind, ObservationPayload],
         return (
             (
                 ObservationKind.NUMERIC_BOUND,
-                NumericBoundPayload(bound=float(range_match.group(1)), direction=BoundDirection.MIN, exclusive=False),
+                NumericBoundPayload(
+                    bound=parse_number(range_match.group(1)), direction=BoundDirection.MIN, exclusive=False
+                ),
             ),
             (
                 ObservationKind.NUMERIC_BOUND,
-                NumericBoundPayload(bound=float(range_match.group(2)), direction=BoundDirection.MAX, exclusive=False),
+                NumericBoundPayload(
+                    bound=parse_number(range_match.group(2)), direction=BoundDirection.MAX, exclusive=False
+                ),
             ),
         )
     numeric_match = _NUMERIC_BOUND.search(message)
@@ -203,7 +208,7 @@ def _classify(message: str) -> tuple[tuple[ObservationKind, ObservationPayload],
             (
                 ObservationKind.NUMERIC_BOUND,
                 NumericBoundPayload(
-                    bound=float(numeric_match.group("value")),
+                    bound=parse_number(numeric_match.group("value")),
                     direction=direction,
                     exclusive=numeric_match.group("inclusive") is None,
                 ),
@@ -320,7 +325,7 @@ class SpringParser:
                     kind=ObservationKind.NUMERIC_BOUND,
                     raw_message=line,
                     payload=NumericBoundPayload(
-                        bound=float(_JAVA_TYPE_MAX[type_hint.group("type")]),
+                        bound=_JAVA_TYPE_MAX[type_hint.group("type")],
                         direction=BoundDirection.MAX,
                         exclusive=False,
                     ),

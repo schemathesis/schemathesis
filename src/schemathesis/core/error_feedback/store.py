@@ -68,7 +68,7 @@ class BoundDirection(str, Enum):
 class NumericBoundPayload:
     """One half of a numeric range — `direction` picks which side, `exclusive` whether the bound itself is excluded."""
 
-    bound: float
+    bound: int | float
     direction: BoundDirection
     exclusive: bool
 

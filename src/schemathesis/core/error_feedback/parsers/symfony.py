@@ -7,10 +7,10 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     DictHandler,
-    float_or_none,
     format_handler,
     int_or_none,
     location_for_method,
+    number_or_none,
     required_handler,
 )
 from schemathesis.core.error_feedback.store import (
@@ -102,7 +102,7 @@ def _size_handler(direction: BoundDirection) -> DictHandler:
 
 def _bound_handler(direction: BoundDirection, exclusive: bool) -> DictHandler:
     def handler(violation: dict) -> tuple[ClassificationResult, ...]:
-        bound = float_or_none(_params(violation).get("{{ compared_value }}"))
+        bound = number_or_none(_params(violation).get("{{ compared_value }}"))
         if bound is None:
             return ()
         return (
@@ -117,8 +117,8 @@ def _bound_handler(direction: BoundDirection, exclusive: bool) -> DictHandler:
 
 def _range_handler(violation: dict) -> tuple[ClassificationResult, ...]:
     params = _params(violation)
-    low = float_or_none(params.get("{{ min }}"))
-    high = float_or_none(params.get("{{ max }}"))
+    low = number_or_none(params.get("{{ min }}"))
+    high = number_or_none(params.get("{{ max }}"))
     if low is None or high is None:
         return ()
     return (

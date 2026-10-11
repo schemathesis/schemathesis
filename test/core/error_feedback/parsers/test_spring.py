@@ -536,7 +536,7 @@ def test_spring_parser_extracts_pagination_type_hint(type_name, expected_bound, 
             ("page",),
             ParameterLocation.QUERY,
             ObservationKind.NUMERIC_BOUND,
-            NumericBoundPayload(bound=float(expected_bound), direction=BoundDirection.MAX, exclusive=False),
+            NumericBoundPayload(bound=expected_bound, direction=BoundDirection.MAX, exclusive=False),
         ),
     ]
 

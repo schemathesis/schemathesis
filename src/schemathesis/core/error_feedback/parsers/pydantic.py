@@ -123,11 +123,11 @@ def _numeric_bound(direction: BoundDirection, exclusive: bool, context_key: str)
         bound = context.get(context_key)
         # Decimal-typed fields (money, prices) put a Decimal in `ctx`; coerce to
         # float since downstream JSON Schema bounds are numeric-typed anyway.
-        if not isinstance(bound, (int, float, Decimal)) or isinstance(bound, bool):
+        if isinstance(bound, Decimal):
+            bound = float(bound)
+        if not isinstance(bound, (int, float)) or isinstance(bound, bool):
             return None, None
-        return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
-            bound=float(bound), direction=direction, exclusive=exclusive
-        )
+        return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(bound=bound, direction=direction, exclusive=exclusive)
 
     return handler
 
