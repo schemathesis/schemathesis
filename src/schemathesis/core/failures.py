@@ -5,7 +5,6 @@ import itertools
 import textwrap
 import traceback
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from enum import Enum
 from json import JSONDecodeError
 from pathlib import Path
@@ -58,7 +57,6 @@ class Severity(str, Enum):
 _SEVERITY_ORDER = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, Severity.LOW: 3}
 
 
-@dataclass
 class Failure(AssertionError):
     """API check failure."""
 
@@ -80,6 +78,12 @@ class Failure(AssertionError):
         self.message = message
         self.case_id = case_id
         self.severity = severity
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(operation={self.operation!r}, title={self.title!r}, "
+            f"message={self.message!r}, case_id={self.case_id!r}, severity={self.severity!r})"
+        )
 
     def __str__(self) -> str:
         if not self.message:

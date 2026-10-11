@@ -19,6 +19,7 @@
 ### :bug: Fixed
 
 - Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
+- Check failures shown as a bare `Failure()` in `repr` and pytest assertion messages.
 - Missing or broken inferred stateful links for paginated lists of wrapped items, e.g. `{items: [{track}]}`.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
 - Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
