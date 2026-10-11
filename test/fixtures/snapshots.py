@@ -494,7 +494,8 @@ def _find(lines: list[str], offsets: dict[str, int]) -> int | None:
 def clean_stateful_tests(lines):
     start_idx = _find(lines, {"Fuzzing (in": 3})
     if start_idx is None:
-        start_idx = _find(lines, {"API probing failed": 1, "API capabilities": 3})
+        # An unreachable server has no capability rows under the header.
+        start_idx = _find(lines, {"API probing failed": 1, "API capabilities: unknown": 0, "API capabilities": 3})
     end_idx = _find(lines, {"Stateful (in": 0})
     if start_idx is None or end_idx is None:
         return lines

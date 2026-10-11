@@ -12,10 +12,7 @@ Schemathesis dev
      Operations:       3 selected / 3 total
 
 
- ✅  API capabilities:
-
-     Supports NULL byte in headers:                            ✘
-     Accepts backslash and control characters in URL paths:    ✘
+ ⚠️  API capabilities: unknown, server unreachable
 
  🚫  Stateful (in 0.00s)
 

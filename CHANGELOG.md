@@ -20,6 +20,7 @@
 ### :bug: Fixed
 
 - `st fuzz` skipping checks for requests sent after the first failure in a scenario.
+- API capabilities reported as unsupported when the server is unreachable.
 - Missing unresolvable-reference warning for responses whose `$ref` reaches it through a cycle.
 - Crash in negative mode on schemas with a boolean `not`, e.g. `not: false`.
 - Traceback and early stateful phase exit with `--mode negative` for steps with nothing to negate.
