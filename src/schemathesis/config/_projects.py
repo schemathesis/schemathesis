@@ -403,6 +403,12 @@ class ProjectConfig(DiffBase):
             return self.request_retries
         return None
 
+    def continue_on_failure_for(self, *, operation: APIOperation) -> bool:
+        config = self.operations.get_for_operation(operation=operation)
+        if config.continue_on_failure is not None:
+            return config.continue_on_failure
+        return bool(self.continue_on_failure)
+
     def tls_verify_for(self, *, operation: APIOperation | None = None) -> bool | str | None:
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)

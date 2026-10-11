@@ -158,13 +158,7 @@ def build_fuzz_plan(ctx: EngineContext, *, operations: list[APIOperation]) -> Fu
         operations=operations,
         weighted_operations=[op for op in operations for _ in range(weights_by_label[op.label])],
         operations_by_label={operation.label: operation for operation in operations},
-        continue_on_failure_by_label={
-            op.label: bool(
-                ctx.config.operations.get_for_operation(operation=op).continue_on_failure
-                or ctx.config.continue_on_failure
-            )
-            for op in operations
-        },
+        continue_on_failure_by_label={op.label: ctx.config.continue_on_failure_for(operation=op) for op in operations},
     )
 
 

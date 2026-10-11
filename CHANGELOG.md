@@ -28,6 +28,7 @@
 - `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
+- `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
 - Error feedback dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
