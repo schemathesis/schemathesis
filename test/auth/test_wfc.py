@@ -1144,6 +1144,56 @@ def test_content_type_probe_refusal_does_not_move_the_identity(cli, ctx, tmp_pat
     assert set(sent) == {"ApiKey viewer"}
 
 
+BASIC_AUTH = {
+    "auth": [
+        {"name": "alice", "fixedHeaders": [{"name": "Authorization", "value": "Basic YWxpY2U6c2VjcmV0"}]},
+        {"name": "bob", "fixedHeaders": [{"name": "Authorization", "value": "Basic Ym9iOnNlY3JldA=="}]},
+    ]
+}
+
+
+@pytest.mark.parametrize(
+    ("version", "scheme"),
+    [
+        ("2.0", {"type": "basic"}),
+        ("3.0.2", {"type": "http", "scheme": "basic"}),
+        ("3.0.2", {"type": "http", "scheme": "bearer"}),
+    ],
+    ids=["swagger-basic", "openapi-basic", "openapi-bearer"],
+)
+def test_case_without_credentials_does_not_move_the_identity(ctx, app_runner, tmp_path, version, scheme):
+    # The coverage phase drops the credentials on purpose, so its 401 says nothing about the identity.
+    responses = {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}}
+    security = (
+        {"securityDefinitions": {"auth": scheme}, "basePath": "/"}
+        if version == "2.0"
+        else {"components": {"securitySchemes": {"auth": scheme}}}
+    )
+    app, _ = ctx.openapi.make_flask_app(
+        {"/api/first": {"get": {"responses": responses}}, "/api/orders": {"get": {"responses": responses}}},
+        version=version,
+        security=[{"auth": []}],
+        **security,
+    )
+
+    @app.route("/api/first", endpoint="first")
+    @app.route("/api/orders", endpoint="orders")
+    def protected():
+        return jsonify({}), 200 if request.headers.get("Authorization") else 401
+
+    config = schemathesis.Config.from_dict({"auth": {"wfc": {"path": _write(tmp_path, BASIC_AUTH)}}})
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
+    schema.config.phases.fuzzing.enabled = False
+    schema.config.phases.stateful.enabled = False
+    list(schemathesis.engine.from_schema(schema).execute())
+
+    provider = escalating_provider(schema)
+    assert [provider.names[provider.index_for(label)] for label in ("GET /api/first", "GET /api/orders")] == [
+        "alice",
+        "alice",
+    ]
+
+
 def test_identity_refused_before_accounts_exist_is_retried(cli, ctx, tmp_path):
     # An API may create its accounts mid-run, so a 401 from before then says nothing about the identity.
     api = ctx.openapi.apps.wfc_accounts_seeded_later()
