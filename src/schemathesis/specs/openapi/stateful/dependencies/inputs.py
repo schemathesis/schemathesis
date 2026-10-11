@@ -77,6 +77,7 @@ def extract_inputs(
     for param in operation.iter_parameters():
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
+            parameter_schema=param.raw_schema,
             parameter_types=_parameter_types(param),
             parameter_location=param.location,
             operation=operation,
@@ -134,6 +135,7 @@ def _parameter_types(parameter: OpenApiParameter) -> list[str]:
 def _resolve_parameter_dependency(
     *,
     parameter_name: str,
+    parameter_schema: JsonSchema,
     parameter_types: list[str],
     parameter_location: ParameterLocation,
     operation: APIOperation,
@@ -209,7 +211,11 @@ def _resolve_parameter_dependency(
             field = parameter_name
     else:
         field = _prefer_string_identifier(
-            _match_field(parameter_name, resource_name, resource.fields), resource, parameter_types
+            _match_field(parameter_name, resource_name, resource.fields),
+            resource,
+            parameter_name,
+            parameter_schema,
+            parameter_types,
         )
 
     return InputSlot(
@@ -605,10 +611,21 @@ def _match_field(parameter_name: str, resource_name: str, fields: list[str]) -> 
     return parameter_name
 
 
-def _prefer_string_identifier(field: str, resource: ResourceDefinition, parameter_types: list[str]) -> str:
-    # A string parameter carries the resource's string identifier (`uuid`), not a numeric one (`id`).
+def _prefer_string_identifier(
+    field: str,
+    resource: ResourceDefinition,
+    parameter_name: str,
+    parameter_schema: JsonSchema,
+    parameter_types: list[str],
+) -> str:
+    # A string parameter carries the resource's string identifier (`uuid`), not a numeric one (`id`), unless its
+    # name matches the field exactly or its `pattern` / `format` rules a UUID out.
     if (
         parameter_types != ["string"]
+        or naming.normalize_for_matching(parameter_name) == naming.normalize_for_matching(field)
+        or not isinstance(parameter_schema, dict)
+        or "pattern" in parameter_schema
+        or parameter_schema.get("format") not in (None, "uuid")
         or naming.normalize_for_matching(field) not in naming.ID_FIELD_NAMES
         or "string" in resource.types.get(field, {"string"})
     ):
