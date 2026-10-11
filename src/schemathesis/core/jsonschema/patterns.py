@@ -1100,6 +1100,8 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
             group, add_flags, del_flags, inner = value
             inner_nodes = list(inner)
             if len(inner_nodes) == 1 and inner_nodes[0][0] in REPEATS:
+                if inner_nodes[0][0] in POSSESSIVE_REPEATS:
+                    return None
                 min_repeat, max_repeat, subpattern = inner_nodes[0][1]
                 quantifier_bounds.append((min_repeat, max_repeat))
                 repetition_lengths.append(_calculate_min_repetition_length(subpattern))
