@@ -266,7 +266,9 @@ class ExamplesGenerator:
 
         if self._fill_missing and not cases:
             try:
-                add_single_example(operation.as_strategy(**self._as_strategy_kwargs), cases)
+                add_single_example(
+                    operation.as_strategy(feedback=self._feedback.for_examples(), **self._as_strategy_kwargs), cases
+                )
             except (
                 InvalidSchema,
                 Unsatisfiable,

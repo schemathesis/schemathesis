@@ -348,7 +348,7 @@ def generate_example_cases(
             InvalidRegexMark.set(test, exc)
 
     if fill_missing and not result:
-        strategy = operation.as_strategy(phase=TestPhase.EXAMPLES, **kwargs)
+        strategy = operation.as_strategy(phase=TestPhase.EXAMPLES, feedback=feedback.for_examples(), **kwargs)
         add_single_example(strategy, result)
 
     context = HookContext(operation=operation)  # context should be passed here instead
