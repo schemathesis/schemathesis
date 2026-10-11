@@ -37,6 +37,7 @@
 - Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
 - Positive cases treated as negative when an auth hook adds an undeclared or differently-cased header.
 - Error feedback rounding large integer bounds, e.g. Java `long` maximum written as `2**63`.
+- Wildcard response deserializers like `@schemathesis.deserializer("application/*")` never matching.
 
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 

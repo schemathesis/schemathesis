@@ -33,19 +33,16 @@ def find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | No
         return MEDIA_TYPE_STRATEGIES[content_type]
 
     try:
-        main, sub = parse(content_type)
+        parsed = parse(content_type)
     except MalformedMediaType:
         return None
 
     for registered_type, strategy in MEDIA_TYPE_STRATEGIES.items():
         try:
-            target_main, target_sub = parse(registered_type)
+            target = parse(registered_type)
         except MalformedMediaType:
             continue
-        # `*` on either side acts as a wildcard.
-        main_match = main == "*" or target_main == "*" or main == target_main
-        sub_match = sub == "*" or target_sub == "*" or sub == target_sub
-        if main_match and sub_match:
+        if matches_either(parsed, target):
             return strategy
 
     return None
@@ -162,6 +159,15 @@ def matches_parts(expected: tuple[str, str], actual: tuple[str, str]) -> bool:
     actual_main, actual_sub = actual
     main_matches = expected_main == "*" or expected_main == actual_main
     sub_matches = expected_sub == "*" or expected_sub == actual_sub
+    return main_matches and sub_matches
+
+
+def matches_either(first: tuple[str, str], second: tuple[str, str]) -> bool:
+    """Check if two parsed media types match, with `*` on either side acting as a wildcard."""
+    first_main, first_sub = first
+    second_main, second_sub = second
+    main_matches = first_main == "*" or second_main == "*" or first_main == second_main
+    sub_matches = first_sub == "*" or second_sub == "*" or first_sub == second_sub
     return main_matches and sub_matches
 
 
