@@ -998,6 +998,14 @@ def test_keyboard_interrupt(ctx, cli, workers, snapshot_cli):
         assert "skipped" in result.stdout
 
 
+def test_keyboard_interrupt_is_named_in_the_final_line(ctx, cli):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
+    result = cli.run(api.schema_url, "--mode=positive", hooks=module)
+    assert result.exit_code == 130
+    assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
+
+
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT

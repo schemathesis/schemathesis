@@ -414,8 +414,8 @@ def _has_unstable_blank_lines(data: str) -> bool:
         or "No operations matched the filters" in data
         or "Every selected operation was skipped" in data
         or "No links for stateful testing" in data
-        # Same no-tests path, but a warning replaced the "Empty test suite" banner.
-        or ("No test cases were generated" in data and "Warnings:" in data)
+        # Same no-tests path, but a warning or an interrupt replaced the "Empty test suite" banner.
+        or ("No test cases were generated" in data and ("Warnings:" in data or "Interrupted after" in data))
     )
 
 

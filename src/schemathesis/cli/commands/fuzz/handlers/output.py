@@ -313,6 +313,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             total_cases=ctx.statistic.total_cases,
             nothing_tested_reason=ctx.nothing_tested_reason,
             no_checks_ran=ctx.statistic.no_checks_ran,
+            interrupted=event.stop_reason == StopReason.INTERRUPTED,
         )
 
 

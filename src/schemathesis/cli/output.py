@@ -92,6 +92,7 @@ def display_final_line(
     exit_code: int = 0,
     baseline_not_saved: bool = False,
     no_checks_ran: bool = False,
+    interrupted: bool = False,
 ) -> None:
     parts = []
     if failures:
@@ -107,6 +108,10 @@ def display_final_line(
     if nothing_tested_reason is not None:
         message = nothing_tested_reason
         color = "red"
+    # Counts after Ctrl-C cover only the part that ran, so the line says the run did not finish.
+    elif interrupted:
+        message = f"{', '.join([*parts, 'interrupted']) if parts else 'Interrupted'} after {running_time:.2f}s"
+        color = "red" if failures or errors else "yellow"
     elif failures or errors:
         message = f"{', '.join(parts)} in {running_time:.2f}s"
         color = "red"
