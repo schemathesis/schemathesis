@@ -330,6 +330,8 @@ def _case_to_interaction(case: Case) -> tracecov.HttpInteraction:
         )
     url = _attach_query(kwargs["url"], kwargs.get("params"))
     headers = dict(kwargs["headers"])
+    if kwargs["cookies"] and "Cookie" not in kwargs["headers"]:
+        headers["Cookie"] = "; ".join(f"{name}={value}" for name, value in kwargs["cookies"].items())
     if body is not None:
         headers.setdefault("Content-Length", str(len(body)))
     elif kwargs.get("data") == {} or kwargs.get("data") == "":
