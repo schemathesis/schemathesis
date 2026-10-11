@@ -7,8 +7,8 @@
           "cardinality": "ONE",
           "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/datasets/dataset",
-          "resource": "Dataset",
+          "pointer": "/datasets/*/dataset",
+          "resource": "dataset",
           "status_code": "200"
         }
       ]
@@ -16,10 +16,10 @@
     "GET /{source}/datasets/{dataset_id}/exports/json": {
       "inputs": [
         {
-          "is_suffix_matched": false,
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "dataset_id",
-          "resource": "Dataset",
+          "resource": "dataset",
           "resource_field": "id"
         }
       ],
@@ -27,7 +27,7 @@
     }
   },
   "resources": {
-    "Dataset": {
+    "dataset": {
       "fields": [
         "id"
       ],
