@@ -103,3 +103,50 @@ def test_api(case):
     )
     result = testdir.runpytest("-W", "always")
     result.stdout.re_match_lines([r".*broken_source.*"])
+
+
+def test_examples_phase_does_not_draw_application_constants(testdir):
+    testdir.makepyfile(
+        app="""
+from flask import Flask, jsonify
+
+EXAMPLES = {f"e{i}": {"value": f"v{i}"} for i in range(20)}
+SPEC = {
+    "openapi": "3.0.0",
+    "info": {"title": "Test API", "version": "1.0.0"},
+    "paths": {
+        "/u": {
+            "get": {
+                "parameters": [
+                    {"name": "a", "in": "query", "required": True, "schema": {"type": "string"}, "examples": EXAMPLES},
+                    {"name": "code", "in": "query", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    },
+}
+
+app = Flask(__name__)
+
+@app.route("/openapi.json")
+def spec():
+    return jsonify(SPEC)
+""",
+        test_examples="""
+import schemathesis
+from hypothesis import settings, Phase
+from schemathesis.generation.meta import TestPhase
+from app import app
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
+
+@schema.parametrize()
+@settings(phases=[Phase.explicit])
+def test_api(case):
+    if case.meta.phase.name == TestPhase.EXAMPLES:
+        assert case.meta.constants_draws == ()
+""",
+    )
+    result = testdir.runpytest("test_examples.py")
+    result.assert_outcomes(passed=1)

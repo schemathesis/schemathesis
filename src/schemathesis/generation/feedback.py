@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,6 +20,10 @@ class FeedbackSources:
     extra_data_source: ExtraDataSource | None = None
     error_feedback: ErrorFeedbackStore | None = None
     constants_value_source: ConstantsPool | None = None
+
+    def for_examples(self) -> FeedbackSources:
+        # The examples phase never draws from extracted constants.
+        return replace(self, constants_value_source=None)
 
 
 NO_FEEDBACK = FeedbackSources()
