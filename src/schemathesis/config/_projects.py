@@ -476,9 +476,7 @@ class ProjectConfig(DiffBase):
                     configs.append(op.generation)
         if phase is not None:
             phases = self.phases_for(operation=operation)
-            phase_config = phases.get_by_name(name=phase)
-            if not phase_config._is_default:
-                configs.append(phase_config.generation)
+            configs.append(phases.get_by_name(name=phase).generation)
         if not configs:
             return self.generation
         configs.append(self.generation)
@@ -500,9 +498,7 @@ class ProjectConfig(DiffBase):
                     configs.append(op.checks)
         if phase is not None:
             phases = self.phases_for(operation=operation)
-            phase_config = phases.get_by_name(name=phase)
-            if not phase_config._is_default:
-                configs.append(phase_config.checks)
+            configs.append(phases.get_by_name(name=phase).checks)
         if not configs:
             return self.checks
         configs.append(self.checks)
