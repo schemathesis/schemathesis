@@ -1785,7 +1785,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         display_final_line(
             failures=unique_failures,
             errors=len(ctx.errors),
-            warnings=ctx.warnings.kind_count,
+            warnings=ctx.warnings.kind_count + bool(ctx.startup_warnings),
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
             nothing_tested_reason=ctx.nothing_tested_reason,

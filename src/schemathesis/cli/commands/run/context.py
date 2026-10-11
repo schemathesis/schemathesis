@@ -11,7 +11,7 @@ from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.ext.fs import describe_path_error
 from schemathesis.cli.summary import SummaryData, WarningData
-from schemathesis.config import ConfigError
+from schemathesis.config import ConfigError, SchemathesisWarning
 from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
@@ -49,6 +49,9 @@ class ExecutionContext(BaseExecutionContext):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.warning_collector = WarningCollector(config=self.config)
+        # Every startup warning is a timeout given in milliseconds.
+        if self.startup_warnings:
+            self.warning_collector.on_startup_warning(SchemathesisWarning.TIMEOUT_UNITS)
 
     def on_event(self, event: events.EngineEvent) -> None:
         super().on_event(event)

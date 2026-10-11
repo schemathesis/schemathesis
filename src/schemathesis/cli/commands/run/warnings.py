@@ -294,6 +294,10 @@ class WarningCollector:
         """Whether a warning configured with `fail-on` still stands."""
         return self.fails or bool(self.fails_on_auth) or bool(self.fails_on_missing_test_data)
 
+    def on_startup_warning(self, kind: SchemathesisWarning) -> None:
+        if self.config.warnings.should_fail(kind):
+            self.fails = True
+
     def on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING):
             self._check_warnings(ctx, event)
