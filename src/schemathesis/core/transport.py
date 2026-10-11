@@ -25,6 +25,8 @@ HttpMethod: TypeAlias = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD",
 # so `APIOperation.method` carries this form; the wire `HttpMethod` is its uppercase counterpart.
 HttpMethodSchema: TypeAlias = Literal["get", "post", "put", "patch", "delete", "head", "options", "trace", "query"]
 HTTP_METHODS_SCHEMA: frozenset[HttpMethodSchema] = frozenset(get_args(HttpMethodSchema))
+# Methods that must not change server state.
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
 
 def is_http_method_schema(value: str) -> TypeGuard[HttpMethodSchema]:

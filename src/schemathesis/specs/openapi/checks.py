@@ -22,7 +22,13 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_vali
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code, expand_status_codes
+from schemathesis.core.transport import (
+    HTTP_METHODS_SCHEMA,
+    SAFE_METHODS,
+    Response,
+    expand_status_code,
+    expand_status_codes,
+)
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     REQUEST_SHAPE_PROBES,
@@ -41,7 +47,6 @@ from schemathesis.openapi.checks import (
     MissingContentType,
     MissingHeaderNotRejected,
     MissingHeaders,
-    ObjectLevelAuthorizationViolation,
     RejectedPositiveData,
     UndefinedContentType,
     UndefinedStatusCode,
@@ -49,9 +54,9 @@ from schemathesis.openapi.checks import (
     UseAfterFree,
 )
 from schemathesis.specs.openapi._auth_retry import (
-    build_retry_transport_kwargs,
     get_security_parameters,
     remove_auth,
+    send_probe,
     set_auth_for_case,
 )
 from schemathesis.specs.openapi.utils import (
@@ -68,7 +73,6 @@ if TYPE_CHECKING:
     import jsonschema_rs
 
     from schemathesis.engine.recorder import RecordedScenario
-    from schemathesis.generation.meta import CaseMetadata
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -1104,14 +1108,6 @@ def _requires_authentication(operation: APIOperation) -> bool:
     return bool(get_effective_security_scheme_names(operation, operation.schema.raw_schema))
 
 
-def _declared_public(operation: APIOperation) -> bool:
-    """Whether the schema says anyone may call `operation`."""
-    if _requires_authentication(operation):
-        return False
-    # Without schema-wide `security` the server may still require credentials; the anonymous replay decides.
-    return "security" in operation.schema.raw_schema
-
-
 def _targets_generated_resource(ctx: CheckContext, operation: APIOperation) -> bool:
     """Whether the resource this request targets was drawn rather than supplied by the user."""
     if "{" not in operation.path:
@@ -1571,14 +1567,14 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
-            no_auth_response = _send_probe(ctx, case, no_auth_case)
+            no_auth_response = send_probe(ctx, case, no_auth_case)
             if not _enforces_auth(no_auth_response, response):
                 _raise_no_auth_error(no_auth_response, no_auth_case, AuthScenario.NO_AUTH)
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 invalid_auth_case = remove_auth(case, security_parameters)
                 set_auth_for_case(invalid_auth_case, parameter)
-                invalid_auth_response = _send_probe(ctx, case, invalid_auth_case)
+                invalid_auth_response = send_probe(ctx, case, invalid_auth_case)
                 if not _enforces_auth(invalid_auth_response, response):
                     _raise_no_auth_error(invalid_auth_response, invalid_auth_case, AuthScenario.INVALID_AUTH)
             if enforced is not None:
@@ -1597,146 +1593,10 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
 @requires_openapi_schema
 def object_level_authorization(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """Check that one identity cannot read an object another identity created."""
-    from schemathesis.specs.openapi.extra_data_source import declared_response_schema
-    from schemathesis.specs.openapi.object_authorization import (
-        apply_as,
-        listings,
-        lists_equivalent,
-        owner_provider,
-        strip_credentials,
-        value_paths,
-    )
-    from schemathesis.wfc.escalation import escalating_provider
+    from schemathesis.specs.openapi.object_authorization import check_object_level_authorization
 
-    # Replaying a write as another identity would change the owner's data.
-    if case.method != "GET" or not 200 <= response.status_code < 300 or case.meta is None:
-        return None
-    provider = escalating_provider(case.operation.schema)
-    owner = case._auth_identity
-    if provider is None or owner not in provider.peers or _declared_public(case.operation):
-        return None
-    content_types = response.headers.get("content-type")
-    content_type = content_types[0] if content_types else None
-    # Without a declared schema, every field of the body counts.
-    schema = declared_response_schema(case.operation, response.status_code, content_type) or {}
-    owner_body = _json_body(response)
-    for resource, value, source_listing in _owned_values(ctx, case, case.meta, owner):
-        if not value_paths(owner_body, value):
-            continue
-        for peer in provider.peers:
-            if peer == owner:
-                continue
-            peer_provider = provider.provider_for(peer)
-            # An id the owner only listed is theirs when the same list, sent by the peer, does not show it.
-            # Each listed value is checked once and, when not owned, leaves the operation free for the next one.
-            if source_listing is not None and (
-                not provider.claim_probe((case.operation.label, f"{resource}={value}", peer))
-                or value_paths(_json_body(_send_probe(ctx, case, apply_as(source_listing, peer_provider, peer))), value)
-            ):
-                continue
-            if not provider.claim_probe((case.operation.label, resource, peer)):
-                continue
-            peer_case = apply_as(case, peer_provider, peer)
-            peer_response = _send_probe(ctx, case, peer_case)
-            if not _equivalent_response(peer_response, owner_body, value, schema):
-                continue
-            anonymous_response = _send_probe(ctx, case, strip_credentials(case, owner_provider(case)))
-            # A body anyone gets is public; an unenforced declared scheme is `ignored_auth`'s to report.
-            if _equivalent_response(anonymous_response, owner_body, value, schema):
-                continue
-            # An object the peer can list in full is shared by design.
-            if any(
-                lists_equivalent(
-                    _json_body(_send_probe(ctx, case, apply_as(listing, peer_provider, peer))),
-                    owner_body,
-                    value,
-                    schema,
-                )
-                for listing in listings(case)
-            ):
-                continue
-            raise ObjectLevelAuthorizationViolation(
-                operation=case.operation.label,
-                message=(
-                    f"`{peer}` received the `{resource}` that `{owner}` owns\n\n"
-                    f"Owner: {case.method} {case.formatted_path} as {owner} -> {response.status_code}\n"
-                    f"Peer:  {peer_case.method} {peer_case.formatted_path} as {peer} -> "
-                    f"{peer_response.status_code} (equivalent body)"
-                ),
-                owner=owner,
-                peer=peer,
-                owner_case_id=case.id,
-                case_id=peer_case.id,
-            )
+    check_object_level_authorization(ctx, response, case)
     return None
-
-
-def _owned_values(
-    ctx: CheckContext, case: Case, meta: CaseMetadata, owner: str
-) -> Iterator[tuple[str, object, Case | None]]:
-    """Resource names and values in `case` that `owner` created or listed, with the list they came from."""
-    from schemathesis.specs.openapi.object_authorization import is_collection, listing_case, path_resource, value_paths
-    from schemathesis.specs.openapi.stateful.dependencies import naming
-
-    # A read shows other users' objects too, so it proves ownership only through a list the peer is then shown.
-    for draw in meta.pool_draws:
-        container = case.get_container(ParameterLocation(draw.location))
-        if (
-            draw.source_identity != owner
-            or draw.source_input
-            or not isinstance(container, Mapping)
-            or draw.parameter_name not in container
-        ):
-            continue
-        if draw.source_operation.split(" ", 1)[0] not in SAFE_METHODS:
-            yield draw.resource_name, container[draw.parameter_name], None
-            continue
-        source = listing_case(case, case.operation.schema.find_operation_by_label(draw.source_operation))
-        if source is not None:
-            yield draw.resource_name, container[draw.parameter_name], source
-    # Stateful steps get ids through links: the previous step either returned them or sent them.
-    parent = ctx._find_parent(case_id=case.id)
-    if parent is None or parent._auth_identity != owner:
-        return
-    is_read = parent.method.upper() in SAFE_METHODS
-    if is_read and not is_collection(parent.operation):
-        return
-    source = parent if is_read else None
-    parent_response = ctx._find_response(case_id=parent.id)
-    parent_body = _json_body(parent_response) if parent_response is not None else None
-    # The linked request created only what its trailing path parameter names; other path and query values it sent
-    # name existing objects, so returning them proves nothing.
-    created = naming.trailing_path_parameter(parent.operation.path)
-    parent_paths = [value for name, value in (parent.path_parameters or {}).items() if name != created]
-    parent_inputs = {str(value) for value in [*parent_paths, *(parent.query or {}).values()]}
-    for name, value in (case.path_parameters or {}).items():
-        if str(value) in parent_inputs:
-            continue
-        if value_paths(parent_body, value) or value_paths(parent.body, value):
-            yield path_resource(case, name), value, source
-
-
-def _send_probe(ctx: CheckContext, parent: Case, probe: Case) -> Response:
-    kwargs = build_retry_transport_kwargs(ctx._transport_kwargs, get_security_parameters(parent.operation))
-    if parent.operation.app is not None:
-        kwargs.setdefault("app", parent.operation.app)
-    ctx._record_case(parent_id=parent.id, case=probe)
-    probe_response = parent.operation.schema.transport.send(probe, **kwargs)
-    ctx._record_response(case_id=probe.id, response=probe_response)
-    return probe_response
-
-
-def _json_body(response: Response) -> object:
-    try:
-        return response.json()
-    except ValueError:
-        return None
-
-
-def _equivalent_response(response: Response, owner_body: object, value: object, schema: dict[str, Any]) -> bool:
-    from schemathesis.specs.openapi.object_authorization import is_equivalent
-
-    return 200 <= response.status_code < 300 and is_equivalent(owner_body, _json_body(response), value, schema)
 
 
 def _has_undeclared_explicit_authorization(
@@ -1901,9 +1761,6 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
 
     # If we've reached this point, the LHS path is a prefix of the RHS path
     return True
-
-
-SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
 
 def resource_was_deleted(recorder: RecordedScenario, case: Case) -> bool:

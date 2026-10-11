@@ -18,7 +18,7 @@ from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex, iter_ingestion_leaves
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
-from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, trailing_path_parameter
+from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, referenced_values
 
 if TYPE_CHECKING:
     from random import Random
@@ -175,16 +175,12 @@ class CapturedVariant:
 
 
 def _build_pool_draw(slot: InputSlot, instance: ResourceInstance, value: object) -> PoolDraw:
-    parameter_name = slot.parameter_name if isinstance(slot.parameter_name, str) else ""
-    return PoolDraw(
-        location=slot.parameter_location.value,
-        parameter_name=parameter_name,
-        resource_name=slot.resource.name,
-        resource_field=slot.resource_field or "",
-        source_operation=instance.source_operation,
-        source_status=instance.status_code,
-        source_identity=instance.identity,
-        source_input=_is_source_input(instance, value),
+    return _build_pool_draw_from_requirement(
+        location=slot.parameter_location,
+        parameter_name=slot.parameter_name if isinstance(slot.parameter_name, str) else "",
+        requirement=ParameterRequirement(resource_name=slot.resource.name, resource_field=slot.resource_field or ""),
+        instance=instance,
+        value=value,
     )
 
 
@@ -196,7 +192,6 @@ def _build_pool_draw_from_requirement(
     instance: ResourceInstance,
     value: object,
 ) -> PoolDraw:
-    """Variant of `_build_pool_draw` for sites that hold a `ParameterRequirement` rather than an `InputSlot`."""
     return PoolDraw(
         location=location.value,
         parameter_name=parameter_name,
@@ -205,14 +200,17 @@ def _build_pool_draw_from_requirement(
         source_operation=instance.source_operation,
         source_status=instance.status_code,
         source_identity=instance.identity,
-        source_input=_is_source_input(instance, value),
+        source_input=str(value) in instance.referenced,
+        source_query=instance.query or None,
     )
 
 
-def _is_source_input(instance: ResourceInstance, value: object) -> bool:
-    # The trailing path parameter names what the request creates; the others name existing parents.
-    created = trailing_path_parameter(instance.source_operation.split(" ", 1)[-1])
-    return any(value == parameter for name, parameter in instance.context.items() if name != created)
+def referenced_by(case: Case) -> frozenset[str]:
+    """Values `case` sent to name existing objects, rather than the one it creates."""
+    node = case.operation.schema.analysis.dependency_graph.operations.get(case.operation.label)
+    created = {output.body_field for output in node.outputs if output.body_field} if node is not None else set()
+    path_parameters = case.path_parameters or {}
+    return frozenset(referenced_values(case.operation.path, path_parameters, case.query or {}, case.body, created))
 
 
 def declared_response_schema(
@@ -743,6 +741,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
             status_code=status_code,
             context=case.path_parameters or {},
             identity=case._auth_identity,
+            query=case.query or {},
+            referenced=referenced_by(case),
         )
 
     def record_response(
@@ -783,6 +783,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 payload=payload,
                 context=case.path_parameters or {},
                 identity=case._auth_identity,
+                query=case.query or {},
+                referenced=referenced_by(case),
             )
         if semantic_active:
             # Without a usable schema, fall back to a schemaless walk.

@@ -869,7 +869,9 @@ def test_case_metadata_round_trip_preserves_fuzzing_mutations():
 
 
 def test_case_metadata_round_trip_preserves_pool_draw_provenance():
-    draw = PoolDraw("path", "order_id", "Order", "id", "POST /orders/{order_id}/notes", 201, "alice", True)
+    draw = PoolDraw(
+        "path", "order_id", "Order", "id", "POST /orders/{order_id}/notes", 201, "alice", True, {"page": "2"}
+    )
     meta = CaseMetadata(
         generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE),
         components={},
