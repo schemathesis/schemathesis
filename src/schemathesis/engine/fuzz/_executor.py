@@ -360,7 +360,8 @@ def _send_step(
         _, response = call_with_retry(call_fn=call, auto_mode=auto_mode, on_delay=on_delay)
     except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
         if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
-            raise _StopFuzzing from None
+            # The outage stops the run, but the steps the server answered before it went away still get checked.
+            return None
         _report_once(exc, label=operation.label, seen_labels=seen_error_labels, event_queue=event_queue)
         return None
     return response
