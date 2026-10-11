@@ -168,10 +168,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                 if label in statistic.operations_without_checks:
                     reasons = reasons | {"No checks ran"}
                 note = ", ".join(sorted(reasons)) or None
-            continue_on_failure = (
-                ctx.config.operations.get_for_operation(operation=operation).continue_on_failure
-                or ctx.config.continue_on_failure
-            )
+            continue_on_failure = ctx.config.continue_on_failure_for(operation=operation)
             rows.append(
                 OperationRow(
                     label=label,

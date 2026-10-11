@@ -211,3 +211,17 @@ def test_warnings_disabled_for_operation(operation):
         "WarningsConfig()",
         "WarningsConfig(display=[])",
     )
+
+
+def test_operation_disables_project_continue_on_failure(ctx, cli):
+    args = ("--phases=fuzzing", "--max-examples=30", "--seed=1")
+    stopping = ctx.openapi.apps.multiple_failures()
+    cli.run(stopping.schema_url, *args)
+    overridden = ctx.openapi.apps.multiple_failures()
+    result = cli.run(
+        overridden.schema_url,
+        *args,
+        "--continue-on-failure",
+        config={"operations": [{"include-path": "/api/multiple_failures", "continue-on-failure": False}]},
+    )
+    assert len(overridden.requests) == len(stopping.requests), result.stdout

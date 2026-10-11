@@ -82,7 +82,7 @@ def start_scenario(
         ),
         generation=ctx.config.generation_for(operation=operation, phase=phase.value),
         transport_kwargs=check_data.transport_kwargs,
-        continue_on_failure=_continue_on_failure(operation, ctx),
+        continue_on_failure=ctx.config.continue_on_failure_for(operation=operation),
     )
     _checkpoint_error_feedback(ctx)
     return scenario
@@ -91,11 +91,6 @@ def start_scenario(
 def _checkpoint_error_feedback(ctx: EngineContext) -> None:
     if ctx.error_feedback is not None:
         ctx.error_feedback.checkpoint()
-
-
-def _continue_on_failure(operation: APIOperation, ctx: EngineContext) -> bool:
-    operation_config = ctx.config.operations.get_for_operation(operation)
-    return operation_config.continue_on_failure or ctx.config.continue_on_failure or False
 
 
 def iter_closing_events(
