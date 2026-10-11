@@ -361,9 +361,7 @@ def _envelope_wrapper_field(properties: Mapping[str, Any]) -> str | None:
 
 def _envelope_identifier_pointer(envelope: Mapping[str, Any], resource_name: str) -> str | None:
     # `{bookingid: 1, booking: {...}}`: the identifier of the wrapped booking sits next to it
-    properties = envelope.get("properties")
-    if not isinstance(properties, dict):
-        return None
+    properties = envelope["properties"]
     identifier = naming.normalize_for_matching(resource_name) + "id"
     for name in properties:
         if naming.normalize_for_matching(name) == identifier:

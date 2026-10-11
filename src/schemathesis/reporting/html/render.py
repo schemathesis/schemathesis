@@ -249,9 +249,8 @@ def _extraction_failures(data: ReportData) -> str:
             f'<div class="case-owner"><span class="ex-link">{esc(failure.link)}</span></div>',
             f'<div class="finding"><h4 class="finding-title">{_code_spans(title)}</h4>{details}</div>',
             _evidence("Response", _body(failure.body), _status(failure.status_code)),
+            _reproduce(failure.commands, None),
         ]
-        if failure.commands:
-            parts.append(_reproduce(failure.commands, None))
         cards.append(
             f'<article class="case" id="case-{esc(failure.case_id)}"><div class="case-body">{"".join(parts)}</div>'
             f'<div class="case-meta"><span class="case-id">{esc(failure.case_id)}</span></div></article>'
@@ -596,11 +595,9 @@ def _reproduce(commands: list[Command], replay: str | None) -> str:
     else:
         steps = []
         for command in commands:
-            label = ""
-            if command.path is not None:
-                failed = '<span class="step-failed">failed here</span>' if command.failed else ""
-                method = _method(command.method) if command.method is not None else ""
-                label = f'<span class="step-req">{method}{esc(command.path)}{failed}</span>'
+            failed = '<span class="step-failed">failed here</span>' if command.failed else ""
+            method = _method(command.method) if command.method is not None else ""
+            label = f'<span class="step-req">{method}{esc(command.path)}{failed}</span>'
             steps.append(f'<li>{label}<pre class="cmd" tabindex="0">{esc(command.curl)}</pre></li>')
         content = f'<ol class="steps">{"".join(steps)}</ol>'
     replay_line = f'<p class="replay">or <code>{esc(replay)}</code></p>' if replay is not None else ""
