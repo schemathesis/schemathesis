@@ -10,6 +10,14 @@ Schemathesis dev
 
      No scenarios were run
 
+=================================== WARNINGS ===================================
+
+Unmatched filters: 1 filter matched no API operations
+
+  - --include-path '/nonexistent'
+
+💡 Check the filter for a typo, or update it if the operation was renamed
+
 =================================== SUMMARY ====================================
 
 API Operations:

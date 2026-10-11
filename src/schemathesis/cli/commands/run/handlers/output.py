@@ -443,6 +443,12 @@ def _low_valid_rate_block(ctx: ExecutionContext) -> WarningBlock:
     )
 
 
+def unmatched_filter_block(filters: set[str]) -> WarningBlock:
+    return _list_block(
+        "Unmatched filters", filters, " matched no API operations", [UNMATCHED_FILTER_TIP], entity="filter"
+    )
+
+
 def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
     """Every warning the run raised, in the order the terminal shows them."""
     warnings = ctx.warnings
@@ -505,15 +511,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             )
         )
     if warnings.unmatched_filter:
-        blocks.append(
-            _list_block(
-                "Unmatched filters",
-                warnings.unmatched_filter,
-                " matched no API operations",
-                [UNMATCHED_FILTER_TIP],
-                entity="filter",
-            )
-        )
+        blocks.append(unmatched_filter_block(warnings.unmatched_filter))
     if warnings.method_not_allowed:
         blocks.append(
             _list_block(
@@ -555,6 +553,29 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             )
         )
     return blocks
+
+
+def display_warning_blocks(blocks: list[WarningBlock]) -> None:
+    display_section_name("WARNINGS")
+    click.echo()
+    for block in blocks:
+        click.echo(_style(f"{block.title}: {block.summary}\n", fg="yellow"))
+        for group in block.groups:
+            if group.heading is not None:
+                click.echo(_style(f"{group.heading}:", fg="yellow"))
+            for index, item in enumerate(group.items):
+                click.echo(_style(f"  - {item.text}", fg="yellow"))
+                for detail in item.details:
+                    click.echo(_style(f"    {detail}", fg="yellow"))
+                # Items with details read as separate paragraphs.
+                if item.details and index < len(group.items) - 1:
+                    click.echo()
+            if group.tips is not None:
+                click.echo()
+                for tip in group.tips:
+                    click.echo(_style(f"💡 {tip}", fg="yellow"))
+                if group.tips:
+                    click.echo()
 
 
 def extraction_failure_reason(failure: ExtractionFailure) -> list[str]:
@@ -1608,26 +1629,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.probing_manager = None
 
     def display_warnings(self, ctx: ExecutionContext) -> None:
-        display_section_name("WARNINGS")
-        click.echo()
-        for block in warning_blocks(ctx):
-            click.echo(_style(f"{block.title}: {block.summary}\n", fg="yellow"))
-            for group in block.groups:
-                if group.heading is not None:
-                    click.echo(_style(f"{group.heading}:", fg="yellow"))
-                for index, item in enumerate(group.items):
-                    click.echo(_style(f"  - {item.text}", fg="yellow"))
-                    for detail in item.details:
-                        click.echo(_style(f"    {detail}", fg="yellow"))
-                    # Items with details read as separate paragraphs.
-                    if item.details and index < len(group.items) - 1:
-                        click.echo()
-                if group.tips is not None:
-                    click.echo()
-                    for tip in group.tips:
-                        click.echo(_style(f"💡 {tip}", fg="yellow"))
-                    if group.tips:
-                        click.echo()
+        display_warning_blocks(warning_blocks(ctx))
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")

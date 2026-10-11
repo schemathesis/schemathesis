@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
+from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.summary import (
     SummaryData,
-    WarningData,
     build_operations,
     reduce_baseline,
     reduce_errors,
@@ -24,6 +25,11 @@ class FuzzExecutionContext(BaseExecutionContext):
 
     errors: set[events.NonFatalError] = field(default_factory=set)
     stop_reason: StopReason = StopReason.COMPLETED
+    warning_collector: WarningCollector = field(init=False)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.warning_collector = WarningCollector(config=self.config)
 
     def summary(self) -> SummaryData:
         # `st fuzz` has no phases, so the map stays empty and the report reports none.
@@ -38,14 +44,16 @@ class FuzzExecutionContext(BaseExecutionContext):
             test_cases=reduce_test_cases(self.statistic),
             failures=reduce_failures(self.statistic),
             errors=reduce_errors(self.errors),
-            warnings=WarningData(),
+            warnings=self.warning_collector.data,
             baseline=reduce_baseline(self.statistic),
             filtered=self.statistic.filtered_failures,
         )
 
     def on_event(self, event: events.EngineEvent) -> None:
         super().on_event(event)
-        if isinstance(event, FuzzScenarioFinished):
+        if isinstance(event, LoadingFinished):
+            self.warning_collector.on_unmatched_filters(event.statistic)
+        elif isinstance(event, FuzzScenarioFinished):
             self.statistic.on_scenario_finished(event.recorder, failure_label=lambda case: case.operation.label)
             if event.status in (Status.FAILURE, Status.ERROR):
                 self.exit_code = ExitCode.FAILURES

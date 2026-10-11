@@ -291,6 +291,12 @@ def test_fuzz_final_line_empty_test_suite(cli, app_runner, ctx, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_unmatched_filter_suggests_the_operation_it_nearly_names(cli, ctx, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert_cli_snapshot(cli.main("fuzz", api.schema_url, "--include-path=/api/succes"), snapshot_cli)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_fatal_error_loader(cli, snapshot_cli):
     assert_cli_snapshot(cli.main("fuzz", "http://127.0.0.1:1/openapi.json"), snapshot_cli)
 

@@ -1,0 +1,34 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ 🕛  Fuzzing (in 0.00s)
+
+     No scenarios were run
+
+=================================== WARNINGS ===================================
+
+Unmatched filters: 1 filter matched no API operations
+
+  - --include-path '/api/succes' (did you mean '/api/success'?)
+
+💡 Check the filter for a typo, or update it if the operation was renamed
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 0/1
+  Tested: N
+
+Stop reason: Completed
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+====================== No operations matched the filters =======================
