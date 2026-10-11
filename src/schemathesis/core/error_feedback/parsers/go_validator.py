@@ -8,7 +8,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     DictHandler,
     format_handler,
-    location_for_method,
+    location_for_parameter,
     lowercase_first_letter,
     number_or_none,
     required_handler,
@@ -23,7 +23,6 @@ from schemathesis.core.error_feedback.store import (
     ParameterPath,
     SizeBoundPayload,
 )
-from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -186,9 +185,7 @@ def _classify_default_clause(tag: str) -> tuple[ClassificationResult, ...]:
     return handler({})
 
 
-def _structured_observations(
-    issues: list[dict], operation_label: str, location: ParameterLocation
-) -> tuple[Observation, ...]:
+def _structured_observations(issues: list[dict], operation: APIOperation) -> tuple[Observation, ...]:
     observations: list[Observation] = []
     for issue in issues:
         path = _split_namespace(issue["namespace"])
@@ -200,8 +197,8 @@ def _structured_observations(
         for kind, payload in handler(issue):
             observations.append(
                 Observation(
-                    operation_label=operation_label,
-                    location=location,
+                    operation_label=operation.label,
+                    location=location_for_parameter(operation, path),
                     parameter_path=path,
                     kind=kind,
                     raw_message="",
@@ -211,7 +208,7 @@ def _structured_observations(
     return tuple(observations)
 
 
-def _default_observations(body: dict, operation_label: str, location: ParameterLocation) -> tuple[Observation, ...]:
+def _default_observations(body: dict, operation: APIOperation) -> tuple[Observation, ...]:
     message = body["error"]
     observations: list[Observation] = []
     for match in _DEFAULT_CLAUSE.finditer(message):
@@ -221,8 +218,8 @@ def _default_observations(body: dict, operation_label: str, location: ParameterL
         for kind, payload in _classify_default_clause(match.group("tag")):
             observations.append(
                 Observation(
-                    operation_label=operation_label,
-                    location=location,
+                    operation_label=operation.label,
+                    location=location_for_parameter(operation, path),
                     parameter_path=path,
                     kind=kind,
                     raw_message=message,
@@ -244,13 +241,12 @@ class GoValidatorParser:
         return _is_default_envelope(body)
 
     def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
-        location = location_for_method(operation.method)
         issues = _extract_structured(body)
         if issues is not None:
-            return _structured_observations(issues, operation.label, location)
+            return _structured_observations(issues, operation)
         if _is_default_envelope(body):
             assert isinstance(body, dict)
-            return _default_observations(body, operation.label, location)
+            return _default_observations(body, operation)
         return ()
 
 

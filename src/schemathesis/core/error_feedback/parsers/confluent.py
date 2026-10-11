@@ -4,7 +4,7 @@ import re
 from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.parsers.extractors import location_for_method
+from schemathesis.core.error_feedback.parsers.extractors import location_for_parameter
 from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
@@ -110,7 +110,6 @@ class ConfluentParser:
         if envelope is None:
             return ()
         _, message = envelope
-        location = location_for_method(operation.method)
         observations: list[Observation] = []
 
         if _COERCE_EMPTY_STRING.search(message) is not None:
@@ -119,7 +118,7 @@ class ConfluentParser:
                 observations.append(
                     Observation(
                         operation_label=operation.label,
-                        location=location,
+                        location=location_for_parameter(operation, path),
                         parameter_path=path,
                         kind=ObservationKind.SIZE_BOUND,
                         raw_message=message,
@@ -130,7 +129,7 @@ class ConfluentParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location,
+                    location=location_for_parameter(operation, _DATA_FIELD),
                     parameter_path=_DATA_FIELD,
                     kind=ObservationKind.SIZE_BOUND,
                     raw_message=message,
@@ -141,7 +140,7 @@ class ConfluentParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location,
+                    location=location_for_parameter(operation, _TOPIC_NAME_FIELD),
                     parameter_path=_TOPIC_NAME_FIELD,
                     kind=ObservationKind.PATTERN,
                     raw_message=message,

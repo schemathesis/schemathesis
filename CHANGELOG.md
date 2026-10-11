@@ -24,6 +24,7 @@
 - Traceback and early stateful phase exit with `--mode negative` for steps with nothing to negate.
 - Check failures shown as a bare `Failure()` in `repr` and pytest assertion messages.
 - Missing or broken inferred stateful links for paginated lists of wrapped items, e.g. `{items: [{track}]}`.
+- Error feedback attributing query and path parameter errors of `POST`/`PUT` requests to the body.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
 - Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
 - Coverage phase generating no valid values for schemas with keywords but no `type`.

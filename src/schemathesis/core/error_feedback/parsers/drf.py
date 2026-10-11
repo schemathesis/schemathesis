@@ -8,7 +8,7 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
-    location_for_method,
+    location_for_parameter,
     numeric_bound,
     size_bound,
 )
@@ -20,7 +20,6 @@ from schemathesis.core.error_feedback.store import (
     ParameterPath,
     TypeMismatchPayload,
 )
-from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -188,9 +187,7 @@ class DRFParser:
         return _has_string_list_leaf(body)
 
     def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
-        location = location_for_method(operation.method)
-        if location == ParameterLocation.QUERY:
-            body = _unwrap_detail_envelope(operation, body)
+        body = _unwrap_detail_envelope(operation, body)
         observations: list[Observation] = []
         for path, message in _walk(body):
             classification = _classify(message)
@@ -200,7 +197,7 @@ class DRFParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location,
+                    location=location_for_parameter(operation, path),
                     parameter_path=path,
                     kind=kind,
                     raw_message=message,

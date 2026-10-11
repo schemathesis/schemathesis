@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
     location_for_method,
+    location_for_parameter,
     numeric_bound,
     required_handler,
     size_bound,
@@ -306,9 +307,7 @@ def _fastify_observations(body: dict, operation_label: str) -> tuple[Observation
     return tuple(observations)
 
 
-def _array_observations(
-    errors: list[dict], operation_label: str, location: ParameterLocation, case: Case
-) -> tuple[Observation, ...]:
+def _array_observations(errors: list[dict], operation: APIOperation, case: Case) -> tuple[Observation, ...]:
     observations: list[Observation] = []
     for error in errors:
         handler = _KEYWORD_HANDLERS.get(error["keyword"])
@@ -319,11 +318,11 @@ def _array_observations(
         base_path = _array_base_path(error)
         path = _array_form_path(error, base_path)
         if path is None:
-            if not base_path and _is_root_body_type_error(error, location, case):
+            if not base_path and _is_root_body_type_error(error, location_for_method(operation.method), case):
                 observations.append(
                     Observation(
-                        operation_label=operation_label,
-                        location=location,
+                        operation_label=operation.label,
+                        location=ParameterLocation.BODY,
                         parameter_path=(),
                         kind=ObservationKind.MUST_NOT_BE_BLANK,
                         raw_message=raw_message,
@@ -334,8 +333,8 @@ def _array_observations(
         for kind, payload in handler(error):
             observations.append(
                 Observation(
-                    operation_label=operation_label,
-                    location=location,
+                    operation_label=operation.label,
+                    location=location_for_parameter(operation, path),
                     parameter_path=path,
                     kind=kind,
                     raw_message=raw_message,
@@ -362,7 +361,7 @@ class AjvParser:
     def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         errors = _extract_array_errors(body)
         if errors is not None:
-            return _array_observations(errors, operation.label, location_for_method(operation.method), case)
+            return _array_observations(errors, operation, case)
         if _is_fastify_envelope(body):
             assert isinstance(body, dict)
             return _fastify_observations(body, operation.label)

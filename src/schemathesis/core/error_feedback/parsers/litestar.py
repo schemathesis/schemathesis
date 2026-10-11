@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, TypedDict, TypeGuard
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
-    location_for_method,
+    location_for_parameter,
     parse_number,
     split_field_path,
 )
@@ -166,7 +166,6 @@ class LitestarParser:
         issues = _extract_issues(body)
         if issues is None:
             return ()
-        method_default = location_for_method(operation.method)
         observations: list[Observation] = []
         for issue in issues:
             message = issue["message"]
@@ -174,8 +173,8 @@ class LitestarParser:
             if classification is None:
                 continue
             kind, payload = classification
-            location = _SOURCE_LOCATIONS.get(issue["source"], method_default)
             path = _resolve_path(issue["key"], message)
+            location = _SOURCE_LOCATIONS.get(issue["source"], location_for_parameter(operation, path))
             observations.append(
                 Observation(
                     operation_label=operation.label,

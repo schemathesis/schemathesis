@@ -7,7 +7,7 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
-    location_for_method,
+    location_for_parameter,
     numeric_bound,
     size_bound,
 )
@@ -162,7 +162,7 @@ class RestlerParser:
         return (
             Observation(
                 operation_label=operation.label,
-                location=location_for_method(operation.method),
+                location=location_for_parameter(operation, path),
                 parameter_path=path,
                 kind=kind,
                 raw_message=body["error"]["message"],
