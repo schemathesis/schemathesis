@@ -69,8 +69,9 @@ def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: 
     """
     for recorder in recorders:
         for case_id, interaction in recorder.interactions.items():
-            if interaction.response is not None:
-                _record_into_pool(extra_data_source, recorder.cases[case_id].value, interaction.response)
+            # Stateful steps record an interaction only once the server answered.
+            assert interaction.response is not None
+            _record_into_pool(extra_data_source, recorder.cases[case_id].value, interaction.response)
 
 
 def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response: Response) -> None:
@@ -255,11 +256,8 @@ def _reject_unusable_operation(engine: EngineContext, operation_label: str) -> N
 
 
 def _replay_cached_outcome(ctx: StatefulContext, case: Case) -> bool:
-    """Re-raise the error this input produced before; `True` when it already passed."""
-    cached = ctx.get_step_outcome(case)
-    if isinstance(cached, BaseException):
-        raise cached
-    return cached is None
+    """`True` when this input already passed in the current scenario."""
+    return ctx.get_step_outcome(case) is None
 
 
 def _send_step(machine: APIStateMachine, case: Case, *, engine: EngineContext, event_queue: queue.Queue) -> Response:
