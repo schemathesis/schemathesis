@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.core import media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import maybe_resolve_bundled
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
@@ -314,15 +315,22 @@ GENERIC_FIELD_NAMES = frozenset(
 )
 
 
-def _flatten_composition(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def _flatten_composition(schema: dict[str, Any], bundled: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Merge ``properties`` and ``required`` across ``allOf``/``oneOf``/``anyOf`` branches.
 
     First-seen property definition wins; required is a union across branches.
     """
     properties: dict[str, Any] = {}
     required: list[str] = []
+    seen: set[str] = set()
 
     def merge(node: dict[str, Any]) -> None:
+        reference = node.get("$ref")
+        if isinstance(reference, str) and reference not in seen:
+            seen.add(reference)
+            target = bundled.get(reference.rsplit("/", 1)[-1])
+            if isinstance(target, dict):
+                merge(target)
         node_properties = node.get("properties")
         if isinstance(node_properties, dict):
             for name, subschema in node_properties.items():
@@ -366,6 +374,7 @@ def _resolve_body_dependencies(
         return
 
     resolved = maybe_resolve_bundled(schema)
+    bundled = schema.get(BUNDLE_STORAGE_KEY, {})
 
     # For `items`, we'll inject an array with extracted resource
     items = resolved.get("items")
@@ -393,7 +402,7 @@ def _resolve_body_dependencies(
 
     # Inspect each property that could be a part of some other resource.
     # Flatten composition keywords first so bodies whose top level is allOf/oneOf/anyOf still surface their fields.
-    properties, required = _flatten_composition(resolved)
+    properties, required = _flatten_composition(resolved, bundled)
     if not properties:
         return
     path = operation.path
@@ -478,12 +487,13 @@ def _resolve_body_dependencies(
         )
 
     # Recursively find nested FK fields in request body
-    yield from _extract_nested_body_fk_fields(resolved, resources, path="", deferred=deferred_nested_fks)
+    yield from _extract_nested_body_fk_fields(resolved, resources, bundled, path="", deferred=deferred_nested_fks)
 
 
 def _extract_nested_body_fk_fields(
     schema: dict[str, Any],
     resources: ResourceMap,
+    bundled: dict[str, Any],
     path: str,
     max_depth: int = 5,
     deferred: list[tuple[str, str, str]] | None = None,
@@ -500,7 +510,7 @@ def _extract_nested_body_fk_fields(
     if max_depth <= 0:
         return
 
-    properties, _ = _flatten_composition(schema)
+    properties, _ = _flatten_composition(schema, bundled)
     if not properties:
         return
 
@@ -512,7 +522,7 @@ def _extract_nested_body_fk_fields(
         current_path = f"{path}/{property_name}" if path else property_name
 
         # Composition branches may carry the actual object shape, so flatten before treating as object.
-        sub_properties, _ = _flatten_composition(subschema)
+        sub_properties, _ = _flatten_composition(subschema, bundled)
         prop_type = subschema.get("type")
 
         if prop_type == "object" or sub_properties:
@@ -538,10 +548,10 @@ def _extract_nested_body_fk_fields(
                         deferred.append((target_resource_name, target_field, nested_path))
                     continue
 
-                deeper_properties, _ = _flatten_composition(nested_schema)
+                deeper_properties, _ = _flatten_composition(nested_schema, bundled)
                 if nested_schema.get("type") == "object" or deeper_properties:
                     yield from _extract_nested_body_fk_fields(
-                        nested_schema, resources, nested_path, max_depth - 1, deferred=deferred
+                        nested_schema, resources, bundled, nested_path, max_depth - 1, deferred=deferred
                     )
 
         elif prop_type == "array":
@@ -550,7 +560,7 @@ def _extract_nested_body_fk_fields(
             if isinstance(items, dict):
                 items_path = f"{current_path}/0"
 
-                items_props, _ = _flatten_composition(items)
+                items_props, _ = _flatten_composition(items, bundled)
                 for item_prop_name, item_prop_schema in items_props.items():
                     if not isinstance(item_prop_schema, dict):
                         continue
@@ -575,7 +585,7 @@ def _extract_nested_body_fk_fields(
                 # Recurse into array items
                 if items.get("type") == "object" or items_props:
                     yield from _extract_nested_body_fk_fields(
-                        items, resources, items_path, max_depth - 1, deferred=deferred
+                        items, resources, bundled, items_path, max_depth - 1, deferred=deferred
                     )
 
 
