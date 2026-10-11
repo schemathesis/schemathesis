@@ -4046,6 +4046,46 @@ def test_nested_fk_inference_array_items_consumer_first(ctx):
     assert (array_slot.resource.name, array_slot.resource_field) == ("Location", "id")
 
 
+def nested_object(name, schema):
+    return {"type": "object", "properties": {name: schema}}
+
+
+@pytest.mark.parametrize(
+    ["body", "expected"],
+    [
+        (
+            nested_object("shipping", nested_object("address", nested_object("warehouse_id", {"type": "string"}))),
+            {"shipping": {"address": {"warehouse_id": "$response.body#/id"}}},
+        ),
+        (
+            nested_object(
+                "shipping",
+                nested_object("lines", {"type": "array", "items": nested_object("warehouse_id", {"type": "string"})}),
+            ),
+            {"shipping": {"lines": [{"warehouse_id": "$response.body#/id"}]}},
+        ),
+    ],
+    ids=["object-in-object", "array-in-object"],
+)
+def test_nested_body_fk_links_from_producer(ctx, body, expected):
+    paths = {
+        **operation("post", "/warehouses", "201", SCHEMA_WITH_ID, operation_id="createWarehouse"),
+        **operation_with_body("post", "/orders", "201", body, operation_id="createOrder"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1warehouses/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "requestBody": expected,
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
 def test_nested_fk_inference_drops_slot_when_target_never_registered(ctx):
     # A nested FK whose target resource is never declared anywhere stays dropped:
     # the replay loop sees `resources.get(target) is None` and skips it.
