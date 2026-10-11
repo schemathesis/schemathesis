@@ -144,6 +144,7 @@ class HtmlWriter:
             reauth_broke=False,
             extraction_failures=[],
             running_time=time.time() - self._started_at,
+            phase_spans=[],
             stop_reason=StopReason.COMPLETED,
             started=True,
             complete=True,

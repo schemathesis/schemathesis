@@ -1,15 +1,36 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from html import escape
 from importlib.resources import files
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from schemathesis.core.failures import reason_phrase
 from schemathesis.core.output import TRUNCATED, escape_surrogates
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
-from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, split_label
+from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, plural, split_label
+from schemathesis.reporting.html.timeline import (
+    MAX_TICKED_FAILURES,
+    Lane,
+    Marker,
+    axis_end,
+    axis_label,
+    axis_ticks,
+    build_lanes,
+    collect_markers,
+    curve_path,
+    failure_count,
+    last_phase,
+    mark_classes,
+    position,
+    quiet_stretch,
+    short_duration,
+    tick_groups,
+    tick_lines,
+    total_duration,
+)
 
 if TYPE_CHECKING:
     from schemathesis.cli.commands.run.handlers.output import WarningBlock, WarningGroup, WarningItem
@@ -20,10 +41,6 @@ _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text
 
 def esc(value: object) -> str:
     return escape(escape_surrogates(str(value)), quote=True)
-
-
-def plural(count: int, word: str) -> str:
-    return f"{count} {word}" if count == 1 else f"{count} {word}s"
 
 
 def humanize_duration(seconds: float) -> str:
@@ -97,6 +114,7 @@ def render_index(data: ReportData) -> str:
         _hero(data),
         _warnings(data, anchors),
         _target_block(data),
+        _timeline(data, anchors),
         _operations_table(data, anchors),
         _extraction_failures(data),
     ]
@@ -238,6 +256,9 @@ def _note_row(key: str, anchor: str, value: str) -> str:
     )
 
 
+_EXTRACTION_TIP = "The response was not in the format the link expects, so the link could not be followed."
+
+
 def _extraction_failures(data: ReportData) -> str:
     if not data.extraction_failures:
         return ""
@@ -250,11 +271,9 @@ def _extraction_failures(data: ReportData) -> str:
             f'<div class="finding"><h4 class="finding-title">{_code_spans(title)}</h4>{details}</div>',
             _evidence("Response", _body(failure.body), _status(failure.status_code)),
             _reproduce(failure.commands, None),
+            _evidence("Tip", f'<p class="tip">{_EXTRACTION_TIP}</p>'),
         ]
-        cards.append(
-            f'<article class="case" id="case-{esc(failure.case_id)}"><div class="case-body">{"".join(parts)}</div>'
-            f'<div class="case-meta"><span class="case-id">{esc(failure.case_id)}</span></div></article>'
-        )
+        cards.append(f'<article class="case"><div class="case-body">{"".join(parts)}</div></article>')
     return (
         '<section class="run-notes" id="note-extraction" aria-labelledby="note-extraction-h">'
         '<h2 class="rn-title" id="note-extraction-h">Failed to extract data from response</h2>'
@@ -288,49 +307,97 @@ def _tip(text: str | None) -> str:
 
 def _hero(data: ReportData) -> str:
     # Nothing was tested, so metric cells would only show zeros; explain what happened instead.
-    if data.verdict in (Verdict.ERRORED, Verdict.EMPTY, Verdict.INTERRUPTED) and not data.tested_operations:
+    if data.verdict in _MESSAGES and not data.tested_operations:
         return _message(data)
     return _result(data)
 
 
+_NO_CHECKS_TIP = "enable checks with `--checks all` or in the `[checks]` section of `schemathesis.toml`."
+
+
+class Message(NamedTuple):
+    subtitle: str
+    title: str
+    # Markup, already escaped.
+    detail: str = ""
+    tip: str | None = None
+
+
+def _interrupted_message(data: ReportData) -> Message:
+    detail = f"Ctrl-C during the {data.last_phase.display} phase." if data.last_phase is not None else ""
+    return Message(
+        f"Stopped by user after {_duration(data)}",
+        "Stopped before any test case completed",
+        detail,
+        "re-run the command below to get results.",
+    )
+
+
+def _skip_reasons(data: ReportData) -> str:
+    # The skip reasons say why, as the terminal does.
+    reasons = data.summary.operations.skip_reasons if data.summary.operations is not None else []
+    return ", ".join(reasons) or "No operations were tested"
+
+
+def _filters(filters: list[str]) -> str:
+    if not filters:
+        return ""
+    label = "Filter" if len(filters) == 1 else "Filters"
+    return f"{label}: " + " ".join(f"<code>{esc(value)}</code>" for value in filters)
+
+
+def _empty_message(data: ReportData) -> Message:
+    subtitle = f"Finished in {_duration(data)}"
+    nothing = data.nothing_tested
+    if nothing is None:
+        return Message(subtitle, _skip_reasons(data))
+    return Message(subtitle, nothing.title, _filters(nothing.filters), nothing.tip)
+
+
+def _unchecked_message(data: ReportData) -> Message:
+    cases = data.summary.test_cases.without_checks
+    return Message(
+        f"Finished in {_duration(data)}",
+        f"No selected check applied to {plural(cases, 'response')}",
+        tip=_NO_CHECKS_TIP,
+    )
+
+
+def _error_tip(data: ReportData) -> str | None:
+    return next((error.tip for row in data.operations for error in row.errors if error.tip is not None), None)
+
+
+def _error_counts(data: ReportData) -> str:
+    return esc("\n".join(f"{group.title}: {group.count}" for group in data.summary.errors))
+
+
+def _errored_message(data: ReportData) -> Message:
+    error = data.fatal_error
+    if error is not None:
+        return Message("No tests ran", error.title, esc(error.message), error.tip)
+    # Requests that went out and errored are still tests that ran.
+    subtitle = f"Finished in {_duration(data)}" if data.summary.test_cases.generated else "No tests ran"
+    return Message(subtitle, "No operation could be tested", _error_counts(data), _error_tip(data))
+
+
+_MESSAGES = {
+    Verdict.INTERRUPTED: _interrupted_message,
+    Verdict.EMPTY: _empty_message,
+    Verdict.UNCHECKED: _unchecked_message,
+    Verdict.ERRORED: _errored_message,
+}
+
+
 def _message(data: ReportData) -> str:
     verdict = data.verdict
-    detail = ""
-    tip = ""
-    if verdict is Verdict.INTERRUPTED:
-        subtitle = f"Stopped by user after {_duration(data)}"
-        title = "Stopped before any test case completed"
-        if data.last_phase is not None:
-            detail = f"Ctrl-C during the {data.last_phase.display} phase."
-        tip = _tip("re-run the command below to get results.")
-    elif verdict is Verdict.EMPTY:
-        subtitle = f"Finished in {_duration(data)}"
-        if data.nothing_tested is not None:
-            title = data.nothing_tested.title
-            if data.nothing_tested.filters:
-                label = "Filter" if len(data.nothing_tested.filters) == 1 else "Filters"
-                codes = " ".join(f"<code>{esc(value)}</code>" for value in data.nothing_tested.filters)
-                detail = f"{label}: {codes}"
-            tip = _tip(data.nothing_tested.tip)
-        else:
-            # Cases ran without any check applying; the skip reasons say why, as the terminal does.
-            reasons = data.summary.operations.skip_reasons if data.summary.operations is not None else []
-            title = ", ".join(reasons) or "No operations were tested"
-    else:
-        subtitle = "No tests ran"
-        if data.fatal_error is not None:
-            title = data.fatal_error.title
-            detail = esc(data.fatal_error.message)
-            tip = _tip(data.fatal_error.tip)
-        else:
-            title = "No operation could be tested"
-            detail = esc("\n".join(f"{group.title}: {group.count}" for group in data.summary.errors))
-    detail_html = f'<p class="ex-detail">{detail}</p>' if detail else ""
+    message = _MESSAGES[verdict](data)
+    detail_html = f'<p class="ex-detail">{message.detail}</p>' if message.detail else ""
     return (
         f'<section class="hero-strip is-message verdict-{verdict.css}{_at_risk(data)}">'
         f'<div class="hs-cell hs-verdict"><h1 class="hero-status-label">{esc(verdict.value)}</h1>'
-        f'<div class="hs-sub">{esc(subtitle)}</div>{_caveat(data)}{_exit_note(data)}</div>'
-        f'<div class="hs-cell hs-explain"><div class="ex-title">{esc(title)}</div>{detail_html}{tip}</div>'
+        f'<div class="hs-sub">{esc(message.subtitle)}</div>{_caveat(data)}{_exit_note(data)}</div>'
+        f'<div class="hs-cell hs-explain"><div class="ex-title">{esc(message.title)}</div>{detail_html}'
+        f"{_tip(message.tip)}</div>"
         "</section>"
     )
 
@@ -343,13 +410,19 @@ def _metric(label: str, value: str, subtitle: str = "", *, extra_class: str = ""
     )
 
 
+_TOP_FAILURES_SHOWN = 3
+
+
 def _second_cell(data: ReportData) -> str:
     if data.top_failures:
         rows = "".join(
             f'<li><span class="tf-n">{group.count}</span>'
             f'<span class="tf-name" title="{esc(group.title)}">{esc(group.title)}</span></li>'
-            for group in data.top_failures[:3]
+            for group in data.top_failures[:_TOP_FAILURES_SHOWN]
         )
+        hidden = len(data.top_failures) - _TOP_FAILURES_SHOWN
+        if hidden > 0:
+            rows += f'<li><a class="tf-more" href="#operations">+{hidden} more</a></li>'
         return (
             '<div class="hs-cell hs-top-failures hs-second"><span class="m-label">Top failures</span>'
             f'<ul class="tf-list">{rows}</ul></div>'
@@ -396,14 +469,11 @@ def _result(data: ReportData) -> str:
     bar, text = _verdict_line(data)
     phases = data.executed_phase_count
     cases_subtitle = f"across {plural(phases, 'phase')}" if phases else ""
-    operations_parts = [f"{data.tested_operations} tested"]
-    for count, word in (
-        (data.not_run_operations, "not run"),
-        (data.skipped_operations, "skipped"),
-        (data.errored_operations, "errored"),
-    ):
-        if count:
-            operations_parts.append(f"{count} {word}")
+    # The same buckets as the operations table groups, so the counts agree.
+    buckets = Counter(row.status for row in data.operations)
+    operations_parts = [f"{buckets[status]} {status.value.lower()}" for status in OperationStatus if buckets[status]]
+    if data.not_run_operations:
+        operations_parts.append(f"{data.not_run_operations} not run")
     return (
         f'<section class="hero-strip verdict-{verdict.css}{_at_risk(data)}">'
         f'<div class="hs-cell hs-verdict"><h1 class="hero-status-label">{esc(verdict.value)}</h1>'
@@ -471,6 +541,98 @@ def _target_block(data: ReportData) -> str:
     return f'<section class="target-block">{"".join(rows)}</section>'
 
 
+def _curve(markers: list[Marker], total: float) -> str:
+    path = curve_path(markers, total)
+    return (
+        '<svg class="tl-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+        f'<path class="tl-area" d="{path}V100Z"/><path class="tl-line" d="{path}"/></svg>'
+    )
+
+
+def _quiet_tail(markers: list[Marker], total: float) -> str:
+    quiet = quiet_stretch(markers, total)
+    if quiet is None:
+        return ""
+    return (
+        f'<div class="tl-quiet" style="left:{position(total - quiet, total)}"><span>'
+        '<span class="tl-q-long">No new failures for</span><span class="tl-q-short">Quiet</span> '
+        f"{esc(short_duration(quiet))}</span></div>"
+    )
+
+
+def _tick(group: list[Marker], total: float) -> str:
+    lines = tick_lines(group)
+    count = failure_count(group)
+    badge = f'<span class="tl-count" aria-hidden="true">{count}</span>' if count > 1 else ""
+    at = group[0].found_at
+    return (
+        f'<a class="tl-mark{mark_classes(at, total)}" href="#{esc(group[0].href)}" style="left:{position(at, total)}">'
+        f'{badge}<span class="tl-vh">{"<br>".join(esc(line) for line in lines)}</span></a>'
+    )
+
+
+def _lane_bar(lane: Lane, total: float, *, stopped: bool) -> str:
+    if not lane.passes:
+        return ""
+    start, end = lane.passes[0][0], lane.passes[-1][1]
+    classes = "tl-span tl-span-stopped" if stopped else "tl-span"
+    return f'<span class="{classes}" style="left:{position(start, total)};width:{position(end - start, total)}"></span>'
+
+
+def _lane_row(lane: Lane, total: float, *, ticks: bool, stopped: bool) -> str:
+    marks = "".join(_tick(group, total) for group in tick_groups(lane.markers, total)) if ticks else ""
+    return (
+        f'<div class="tl-row"><div class="tl-label"><span class="tl-lane-name">{esc(lane.phase)}</span>'
+        f'<span class="tl-sub">{esc(lane.details())}</span></div>'
+        f'<div class="tl-track tl-lane">{_lane_bar(lane, total, stopped=stopped)}{marks}</div></div>'
+    )
+
+
+def _axis_row(total: float, *, stopped: bool) -> str:
+    axis = "".join(
+        f'<span class="tl-tick" style="left:{position(tick, total)}">{esc(axis_label(tick))}</span>'
+        for tick in axis_ticks(total)
+    )
+    axis += f'<span class="tl-tick tl-end">{esc(axis_end(total, stopped=stopped))}</span>'
+    return f'<div class="tl-row tl-axis-row"><div class="tl-label"></div><div class="tl-axis">{axis}</div></div>'
+
+
+def _found_row(markers: list[Marker], total: float) -> str:
+    if not markers:
+        return ""
+    return (
+        '<div class="tl-row tl-found"><div class="tl-label"><span class="tl-name">Failures found</span>'
+        f'<span class="tl-sub">{failure_count(markers)} total</span></div>'
+        f'<div class="tl-track">{_curve(markers, total)}{_quiet_tail(markers, total)}</div></div>'
+    )
+
+
+def _chart(lanes: list[Lane], markers: list[Marker], total: float, *, stopped: bool) -> str:
+    rows = [_found_row(markers, total)]
+    ticks = len(markers) <= MAX_TICKED_FAILURES
+    cut = last_phase(lanes) if stopped else None
+    rows.extend(_lane_row(lane, total, ticks=ticks, stopped=lane.phase == cut) for lane in lanes)
+    rows.append(_axis_row(total, stopped=stopped))
+    return f'<div class="tl-rows">{"".join(rows)}</div>'
+
+
+def _timeline_section(body: str) -> str:
+    return (
+        f'<section class="timeline" aria-labelledby="tl-heading">'
+        f'<div class="tl-head"><h2 class="tl-heading" id="tl-heading">Timeline</h2></div>{body}</section>'
+    )
+
+
+def _timeline(data: ReportData, anchors: dict[str, str]) -> str:
+    total = total_duration(data)
+    if not total:
+        return ""
+    markers = collect_markers(data, anchors)
+    lanes = build_lanes(data, markers)
+    stopped = data.stop_reason is StopReason.INTERRUPTED
+    return _timeline_section(_chart(lanes, markers, total, stopped=stopped))
+
+
 # Above this many rows a failing run collapses its Passed group so failures stay in view.
 _COLLAPSE_PASSED_ABOVE = 25
 
@@ -494,7 +656,11 @@ def _operation_cell(row: OperationRow, toggle: str) -> str:
             f"{esc(first.title)}{more}</a>"
         )
     if row.known_failures:
-        warned += f'<a class="row-known" href="#note-baseline">{plural(row.known_failures, "known failure")}</a>'
+        kinds = ", ".join(sorted(set(row.known_failures)))
+        warned += (
+            f'<a class="row-known" href="#note-baseline" title="{esc(kinds)}">'
+            f"{plural(len(row.known_failures), 'known failure')}</a>"
+        )
     return (
         f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span>'
         f"{warned}</span></td>"
@@ -775,7 +941,7 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
         )
     footer = f"<tfoot>{''.join(footer_rows)}</tfoot>" if footer_rows else ""
     return (
-        '<section class="ops"><table class="ops-table" aria-label="Operations">'
+        '<section class="ops" id="operations"><table class="ops-table" aria-label="Operations">'
         '<thead><tr><th scope="col">Operation</th><th scope="col">Failures</th>'
         '<th scope="col" class="numeric">Cases</th></tr></thead>'
         f"{''.join(groups)}{footer}</table></section>"

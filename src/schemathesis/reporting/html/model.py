@@ -12,6 +12,14 @@ if TYPE_CHECKING:
     from schemathesis.cli.summary import FailureGroup, SummaryData
 
 
+# The phase name for failures from checks that run once after all phases.
+AFTER_RUN = "After the run"
+
+
+def plural(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
 def split_label(label: str) -> tuple[str | None, str]:
     """Split "GET /users" into its method and path; other labels ("Query.users", "Run checks") have no method."""
     method, separator, path = label.partition(" ")
@@ -26,6 +34,7 @@ class Verdict(str, Enum):
     ERRORED = "Errored"
     INTERRUPTED = "Interrupted"
     EMPTY = "No tests ran"
+    UNCHECKED = "No checks ran"
 
     @property
     def css(self) -> str:
@@ -81,6 +90,19 @@ class FailingCase:
     # `st replay <id>` when a crash record exists.
     replay: str | None
     auth_identity: str | None
+    # Seconds from the run start to the moment the run first recorded this failure, and the phase that found it.
+    found_at: float | None = None
+    found_in: str | None = None
+
+
+@dataclass(slots=True)
+class PhaseSpan:
+    """One pass of a test phase; phases repeat under a time budget."""
+
+    phase: str
+    # Seconds from the run start.
+    start: float
+    end: float
 
 
 @dataclass(slots=True)
@@ -117,8 +139,8 @@ class OperationRow:
     errors: list[ErrorEntry] = field(default_factory=list)
     # Warnings that name this operation.
     warnings: list[WarningBlock] = field(default_factory=list)
-    # Failures the baseline suppressed.
-    known_failures: int = 0
+    # Titles of the failures the baseline suppressed.
+    known_failures: list[str] = field(default_factory=list)
 
     @property
     def method(self) -> str:
@@ -158,7 +180,7 @@ class ReportData:
     warnings: list[WarningBlock]
     # Problems with the invocation itself, e.g. a timeout given in milliseconds.
     startup_warnings: list[str]
-    # Each test phase as (name, kind, outcome): ("Fuzzing", "passed", "passed"), ("Coverage", "skipped", "disabled").
+    # Each test phase as (name, kind, outcome): ("Fuzzing", "passed", "passed"), ("Coverage", "errored", "2 errors").
     phases: list[tuple[str, str, str]]
     # Checks enabled for the run.
     checks: list[str]
@@ -169,12 +191,17 @@ class ReportData:
     reauth_broke: bool
     extraction_failures: list[ExtractionNote]
     running_time: float | None
+    # Oldest first; empty when nothing ran or the run has no phases (pytest).
+    phase_spans: list[PhaseSpan]
     stop_reason: StopReason
     # `started` is False when the engine never ran (schema failed to load); `complete` is False
     # when `EngineFinished` never arrived (crash, load-time Ctrl-C). Both feed the verdict.
     started: bool
     complete: bool
     exit_code: int
+    # Distinct errors per phase name, and failures each phase hit after an earlier phase found them.
+    phase_errors: dict[str, int] = field(default_factory=dict)
+    found_again: dict[str, int] = field(default_factory=dict)
 
     @property
     def tested_operations(self) -> int:
@@ -227,7 +254,8 @@ class ReportData:
             return Verdict.INTERRUPTED
         # Filters that match nothing exit non-zero, yet nothing failed.
         if not self.tested_operations and not self.summary.failures and not self.summary.errors:
-            return Verdict.EMPTY
+            # Requests went out, yet no selected check applied to their responses.
+            return Verdict.UNCHECKED if self.summary.test_cases.without_checks else Verdict.EMPTY
         # The verdict comes from the tests; other reasons for a non-zero exit show next to it.
         if self.summary.failures:
             return Verdict.FAILED

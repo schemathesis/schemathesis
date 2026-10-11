@@ -593,6 +593,9 @@ def snapshot_html(snapshot):
                 '<span class="tk">Command</span><COMMAND>',
                 data,
             )
+            # Whether the timeline is compact, and where its marks fall, depends on run time; its own tests cover it.
+            data = re.sub(r'<section class="timeline[^"]*".*?</section>', "<TIMELINE>", data, flags=re.DOTALL)
+            data = re.sub(r'href="#case-\w+"', 'href="#case-<CASE-ID>"', data)
             return data.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n"
 
     return snapshot.use_extension(extension_class=HtmlSnapshotExtension)

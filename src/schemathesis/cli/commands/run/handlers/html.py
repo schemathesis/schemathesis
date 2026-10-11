@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import time
 from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
@@ -22,10 +23,11 @@ from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.output import format_response_payload
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import EngineErrorInfo
-from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
+from schemathesis.engine.run import INTERNAL_PHASES, PhaseName, PhaseSkipReason
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.reporting.html.build import enabled_checks, failing_case, request_name, sanitized
 from schemathesis.reporting.html.model import (
+    AFTER_RUN,
     Command,
     ErrorEntry,
     ExtractionNote,
@@ -33,15 +35,19 @@ from schemathesis.reporting.html.model import (
     NothingTested,
     OperationRow,
     OperationStatus,
+    PhaseSpan,
     ReportData,
     ReportMeta,
+    plural,
 )
 
 if TYPE_CHECKING:
     from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
+    from schemathesis.core.failures import Failure
     from schemathesis.engine.recorder import RecordedScenario
+    from schemathesis.engine.statistic import GroupedFailures, Statistic
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
     from schemathesis.schemas import APIOperation
 
@@ -58,6 +64,11 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         "cases",
         "skip_reasons",
         "errors",
+        "phase_started",
+        "phase_spans",
+        "found",
+        "found_again",
+        "phase_errors",
     )
 
     def __init__(self, output_dir: Path) -> None:
@@ -72,6 +83,14 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         self.skip_reasons: dict[str, set[str]] = {}
         # The first error of each exception type per label, the way the terminal lists them.
         self.errors: dict[str, dict[type, ErrorEntry]] = {}
+        self.phase_started: dict[PhaseName, float] = {}
+        self.phase_spans: list[PhaseSpan] = []
+        # Key of each failure group (its case id) -> seconds from the run start when it first appeared, and the phase.
+        self.found: dict[str, tuple[float, str]] = {}
+        # Failures each phase hit after an earlier phase had found them.
+        self.found_again: dict[str, set[Failure]] = {}
+        # Distinct errors in each phase, as (label, exception type).
+        self.phase_errors: dict[PhaseName, set[tuple[str, type]]] = {}
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         # A failed load never reaches `LoadingFinished`, so the location is recorded as soon as it is known.
@@ -83,25 +102,106 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         elif isinstance(event, events.EngineStarted):
             self.started_at = event.timestamp
         elif isinstance(event, events.PhaseStarted):
-            self.last_phase = event.phase.name
+            self._on_phase_started(event)
+        elif isinstance(event, events.PhaseFinished):
+            self._on_phase_finished(event)
         elif isinstance(event, events.ScenarioFinished):
-            self._record(event.recorder)
-            if event.status == Status.SKIP and event.skip_reason is not None and event.label is not None:
-                self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
+            self._on_scenario_finished(ctx, event)
         elif isinstance(event, events.FuzzScenarioFinished):
-            self._record(event.recorder)
+            self._on_fuzz_scenario_finished(ctx, event)
         elif isinstance(event, events.NonFatalError):
-            entries = self.errors.setdefault(event.label, {})
-            if type(event.value) not in entries:
-                entries[type(event.value)] = _error_entry(event.info)
+            self._on_error(event)
         elif isinstance(event, events.FatalError):
             self.fatal_error = _fatal_entry(event.exception, wait_for_schema=ctx.config.wait_for_schema)
         elif isinstance(event, events.EngineFinished):
             self.finished = event
+            # Checks that run once after all phases report here.
+            self._record_found(ctx, None, AFTER_RUN, event.timestamp)
+            self._close_open_phases(event.timestamp)
+
+    def _on_phase_started(self, event: events.PhaseStarted) -> None:
+        self.last_phase = event.phase.name
+        if event.phase.name not in INTERNAL_PHASES:
+            self.phase_started[event.phase.name] = event.timestamp
+
+    def _on_phase_finished(self, event: events.PhaseFinished) -> None:
+        started = self.phase_started.pop(event.phase.name, None)
+        # A phase without applicable checks still sent its requests.
+        ran = event.status != Status.SKIP or event.phase.skip_reason is PhaseSkipReason.NO_CHECKS_RAN
+        if started is not None and ran:
+            self._add_span(event.phase.name, started, event.timestamp)
+
+    def _close_open_phases(self, now: float) -> None:
+        for phase, started in self.phase_started.items():
+            self._add_span(phase, started, now)
+        self.phase_started.clear()
+
+    def _on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
+        self._record(event.recorder)
+        self._record_found_again(ctx, event.recorder, event.phase.display)
+        self._record_found(ctx, event.recorder, event.phase.display, event.timestamp)
+        if event.status == Status.SKIP and event.skip_reason is not None and event.label is not None:
+            self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
+
+    def _on_fuzz_scenario_finished(self, ctx: BaseExecutionContext, event: events.FuzzScenarioFinished) -> None:
+        # `st fuzz` has no phases; the timeline shows its whole run as one fuzzing span.
+        if self.started_at is not None:
+            self.phase_started.setdefault(PhaseName.FUZZING, self.started_at)
+        self._record(event.recorder)
+        self._record_found(ctx, event.recorder, PhaseName.FUZZING.display, event.timestamp)
+
+    def _on_error(self, event: events.NonFatalError) -> None:
+        entries = self.errors.setdefault(event.label, {})
+        if type(event.value) not in entries:
+            entries[type(event.value)] = _error_entry(event.info)
+        if event.phase is not None:
+            self.phase_errors.setdefault(event.phase, set()).add((event.label, type(event.value)))
 
     def _record(self, recorder: RecordedScenario) -> None:
         for node in recorder.cases.values():
             self.cases[node.value.operation.label] += 1
+
+    def _add_span(self, phase: PhaseName, started: float, finished: float) -> None:
+        if self.started_at is not None:
+            self.phase_spans.append(
+                PhaseSpan(phase=phase.display, start=started - self.started_at, end=finished - self.started_at)
+            )
+
+    def _record_found(
+        self, ctx: BaseExecutionContext, recorder: RecordedScenario | None, phase: str, timestamp: float
+    ) -> None:
+        if self.started_at is None:
+            return
+        if recorder is not None and not any(
+            check.failure_info is not None for checks in recorder.checks.values() for check in checks
+        ):
+            return
+        for groups in ctx.statistic.failures.values():
+            for case_id in groups:
+                if case_id in self.found:
+                    continue
+                # The failing response's own time; the scenario ends later, after shrinking.
+                interaction = recorder.interactions.get(case_id) if recorder is not None else None
+                found_at = interaction.timestamp if interaction is not None else timestamp
+                self.found[case_id] = (max(found_at - self.started_at, 0.0), phase)
+
+    def _record_found_again(self, ctx: BaseExecutionContext, recorder: RecordedScenario, phase: str) -> None:
+        first_cases = ctx.statistic.unique_failures_map
+        for checks in recorder.checks.values():
+            for check in checks:
+                if check.failure_info is None:
+                    continue
+                first_case = first_cases.get(check.failure_info.failure)
+                if first_case is not None and self.found.get(first_case, (0.0, phase))[1] != phase:
+                    self.found_again.setdefault(phase, set()).add(check.failure_info.failure)
+
+    def _failing_case(self, ctx: BaseExecutionContext, key: str, group: GroupedFailures) -> FailingCase:
+        case = failing_case(
+            group, config=ctx.config.output, replay=replay_command(group, record_crashes=ctx.config.cache.enabled)
+        )
+        # Keyed like the run's failure groups: run-level failures have no case id.
+        case.found_at, case.found_in = self.found.get(key, (None, None))
+        return case
 
     def _operation_rows(self, ctx: BaseExecutionContext) -> Rows:
         statistic = ctx.statistic
@@ -115,12 +215,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         unattributed_cases = []
         unattributed: Counter[str] = Counter()
         for label, groups in statistic.failures.items():
-            for group in groups.values():
-                case = failing_case(
-                    group,
-                    config=ctx.config.output,
-                    replay=replay_command(group, record_crashes=ctx.config.cache.enabled),
-                )
+            for key, group in groups.items():
+                case = self._failing_case(ctx, key, group)
                 owner = label
                 # Stateful failures are keyed by the scenario; the row is the operation whose request failed.
                 if label == STATEFUL_TESTS_LABEL:
@@ -141,7 +237,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             | self.errors.keys()
             | self.skip_reasons.keys()
         )
-        known = Counter(operation for operation, *_ in statistic.known_failures)
+        known = _known_failure_titles(statistic)
         stopped_early = self.finished is None or self.finished.stop_reason is not StopReason.COMPLETED
         rows = []
         for label in labels:
@@ -179,7 +275,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                     stops_at_first_failure=label in failed_directly and not continue_on_failure,
                     failing_cases=cases,
                     errors=errors,
-                    known_failures=known[label],
+                    known_failures=known.get(label, []),
                 )
             )
         unattributed_errors = [
@@ -193,6 +289,15 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             unattributed_failures=_by_count(unattributed),
             unattributed_cases=unattributed_cases,
             unattributed_errors=unattributed_errors,
+        )
+
+    def _phase_outcomes(self, phases: PhaseStatuses, stop_reason: StopReason) -> PhaseOutcomes:
+        again = {phase: len(failures) for phase, failures in self.found_again.items()}
+        return PhaseOutcomes(
+            errors=_phase_error_counts(phases, self.phase_errors),
+            again=again,
+            failed={phase for _, phase in self.found.values()} | again.keys(),
+            interrupted=_cut_phase(self.phase_spans) if stop_reason is StopReason.INTERRUPTED else None,
         )
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
@@ -216,6 +321,10 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                 warned.setdefault(label, []).append(block)
         for row in rows.operations:
             row.warnings = warned.get(row.label, [])
+        # An interrupted run never finishes the phase it was in; a finished run has none open.
+        self._close_open_phases(time.time())
+        stop_reason = self.finished.stop_reason if self.finished is not None else StopReason.INTERRUPTED
+        outcomes = self._phase_outcomes(summary.phases, stop_reason)
         data = ReportData(
             meta=ReportMeta(
                 generated_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -234,27 +343,20 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             unattributed_errors=rows.unattributed_errors,
             warnings=warnings,
             startup_warnings=ctx.startup_warnings if isinstance(ctx, ExecutionContext) else [],
-            phases=_phases(ctx) if isinstance(ctx, ExecutionContext) else [],
+            phases=_phases(summary.phases, outcomes),
             checks=enabled_checks(ctx.config.checks_config_for()),
             reports=_report_links(ctx, self.output_dir),
             reauth_count=payload.reauth_count if payload is not None else 0,
             reauth_broke=payload.reauth_broke if payload is not None else False,
-            extraction_failures=[
-                ExtractionNote(
-                    link=failure.id,
-                    case_id=failure.case_id,
-                    reason=extraction_failure_reason(failure),
-                    commands=_extraction_commands(failure),
-                    status_code=failure.response.status_code,
-                    body=format_response_payload(failure.response, config=ctx.config.output),
-                )
-                for failure in ctx.statistic.extraction_failures
-            ],
+            extraction_failures=_extraction_notes(ctx),
             running_time=running_time(self.started_at, self.finished),
-            stop_reason=self.finished.stop_reason if self.finished is not None else StopReason.INTERRUPTED,
+            phase_spans=self.phase_spans,
+            stop_reason=stop_reason,
             started=self.started_at is not None,
             complete=self.finished is not None,
             exit_code=ctx.exit_code,
+            phase_errors=outcomes.errors,
+            found_again=outcomes.again,
         )
         write_report(data, self.output_dir)
 
@@ -274,17 +376,73 @@ _PHASE_OUTCOMES = {
 }
 
 
-def _phases(ctx: ExecutionContext) -> list[tuple[str, str, str]]:
+PhaseStatuses = dict[PhaseName, tuple[Status, PhaseSkipReason | None]]
+
+
+class PhaseOutcomes(NamedTuple):
+    # Distinct errors per phase name.
+    errors: dict[str, int]
+    # Failures per phase name that an earlier phase found first.
+    again: dict[str, int]
+    # Phases that found a failure or hit one found earlier.
+    failed: set[str]
+    # The phase the run was in when the user stopped it.
+    interrupted: str | None
+
+
+def _phase_error_counts(phases: PhaseStatuses, errors: dict[PhaseName, set[tuple[str, type]]]) -> dict[str, int]:
+    counts = {}
+    for phase, (status, _) in phases.items():
+        # The engine drops a run-level error that repeats one shown on an operation; the phase still had it.
+        count = len(errors.get(phase, ())) or int(status == Status.ERROR)
+        if count and phase not in INTERNAL_PHASES:
+            counts[phase.display] = count
+    return counts
+
+
+def _cut_phase(spans: list[PhaseSpan]) -> str | None:
+    """The phase whose span ends last, the one an interrupted run cut short."""
+    return max(spans, key=lambda span: span.end).phase if spans else None
+
+
+def _skip_outcome(reason: PhaseSkipReason | None) -> str:
+    if reason is PhaseSkipReason.FAILURE_LIMIT_REACHED:
+        return "not run, failure limit"
+    return reason.display if reason is not None else "skipped"
+
+
+def _phase_outcome(name: str, status: Status, outcomes: PhaseOutcomes) -> tuple[str, str]:
+    """The phase kind and its outcome text, e.g. ("failed", "failed, 1 error")."""
+    errors = outcomes.errors.get(name, 0)
+    if name == outcomes.interrupted:
+        kind = "interrupted"
+    elif name in outcomes.failed or status == Status.FAILURE:
+        kind = "failed"
+    elif errors:
+        return "errored", plural(errors, "error")
+    else:
+        kind = _PHASE_OUTCOMES[status]
+    return kind, f"{kind}, {plural(errors, 'error')}" if errors else kind
+
+
+def _phases(statuses: PhaseStatuses, outcomes: PhaseOutcomes) -> list[tuple[str, str, str]]:
     phases = []
-    for phase in PhaseName:
+    for phase, (status, skip_reason) in statuses.items():
         if phase in INTERNAL_PHASES:
             continue
-        status, skip_reason = ctx.phases[phase]
         if status == Status.SKIP:
-            phases.append((phase.display, "skipped", skip_reason.display if skip_reason is not None else "skipped"))
+            phases.append((phase.display, "skipped", _skip_outcome(skip_reason)))
         else:
-            phases.append((phase.display, _PHASE_OUTCOMES[status], _PHASE_OUTCOMES[status]))
+            phases.append((phase.display, *_phase_outcome(phase.display, status, outcomes)))
     return phases
+
+
+def _known_failure_titles(statistic: Statistic) -> dict[str, list[str]]:
+    titles: dict[str, list[str]] = {}
+    for identity in statistic.known_failures:
+        failure, _ = statistic.observed_failures[identity]
+        titles.setdefault(identity[0], []).append(failure.title)
+    return titles
 
 
 def _report_links(ctx: BaseExecutionContext, output_dir: Path) -> list[tuple[str, str]]:
@@ -319,6 +477,20 @@ def _fatal_entry(exception: Exception, *, wait_for_schema: float | int | None) -
         )
     info = EngineErrorInfo(error=exception)
     return ErrorEntry(title=info.title, message=info.message, tip=None)
+
+
+def _extraction_notes(ctx: BaseExecutionContext) -> list[ExtractionNote]:
+    return [
+        ExtractionNote(
+            link=failure.id,
+            case_id=failure.case_id,
+            reason=extraction_failure_reason(failure),
+            commands=_extraction_commands(failure),
+            status_code=failure.response.status_code,
+            body=format_response_payload(failure.response, config=ctx.config.output),
+        )
+        for failure in ctx.statistic.extraction_failures
+    ]
 
 
 def _extraction_commands(failure: ExtractionFailure) -> list[Command]:
