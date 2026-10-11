@@ -3,9 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
-
-from tools.corpus.io import CorpusEntry, Loader, json_loads, load_from_corpus, read_corpus_file
+from schemathesis.core.deserialization import deserialize_yaml
+from tools.corpus.io import CorpusEntry, json_loads, load_from_corpus, read_corpus_file
 
 CORPUS_SCHEME = "corpus://"
 
@@ -40,8 +39,8 @@ def load_schema_dict(spec: str) -> CorpusEntry:
 
 def _decode_text(text: str, *, suffix: str | None = None) -> dict[str, Any]:
     if suffix and suffix.lower() in (".yaml", ".yml"):
-        return yaml.load(text, Loader)
+        return deserialize_yaml(text)
     try:
         return json_loads(text)
     except Exception:
-        return yaml.load(text, Loader)
+        return deserialize_yaml(text)

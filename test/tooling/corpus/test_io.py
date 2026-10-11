@@ -50,6 +50,23 @@ def test_parse_schemas_skips_schema_without_version(tmp_path):
     assert parse_schemas(tmp_path) == {"3.0": {"valid-openapi.yaml": valid_schema}}
 
 
+def test_parse_schemas_reads_yaml_as_yaml_1_2(tmp_path):
+    (tmp_path / "openapi.yaml").write_text(
+        "openapi: 3.0.3\npaths: {}\nx-values: {flag: on, answer: yes, payload: !!binary YWJj}\non: off\n"
+    )
+
+    assert parse_schemas(tmp_path) == {
+        "3.0": {
+            "openapi.yaml": {
+                "openapi": "3.0.3",
+                "paths": {},
+                "x-values": {"flag": "on", "answer": "yes", "payload": "YWJj"},
+                "on": "off",
+            }
+        }
+    }
+
+
 def test_iter_corpus_streaming_filters_by_name_before_decoding(tmp_path, make_tarball):
     make_tarball(
         tmp_path / "openapi-3.0.tar.gz",
