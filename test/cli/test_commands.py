@@ -3937,6 +3937,64 @@ def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, c
     assert int(re.findall(r"""'\{"size": (\d+)\}'""", result.stdout.split("before it went away:")[1])[0]) > 50000
 
 
+ERROR_THEN_GONE_SERVER = (
+    STOP_LISTENING
+    + """
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+ADDRESS = ("127.0.0.1", int(os.environ["PORT"]))
+SCHEMA = b'{"openapi": "3.0.0", "info": {"title": "t", "version": "1"}, "paths": {"/data": {"get": {"responses": {"200": {"description": "OK"}}}}}}'
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        if self.path != "/data":
+            self.send(200, SCHEMA)
+            return
+        # Stop listening before answering: the next request is refused, never queued.
+        stop_listening(self.server)
+        threading.Thread(target=self.server.shutdown).start()
+        self.send(500, b"{}")
+
+    def send(self, status, body):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        self.wfile.flush()
+
+
+server = ThreadingHTTPServer(ADDRESS, Handler)
+try:
+    server.serve_forever()
+except OSError:
+    pass
+threading.Event().wait()
+"""
+)
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+def test_fuzz_reports_failure_answered_right_before_the_server_went_away(subprocess_runner, cli):
+    port = subprocess_runner.run_app(ERROR_THEN_GONE_SERVER)
+    result = cli.main(
+        "fuzz",
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=not_a_server_error",
+        "--workers=1",
+        "--max-time=20",
+    )
+    assert "Stop reason: Server stopped responding" in result.stdout, result.stdout
+    assert "Server error" in result.stdout, result.stdout
+
+
 ONE_SHOT_SERVER = (
     STOP_LISTENING
     + """
