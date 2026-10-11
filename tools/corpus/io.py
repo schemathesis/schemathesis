@@ -250,21 +250,22 @@ def iter_corpus_entries_from_refs(
 # Per-process cache of (open archive, member-name index). gzip streams are random-access only
 # after a one-time decompression; we hold the decompressed bytes so subsequent extracts are
 # memcpy-cheap. Workers handle dozens of members from the same corpus, so the amortization wins.
-_INDEXED_ARCHIVES: dict[str, tuple[tarfile.TarFile, dict[str, tarfile.TarInfo]]] = {}
+_INDEXED_ARCHIVES: dict[tuple[str, pathlib.Path], tuple[tarfile.TarFile, dict[str, tarfile.TarInfo]]] = {}
 
 
 def _open_indexed_corpus(
     corpus_name: str, *, data_dir: pathlib.Path = DATA_DIR
 ) -> tuple[tarfile.TarFile, dict[str, tarfile.TarInfo]]:
-    cached = _INDEXED_ARCHIVES.get(corpus_name)
+    cache_key = (corpus_name, data_dir.resolve())
+    cached = _INDEXED_ARCHIVES.get(cache_key)
     if cached is not None:
         return cached
-    path = data_dir / f"{corpus_name}.tar.gz"
+    path = cache_key[1] / f"{corpus_name}.tar.gz"
     with gzip.open(path, "rb") as fd:
         raw = io.BytesIO(fd.read())
     archive = tarfile.open(fileobj=raw, mode="r:")  # noqa: SIM115
     index = {member.name: member for member in archive}
-    _INDEXED_ARCHIVES[corpus_name] = (archive, index)
+    _INDEXED_ARCHIVES[cache_key] = (archive, index)
     return archive, index
 
 

@@ -9,6 +9,7 @@ from tools.corpus.io import (
     iter_corpus_entries_from_refs,
     iter_corpus_file,
     iter_corpus_streaming,
+    load_corpus_entry,
 )
 
 
@@ -77,6 +78,18 @@ def test_iter_corpus_entries_from_refs_reads_requested_members(tmp_path, make_ta
         CorpusEntry(corpus="openapi-3.0", name="beta.json", schema={"openapi": "3.0.0", "paths": {"/b": {}}}),
         CorpusEntry(corpus="openapi-3.0", name="alpha.json", schema={"openapi": "3.0.0", "paths": {"/a": {}}}),
     ]
+
+
+def test_load_corpus_entry_separates_data_directories(tmp_path, make_tarball):
+    first_directory = tmp_path / "first"
+    second_directory = tmp_path / "second"
+    first_directory.mkdir()
+    second_directory.mkdir()
+    make_tarball(first_directory / "same.tar.gz", {"entry.json": b'{"marker":"first"}'})
+    make_tarball(second_directory / "same.tar.gz", {"entry.json": b'{"marker":"second"}'})
+
+    assert load_corpus_entry("same", "entry.json", data_dir=first_directory).schema == {"marker": "first"}
+    assert load_corpus_entry("same", "entry.json", data_dir=second_directory).schema == {"marker": "second"}
 
 
 def test_corpus_entry_api_strips_json_suffix():
