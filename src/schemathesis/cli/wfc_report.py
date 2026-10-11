@@ -31,6 +31,7 @@ from schemathesis.openapi.checks import (
     MissingContentType,
     MissingHeaderNotRejected,
     MissingHeaders,
+    ObjectLevelAuthorizationViolation,
     RejectedPositiveData,
     UndefinedContentType,
     UndefinedStatusCode,
@@ -59,9 +60,10 @@ VALIDATION_FAILURES = (
     MissingHeaders,
 )
 DESTRUCTIVE_METHODS = frozenset({"DELETE", "PUT", "PATCH"})
-# Codes 904-905 are Schemathesis-specific: WFC has no category for these oracles yet.
+# Codes 904-906 are Schemathesis-specific: WFC has no category for these oracles yet.
 INVALID_INPUT_ACCEPTED = 904
 UNMAPPED_METHOD = 905
+OBJECT_LEVEL_AUTHORIZATION = 906
 FAULT_CATEGORY_IDS = {
     100: "HTTP_STATUS_500",
     110: "HTTP_STATUS_NO_405_IF_NO_ALLOW",
@@ -80,6 +82,7 @@ FAULT_CATEGORY_IDS = {
     312: "SECURITY_CALL_TIMEOUT",
     INVALID_INPUT_ACCEPTED: "SCHEMATHESIS_INVALID_INPUT_ACCEPTED",
     UNMAPPED_METHOD: "SCHEMATHESIS_UNSUPPORTED_METHOD_RESPONSE",
+    OBJECT_LEVEL_AUTHORIZATION: "SCHEMATHESIS_OBJECT_LEVEL_AUTHORIZATION",
 }
 
 
@@ -123,6 +126,8 @@ def fault_category(failure: Failure) -> tuple[int, str] | None:
         return 122, description
     if isinstance(failure, ResponseTimeExceeded):
         return 312, description
+    if isinstance(failure, ObjectLevelAuthorizationViolation):
+        return OBJECT_LEVEL_AUTHORIZATION, f"{description} ({failure.peer} read an object {failure.owner} owns)"
     return None
 
 

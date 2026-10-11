@@ -18,6 +18,7 @@ from schemathesis.openapi.checks import (
     EnsureResourceAvailability,
     IgnoredAuth,
     MissingHeaderNotRejected,
+    ObjectLevelAuthorizationViolation,
     RejectedPositiveData,
     UnsupportedMethodResponse,
     UseAfterFree,
@@ -529,6 +530,9 @@ def test_report_format_uses_default_path(ctx, cli, tmp_path):
     jsonschema_rs.validate(WFC_REPORT_SCHEMA, load_report(report))
 
 
+BOLA = ObjectLevelAuthorizationViolation(
+    operation="GET /orders/{id}", message="", owner="alice", peer="bob", owner_case_id="c1", case_id="c2"
+)
 OPERATION = "GET /users/{id}"
 
 
@@ -595,11 +599,51 @@ OPERATION = "GET /users/{id}"
             122,
         ),
         (ResponseTimeExceeded(operation=OPERATION, elapsed=2.0, deadline=1.0, message=""), 312),
+        (BOLA, 906),
     ],
     ids=lambda value: type(value).__name__ if not isinstance(value, int) else str(value),
 )
 def test_fault_category(failure, code):
     assert fault_category(failure)[0] == code
+
+
+def test_object_level_authorization_context_names_both_peers():
+    assert fault_category(BOLA) == (
+        906,
+        "ObjectLevelAuthorizationViolation: Object-level authorization bypass (bob read an object alice owns)",
+    )
+
+
+def test_object_level_authorization_fault_is_reported(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    auth = tmp_path / "auth.json"
+    auth.write_text(
+        json.dumps(
+            {
+                "auth": [
+                    {"name": "alice", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey alice"}]},
+                    {"name": "bob", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey bob"}]},
+                ]
+            }
+        )
+    )
+    path = tmp_path / "report.json"
+    cli.run(
+        api.schema_url,
+        f"--report-wfc-path={path}",
+        "--max-examples=10",
+        "--phases=fuzzing",
+        "--checks=object_level_authorization",
+        config={"auth": {"wfc": {"path": str(auth), "peers": ["alice", "bob"]}}},
+    )
+
+    report = load_report(path)
+    (fault,) = report["faults"]["foundFaults"]
+    assert (fault["operationId"], [category["code"] for category in fault["faultCategories"]]) == (
+        "GET:/api/orders/{order_id}",
+        [906],
+    )
+    assert fault["testCaseId"] in {test_case["id"] for test_case in report["testCases"]}
 
 
 def test_declared_auth_not_enforced_context_names_the_scenario():

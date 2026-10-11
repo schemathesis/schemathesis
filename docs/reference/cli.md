@@ -599,7 +599,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String`
 
-    Custom path for a [Web Fuzzing Commons Report](https://github.com/WebFuzzing/Commons). Schemathesis exports REST findings using WFC fault codes. Checks without an upstream WFC code use Schemathesis-specific 9xx codes: 904 for invalid input accepted with a non-2xx status and 905 for unsupported-method responses without a matching WFC code. Schemathesis writes a shell script with curl commands that reproduce each reported failure next to the report, named after it (e.g. `wfc-report.sh`).
+    Custom path for a [Web Fuzzing Commons Report](https://github.com/WebFuzzing/Commons). Schemathesis exports REST findings using WFC fault codes. Checks without an upstream WFC code use Schemathesis-specific 9xx codes: 904 for invalid input accepted with a non-2xx status, 905 for unsupported-method responses without a matching WFC code, and 906 for object-level authorization bypasses. Schemathesis writes a shell script with curl commands that reproduce each reported failure next to the report, named after it (e.g. `wfc-report.sh`).
 
     ```console
     $ st run openapi.yaml --report-wfc-path ./wfc-report.json
