@@ -4,7 +4,6 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-
  ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/
@@ -12,7 +11,6 @@ Schemathesis dev
      Operations:       1 selected / 1 total
      Configuration:    /tmp/config.toml
      Baseline:         schemathesis-baseline.json / 2 entries
-
 
  ✅  API capabilities:
 

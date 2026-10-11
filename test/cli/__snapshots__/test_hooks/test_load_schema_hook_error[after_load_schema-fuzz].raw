@@ -4,7 +4,6 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-
  ❌  Failed to load specification from http://127.0.0.1/openapi.json after 0.00s
 
  Hook Error

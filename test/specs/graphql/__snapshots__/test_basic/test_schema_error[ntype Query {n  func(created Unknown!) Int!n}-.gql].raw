@@ -4,7 +4,6 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-
  ❌  Failed to load specification from /tmp/schema.gql after 0.00s
 
  Schema Loading Error
