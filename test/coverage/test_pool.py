@@ -607,6 +607,7 @@ def test_coverage_pool_draws_multi_slot_correlated(ctx):
         status_code=201,
         payload={"id": "post-7", "userId": "user-1"},
         context={"userId": "user-1"},
+        referenced=frozenset({"user-1"}),
     )
 
     consumer = schema["/users/{userId}/posts/{postId}"]["GET"]

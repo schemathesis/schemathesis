@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Collection, Mapping
 from functools import lru_cache
 
 from schemathesis.core.text import to_pascal_case
@@ -82,6 +83,27 @@ def trailing_path_parameter(path: str) -> str | None:
 
 def collection_path(path: str) -> str:
     return path.rstrip("/").rsplit("/", 1)[0]
+
+
+def referenced_values(
+    path: str,
+    path_parameters: Mapping[str, object],
+    query: Mapping[str, object],
+    body: object = None,
+    created_fields: Collection[str] = (),
+) -> set[str]:
+    """Values a request sent to name existing objects, rather than the one it creates."""
+    # A write creates what its trailing path parameter, its created body keys and its own `id` name.
+    created = trailing_path_parameter(path)
+    referenced = [value for name, value in path_parameters.items() if name != created]
+    referenced.extend(query.values())
+    if isinstance(body, Mapping):
+        referenced.extend(
+            value
+            for name, value in body.items()
+            if name not in created_fields and name != "id" and not isinstance(value, (dict, list))
+        )
+    return {str(value) for value in referenced}
 
 
 @lru_cache(maxsize=2048)

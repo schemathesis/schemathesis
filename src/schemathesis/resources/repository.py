@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from collections import defaultdict, deque
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import jsonschema_rs
@@ -40,6 +40,10 @@ class ResourceInstance:
     from_example: bool = False
     # Identity whose request produced the resource; `None` outside multi-identity auth.
     identity: str | None = None
+    # Query of that request, so it can be repeated as sent.
+    query: dict[str, Any] = field(default_factory=dict)
+    # Values that request sent to name existing objects, so returning them proves no ownership.
+    referenced: frozenset[str] = frozenset()
 
 
 class ResourceRepository:
@@ -130,6 +134,8 @@ class ResourceRepository:
         context: dict[str, Any] | None = None,
         from_example: bool = False,
         identity: str | None = None,
+        query: dict[str, Any] | None = None,
+        referenced: frozenset[str] = frozenset(),
     ) -> None:
         """Capture resources from an API response based on configured descriptors."""
         descriptors = self._descriptors_by_operation.get(operation, [])
@@ -150,6 +156,8 @@ class ResourceRepository:
                     context=context or {},
                     from_example=from_example,
                     identity=identity,
+                    query=query or {},
+                    referenced=referenced,
                 )
 
     def seed_input_values(self, by_resource: dict[str, dict[str, Any]], *, source: str) -> None:
@@ -177,6 +185,8 @@ class ResourceRepository:
         status_code: int,
         context: dict[str, Any] | None = None,
         identity: str | None = None,
+        query: dict[str, Any] | None = None,
+        referenced: frozenset[str] = frozenset(),
     ) -> None:
         """Capture identifier values from a successful request.
 
@@ -198,6 +208,8 @@ class ResourceRepository:
                 status_code=status_code,
                 context=context or {},
                 identity=identity,
+                query=query or {},
+                referenced=referenced,
             )
 
     def _extract_payload(self, payload: object, descriptor: ResourceDescriptor) -> Iterable[dict[str, Any]]:
@@ -247,6 +259,8 @@ class ResourceRepository:
         context: dict[str, Any],
         from_example: bool = False,
         identity: str | None = None,
+        query: dict[str, Any] | None = None,
+        referenced: frozenset[str] = frozenset(),
     ) -> None:
         """Store a resource instance with context-aware eviction.
 
@@ -266,6 +280,8 @@ class ResourceRepository:
             context=context,
             from_example=from_example,
             identity=identity,
+            query=query or {},
+            referenced=referenced,
         )
 
         with self._lock:

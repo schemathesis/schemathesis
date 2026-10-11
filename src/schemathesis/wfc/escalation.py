@@ -88,7 +88,7 @@ class EscalatingAuthProvider:
         self.peers = peers
         # A pinned identity keeps every operation; the others stay loaded only for peer probes.
         self._pinned = self.names.index(pinned) if pinned is not None else None
-        self._probed: set[tuple[str, str, str]] = set()
+        self._probed: set[tuple[str, ...]] = set()
 
     def index_for(self, label: str) -> int:
         if self._pinned is not None:
@@ -98,7 +98,7 @@ class EscalatingAuthProvider:
     def provider_for(self, name: str) -> AuthProvider:
         return self.providers[self.names.index(name)]
 
-    def claim_probe(self, key: tuple[str, str, str]) -> bool:
+    def claim_probe(self, key: tuple[str, ...]) -> bool:
         """Whether `key` is probed for the first time in this run."""
         with self._lock:
             if key in self._probed:

@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
+    from schemathesis.checks import CheckContext
+    from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
 
 INVALID_CREDENTIAL = "SCHEMATHESIS-INVALID-VALUE"
@@ -147,3 +149,14 @@ def build_retry_transport_kwargs(
     kwargs.pop("session", None)
     kwargs.pop("auth", None)
     return kwargs
+
+
+def send_probe(ctx: CheckContext, parent: Case, probe: Case) -> Response:
+    """Send `probe` as a child of `parent`, keeping the run's transport settings but none of its credentials."""
+    kwargs = build_retry_transport_kwargs(ctx._transport_kwargs, get_security_parameters(parent.operation))
+    if parent.operation.app is not None:
+        kwargs.setdefault("app", parent.operation.app)
+    ctx._record_case(parent_id=parent.id, case=probe)
+    response = parent.operation.schema.transport.send(probe, **kwargs)
+    ctx._record_response(case_id=probe.id, response=response)
+    return response

@@ -431,6 +431,18 @@ _NOTE_RESPONSES = {
     "404": {"description": "Not found"},
 }
 _ORDER_ID = {"name": "order_id", "required": True, "schema": {"type": "integer"}}
+_NOTE_BODY_WITH_ORDER = {
+    "required": True,
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "properties": {"order_id": {"type": "integer"}, "text": {"type": "string"}},
+                "required": ["order_id", "text"],
+            }
+        }
+    },
+}
 _ORDER_NOTES = {
     "/api/orders/{order_id}/notes": {
         "post": {"parameters": [{**_ORDER_ID, "in": "path"}], "requestBody": _NOTE_BODY, "responses": _NOTE_RESPONSES}
@@ -438,6 +450,7 @@ _ORDER_NOTES = {
     "/api/notes": {
         "post": {"parameters": [{**_ORDER_ID, "in": "query"}], "requestBody": _NOTE_BODY, "responses": _NOTE_RESPONSES}
     },
+    "/api/order-notes": {"post": {"requestBody": _NOTE_BODY_WITH_ORDER, "responses": _NOTE_RESPONSES}},
 }
 
 _KEYED_CREATE = {
@@ -455,9 +468,9 @@ def wfc_owned_orders(
     """Orders owned by the caller; `policy` decides what another caller sees.
 
     `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only,
-    `all_renamed` everyone's under a differently named schema.
+    `all_renamed` everyone's under a differently named schema, `all_paged` everyone's, one per `offset` page.
     `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note endpoints that take the
-    order id in the path or query, accept any caller and echo the id.
+    order id in the path, query or body, accept any caller and echo the id.
     `security` is `declared` for an API key on every operation, `undeclared` for none in the schema while the server
     still requires one, `public_read` for the order read marked public with `security: []`, and `public_root` for
     `security: []` on the whole schema.
@@ -475,15 +488,12 @@ def wfc_owned_orders(
             schemas = {"OrderSummary": _ORDER}
             items = {"$ref": "#/components/schemas/OrderSummary"}
         listed = {"type": "array", "items": items}
-        paths = {
-            **paths,
-            "/api/orders": {
-                **_OWNED_ORDERS["/api/orders"],
-                "get": {
-                    "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": listed}}}}
-                },
-            },
+        list_orders_spec: dict[str, object] = {
+            "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": listed}}}}
         }
+        if listing == "all_paged":
+            list_orders_spec["parameters"] = [{"name": "offset", "in": "query", "schema": {"type": "integer"}}]
+        paths = {**paths, "/api/orders": {**_OWNED_ORDERS["/api/orders"], "get": list_orders_spec}}
     if security == "public_read":
         item = paths["/api/orders/{order_id}"]
         paths = {**paths, "/api/orders/{order_id}": {**item, "get": {**item["get"], "security": []}}}
@@ -532,6 +542,9 @@ def wfc_owned_orders(
             return jsonify([order for order in orders.values() if order["owner"] == user])
         if listing == "ids":
             return jsonify([{"id": order["id"]} for order in orders.values()])
+        if listing == "all_paged":
+            offset = request.args.get("offset", 0, type=int)
+            return jsonify(list(orders.values())[offset : offset + 1])
         return jsonify(list(orders.values()))
 
     @app.route("/api/orders/<int:order_id>", methods=["GET"])
@@ -561,12 +574,16 @@ def wfc_owned_orders(
         return jsonify(orders[order_id]), 201
 
     @app.route("/api/notes", methods=["POST"])
+    @app.route("/api/order-notes", methods=["POST"])
     @app.route("/api/orders/<int:order_id>/notes", methods=["POST"])
     def add_note(order_id: int | None = None) -> object:
         if caller() is None:
             return jsonify({"detail": "unauthorized"}), 401
         if order_id is None:
-            order_id = request.args.get("order_id", type=int)
+            body = request.get_json(silent=True)
+            order_id = request.args.get("order_id", type=int) or (
+                body.get("order_id") if isinstance(body, dict) else None
+            )
         if order_id not in orders:
             return jsonify({"detail": "not found"}), 404
         return jsonify({"id": 7, "order_id": order_id, "text": "note"}), 201
