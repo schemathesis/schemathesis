@@ -93,6 +93,38 @@ def test_audit_schema_does_not_synthesize_response_coverage(ctx):
     assert all(not gap.get("kind", "").startswith("response_") for gap in outcome.result.gaps)
 
 
+def test_audit_schema_records_cookie_parameter_coverage(ctx):
+    outcome = audit_schema(
+        ctx.openapi.build_schema(
+            {
+                "/a": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "sid",
+                                "in": "cookie",
+                                "required": True,
+                                "schema": {"type": "string", "minLength": 2},
+                            },
+                            {
+                                "name": "q",
+                                "in": "query",
+                                "required": True,
+                                "schema": {"type": "string", "minLength": 2},
+                            },
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            }
+        ),
+        api="t",
+        corpus="external",
+        phase=PhaseName.COVERAGE,
+    )
+    assert outcome.result.uncovered_keywords == []
+
+
 def test_audit_schema_records_required_invalid_for_form_urlencoded_body(ctx):
     # `requests` collapses an empty form body to None, which used to skip the body schema
     # in the recorder; the omit-required negative case must still register `/required` as
