@@ -956,10 +956,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
             feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
         if self.schema.config.headers:
-            headers = kwargs.get("headers")
-            if headers is None:
-                headers = kwargs["headers"] = {}
-            headers.update(self.schema.config.headers)
+            kwargs["headers"] = {**(kwargs.get("headers") or {}), **self.schema.config.headers}
         strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, feedback=feedback, **kwargs)
         return apply_case_hooks(strategy, self, local=kwargs.get("hooks"))
 
