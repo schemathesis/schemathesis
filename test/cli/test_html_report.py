@@ -471,6 +471,26 @@ def test_html_report_network_error_details(ctx, cli, report_dir, snapshot_html):
     assert html == snapshot_html
 
 
+def test_html_report_identical_errors_share_one_card(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success_and_failure()
+    html = run_with_report(cli, report_dir, api.schema_url, "--url=http://127.0.0.1:1", exit_code=ExitCode.FAILURES)
+    assert html.count('<article class="case case-error"') == 1
+    assert html == snapshot_html
+
+
+def test_html_report_different_errors_keep_separate_cards(ctx, cli, report_dir):
+    api = ctx.openapi.apps.success_and_failure()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(ctx, case, **kwargs):
+    raise ValueError(case.path)
+"""
+    )
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.FAILURES, hooks=module)
+    assert html.count('<article class="case case-error"') == 2
+
+
 def test_html_report_run_level_failure(ctx, cli, report_dir, snapshot_html, ensure_reachability_module):
     api = ctx.openapi.apps.success_and_failure()
     html = run_with_report(

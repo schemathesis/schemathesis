@@ -497,9 +497,13 @@ def _operation_cell(row: OperationRow, toggle: str) -> str:
     )
 
 
-def _failures_cell(row: OperationRow) -> str:
+def _failures_cell(row: OperationRow, note_target: str | None = None) -> str:
     if not row.failures:
-        note = f'<span class="op-note">{esc(row.note)}</span>' if row.note else ""
+        note = ""
+        if row.note and note_target is not None:
+            note = f'<a class="op-note" href="#{note_target}">{esc(row.note)}</a>'
+        elif row.note:
+            note = f'<span class="op-note">{esc(row.note)}</span>'
         return f'<td class="failures-cell">{note}</td>'
     first, *rest = row.failures
     title = f'<span class="failure-title">{esc(first)}</span>'
@@ -652,7 +656,7 @@ def _traceback(lines: list[str]) -> str:
     )
 
 
-def _error(error: ErrorEntry, *, with_title: bool, owner: str = "") -> str:
+def _error(error: ErrorEntry, *, with_title: bool, owner: str = "", card_id: str = "") -> str:
     lead = "" if with_title else " lead"
     parts = [f'<h4 class="finding-title">{esc(error.title)}</h4>' if with_title else ""]
     parts.append(f'<pre class="msg{lead}">{esc(error.message)}</pre>')
@@ -666,7 +670,8 @@ def _error(error: ErrorEntry, *, with_title: bool, owner: str = "") -> str:
         sections.append(_reproduce([Command(curl=error.reproduce, method=None, path=None, failed=False)], None))
     if error.tip is not None:
         sections.append(_evidence("Tip", f'<p class="tip">{_code_spans(error.tip)}</p>'))
-    return f'<article class="case case-error"><div class="case-body">{"".join(sections)}</div></article>'
+    id_attribute = f' id="{card_id}"' if card_id else ""
+    return f'<article class="case case-error"{id_attribute}><div class="case-body">{"".join(sections)}</div></article>'
 
 
 def _case_owner(label: str) -> str:
@@ -675,8 +680,33 @@ def _case_owner(label: str) -> str:
     return f'<div class="case-owner">{badge}<span class="path">{esc(path)}</span></div>'
 
 
-def _has_details(row: OperationRow) -> bool:
-    return bool(row.failing_cases or row.errors)
+ErrorKey = tuple[str, str, str | None, tuple[str, ...], str | None]
+
+
+def _error_key(error: ErrorEntry) -> ErrorKey:
+    return (error.title, error.message, error.tip, tuple(error.details), error.reproduce)
+
+
+def _shared_errors(rows: list[OperationRow]) -> dict[ErrorKey, tuple[str, list[str]]]:
+    """Errors identical across operations, each with its card id and the operations it occurred in, in table order."""
+    labels: dict[ErrorKey, list[str]] = {}
+    for row in rows:
+        for error in row.errors:
+            labels.setdefault(_error_key(error), []).append(row.label)
+    shared = [(key, owners) for key, owners in labels.items() if len(owners) > 1]
+    return {key: (f"shared-error-{index}", owners) for index, (key, owners) in enumerate(shared, 1)}
+
+
+def _shared_operations(labels: list[str], anchors: dict[str, str]) -> str:
+    items = []
+    for label in labels:
+        method, path = split_label(label)
+        badge = _method(method) if method is not None else ""
+        items.append(f'<li><a href="#{anchors[label]}">{badge}<span class="path">{esc(path)}</span></a></li>')
+    return (
+        f'<div class="case-ops"><span class="case-ops-count">{plural(len(labels), "operation")}</span>'
+        f"<ul>{''.join(items)}</ul></div>"
+    )
 
 
 def _detail_row(items: list[str], anchor: str, css: str) -> str:
@@ -686,12 +716,27 @@ def _detail_row(items: list[str], anchor: str, css: str) -> str:
     )
 
 
-def _row_items(row: OperationRow) -> list[str]:
+def _row_items(row: OperationRow, shared: dict[ErrorKey, tuple[str, list[str]]], anchors: dict[str, str]) -> list[str]:
     items = [_failing_case(case) for case in row.failing_cases]
+    # A shared error shows once, in the row of the first operation it occurred in.
+    errors = []
+    for error in row.errors:
+        card_id, labels = shared.get(_error_key(error), ("", [row.label]))
+        if labels[0] == row.label:
+            errors.append((error, card_id, labels))
     # A lone error on an errored row repeats the title the row already shows.
-    with_title = bool(row.failing_cases) or len(row.errors) > 1
-    items.extend(_error(error, with_title=with_title) for error in row.errors)
+    with_title = bool(row.failing_cases) or len(errors) > 1
+    for error, card_id, labels in errors:
+        owner = _shared_operations(labels, anchors) if card_id else ""
+        items.append(_error(error, with_title=with_title, owner=owner, card_id=card_id))
     return items
+
+
+def _note_target(row: OperationRow, shared: dict[ErrorKey, tuple[str, list[str]]]) -> str | None:
+    if not row.errors:
+        return None
+    card_id, labels = shared.get(_error_key(row.errors[0]), ("", [row.label]))
+    return card_id if labels[0] != row.label else None
 
 
 def _operation_order(row: OperationRow) -> tuple[int, str, str]:
@@ -721,29 +766,33 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
     has_failures = any(row.status is OperationStatus.FAILED for row in data.operations)
     collapse_passed = has_failures and len(data.operations) > _COLLAPSE_PASSED_ABOVE
     groups = []
+    grouped = {
+        status: sorted((row for row in data.operations if row.status is status), key=_operation_order)
+        for status in OperationStatus
+    }
+    shared = _shared_errors([row for rows in grouped.values() for row in rows])
+    row_items = {row.label: _row_items(row, shared, anchors) for row in data.operations}
     # A single expandable block answers "what broke" with nothing competing for the space, so it starts open.
-    open_details = (
-        sum(map(_has_details, data.operations)) + bool(data.unattributed_cases or data.unattributed_errors) == 1
-    )
-    for status in OperationStatus:
-        rows = sorted((row for row in data.operations if row.status is status), key=_operation_order)
+    open_details = sum(map(bool, row_items.values())) + bool(data.unattributed_cases or data.unattributed_errors) == 1
+    for status, rows in grouped.items():
         if not rows:
             continue
         header = _group_header(status, rows, collapsible=collapse_passed and status is OperationStatus.PASSED)
         body = ""
         for row in rows:
             anchor = anchors[row.label]
-            if _has_details(row):
+            failures = _failures_cell(row, _note_target(row, shared))
+            if row_items[row.label]:
                 toggle = _toggle(f"{anchor}-details", row.label, checked=open_details)
                 body += (
                     f'<tr class="op-row row-{status.css} has-details" id="{anchor}">'
-                    f"{_operation_cell(row, toggle)}{_failures_cell(row)}{_cases_cell(row, _CHEVRON)}</tr>"
-                    f"{_detail_row(_row_items(row), anchor, status.css)}"
+                    f"{_operation_cell(row, toggle)}{failures}{_cases_cell(row, _CHEVRON)}</tr>"
+                    f"{_detail_row(row_items[row.label], anchor, status.css)}"
                 )
             else:
                 body += (
                     f'<tr class="op-row row-{status.css}" id="{anchor}">'
-                    f"{_operation_cell(row, '')}{_failures_cell(row)}{_cases_cell(row, '')}</tr>"
+                    f"{_operation_cell(row, '')}{failures}{_cases_cell(row, '')}</tr>"
                 )
         groups.append(f'<tbody class="ops-group">{header}{body}</tbody>')
     footer_rows = []

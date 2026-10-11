@@ -221,7 +221,13 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
 .case-id{color:var(--color-text-secondary)}
 .case-identity code{font-family:inherit;color:var(--color-text-secondary)}
 .case-owner{display:flex;align-items:baseline;gap:8px;font-family:var(--font-family-monospace);font-size:12px}
-.case-owner .method{min-width:0;padding:0 5px;font-size:10px}
+.case-owner .method,.case-ops .method{min-width:0;padding:0 5px;font-size:10px}
+.case-ops{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-family:var(--font-family-monospace);font-size:12px}
+.case-ops-count{color:var(--color-text-secondary)}
+.case-ops ul{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0;padding:0;list-style:none}
+.case-ops a{display:inline-flex;align-items:baseline;gap:8px;text-decoration:none}
+.case-ops a:hover .path,a.op-note:hover{text-decoration:underline}
+a.op-note{position:relative;z-index:2;text-decoration:none}
 
 .finding{display:flex;flex-direction:column;gap:4px;min-width:0}
 .finding-title{margin:0;display:flex;align-items:baseline;gap:8px;font-family:var(--font-family-default);font-size:var(--font-size-sm);font-weight:600;line-height:1.4;color:var(--color-text-primary)}
