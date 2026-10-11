@@ -6313,6 +6313,22 @@ def test_positive_object_annotations_fall_back_to_template(ctx, annotations, exp
         validator.validate(case.body)
 
 
+@pytest.mark.parametrize(
+    "annotations",
+    [{"example": 5}, {"default": "bad"}, {"examples": ["nope", 3]}, {"example": 5, "default": "bad"}],
+    ids=["example", "default", "examples", "example-and-default"],
+)
+@pytest.mark.parametrize(
+    "base",
+    [{"type": "array"}, {"type": "array", "minItems": 2}, {"type": "array", "items": {"type": "integer"}}],
+    ids=["plain", "min-items", "items"],
+)
+def test_positive_array_invalid_annotations_keep_baseline(ctx, base, annotations):
+    expected = [case.body for case in collect_coverage_cases(ctx, base, positive=True, version="3.1.0")]
+    annotated = collect_coverage_cases(ctx, {**base, **annotations}, positive=True, version="3.1.0")
+    assert [case.body for case in annotated] == expected
+
+
 def test_positive_object_example_with_invalid_format_not_yielded(ctx):
     # Schema-level example with a property value that violates format: date-time (missing timezone).
     # The invalid example must not appear as a POSITIVE coverage case.
