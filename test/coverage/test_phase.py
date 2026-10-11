@@ -10141,3 +10141,28 @@ def test_coverage_pattern_with_identity_escape_in_query(ctx):
     )
 
     assert_positive_coverage(schema, [{"query": {"latitude": "0"}}])
+
+
+@pytest.mark.parametrize(
+    ("target", "body"),
+    [
+        ({"type": "integer", "maximum": 10}, {"$ref": "#/components/schemas/Target", "maximum": 100}),
+        (
+            {"type": "string", "maxLength": 3},
+            {"$ref": "#/components/schemas/Target", "minLength": 2, "maxLength": 50},
+        ),
+        (
+            {"type": "object", "properties": {"a": {"type": "integer", "minimum": 5}}, "required": ["a"]},
+            {"$ref": "#/components/schemas/Target", "properties": {"a": {"type": "integer", "minimum": 0}}},
+        ),
+        (
+            {"type": "integer", "maximum": 10},
+            {"oneOf": [{"$ref": "#/components/schemas/Target", "maximum": 100}, {"type": "string"}]},
+        ),
+    ],
+    ids=["number", "string", "object", "one-of-branch"],
+)
+def test_positive_bodies_honor_ref_siblings_and_target_in_openapi_31(ctx, target, body):
+    # Draft 2020-12 applies both the `$ref` target and the keywords beside it.
+    operation = body_operation(ctx, body, version="3.1.0", components={"schemas": {"Target": target}})
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
