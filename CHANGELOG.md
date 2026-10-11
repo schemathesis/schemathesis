@@ -28,6 +28,7 @@
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
+- Missing `negative_data_rejection` failures for integer parameters sent as `1_0`, ` 5` or non-ASCII digits.
 - Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
 - Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
