@@ -1608,11 +1608,10 @@ def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, ap
     def items(kind, id):
         if kind not in VALID_KINDS:
             return jsonify({"error": "invalid kind"}), 400
-        try:
-            id_int = int(id)
-        except ValueError:
+        # Python's `int` also accepts surrounding whitespace, signs, underscores, and non-ASCII digits.
+        if not (id.isascii() and id.isdigit()):
             return jsonify({"error": "id must be an integer"}), 400
-        if not (0 <= id_int <= 2**63 - 1):
+        if int(id) > 2**63 - 1:
             return jsonify({"error": "id out of range"}), 400
         return jsonify({"ok": True}), 200
 

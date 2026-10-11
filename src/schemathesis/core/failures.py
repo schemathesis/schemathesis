@@ -448,7 +448,7 @@ def format_failures(
         )
     # `response`/`curl` are None for failures not tied to a case (e.g. after_run): nothing to show.
     if curl is not None:
-        _curl = "\n".join(f"    {line}" for line in curl.splitlines())
+        _curl = "\n".join(f"    {line}" if line else line for line in curl.splitlines())
         output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with:\n\n{_curl}")
 
     return escape_surrogates(output.rstrip("\n"))

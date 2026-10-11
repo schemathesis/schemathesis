@@ -12,7 +12,7 @@ _DEFAULT_GENERATION_DATABASE_ARGUMENT = "--generation-database=none"
 
 
 def _with_default_generation_database(args, config=None):
-    if not args or args[0] != "run":
+    if not args or args[0] not in ("run", "fuzz"):
         return args
     if _has_cli_option(args, "--generation-database") or _has_cli_option(args, "--generation-deterministic"):
         return args

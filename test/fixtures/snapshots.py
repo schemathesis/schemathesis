@@ -395,7 +395,7 @@ def _is_phase_header(line: str) -> bool:
 
 def _normalize_line(line: str) -> str:
     line = click.unstyle(line)
-    if line.endswith("Schema Loading Error"):
+    if line.endswith("Schema Loading Error") and line.strip() != "Schema Loading Error":
         # It is written at the end of the current line and does not properly rewrite the current line
         # on all terminals
         return "Schema Loading Error"
