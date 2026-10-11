@@ -501,82 +501,48 @@ def _extract_nested_body_fk_fields(
         return
 
     properties, _ = _flatten_composition(schema)
-    if not properties:
+    for property_name, subschema in properties.items():
+        if isinstance(subschema, dict):
+            current_path = f"{path}/{property_name}" if path else property_name
+            yield from _extract_container_fk_fields(subschema, resources, current_path, max_depth, deferred)
+
+
+def _extract_container_fk_fields(
+    schema: dict[str, Any],
+    resources: ResourceMap,
+    path: str,
+    max_depth: int,
+    deferred: list[tuple[str, str, str]] | None,
+) -> Iterator[InputSlot]:
+    if schema.get("type") == "array":
+        items = schema.get("items")
+        if isinstance(items, dict):
+            yield from _extract_container_fk_fields(items, resources, f"{path}/0", max_depth, deferred)
         return
 
-    for property_name, subschema in properties.items():
+    # Composition branches may carry the actual object shape, so flatten before treating as object.
+    properties, _ = _flatten_composition(schema)
+    for name, subschema in properties.items():
         if not isinstance(subschema, dict):
             continue
+        fk_info = infer_fk_target(name)
+        if fk_info is None:
+            continue
+        nested_path = f"{path}/{name}"
+        target_resource_name, target_field, _ = fk_info
+        resource = resources.get(target_resource_name)
+        if resource is not None:
+            yield InputSlot(
+                resource=resource,
+                resource_field=target_field,
+                parameter_name=nested_path,
+                parameter_location=ParameterLocation.BODY,
+            )
+        elif deferred is not None:
+            deferred.append((target_resource_name, target_field, nested_path))
 
-        # Build the path for nested fields
-        current_path = f"{path}/{property_name}" if path else property_name
-
-        # Composition branches may carry the actual object shape, so flatten before treating as object.
-        sub_properties, _ = _flatten_composition(subschema)
-        prop_type = subschema.get("type")
-
-        if prop_type == "object" or sub_properties:
-            for nested_name, nested_schema in sub_properties.items():
-                if not isinstance(nested_schema, dict):
-                    continue
-
-                nested_path = f"{current_path}/{nested_name}"
-
-                # Check if nested field is a FK
-                fk_info = infer_fk_target(nested_name)
-                if fk_info is not None:
-                    target_resource_name, target_field, _ = fk_info
-                    resource = resources.get(target_resource_name)
-                    if resource is not None:
-                        yield InputSlot(
-                            resource=resource,
-                            resource_field=target_field,
-                            parameter_name=nested_path,
-                            parameter_location=ParameterLocation.BODY,
-                        )
-                    elif deferred is not None:
-                        deferred.append((target_resource_name, target_field, nested_path))
-                    continue
-
-                deeper_properties, _ = _flatten_composition(nested_schema)
-                if nested_schema.get("type") == "object" or deeper_properties:
-                    yield from _extract_nested_body_fk_fields(
-                        nested_schema, resources, nested_path, max_depth - 1, deferred=deferred
-                    )
-
-        elif prop_type == "array":
-            # Check array items for FK fields
-            items = subschema.get("items")
-            if isinstance(items, dict):
-                items_path = f"{current_path}/0"
-
-                items_props, _ = _flatten_composition(items)
-                for item_prop_name, item_prop_schema in items_props.items():
-                    if not isinstance(item_prop_schema, dict):
-                        continue
-
-                    item_path = f"{items_path}/{item_prop_name}"
-
-                    # Check if this item property is a FK
-                    fk_info = infer_fk_target(item_prop_name)
-                    if fk_info is not None:
-                        target_resource_name, target_field, _ = fk_info
-                        resource = resources.get(target_resource_name)
-                        if resource is not None:
-                            yield InputSlot(
-                                resource=resource,
-                                resource_field=target_field,
-                                parameter_name=item_path,
-                                parameter_location=ParameterLocation.BODY,
-                            )
-                        elif deferred is not None:
-                            deferred.append((target_resource_name, target_field, item_path))
-
-                # Recurse into array items
-                if items.get("type") == "object" or items_props:
-                    yield from _extract_nested_body_fk_fields(
-                        items, resources, items_path, max_depth - 1, deferred=deferred
-                    )
+    if properties:
+        yield from _extract_nested_body_fk_fields(schema, resources, path, max_depth - 1, deferred=deferred)
 
 
 def rebind_inherited_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:
