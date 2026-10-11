@@ -46,6 +46,7 @@
 - `as_strategy(headers=...)` modifying the passed headers dictionary.
 - Stateful extraction failures listed in a different order between runs with the same seed.
 - Duplicated and unsorted run-level check failures in JUnit and Allure reports.
+- Success icon for an interrupted `st fuzz` run.
 - Allure reports missing coverage failures for undeclared HTTP methods.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
 - WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.
