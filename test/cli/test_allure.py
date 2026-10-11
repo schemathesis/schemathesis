@@ -1,6 +1,7 @@
 import json
 
 from _pytest.main import ExitCode
+from flask import jsonify
 
 
 def test_allure_result_files_written(ctx, cli, tmp_path):
@@ -48,6 +49,29 @@ def test_allure_failure_has_reproduce_attachment(ctx, cli, tmp_path):
     step_messages = [s["statusDetails"]["message"] for r in failed for s in r.get("steps", [])]
     assert step_messages
     assert any("curl" in m.lower() for m in step_messages)
+
+
+def test_coverage_unspecified_method_in_allure(ctx, cli, tmp_path):
+    allure_dir = tmp_path / "allure-results"
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/users", methods=["GET", "DELETE", "POST", "PUT", "PATCH", "HEAD"])
+    def users():
+        return jsonify([])
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=coverage",
+            f"--report-allure-path={allure_dir}",
+            "--checks=unsupported_method",
+        ).exit_code
+        == ExitCode.TESTS_FAILED
+    )
+
+    results = [json.loads(file.read_text()) for file in allure_dir.glob("*-result.json")]
+    messages = [step["statusDetails"]["message"] for result in results for step in result.get("steps", [])]
+    assert any("Unsupported methods" in message for message in messages)
 
 
 def test_allure_no_report_without_flag(ctx, cli, tmp_path):

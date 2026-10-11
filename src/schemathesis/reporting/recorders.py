@@ -18,6 +18,12 @@ def scenario_failures(statistic: Statistic, recorder: RecordedScenario, label: s
     return [group for case_id, group in statistic.failures.get(label, {}).items() if case_id in case_ids]
 
 
+def recorder_failures(statistic: Statistic, recorder: RecordedScenario) -> list[GroupedFailures]:
+    """Failures recorded for cases in a scenario."""
+    case_ids = set(recorder.cases)
+    return [group for groups in statistic.failures.values() for case_id, group in groups.items() if case_id in case_ids]
+
+
 def scenario_has_failures(recorder: RecordedScenario, label: str) -> bool:
     """Whether any case for a specific operation label within a multi-operation scenario failed a check."""
     return any(
