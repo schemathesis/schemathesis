@@ -199,9 +199,8 @@ class ReportData:
     started: bool
     complete: bool
     exit_code: int
-    # Distinct errors per phase name, and failures each phase hit after an earlier phase found them.
+    # Distinct errors per phase name.
     phase_errors: dict[str, int] = field(default_factory=dict)
-    found_again: dict[str, int] = field(default_factory=dict)
 
     @property
     def tested_operations(self) -> int:
