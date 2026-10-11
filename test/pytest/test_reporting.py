@@ -1,4 +1,5 @@
 import pathlib
+import re
 from xml.etree import ElementTree
 
 import pytest
@@ -915,6 +916,30 @@ def test_html_report_uses_pytest_outcome(testdir, ctx, outcome, snapshot_html):
     testdir.runpytest()
 
     assert report_dir.join("index.html").read_text("utf-8") == snapshot_html
+
+
+def test_html_report_repeated_check_failure_across_items(testdir, ctx):
+    api = ctx.openapi.apps.failure()
+    report_dir = testdir.tmpdir.join("report")
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.reports.update(html_path=r"{report_dir}")
+
+@pytest.mark.parametrize("user", ["alice", "bob"])
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case, user):
+    case.call_and_validate(headers={{"X-User": user}})
+""",
+        schema=ctx.openapi.build_schema({"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}}),
+    )
+    testdir.runpytest().assert_outcomes(failed=2)
+
+    assert re.findall(r'tf-name" title="([^"]+)"', report_dir.join("index.html").read_text("utf-8")) == [
+        "Server error",
+        "Undocumented HTTP status code",
+    ]
 
 
 def test_html_report_merged_via_xdist(testdir, ctx, snapshot_html):

@@ -77,8 +77,9 @@ class HtmlWriter:
         operation = self._operations.setdefault(label, _Operation())
         operation.cases += len(recorder.cases)
         self._statistic.total_cases += len(recorder.cases)
-        groups = _latest_per_failure(grouped_failures_from_recorder(recorder), operation.seen)
-        if not groups and status == Status.FAILURE:
+        recorded = grouped_failures_from_recorder(recorder)
+        groups = _latest_per_failure(recorded, operation.seen)
+        if not recorded and status == Status.FAILURE:
             # The test itself failed, e.g. on an assertion, without any check failing.
             failure = Failure(operation=label, title="Test failed", message=message or "")
             groups = [GroupedFailures(case_id=None, code_sample=None, failures=[failure], response=None)]
