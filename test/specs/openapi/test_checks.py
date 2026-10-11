@@ -1701,6 +1701,77 @@ def test_negative_data_rejection_reports_invalid_serialized_query(
         negative_data_rejection(check_context(), response, case)
 
 
+_UNPARSEABLE_INTEGER_TEXTS = pytest.mark.parametrize(
+    "value", ["1_0", " 5", "\u0665"], ids=["underscore", "whitespace", "non-ascii"]
+)
+
+
+@_UNPARSEABLE_INTEGER_TEXTS
+def test_negative_data_rejection_reports_unparseable_integer_in_query_array(ctx, response_factory, value):
+    schema = ctx.openapi.load_schema(
+        {"/items": {"get": {"parameters": [{"in": "query", "name": "value", "schema": {"type": "integer"}}]}}}
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        query={"value": [value]},
+    )
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+@_UNPARSEABLE_INTEGER_TEXTS
+@pytest.mark.parametrize("location", [ParameterLocation.PATH, ParameterLocation.QUERY], ids=["path", "query"])
+def test_negative_data_rejection_reports_unparseable_integer_type_mutation(ctx, response_factory, value, location):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{value}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "value", "required": True, "schema": {"type": "integer"}},
+                        {"in": "query", "name": "value", "required": True, "schema": {"type": "integer"}},
+                    ]
+                }
+            }
+        }
+    )
+    mutation = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="value", location=location)
+    meta = build_metadata(generation_modes=[GenerationMode.NEGATIVE], mutations=(mutation,))
+    meta.components = {location: ComponentInfo(mode=GenerationMode.NEGATIVE)}
+    case = schema["/items/{value}"]["GET"].Case(
+        _meta=meta,
+        path_parameters={"value": value if location == ParameterLocation.PATH else 1},
+        query={"value": value if location == ParameterLocation.QUERY else 1},
+    )
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+@_UNPARSEABLE_INTEGER_TEXTS
+def test_negative_data_rejection_reports_unparseable_integer_in_path_array(ctx, response_factory, value):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{values}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "values",
+                            "required": True,
+                            "schema": {"type": "array", "items": {"type": "integer"}},
+                        }
+                    ]
+                }
+            }
+        }
+    )
+    case = schema["/items/{values}"]["GET"].Case(
+        _meta=build_metadata(path_parameters=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        path_parameters={"values": f"{value},2"},
+    )
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
 # Servers commonly parse these as floats, so they may legitimately read them as numbers.
 @pytest.mark.parametrize("value", ["nan", "inf", "-Infinity", "1e400"])
 @pytest.mark.parametrize("location", [ParameterLocation.PATH, ParameterLocation.QUERY], ids=["path", "query"])

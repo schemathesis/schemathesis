@@ -44,6 +44,9 @@ def coerce_wire_string(value: str, expected_types: list[str]) -> int | float | b
     Used to bridge wire-level string transmission (query/header/cookie/path) and
     the JSON-typed schema constraints those parameters declare.
     """
+    # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
+    if not value.isascii() or "_" in value or value != value.strip():
+        return None
     if "integer" in expected_types:
         try:
             return int(value)
@@ -77,9 +80,6 @@ def sent_text_is_valid(text: str, is_valid: Callable[[object], bool], expected_t
     """Whether a server reading `text` off the wire gets a value `is_valid` accepts."""
     if is_valid(text) or reads_as_null(text, is_valid):
         return True
-    # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
-    if not text.isascii() or "_" in text or text != text.strip():
-        return False
     coerced = coerce_wire_string(text, expected_types)
     return coerced is not None and numeric_wire_value_is_valid(coerced, is_valid)
 
