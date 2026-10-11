@@ -14,7 +14,7 @@ from schemathesis.cli.summary import (
     reduce_test_cases,
 )
 from schemathesis.core.failures import RUN_CHECKS_LABEL
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.events import FuzzScenarioFinished
 
 
@@ -23,11 +23,17 @@ class FuzzExecutionContext(BaseExecutionContext):
     """Execution state for `st fuzz`."""
 
     errors: set[events.NonFatalError] = field(default_factory=set)
+    stop_reason: StopReason = StopReason.COMPLETED
 
     def summary(self) -> SummaryData:
         # `st fuzz` has no phases, so the map stays empty and the report reports none.
         return SummaryData(
-            operations=build_operations(api_statistic=self.api_statistic, statistic=self.statistic, errors=self.errors),
+            operations=build_operations(
+                api_statistic=self.api_statistic,
+                statistic=self.statistic,
+                errors=self.errors,
+                stop_reason=self.stop_reason,
+            ),
             phases={},
             test_cases=reduce_test_cases(self.statistic),
             failures=reduce_failures(self.statistic),
@@ -44,6 +50,7 @@ class FuzzExecutionContext(BaseExecutionContext):
             if event.status in (Status.FAILURE, Status.ERROR):
                 self.exit_code = ExitCode.FAILURES
         elif isinstance(event, events.EngineFinished):
+            self.stop_reason = event.stop_reason
             # after_run failures arrive here.
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)

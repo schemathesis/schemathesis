@@ -292,6 +292,7 @@ def _reduce_operations(
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]],
     skip_reasons: dict[str, set[str]],
     stop_reason: StopReason,
+    error_phases: tuple[PhaseName, ...] | None = UNIT_PHASES,
 ) -> OperationsSummary:
     errored = len(
         statistic.errored_operations - statistic.tested_operations
@@ -299,7 +300,7 @@ def _reduce_operations(
             error.label
             for error in errors
             # Some API operations may have some tests before they have an error
-            if error.phase in UNIT_PHASES
+            if (error_phases is None or error.phase in error_phases)
             and error.label not in statistic.tested_operations
             and error.related_to_operation
         }
@@ -317,7 +318,7 @@ def _reduce_operations(
     if skipped > len(explained.keys() | without_checks):
         if stop_reason.skip_explanation is not None:
             reasons.add(stop_reason.skip_explanation)
-        elif any(phases[phase][0] == Status.ERROR for phase in UNIT_PHASES):
+        elif any(phases.get(phase, (Status.SKIP, None))[0] == Status.ERROR for phase in UNIT_PHASES):
             reasons.add("Phase errored")
     return OperationsSummary(
         total=api_statistic.operations.total,
@@ -330,26 +331,23 @@ def _reduce_operations(
 
 
 def build_operations(
-    *, api_statistic: ApiStatistic | None, statistic: Statistic, errors: set[events.NonFatalError]
+    *,
+    api_statistic: ApiStatistic | None,
+    statistic: Statistic,
+    errors: set[events.NonFatalError],
+    stop_reason: StopReason,
 ) -> OperationsSummary | None:
     """Operation counts without phase context; `st run` uses `SummaryData.from_run` instead."""
     if api_statistic is None:
         return None
-    errored = len(
-        statistic.errored_operations - statistic.tested_operations
-        | {
-            error.label
-            for error in errors
-            if error.related_to_operation and error.label not in statistic.tested_operations
-        }
-    )
-    return OperationsSummary(
-        total=api_statistic.operations.total,
-        selected=api_statistic.operations.selected,
-        tested=len(statistic.tested_operations),
-        errored=errored,
-        skipped=0,
-        skip_reasons=[],
+    return _reduce_operations(
+        api_statistic=api_statistic,
+        statistic=statistic,
+        errors=errors,
+        phases={},
+        skip_reasons={},
+        stop_reason=stop_reason,
+        error_phases=None,
     )
 
 
