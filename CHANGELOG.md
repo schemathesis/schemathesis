@@ -20,7 +20,7 @@
 ### :bug: Fixed
 
 - Missing unresolvable-reference warning for responses whose `$ref` reaches it through a cycle.
-- Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
+- Traceback and early stateful phase exit with `--mode negative` for steps with nothing to negate.
 - Check failures shown as a bare `Failure()` in `repr` and pytest assertion messages.
 - Missing or broken inferred stateful links for paginated lists of wrapped items, e.g. `{items: [{track}]}`.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
@@ -31,9 +31,9 @@
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - Generated strings failing `pattern` when a group holds a possessive quantifier, e.g. `(a*+)`.
 - `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.
-- Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
+- Crash on schemas with a non-object `info` or a non-string `info.title`.
 - Top-level `[[operations]]` overriding `[[project.operations]]` for the same operation.
-- `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
+- `st fuzz` crashing with `Inconsistent data generation` when the server stops responding.
 - `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
 - Allure reports missing coverage failures for undeclared HTTP methods.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
@@ -55,9 +55,9 @@
 - pytest negative testing skipped as impossible on operations with configured basic auth.
 - Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
 - Crash in the examples phase when a response example field holds a list of scalars.
-- Missing inferred stateful links from `POST /books` to `GET /books/{title}` when the request body sends `title`.
+- Missing inferred stateful links from `POST /books` to `GET /books/{title}` via request body `title`.
 - Coverage phase dropping `$ref` target constraints when sibling keywords are looser in Open API 3.1.
-- Inferred stateful links sending a numeric `id` to string path parameters when a string `uuid` exists.
+- Inferred links sending a numeric `id` to string path parameters when a string `uuid` exists.
 - Coverage phase skipping the valid array when every `example`, `examples` and `default` is invalid.
 - Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
 - Coverage phase skipping the object-body negative for non-object `type` when `required` precedes `properties`.

@@ -47,8 +47,8 @@ def test_pydantic_parser_can_parse_recognises_envelope(body):
         {"detail": "RFC 7807 prose, not a list"},
         {"detail": []},
         {"detail": [123, "not a dict"]},
-        {"detail": [{"loc": ["body", "x"]}]},  # missing `type`
-        {"detail": [{"type": "missing"}]},  # missing `loc`
+        {"detail": [{"loc": ["body", "x"]}]},
+        {"detail": [{"type": "missing"}]},
     ],
     ids=[
         "empty-dict",
@@ -667,9 +667,9 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
         "not a dict",
         [1, 2, 3],
         {"detail": "RFC 7807 prose"},
-        {"detail": [{"type": "missing"}]},  # missing loc
+        {"detail": [{"type": "missing"}]},
         {"detail": [{"type": "unknown_code", "loc": ["body", "x"], "msg": "..."}]},
-        {"detail": [{"type": "missing", "loc": [], "msg": "..."}]},  # empty loc - no path
+        {"detail": [{"type": "missing", "loc": [], "msg": "..."}]},
     ],
     ids=[
         "none",

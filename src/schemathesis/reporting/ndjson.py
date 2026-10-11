@@ -39,7 +39,8 @@ SKIP_FIELDS: dict[str, frozenset[str]] = {
     ),
     "Case": frozenset({"operation"}),
     "NonFatalError": frozenset({"info"}),  # Duplicate of `value`
-    "CheckFailureInfo": frozenset({"code_sample", "steps"}),  # Reconstructable from case + interaction
+    # Reconstructable from case + interaction
+    "CheckFailureInfo": frozenset({"code_sample", "steps"}),
 }
 
 # Underscore-prefixed dataclass fields are skipped by default. EXPOSE_PRIVATE_FIELDS

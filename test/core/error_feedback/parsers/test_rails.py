@@ -216,10 +216,11 @@ def test_rails_parser_split_legacy_message(line, expected):
 @pytest.mark.parametrize(
     "line",
     [
-        "nothing recognisable",  # no lead token
-        "is invalid",  # leads with a token, no humanised attribute prefix
-        "must be accepted",  # same — bare phrasing
+        "nothing recognisable",
+        "is invalid",
+        "must be accepted",
     ],
+    ids=["no-lead-token", "lead-token-without-attribute", "bare-phrasing"],
 )
 def test_rails_parser_split_legacy_message_returns_none(line):
     assert _split_legacy_message(line) is None

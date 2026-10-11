@@ -5,6 +5,7 @@ import os
 from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
+from urllib.parse import quote
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
@@ -287,8 +288,6 @@ def _phases(ctx: ExecutionContext) -> list[tuple[str, str, str]]:
 
 
 def _report_links(ctx: BaseExecutionContext, output_dir: Path) -> list[tuple[str, str]]:
-    from urllib.parse import quote
-
     base = output_dir.resolve()
     own = base / "index.html"
     links = []
