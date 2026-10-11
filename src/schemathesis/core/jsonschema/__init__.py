@@ -333,8 +333,12 @@ def schema_with_bundle(schema: JsonSchema, root_schema: JsonSchema) -> JsonSchem
 
 def maybe_resolve_bundled(schema: dict[str, Any]) -> dict[str, Any]:
     """Follow `$ref` into a sibling `x-bundled` map; return `schema` as-is when not a bundled-ref node."""
+    return resolve_bundled_ref(schema, schema.get(BUNDLE_STORAGE_KEY))
+
+
+def resolve_bundled_ref(schema: dict[str, Any], bundled: object) -> dict[str, Any]:
+    """Follow `$ref` into the `bundled` map; return `schema` as-is when it does not point into it."""
     ref = schema.get("$ref")
-    bundled = schema.get(BUNDLE_STORAGE_KEY)
     if not isinstance(ref, str) or not isinstance(bundled, dict):
         return schema
     target = bundled.get(ref.rsplit("/", 1)[-1])
@@ -382,6 +386,7 @@ __all__ = [
     "make_validator",
     "make_validator_for",
     "maybe_resolve_bundled",
+    "resolve_bundled_ref",
     "bundle",
     "schema_with_bundle",
     "REFERENCE_TO_BUNDLE_PREFIX",
