@@ -786,6 +786,14 @@ def test_unreachable_server_capabilities_are_unknown(ctx, cli):
     ]
 
 
+def test_connection_error_suggests_checking_the_base_url(ctx, cli):
+    api = ctx.openapi.apps.success()
+    stdout = cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "1").stdout
+    assert [line for line in stdout.splitlines() if line.startswith("Tip:")] == [
+        "Tip: Check that the API is running and reachable at its base URL; set the address with `--url`."
+    ]
+
+
 @pytest.mark.snapshot(replace_test_cases=False)
 def test_connection_error_cases_are_not_reported_as_skipped(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()

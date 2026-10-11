@@ -12,10 +12,7 @@ Schemathesis dev
      Operations:       1 selected / 1 total
 
 
- ✅  API capabilities:
-
-     Supports NULL byte in headers:                            ✘
-     Accepts backslash and control characters in URL paths:    ✘
+ ⚠️  API capabilities: unknown, server unreachable
 
  🚫  Fuzzing (in 0.00s)
 
@@ -28,6 +25,8 @@ Network Error
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
+
+Tip: Check that the API is running and reachable at its base URL; set the address with `--url`.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
