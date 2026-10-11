@@ -27,7 +27,7 @@ from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
 from schemathesis.generation.hypothesis.reporting import GENERIC_UNSATISFIABLE_MESSAGE
-from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.generation.meta import CoveragePhaseData, TestPhase
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -267,7 +267,10 @@ class ExamplesGenerator:
         if self._fill_missing and not cases:
             try:
                 add_single_example(
-                    operation.as_strategy(feedback=self._feedback.for_examples(), **self._as_strategy_kwargs), cases
+                    operation.as_strategy(
+                        phase=TestPhase.EXAMPLES, feedback=self._feedback.for_examples(), **self._as_strategy_kwargs
+                    ),
+                    cases,
                 )
             except (
                 InvalidSchema,

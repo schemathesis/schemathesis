@@ -143,3 +143,29 @@ def test_type_wide_dictionary_mismatch_reported_once_per_parameter(ctx, cli, sna
         )
         == snapshot_cli
     )
+
+
+def test_examples_phase_fill_missing_uses_examples_phase_dictionaries(ctx, cli):
+    app = _items_app(ctx)
+
+    cli.run_openapi_app(
+        app,
+        "--phases=examples",
+        "--mode=positive",
+        config={
+            "dictionaries": {"fuzzing-ids": {"values": [111]}, "examples-ids": {"values": [222]}},
+            "phases": {
+                "examples": {
+                    "fill-missing": True,
+                    "generation": {"dictionaries": {"integer": {"dictionary": "examples-ids", "probability": 1.0}}},
+                },
+                "fuzzing": {
+                    "generation": {"dictionaries": {"integer": {"dictionary": "fuzzing-ids", "probability": 1.0}}}
+                },
+            },
+        },
+    )
+
+    assert {request.path for request in app.config["captured_requests"] if request.path.startswith("/items/")} == {
+        "/items/222"
+    }

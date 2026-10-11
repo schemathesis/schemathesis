@@ -77,7 +77,7 @@ def extract_inputs(
     for param in operation.iter_parameters():
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
-            parameter_schema=param.raw_schema,
+            parameter_schema=_parameter_schema(param),
             parameter_types=_parameter_types(param),
             parameter_location=param.location,
             operation=operation,
@@ -123,6 +123,13 @@ def extract_inputs(
             deferred_writable_body_fields=deferred_writable_body_fields,
             candidate_resource_names=candidate_resource_names,
         )
+
+
+def _parameter_schema(parameter: OpenApiParameter) -> JsonSchema:
+    try:
+        return parameter.raw_schema
+    except InvalidSchema:
+        return {}
 
 
 def _parameter_types(parameter: OpenApiParameter) -> list[str]:
