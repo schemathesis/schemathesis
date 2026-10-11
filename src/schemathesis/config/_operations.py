@@ -53,6 +53,44 @@ FILTER_ATTRIBUTES = [
 ]
 
 
+def _build_filter_set(
+    *,
+    by: Callable[[HasAPIOperation], bool] | None,
+    names: tuple[str, ...],
+    methods: tuple[str, ...],
+    paths: tuple[str, ...],
+    tags: tuple[str, ...],
+    operation_ids: tuple[str, ...],
+    name_regex: str | None,
+    method_regex: str | None,
+    path_regex: str | None,
+    tag_regex: str | None,
+    operation_id_regex: str | None,
+) -> FilterSet:
+    filter_set = FilterSet()
+    if by:
+        filter_set.include(by)
+    for name in names:
+        filter_set.include(name=name)
+    for method in methods:
+        filter_set.include(method=method)
+    for path in paths:
+        filter_set.include(path=path)
+    for tag in tags:
+        filter_set.include(tag=tag)
+    for operation_id in operation_ids:
+        filter_set.include(operation_id=operation_id)
+    if name_regex or method_regex or path_regex or tag_regex or operation_id_regex:
+        filter_set.include(
+            name_regex=name_regex,
+            method_regex=method_regex,
+            path_regex=path_regex,
+            tag_regex=tag_regex,
+            operation_id_regex=operation_id_regex,
+        )
+    return filter_set
+
+
 @contextmanager
 def reraise_filter_error(attr: str) -> Generator:
     try:
@@ -122,63 +160,32 @@ class OperationsConfig(DiffBase):
         exclude_by: Callable | None,
         exclude_deprecated: bool,
     ) -> FilterSet:
-        # Build explicit include filters
-        include_set = FilterSet()
-        if include_by:
-            include_set.include(include_by)
-        for name_ in include_name:
-            include_set.include(name=name_)
-        for method in include_method:
-            include_set.include(method=method)
-        for path in include_path:
-            include_set.include(path=path)
-        for tag in include_tag:
-            include_set.include(tag=tag)
-        for operation_id in include_operation_id:
-            include_set.include(operation_id=operation_id)
-        if (
-            include_name_regex
-            or include_method_regex
-            or include_path_regex
-            or include_tag_regex
-            or include_operation_id_regex
-        ):
-            include_set.include(
-                name_regex=include_name_regex,
-                method_regex=include_method_regex,
-                path_regex=include_path_regex,
-                tag_regex=include_tag_regex,
-                operation_id_regex=include_operation_id_regex,
-            )
-
-        # Build explicit exclude filters
-        exclude_set = FilterSet()
-        if exclude_by:
-            exclude_set.include(exclude_by)
-        for name_ in exclude_name:
-            exclude_set.include(name=name_)
-        for method in exclude_method:
-            exclude_set.include(method=method)
-        for path in exclude_path:
-            exclude_set.include(path=path)
-        for tag in exclude_tag:
-            exclude_set.include(tag=tag)
-        for operation_id in exclude_operation_id:
-            exclude_set.include(operation_id=operation_id)
-        if (
-            exclude_name_regex
-            or exclude_method_regex
-            or exclude_path_regex
-            or exclude_tag_regex
-            or exclude_operation_id_regex
-        ):
-            exclude_set.include(
-                name_regex=exclude_name_regex,
-                method_regex=exclude_method_regex,
-                path_regex=exclude_path_regex,
-                tag_regex=exclude_tag_regex,
-                operation_id_regex=exclude_operation_id_regex,
-            )
+        include_set = _build_filter_set(
+            by=include_by,
+            names=include_name,
+            methods=include_method,
+            paths=include_path,
+            tags=include_tag,
+            operation_ids=include_operation_id,
+            name_regex=include_name_regex,
+            method_regex=include_method_regex,
+            path_regex=include_path_regex,
+            tag_regex=include_tag_regex,
+            operation_id_regex=include_operation_id_regex,
+        )
+        exclude_set = _build_filter_set(
+            by=exclude_by,
+            names=exclude_name,
+            methods=exclude_method,
+            paths=exclude_path,
+            tags=exclude_tag,
+            operation_ids=exclude_operation_id,
+            name_regex=exclude_name_regex,
+            method_regex=exclude_method_regex,
+            path_regex=exclude_path_regex,
+            tag_regex=exclude_tag_regex,
+            operation_id_regex=exclude_operation_id_regex,
+        )
 
         # Add deprecated operations to exclude filters if requested
         if exclude_deprecated:
