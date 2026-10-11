@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput
 from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
-from schemathesis.engine.statistic import GroupedFailures
 from schemathesis.reporting.junitxml import JunitXmlWriter
 from schemathesis.reporting.recorders import recorder_failures, scenario_elapsed, scenario_failures, unique_labels
 
@@ -61,11 +60,12 @@ class JunitXMLHandler(EventHandler):
             self.writer.record_error(label=event.label, message=event.info.format())
         elif isinstance(event, events.EngineFinished):
             if event.failures:
-                group = GroupedFailures(case_id=None, code_sample=None, failures=event.failures, response=None)
+                # Recorded by the execution context before handlers run, deduplicated and sorted.
+                groups = list(ctx.statistic.failures[RUN_CHECKS_LABEL].values())
                 self.writer.record_scenario(
                     label=RUN_CHECKS_LABEL,
                     elapsed_sec=0.0,
-                    failures=[group],
+                    failures=groups,
                     skip_reason=None,
                     config=ctx.config.output,
                 )
