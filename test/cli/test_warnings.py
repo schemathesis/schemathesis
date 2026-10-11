@@ -83,6 +83,36 @@ def test_final_line_does_not_count_warnings_that_do_not_fail_the_run(ctx, cli):
     assert result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0] == "Warnings fail the run"
 
 
+@pytest.mark.parametrize("fail_on", [["timeout_units"], True], ids=["specific", "all"])
+def test_timeout_units_warning_with_fail_on(ctx, cli, fail_on):
+    api = ctx.openapi.apps.success()
+
+    result = cli.run(
+        api.schema_url,
+        "--request-timeout=5000",
+        "--phases=fuzzing",
+        "--max-examples=1",
+        config={"warnings": {"fail-on": fail_on}},
+    )
+
+    final_line = result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0]
+    assert (result.exit_code, final_line) == (ExitCode.TESTS_FAILED, "Warnings fail the run")
+
+
+def test_timeout_units_warning_does_not_fail_by_default(ctx, cli):
+    api = ctx.openapi.apps.success()
+
+    result = cli.run(
+        api.schema_url,
+        "--request-timeout=5000",
+        "--phases=fuzzing",
+        "--max-examples=1",
+    )
+
+    assert result.exit_code == ExitCode.OK
+    assert result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0] == "1 warning"
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_deserializer_warning_grouped_by_media_type(cli, ctx, snapshot_cli):
     html = {"text/html": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}
