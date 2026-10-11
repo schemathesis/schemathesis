@@ -20,13 +20,16 @@ from schemathesis.cli.commands.fuzz.context import FuzzExecutionContext
 from schemathesis.cli.commands.run.handlers.allure import AllureHandler
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
+from schemathesis.cli.summary import build_operations
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.failures import ServerError
+from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import Response
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.events import EngineFinished
 from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.statistic import Statistic
 from test.apps.fragments.schemas import linked_users
 from test.utils import assert_cli_snapshot
 
@@ -101,6 +104,39 @@ def test_fuzz_operations_summary_accounts_for_failure_limit(ctx, cli, app_runner
     assert counts["skipped"] > 0, result.stdout
     assert counts["selected"] == counts["tested"] + counts["skipped"] + counts.get("errored", 0), result.stdout
     assert "Failure limit reached" in reasons, result.stdout
+
+
+# A step left unanswered when the failure limit stops the scenario never had a chance to run checks.
+def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx):
+    ok = {"get": {"responses": {"200": {"description": "OK"}}}}
+    schema = ctx.openapi.load_schema({"/answered": ok, "/unanswered": ok})
+    answered = schema["/answered"]["GET"].Case()
+    unanswered = schema["/unanswered"]["GET"].Case()
+    recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL)
+    recorder.record_case(parent_id=None, case=answered, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=answered.id,
+        response=Response(
+            status_code=200,
+            headers={},
+            content=b"{}",
+            request=requests.Request(method="GET", url="http://127.0.0.1/answered").prepare(),
+            elapsed=0.1,
+            verify=False,
+        ),
+    )
+    recorder.record_check_success(name="not_a_server_error", case_id=answered.id)
+    recorder.record_case(parent_id=answered.id, case=unanswered, transition=None, is_transition_applied=False)
+    statistic = Statistic()
+    statistic.on_scenario_finished(recorder, failure_label=lambda case: case.operation.label)
+    api_statistic = ApiStatistic()
+    api_statistic.operations.total = api_statistic.operations.selected = 2
+
+    operations = build_operations(
+        api_statistic=api_statistic, statistic=statistic, errors=set(), stop_reason=StopReason.FAILURE_LIMIT
+    )
+
+    assert (operations.tested, operations.skipped, operations.skip_reasons) == (1, 1, ["Failure limit reached"])
 
 
 def test_fuzz_operations_summary_accounts_for_disabled_checks(ctx, cli):

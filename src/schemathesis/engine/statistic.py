@@ -175,7 +175,7 @@ class Statistic:
                     self.errored_cases += 1
                 else:
                     self.cases_without_checks += 1
-                self.operations_without_checks.add(case.value.operation.label)
+                    self.operations_without_checks.add(case.value.operation.label)
                 continue
 
             self.tested_operations.add(case.value.operation.label)
