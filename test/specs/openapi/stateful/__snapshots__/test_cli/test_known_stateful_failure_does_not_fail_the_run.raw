@@ -18,6 +18,7 @@ Schemathesis dev
 
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
+
  ✅  Stateful (in 0.00s)
 
      Scenarios:    N
