@@ -12,6 +12,7 @@ import schemathesis
 from schemathesis.cli.constants import ExitCode
 from schemathesis.engine import events
 from schemathesis.graphql import nodes
+from schemathesis.reporting.html.model import PhaseSpan
 from schemathesis.reporting.html.render import humanize_duration
 from schemathesis.reporting.html.timeline import (
     BADGE_PX,
@@ -22,9 +23,11 @@ from schemathesis.reporting.html.timeline import (
     Marker,
     axis_ticks,
     mark_classes,
+    phase_blocks,
     tick_groups,
 )
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
+from test.apps.catalog.openapi.modifiers.stateful import FailAfterRequests
 
 
 @pytest.fixture
@@ -68,9 +71,56 @@ def assert_phases_match_lanes(html):
         ), (name, outcome)
         stopped = 'class="tl-span tl-span-stopped"' in lanes[name][1]
         assert stopped == (kind == "interrupted"), (name, outcome)
+    blocks = {name: assert_lane_blocks(name, details, track, html) for name, (details, track) in lanes.items()}
+    assert_lanes_take_turns(blocks)
     if '<h1 class="hero-status-label">Interrupted</h1>' in html and charted:
         assert re.search(r'<span class="tl-tick tl-end">[^<]+, stopped</span>', html)
         assert "interrupted" in [kind for kind, _ in phases.values()]
+
+
+def track_seconds(html):
+    return parse_duration(re.search(r'<span class="tl-tick tl-end">([^<,]+)', html).group(1))
+
+
+def parse_duration(text):
+    if text.endswith("ms"):
+        return float(text[:-2]) / 1000
+    return sum(float(part[:-1]) * {"h": 3600, "m": 60, "s": 1}[part[-1]] for part in text.split())
+
+
+def display_rounding(seconds):
+    for limit, error in ((1, 0.0005), (60, 0.05), (3600, 0.5)):
+        if seconds < limit:
+            return error
+    return 30
+
+
+def assert_lane_blocks(name, details, track, html):
+    # Offset and width are rounded separately, so touching blocks may overlap by one rounding step.
+    blocks = [
+        (float(left), float(left) + float(width))
+        for left, width in re.findall(
+            r'<span class="tl-span[^"]*" style="left:([\d.]+)%;width:([\d.]+)%"></span>', track
+        )
+    ]
+    for (_, previous_end), (start, _) in itertools.pairwise(blocks):
+        assert previous_end <= start + 0.02, (name, blocks)
+    assert all(0 <= start <= end <= 100.02 for start, end in blocks), (name, blocks)
+    if blocks:
+        passes = count_of(r" in (\d+) passes", details) or 1
+        assert passes == len(blocks), (name, details, blocks)
+        label = parse_duration(details.split(",")[0].split(" in ")[0])
+        drawn = sum(end - start for start, end in blocks) / 100
+        track = track_seconds(html)
+        tolerance = display_rounding(label) + drawn * display_rounding(track) + 0.0001 * len(blocks) * track
+        assert drawn * track == pytest.approx(label, abs=tolerance), (name, details, blocks)
+    return blocks
+
+
+def assert_lanes_take_turns(blocks):
+    drawn = sorted((start, end, name) for name, items in blocks.items() for start, end in items)
+    for (_, previous_end, previous), (start, _, current) in itertools.pairwise(drawn):
+        assert previous_end <= start + 0.02, f"{previous} and {current} overlap: {drawn}"
 
 
 def assert_failure_counts_match(html):
@@ -904,6 +954,39 @@ def test_html_report_timeline_for_fuzz_command(ctx, cli, report_dir):
     assert phases == ["Fuzzing"]
 
 
+# Passes end on their own until the server breaks, so fuzzing and stateful take turns however slow the machine is.
+def test_html_report_timeline_draws_each_pass(ctx, cli, report_dir):
+    api = ctx.openapi.apps.stateful_users(FailAfterRequests(40))
+    html = run_until_server_breaks(cli, report_dir, api.schema_url, phases="fuzzing,stateful")
+    tracks = re.findall(r'<div class="tl-track tl-lane">(.*?)</div></div>', html)
+    assert [track.count('class="tl-span') > 1 for track in tracks] == [True, True]
+
+
+# Back-to-back fuzzing passes with nothing in between read as one stretch of fuzzing.
+def test_html_report_timeline_merges_consecutive_passes(ctx, cli, report_dir):
+    api = ctx.openapi.apps.stateful_users(FailAfterRequests(20))
+    html = run_until_server_breaks(cli, report_dir, api.schema_url, phases="fuzzing")
+    (details, track) = re.findall(
+        r'<span class="tl-sub">([^<]*)</span></div><div class="tl-track tl-lane">(.*?)</div></div>', html
+    )[0]
+    assert track.count('class="tl-span') == 1
+    assert "passes" not in details
+
+
+def run_until_server_breaks(cli, report_dir, schema_url, *, phases):
+    # The time limit only keeps phases repeating; the first failure ends the run.
+    return run_with_report(
+        cli,
+        report_dir,
+        schema_url,
+        "--max-time=60",
+        "--max-failures=1",
+        "--mode=positive",
+        phases=phases,
+        exit_code=ExitCode.FAILURES,
+    )
+
+
 def marker(seconds, phase="Fuzzing", count=1):
     return Marker(seconds, phase, "case-1", "GET /api/users: Server error", count)
 
@@ -927,8 +1010,19 @@ def test_timeline_ticks_never_overlap():
         assert gap >= (BADGE_PX if len(previous) > 1 else TICK_GAP_PX)
 
 
-def test_timeline_lane_details_skip_round_count():
-    assert Lane("Fuzzing", [(0.0, 1.0), (2.0, 3.0)], [marker(0.5)]).details() == "3s, 1 found"
+def test_timeline_blocks_split_only_where_another_phase_ran():
+    spans = [
+        PhaseSpan("Fuzzing", 0.0, 1.0),
+        PhaseSpan("Fuzzing", 1.0, 2.0),
+        PhaseSpan("Stateful", 2.0, 3.0),
+        PhaseSpan("Fuzzing", 3.0, 4.0),
+        PhaseSpan("Fuzzing", 4.0, 5.0),
+    ]
+    assert phase_blocks(spans) == {"Fuzzing": [(0.0, 2.0), (3.0, 5.0)], "Stateful": [(2.0, 3.0)]}
+
+
+def test_timeline_lane_details_sum_passes():
+    assert Lane("Fuzzing", [(0.0, 1.0), (2.0, 3.5)], [marker(0.5)]).details() == "2.5s in 2 passes, 1 found"
 
 
 def test_timeline_axis_for_long_runs():
