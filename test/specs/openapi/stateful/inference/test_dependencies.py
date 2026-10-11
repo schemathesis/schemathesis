@@ -9715,8 +9715,21 @@ NUMERIC_ID_AND_STRING_UUID = {"id": {"type": "number"}, "uuid": {"type": "string
         ("vehicleId", {"type": "string"}, {"id": {"type": "number"}, "vin": {"type": "string"}}, "id"),
         ("vehicleSlug", {"type": "string"}, NUMERIC_ID_AND_STRING_UUID, "slug"),
         ("vehicleUuid", {"type": "string"}, {"id": {"type": "string"}, "uuid": {"type": "string"}}, "uuid"),
+        ("vehicleId", {"type": "string", "pattern": "^[0-9]+$"}, NUMERIC_ID_AND_STRING_UUID, "id"),
+        ("vehicleId", {"type": "string", "format": "int64"}, NUMERIC_ID_AND_STRING_UUID, "id"),
+        ("id", {"type": "string"}, NUMERIC_ID_AND_STRING_UUID, "id"),
     ],
-    ids=["uuid-string", "string", "integer", "no-string-identifier", "not-an-identifier", "compatible-match"],
+    ids=[
+        "uuid-string",
+        "string",
+        "integer",
+        "no-string-identifier",
+        "not-an-identifier",
+        "compatible-match",
+        "digit-pattern",
+        "int64-format",
+        "exact-name",
+    ],
 )
 def test_path_param_binds_to_identifier_field_of_matching_type(ctx, parameter, parameter_schema, properties, field):
     vehicle = {"type": "object", "properties": properties}
