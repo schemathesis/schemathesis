@@ -1,0 +1,4 @@
+Error in [operations.0] section:
+  Type error:
+
+  - Item #1 in the 'include-method' array -> Must be a string, but got integer: 1
