@@ -14,8 +14,8 @@ Schemathesis applies settings from highest to lowest precedence:
 
 1. CLI options
 2. Operation-specific phase settings
-3. Global phase settings (e.g., `[phases.fuzzing]`)
-4. Operation settings (e.g., `[[operations]]`)
+3. Operation settings (e.g., `[[operations]]`)
+4. Global phase settings (e.g., `[phases.fuzzing]`)
 5. Project settings (e.g., `[[project]]`)
 6. Global settings
 
