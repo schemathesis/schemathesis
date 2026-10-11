@@ -33,6 +33,7 @@
 - Error feedback ignoring "required" errors on array item fields like `items.0.name`.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
 - Exit code 1 from a `fail-on` missing-auth warning withdrawn after a later successful response.
+- Exit code 1 from a `fail-on` missing-test-data warning withdrawn during stateful testing.
 - Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
 - Inferred update links filling nested body foreign keys with the updated item's id, e.g. `recipient.clientId`.
 - Coverage phase generating no valid values for schemas with keywords but no `type`.

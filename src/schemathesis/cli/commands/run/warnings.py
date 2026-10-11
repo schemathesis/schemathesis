@@ -279,6 +279,8 @@ class WarningCollector:
     fails: bool
     # Operations whose missing-auth warning is configured with `fail-on`; a later success withdraws them.
     fails_on_auth: set[str]
+    # Operations whose missing-test-data warning is configured with `fail-on`; stateful success withdraws them.
+    fails_on_missing_test_data: set[str]
 
     def __init__(self, config: ProjectConfig) -> None:
         self.config = config
@@ -286,10 +288,11 @@ class WarningCollector:
         self.authenticated = set()
         self.fails = False
         self.fails_on_auth = set()
+        self.fails_on_missing_test_data = set()
 
     def fails_the_run(self) -> bool:
         """Whether a warning configured with `fail-on` still stands."""
-        return self.fails or bool(self.fails_on_auth)
+        return self.fails or bool(self.fails_on_auth) or bool(self.fails_on_missing_test_data)
 
     def on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING):
@@ -483,7 +486,10 @@ class WarningCollector:
             return
         record_callback()
         if self.config.warnings.should_fail(kind):
-            self.fails = True
+            if kind is SchemathesisWarning.MISSING_TEST_DATA:
+                self.fails_on_missing_test_data.update(self.data.missing_test_data)
+            else:
+                self.fails = True
 
     def _record_skip_warning(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         """Record a warning surfaced via a supervisor-driven scenario skip."""
@@ -575,3 +581,4 @@ class WarningCollector:
                     continue
                 if node.value.operation.schema.classify_call_outcome(response) is CallOutcome.ACCEPTED:
                     self.data.missing_test_data.remove(label)
+                    self.fails_on_missing_test_data.discard(label)
