@@ -29,6 +29,7 @@
 - Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
+- `st fuzz` summary missing the "Baseline" and "Filtered" counts.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
 - Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
 - Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
