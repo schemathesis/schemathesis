@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import sys
+import time
 import unittest
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
@@ -65,20 +66,23 @@ from schemathesis.schemas import APIOperation
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
 
-    from schemathesis.config import OutputConfig
+    from schemathesis.config import OutputConfig, ReportsConfig
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.pytest.reporting import PytestReportDispatcher
     from schemathesis.reporting.allure import AllureWriter, _AllureCallBuffer, _AllureHookForwarder
     from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.html.writer import HtmlWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
     from schemathesis.schemas import BaseSchema
 
 _CASSETTE_KEY: pytest.StashKey[
-    dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]]]
+    dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]]]
 ] = pytest.StashKey()
-_STATEFUL_WRITERS_KEY: pytest.StashKey[list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]] = pytest.StashKey()
+_STATEFUL_WRITERS_KEY: pytest.StashKey[list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]] = (
+    pytest.StashKey()
+)
 _ALLURE_FORWARDER_KEY: pytest.StashKey[_AllureHookForwarder] = pytest.StashKey()
 _ALLURE_BUFFER_KEY: pytest.StashKey[_AllureCallBuffer] = pytest.StashKey()
 _REPORT_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
@@ -524,14 +528,20 @@ def pytest_configure(config: pytest.Config) -> None:
         config.pluginmanager.register(XdistReportingPlugin(), "schemathesis-xdist")
 
 
-def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
+def _has_reports(reports: ReportsConfig) -> bool:
+    return any(report.enabled for report in (reports.vcr, reports.har, reports.junit, reports.allure, reports.html))
+
+
+def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
     from schemathesis.config._report import ReportFormat
     from schemathesis.reporting._command import get_command_representation
     from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.html.build import enabled_checks
+    from schemathesis.reporting.html.writer import HtmlWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
 
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter] = []
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter] = []
     reports = schema.config.reports
     seed = schema.config.seed
     sanitization = schema.config.output.sanitization
@@ -557,17 +567,31 @@ def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitX
 
         path = reports.get_path(ReportFormat.ALLURE)
         writers.append(AllureWriter(output_dir=path, config=schema.config.output, api_title=schema.title))
+    if reports.html.enabled:
+        writers.append(
+            HtmlWriter(
+                reports.get_path(ReportFormat.HTML),
+                config=schema.config.output,
+                location=schema.location,
+                base_url=schema.get_base_url() or None,
+                command=command,
+                seed=seed,
+                checks=enabled_checks(schema.config.checks_config_for()),
+                started_at=time.time(),
+            )
+        )
     return writers
 
 
 def _write_to_writers(
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter],
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter],
     recorder: ScenarioRecorder,
     elapsed_sec: float,
     tags: list[str] | None = None,
     outcome: PytestReportOutcome | None = None,
     has_recorder: bool = True,
 ) -> None:
+    from schemathesis.reporting.html.writer import HtmlWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
 
     _AllureWriter: type[AllureWriter] | None = None
@@ -577,7 +601,7 @@ def _write_to_writers(
         pass
 
     for writer in writers:
-        if isinstance(writer, JunitXmlWriter):
+        if isinstance(writer, (JunitXmlWriter, HtmlWriter)):
             writer.write(
                 recorder,
                 elapsed_sec,
@@ -603,7 +627,8 @@ def _writers_key(schema: SchemaMetadata) -> int:
 
 
 def _register_allure_forwarder(
-    label: str, writers: Sequence[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | _AllureCallBuffer]
+    label: str,
+    writers: Sequence[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter | _AllureCallBuffer],
 ) -> _AllureHookForwarder | None:
     import allure_commons
 
@@ -694,7 +719,7 @@ def _write_pytest_result(
     label: str,
     tags: list[str] | None,
     dispatcher: PytestReportDispatcher,
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter],
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter],
     outcome: PytestReportOutcome,
     allure_buffer: _AllureCallBuffer | None,
 ) -> None:
@@ -741,7 +766,7 @@ def report_subtest(
     item: pytest.Item, schema: SchemaMetadata, label: str, tags: list[str] | None
 ) -> Generator[None, None, None]:
     reports = schema.config.reports
-    if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled):
+    if not (_has_reports(reports)):
         yield
         return
 
@@ -798,7 +823,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         _schema = schema
         if _is_xdist_worker(item.config):
             reports = _schema.config.reports
-            if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled:
+            if _has_reports(reports):
 
                 def _xdist_stateful_callback(recorder: Any, elapsed_sec: float) -> None:
                     _push_to_xdist_workeroutput(item.config.workeroutput, _schema, recorder, elapsed_sec)
@@ -829,7 +854,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         return
 
     reports = schema.config.reports
-    if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled):
+    if not (_has_reports(reports)):
         return
     schema_id = _writers_key(schema)
 

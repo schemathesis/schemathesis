@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import dataclasses
 import hashlib
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.pytest.reporting import PytestReportOutcome
 from schemathesis.reporting._command import get_command_representation
+from schemathesis.reporting.html.build import enabled_checks
 
 if TYPE_CHECKING:
     from xdist.workermanage import WorkerController
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.meta import CaseMetadata
     from schemathesis.reporting.allure import AllureWriter
     from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.html.writer import HtmlWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
 
@@ -265,7 +268,7 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
     """Serialize the minimal writer configuration for cross-process transport."""
     reports = schema.config.reports
     paths: dict[str, str | None] = {}
-    for fmt in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT, ReportFormat.ALLURE):
+    for fmt in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT, ReportFormat.ALLURE, ReportFormat.HTML):
         report = getattr(reports, fmt.value)
         if report.enabled:
             paths[fmt.value] = str(report.path) if report.path is not None else None
@@ -279,14 +282,18 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
         "directory": str(reports.directory),
         "paths": paths,
         "api_title": schema.title,
+        "location": schema.location,
+        "base_url": schema.get_base_url() or None,
+        "checks": enabled_checks(schema.config.checks_config_for()),
     }
 
 
 def _open_writers_from_config(
-    writer_config: dict, suffix: str | None = None
-) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
+    writer_config: dict, *, started_at: float, suffix: str | None = None
+) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
     """Open report writers on the controller using serialized writer configuration."""
     from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.html.writer import HtmlWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
 
@@ -314,9 +321,10 @@ def _open_writers_from_config(
         har=_rc(ReportFormat.HAR),
         junit=_rc(ReportFormat.JUNIT),
         allure=_rc(ReportFormat.ALLURE),
+        html=_rc(ReportFormat.HTML),
     )
 
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter] = []
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter] = []
     try:
         if ReportFormat.VCR.value in paths:
             vcr_writer = VcrWriter(
@@ -348,6 +356,19 @@ def _open_writers_from_config(
                     api_title=writer_config.get("api_title"),
                 )
             )
+        if ReportFormat.HTML.value in paths:
+            writers.append(
+                HtmlWriter(
+                    reports.get_stable_path(ReportFormat.HTML, suffix=suffix),
+                    config=output,
+                    location=writer_config["location"],
+                    base_url=writer_config["base_url"],
+                    command=command,
+                    seed=seed,
+                    checks=writer_config["checks"],
+                    started_at=started_at,
+                )
+            )
     except Exception:
         for writer in writers:
             writer.close()
@@ -357,6 +378,10 @@ def _open_writers_from_config(
 
 class XdistReportingPlugin:
     """Controller-side pytest plugin for xdist reporting."""
+
+    def __init__(self) -> None:
+        # Registered at configuration time, so this is when the whole run started.
+        self.started_at = time.time()
 
     def pytest_testnodedown(self, node: WorkerController, error: object) -> None:
         # Accumulate per schema_id; writing is deferred to pytest_sessionfinish
@@ -376,6 +401,7 @@ class XdistReportingPlugin:
             from schemathesis.reporting.allure import AllureWriter
         except ImportError:
             AllureWriter = None  # type: ignore[assignment,misc]
+        from schemathesis.reporting.html.writer import HtmlWriter
         from schemathesis.reporting.junitxml import JunitXmlWriter
 
         if hasattr(session.config, "workerinput"):
@@ -387,7 +413,7 @@ class XdistReportingPlugin:
         multi = len(data) > 1
         for schema_id, payload in data.items():
             suffix = schema_id[:8] if multi else None
-            writers = _open_writers_from_config(payload["writer_config"], suffix=suffix)
+            writers = _open_writers_from_config(payload["writer_config"], started_at=self.started_at, suffix=suffix)
             try:
                 for record in payload["records"]:
                     recorder, elapsed_sec = deserialize_recorder(record)
@@ -400,7 +426,7 @@ class XdistReportingPlugin:
                     )
                     has_recorder = record.get("has_recorder", True)
                     for writer in writers:
-                        if isinstance(writer, JunitXmlWriter):
+                        if isinstance(writer, (JunitXmlWriter, HtmlWriter)):
                             writer.write(
                                 recorder,
                                 elapsed_sec,
