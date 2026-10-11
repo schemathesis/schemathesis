@@ -5,6 +5,7 @@ from collections.abc import Callable
 import hypothesis
 import hypothesis.errors
 import jsonschema_rs
+import pytest
 
 import schemathesis
 from schemathesis.core.errors import InvalidRegexPattern, InvalidRegexType, InvalidSchema, SerializationNotPossible
@@ -19,6 +20,7 @@ from test.engine.helpers import (
     raise_unsatisfiable,
     raise_yaml_pattern_as_float_typeerror,
 )
+from test.python._constants.fixtures import graphql_string_pool
 from test.utils import EventStream
 
 
@@ -291,6 +293,33 @@ def test_examples_phase_fill_missing_fallback_defers_unsatisfiable(ctx):
     ), [type(e.value).__name__ for e in errors]
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.ERROR for event in finished), [event.status for event in finished]
+
+
+@pytest.mark.usefixtures("clean_constants_registry")
+def test_examples_phase_fill_missing_does_not_draw_constants(ctx):
+    @schemathesis.python.constants
+    def source():
+        return graphql_string_pool
+
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "code", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.phases.examples.fill_missing = True
+
+    stream = examples_only(schema)
+
+    assert [
+        node.value.meta.constants_draws
+        for event in stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
+        for node in event.recorder.cases.values()
+    ] == [()]
 
 
 def test_examples_phase_serialization_not_possible_wraps_message(ctx):
