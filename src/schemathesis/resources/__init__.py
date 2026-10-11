@@ -25,6 +25,8 @@ class PoolDraw:
     source_status: int
     # Identity whose request produced the resource; `None` outside multi-identity auth.
     source_identity: str | None = None
+    # The value was a parent path parameter of the source request, so that request referenced it, not created it.
+    source_input: bool = False
 
 
 @dataclass(slots=True, frozen=True)

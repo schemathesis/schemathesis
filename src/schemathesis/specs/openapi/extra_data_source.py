@@ -18,7 +18,7 @@ from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex, iter_ingestion_leaves
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
-from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching
+from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, trailing_path_parameter
 
 if TYPE_CHECKING:
     from random import Random
@@ -174,8 +174,8 @@ class CapturedVariant:
     draws: tuple[PoolDraw, ...]
 
 
-def _build_pool_draw(slot: InputSlot, instance: ResourceInstance) -> PoolDraw:
-    """Build a `PoolDraw` provenance record for a slot that was filled from `instance`."""
+def _build_pool_draw(slot: InputSlot, instance: ResourceInstance, value: object) -> PoolDraw:
+    """Build a `PoolDraw` provenance record for a slot that was filled with `value` from `instance`."""
     parameter_name = slot.parameter_name if isinstance(slot.parameter_name, str) else ""
     return PoolDraw(
         location=slot.parameter_location.value,
@@ -185,6 +185,7 @@ def _build_pool_draw(slot: InputSlot, instance: ResourceInstance) -> PoolDraw:
         source_operation=instance.source_operation,
         source_status=instance.status_code,
         source_identity=instance.identity,
+        source_input=_is_source_input(instance, value),
     )
 
 
@@ -194,6 +195,7 @@ def _build_pool_draw_from_requirement(
     parameter_name: str,
     requirement: ParameterRequirement,
     instance: ResourceInstance,
+    value: object,
 ) -> PoolDraw:
     """Variant of `_build_pool_draw` for sites that hold a `ParameterRequirement` rather than an `InputSlot`."""
     return PoolDraw(
@@ -204,7 +206,14 @@ def _build_pool_draw_from_requirement(
         source_operation=instance.source_operation,
         source_status=instance.status_code,
         source_identity=instance.identity,
+        source_input=_is_source_input(instance, value),
     )
+
+
+def _is_source_input(instance: ResourceInstance, value: object) -> bool:
+    # The trailing path parameter names what the request creates; the others name existing parents.
+    created = trailing_path_parameter(instance.source_operation.split(" ", 1)[-1])
+    return any(value == parameter for name, parameter in instance.context.items() if name != created)
 
 
 def declared_response_schema(
@@ -456,6 +465,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                             parameter_name=slot.lookup_key,
                             requirement=slot.requirement,
                             instance=instance,
+                            value=value,
                         ),
                     ),
                 )
@@ -498,6 +508,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                                 parameter_name=slot.lookup_key,
                                 requirement=req,
                                 instance=instance,
+                                value=value,
                             )
                         )
                 if len(filled) == len(slots):
@@ -537,6 +548,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                         parameter_name=slot.lookup_key,
                         requirement=req,
                         instance=best[1],
+                        value=best[0],
                     )
                 )
         if chosen:
@@ -666,7 +678,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
             slot_by_key = {(slot.parameter_location, slot.parameter_name): slot for slot in slots}
             values = {key: value for key, (_, value) in chosen.items()}
             draws = tuple(
-                _build_pool_draw(slot_by_key[key], source_instance) for key, (source_instance, _) in chosen.items()
+                _build_pool_draw(slot_by_key[key], source_instance, value)
+                for key, (source_instance, value) in chosen.items()
             )
             return PoolPick(values=values, draws=draws)
 
@@ -687,7 +700,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             if picked is not None:
                 value, source_instance = picked
                 values_result[(slot.parameter_location, param_name)] = value
-                draws_result.append(_build_pool_draw(slot, source_instance))
+                draws_result.append(_build_pool_draw(slot, source_instance, value))
                 assert slot.resource_field is not None
                 context_constraints.append(
                     (param_name, ParameterRequirement(slot.resource.name, slot.resource_field), value)

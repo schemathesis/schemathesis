@@ -1659,11 +1659,17 @@ def _owned_values(
 ) -> Iterator[tuple[str, object, Case | None]]:
     """Resource names and values in `case` that `owner` created or listed, with the list they came from."""
     from schemathesis.specs.openapi.object_authorization import is_collection, listing_case, path_resource, value_paths
+    from schemathesis.specs.openapi.stateful.dependencies import naming
 
     # A read shows other users' objects too, so it proves ownership only through a list the peer is then shown.
     for draw in meta.pool_draws:
         container = case.get_container(ParameterLocation(draw.location))
-        if draw.source_identity != owner or not isinstance(container, Mapping) or draw.parameter_name not in container:
+        if (
+            draw.source_identity != owner
+            or draw.source_input
+            or not isinstance(container, Mapping)
+            or draw.parameter_name not in container
+        ):
             continue
         if draw.source_operation.split(" ", 1)[0] not in SAFE_METHODS:
             yield draw.resource_name, container[draw.parameter_name], None
@@ -1681,7 +1687,14 @@ def _owned_values(
     source = parent if is_read else None
     parent_response = ctx._find_response(case_id=parent.id)
     parent_body = _json_body(parent_response) if parent_response is not None else None
+    # The linked request created only what its trailing path parameter names; other path and query values it sent
+    # name existing objects, so returning them proves nothing.
+    created = naming.trailing_path_parameter(parent.operation.path)
+    parent_paths = [value for name, value in (parent.path_parameters or {}).items() if name != created]
+    parent_inputs = {str(value) for value in [*parent_paths, *(parent.query or {}).values()]}
     for name, value in (case.path_parameters or {}).items():
+        if str(value) in parent_inputs:
+            continue
         if value_paths(parent_body, value) or value_paths(parent.body, value):
             yield path_resource(case, name), value, source
 
