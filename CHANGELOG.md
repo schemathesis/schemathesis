@@ -28,6 +28,7 @@
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
+- Phase shown as passed when no checks ran on any of its operations.
 - Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
 - Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
 - Missing inferred stateful links from `POST /books` to `GET /books/{title}` when the request body sends `title`.

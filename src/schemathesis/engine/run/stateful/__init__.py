@@ -44,6 +44,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     )
     status: Status | None = None
     is_executed = False
+    checks_ran = False
 
     thread.start()
     try:
@@ -59,6 +60,8 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                     and (status is None or status < event.status)
                 ):
                     status = event.status
+                if isinstance(event, events.ScenarioFinished):
+                    checks_ran = checks_ran or any(event.recorder.checks.values())
                 yield event
             except queue.Empty:
                 # The producer may put its final events and exit between this thread's
@@ -88,5 +91,8 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
         status = Status.SKIP
     elif status is None:
+        status = Status.SKIP
+    elif status == Status.SUCCESS and not checks_ran:
+        phase.skip_reason = PhaseSkipReason.NO_CHECKS_RAN
         status = Status.SKIP
     yield events.PhaseFinished(phase=phase, status=status, payload=None)
