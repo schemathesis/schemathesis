@@ -167,39 +167,10 @@ class EscalatingAuthProvider:
             self._settled.discard(label)
         self._refused_early.clear()
 
-    def snapshot(self) -> dict[str, str]:
-        """Identity per operation, including the ones that never had to escalate."""
-        with self._lock:
-            labels = set(self._assigned) | self._settled
-            return {label: self.names[self._assigned.get(label, 0)] for label in labels}
-
-    def restore(self, assignments: dict[str, str]) -> None:
-        """Start from where a previous run settled; escalation still corrects it if the API changed."""
-        if self._pinned is not None:
-            return
-        index_by_name = {name: index for index, name in enumerate(self.names)}
-        with self._lock:
-            for label, name in assignments.items():
-                index = index_by_name.get(name)
-                if index is not None:
-                    self._assigned[label] = index
-
 
 def escalating_provider(schema: SchemaMetadata) -> EscalatingAuthProvider | None:
     """`[auth.wfc]` registers at most one, so there is nothing to merge across providers."""
     return next((p for p in schema.auth.providers if isinstance(p, EscalatingAuthProvider)), None)
-
-
-def identity_assignments(schema: SchemaMetadata) -> dict[str, str]:
-    """Per-operation identities settled on so far, for persistence."""
-    provider = escalating_provider(schema)
-    return provider.snapshot() if provider is not None else {}
-
-
-def restore_identity_assignments(schema: SchemaMetadata, assignments: dict[str, str]) -> None:
-    provider = escalating_provider(schema)
-    if provider is not None:
-        provider.restore(assignments)
 
 
 def record_auth_outcome(case: Case, status_code: int) -> None:

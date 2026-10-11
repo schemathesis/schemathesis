@@ -36,6 +36,7 @@
 - Error feedback ignoring server errors on fields of `$ref` objects nested in the request body.
 - Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
 - Negative request bodies for `enum` or `const` schemas changing after they were generated.
+- WFC user choices restored from an earlier run deciding which user sends an operation.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Missing `negative_data_rejection` failures for integer parameters sent as `1_0`, ` 5` or non-ASCII digits.
 - Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.

@@ -10,13 +10,11 @@ from flask import Flask, Response, jsonify, redirect, request
 
 import schemathesis
 from schemathesis.auths import AuthContext
-from schemathesis.core.cache import Manifest, write
-from schemathesis.core.cache.models import FORMAT_VERSION
 from schemathesis.core.errors import LoaderError
 from schemathesis.specs.openapi.object_authorization import apply_as
 from schemathesis.wfc.converter import wfc_to_auth_provider
 from schemathesis.wfc.errors import WFCLoginError, WFCValidationError
-from schemathesis.wfc.escalation import escalating_provider, identity_assignments, restore_identity_assignments
+from schemathesis.wfc.escalation import escalating_provider
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
@@ -1189,8 +1187,8 @@ def test_pinned_user_never_escalates(cli, ctx, tmp_path):
     assert _identities(api, "DELETE", "/api/admin-only") == {"viewer"}
 
 
-def test_assignment_is_restored_from_cache(cli, ctx, tmp_path):
-    # A second run starts where the first settled instead of walking the chain again.
+def test_escalated_identity_is_not_carried_into_the_next_run(cli, ctx, tmp_path):
+    # An identity settled in an earlier run may be wrong once the API state or its accounts change.
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
     cache_dir = tmp_path / "cache"
@@ -1200,9 +1198,12 @@ def test_assignment_is_restored_from_cache(cli, ctx, tmp_path):
     first = len(api.requests)
     cli.run(api.schema_url, "--max-examples=8", "--phases=fuzzing", config=config)
 
-    second = [r for r in api.requests[first:] if r.method == "DELETE" and "admin-only" in r.path]
-    assert second, "second run never reached the gated operation"
-    assert {(r.headers.get("Authorization") or "").removeprefix("ApiKey ") for r in second} == {"admin"}
+    second = [
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests[first:]
+        if r.method == "DELETE" and r.path.startswith("/api/admin-only")
+    ]
+    assert second[:1] == ["viewer"]
 
 
 def test_failure_names_the_identity(cli, ctx, tmp_path):
@@ -1262,34 +1263,6 @@ def test_exhausted_chain_stops_rather_than_wrapping(cli, ctx, tmp_path):
     assert seen, "operation was never dispatched"
     # Which identity it keeps is the subject of another test; here it only has to stop moving.
     assert len(set(seen[-3:])) == 1, f"kept cycling through the chain: {seen}"
-
-
-def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
-    # The auth file may have been edited since the cache was written.
-    api = ctx.openapi.apps.wfc_role_gated()
-    auth = _write(tmp_path, ROLE_AUTH)
-    cache_dir = tmp_path / "cache"
-    cache_dir.mkdir()
-    manifest = Manifest(
-        format_version=FORMAT_VERSION,
-        schemathesis_version="0.0.0",
-        schema_location=api.schema_url,
-        base_url=api.base_url,
-        created_at="2026-01-01T00:00:00Z",
-        auth_identities={"GET /api/open": "ghost"},
-    )
-    write(cache_dir, manifest, [])
-
-    cli.run(
-        api.schema_url,
-        "--max-examples=8",
-        "--phases=fuzzing",
-        "-c",
-        "not_a_server_error",
-        config={"cache": {"directory": str(cache_dir)}, "auth": {"wfc": {"path": auth}}},
-    )
-
-    assert _identities(api, "GET", "/api/open") == {"viewer"}
 
 
 def test_escalation_falls_back_to_anonymous(cli, ctx, tmp_path):
@@ -1392,13 +1365,6 @@ def test_pinned_user_with_peers_tags_cases(ctx, tmp_path):
     escalating_provider(schema).record("GET /api/protected", "bob", 403)
 
     assert _authenticated_case(schema)._auth_identity == "bob"
-
-
-def test_pinned_user_ignores_persisted_assignments(ctx, tmp_path):
-    schema = _peer_schema(ctx, tmp_path, user="bob")
-    restore_identity_assignments(schema, {"GET /api/protected": "alice"})
-
-    assert (identity_assignments(schema), _authenticated_case(schema)._auth_identity) == ({}, "bob")
 
 
 @pytest.mark.parametrize(
