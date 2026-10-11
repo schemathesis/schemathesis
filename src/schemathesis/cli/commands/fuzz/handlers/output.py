@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
+from schemathesis.cli.commands.run.handlers.output import get_status_icon
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     BLOCK_PADDING,
@@ -171,16 +172,16 @@ class FuzzProgressManager:
         if self.live is not None:
             self.live.stop()
 
-    def get_completion_message(self) -> str:
+    def get_completion_message(self, *, is_interrupted: bool) -> str:
         duration = format_duration(self.started_at.elapsed_ms)
         errors = self.stats[Status.ERROR]
-
-        if self.unique_failures > 0 or errors > 0:
-            icon = "🚫" if errors > 0 else "❌"
-        elif self.total_scenarios > 0:
-            icon = "✅"
-        else:
-            icon = "🕛"
+        stats = {
+            Status.ERROR: errors,
+            Status.FAILURE: self.unique_failures,
+            Status.SUCCESS: self.total_scenarios,
+            Status.SKIP: 0,
+        }
+        icon = get_status_icon(stats, is_interrupted=is_interrupted)
 
         parts = []
         if self.total_scenarios:
@@ -192,7 +193,8 @@ class FuzzProgressManager:
             parts.append(f"🚫 {errors} error{suffix}")
         stats_line = "  ".join(parts) if parts else "No scenarios were run"
 
-        return f"{icon}  Fuzzing (in {duration})\n\n    {stats_line}"
+        duration_message = f"interrupted after {duration}" if is_interrupted else f"in {duration}"
+        return f"{icon}  Fuzzing ({duration_message})\n\n    {stats_line}"
 
     def update(self, unique_failures: int) -> None:
         self.total_scenarios += 1
@@ -255,7 +257,9 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         from rich.padding import Padding
         from rich.text import Text
 
-        self.console.print(Padding(Text(self.progress_manager.get_completion_message(), style="white"), BLOCK_PADDING))
+        is_interrupted = event.stop_reason is StopReason.INTERRUPTED
+        message = self.progress_manager.get_completion_message(is_interrupted=is_interrupted)
+        self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
         self.console.print()
 
         if ctx.errors:

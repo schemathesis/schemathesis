@@ -130,6 +130,48 @@ def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_interrupted(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({})
+
+    module = ctx.write_pymodule(
+        """
+calls = 0
+
+@schemathesis.hook
+def after_call(context, case, response):
+    global calls
+    calls += 1
+    if calls > 20:
+        raise KeyboardInterrupt
+"""
+    )
+    assert_cli_snapshot(
+        cli.main(
+            "fuzz",
+            app_runner.openapi_url(app),
+            "--checks=not_a_server_error",
+            "--max-time=30",
+            "--workers=1",
+            hooks=module,
+        ),
+        snapshot_cli,
+    )
+
+
 @pytest.mark.parametrize(
     ("make_app", "args", "expected"),
     [
