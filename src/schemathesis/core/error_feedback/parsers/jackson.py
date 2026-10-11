@@ -143,6 +143,108 @@ def _match_enum_values(message: str) -> tuple[str, ...] | None:
     return values or None
 
 
+def _date_parse_observation(
+    operation_label: str,
+    message: str,
+    case: Case,
+    rejected_value: str,
+) -> Observation | None:
+    slot = _resolve_date_parse_slot(case, rejected_value)
+    if slot is None:
+        return None
+    location, slot_path = slot
+    return Observation(
+        operation_label=operation_label,
+        location=location,
+        parameter_path=slot_path,
+        kind=ObservationKind.FORMAT,
+        raw_message=message,
+        payload=FormatPayload(name="date-time"),
+    )
+
+
+def _append_numeric_constraints(
+    message: str,
+    constraints: list[tuple[ObservationKind, ObservationPayload]],
+) -> None:
+    overflow_match = _JACKSON_NUMERIC_OVERFLOW.search(message)
+    if overflow_match is not None:
+        minimum, maximum = _JAVA_INT_BOUNDS[overflow_match.group("size")]
+        for bound, direction in (
+            (minimum, BoundDirection.MIN),
+            (maximum, BoundDirection.MAX),
+        ):
+            constraints.append(
+                (
+                    ObservationKind.NUMERIC_BOUND,
+                    NumericBoundPayload(bound=bound, direction=direction, exclusive=False),
+                ),
+            )
+
+
+def _constraints(message: str) -> list[tuple[ObservationKind, ObservationPayload]]:
+    constraints: list[tuple[ObservationKind, ObservationPayload]] = []
+    type_match = _match_type(message)
+    if type_match is not None:
+        constraints.append((ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=type_match)))
+    enum_values = _match_enum_values(message)
+    if enum_values is not None:
+        constraints.append((ObservationKind.ENUM, EnumPayload(values=enum_values)))
+    _append_numeric_constraints(message, constraints)
+    return constraints
+
+
+def _locate(message: str, case: Case) -> tuple[ParameterLocation, ParameterPath] | None:
+    path = _extract_path(message)
+    if path is not None:
+        return ParameterLocation.BODY, path
+    string_match = _JACKSON_STRING_SOURCE.search(message)
+    if not string_match or not string_match.group("value"):
+        return None
+    return infer_path_from_request(case=case, rejected_value=string_match.group("value"))
+
+
+def _append_constraint_observations(
+    operation_label: str,
+    message: str,
+    case: Case,
+    observations: list[Observation],
+) -> None:
+    constraints = _constraints(message)
+    if not constraints:
+        return
+    slot = _locate(message, case)
+    if slot is None:
+        return
+    location, slot_path = slot
+    for kind, payload in constraints:
+        observations.append(
+            Observation(
+                operation_label=operation_label,
+                location=location,
+                parameter_path=slot_path,
+                kind=kind,
+                raw_message=message,
+                payload=payload,
+            )
+        )
+
+
+def _append_observations_for_message(
+    operation_label: str,
+    message: str,
+    case: Case,
+    observations: list[Observation],
+) -> None:
+    date_parse_match = _JACKSON_DATE_PARSE.search(message)
+    if date_parse_match is not None:
+        observation = _date_parse_observation(operation_label, message, case, date_parse_match.group("value"))
+        if observation is not None:
+            observations.append(observation)
+        return
+    _append_constraint_observations(operation_label, message, case, observations)
+
+
 @PARSERS.register
 class JacksonParser:
     """Parser for Jackson `InvalidFormatException` messages naming the offending Java type.
@@ -180,69 +282,5 @@ class JacksonParser:
         operation_label = operation.label
         observations: list[Observation] = []
         for message in _carrier_strings(body):
-            date_parse_match = _JACKSON_DATE_PARSE.search(message)
-            if date_parse_match is not None:
-                slot = _resolve_date_parse_slot(case, date_parse_match.group("value"))
-                if slot is not None:
-                    location, slot_path = slot
-                    observations.append(
-                        Observation(
-                            operation_label=operation_label,
-                            location=location,
-                            parameter_path=slot_path,
-                            kind=ObservationKind.FORMAT,
-                            raw_message=message,
-                            payload=FormatPayload(name="date-time"),
-                        )
-                    )
-                continue
-            path = _extract_path(message)
-            type_match = _match_type(message)
-            enum_values = _match_enum_values(message)
-            overflow_match = _JACKSON_NUMERIC_OVERFLOW.search(message)
-
-            constraints: list[tuple[ObservationKind, ObservationPayload]] = []
-            if type_match is not None:
-                constraints.append((ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=type_match)))
-            if enum_values is not None:
-                constraints.append((ObservationKind.ENUM, EnumPayload(values=enum_values)))
-            if overflow_match is not None:
-                minimum, maximum = _JAVA_INT_BOUNDS[overflow_match.group("size")]
-                for bound, direction in (
-                    (minimum, BoundDirection.MIN),
-                    (maximum, BoundDirection.MAX),
-                ):
-                    constraints.append(
-                        (
-                            ObservationKind.NUMERIC_BOUND,
-                            NumericBoundPayload(bound=bound, direction=direction, exclusive=False),
-                        ),
-                    )
-
-            if not constraints:
-                continue
-
-            if path is not None:
-                location, slot_path = ParameterLocation.BODY, path
-            else:
-                string_match = _JACKSON_STRING_SOURCE.search(message)
-                if string_match is None or not string_match.group("value"):
-                    # Message variant has no captured string source; nothing to walk against.
-                    continue
-                slot = infer_path_from_request(case=case, rejected_value=string_match.group("value"))
-                if slot is None:
-                    continue
-                location, slot_path = slot
-
-            for kind, payload in constraints:
-                observations.append(
-                    Observation(
-                        operation_label=operation_label,
-                        location=location,
-                        parameter_path=slot_path,
-                        kind=kind,
-                        raw_message=message,
-                        payload=payload,
-                    )
-                )
+            _append_observations_for_message(operation_label, message, case, observations)
         return tuple(observations)
