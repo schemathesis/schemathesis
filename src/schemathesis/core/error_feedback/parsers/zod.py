@@ -88,7 +88,7 @@ def _bound_classifier(value_key: str, direction: BoundDirection) -> CodeHandler:
                 (
                     ObservationKind.NUMERIC_BOUND,
                     NumericBoundPayload(
-                        bound=float(bound),
+                        bound=bound,
                         direction=direction,
                         exclusive=not bool(issue.get("inclusive")),
                     ),

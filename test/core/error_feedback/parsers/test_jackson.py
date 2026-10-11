@@ -403,12 +403,12 @@ def test_jackson_numeric_overflow_long(make_operation, case_factory):
         (
             ("quantity",),
             ObservationKind.NUMERIC_BOUND,
-            NumericBoundPayload(bound=-9_223_372_036_854_775_808.0, direction=BoundDirection.MIN, exclusive=False),
+            NumericBoundPayload(bound=-9_223_372_036_854_775_808, direction=BoundDirection.MIN, exclusive=False),
         ),
         (
             ("quantity",),
             ObservationKind.NUMERIC_BOUND,
-            NumericBoundPayload(bound=9_223_372_036_854_775_807.0, direction=BoundDirection.MAX, exclusive=False),
+            NumericBoundPayload(bound=9_223_372_036_854_775_807, direction=BoundDirection.MAX, exclusive=False),
         ),
     ]
 

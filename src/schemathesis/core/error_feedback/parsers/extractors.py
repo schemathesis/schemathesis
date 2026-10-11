@@ -64,7 +64,7 @@ def numeric_bound(*, direction: BoundDirection, exclusive: bool) -> RegexHandler
 
     def handler(match: re.Match[str]) -> ClassificationResult:
         return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
-            bound=float(match.group(1)),
+            bound=parse_number(match.group(1)),
             direction=direction,
             exclusive=exclusive,
         )
@@ -96,11 +96,19 @@ def int_or_none(value: object) -> int | None:
         return None
 
 
-def float_or_none(value: object) -> float | None:
-    """Parse a string into a float; return None if the value is not a string or not parseable."""
+def parse_number(text: str) -> int | float:
+    """Parse a numeric string, keeping integers exact: a float loses precision above 2**53."""
+    try:
+        return int(text)
+    except ValueError:
+        return float(text)
+
+
+def number_or_none(value: object) -> int | float | None:
+    """Parse a string into a number; return None if the value is not a string or not parseable."""
     if not isinstance(value, str):
         return None
     try:
-        return float(value)
+        return parse_number(value)
     except ValueError:
         return None

@@ -2311,3 +2311,49 @@ def test_body_required_per_feedback_with_store(make_operation, kind, parameter_p
 
 def test_body_required_per_feedback_returns_false_with_no_store(make_operation):
     assert _body_required_per_feedback(make_operation(), None) is False
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            {
+                "message": "JSON parse error: Numeric value (99999999999999999999) out of range of long "
+                'through reference chain: Order["quantity"]'
+            },
+            {"type": "integer", "minimum": -(2**63), "maximum": 2**63 - 1},
+        ),
+        (
+            {"errors": [{"field": "quantity", "defaultMessage": "must be less than or equal to 9007199254740993"}]},
+            {"type": "integer", "maximum": 9007199254740993},
+        ),
+    ],
+    ids=["jackson-long", "spring-max"],
+)
+def test_integer_bounds_above_float_precision_stay_exact(ctx, case_factory, response_factory, body, expected):
+    operation = ctx.openapi.load_schema(
+        {
+            "/orders": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"quantity": {"type": "integer"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/orders"]["POST"]
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
+    store = ErrorFeedbackStore()
+    for observation in FeedbackPipeline.from_registry().parse(
+        operation=operation, case=case_factory(operation=operation), response=response
+    ):
+        store.record(observation)
+    schema = operation.body[0].optimized_schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
+    assert adjusted["properties"]["quantity"] == expected

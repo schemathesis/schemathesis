@@ -7,10 +7,10 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     DictHandler,
-    float_or_none,
     format_handler,
     location_for_method,
     lowercase_first_letter,
+    number_or_none,
     required_handler,
 )
 from schemathesis.core.error_feedback.store import (
@@ -94,7 +94,7 @@ def _bound_handler(direction: BoundDirection, exclusive: bool) -> DictHandler:
     """`gte`/`lte`/`gt`/`lt` — always numeric per validator/v10 semantics."""
 
     def handler(issue: dict) -> tuple[ClassificationResult, ...]:
-        bound = float_or_none(issue.get("param"))
+        bound = number_or_none(issue.get("param"))
         if bound is None:
             return ()
         return (
@@ -127,7 +127,7 @@ def _polymorphic_bound_handler(direction: BoundDirection) -> DictHandler:
             )
             return ((ObservationKind.SIZE_BOUND, payload),)
         if kind in _NUMERIC_KINDS:
-            bound = float_or_none(param)
+            bound = number_or_none(param)
             if bound is None:
                 return ()
             return (

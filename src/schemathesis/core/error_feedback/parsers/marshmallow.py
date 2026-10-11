@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     RegexHandler,
     location_for_method,
     numeric_bound,
+    parse_number,
     size_bound,
     size_bound_exact,
 )
@@ -115,7 +116,7 @@ def _classify(message: str) -> tuple[ClassificationResult, ...]:
             (
                 ObservationKind.NUMERIC_BOUND,
                 NumericBoundPayload(
-                    bound=float(range_pair.group("min")),
+                    bound=parse_number(range_pair.group("min")),
                     direction=BoundDirection.MIN,
                     exclusive=range_pair.group("min_inc") is None,
                 ),
@@ -123,7 +124,7 @@ def _classify(message: str) -> tuple[ClassificationResult, ...]:
             (
                 ObservationKind.NUMERIC_BOUND,
                 NumericBoundPayload(
-                    bound=float(range_pair.group("max")),
+                    bound=parse_number(range_pair.group("max")),
                     direction=BoundDirection.MAX,
                     exclusive=range_pair.group("max_inc") is None,
                 ),
