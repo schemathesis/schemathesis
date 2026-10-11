@@ -531,6 +531,15 @@ def _extract_container_fk_fields(
     max_depth: int,
     deferred: list[tuple[str, str, str]] | None,
 ) -> Iterator[InputSlot]:
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        target = bundled.get(reference.rsplit("/", 1)[-1])
+        if isinstance(target, dict) and target.get("type") == "array":
+            # Each followed reference spends depth, so an array whose items point back at it terminates.
+            if max_depth <= 1:
+                return
+            schema = target
+            max_depth -= 1
     if schema.get("type") == "array":
         items = schema.get("items")
         if isinstance(items, dict):
