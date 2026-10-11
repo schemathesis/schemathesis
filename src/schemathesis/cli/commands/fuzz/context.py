@@ -63,6 +63,8 @@ class FuzzExecutionContext(BaseExecutionContext):
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
                 self.exit_code = ExitCode.FAILURES
+            if self.warning_collector.fails_the_run() and self.exit_code == ExitCode.OK:
+                self.exit_code = ExitCode.FAILURES
             self.on_engine_finished(event.stop_reason)
         elif isinstance(event, events.NonFatalError):
             self.errors.add(event)
