@@ -333,14 +333,24 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
     return resolved_uri, Resolver(resolved.resolver, resolved.contents), resolved.contents
 
 
+NOT_IN_CYCLE = sys.maxsize
+
+
 def find_unresolvable_reference(schema: JsonSchema, resolver: Resolver, memo: dict[str, str | None]) -> str | None:
     """The first reference under `schema` the resolver cannot follow, as written in the schema.
 
     `memo` carries the verdict for every reference target already walked, so a component shared by
     many schemas in the same document is inspected once instead of once per referring schema.
     """
+    # Targets of one strongly connected group of references share one verdict, known only once the walk leaves
+    # the group's first target. Until then they wait here, keyed by their position on the stack.
+    pending: dict[str, int] = {}
+    stack: list[str] = []
+    # The earliest pending target the current target's walk ran into.
+    earliest = NOT_IN_CYCLE
 
-    def walk(node: JsonValue, current_resolver: Resolver, in_progress: set[str]) -> str | None:
+    def walk(node: JsonValue, current_resolver: Resolver) -> str | None:
+        nonlocal earliest
         if isinstance(node, dict):
             reference = node.get("$ref")
             # An empty reference points at the current scope, which always resolves.
@@ -352,24 +362,39 @@ def find_unresolvable_reference(schema: JsonSchema, resolver: Resolver, memo: di
                 if uri in memo:
                     if memo[uri] is not None:
                         return memo[uri]
-                elif uri not in in_progress:
-                    in_progress.add(uri)
-                    found = walk(target, target_resolver, in_progress)
-                    in_progress.discard(uri)
-                    memo[uri] = found
+                elif uri in pending:
+                    earliest = min(earliest, pending[uri])
+                else:
+                    order = len(stack)
+                    pending[uri] = order
+                    stack.append(uri)
+                    outer_earliest = earliest
+                    earliest = NOT_IN_CYCLE
+                    found = walk(target, target_resolver)
                     if found is not None:
+                        memo[uri] = found
                         return found
+                    if earliest >= order:
+                        while True:
+                            member = stack.pop()
+                            del pending[member]
+                            memo[member] = None
+                            if member == uri:
+                                break
+                        earliest = outer_earliest
+                    else:
+                        earliest = min(outer_earliest, earliest)
             for value in node.values():
                 if isinstance(value, (dict, list)):
-                    found = walk(value, current_resolver, in_progress)
+                    found = walk(value, current_resolver)
                     if found is not None:
                         return found
         elif isinstance(node, list):
             for item in node:
                 if isinstance(item, (dict, list)):
-                    found = walk(item, current_resolver, in_progress)
+                    found = walk(item, current_resolver)
                     if found is not None:
                         return found
         return None
 
-    return walk(schema, resolver, set())
+    return walk(schema, resolver)
