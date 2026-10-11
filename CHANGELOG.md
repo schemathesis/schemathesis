@@ -35,6 +35,7 @@
 - Missing inferred stateful links from `POST /books` to `GET /books/{title}` when the request body sends `title`.
 - Inferred stateful links sending a numeric `id` to string path parameters when a string `uuid` exists.
 - Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
+- Coverage phase skipping the object-body negative for non-object `type` when `required` precedes `properties`.
 - Positive cases treated as negative when an auth hook adds an undeclared or differently-cased header.
 - Error feedback rounding large integer bounds, e.g. Java `long` maximum written as `2**63`.
 
