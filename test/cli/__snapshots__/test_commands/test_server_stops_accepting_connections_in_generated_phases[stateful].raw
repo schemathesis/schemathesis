@@ -22,7 +22,7 @@ Schemathesis dev
      Scenarios:    N
      API Links:    N covered / 1 selected / 1 total
 
-     ✅ N passed
+     ✅ N passed  🚫 server stopped responding
 
 ==================================== ERRORS ====================================
 ____________________________________ Server ____________________________________
