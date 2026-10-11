@@ -3416,7 +3416,8 @@ def _positive_array(
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    else:
+    # Rejected annotations must not suppress the generated baseline.
+    if not seen:
         # An empty template skips every items-level keyword on the wire; surface a non-empty
         # baseline first so the recorder sees items satisfied. Skip when `maxItems` forbids any.
         items = schema.get("items")
