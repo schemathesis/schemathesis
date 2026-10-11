@@ -550,15 +550,20 @@ class MutationContext:
                 new_schema["additionalProperties"] = {"type": "string", "format": "_header_value"}
         # Empty arrays / objects may still validate against the original schema,
         # turning a "negative" case into a positive one — force at least one element.
-        if "array" in get_type(new_schema) and new_schema.get("items") and "minItems" not in new_schema.get("not", {}):
+        not_schema = new_schema.get("not")
+        if (
+            "array" in get_type(new_schema)
+            and new_schema.get("items")
+            and (not isinstance(not_schema, dict) or "minItems" not in not_schema)
+        ):
             new_schema.setdefault("minItems", 1)
         # A barred `required` already rules the empty object out, and demanding a property on top of it
         # asks a closed shape for a key it does not admit.
         if (
             "object" in get_type(new_schema)
             and new_schema.get("properties")
-            and "minProperties" not in new_schema.get("not", {})
-            and "required" not in new_schema.get("not", {})
+            and (not isinstance(not_schema, dict) or "minProperties" not in not_schema)
+            and (not isinstance(not_schema, dict) or "required" not in not_schema)
         ):
             new_schema.setdefault("minProperties", 1)
 
@@ -803,9 +808,10 @@ def _get_type_candidates_with_weights(ctx: MutationContext, schema: Schema, draw
 def prevent_unsatisfiable_schema(schema: Schema, new_type: str) -> None:
     """Drop keywords that would conflict with `new_type` in the schema and its `not` branch."""
     drop_not_type_specific_keywords(schema, new_type)
-    if "not" in schema:
-        drop_not_type_specific_keywords(schema["not"], new_type)
-        if not schema["not"]:
+    not_schema = schema.get("not")
+    if isinstance(not_schema, dict):
+        drop_not_type_specific_keywords(not_schema, new_type)
+        if not not_schema:
             del schema["not"]
 
 

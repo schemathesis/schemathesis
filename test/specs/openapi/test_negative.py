@@ -844,6 +844,53 @@ def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
     test()
 
 
+@pytest.mark.parametrize("negated", [False, True])
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"value": {"type": "integer", "minimum": 1}},
+                "required": ["value"],
+            },
+        },
+        {
+            "type": "object",
+            "properties": {"value": {"type": "array", "items": {"type": "integer"}, "minItems": 1}},
+            "required": ["value"],
+        },
+    ],
+)
+@pytest.mark.hypothesis_nested
+def test_boolean_not_in_negative_body_schema(ctx, body_schema, negated):
+    body_schema["not"] = negated
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/items"]["POST"]
+    validator = make_validator(body_schema, operation.schema.adapter.jsonschema_validator_cls)
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=10, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        if not isinstance(case.body, bytes):
+            assert not validator.is_valid(case.body)
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_negating_multiple_query_params(ctx):
     # When all query parameters are optional
