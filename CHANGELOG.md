@@ -31,6 +31,7 @@
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
+- WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.
 - Error feedback dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Error feedback ignoring server errors on fields of `$ref` objects nested in the request body.

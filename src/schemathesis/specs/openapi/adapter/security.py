@@ -38,7 +38,8 @@ def _matches_security_parameter(
     """Check if security definition would set the given parameter."""
     ty = definition.get("type")
 
-    if ty == "http":
+    # Swagger 2.0 spells HTTP Basic as its own `basic` type.
+    if ty in ("http", "basic"):
         return param_name == "Authorization" and param_location == ParameterLocation.HEADER
 
     if ty == "apiKey":
