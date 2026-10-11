@@ -32,6 +32,7 @@
 - Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
 - `st fuzz` suggesting `--wait-for-schema` on connection errors when it is already set.
 - pytest examples phase ignoring `[parameters]` overrides in `fill-missing` cases.
+- Coverage cases dropped when a schema `filter_case` hook depends on a global `map_case`.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - Generated strings failing `pattern` when a group holds a possessive quantifier, e.g. `(a*+)`.
 - `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.

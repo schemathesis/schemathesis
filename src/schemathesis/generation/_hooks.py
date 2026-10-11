@@ -20,11 +20,17 @@ def apply_case_hooks(
     local: HookDispatcher | None,
 ) -> SearchStrategy[Case]:
     """Layer case hooks onto `strategy` in dispatcher order: global, schema, local."""
-    strategy = _apply_dispatcher(strategy, GLOBAL_HOOK_DISPATCHER, operation)
-    strategy = _apply_dispatcher(strategy, operation.schema.hooks, operation)
-    if local is not None:
-        strategy = _apply_dispatcher(strategy, local, operation)
+    for dispatcher in case_hook_dispatchers(operation, local):
+        strategy = _apply_dispatcher(strategy, dispatcher, operation)
     return strategy
+
+
+def case_hook_dispatchers(operation: APIOperation, local: HookDispatcher | None) -> list[HookDispatcher]:
+    """Dispatchers whose case hooks apply to `operation`, in application order."""
+    dispatchers = [GLOBAL_HOOK_DISPATCHER, operation.schema.hooks]
+    if local is not None:
+        dispatchers.append(local)
+    return dispatchers
 
 
 def _apply_dispatcher(
