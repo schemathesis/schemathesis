@@ -2448,7 +2448,7 @@ _ALL_TYPES = ("null", "boolean", "string", "number", "array", "object")
 
 
 def _admits_every_type(schema: JsonSchemaObject) -> bool:
-    # A keyword constrains only values of its own type, so without `type` every other type passes it untouched.
+    # For JSON values, a keyword constrains only its own type; without `type`, every other type passes untouched.
     return (
         "type" not in schema
         and not any(key in schema for key in _SINGLE_PASS_KEYWORDS)
@@ -2515,7 +2515,11 @@ def cover_schema_iter(
         types = []
         schema = {"not": {}}
     elif not any(k in ALL_KEYWORDS for k in schema) or (
-        GenerationMode.POSITIVE in ctx.generation_modes and _admits_every_type(schema)
+        GenerationMode.POSITIVE in ctx.generation_modes
+        and ctx.location == ParameterLocation.BODY
+        and not ctx.wire.form_body()
+        and not ctx.wire.xml_body()
+        and _admits_every_type(schema)
     ):
         types = list(_ALL_TYPES)
     else:

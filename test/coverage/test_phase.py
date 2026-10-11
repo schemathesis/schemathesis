@@ -3897,6 +3897,45 @@ def test_positive_untyped_schema_with_keywords(ctx, schema):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
+@pytest.mark.parametrize(
+    ("location", "schema", "expected"),
+    [
+        (ParameterLocation.PATH, {"maxLength": 2}, ["0"]),
+        (ParameterLocation.PATH, {"format": "uuid"}, ["e3e70682-c209-1cac-a29f-6fbed82c07cd"]),
+        (ParameterLocation.QUERY, {"maxLength": 2}, []),
+        (ParameterLocation.HEADER, {"maxLength": 2}, ["00", "0"]),
+        (ParameterLocation.BODY, {"maxLength": 2}, []),
+    ],
+    ids=["path", "path-uuid", "query", "header", "form-urlencoded"],
+)
+def test_positive_untyped_schema_with_keywords_does_not_widen_string_locations(ctx, location, schema, expected):
+    path = "/items/{value}" if location == ParameterLocation.PATH else "/items"
+    if location == ParameterLocation.BODY:
+        operation = body_operation(
+            ctx,
+            {"type": "object", "properties": {"value": schema}, "required": ["value"]},
+            path=path,
+            media_type="application/x-www-form-urlencoded",
+            version="3.1.0",
+        )
+    else:
+        operation = load_schema(
+            ctx,
+            parameters=[{"name": "value", "in": location, "required": True, "schema": schema}],
+            path=path,
+            version="3.1.0",
+        )[path]["POST"]
+    container = LOCATION_TO_CONTAINER[location]
+    cases = [
+        case
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if location != ParameterLocation.BODY
+        or case.meta.phase.data.description.startswith("Object with valid 'value' value:")
+    ]
+
+    assert [getattr(case, container).get("value", NOT_SET) for case in cases] == expected
+
+
 def test_positive_number_boundary_respects_exclusive_bounds(ctx):
     # Boolean `exclusiveMinimum: true` + `exclusiveMaximum: true` combined with `minimum: 0`
     # / `maximum: 1` (legacy OpenAPI 3.0 form). The boundary generator's `+= 1` / `-= 1`
