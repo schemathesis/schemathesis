@@ -4,7 +4,6 @@ import gzip
 import io
 import os
 import pathlib
-import re
 import tarfile
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -12,10 +11,7 @@ from typing import IO, Any
 
 import yaml
 
-try:
-    from yaml import CSafeLoader as SafeLoader
-except ImportError:
-    from yaml import SafeLoader  # type: ignore[assignment]
+from schemathesis.core.deserialization import deserialize_yaml
 
 try:
     import orjson
@@ -35,42 +31,6 @@ except ImportError:
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "corpus" / "data"
 CATALOG_DIR = REPO_ROOT / "test-corpus" / "openapi-directory" / "APIs"
-
-Loader = type("YAMLLoader", (SafeLoader,), {})
-Loader.yaml_implicit_resolvers = {  # type: ignore[attr-defined]
-    key: [(tag, regexp) for tag, regexp in mapping if tag != "tag:yaml.org,2002:timestamp"]
-    for key, mapping in Loader.yaml_implicit_resolvers.copy().items()  # type: ignore[attr-defined]
-}
-
-Loader.add_implicit_resolver(  # type: ignore[attr-defined]
-    "tag:yaml.org,2002:float",
-    re.compile(
-        r"""^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
-                    |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
-                    |\.[0-9_]+(?:[eE][-+]?[0-9]+)?
-                    |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*
-                    |[-+]?\.(?:inf|Inf|INF)
-                    |\.(?:nan|NaN|NAN))$""",
-        re.VERBOSE,
-    ),
-    list("-+0123456789."),
-)
-
-
-def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> dict[str, Any]:
-    if isinstance(node, yaml.MappingNode):
-        self.flatten_mapping(node)
-    mapping = {}
-    for key_node, value_node in node.value:
-        if key_node.tag != "tag:yaml.org,2002:str":
-            key = key_node.value
-        else:
-            key = self.construct_object(key_node, deep)
-        mapping[key] = self.construct_object(value_node, deep)
-    return mapping
-
-
-Loader.construct_mapping = construct_mapping  # type: ignore[attr-defined]
 
 
 def create_tar_gz(schemas: dict[str, dict[str, Any]], output_dir: pathlib.Path) -> None:
@@ -101,7 +61,7 @@ def parse_schemas(directory: pathlib.Path) -> dict[str, dict[str, Any]]:
                 file_path = os.path.join(root, file)
                 try:
                     with open(file_path) as fd:
-                        schema = yaml.load(fd, Loader)
+                        schema = deserialize_yaml(fd)
                     version = get_schema_version(schema)
                     schema_name = (
                         os.path.relpath(file_path, directory)
