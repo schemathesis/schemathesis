@@ -5243,6 +5243,55 @@ def test_response_composition_with_boolean_branch_infers_link(ctx, composition, 
     }
 
 
+@pytest.mark.parametrize(
+    ["schemas", "expected"],
+    [
+        (
+            {
+                "OrderBase": {
+                    "type": "object",
+                    "properties": {"customer_id": {"type": "string"}},
+                    "required": ["customer_id"],
+                },
+                "OrderCreate": {
+                    "allOf": [
+                        component_ref("OrderBase"),
+                        {"type": "object", "properties": {"total": {"type": "number"}}},
+                    ]
+                },
+            },
+            {"customer_id": "$response.body#/id"},
+        ),
+        (
+            {
+                "Shipping": {"type": "object", "properties": {"customer_id": {"type": "string"}}},
+                "OrderCreate": {"type": "object", "properties": {"shipping": component_ref("Shipping")}},
+            },
+            {"shipping": {"customer_id": "$response.body#/id"}},
+        ),
+    ],
+    ids=["all-of-reference", "nested-reference"],
+)
+def test_body_fields_behind_references_link_from_producer(ctx, schemas, expected):
+    paths = {
+        **operation("post", "/customers", "201", component_ref("Customer"), operation_id="createCustomer"),
+        **operation_with_body("post", "/orders", "201", component_ref("OrderCreate"), operation_id="createOrder"),
+    }
+    components = {"schemas": {"Customer": SCHEMA_WITH_ID, **schemas}}
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1customers/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "requestBody": expected,
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
 def test_nested_body_fk_inside_composition_branch(ctx):
     # Composition keywords inside nested objects must still be traversed for FK fields.
     _, graph = analyze_dependencies(
