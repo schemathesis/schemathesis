@@ -762,6 +762,11 @@ def _query_as_sent(
     return sent
 
 
+def _headers_as_read(headers: Mapping[str, object]) -> dict[str, object]:
+    """Header values as the application reads them: servers drop the spaces and tabs around each value."""
+    return {name: value.strip(" \t") if isinstance(value, str) else value for name, value in headers.items()}
+
+
 def _non_body_negative_values_match_schema(response: Response, case: Case) -> bool:
     """Check if all negative non-body parameter values are still valid against their original schema."""
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -802,6 +807,8 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
         v = dict(value) if location == ParameterLocation.HEADER else value
         if isinstance(v, dict):
             v = plain_str_values(v)
+        if location == ParameterLocation.HEADER:
+            v = _headers_as_read(v)
         try:
             if not container.get_strict_validator().is_valid(v):
                 # At least one parameter is invalid
@@ -1216,6 +1223,8 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     for location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE):
         meta_for_location = meta.components.get(location)
         value = case.get_container(location)
+        if isinstance(value, Mapping) and location == ParameterLocation.HEADER:
+            value = _headers_as_read(value)
         if isinstance(value, Mapping) and meta_for_location is not None and meta_for_location.mode.is_negative:
             container = getattr(case.operation, location.container_name)
             schema = container.schema

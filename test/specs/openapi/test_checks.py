@@ -1577,6 +1577,49 @@ def test_negative_data_rejection_validates_boolean_spelling_in_headers_and_cooki
             negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
+@pytest.mark.parametrize(
+    ("value", "accepted"),
+    [
+        ("a" * 255 + " ", True),
+        ("a" * 252 + "\t\t\t\t", True),
+        (" \t", False),
+        ("a" * 256 + " ", False),
+    ],
+    ids=["trailing-space", "trailing-tabs", "only-whitespace", "too-long"],
+)
+@pytest.mark.parametrize("extra", [{}, {"X-Extra": "1"}], ids=["declared-only", "with-undeclared-header"])
+def test_negative_data_rejection_validates_headers_without_surrounding_whitespace(
+    ctx, response_factory, value, accepted, extra
+):
+    # HTTP servers drop leading and trailing spaces and tabs from header values before the application reads them.
+    operation = ctx.openapi.load_schema(
+        {
+            "/tasks": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "header",
+                            "name": "Idempotency-Key",
+                            "required": True,
+                            "schema": {"type": "string", "minLength": 1, "maxLength": 255},
+                        }
+                    ],
+                    "responses": {"201": {"description": "Created"}},
+                }
+            }
+        }
+    )["/tasks"]["POST"]
+    case = _negative_case(
+        operation, ParameterLocation.HEADER, "Idempotency-Key", None, headers={"Idempotency-Key": value, **extra}
+    )
+    response = response_factory.requests(status_code=201)
+    if accepted:
+        assert negative_data_rejection(check_context(), response, case) is None
+    else:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+
+
 def test_negative_data_rejection_reports_object_query_with_another_invalid_parameter(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {
