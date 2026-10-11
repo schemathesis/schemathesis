@@ -27,6 +27,7 @@
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
+- Top-level `[[operations]]` overriding `[[project.operations]]` for the same operation.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
