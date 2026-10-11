@@ -274,3 +274,19 @@ def test_base_url_override_ignores_variables(ctx):
     )
     schema = schemathesis.openapi.from_dict(_templated_schema(ctx), config=config)
     assert schema["/items"]["GET"].base_url == "https://override.example.com"
+
+
+def test_project_scope_variables_override_global_server_defaults(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/items": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        servers=[
+            {
+                "url": "https://{host}.example.com/{version}",
+                "variables": {"host": {"default": "api"}, "version": {"default": "v1"}},
+            }
+        ],
+    )
+    schema_url = app_runner.openapi_url(app)
+    config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "staging", "version": "v2"}}})
+    schema = schemathesis.openapi.from_url(schema_url, config=config)
+    assert schema["/items"]["GET"].base_url == schema_url.removesuffix("/openapi.json") + "/v2"
