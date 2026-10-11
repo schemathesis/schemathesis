@@ -9,6 +9,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.cli.constants import ExitCode
+from schemathesis.engine import events
 from schemathesis.graphql import nodes
 from schemathesis.reporting.html.render import humanize_duration
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
@@ -934,3 +935,20 @@ def test_html_report_unwritable_path(ctx, cli, tmp_path, snapshot_cli):
     parent = tmp_path / "file"
     parent.write_text("", encoding="utf-8")
     assert cli.run(api.schema_url, f"--report-html-path={parent / 'report'}") == snapshot_cli
+
+
+def test_html_report_links_other_reports(ctx, cli, tmp_path, report_dir):
+    coverage = tmp_path / "coverage.html"
+
+    @schemathesis.cli.handler()
+    class CoverageReport(schemathesis.cli.EventHandler):
+        def handle_event(self, context, event) -> None:
+            if isinstance(event, events.EngineFinished):
+                context.add_report("Schema coverage", coverage)
+
+    api = ctx.openapi.apps.success()
+    html = run_with_report(cli, report_dir, api.schema_url, f"--report-junit-path={tmp_path / 'junit.xml'}")
+    assert re.findall(r'<a href="([^"]+)" target="_blank" rel="noopener">([^<]+)</a>', html) == [
+        ("../junit.xml", "JUNIT"),
+        ("../coverage.html", "Schema coverage"),
+    ]

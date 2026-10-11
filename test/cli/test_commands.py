@@ -1102,6 +1102,19 @@ def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot
     assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
 
 
+def test_custom_handler_report_in_reports_list(ctx, cli):
+    @schemathesis.cli.handler()
+    class CoverageReport(schemathesis.cli.EventHandler):
+        def handle_event(self, context, event) -> None:
+            if isinstance(event, events.EngineFinished):
+                context.add_report("Schema coverage", "coverage.html")
+
+    api = ctx.openapi.apps.success()
+    lines = cli.run(api.schema_url, "--max-examples=1").stdout.splitlines()
+    start = lines.index("Reports:")
+    assert lines[start : start + 2] == ["Reports:", "  - Schema coverage: coverage.html"]
+
+
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     api = ctx.openapi.apps.teapot()
     # When the schema contains references to other files

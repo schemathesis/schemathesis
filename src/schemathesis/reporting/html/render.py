@@ -463,6 +463,11 @@ def _target_block(data: ReportData) -> str:
         rows.append(_row("Phases", f'<ol class="phases">{phases}</ol>'))
     if data.checks:
         rows.append(_row("Checks", _checks(data.checks)))
+    if data.reports:
+        links = ", ".join(
+            f'<a href="{esc(href)}" target="_blank" rel="noopener">{esc(name)}</a>' for name, href in data.reports
+        )
+        rows.append(_row("Reports", links))
     rows.extend(_note_rows(data))
     return f'<section class="target-block">{"".join(rows)}</section>'
 

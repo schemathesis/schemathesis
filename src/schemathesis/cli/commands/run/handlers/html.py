@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import datetime
+import os
 from collections import Counter
+from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
 from schemathesis.cli.commands.run.context import ExecutionContext
@@ -35,8 +37,6 @@ from schemathesis.reporting.html.model import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
@@ -235,6 +235,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             startup_warnings=ctx.startup_warnings if isinstance(ctx, ExecutionContext) else [],
             phases=_phases(ctx) if isinstance(ctx, ExecutionContext) else [],
             checks=enabled_checks(ctx.config.checks_config_for()),
+            reports=_report_links(ctx, self.output_dir),
             reauth_count=payload.reauth_count if payload is not None else 0,
             reauth_broke=payload.reauth_broke if payload is not None else False,
             extraction_failures=[
@@ -283,6 +284,25 @@ def _phases(ctx: ExecutionContext) -> list[tuple[str, str, str]]:
         else:
             phases.append((phase.display, _PHASE_OUTCOMES[status], _PHASE_OUTCOMES[status]))
     return phases
+
+
+def _report_links(ctx: BaseExecutionContext, output_dir: Path) -> list[tuple[str, str]]:
+    from urllib.parse import quote
+
+    base = output_dir.resolve()
+    own = base / "index.html"
+    links = []
+    for name, path in ctx.all_reports():
+        target = path.resolve()
+        if target == own:
+            continue
+        try:
+            href = quote(Path(os.path.relpath(target, base)).as_posix())
+        except ValueError:
+            # Paths on different Windows drives have no relative form.
+            href = target.as_uri()
+        links.append((name, href))
+    return links
 
 
 def _by_count(counts: Counter[str]) -> list[tuple[str, int]]:
