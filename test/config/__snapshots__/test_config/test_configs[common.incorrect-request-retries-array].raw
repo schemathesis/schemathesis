@@ -1,0 +1,4 @@
+Error in root section:
+  Type error:
+
+  - 'request-retries' -> Must be an integer or an object, but got array: [3]

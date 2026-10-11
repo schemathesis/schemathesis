@@ -246,11 +246,12 @@ def _format_type_error(error: ValidationError, replaced: dict[InstancePath, obje
 
 def _type_error_message(error: ValidationError, expectation: str, replaced: dict[InstancePath, object]) -> str:
     assert error.instance_path
-    section = path_to_section_name(list(error.instance_path)[:-1])
+    description, section_path = _describe_instance_location(list(error.instance_path))
+    section = path_to_section_name(section_path)
     instance = _original_instance(error, replaced)
     return (
         f"Error in {section} section:\n  Type error:\n\n"
-        f"  - '{error.instance_path[-1]}' -> Must be {expectation}, but got {_type_name(instance)}: {_format_value(instance)}"
+        f"  - {description} -> Must be {expectation}, but got {_type_name(instance)}: {_format_value(instance)}"
     )
 
 
@@ -313,13 +314,19 @@ def _format_anyof_error(error: ValidationError, replaced: dict[InstancePath, obj
             f"  - A positive integer (e.g., workers = 4)\n"
             f'  - The string "auto" for automatic detection (workers = "auto")'
         )
+    assert isinstance(error.kind, ValidationErrorKind.AnyOf)
+    assert error.kind.context is not None
+    return _format_no_matching_branch(error, error.kind.context, replaced)
+
+
+def _format_no_matching_branch(
+    error: ValidationError, context: list[list[ValidationError]], replaced: dict[InstancePath, object]
+) -> str:
     raw_branches = resolve_path(CONFIG_SCHEMA, error.schema_path)
     assert isinstance(raw_branches, list)
     branches = [_resolve_reference(branch) for branch in raw_branches]
-    assert isinstance(error.kind, ValidationErrorKind.AnyOf)
-    assert error.kind.context is not None
     instance_type = _JSON_TYPES[type(error.instance)]
-    for branch, errors in zip(branches, error.kind.context, strict=True):
+    for branch, errors in zip(branches, context, strict=True):
         # The value has the right type for this branch, so its nested error is the precise one
         if branch.get("type") == instance_type and errors:
             return _format_validation_error(errors[0], replaced)
@@ -350,7 +357,8 @@ def _format_oneof_error(error: ValidationError, replaced: dict[InstancePath, obj
     if message is not None:
         return message
 
-    return error.message  # pragma: no cover
+    assert isinstance(error.kind, ValidationErrorKind.OneOfNotValid)
+    return _format_no_matching_branch(error, error.kind.context, replaced)
 
 
 def _format_openapi_auth_oneof(error: ValidationError, replaced: dict[InstancePath, object]) -> str | None:
@@ -443,7 +451,8 @@ def _invalid_auth_property_message(error: ValidationError, instance: Mapping[str
 def _format_request_retries_oneof(error: ValidationError) -> str | None:
     if list(error.instance_path)[-1:] != ["request-retries"]:
         return None
-    if isinstance(error.instance, int):
+    # TOML booleans are not integers
+    if isinstance(error.instance, int) and not isinstance(error.instance, bool):
         return "'request-retries' must be a non-negative integer"
     if isinstance(error.instance, dict):
         return "'request-retries' table requires 'max-attempts'"

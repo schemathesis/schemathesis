@@ -1,0 +1,4 @@
+Error in [operations.0] section:
+  Type error:
+
+  - 'exclude-tag' -> Must be a string or an array, but got boolean: true
