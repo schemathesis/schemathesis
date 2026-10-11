@@ -1592,6 +1592,28 @@ def _intersect_types(current: Any, value: Any) -> Any:
     return shared[0] if len(shared) == 1 else shared
 
 
+def _merge_ref_siblings(ctx: CoverageContext, resolved: JsonSchemaObject, schema: JsonSchemaObject) -> JsonSchema:
+    """The `$ref` target combined with the keywords written beside the reference."""
+    rest = {key: value for key, value in schema.items() if key != "$ref"}
+    if ctx.validator_cls is not jsonschema_rs.Draft4Validator and any(key not in ANNOTATION_KEYWORDS for key in rest):
+        # Later drafts apply keywords beside `$ref` together with the target, so a looser sibling
+        # must not replace the target's bound.
+        both = {"allOf": [resolved, rest]}
+        return _merge_all_of(both) or both
+    # Deep-merge so sibling `properties`/`required` augment the resolved schema rather than wiping it;
+    # the discriminator-pinning rewrite produces exactly this shape (sibling pins the discriminator key,
+    # resolved carries the rest).
+    merged = {**resolved}
+    for key, value in rest.items():
+        if key == "properties" and isinstance(value, dict) and isinstance(merged.get("properties"), dict):
+            merged["properties"] = {**merged["properties"], **value}
+        elif key == "required" and isinstance(value, list) and isinstance(merged.get("required"), list):
+            merged["required"] = list(dict.fromkeys(merged["required"] + value))
+        else:
+            merged[key] = value
+    return merged
+
+
 def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
     """Resolve a $ref sub-schema to its concrete content before merging."""
     if not isinstance(sub, dict) or "$ref" not in sub:
@@ -1600,20 +1622,7 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
         resolved = ctx.resolve_ref(sub["$ref"])
         if not isinstance(resolved, dict):
             return resolved
-        # Deep-merge so sibling `properties`/`required` augment the resolved schema
-        # rather than wiping it; the discriminator-pinning rewrite produces exactly
-        # this shape (sibling pins the discriminator key, resolved carries the rest).
-        merged = {**resolved}
-        for key, value in sub.items():
-            if key == "$ref":
-                continue
-            if key == "properties" and isinstance(value, dict) and isinstance(merged.get("properties"), dict):
-                merged["properties"] = {**merged["properties"], **value}
-            elif key == "required" and isinstance(value, list) and isinstance(merged.get("required"), list):
-                merged["required"] = list(dict.fromkeys(merged["required"] + value))
-            else:
-                merged[key] = value
-        return merged
+        return _merge_ref_siblings(ctx, resolved, sub)
     except RefResolutionError:
         # Schemas are bundled, so this should not happen in practice
         return sub
@@ -2465,19 +2474,7 @@ def cover_schema_iter(
         try:
             resolved = ctx.resolve_ref(reference)
             if isinstance(resolved, dict):
-                merged = {**resolved}
-                for k, v in schema.items():
-                    if k == "$ref":
-                        continue
-                    if k == "properties" and isinstance(v, dict) and isinstance(merged.get("properties"), dict):
-                        # Deep-merge: resolved's properties take lower priority than sibling properties,
-                        # but both must be present so that 'required' fields from the resolved schema
-                        # are included in the merged properties dict.
-                        merged["properties"] = {**merged["properties"], **v}
-                    elif k == "required" and isinstance(v, list) and isinstance(merged.get("required"), list):
-                        merged["required"] = list(dict.fromkeys(merged["required"] + v))
-                    else:
-                        merged[k] = v
+                merged = _merge_ref_siblings(ctx, resolved, schema)
                 # Draft 4 silently drops `$ref` siblings; the merged form is what generation
                 # walks but the body validator only honors the bare ref target. Build a view
                 # validator from the un-merged schema and skip negative values it accepts.

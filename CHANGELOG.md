@@ -45,6 +45,7 @@
 - Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
 - Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
 - Missing inferred stateful links from `POST /books` to `GET /books/{title}` when the request body sends `title`.
+- Coverage phase dropping `$ref` target constraints when sibling keywords are looser in Open API 3.1.
 - Inferred stateful links sending a numeric `id` to string path parameters when a string `uuid` exists.
 - Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
 - Positive cases treated as negative when an auth hook adds an undeclared or differently-cased header.
