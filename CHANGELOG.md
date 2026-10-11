@@ -21,6 +21,7 @@
 - Traceback printed and the stateful phase ending early with `--mode negative` when a step has nothing to negate.
 - Missing or broken inferred stateful links for paginated lists of wrapped items, e.g. `{items: [{track}]}`.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
+- Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
 - Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
