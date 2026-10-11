@@ -744,6 +744,15 @@ def test_optional_auth_should_not_trigger_ignored_auth_check(ctx, cli, snapshot_
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.run(api.schema_url, "--phases=fuzzing", "--max-examples=3", config={"checks": {"enabled": False}})
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_login_redirect_counts_as_enforced_auth(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {"/me": {"get": {"security": [{"session": []}], "responses": {"200": {"description": "OK"}}}}},

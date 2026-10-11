@@ -308,6 +308,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
             nothing_tested_reason=ctx.nothing_tested_reason,
+            no_checks_ran=ctx.statistic.no_checks_ran,
         )
 
 

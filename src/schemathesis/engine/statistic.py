@@ -80,6 +80,11 @@ class Statistic:
         self.cases_without_checks = 0
         self.errored_cases = 0
 
+    @property
+    def no_checks_ran(self) -> bool:
+        """Cases ran, but no check applied to any of them."""
+        return self.cases_without_checks > 0 and not self.tested_operations
+
     def on_scenario_finished(
         self, recorder: RecordedScenario, *, failure_label: Callable[[Case], str] | None = None
     ) -> None:

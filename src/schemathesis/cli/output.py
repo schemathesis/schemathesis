@@ -91,6 +91,7 @@ def display_final_line(
     nothing_tested_reason: str | None = None,
     exit_code: int = 0,
     baseline_not_saved: bool = False,
+    no_checks_ran: bool = False,
 ) -> None:
     parts = []
     if failures:
@@ -123,6 +124,9 @@ def display_final_line(
         color = "yellow"
     elif total_cases == 0:
         message = "Empty test suite"
+        color = "yellow"
+    elif no_checks_ran:
+        message = f"No checks ran in {running_time:.2f}s"
         color = "yellow"
     else:
         message = f"No issues found in {running_time:.2f}s"
