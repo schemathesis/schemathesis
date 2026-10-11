@@ -188,7 +188,7 @@ class MarshmallowParser:
         observations: list[Observation] = []
         for path, location, message in _walk(body, path=(), location=ParameterLocation.UNKNOWN, at_root=True):
             if location is ParameterLocation.UNKNOWN:
-                location = location_for_parameter(operation, path)
+                location = location_for_parameter(operation, path, case)
             for kind, payload in _classify(message):
                 observations.append(
                     Observation(

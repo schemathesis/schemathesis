@@ -185,7 +185,7 @@ def _classify_default_clause(tag: str) -> tuple[ClassificationResult, ...]:
     return handler({})
 
 
-def _structured_observations(issues: list[dict], operation: APIOperation) -> tuple[Observation, ...]:
+def _structured_observations(issues: list[dict], operation: APIOperation, case: Case) -> tuple[Observation, ...]:
     observations: list[Observation] = []
     for issue in issues:
         path = _split_namespace(issue["namespace"])
@@ -198,7 +198,7 @@ def _structured_observations(issues: list[dict], operation: APIOperation) -> tup
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, path),
+                    location=location_for_parameter(operation, path, case),
                     parameter_path=path,
                     kind=kind,
                     raw_message="",
@@ -208,7 +208,7 @@ def _structured_observations(issues: list[dict], operation: APIOperation) -> tup
     return tuple(observations)
 
 
-def _default_observations(body: dict, operation: APIOperation) -> tuple[Observation, ...]:
+def _default_observations(body: dict, operation: APIOperation, case: Case) -> tuple[Observation, ...]:
     message = body["error"]
     observations: list[Observation] = []
     for match in _DEFAULT_CLAUSE.finditer(message):
@@ -219,7 +219,7 @@ def _default_observations(body: dict, operation: APIOperation) -> tuple[Observat
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, path),
+                    location=location_for_parameter(operation, path, case),
                     parameter_path=path,
                     kind=kind,
                     raw_message=message,
@@ -243,10 +243,10 @@ class GoValidatorParser:
     def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         issues = _extract_structured(body)
         if issues is not None:
-            return _structured_observations(issues, operation)
+            return _structured_observations(issues, operation, case)
         if _is_default_envelope(body):
             assert isinstance(body, dict)
-            return _default_observations(body, operation)
+            return _default_observations(body, operation, case)
         return ()
 
 

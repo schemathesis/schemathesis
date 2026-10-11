@@ -18,6 +18,7 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 ClassificationResult = tuple[ObservationKind, ObservationPayload | None]
@@ -32,10 +33,16 @@ def location_for_method(method: str) -> ParameterLocation:
     return ParameterLocation.QUERY if method.upper() in QUERY_METHODS else ParameterLocation.BODY
 
 
-def location_for_parameter(operation: APIOperation, parameter_path: ParameterPath) -> ParameterLocation:
-    # A field named like a declared path/query/header parameter belongs there, whatever the method.
+def location_for_parameter(operation: APIOperation, parameter_path: ParameterPath, case: Case) -> ParameterLocation:
     if parameter_path and isinstance(parameter_path[0], str):
         name = parameter_path[0]
+        # A field the sent body carries belongs to the body; otherwise one named like a declared parameter belongs there.
+        if (
+            location_for_method(operation.method) is ParameterLocation.BODY
+            and isinstance(case.body, dict)
+            and name in case.body
+        ):
+            return ParameterLocation.BODY
         for location in (ParameterLocation.PATH, ParameterLocation.QUERY, ParameterLocation.HEADER):
             if name in operation.get_parameter_set(location):
                 return location

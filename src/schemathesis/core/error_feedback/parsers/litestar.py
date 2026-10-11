@@ -174,7 +174,7 @@ class LitestarParser:
                 continue
             kind, payload = classification
             path = _resolve_path(issue["key"], message)
-            location = _SOURCE_LOCATIONS.get(issue["source"], location_for_parameter(operation, path))
+            location = _SOURCE_LOCATIONS.get(issue["source"], location_for_parameter(operation, path, case))
             observations.append(
                 Observation(
                     operation_label=operation.label,
