@@ -2525,8 +2525,28 @@ def _nested_body(*, name=None, address=None):
             },
             _nested_body(name={"type": "string", "minLength": 3, "maxLength": 10}),
         ),
+        (
+            {
+                "message": "The given data was invalid.",
+                "errors": {"items.0.name": ["The items.0.name field is required."]},
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "address": {"type": "object", "properties": {"street": {"type": "string"}}},
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"name": {"type": "string", "minLength": 1}},
+                            "required": ["name"],
+                        },
+                    },
+                },
+            },
+        ),
     ],
-    ids=["spring-index", "laravel-index", "rails-index", "aspnet-nested", "aspnet-index"],
+    ids=["spring-index", "laravel-index", "rails-index", "aspnet-nested", "aspnet-index", "laravel-index-required"],
 )
 def test_framework_field_paths_reach_nested_properties(ctx, case_factory, response_factory, body, expected):
     operation = ctx.openapi.load_schema(

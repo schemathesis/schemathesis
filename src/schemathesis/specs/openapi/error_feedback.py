@@ -132,14 +132,19 @@ def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
 def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object) -> None:
     """Descend along `path` and mark the leaf as required.
 
-    String-only paths only — synthesizing intermediate objects under `properties`
-    is safe but synthesizing array `items` requires knowing the element shape,
-    which we don't have. Jackson never drives required-field adjustments anyway.
+    Missing intermediate objects under `properties` are synthesized only on string-only
+    paths; a path through an array element needs the declared `items` schema, since
+    synthesizing one requires knowing the element shape, which we don't have.
     """
-    if not path or not all(isinstance(step, str) for step in path):
+    if not path or not isinstance(path[-1], str):
         return
     *prefix, leaf = path
     assert isinstance(leaf, str)
+    if any(isinstance(step, int) for step in prefix):
+        target = _walk_to_property(schema, tuple(prefix), bundled)
+        if target is not None:
+            _ensure_required_in_object(target, leaf)
+        return
     current = schema
     for step in prefix:
         assert isinstance(step, str)
