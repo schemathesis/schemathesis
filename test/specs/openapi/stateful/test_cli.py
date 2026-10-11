@@ -1186,7 +1186,6 @@ def map_query(context, query):
 # An exception leaking out of the stateful thread is printed as a traceback.
 @pytest.mark.filterwarnings("error::pytest.PytestUnhandledThreadExceptionWarning")
 def test_negative_only_steps_without_negatable_parameters_still_run(ctx, cli):
-    # Neither the root step nor the link-filled step has anything left to negate.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {

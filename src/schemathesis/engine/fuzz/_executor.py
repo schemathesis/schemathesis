@@ -330,7 +330,7 @@ def _draw_case(
             )
         )
     except UnsatisfiedAssumption:
-        # Let Hypothesis handle filtered examples normally.
+        # Let Hypothesis handle filtered examples.
         raise
     except Exception as exc:
         excluded_operations.add(operation.label)
@@ -435,7 +435,6 @@ def _start_scenario(
 
 
 def _status_for(exc: FailureGroup | Exception | KeyboardInterrupt) -> Status:
-    # A failure without `continue-on-failure` stops checking remaining steps and stops the campaign.
     if isinstance(exc, FailureGroup):
         return Status.FAILURE
     if isinstance(exc, KeyboardInterrupt):
@@ -471,9 +470,8 @@ def _handle_session_end(
     operations: list[APIOperation],
     event_queue: queue.Queue[events.EngineEvent],
 ) -> None:
-    """React to whatever ended this worker's Hypothesis session."""
     if isinstance(exc, _StopFuzzing):
-        # Natural thread completion: no work left, other workers keep running.
+        # This worker has no work left; other workers keep running.
         return
     if isinstance(exc, KeyboardInterrupt):
         ctx.stop()

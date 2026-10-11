@@ -467,9 +467,9 @@ def _with_value_channel(
             new_body, original_value, new_value = apply_value_channel(
                 cast(JsonValue, deepclone(positive)), target_path, keyword, schema_at_path
             )
-            # Violators are no-ops on permissive schemas; fall back to schema-channel to avoid
-            # false-positive `negative_data_rejection`. Strip Binary to "" before validating:
-            # jsonschema_rs rejects the wrapper but structure-level keywords still fire.
+            # Breaking a value can leave a permissive schema satisfied; fall back to schema mutation to avoid a
+            # false-positive `negative_data_rejection`. Binary values validate as "": the validator rejects the
+            # wrapper, but structure-level keywords still apply.
             body_for_validation = _strip_binary(new_body) if contains_binary(new_body) else new_body
             if real_validator.is_valid(body_for_validation):
                 return draw(mutated_strategy)

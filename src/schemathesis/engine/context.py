@@ -237,8 +237,7 @@ class EngineContext:
         return None
 
     def constants_value_source(self) -> ConstantsPool | None:
-        # The pool is extracted once before the run and is read-only during draws, and value selection uses
-        # Hypothesis's own `st.randoms()`, so strategies stay reproducible. An empty pool is not offered at all.
+        # The pool is read-only during draws and values are picked via `st.randoms()`, so strategies stay reproducible.
         if self.constants_extraction.is_empty():
             return None
         return self.constants_extraction

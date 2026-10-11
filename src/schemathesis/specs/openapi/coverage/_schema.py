@@ -1600,9 +1600,7 @@ def _merge_ref_siblings(ctx: CoverageContext, resolved: JsonSchemaObject, schema
         # must not replace the target's bound.
         both = {"allOf": [resolved, rest]}
         return _merge_all_of(both) or both
-    # Deep-merge so sibling `properties`/`required` augment the resolved schema rather than wiping it;
-    # the discriminator-pinning rewrite produces exactly this shape (sibling pins the discriminator key,
-    # resolved carries the rest).
+    # Deep-merge so sibling `properties`/`required` extend the resolved schema; discriminator pinning yields this shape.
     merged = {**resolved}
     for key, value in rest.items():
         if key == "properties" and isinstance(value, dict) and isinstance(merged.get("properties"), dict):
@@ -2954,9 +2952,7 @@ def _type_excludes_object(schema: JsonSchemaObject) -> bool:
 def _ensure_object_template_with_baseline(
     ctx: CoverageContext, schema: JsonSchemaObject, template: Any, baseline_emitted: bool
 ) -> Generator[GeneratedValue, None, Any]:
-    # The first object applicator emits a baseline `NegativeValue` when the outer type excludes
-    # object; the inner `properties` applicator otherwise never sees an all-children-valid case
-    # (per-leaf negatives each break one child).
+    # Outer type excludes object: emit one all-valid object as a negative baseline; per-property negatives never do.
     if template is None:
         template = _generate_template_with_deflation_fallback(ctx, schema, _get_template_schema(schema, "object", ctx))
     if not baseline_emitted and isinstance(template, dict) and _type_excludes_object(schema):

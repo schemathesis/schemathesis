@@ -176,7 +176,7 @@ def _exit_note(data: ReportData) -> str:
     return f'<{tag} class="hs-exit"{href}>{esc(text)}</{tag}>'
 
 
-# The default run enables over a dozen checks; the row shows the first few, like the Failures cell.
+# The default run enables many checks; the row shows the first few, like the Failures cell.
 _CHECKS_SHOWN = 5
 
 

@@ -747,9 +747,7 @@ def _serialize_for_location(
     if serialize is not None:
         strategy = strategy.map(wrap_map_hook_for_generated_value(serialize, prune_constants=False))
 
-    # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
-    # `True` / `False` / `None` improves chances of them passing validation in apps
-    # that expect boolean / null types and not aware of Python-specific representation of those types
+    # Path and query values become strings; JSON spellings of `True`/`False`/`None` pass validation more often.
     match location:
         case ParameterLocation.PATH:
             if is_negative:
@@ -1715,8 +1713,7 @@ class OpenApiBody(OpenApiComponent):
 
         The order is load-bearing: examples are mixed before any substitution; constants run before
         semantic and captured values so live, response-derived values win over a random pool literal.
-        `build_semantic_overlay` and `build_hybrid_strategy` both unwrap an upstream `GeneratedValue`
-        and re-wrap with combined provenance, so constants substitutions that survive keep their attribution.
+        Later overlays re-wrap `GeneratedValue` with combined provenance, so surviving constants keep their attribution.
         """
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
 
@@ -1766,8 +1763,7 @@ class OpenApiBody(OpenApiComponent):
         self, strategy: st.SearchStrategy, operation: OpenApiOperation, error_feedback: ErrorFeedbackStore | None
     ) -> st.SearchStrategy:
         """Mix in schema examples (20% example, 80% generated)."""
-        # Filter against the adjustment-applied schema so spec examples that the API has demonstrated
-        # to be invalid (e.g. `"dd-MM-yyyy"` after format inference) don't leak into the mixer.
+        # Drop spec examples the API has shown invalid, e.g. `"dd-MM-yyyy"` after format inference.
         validation_schema = _adjusted_schema(self.validation_schema, operation, ParameterLocation.BODY, error_feedback)
         examples = filter_schema_valid_examples(
             self._get_strategy_examples(operation), validation_schema, self.adapter.jsonschema_validator_cls

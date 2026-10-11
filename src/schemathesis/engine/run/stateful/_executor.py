@@ -143,8 +143,7 @@ def _classify_flaky(*, ctx: StatefulContext, engine: EngineContext, state: Testi
     found = Status.FAILURE if ctx.has_new_failures_in_suite else Status.SUCCESS
     if engine.has_reached_the_failure_limit:
         return found, False, []
-    # Flakiness caused by a transient transport failure: surface it and stop rather than
-    # restarting the whole suite - a replayed drop won't reproduce, so re-running is wasted.
+    # Flakiness from a transient transport failure: surface it and stop, since a replayed drop won't reproduce.
     network_outcome = _network_error_outcome(state)
     if network_outcome is not None:
         return network_outcome
@@ -248,7 +247,7 @@ def _raise_if_stopped(engine: EngineContext) -> None:
 
 def _reject_unusable_operation(engine: EngineContext, operation_label: str) -> None:
     use_probability = engine.health.frozen_use_probability(operation_label)
-    # Always draw - keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
+    # Always draw, so the data tree keeps its shape across replays as `use_probability` drops below 1.0.
     if not current_build_context().data.draw_boolean(p=use_probability):
         reject()
     if engine.health.is_unresponsive(operation_label):
@@ -444,7 +443,6 @@ def _begin_suite(engine: EngineContext, suite_recorders: list[ScenarioRecorder])
 
 def _drain_suite_recorders(engine: EngineContext, suite_recorders: list[ScenarioRecorder]) -> None:
     """Feed the suite's recorders into the pool before the next suite builds its strategies."""
-    # Mirrors `record_extra_data_from_recorder` in the unit phase.
     if engine.extra_data_source is not None and suite_recorders:
         _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
 

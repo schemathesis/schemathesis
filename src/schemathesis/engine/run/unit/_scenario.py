@@ -100,7 +100,7 @@ def iter_closing_events(
     pending_events: list[events.EngineEvent],
     errors: list[Exception],
 ) -> Iterator[events.EngineEvent]:
-    """Deferred events and deduplicated errors, then feed what the scenario captured into the resource pool."""
+    """Yield deferred events and deduplicated errors, then feed what the scenario captured into the resource pool."""
     yield from pending_events
     for error in deduplicate_errors(errors):
         yield scenario.non_fatal_error(error)

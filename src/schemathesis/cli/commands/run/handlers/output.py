@@ -115,7 +115,7 @@ def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: 
 
 
 def phase_status_icon(status: Status, stats: dict[Status, int]) -> str | None:
-    """Icon for a finished phase whose status its scenario counts do not convey."""
+    """Icon for a finished phase whose scenario counts do not convey its status."""
     # A phase errors without any operation erroring once the server stops responding.
     if status == Status.ERROR:
         return "🚫"
@@ -222,7 +222,7 @@ class WarningItem:
     text: str
     # Lines shown under the item, e.g. the patterns an operation could not use.
     details: list[str] = field(default_factory=list)
-    # Label of the operation the item is about, if it is about one.
+    # Label of the operation the item is about, if any.
     operation: str | None = None
 
 
@@ -338,7 +338,7 @@ def _missing_deserializer_block(ctx: ExecutionContext) -> WarningBlock:
 
 
 def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
-    """Operations nothing ever served, grouped by what would actually make them reachable."""
+    """Operations nothing ever served, grouped by what would make them reachable."""
     missing = ctx.warnings.missing_test_data
     if _status_codes_are_uninformative(ctx):
         return _list_block(

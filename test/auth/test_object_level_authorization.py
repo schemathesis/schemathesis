@@ -173,8 +173,7 @@ def test_stateful_owner_is_the_identity_of_the_linked_step(ctx, tmp_path, creato
         object_level_authorization(check_context(recorder=recorder), case.call(), case)
 
 
-# Servers that let the client pick the id often answer a create with a bare acknowledgement.
-# A list shows other users' objects too, so seeing an id there does not make it yours.
+# An id seen in a read response may belong to another user, so it does not prove ownership.
 def test_listed_object_is_not_owned(ctx, tmp_path):
     api, case = _owner_case(
         ctx,

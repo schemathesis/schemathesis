@@ -39,8 +39,7 @@ def register_wfc_auth(schema: BaseSchema, config: WFCAuthConfig, user: str | Non
     if peers or (selected is None and len(entries) > 1):
         if selected is not None:
             select_user(entries, selected)
-        # No user named: work through the document rather than spending the run on the first entry.
-        # Peers need every identity loaded, even when one is pinned.
+        # No user named: try every entry, not only the first. Peers need every identity loaded, even when one is pinned.
         schema.auth.providers.append(
             EscalatingAuthProvider([_build(entry, config) for entry in entries], names, peers=peers, pinned=selected)
         )

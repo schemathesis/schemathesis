@@ -232,7 +232,6 @@ def test_certificates(cli, tmp_path):
         )
     finally:
         server.shutdown()
-    # Both the schema fetch and the API calls present the client certificate.
     expected = {ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode())}
     assert presented["/openapi.json"] == presented["/api/success"] == expected
 
@@ -5002,7 +5001,7 @@ def before_add_examples(context, examples):
 
 @pytest.mark.parametrize("workers", ["1", "2"])
 def test_interrupt_counts_each_operation_once(ctx, cli, workers):
-    # Workers can report the interrupt more than once; each operation must still be counted once.
+    # Workers can report the same interrupt more than once.
     api = ctx.openapi.apps.success_and_failure()
     module = ctx.write_pymodule(INTERRUPT_ON_EVERY_EXAMPLES_SETUP)
     result = cli.main("run", api.schema_url, f"--workers={workers}", "--phases=examples", hooks=module)

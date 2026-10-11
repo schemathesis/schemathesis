@@ -19,7 +19,6 @@ def scenario_failures(statistic: Statistic, recorder: RecordedScenario, label: s
 
 
 def recorder_failures(statistic: Statistic, recorder: RecordedScenario) -> list[GroupedFailures]:
-    """Failures recorded for cases in a scenario."""
     case_ids = set(recorder.cases)
     return [group for groups in statistic.failures.values() for case_id, group in groups.items() if case_id in case_ids]
 

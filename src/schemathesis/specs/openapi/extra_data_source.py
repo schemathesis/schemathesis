@@ -175,7 +175,6 @@ class CapturedVariant:
 
 
 def _build_pool_draw(slot: InputSlot, instance: ResourceInstance, value: object) -> PoolDraw:
-    """Build a `PoolDraw` provenance record for a slot that was filled with `value` from `instance`."""
     parameter_name = slot.parameter_name if isinstance(slot.parameter_name, str) else ""
     return PoolDraw(
         location=slot.parameter_location.value,
@@ -223,13 +222,11 @@ def declared_response_schema(
     response_def = operation.responses.find_by_status_code(status_code)
     if response_def is None:
         return None
-    # Callers run outside the response-schema check path; an unresolvable `$ref` or other malformed
-    # response schema must not fail the operation when only non-schema checks are enabled.
+    # An unresolvable `$ref` or malformed response schema must not fail the operation when only non-schema checks run.
     try:
         schema = response_def.get_schema(content_type).schema
     except (BundleError, InvalidSchema, MalformedMediaType):
         return None
-    # A boolean JSON Schema (true/false) carries no leaf info.
     return schema if isinstance(schema, dict) else None
 
 

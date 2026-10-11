@@ -151,7 +151,7 @@ def _settle_status(
     server_went_away: bool,
     recorder: ScenarioRecorder,
 ) -> tuple[Status, str | None]:
-    """Turn a scenario that raised nothing into a skip or an error when its cases did not really run."""
+    """Turn a scenario that raised nothing into a skip or an error when its cases did not run cleanly."""
     if status != Status.SUCCESS:
         return status, None
     if not any_case_ran:

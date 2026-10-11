@@ -403,7 +403,7 @@ def test_drf_parser_parse_list_with_failing_index(make_operation, case_factory):
 _DRF_MULTI_ERROR_BODY = {"username": ["This field may not be blank.", "Ensure this field has at least 3 characters."]}
 
 
-# DRF response: Django MaxLengthValidator bridge
+# DRF response: Django's MaxLengthValidator message passed through
 _DRF_DJANGO_BRIDGE_BODY = {"email": ["Ensure this value has at most 20 characters (it has 25)."]}
 
 

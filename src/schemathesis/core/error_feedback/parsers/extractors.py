@@ -118,7 +118,6 @@ def parse_number(text: str) -> int | float:
 
 
 def number_or_none(value: object) -> int | float | None:
-    """Parse a string into a number; return None if the value is not a string or not parseable."""
     if not isinstance(value, str):
         return None
     try:

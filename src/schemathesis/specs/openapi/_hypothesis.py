@@ -221,8 +221,8 @@ def openapi_cases(
     else:
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
 
-    # If we need to generate negative cases but no generated values were negated, then skip the whole test.
-    # Skipping or rejecting a stateful step discards the whole scenario, so the step is sent as a positive one instead.
+    # Reject a negative case with no negated values, or skip the test when only negative mode is enabled.
+    # A stateful step is exempt: rejecting it discards the whole scenario, so it goes out as a positive one.
     if (
         generation_mode.is_negative
         and phase != TestPhase.STATEFUL

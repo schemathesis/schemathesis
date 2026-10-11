@@ -454,8 +454,8 @@ def wfc_owned_orders(policy: str, listing: str | None = None, writes: bool = Fal
 
     `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only,
     `all_renamed` everyone's under a differently named schema.
-    `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note writes open to any caller
-    that take the order id in the path or query and echo it.
+    `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note endpoints that take the
+    order id in the path or query, accept any caller and echo the id.
     """
     paths = _OWNED_ORDERS
     schemas: dict[str, object] = {}

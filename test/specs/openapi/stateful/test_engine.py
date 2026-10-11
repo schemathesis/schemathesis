@@ -338,7 +338,7 @@ def test_find_use_after_free(engine_factory):
 
 
 _STATE_MACHINE_SETTINGS = hypothesis.settings(
-    # The bug needs a specific call sequence, which takes many scenarios to reach.
+    # Planted bugs need specific call sequences, which take many scenarios to reach.
     max_examples=60,
     stateful_step_count=10,
     deadline=None,

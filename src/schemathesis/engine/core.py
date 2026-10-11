@@ -260,7 +260,7 @@ class ExecutionPlan:
                     key = (event.info.title, event.info.message)
                     if event.related_to_operation:
                         self.operation_errors.add(key)
-                    # A run-level error repeating one already shown on an operation tells the reader nothing new.
+                    # Skip run-level errors already shown on an operation.
                     elif key in self.operation_errors:
                         continue
                 yield event
