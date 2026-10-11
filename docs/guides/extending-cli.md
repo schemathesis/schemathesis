@@ -85,7 +85,7 @@ class CounterHandler(cli.EventHandler):
 
         if self.output_file:
             self._write_output_file()
-            ctx.add_summary_line(f"  Results written to: {self.output_file}")
+            ctx.add_report("Counter", self.output_file)
 
     def _write_output_file(self):
         with open(self.output_file, "w") as f:
@@ -128,8 +128,12 @@ Counter Summary:
   Scenarios: 3
   Failed scenarios: 0
   Errors: 0
-  Results written to: results.txt
+
+Reports:
+  - Counter: results.txt
 ```
+
+`ctx.add_report` lists a file your handler writes next to the built-in reports: in the terminal's "Reports" section and, with `--report html`, as a link in the HTML report. Call it no later than `EngineFinished`.
 
 ## Troubleshooting
 

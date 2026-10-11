@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- `ctx.add_report()` for CLI extensions to list their reports in the terminal and HTML report.
 - `auth.auto-signup` config option to disable automatic sign-up.
 - Warning when most entries of a dictionary fail the schema of their parameter.
 - Warning when `--request-timeout` or `max_response_time` is 1000 seconds or more.

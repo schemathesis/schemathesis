@@ -33,7 +33,7 @@ from schemathesis.cli.output import (
     make_progress_bar,
     print_lines,
 )
-from schemathesis.config import ProjectConfig, ReportFormat
+from schemathesis.config import ProjectConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.output import format_response_payload
 from schemathesis.core.result import Ok
@@ -1746,30 +1746,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             baseline_not_saved=ctx.baseline_write_error is not None,
         )
 
-    def display_reports(self) -> None:
-        reports = self.config.reports
-        enabled = [
-            (format, report)
-            for format, report in (
-                (ReportFormat.JUNIT, reports.junit),
-                (ReportFormat.VCR, reports.vcr),
-                (ReportFormat.HAR, reports.har),
-                (ReportFormat.NDJSON, reports.ndjson),
-                (ReportFormat.JSON, reports.json),
-                (ReportFormat.WFC, reports.wfc),
-                (ReportFormat.ALLURE, reports.allure),
-                (ReportFormat.HTML, reports.html),
-            )
-            if report.enabled
-        ]
-        if enabled:
+    def display_reports(self, ctx: ExecutionContext) -> None:
+        reports = ctx.all_reports()
+        if reports:
             click.echo(_style("Reports:", bold=True))
-            for format, _ in enabled:
-                path = reports.get_path(format)
-                # Point at the page itself so it opens in one click.
-                if format == ReportFormat.HTML:
-                    path = path / "index.html"
-                click.echo(_style(f"  - {format.value.upper()}: {path}"))
+            for name, path in reports:
+                click.echo(_style(f"  - {name}: {path}"))
             click.echo()
 
     def display_seed(self) -> None:
@@ -1847,6 +1829,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             click.echo()
 
         display_test_cases(summary.test_cases)
-        self.display_reports()
+        self.display_reports(ctx)
         self.display_seed()
         self.display_final_line(ctx, event)

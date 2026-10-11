@@ -162,6 +162,8 @@ class ReportData:
     phases: list[tuple[str, str, str]]
     # Checks enabled for the run.
     checks: list[str]
+    # Other reports of the run as (name, href), the href relative to this report's directory.
+    reports: list[tuple[str, str]]
     reauth_count: int
     # Authentication stopped working mid-run.
     reauth_broke: bool

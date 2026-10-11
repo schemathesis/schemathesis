@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.summary import SummaryData
+from schemathesis.config import ReportFormat
 from schemathesis.engine import StopReason, events
 from schemathesis.engine.statistic import Statistic
 
@@ -31,6 +33,8 @@ class BaseExecutionContext:
     nothing_tested_reason: str | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
+    # Reports written by extensions, as (name, path).
+    reports: list[tuple[str, Path]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.statistic.baseline = self.config.load_baseline()
@@ -40,6 +44,23 @@ class BaseExecutionContext:
 
     def add_summary_line(self, line: str | Generator[str, None, None]) -> None:
         self.summary_lines.append(line)
+
+    def add_report(self, name: str, path: str | Path) -> None:
+        """List a report an extension writes next to the built-in ones, in the terminal and the HTML report."""
+        self.reports.append((name, Path(path)))
+
+    def all_reports(self) -> list[tuple[str, Path]]:
+        """Every report this run writes: enabled built-in formats, then the ones extensions added."""
+        config = self.config.reports
+        built_in = []
+        for format in ReportFormat:
+            if getattr(config, format.value).enabled:
+                path = config.get_path(format)
+                # Point at the page itself so it opens in one click.
+                if format == ReportFormat.HTML:
+                    path = path / "index.html"
+                built_in.append((format.value.upper(), path))
+        return [*built_in, *self.reports]
 
     def summary(self) -> SummaryData:
         """Reduce the run so far into the numbers reports and the terminal share."""

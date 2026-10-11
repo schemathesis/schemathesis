@@ -139,6 +139,7 @@ class HtmlWriter:
             startup_warnings=[],
             phases=[],
             checks=self._checks,
+            reports=[],
             reauth_count=0,
             reauth_broke=False,
             extraction_failures=[],
