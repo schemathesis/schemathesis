@@ -183,6 +183,24 @@ def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner
     assert "Tested: 1" in result.stdout, result.stdout
 
 
+# Steps after the first failure in a scenario were already sent, so their responses are checked too.
+def test_fuzz_checks_steps_after_a_failure(cli, app_runner, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {f"/{name}": {"get": {"responses": {"200": {"description": "OK"}}}} for name in ("failure", "a", "b", "c")}
+    )
+    requested = set()
+
+    @app.route("/<name>")
+    def endpoint(name):
+        requested.add(name)
+        return (jsonify({}), 500) if name == "failure" else jsonify({})
+
+    result = cli.main("fuzz", app_runner.openapi_url(app), "--max-time=30")
+
+    assert "skipped" not in result.stdout, result.stdout
+    assert f"Tested: {len(requested)}\n" in result.stdout, result.stdout
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_empty_test_suite(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)
