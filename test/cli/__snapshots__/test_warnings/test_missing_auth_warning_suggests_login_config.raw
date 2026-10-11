@@ -27,7 +27,7 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
-Authentication failed: 2 operations returned authentication errors
+Authentication failed: 2 operations returned only 401/403 responses
 
 401 Unauthorized (2 operations):
   - GET /orders

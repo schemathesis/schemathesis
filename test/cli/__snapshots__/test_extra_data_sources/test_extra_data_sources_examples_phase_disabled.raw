@@ -44,7 +44,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
+  ⚠️ Missing test data: 2 operations repeatedly returned 404 responses
 
 Test cases:
   N generated, N passed

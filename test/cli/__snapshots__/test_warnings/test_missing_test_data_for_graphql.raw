@@ -40,7 +40,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Missing valid test data: 1 operation never returned data
+  ⚠️ Missing test data: 1 operation never returned data
 
 Test cases:
   N generated, N passed
