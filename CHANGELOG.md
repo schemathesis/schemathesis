@@ -24,6 +24,7 @@
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
 - Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
+- `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - Fuzzing sending examples of query parameters the server rejected as unknown.

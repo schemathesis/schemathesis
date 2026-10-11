@@ -48,7 +48,7 @@ WORKER_TIMEOUT = 0.1
 def _build_coverage_generator(
     operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any], feedback: FeedbackSources
 ) -> CoverageGenerator:
-    generation = ctx.config.generation_for(operation=operation)
+    generation = ctx.config.generation_for(operation=operation, phase=PhaseName.COVERAGE.value)
     return CoverageGenerator(
         operation=operation,
         generation_modes=generation.modes,
