@@ -161,8 +161,6 @@ class Lane(NamedTuple):
     # Each pass as (start, end) in seconds from the run start; empty for failures found outside any phase.
     passes: list[tuple[float, float]]
     markers: list[Marker]
-    # Failures found by an earlier phase that this one hit too.
-    again: int = 0
     errors: int = 0
 
     def details(self) -> str:
@@ -171,8 +169,6 @@ class Lane(NamedTuple):
             parts.append(short_duration(self.passes[-1][1] - self.passes[0][0]))
         if self.markers:
             parts.append(f"{failure_count(self.markers)} found")
-        if self.again:
-            parts.append(f"{self.again} again")
         if self.errors:
             parts.append(plural(self.errors, "error"))
         return ", ".join(parts)
@@ -184,10 +180,7 @@ def build_lanes(data: ReportData, markers: list[Marker]) -> list[Lane]:
         lanes.setdefault(span.phase, Lane(span.phase, [], [])).passes.append((span.start, span.end))
     for marker in markers:
         lanes.setdefault(marker.phase, Lane(marker.phase, [], [])).markers.append(marker)
-    return [
-        lane._replace(again=data.found_again.get(lane.phase, 0), errors=data.phase_errors.get(lane.phase, 0))
-        for lane in lanes.values()
-    ]
+    return [lane._replace(errors=data.phase_errors.get(lane.phase, 0)) for lane in lanes.values()]
 
 
 def mark_classes(seconds: float, total: float) -> str:

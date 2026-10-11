@@ -45,7 +45,6 @@ if TYPE_CHECKING:
     from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
-    from schemathesis.core.failures import Failure
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures, Statistic
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
@@ -67,7 +66,6 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         "phase_started",
         "phase_spans",
         "found",
-        "found_again",
         "phase_errors",
     )
 
@@ -87,8 +85,6 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         self.phase_spans: list[PhaseSpan] = []
         # Key of each failure group (its case id) -> seconds from the run start when it first appeared, and the phase.
         self.found: dict[str, tuple[float, str]] = {}
-        # Failures each phase hit after an earlier phase had found them.
-        self.found_again: dict[str, set[Failure]] = {}
         # Distinct errors in each phase, as (label, exception type).
         self.phase_errors: dict[PhaseName, set[tuple[str, type]]] = {}
 
@@ -138,7 +134,6 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
 
     def _on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         self._record(event.recorder)
-        self._record_found_again(ctx, event.recorder, event.phase.display)
         self._record_found(ctx, event.recorder, event.phase.display, event.timestamp)
         if event.status == Status.SKIP and event.skip_reason is not None and event.label is not None:
             self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
@@ -184,16 +179,6 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                 interaction = recorder.interactions.get(case_id) if recorder is not None else None
                 found_at = interaction.timestamp if interaction is not None else timestamp
                 self.found[case_id] = (max(found_at - self.started_at, 0.0), phase)
-
-    def _record_found_again(self, ctx: BaseExecutionContext, recorder: RecordedScenario, phase: str) -> None:
-        first_cases = ctx.statistic.unique_failures_map
-        for checks in recorder.checks.values():
-            for check in checks:
-                if check.failure_info is None:
-                    continue
-                first_case = first_cases.get(check.failure_info.failure)
-                if first_case is not None and self.found.get(first_case, (0.0, phase))[1] != phase:
-                    self.found_again.setdefault(phase, set()).add(check.failure_info.failure)
 
     def _failing_case(self, ctx: BaseExecutionContext, key: str, group: GroupedFailures) -> FailingCase:
         case = failing_case(
@@ -292,11 +277,9 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         )
 
     def _phase_outcomes(self, phases: PhaseStatuses, stop_reason: StopReason) -> PhaseOutcomes:
-        again = {phase: len(failures) for phase, failures in self.found_again.items()}
         return PhaseOutcomes(
             errors=_phase_error_counts(phases, self.phase_errors),
-            again=again,
-            failed={phase for _, phase in self.found.values()} | again.keys(),
+            failed={phase for _, phase in self.found.values()},
             interrupted=_cut_phase(self.phase_spans) if stop_reason is StopReason.INTERRUPTED else None,
         )
 
@@ -356,7 +339,6 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             complete=self.finished is not None,
             exit_code=ctx.exit_code,
             phase_errors=outcomes.errors,
-            found_again=outcomes.again,
         )
         write_report(data, self.output_dir)
 
@@ -382,9 +364,7 @@ PhaseStatuses = dict[PhaseName, tuple[Status, PhaseSkipReason | None]]
 class PhaseOutcomes(NamedTuple):
     # Distinct errors per phase name.
     errors: dict[str, int]
-    # Failures per phase name that an earlier phase found first.
-    again: dict[str, int]
-    # Phases that found a failure or hit one found earlier.
+    # Phases that found a failure first.
     failed: set[str]
     # The phase the run was in when the user stopped it.
     interrupted: str | None

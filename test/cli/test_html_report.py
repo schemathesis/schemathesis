@@ -61,8 +61,6 @@ def assert_phases_match_lanes(html):
     for name in ran:
         kind, outcome = phases[name]
         details = lanes[name][0]
-        if "failed" in outcome:
-            assert count_of(r"(\d+) found", details) + count_of(r"(\d+) again", details), (name, outcome, details)
         errors = count_of(r"(\d+) errors?\b", outcome)
         assert errors == count_of(r"(\d+) errors?\b", details), (name, outcome, details)
         assert outcome.split(",")[0] in ("passed", "failed", "interrupted", "no checks ran") or re.fullmatch(
@@ -964,6 +962,50 @@ def test_html_report_run_level_error(ctx, cli, app_runner, report_dir, snapshot_
         cli, report_dir, app_runner.openapi_url(app), phases="fuzzing,stateful", exit_code=ExitCode.FAILURES
     )
     assert html == snapshot_html
+
+
+def test_html_report_lanes_count_only_new_failures(ctx, cli, app_runner, report_dir):
+    item = {"type": "object", "properties": {"id": {"type": "integer"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": item}},
+                            "links": {"Get": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}},
+                        }
+                    }
+                }
+            },
+            "/api/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    app.add_url_rule("/api/items", "create", lambda: ({"id": 1}, 201), methods=["POST"])
+    app.add_url_rule("/api/items/<int:id>", "get", lambda id: ({"detail": "boom"}, 500))
+
+    html = run_with_report(
+        cli,
+        report_dir,
+        app_runner.openapi_url(app),
+        "--checks=not_a_server_error",
+        "--continue-on-failure",
+        phases="fuzzing,stateful",
+        exit_code=ExitCode.FAILURES,
+    )
+    lanes = dict(re.findall(r'<span class="tl-lane-name">([^<]+)</span><span class="tl-sub">([^<]*)</span>', html))
+    # The duration comes first; only the counts are stable.
+    assert {name: details.split(", ")[1:] for name, details in lanes.items()} == {
+        "Fuzzing": ["1 found"],
+        "Stateful": [],
+    }
 
 
 def test_html_report_warning_on_passed_run(ctx, cli, report_dir, snapshot_html):
