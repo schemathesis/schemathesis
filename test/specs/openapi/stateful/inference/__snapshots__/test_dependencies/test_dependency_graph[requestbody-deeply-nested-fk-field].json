@@ -14,7 +14,15 @@
       ]
     },
     "POST /orders": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "fulfillment/shipping/warehouse_id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        }
+      ],
       "outputs": []
     }
   },
