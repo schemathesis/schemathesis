@@ -1949,6 +1949,47 @@ def test_apply_adjustments_bounds_an_untyped_property(case_factory):
             id="allof-branches-untouched",
         ),
         pytest.param(
+            {
+                "type": "object",
+                "allOf": [
+                    {"type": "object", "properties": {"a": {}}, "required": ["a"]},
+                    {"type": "object", "properties": {"b": {}}},
+                ],
+            },
+            (),
+            {
+                "type": "object",
+                "allOf": [
+                    {"type": "object", "properties": {"a": {}}, "required": ["a"]},
+                    {"type": "object", "properties": {"b": {}}},
+                ],
+                "properties": {"a": {}, "b": {}},
+                "additionalProperties": False,
+            },
+            id="allof-root-keeps-branch-properties",
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"c": {"type": "integer"}},
+                "allOf": [
+                    {"type": "object", "properties": {"a": {}}, "required": ["a"]},
+                    {"type": "object", "properties": {"b": {}}},
+                ],
+            },
+            (),
+            {
+                "type": "object",
+                "properties": {"c": {"type": "integer"}, "a": {}, "b": {}},
+                "allOf": [
+                    {"type": "object", "properties": {"a": {}}, "required": ["a"]},
+                    {"type": "object", "properties": {"b": {}}},
+                ],
+                "additionalProperties": False,
+            },
+            id="allof-root-with-own-properties",
+        ),
+        pytest.param(
             {"type": "object", "properties": {"address": {"type": "object", "properties": {"city": {}}}}},
             ("address",),
             {
@@ -1985,6 +2026,55 @@ def test_additional_properties_adjustment_forbids_extras(input_schema, path, exp
         )
         == expected
     )
+
+
+def test_additional_properties_adjustment_preserves_allof_ref_properties(ctx, case_factory, response_factory):
+    operation = ctx.openapi.load_schema(
+        {
+            "/api/pets": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Dog"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Pet": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "required": ["name"],
+                },
+                "Dog": {
+                    "type": "object",
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Pet"},
+                        {"type": "object", "properties": {"bark": {"type": "boolean"}}},
+                    ],
+                },
+            }
+        },
+    )["/api/pets"]["POST"]
+    store = ErrorFeedbackStore()
+    _record(
+        store,
+        operation=operation,
+        case=case_factory(operation=operation, body={"name": "rex", "zzz": 1}),
+        body={"message": 'JSON parse error: Unrecognized field "zzz" (class com.x.Dog), not marked as ignorable'},
+        response_factory=response_factory,
+    )
+    adjusted = apply_adjustments(
+        operation=operation,
+        location=ParameterLocation.BODY,
+        schema=operation.body[0].optimized_schema,
+        store=store,
+    )
+    validator = jsonschema_rs.validator_for(adjusted)
+    assert validator.is_valid({"name": "rex"})
+    assert not validator.is_valid({"name": "rex", "zzz": 1})
 
 
 @pytest.mark.parametrize(
