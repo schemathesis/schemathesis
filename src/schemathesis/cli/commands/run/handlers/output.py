@@ -130,10 +130,14 @@ def phase_status_icon(status: Status, stats: dict[Status, int]) -> str | None:
     # A phase errors without any operation erroring once the server stops responding.
     if status == Status.ERROR:
         return "🚫"
-    # Scenarios that passed without any check applied to them leave the phase skipped.
-    if status == Status.SKIP and stats[Status.SUCCESS]:
+    if phase_without_checks(status, stats):
         return "⏭ "
     return None
+
+
+def phase_without_checks(status: Status, stats: dict[Status, int]) -> bool:
+    """Scenarios that passed without any check applied to them leave the phase skipped."""
+    return status == Status.SKIP and stats[Status.SUCCESS] > 0
 
 
 def bold(option: str) -> str:
@@ -739,12 +743,15 @@ class UnitTestProgressManager:
         self.live = None
         self.is_interrupted = False
 
-    def _get_stats_message(self, *, live: bool = True) -> str:
+    def _get_stats_message(self, *, live: bool = True, without_checks: bool = False) -> str:
         width = len(str(self.total))
 
         parts = []
         if self.stats[Status.SUCCESS]:
-            parts.append(f"✅ {self.stats[Status.SUCCESS]:{width}d} passed")
+            if without_checks:
+                parts.append(f"⏭  {self.stats[Status.SUCCESS]:{width}d} without checks")
+            else:
+                parts.append(f"✅ {self.stats[Status.SUCCESS]:{width}d} passed")
         if self.stats[Status.FAILURE]:
             parts.append(f"❌ {self.stats[Status.FAILURE]:{width}d} failed")
         if self.stats[Status.ERROR]:
@@ -866,12 +873,12 @@ class UnitTestProgressManager:
     def _get_status_icon(self, default_icon: str = "🕛") -> str:
         return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default=default_icon)
 
-    def get_completion_message(self, icon: str | None = None) -> str:
+    def get_completion_message(self, icon: str | None = None, *, without_checks: bool = False) -> str:
         """Complete the phase and return status message."""
         duration = format_duration(self.elapsed_ms)
         icon = icon or self._get_status_icon()
 
-        message = self._get_stats_message(live=False) or "No tests were run"
+        message = self._get_stats_message(live=False, without_checks=without_checks) or "No tests were run"
         if self.is_interrupted:
             duration_message = f"interrupted after {duration}"
         else:
@@ -1010,11 +1017,14 @@ class StatefulProgressManager:
             links += f" ({self.links_inferred} inferred)"
         self.progress_bar.update(self.progress_task_id, scenarios=self.scenarios, links=links)
 
-    def _get_stats_message(self) -> str:
+    def _get_stats_message(self, *, without_checks: bool = False) -> str:
         """Get formatted stats message."""
         parts = []
         if self.stats[Status.SUCCESS]:
-            parts.append(f"✅ {self.stats[Status.SUCCESS]} passed")
+            if without_checks:
+                parts.append(f"⏭  {self.stats[Status.SUCCESS]} without checks")
+            else:
+                parts.append(f"✅ {self.stats[Status.SUCCESS]} passed")
         if self.stats[Status.FAILURE]:
             parts.append(f"❌ {self.stats[Status.FAILURE]} failed")
         if self.stats[Status.ERROR]:
@@ -1045,12 +1055,12 @@ class StatefulProgressManager:
         """A repeat under a budget draws new scenarios; the totals keep counting."""
         self.started_at = Instant()
 
-    def get_completion_message(self, icon: str | None = None) -> tuple[str, str]:
+    def get_completion_message(self, icon: str | None = None, *, without_checks: bool = False) -> tuple[str, str]:
         """Complete the phase and return status message."""
         duration = format_duration(self.elapsed_ms)
         icon = icon or self._get_status_icon()
 
-        message = self._get_stats_message() or "No tests were run"
+        message = self._get_stats_message(without_checks=without_checks) or "No tests were run"
         if self.is_interrupted:
             duration_message = f"interrupted after {duration}"
         else:
@@ -1455,7 +1465,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         from rich.text import Text
 
         icon = phase_status_icon(status, manager.stats)
-        self.console.print(Padding(Text(manager.get_completion_message(icon), style="white"), BLOCK_PADDING))
+        message = manager.get_completion_message(icon, without_checks=phase_without_checks(status, manager.stats))
+        self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
         self.console.print()
 
     def _print_stateful_completion(self, manager: StatefulProgressManager, status: Status) -> None:
@@ -1464,7 +1475,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         from rich.table import Table
         from rich.text import Text
 
-        title, summary = manager.get_completion_message(phase_status_icon(status, manager.stats))
+        title, summary = manager.get_completion_message(
+            phase_status_icon(status, manager.stats), without_checks=phase_without_checks(status, manager.stats)
+        )
         self.console.print(Padding(Text(title, style="bright_white"), BLOCK_PADDING))
 
         table = Table(show_header=False, box=None, padding=(0, 4), collapse_padding=True)

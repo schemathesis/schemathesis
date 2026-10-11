@@ -2358,10 +2358,11 @@ def test_ignored_auth_probes_each_operation_until_enforcement_is_confirmed(ctx, 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_phase_without_checks_is_skipped(ctx, cli, snapshot_cli, phase):
     api = ctx.openapi.apps.users_crud()
-    assert (
-        cli.run(api.schema_url, f"--phases={phase}", "--max-examples=1", config={"checks": {"enabled": False}})
-        == snapshot_cli
-    )
+    result = cli.run(api.schema_url, f"--phases={phase}", "--max-examples=1", config={"checks": {"enabled": False}})
+    phase_body = result.stdout.split("SUMMARY", 1)[0].split(f"{phase.title()} (", 1)[1]
+    assert "without checks" in phase_body
+    assert "passed" not in phase_body
+    assert result == snapshot_cli
 
 
 # Cycling ends at the deadline however slow the runner is; dropping the phase ends the run well before it.

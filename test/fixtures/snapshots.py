@@ -213,6 +213,7 @@ def _mask_fuzz_counters(data: str) -> str:
         return data
     # Fuzz-specific output: scenario count and counters vary with time and machine speed
     data = re.sub(r"✅ \d+ scenarios", "✅ N scenarios", data)
+    data = re.sub(r"⏭  \d+ without checks", "⏭  N without checks", data)
     data = re.sub(r"❌ \d+ unique failures", "❌ N unique failures", data)
     data = re.sub(r"🚫 \d+ errors?", "🚫 N errors", data)
     return re.sub(r"Tested: \d+", "Tested: N", data)
@@ -235,7 +236,8 @@ def _mask_stateful_counts(data: str, *, links: bool) -> str:
     if links:
         data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
     before, after = data.split("Stateful", 1)
-    return before + "Stateful" + re.sub(r"\d+ passed", "N passed", after)
+    after = re.sub(r"\d+ passed", "N passed", after)
+    return before + "Stateful" + re.sub(r"\d+ without checks", "N without checks", after)
 
 
 def _drop_traceback_noise(data: str) -> str:

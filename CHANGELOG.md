@@ -86,6 +86,7 @@
 - Error feedback rounding large integer bounds, e.g. Java `long` maximum written as `2**63`.
 - Wildcard response deserializers like `@schemathesis.deserializer("application/*")` never matching.
 - Raw `oneOf` validation text in config errors for wrong-typed `request-retries` and operation filters.
+- Phase line claiming passed scenarios when no checks ran.
 
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
