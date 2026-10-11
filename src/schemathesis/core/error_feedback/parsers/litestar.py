@@ -4,7 +4,12 @@ import re
 from typing import TYPE_CHECKING, TypedDict, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_method, parse_number
+from schemathesis.core.error_feedback.parsers.extractors import (
+    ClassificationResult,
+    location_for_method,
+    parse_number,
+    split_field_path,
+)
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     NumericBoundPayload,
@@ -31,8 +36,6 @@ _SOURCE_LOCATIONS: dict[str, ParameterLocation] = {
     "cookie": ParameterLocation.COOKIE,
 }
 
-# Path notation: `address.street`, `items[0]`, `tags[2].name`.
-_PATH_SEGMENT = re.compile(r"\.?([^.\[]+)|\[(\d+)\]")
 
 # Scalar names mapped to JSON Schema types. Unmapped values pass through verbatim
 # so user-defined types reach the consumer's format-vs-type dispatch unchanged.
@@ -51,14 +54,6 @@ _LENGTH_REGEX = re.compile(r"^Expected `(?:str|array)` of length (?P<op>>=|<=) (
 _NUMERIC_REGEX = re.compile(r"^Expected `\w+(?:\s\|\s\w+)*` (?P<op>>=|<=|>|<) (?P<n>-?\d+(?:\.\d+)?)$")
 _REGEX_PATTERN = re.compile(r"^Expected `\w+` matching regex '(?P<regex>.+)'$")
 _TYPE_MISMATCH = re.compile(r"^Expected `(?P<expected>[^`]+)`, got `(?P<got>[^`]+)`$")
-
-
-def _split_path(key: str) -> ParameterPath:
-    """Convert path notation `address.items[0].name` into a structured tuple."""
-    segments: list[str | int] = []
-    for prop, index in _PATH_SEGMENT.findall(key):
-        segments.append(prop or int(index))
-    return tuple(segments)
 
 
 def _resolve_type(expected: str) -> str | None:
@@ -148,7 +143,7 @@ def _extract_issues(body: object) -> list[LitestarIssue] | None:
 
 def _resolve_path(key: str, message: str) -> ParameterPath:
     """Compose the parameter path; required-missing appends the captured field name."""
-    base = () if key == "data" else _split_path(key)
+    base = () if key == "data" else split_field_path(key)
     missing_required = _MISSING_REQUIRED.match(message)
     if missing_required is not None:
         return (*base, missing_required.group("name"))

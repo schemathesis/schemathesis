@@ -11,6 +11,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     ObservationKind,
     ObservationPayload,
+    ParameterPath,
     SizeBoundPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
@@ -26,6 +27,18 @@ QUERY_METHODS = frozenset({"GET", "DELETE", "HEAD"})
 
 def location_for_method(method: str) -> ParameterLocation:
     return ParameterLocation.QUERY if method.upper() in QUERY_METHODS else ParameterLocation.BODY
+
+
+_FIELD_PATH_SEGMENT = re.compile(r"([^.\[\]]+)|\[(\d+)\]")
+
+
+def split_field_path(raw: str) -> ParameterPath:
+    """`address.street` -> ('address', 'street'); `items[0].name` and `items.0.name` -> ('items', 0, 'name')."""
+    segments: list[str | int] = []
+    for name, index in _FIELD_PATH_SEGMENT.findall(raw):
+        segment = name or index
+        segments.append(int(segment) if segment.isascii() and segment.isdigit() else segment)
+    return tuple(segments)
 
 
 def lowercase_first_letter(name: str) -> str:

@@ -2357,3 +2357,82 @@ def test_integer_bounds_above_float_precision_stay_exact(ctx, case_factory, resp
     schema = operation.body[0].optimized_schema
     adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
     assert adjusted["properties"]["quantity"] == expected
+
+
+def _nested_body(*, name=None, address=None):
+    return {
+        "type": "object",
+        "properties": {
+            "address": address or {"type": "object", "properties": {"street": {"type": "string"}}},
+            "items": {
+                "type": "array",
+                "items": {"type": "object", "properties": {"name": name or {"type": "string"}}},
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            {"errors": [{"field": "items[0].name", "defaultMessage": "size must be between 3 and 10"}]},
+            _nested_body(name={"type": "string", "minLength": 3, "maxLength": 10}),
+        ),
+        (
+            {
+                "message": "The given data was invalid.",
+                "errors": {"items.0.name": ["The items.0.name field must be at least 3 characters."]},
+            },
+            _nested_body(name={"type": "string", "minLength": 3}),
+        ),
+        (
+            {"items.0.name": ["is too short (minimum is 3 characters)"]},
+            _nested_body(name={"type": "string", "minLength": 3}),
+        ),
+        (
+            {"title": "Bad Request", "status": 400, "errors": {"Address.Street": ["The Street field is required."]}},
+            _nested_body(
+                address={
+                    "type": "object",
+                    "properties": {"street": {"type": "string", "minLength": 1}},
+                    "required": ["street"],
+                }
+            ),
+        ),
+        (
+            {
+                "title": "Bad Request",
+                "status": 400,
+                "errors": {
+                    "Items[0].Name": [
+                        "The field Name must be a string with a minimum length of 3 and a maximum length of 10."
+                    ]
+                },
+            },
+            _nested_body(name={"type": "string", "minLength": 3, "maxLength": 10}),
+        ),
+    ],
+    ids=["spring-index", "laravel-index", "rails-index", "aspnet-nested", "aspnet-index"],
+)
+def test_framework_field_paths_reach_nested_properties(ctx, case_factory, response_factory, body, expected):
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": _nested_body()}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/items"]["POST"]
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
+    store = ErrorFeedbackStore()
+    for observation in FeedbackPipeline.from_registry().parse(
+        operation=operation, case=case_factory(operation=operation), response=response
+    ):
+        store.record(observation)
+    schema = operation.body[0].optimized_schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
+    _assert_valid_schema_object(schema, adjusted)
+    assert adjusted == expected

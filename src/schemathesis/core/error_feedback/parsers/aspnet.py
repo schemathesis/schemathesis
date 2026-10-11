@@ -13,6 +13,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     numeric_bound,
     parse_number,
     size_bound,
+    split_field_path,
 )
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
@@ -61,10 +62,14 @@ def _walk(errors: AspNetShape) -> Iterator[WalkPair]:
     for raw_key, messages in errors.items():
         if _is_pseudo_field(raw_key):
             continue
-        field = lowercase_first_letter(raw_key)
+        # C# property names are PascalCase; their JSON names are camelCase.
+        path = tuple(
+            lowercase_first_letter(segment) if isinstance(segment, str) else segment
+            for segment in split_field_path(raw_key)
+        )
         for message in messages:
             if message:
-                yield ((field,), message)
+                yield (path, message)
 
 
 def _format(name: str) -> ClassificationResult:

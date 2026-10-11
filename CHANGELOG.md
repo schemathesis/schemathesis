@@ -25,6 +25,7 @@
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
+- Error feedback dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
 - Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.

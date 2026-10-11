@@ -12,6 +12,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     numeric_bound,
     size_bound,
     size_bound_exact,
+    split_field_path,
 )
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
@@ -75,8 +76,7 @@ def _walk_modern(body: ModernShape, path: ParameterPath = ()) -> Iterator[WalkPa
     for raw_key, value in body.items():
         if not isinstance(raw_key, str) or raw_key == _BASE_KEY:
             continue
-        # Rails dotted-key for nested attributes; split into segments.
-        key_path: ParameterPath = tuple(raw_key.split(".")) if "." in raw_key else (raw_key,)
+        key_path = split_field_path(raw_key)
         if not isinstance(value, list):
             continue
         for item in value:
