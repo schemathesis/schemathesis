@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import sys
 import time
 import unittest
@@ -32,7 +31,6 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_report
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.engine import Status
-from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
@@ -50,8 +48,8 @@ from schemathesis.generation.hypothesis.reporting import (
 from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest import _subtests
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
-from schemathesis.pytest._strategy_kwargs import strategy_kwargs_from_config
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
+from schemathesis.pytest._test_builder import schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.reporting import PytestReportOutcome
 from schemathesis.pytest.warnings import (
@@ -90,6 +88,23 @@ _REPORT_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
 
 # Present only while a lazy-schema subtest runs; holds that subtest's outcome.
 _SUBTEST_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
+
+
+def _is_trio(test_function: Callable) -> bool:
+    return any(mark.name == "trio" for mark in getattr(test_function, "pytestmark", []))
+
+
+def _attach_async_inner(hypothesis_test: Callable, test_function: Callable) -> None:
+    import inspect
+
+    from schemathesis.generation.hypothesis.builder import make_async_test
+
+    if inspect.iscoroutinefunction(test_function):
+        # `pytest-trio` expects a coroutine function.
+        if _is_trio(test_function):
+            hypothesis_test.hypothesis.inner_test = test_function  # type: ignore[attr-defined]
+        else:
+            hypothesis_test.hypothesis.inner_test = make_async_test(test_function)  # type: ignore[attr-defined]
 
 
 def _is_schema(value: object) -> bool:
@@ -167,75 +182,50 @@ class SchemathesisCase(PyCollector):
         to produce tests out of hypothesis ones.
         """
         from schemathesis.checks import load_all_checks
-        from schemathesis.generation.hypothesis.builder import (
-            HypothesisTestConfig,
-            HypothesisTestMode,
-            create_test,
-            make_async_test,
-        )
+        from schemathesis.pytest._test_builder import build_operation_test
 
         load_all_checks()
-
-        is_trio_test = False
-        for mark in getattr(self.test_function, "pytestmark", []):
-            if mark.name == "trio":
-                is_trio_test = True
-                break
 
         if isinstance(result, Ok):
             operation = result.ok()
             if self.is_invalid_test:
                 funcobj = self.test_function
             else:
-                as_strategy_kwargs = strategy_kwargs_from_config(self.schema.config, operation)
-                modes = []
-                phases = self.schema.config.phases_for(operation=operation)
-                if phases.examples.enabled:
-                    modes.append(HypothesisTestMode.EXAMPLES)
-                if phases.fuzzing.enabled:
-                    modes.append(HypothesisTestMode.FUZZING)
-                if phases.coverage.enabled:
-                    modes.append(HypothesisTestMode.COVERAGE)
-
-                # Use fuzzing phase settings if fuzzing is enabled, since only fuzzing uses max_examples
-                phase = "fuzzing" if HypothesisTestMode.FUZZING in modes else None
                 try:
-                    funcobj = create_test(
+                    funcobj = build_operation_test(
+                        config=self.schema.config,
                         operation=operation,
                         test_func=self.test_function,
-                        config=HypothesisTestConfig(
-                            modes=modes,
-                            settings=self.schema.config.get_hypothesis_settings(operation=operation, phase=phase),
-                            explicit_setting_names=self.schema.config.explicit_hypothesis_settings(
-                                operation=operation, phase=phase
-                            ),
-                            given_kwargs=self.given_kwargs,
-                            project=self.schema.config,
-                            as_strategy_kwargs=as_strategy_kwargs,
-                            seed=derive_operation_seed(self.schema.config.seed, operation.label),
-                            feedback=feedback,
-                        ),
+                        given_kwargs=self.given_kwargs,
+                        feedback=feedback,
                     )
                 except InvalidSchema as exc:
                     # Coverage cases are built with the test, so a malformed definition surfaces here.
-                    yield from self._gen_items(Err(exc), feedback)
-                    return
-                if inspect.iscoroutinefunction(self.test_function):
-                    # `pytest-trio` expects a coroutine function
-                    if is_trio_test:
-                        funcobj.hypothesis.inner_test = self.test_function  # type: ignore[attr-defined]
-                    else:
-                        funcobj.hypothesis.inner_test = make_async_test(self.test_function)  # type: ignore[attr-defined]
+                    result = Err(exc)
+                else:
+                    _attach_async_inner(funcobj, self.test_function)
+
+        if isinstance(result, Ok):
+            operation = result.ok()
             name = self._get_test_name(operation)
+            operation_label = operation.label
+            operation_tags = operation.tags
         else:
             error = result.err()
             funcobj = error.as_failing_test_function()
-            name = self.name
-            if error.method:
-                name += f"[{error.method.upper()} {error.path}]"
-            else:
-                name += f"[{error.path}]"
+            name = f"{self.name}{schema_error_suffix(error)}"
+            operation_label = error.label
+            operation_tags = None
 
+        yield from self._make_items(funcobj, name, operation_label, operation_tags)
+
+    def _make_items(
+        self,
+        funcobj: Callable,
+        name: str,
+        operation_label: str,
+        operation_tags: list[str] | None,
+    ) -> Generator[SchemathesisFunction, None, None]:
         cls = self._get_class_parent()
         definition: FunctionDefinition = FunctionDefinition.from_parent(
             name=self.name, parent=self.parent, callobj=funcobj
@@ -248,9 +238,6 @@ class SchemathesisCase(PyCollector):
         if isinstance(self.parent, Class):
             # On pytest 7, Class collects the test methods directly, therefore
             funcobj = partial(funcobj, self.parent.obj)
-
-        operation_label = operation.label if isinstance(result, Ok) else result.err().label
-        operation_tags = operation.tags if isinstance(result, Ok) else None
 
         if not metafunc._calls:
             yield SchemathesisFunction.from_parent(

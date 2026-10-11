@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from functools import partial
 from inspect import signature
 from typing import TYPE_CHECKING, Any
 from unittest import SkipTest
@@ -15,9 +14,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import FailureGroup, as_reported_failure
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.feedback import FeedbackSources
-from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
     GIVEN_REFRESH_ATTR,
     GIVEN_TARGET_ATTR,
@@ -30,8 +27,8 @@ from schemathesis.generation.hypothesis.given import (
     validate_given_args,
 )
 from schemathesis.pytest._keys import track_schema
-from schemathesis.pytest._strategy_kwargs import strategy_kwargs_from_config
 from schemathesis.pytest._subtests import make_subtests
+from schemathesis.pytest._test_builder import build_operation_test, schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
 from schemathesis.python._constants.orchestrator import make_constants_value_source
@@ -49,8 +46,6 @@ def get_all_tests(
     schema: BaseSchema,
     test_func: Callable,
     settings: hypothesis.settings | None,
-    seed: int | None,
-    as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None,
     given_kwargs: dict[str, GivenInput] | None,
 ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
     """Generate all operations and Hypothesis tests for them."""
@@ -58,40 +53,14 @@ def get_all_tests(
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
-            if callable(as_strategy_kwargs):
-                _as_strategy_kwargs = as_strategy_kwargs(operation)
-            else:
-                _as_strategy_kwargs = {}
-
-            # Get modes from config for this operation
-            modes = []
-            phases = schema.config.phases_for(operation=operation)
-            if phases.examples.enabled:
-                modes.append(HypothesisTestMode.EXAMPLES)
-            if phases.fuzzing.enabled:
-                modes.append(HypothesisTestMode.FUZZING)
-            if phases.coverage.enabled:
-                modes.append(HypothesisTestMode.COVERAGE)
-
-            # Use fuzzing phase settings if fuzzing is enabled, since only fuzzing uses max_examples
-            phase = "fuzzing" if HypothesisTestMode.FUZZING in modes else None
             try:
-                test = create_test(
+                test = build_operation_test(
+                    config=schema.config,
                     operation=operation,
                     test_func=test_func,
-                    config=HypothesisTestConfig(
-                        settings=schema.config.get_hypothesis_settings(operation=operation, phase=phase),
-                        explicit_settings=settings,
-                        explicit_setting_names=schema.config.explicit_hypothesis_settings(
-                            operation=operation, phase=phase
-                        ),
-                        modes=modes,
-                        seed=derive_operation_seed(seed, operation.label),
-                        project=schema.config,
-                        as_strategy_kwargs=_as_strategy_kwargs,
-                        given_kwargs=given_kwargs or {},
-                        feedback=feedback,
-                    ),
+                    explicit_settings=settings,
+                    given_kwargs=given_kwargs or {},
+                    feedback=feedback,
                 )
             except InvalidSchema as exc:
                 # Coverage cases are built with the test, so a malformed definition surfaces here.
@@ -254,9 +223,7 @@ class LazySchema:
                         schema=schema,
                         test_func=test_func,
                         settings=settings,
-                        as_strategy_kwargs=partial(strategy_kwargs_from_config, schema.config),
                         given_kwargs=given_kwargs,
-                        seed=schema.config.seed,
                     )
                 )
                 if not tests:
@@ -336,20 +303,10 @@ def _schema_error(subtests: pytest.Subtests, error: InvalidSchema, node_id: str,
     if error.method:
         kwargs["method"] = error.method.upper()
     kwargs["path"] = error.path
-    node._nodeid = _get_partial_node_name(node_id, **kwargs)
+    node._nodeid = f"{node_id}{schema_error_suffix(error)}"
     __tracebackhide__ = True
     with subtests.test(**kwargs):
         sub_test()
-
-
-def _get_partial_node_name(node_id: str, **kwargs: Any) -> str:
-    """Make a test node name for failing tests caused by schema errors."""
-    name = node_id
-    if "method" in kwargs:
-        name += f"[{kwargs['method']} {kwargs['path']}]"
-    else:
-        name += f"[{kwargs['path']}]"
-    return name
 
 
 def get_schema(*, request: FixtureRequest, name: str, filter_set: FilterSet, test_function: Callable) -> BaseSchema:
