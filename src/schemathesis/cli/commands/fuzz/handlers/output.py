@@ -172,20 +172,23 @@ class FuzzProgressManager:
         if self.live is not None:
             self.live.stop()
 
-    def get_completion_message(self, *, is_interrupted: bool) -> str:
+    def get_completion_message(self, *, is_interrupted: bool, without_checks: bool = False) -> str:
         duration = format_duration(self.started_at.elapsed_ms)
         errors = self.stats[Status.ERROR]
         stats = {
             Status.ERROR: errors,
             Status.FAILURE: self.unique_failures,
-            Status.SUCCESS: self.total_scenarios,
-            Status.SKIP: 0,
+            Status.SUCCESS: 0 if without_checks else self.total_scenarios,
+            Status.SKIP: self.total_scenarios if without_checks else 0,
         }
         icon = get_status_icon(stats, is_interrupted=is_interrupted)
 
         parts = []
         if self.total_scenarios:
-            parts.append(f"✅ {self.total_scenarios} scenarios")
+            if without_checks:
+                parts.append(f"⏭  {self.total_scenarios} without checks")
+            else:
+                parts.append(f"✅ {self.total_scenarios} scenarios")
         if self.unique_failures:
             parts.append(f"❌ {self.unique_failures} unique failures")
         if errors:
@@ -258,7 +261,10 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         from rich.text import Text
 
         is_interrupted = event.stop_reason is StopReason.INTERRUPTED
-        message = self.progress_manager.get_completion_message(is_interrupted=is_interrupted)
+        without_checks = ctx.statistic.no_checks_ran and not event.failures
+        message = self.progress_manager.get_completion_message(
+            is_interrupted=is_interrupted, without_checks=without_checks
+        )
         self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
         self.console.print()
 
