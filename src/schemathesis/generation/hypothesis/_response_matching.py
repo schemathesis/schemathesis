@@ -40,7 +40,8 @@ def _find_matching_in_responses(
         value = example[param[:-2]]
         if isinstance(value, list):
             for sub_example in value:
-                yield from _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param)
+                if isinstance(sub_example, dict):
+                    yield from _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param)
             return
         else:
             yield value
