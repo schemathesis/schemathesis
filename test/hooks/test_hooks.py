@@ -922,6 +922,43 @@ def test_api(case):
     result.assert_outcomes(passed=1)
 
 
+def test_schema_filter_case_sees_global_map_case_in_coverage_phase(testdir):
+    testdir.make_test(
+        """
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+seen = []
+
+@schemathesis.hook
+def map_case(context, case):
+    case.headers = {**(case.headers or {}), "X-Mapped": "yes"}
+    return case
+
+@schema.hook
+def filter_case(context, case):
+    return (case.headers or {}).get("X-Mapped") == "yes"
+
+@schema.parametrize()
+def test_api(case):
+    seen.append(case.meta.phase.name.value)
+
+def test_coverage_cases_generated():
+    assert "coverage" in seen
+""",
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-p", "no:randomly")
+    result.assert_outcomes(passed=2)
+
+
 def test_test_scoped_after_validate_hook(testdir, ctx):
     api = ctx.openapi.apps.success()
     testdir.make_test(

@@ -22,6 +22,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation._hooks import case_hook_dispatchers
 from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
@@ -70,14 +71,13 @@ class CaseGenerator(Protocol):
 def _apply_filter_and_map_hooks(
     case: Case, dispatchers: list[HookDispatcher], hook_context: HookContext
 ) -> Case | None:
-    """Run `filter_case` then `map_case` across all dispatchers; return `None` when filtered out."""
+    """Run `filter_case` then `map_case` per dispatcher in turn; return `None` when filtered out."""
     for dispatcher in dispatchers:
         for hook in dispatcher.get_all_by_name("filter_case"):
             if _should_skip_hook(hook, hook_context):
                 continue
             if not hook(hook_context, case):
                 return None
-    for dispatcher in dispatchers:
         for hook in dispatcher.get_all_by_name("map_case"):
             if _should_skip_hook(hook, hook_context):
                 continue
@@ -177,10 +177,8 @@ class CoverageGenerator:
                 category=UserWarning,
             )
             hook_context = HookContext(operation=operation)
-            dispatchers = [GLOBAL_HOOK_DISPATCHER, operation.schema.hooks]
             # Per-test hooks are a pytest-plugin feature; the engine has none.
-            if self._hooks is not None:
-                dispatchers.append(self._hooks)
+            dispatchers = case_hook_dispatchers(operation, self._hooks)
 
             unserializable = self._controller.unserializable_media_types
             for case in operation.schema.iter_coverage_cases(
