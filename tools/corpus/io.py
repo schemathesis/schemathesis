@@ -8,7 +8,7 @@ import re
 import tarfile
 from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any
+from typing import IO, Any
 
 import yaml
 
@@ -178,19 +178,14 @@ class CorpusEntry:
         return self.name.removesuffix(".json")
 
 
-def iter_corpus_refs(
-    corpus: str | None = None,
+def _iter_corpus_members(
+    corpus: str | None,
     *,
-    only: str | None = None,
-    limit: int | None = None,
-    data_dir: pathlib.Path = DATA_DIR,
-) -> Generator[tuple[str, str], None, None]:
-    """Stream `(corpus_name, member_name)` pairs from one or all corpus tarballs.
-
-    Same filter semantics as `iter_corpus_streaming` but skips JSON decoding —
-    useful when the consumer wants to ship work to subprocesses by reference
-    and load schemas independently.
-    """
+    only: str | None,
+    limit: int | None,
+    data_dir: pathlib.Path,
+) -> Generator[tuple[str, tarfile.TarInfo, IO[bytes]], None, None]:
+    """Yield readable members whose name contains `only`, at most `limit` per corpus, archive kept open."""
     corpora = [corpus] if corpus else list(CORPUS_NAMES)
     for corpus_name in corpora:
         yielded = 0
@@ -200,8 +195,28 @@ def iter_corpus_refs(
                     continue
                 if limit is not None and yielded >= limit:
                     break
-                yield corpus_name, member.name
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    continue
+                yield corpus_name, member, extracted
                 yielded += 1
+
+
+def iter_corpus_refs(
+    corpus: str | None = None,
+    *,
+    only: str | None = None,
+    limit: int | None = None,
+    data_dir: pathlib.Path = DATA_DIR,
+) -> Generator[tuple[str, str], None, None]:
+    """Stream `(corpus_name, member_name)` pairs from one or all corpus tarballs.
+
+    Same filter semantics as `iter_corpus_streaming` but skips JSON decoding -
+    useful when the consumer wants to ship work to subprocesses by reference
+    and load schemas independently.
+    """
+    for corpus_name, member, _ in _iter_corpus_members(corpus, only=only, limit=limit, data_dir=data_dir):
+        yield corpus_name, member.name
 
 
 def iter_corpus_entries_from_refs(
@@ -277,24 +292,8 @@ def iter_corpus_streaming(
     Filters by member-name substring before decoding JSON, so skipped entries
     cost only a tar header read instead of a full json.loads.
     """
-    corpora = [corpus] if corpus else list(CORPUS_NAMES)
-    for corpus_name in corpora:
-        yielded = 0
-        with read_corpus_file(corpus_name, data_dir=data_dir) as archive:
-            for member in archive:
-                if only is not None and only not in member.name:
-                    continue
-                if limit is not None and yielded >= limit:
-                    break
-                extracted = archive.extractfile(member)
-                if extracted is None:
-                    continue
-                yield CorpusEntry(
-                    corpus=corpus_name,
-                    name=member.name,
-                    schema=json_loads(extracted.read()),
-                )
-                yielded += 1
+    for corpus_name, member, extracted in _iter_corpus_members(corpus, only=only, limit=limit, data_dir=data_dir):
+        yield CorpusEntry(corpus=corpus_name, name=member.name, schema=json_loads(extracted.read()))
 
 
 if __name__ == "__main__":
