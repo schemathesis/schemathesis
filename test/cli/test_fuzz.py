@@ -38,12 +38,32 @@ class _RaisingEngine:
 USERS_OK_PATHS = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
 
 
+def _parse_operations_summary(output):
+    block = output.partition("API Operations:\n")[2].partition("\n\n")[0]
+    counts = {
+        label.lower(): int(value)
+        for label, value in re.findall(r"^  (Selected|Tested|Skipped|Errored): (\d+)", block, re.MULTILINE)
+    }
+    reasons = set(re.findall(r"^    - (.+)", block, re.MULTILINE))
+    return counts, reasons
+
+
 def _make_fuzz_failure_app(ctx, app_runner):
     app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
 
     @app.route("/users")
     def users():
         return jsonify({}), 500
+
+    return app_runner.openapi_url(app)
+
+
+def _make_multi_operation_failure_app(ctx, app_runner):
+    paths = {f"/failure/{idx}": {"get": {"responses": {"200": {"description": "OK"}}}} for idx in range(3)}
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    for idx in range(3):
+        app.add_url_rule(f"/failure/{idx}", endpoint=f"failure_{idx}", view_func=lambda: ({}, 500))
 
     return app_runner.openapi_url(app)
 
@@ -69,6 +89,27 @@ def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
 def test_fuzz_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}}) == snapshot_cli
+
+
+def test_fuzz_operations_summary_accounts_for_failure_limit(ctx, cli, app_runner):
+    url = _make_multi_operation_failure_app(ctx, app_runner)
+
+    result = cli.main("fuzz", url, "--max-time=30", "--checks=not_a_server_error")
+    counts, reasons = _parse_operations_summary(result.stdout)
+
+    assert counts["skipped"] > 0, result.stdout
+    assert counts["selected"] == counts["tested"] + counts["skipped"] + counts.get("errored", 0), result.stdout
+    assert "Failure limit reached" in reasons, result.stdout
+
+
+def test_fuzz_operations_summary_accounts_for_disabled_checks(ctx, cli):
+    api = ctx.openapi.apps.success()
+
+    result = cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}})
+    counts, reasons = _parse_operations_summary(result.stdout)
+
+    assert counts["selected"] == counts["tested"] + counts["skipped"] + counts.get("errored", 0), result.stdout
+    assert "No checks ran" in reasons, result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

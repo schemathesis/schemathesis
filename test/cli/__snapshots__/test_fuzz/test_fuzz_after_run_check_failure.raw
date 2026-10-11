@@ -22,6 +22,8 @@ __________________________________ Run checks __________________________________
 API Operations:
   Selected: 1/1
   Tested: N
+  Skipped: 1
+    - No checks ran
 
 Stop reason: Completed
 

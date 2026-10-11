@@ -22,6 +22,7 @@
 ### :bug: Fixed
 
 - `st fuzz` skipping checks for requests sent after the first failure in a scenario.
+- `st fuzz` summaries not accounting for operations they did not test.
 - Phase line showing only passes when the server stopped responding during the phase.
 - Baseline file written from partial results when the run is interrupted with Ctrl-C.
 - Final line reporting "No issues found" or "Empty test suite" after Ctrl-C.

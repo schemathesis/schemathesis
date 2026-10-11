@@ -24,6 +24,7 @@ Tip: Review your `filter_case` hook to ensure it accepts at least some generated
 API Operations:
   Selected: 1/1
   Tested: N
+  Skipped: 1
 
 Stop reason: Completed
 
