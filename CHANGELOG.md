@@ -30,6 +30,7 @@
 - Top-level `[[operations]]` overriding `[[project.operations]]` for the same operation.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
+- Allure reports missing coverage failures for undeclared HTTP methods.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
 - Error feedback dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.

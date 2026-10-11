@@ -9,7 +9,13 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.statistic import GroupedFailures
-from schemathesis.reporting.recorders import scenario_elapsed, scenario_failures, scenario_has_failures, unique_labels
+from schemathesis.reporting.recorders import (
+    recorder_failures,
+    scenario_elapsed,
+    scenario_failures,
+    scenario_has_failures,
+    unique_labels,
+)
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
@@ -28,7 +34,7 @@ class AllureHandler(EventHandler):
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
-            failures = list(ctx.statistic.failures.get(label, {}).values()) if event.status == Status.FAILURE else []
+            failures = recorder_failures(ctx.statistic, event.recorder) if event.status == Status.FAILURE else []
             is_stateful = event.phase == PhaseName.STATEFUL_TESTING
             operation = ctx.find_operation_by_label(label) if not is_stateful and ctx.find_operation_by_label else None
             self.writer.record_scenario(

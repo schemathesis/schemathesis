@@ -8,7 +8,7 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.statistic import GroupedFailures
 from schemathesis.reporting.junitxml import JunitXmlWriter
-from schemathesis.reporting.recorders import scenario_elapsed, scenario_failures, unique_labels
+from schemathesis.reporting.recorders import recorder_failures, scenario_elapsed, scenario_failures, unique_labels
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
@@ -26,19 +26,7 @@ class JunitXMLHandler(EventHandler):
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
-            if event.status == Status.FAILURE:
-                # Look up failures by case_id across all labels — some coverage scenarios
-                # (e.g. UNSPECIFIED_HTTP_METHOD) store failures under a remapped label
-                # (the actual method+path tested) rather than the recorder label.
-                case_ids = set(event.recorder.cases.keys())
-                failures = [
-                    group
-                    for groups in ctx.statistic.failures.values()
-                    for case_id, group in groups.items()
-                    if case_id in case_ids
-                ]
-            else:
-                failures = []
+            failures = recorder_failures(ctx.statistic, event.recorder) if event.status == Status.FAILURE else []
             self.writer.record_scenario(
                 label=label,
                 elapsed_sec=event.elapsed_time,
