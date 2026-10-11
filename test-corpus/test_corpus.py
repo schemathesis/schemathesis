@@ -12,6 +12,7 @@ import schemathesis.graphql as _graphql
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.har import HarHandler
+from schemathesis.cli.commands.run.handlers.html import HtmlReportHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
@@ -222,7 +223,7 @@ def combined_check_coverage(ctx, response, case):
     _check_conformance_violation(case)
 
 
-def test_default(corpus, filename):
+def test_default(corpus, filename, tmp_path):
     schema = _load_schema(corpus, filename)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
@@ -233,6 +234,7 @@ def test_default(corpus, filename):
         VcrHandler(output=StringIO(), config=schema.config.output),
         HarHandler(output=StringIO(), config=schema.config.output),
         NdjsonHandler(output=StringIO(), config=schema.config),
+        HtmlReportHandler(tmp_path),
     ]
     ctx = ExecutionContext(schema.config)
     for handler in handlers:
@@ -428,7 +430,7 @@ GRAPHQL_FILENAMES = [member.name for member in GRAPHQL_CORPUS.getmembers()]
 
 
 @pytest.mark.parametrize("filename", GRAPHQL_FILENAMES)
-def test_graphql(filename):
+def test_graphql(filename, tmp_path):
     raw_content = GRAPHQL_CORPUS.extractfile(filename).read()
     raw_schema = json_loads(raw_content)
     schema = _graphql.from_dict(raw_schema)
@@ -444,6 +446,7 @@ def test_graphql(filename):
         VcrHandler(output=StringIO(), config=schema.config.output),
         HarHandler(output=StringIO(), config=schema.config.output),
         NdjsonHandler(output=StringIO(), config=schema.config),
+        HtmlReportHandler(tmp_path),
     ]
     ctx = ExecutionContext(schema.config)
     for handler in handlers:
