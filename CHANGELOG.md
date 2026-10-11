@@ -39,6 +39,7 @@
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Missing `negative_data_rejection` failures for integer parameters sent as `1_0`, ` 5` or non-ASCII digits.
 - Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
+- False positive `negative_data_rejection` for header values invalid only through surrounding whitespace.
 - `st fuzz` summary missing the "Baseline" and "Filtered" counts.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
 - Phase shown as passed when no checks ran on any of its operations.
