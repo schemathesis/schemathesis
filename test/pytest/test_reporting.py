@@ -858,3 +858,81 @@ TestCase = schema.as_state_machine().TestCase
     result = testdir.runpytest("-n", "1")
     result.assert_outcomes(failed=1)
     result.stdout.fnmatch_lines(["*Undocumented HTTP status code*"])
+
+
+def test_html_report_failed(testdir, ctx, snapshot_html):
+    api = ctx.openapi.apps.failure()
+    report_dir = testdir.tmpdir.join("report")
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.seed = 42
+schema.config.reports.update(html_path=r"{report_dir}")
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call_and_validate()
+""",
+        schema=ctx.openapi.build_schema(
+            {"/failure": {"get": {"responses": {"500": {"description": "Internal Server Error"}}}}}
+        ),
+    )
+    testdir.runpytest().assert_outcomes(failed=1)
+
+    assert report_dir.join("index.html").read_text("utf-8") == snapshot_html
+    assert report_dir.join("assets", "report.css").check(file=True)
+
+
+def test_html_report_passed(testdir, ctx, snapshot_html):
+    api = ctx.openapi.apps.success()
+    report_dir = testdir.tmpdir.join("report")
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.seed = 42
+schema.config.reports.update(html_path=r"{report_dir}")
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call_and_validate()
+""",
+        schema=ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}),
+    )
+    testdir.runpytest().assert_outcomes(passed=1)
+
+    assert report_dir.join("index.html").read_text("utf-8") == snapshot_html
+
+
+@pytest.mark.parametrize("outcome", ["assertion", "runtime_error", "skip"])
+def test_html_report_uses_pytest_outcome(testdir, ctx, outcome, snapshot_html):
+    report_dir = testdir.tmpdir.join("report")
+    make_pytest_outcome_test(
+        testdir, ctx, outcome, f'schema.config.seed = 42\nschema.config.reports.update(html_path=r"{report_dir}")'
+    )
+
+    testdir.runpytest()
+
+    assert report_dir.join("index.html").read_text("utf-8") == snapshot_html
+
+
+def test_html_report_merged_via_xdist(testdir, ctx, snapshot_html):
+    api = ctx.openapi.apps.success_and_failure()
+    testdir.makefile(".toml", schemathesis='seed = 42\n\n[reports.html]\npath = "report"\n')
+    testdir.makepyfile(
+        f"""
+import schemathesis
+from hypothesis import settings, Phase
+
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call_and_validate()
+"""
+    )
+    testdir.runpytest("-n", "2").assert_outcomes(passed=1, failed=1)
+
+    assert testdir.tmpdir.join("report", "index.html").read_text("utf-8") == snapshot_html

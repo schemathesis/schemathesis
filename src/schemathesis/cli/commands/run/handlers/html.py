@@ -16,25 +16,22 @@ from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import LOADER_ERROR_SUGGESTIONS, replay_command
 from schemathesis.cli.summary import running_time
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
-from schemathesis.core.failures import group_failures, reproducible_by_identity
 from schemathesis.core.output import format_response_payload
-from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
+from schemathesis.reporting.html.build import enabled_checks, failing_case, request_name, sanitized
 from schemathesis.reporting.html.model import (
     Command,
     ErrorEntry,
     ExtractionNote,
     FailingCase,
-    FailureEntry,
     NothingTested,
     OperationRow,
     OperationStatus,
     ReportData,
     ReportMeta,
-    split_label,
 )
 
 if TYPE_CHECKING:
@@ -43,9 +40,7 @@ if TYPE_CHECKING:
     from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
-    from schemathesis.config import OutputConfig, SanitizationConfig
     from schemathesis.engine.recorder import RecordedScenario
-    from schemathesis.engine.statistic import GroupedFailures
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
     from schemathesis.schemas import APIOperation
 
@@ -120,7 +115,11 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         unattributed: Counter[str] = Counter()
         for label, groups in statistic.failures.items():
             for group in groups.values():
-                case = _failing_case(group, config=ctx.config.output, record_crashes=ctx.config.cache.enabled)
+                case = failing_case(
+                    group,
+                    config=ctx.config.output,
+                    replay=replay_command(group, record_crashes=ctx.config.cache.enabled),
+                )
                 owner = label
                 # Stateful failures are keyed by the scenario; the row is the operation whose request failed.
                 if label == STATEFUL_TESTS_LABEL:
@@ -222,8 +221,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         data = ReportData(
             meta=ReportMeta(
                 generated_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
-                location=_sanitized(self.location, sanitization_config),
-                base_url=_sanitized(self.base_url, sanitization_config),
+                location=sanitized(self.location, sanitization_config),
+                base_url=sanitized(self.base_url, sanitization_config),
                 command=get_command_representation(sanitization_config),
                 seed=ctx.config.seed,
             ),
@@ -238,7 +237,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             warnings=warnings,
             startup_warnings=ctx.startup_warnings if isinstance(ctx, ExecutionContext) else [],
             phases=_phases(ctx) if isinstance(ctx, ExecutionContext) else [],
-            checks=_enabled_checks(ctx),
+            checks=enabled_checks(ctx.config.checks_config_for()),
             reauth_count=payload.reauth_count if payload is not None else 0,
             reauth_broke=payload.reauth_broke if payload is not None else False,
             extraction_failures=[
@@ -268,34 +267,6 @@ class Rows(NamedTuple):
     unattributed_errors: list[tuple[str, ErrorEntry]]
 
 
-def _failing_case(group: GroupedFailures, *, config: OutputConfig, record_crashes: bool) -> FailingCase:
-    response = group.response
-    return FailingCase(
-        case_id=group.case_id,
-        failures=[
-            FailureEntry(title=title, messages=[failure.message for failure in failures])
-            for title, failures in group_failures(group.failures)
-        ],
-        status_code=response.status_code if response is not None else None,
-        body=format_response_payload(response, config=config) if response is not None else None,
-        commands=_commands(group),
-        replay=replay_command(group, record_crashes=record_crashes),
-        auth_identity=group.auth_identity if reproducible_by_identity(group.failures) else None,
-    )
-
-
-def _commands(group: GroupedFailures) -> list[Command]:
-    if group.steps:
-        commands = []
-        for step in group.steps:
-            method, path = _request_name(step.operation, step.method, step.path)
-            commands.append(Command(curl=step.curl, method=method, path=path, failed=step.case_id == group.case_id))
-        return commands
-    if group.code_sample is None:
-        return []
-    return [Command(curl=group.code_sample, method=None, path=None, failed=False)]
-
-
 _PHASE_OUTCOMES = {
     Status.SUCCESS: "passed",
     Status.FAILURE: "failed",
@@ -315,16 +286,6 @@ def _phases(ctx: ExecutionContext) -> list[tuple[str, str, str]]:
         else:
             phases.append((phase.display, _PHASE_OUTCOMES[status], _PHASE_OUTCOMES[status]))
     return phases
-
-
-def _enabled_checks(ctx: BaseExecutionContext) -> list[str]:
-    from schemathesis.checks import CHECKS, max_response_time
-
-    config = ctx.config.checks_config_for()
-    names = [check.__name__ for check in CHECKS.get_all() if config.get_by_name(name=check.__name__).enabled]
-    if config.max_response_time.enabled:
-        names.append(max_response_time.__name__)
-    return sorted(names)
 
 
 def _by_count(counts: Counter[str]) -> list[tuple[str, int]]:
@@ -347,16 +308,9 @@ def _fatal_entry(exception: Exception, *, wait_for_schema: float | int | None) -
 def _extraction_commands(failure: ExtractionFailure) -> list[Command]:
     commands = []
     for (case, _), (_, curl) in zip(reversed(failure.history), extraction_failure_steps(failure), strict=True):
-        method, path = _request_name(case.operation.label, case.method, case.formatted_path)
+        method, path = request_name(case.operation.label, case.method, case.formatted_path)
         commands.append(Command(curl=curl, method=method, path=path, failed=False))
     return commands
-
-
-def _request_name(operation: str, method: str, path: str) -> tuple[str | None, str]:
-    # Without a method in the label (GraphQL), every request goes to the same URL, so the step names the field.
-    if split_label(operation)[0] is None:
-        return None, operation
-    return method, path
 
 
 def _error_entry(info: EngineErrorInfo) -> ErrorEntry:
@@ -380,10 +334,3 @@ def _nothing_tested(reason: str | None, summary: SummaryData) -> NothingTested |
             tip=UNMATCHED_FILTER_TIP,
         )
     return NothingTested(title=reason, filters=[], tip=None)
-
-
-def _sanitized(url: str | None, sanitization_config: SanitizationConfig | None) -> str | None:
-    # The schema location may be a file path; only URLs can carry credentials.
-    if url is None or sanitization_config is None or not url.startswith(("http://", "https://")):
-        return url
-    return sanitize_url(url, config=sanitization_config)
