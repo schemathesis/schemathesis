@@ -449,13 +449,18 @@ _KEYED_CREATE = {
 }
 
 
-def wfc_owned_orders(policy: str, listing: str | None = None, writes: bool = False) -> OpenAPIApp:
+def wfc_owned_orders(
+    policy: str, listing: str | None = None, writes: bool = False, security: str = "declared"
+) -> OpenAPIApp:
     """Orders owned by the caller; `policy` decides what another caller sees.
 
     `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only,
     `all_renamed` everyone's under a differently named schema.
     `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note endpoints that take the
     order id in the path or query, accept any caller and echo the id.
+    `security` is `declared` for an API key on every operation, `undeclared` for none in the schema while the server
+    still requires one, `public_read` for the order read marked public with `security: []`, and `public_root` for
+    `security: []` on the whole schema.
     """
     paths = _OWNED_ORDERS
     schemas: dict[str, object] = {}
@@ -479,14 +484,22 @@ def wfc_owned_orders(policy: str, listing: str | None = None, writes: bool = Fal
                 },
             },
         }
-    spec = build_schema(
-        paths,
-        components={
-            "schemas": schemas,
-            "securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "Authorization"}},
-        },
-        security=[{"apiKey": []}],
-    )
+    if security == "public_read":
+        item = paths["/api/orders/{order_id}"]
+        paths = {**paths, "/api/orders/{order_id}": {**item, "get": {**item["get"], "security": []}}}
+    if security in ("undeclared", "public_root"):
+        spec = build_schema(
+            paths, components={"schemas": schemas}, **({"security": []} if security == "public_root" else {})
+        )
+    else:
+        spec = build_schema(
+            paths,
+            components={
+                "schemas": schemas,
+                "securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "Authorization"}},
+            },
+            security=[{"apiKey": []}],
+        )
     app = make_flask_app_from_schema(spec)
     orders: dict[int, dict[str, object]] = {}
 
