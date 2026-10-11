@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import platform
 import re
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -98,258 +100,349 @@ class CliSnapshotConfig:
     def serialize(self, data: str) -> str:
         if not self.replace:
             return data
-        if self.replace_test_cases:
-            # All-skipped case
-            data = re.sub(r"Test cases:\n  (\d+) generated, \1 (?:skipped|errored)", "Test cases:\n  N generated", data)
-            data = re.sub(r"Test cases:\n  \d+ generated, \d+ errored, \d+ skipped", "Test cases:\n  N generated", data)
-            # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
-            data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ errored)?(?:, \d+ skipped)?",
-                "Test cases:\n  N generated, N found N unique failures",
-                data,
-            )
-            # Cases with passed (skip count optional)
-            data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ errored)?(?:, \d+ skipped)?",
-                "Test cases:\n  N generated, N passed",
-                data,
-            )
-        if self.replace_server_host:
-            used_fixtures = self.request.fixturenames
-            if "server_host" in used_fixtures:
-                try:
-                    host = self.request.getfixturevalue("server_host")
-                    data = data.replace(host, "127.0.0.1")
-                except LookupError:
-                    pass
-            with keep_cwd():
-                data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
-        data = re.sub(r"(https?)://127\.0\.0\.1:[0-9]{3,}", r"\1://127.0.0.1", data)
-        if self.replace_tmp_dir:
-            with keep_cwd():
-                data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
-                data = data.replace(str(Path(self.testdir.tmpdir).parent) + os.path.sep, "/tmp/")
-            # Whatever remains is a sibling per-test directory (e.g. the `tmp_path` fixture). Its numeric
-            # suffix depends on allocation order within the session, so strip it instead of recording it.
-            data = re.sub(r"/tmp/[A-Za-z0-9_.\-]+\d+" + re.escape(os.path.sep), "/tmp/", data)
-            if os.path.sep != "/":
-                data = re.sub(r"/tmp/\S+", lambda match: match.group(0).replace(os.path.sep, "/"), data)
-        if "Configuration:" in data:
-            lines = []
-            for line in data.splitlines():
-                normalized = click.unstyle(line)
-                stripped = normalized.lstrip()
-                if stripped.startswith("Configuration:"):
-                    indent = " " * (len(normalized) - len(stripped))
-                    lines.append(f"{indent}Configuration:    /tmp/config.toml")
-                else:
-                    lines.append(line)
-            data = "\n".join(lines)
-        package_root = "/package-root"
-        site_packages = "/site-packages/"
-        data = data.replace(str(PACKAGE_ROOT), package_root)
-        data = data.replace(str(TEST_ROOT), "/test-root")
-        data = re.sub(
-            "❌  Failed to load configuration file from .*toml$",
-            "❌  Failed to load configuration file from config.toml",
-            data,
-            flags=re.MULTILINE,
-        )
-        version_line = "Schemathesis dev"
-        data = data.replace(f"Schemathesis v{SCHEMATHESIS_VERSION}", version_line)
-        data = re.sub("━+", "━" * len(version_line), data)
-        data = data.replace(str(SITE_PACKAGES), site_packages)
-        data = re.sub(", line [0-9]+,", ", line XXX,", data)
-        data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
-        if "Stop reason:" in data:
-            # Fuzz-specific output: scenario count and counters vary with time and machine speed
-            data = re.sub(r"✅ \d+ scenarios", "✅ N scenarios", data)
-            data = re.sub(r"❌ \d+ unique failures", "❌ N unique failures", data)
-            data = re.sub(r"🚫 \d+ errors?", "🚫 N errors", data)
-            data = re.sub(r"Tested: \d+", "Tested: N", data)
-        if self.replace_phase_statistic:
-            data = re.sub("🚫 [0-9]+ errors", "🚫 1 error", data)
-        if self.replace_cycle_metrics:
-            data = re.sub(r"\d+ cases", "N cases", data)
-            data = re.sub(r"Scenarios:\s+\d+", "Scenarios:    N", data)
-            # Whether a scenario passed before the failing one depends on the draw order.
-            data = re.sub(r"(?m)^(\s*)(?:✅ \d+ passed {2})?❌ \d+ failed[ \t]*$", r"\1❌ N failed", data)
-        if "Stateful" in data:
-            if self.replace_stateful_statistic:
-                data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
-            before, after = data.split("Stateful", 1)
-            after = re.sub(r"\d+ passed", "N passed", after)
-            data = before + "Stateful" + after
+        for step in self._steps():
+            data = step(data)
+        return data
 
-        if self.replace_traceback:
-            data = _collapse_tracebacks(data)
-        if "Traceback (most recent call last):" in data:
-            lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
-            comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
-            # Drop frames that are related to comprehensions
-            for idx in comprehension_ids[::-1]:
-                lines.pop(idx)
-                lines.pop(idx)
-            if platform.system() == "Windows":
-                for idx, line in enumerate(lines):
-                    if line.strip().startswith("File") and "line" in line:
-                        lines[idx] = line.replace("\\", "/")
-            data = "\n".join(lines)
-        if self.replace_error_codes:
-            data = normalize_connection_errors(data)
-        if self.replace_duration:
-            data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
-            data = re.sub(r"\(in [0-9]+\.[0-9]{2}s\)", "(in 0.00s)", data)
-            data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
-            lines = data.splitlines()
-            for index, line in enumerate(lines):
-                if line.startswith("=") and re.search(r"in [0-9]+\.[0-9]{2}s", line):
-                    lines[index] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", line).strip("=").center(80, "=")
-            data = "\n".join(lines) + "\n"
-        if self.remove_last_line:
-            lines = data.splitlines()
-            data = "\n".join(lines[:-1])
-        if self.replace_test_case_id:
-            lines = data.splitlines()
-            for idx, line in enumerate(lines):
-                if re.match(r".*\d+\. Test Case ID", line):
-                    sequential_id = line.split(".")[0]
-                    lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
-                elif re.match(r"\s+st replay \S+", line):
-                    lines[idx] = "    st replay <PLACEHOLDER>"
-            data = "\n".join(lines) + "\n"
-        if self.replace_uuid:
-            data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
-        if self.replace_response_time:
-            data = re.sub(
-                r"Actual: (\d+\.\d+)ms",
-                lambda match: "Actual: 500.00ms" if float(match.group(1)) >= 500 else match.group(0),
-                data,
-            )
-        if self.replace_seed:
-            data = re.sub(r"--seed=\d+", "--seed=42", data)
-            data = re.sub(r"Seed: \d+", "Seed: 42", data)
-        # Reauth count varies with how many generated cases hit the stale token.
-        data = re.sub(r"Re-authenticated \d+ times?", "Re-authenticated N times", data)
-        # Hint: "additional properties not defined in the schema (...)" lists the
-        # generated property names verbatim — those names are random Hypothesis output
-        # and shift across runs. Collapse the count + names to a placeholder.
-        data = re.sub(
-            r"contains \d+ additional (?:property|properties) not defined in the schema \(.*?\)\. The server",
-            "contains <N> additional properties not defined in the schema (<NAMES>). The server",
-            data,
-            flags=re.DOTALL,
-        )
-        if self.replace_invalid_component:
-            # Same seed picks different mutator outputs across CI Pythons (constraint
-            # violation vs. syntax fuzzing vs. format violation, etc.). Collapse the
-            # whole `Invalid component:` body to a placeholder so version-specific
-            # case selection doesn't break the snapshot.
-            data = re.sub(
-                r"^([ \t]*Invalid component:)[^\n]*(?:\n[ \t]+- [^\n]*)*",
-                r"\1 <PLACEHOLDER>",
-                data,
-                flags=re.MULTILINE,
-            )
-            # Negative-fuzzing variance can produce body content with non-printable bytes, and the
-            # curl advisory for those only appears where shell detection comes up empty — true on
-            # CI, false on a developer machine. Strip the warning and the blank line under it, which
-            # the reproduce block indents, so spacing matches the warning-free runs.
-            data = re.sub(
-                r"^[ \t]*⚠️[ \t]+Request body contains non-printable characters\.[^\n]*\n[ \t]*\n",
-                "",
-                data,
-                flags=re.MULTILINE,
-            )
-        if self.replace_reproduce_with:
-            # Collapse only the (variable) curl line; the `st replay <id>` line is masked separately by
-            # `replace_test_case_id` so it reads `st replay <PLACEHOLDER>` everywhere, with or without this flag.
-            lines = []
+    def _steps(self) -> list[Callable[[str], str]]:
+        # Order matters: later steps match the text earlier steps produce.
+        flagged = [
+            (self.replace_test_cases, _mask_test_cases),
+            (self.replace_server_host, self._mask_server_host),
+            (True, _mask_local_ports),
+            (self.replace_tmp_dir, self._mask_tmp_dir),
+            (True, _mask_config_path),
+            (True, _mask_environment),
+            (True, _mask_fuzz_counters),
+            (self.replace_phase_statistic, _mask_phase_errors),
+            (self.replace_cycle_metrics, _mask_cycle_metrics),
+            (True, partial(_mask_stateful_counts, links=self.replace_stateful_statistic)),
+            (self.replace_traceback, _collapse_tracebacks),
+            (True, _drop_traceback_noise),
+            (self.replace_error_codes, normalize_connection_errors),
+            (self.replace_duration, _mask_durations),
+            (self.remove_last_line, _drop_last_line),
+            (self.replace_test_case_id, _mask_test_case_ids),
+            (self.replace_uuid, _mask_uuids),
+            (self.replace_response_time, _mask_slow_response_time),
+            (self.replace_seed, _mask_seed),
+            (True, _mask_random_values),
+            (self.replace_invalid_component, _mask_invalid_component),
+            (self.replace_reproduce_with, _mask_reproduce_commands),
+            (True, _clean_lines),
+        ]
+        return [step for enabled, step in flagged if enabled]
+
+    def _mask_server_host(self, data: str) -> str:
+        if "server_host" in self.request.fixturenames:
+            try:
+                data = data.replace(self.request.getfixturevalue("server_host"), "127.0.0.1")
+            except LookupError:
+                pass
+        with keep_cwd():
+            return data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
+
+    def _mask_tmp_dir(self, data: str) -> str:
+        with keep_cwd():
+            data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
+            data = data.replace(str(Path(self.testdir.tmpdir).parent) + os.path.sep, "/tmp/")
+        # Whatever remains is a sibling per-test directory (e.g. the `tmp_path` fixture). Its numeric
+        # suffix depends on allocation order within the session, so strip it instead of recording it.
+        data = re.sub(r"/tmp/[A-Za-z0-9_.\-]+\d+" + re.escape(os.path.sep), "/tmp/", data)
+        if os.path.sep != "/":
+            data = re.sub(r"/tmp/\S+", lambda match: match.group(0).replace(os.path.sep, "/"), data)
+        return data
+
+
+def _mask_test_cases(data: str) -> str:
+    # All-skipped and all-errored runs: the skipped/errored split varies across environments.
+    data = re.sub(r"Test cases:\n  (\d+) generated, \1 (?:skipped|errored)", "Test cases:\n  N generated", data)
+    data = re.sub(r"Test cases:\n  \d+ generated, \d+ errored, \d+ skipped", "Test cases:\n  N generated", data)
+    # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
+    data = re.sub(
+        r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ errored)?(?:, \d+ skipped)?",
+        "Test cases:\n  N generated, N found N unique failures",
+        data,
+    )
+    # Cases with passed (skip count optional)
+    return re.sub(
+        r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ errored)?(?:, \d+ skipped)?",
+        "Test cases:\n  N generated, N passed",
+        data,
+    )
+
+
+def _mask_local_ports(data: str) -> str:
+    return re.sub(r"(https?)://127\.0\.0\.1:[0-9]{3,}", r"\1://127.0.0.1", data)
+
+
+def _mask_config_path(data: str) -> str:
+    if "Configuration:" not in data:
+        return data
+    lines = []
+    for line in data.splitlines():
+        normalized = click.unstyle(line)
+        stripped = normalized.lstrip()
+        if stripped.startswith("Configuration:"):
+            indent = " " * (len(normalized) - len(stripped))
+            lines.append(f"{indent}Configuration:    /tmp/config.toml")
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _mask_environment(data: str) -> str:
+    data = data.replace(str(PACKAGE_ROOT), "/package-root")
+    data = data.replace(str(TEST_ROOT), "/test-root")
+    data = re.sub(
+        "❌  Failed to load configuration file from .*toml$",
+        "❌  Failed to load configuration file from config.toml",
+        data,
+        flags=re.MULTILINE,
+    )
+    version_line = "Schemathesis dev"
+    data = data.replace(f"Schemathesis v{SCHEMATHESIS_VERSION}", version_line)
+    data = re.sub("━+", "━" * len(version_line), data)
+    data = data.replace(str(SITE_PACKAGES), "/site-packages/")
+    data = re.sub(", line [0-9]+,", ", line XXX,", data)
+    return re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
+
+
+def _mask_fuzz_counters(data: str) -> str:
+    if "Stop reason:" not in data:
+        return data
+    # Fuzz-specific output: scenario count and counters vary with time and machine speed
+    data = re.sub(r"✅ \d+ scenarios", "✅ N scenarios", data)
+    data = re.sub(r"❌ \d+ unique failures", "❌ N unique failures", data)
+    data = re.sub(r"🚫 \d+ errors?", "🚫 N errors", data)
+    return re.sub(r"Tested: \d+", "Tested: N", data)
+
+
+def _mask_phase_errors(data: str) -> str:
+    return re.sub("🚫 [0-9]+ errors", "🚫 1 error", data)
+
+
+def _mask_cycle_metrics(data: str) -> str:
+    data = re.sub(r"\d+ cases", "N cases", data)
+    data = re.sub(r"Scenarios:\s+\d+", "Scenarios:    N", data)
+    # Whether a scenario passed before the failing one depends on the draw order.
+    return re.sub(r"(?m)^(\s*)(?:✅ \d+ passed {2})?❌ \d+ failed[ \t]*$", r"\1❌ N failed", data)
+
+
+def _mask_stateful_counts(data: str, *, links: bool) -> str:
+    if "Stateful" not in data:
+        return data
+    if links:
+        data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
+    before, after = data.split("Stateful", 1)
+    return before + "Stateful" + re.sub(r"\d+ passed", "N passed", after)
+
+
+def _drop_traceback_noise(data: str) -> str:
+    if TRACEBACK_HEADER not in data:
+        return data
+    lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
+    comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
+    # Drop frames that are related to comprehensions
+    for idx in comprehension_ids[::-1]:
+        lines.pop(idx)
+        lines.pop(idx)
+    if platform.system() == "Windows":
+        for idx, line in enumerate(lines):
+            if line.strip().startswith("File") and "line" in line:
+                lines[idx] = line.replace("\\", "/")
+    return "\n".join(lines)
+
+
+def _mask_durations(data: str) -> str:
+    data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
+    data = re.sub(r"\(in [0-9]+\.[0-9]{2}s\)", "(in 0.00s)", data)
+    data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
+    lines = data.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("=") and re.search(r"in [0-9]+\.[0-9]{2}s", line):
+            lines[index] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", line).strip("=").center(80, "=")
+    return "\n".join(lines) + "\n"
+
+
+def _drop_last_line(data: str) -> str:
+    return "\n".join(data.splitlines()[:-1])
+
+
+def _mask_test_case_ids(data: str) -> str:
+    lines = data.splitlines()
+    for idx, line in enumerate(lines):
+        if re.match(r".*\d+\. Test Case ID", line):
+            sequential_id = line.split(".")[0]
+            lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
+        elif re.match(r"\s+st replay \S+", line):
+            lines[idx] = "    st replay <PLACEHOLDER>"
+    return "\n".join(lines) + "\n"
+
+
+def _mask_uuids(data: str) -> str:
+    return re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
+
+
+def _mask_slow_response_time(data: str) -> str:
+    return re.sub(
+        r"Actual: (\d+\.\d+)ms",
+        lambda match: "Actual: 500.00ms" if float(match.group(1)) >= 500 else match.group(0),
+        data,
+    )
+
+
+def _mask_seed(data: str) -> str:
+    data = re.sub(r"--seed=\d+", "--seed=42", data)
+    return re.sub(r"Seed: \d+", "Seed: 42", data)
+
+
+def _mask_random_values(data: str) -> str:
+    # Reauth count varies with how many generated cases hit the stale token.
+    data = re.sub(r"Re-authenticated \d+ times?", "Re-authenticated N times", data)
+    # The hint lists generated property names verbatim; they are random Hypothesis output.
+    return re.sub(
+        r"contains \d+ additional (?:property|properties) not defined in the schema \(.*?\)\. The server",
+        "contains <N> additional properties not defined in the schema (<NAMES>). The server",
+        data,
+        flags=re.DOTALL,
+    )
+
+
+def _mask_invalid_component(data: str) -> str:
+    # Same seed picks different mutator outputs across CI Pythons (constraint
+    # violation vs. syntax fuzzing vs. format violation, etc.). Collapse the
+    # whole `Invalid component:` body to a placeholder so version-specific
+    # case selection doesn't break the snapshot.
+    data = re.sub(
+        r"^([ \t]*Invalid component:)[^\n]*(?:\n[ \t]+- [^\n]*)*",
+        r"\1 <PLACEHOLDER>",
+        data,
+        flags=re.MULTILINE,
+    )
+    # Negative-fuzzing variance can produce body content with non-printable bytes, and the
+    # curl advisory for those only appears where shell detection comes up empty — true on
+    # CI, false on a developer machine. Strip the warning and the blank line under it, which
+    # the reproduce block indents, so spacing matches the warning-free runs.
+    return re.sub(
+        r"^[ \t]*⚠️[ \t]+Request body contains non-printable characters\.[^\n]*\n[ \t]*\n",
+        "",
+        data,
+        flags=re.MULTILINE,
+    )
+
+
+def _mask_reproduce_commands(data: str) -> str:
+    # One placeholder per run of curl lines: a stateful reproduction has a varying number of steps.
+    # The `st replay <id>` line is masked separately by `replace_test_case_id`.
+    lines = []
+    seen = False
+    for line in data.splitlines():
+        if "curl" in line:
+            if not seen:
+                lines.append("    <PLACEHOLDER>")
+                seen = True
+        else:
             seen = False
-            for line in data.splitlines():
-                if "curl" in line:
-                    if not seen:
-                        lines.append("    <PLACEHOLDER>")
-                        seen = True
-                else:
-                    seen = False
-                    lines.append(line)
-            data = "\n".join(lines) + "\n"
-        lines = []
-        for line in data.splitlines():
-            line = click.unstyle(line)
-            if line.endswith("Schema Loading Error"):
-                # It is written at the end of the current line and does not properly rewrite the current line
-                # on all terminals
-                lines.append("Schema Loading Error")
-                continue
-            if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
-                line = line.replace("\\", "/")
-            if IS_WINDOWS and line.startswith("Replaying ") and " from " in line:
-                # `st replay` echoes the crash file/dir path, which uses `\` on Windows.
-                line = line.replace("\\", "/")
-            if (
-                any(marker in line for marker in FLASK_MARKERS)
-                or line.lstrip().startswith(
-                    (
-                        "🕛 ",
-                        "🕐 ",
-                        "🕑 ",
-                        "🕒 ",
-                        "🕓 ",
-                        "🕔 ",
-                        "🕕 ",
-                        "🕖 ",
-                        "🕗 ",
-                        "🕘 ",
-                        "🕙 ",
-                        "🕚 ",
-                        "⠋",
-                        "⠙",
-                        "⠹",
-                        "⠸",
-                        "⠼",
-                        "⠴",
-                        "⠦",
-                        "⠧",
-                        "⠇",
-                        "⠏",
-                        "0:0",
-                        # Fuzz live-display lines (transient, not cleared on non-TTY)
-                        "No issues found yet",
-                        "Last new failure:",
-                    )
-                )
-                or re.match(r"    [❌🚫]", line)
-            ):
-                continue
-            lines.append(line.rstrip())
-        if (
-            "Stop reason:" in data
-            or "Empty test suite" in data
-            # Runs that tested nothing end with a banner naming the cause.
-            or "The schema defines no API operations" in data
-            or "No operations matched the filters" in data
-            or "Every selected operation was skipped" in data
-            or "No links for stateful testing" in data
-            # Same no-tests path, but a warning replaced the "Empty test suite" banner.
-            or ("No test cases were generated" in data and "Warnings:" in data)
-        ):
-            # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
-            # collapse runs of consecutive blanks to one. Triggers on st fuzz output
-            # (after "Stop reason:") and on the st run path where nothing was generated,
-            # where the probing progress doesn't clean up identically across platforms.
-            collapsed = []
-            for line in lines:
-                if line == "" and collapsed and collapsed[-1] == "":
-                    continue
-                collapsed.append(line)
-            lines = collapsed
-        lines = clean_unit_tests(lines)
-        lines = clean_stateful_tests(lines)
-        data = "\n".join(lines)
-        data = re.sub(r"\n{4,}", "\n\n\n", data)
-        return data.strip() + "\n"
+            lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
+TRANSIENT_LINE_PREFIXES = (
+    "🕛 ",
+    "🕐 ",
+    "🕑 ",
+    "🕒 ",
+    "🕓 ",
+    "🕔 ",
+    "🕕 ",
+    "🕖 ",
+    "🕗 ",
+    "🕘 ",
+    "🕙 ",
+    "🕚 ",
+    "⠋",
+    "⠙",
+    "⠹",
+    "⠸",
+    "⠼",
+    "⠴",
+    "⠦",
+    "⠧",
+    "⠇",
+    "⠏",
+    "0:0",
+    # Fuzz live-display lines (transient, not cleared on non-TTY)
+    "No issues found yet",
+    "Last new failure:",
+)
+
+
+def _is_transient(line: str) -> bool:
+    return (
+        any(marker in line for marker in FLASK_MARKERS)
+        or (line.lstrip().startswith(TRANSIENT_LINE_PREFIXES) and not _is_phase_header(line))
+        or re.match(r"    [❌🚫]", line) is not None
+    )
+
+
+def _is_phase_header(line: str) -> bool:
+    # A finished phase can carry the same clock icon as the live progress lines.
+    return re.search(r" \(in \d+\.\d{2}s\)$", line.rstrip()) is not None
+
+
+def _normalize_line(line: str) -> str:
+    line = click.unstyle(line)
+    if line.endswith("Schema Loading Error"):
+        # It is written at the end of the current line and does not properly rewrite the current line
+        # on all terminals
+        return "Schema Loading Error"
+    if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
+        return line.replace("\\", "/")
+    if IS_WINDOWS and line.startswith("Replaying ") and " from " in line:
+        # `st replay` echoes the crash file/dir path, which uses `\` on Windows.
+        return line.replace("\\", "/")
+    return line
+
+
+def _has_unstable_blank_lines(data: str) -> bool:
+    return (
+        "Stop reason:" in data
+        or "Empty test suite" in data
+        # Runs that tested nothing end with a banner naming the cause.
+        or "The schema defines no API operations" in data
+        or "No operations matched the filters" in data
+        or "Every selected operation was skipped" in data
+        or "No links for stateful testing" in data
+        # Same no-tests path, but a warning replaced the "Empty test suite" banner.
+        or ("No test cases were generated" in data and "Warnings:" in data)
+    )
+
+
+def _collapse_blank_runs(lines: list[str]) -> list[str]:
+    collapsed: list[str] = []
+    for line in lines:
+        if line == "" and collapsed and collapsed[-1] == "":
+            continue
+        collapsed.append(line)
+    return collapsed
+
+
+def _clean_lines(data: str) -> str:
+    lines = []
+    for line in data.splitlines():
+        normalized = _normalize_line(line)
+        if normalized == "Schema Loading Error" or not _is_transient(normalized):
+            lines.append(normalized.rstrip())
+    if _has_unstable_blank_lines(data):
+        # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
+        # collapse runs of consecutive blanks to one. Triggers on st fuzz output
+        # (after "Stop reason:") and on the st run path where nothing was generated,
+        # where the probing progress doesn't clean up identically across platforms.
+        lines = _collapse_blank_runs(lines)
+    lines = clean_unit_tests(lines)
+    lines = clean_stateful_tests(lines)
+    return re.sub(r"\n{4,}", "\n\n\n", "\n".join(lines)).strip() + "\n"
 
 
 def clean_unit_tests(lines):
@@ -389,30 +482,26 @@ def clean_unit_tests(lines):
     return output
 
 
+def _find(lines: list[str], offsets: dict[str, int]) -> int | None:
+    """Index of the first line containing any marker, shifted by that marker's offset."""
+    for idx, line in enumerate(lines):
+        for marker, offset in offsets.items():
+            if marker in line:
+                return idx + offset
+    return None
+
+
 def clean_stateful_tests(lines):
-    start_idx = None
-    for i, line in enumerate(lines):
-        if "Fuzzing (in" in line:
-            start_idx = i + 3
-            break
+    start_idx = _find(lines, {"Fuzzing (in": 3})
     if start_idx is None:
-        for i, line in enumerate(lines):
-            if "API probing failed" in line:
-                start_idx = i + 1
-                break
-            if "API capabilities" in line:
-                start_idx = i + 3
-                break
-
-    end_idx = None
-    for i, line in enumerate(lines):
-        if "Stateful (in" in line:
-            end_idx = i
-            break
-
-    if start_idx is not None and end_idx is not None:
-        return lines[: start_idx + 1] + lines[end_idx:]
-    return lines
+        start_idx = _find(lines, {"API probing failed": 1, "API capabilities": 3})
+    end_idx = _find(lines, {"Stateful (in": 0})
+    if start_idx is None or end_idx is None:
+        return lines
+    # Keep the blank line that separates the Stateful block from the one above it.
+    if end_idx > start_idx + 1 and lines[end_idx - 1] == "":
+        end_idx -= 1
+    return lines[: start_idx + 1] + lines[end_idx:]
 
 
 def normalize_connection_errors(data: str) -> str:
