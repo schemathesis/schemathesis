@@ -22,7 +22,6 @@ from schemathesis.cli.output import (
     display_errors_summary,
     display_failures,
     display_failures_summary,
-    display_fatal_error,
     display_filtered_summary,
     display_final_line,
     display_header,
@@ -1560,15 +1559,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self.console.print(message)
             self.console.print()
             self.probing_manager = None
-
-    def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
-        self.shutdown(ctx)
-        display_fatal_error(
-            self.console,
-            self.loading_manager,
-            event,
-            wait_for_schema=self.config.wait_for_schema,
-        )
 
     def display_warnings(self, ctx: ExecutionContext) -> None:
         display_section_name("WARNINGS")

@@ -25,6 +25,7 @@
 - Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
 - Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
+- `st fuzz` suggesting `--wait-for-schema` on connection errors when it is already set.
 - Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
 - `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
