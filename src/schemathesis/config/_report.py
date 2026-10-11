@@ -25,6 +25,19 @@ class ReportFormat(str, Enum):
     HTML = "html"
 
     @property
+    def display_name(self) -> str:
+        return {
+            self.JUNIT: "JUnit",
+            self.VCR: "VCR",
+            self.HAR: "HAR",
+            self.NDJSON: "NDJSON",
+            self.JSON: "JSON",
+            self.WFC: "WFC",
+            self.ALLURE: "Allure",
+            self.HTML: "HTML",
+        }[self]
+
+    @property
     def extension(self) -> str:
         """File extension for this format."""
         return {

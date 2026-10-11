@@ -45,8 +45,8 @@ Test cases:
   N generated, N passed
 
 Reports:
-  - JUNIT: /tmp/junit.xml
-  - ALLURE: /tmp/allure-results
+  - JUnit: /tmp/junit.xml
+  - Allure: /tmp/allure-results
 
 Seed: 42
 

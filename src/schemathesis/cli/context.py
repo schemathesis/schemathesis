@@ -59,7 +59,7 @@ class BaseExecutionContext:
                 # Point at the page itself so it opens in one click.
                 if format == ReportFormat.HTML:
                     path = path / "index.html"
-                built_in.append((format.value.upper(), path))
+                built_in.append((format.display_name, path))
         return [*built_in, *self.reports]
 
     def summary(self) -> SummaryData:
