@@ -83,6 +83,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         self.skip_reasons: dict[str, set[str]] = {}
         # The first error of each exception type per label, the way the terminal lists them.
         self.errors: dict[str, dict[type, ErrorEntry]] = {}
+        # Labels of operations that reported errors, including operations that failed to load.
+        self.errored_labels: set[str] = set()
         self.phase_started: dict[PhaseName, float] = {}
         self.phase_spans: list[PhaseSpan] = []
         # Key of each failure group (its case id) -> seconds from the run start when it first appeared, and the phase.
@@ -152,6 +154,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
 
     def _on_error(self, event: events.NonFatalError) -> None:
         entries = self.errors.setdefault(event.label, {})
+        if event.related_to_operation:
+            self.errored_labels.add(event.label)
         if type(event.value) not in entries:
             entries[type(event.value)] = _error_entry(event.info)
         if event.phase is not None:
@@ -209,6 +213,11 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         def find_operation(label: str) -> APIOperation | None:
             return ctx.find_operation_by_label(label) if ctx.find_operation_by_label is not None else None
 
+        def names_operation(label: str) -> bool:
+            # An operation that failed to load cannot be looked up again, yet its error names it.
+            return label in self.errored_labels or find_operation(label) is not None
+
+        operations: dict[str, APIOperation] = {}
         failing_cases: dict[str, list[FailingCase]] = {}
         # Operations with failures from their own cases, not only from stateful sequences.
         failed_directly: set[str] = set()
@@ -224,10 +233,12 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                 else:
                     failed_directly.add(label)
                 # Run-level and undeclared-method failures carry labels that name no operation.
-                if find_operation(owner) is None:
+                operation = find_operation(owner)
+                if operation is None:
                     unattributed_cases.append((label, case))
                     unattributed.update(failure.title for failure in group.failures)
                 else:
+                    operations[owner] = operation
                     failing_cases.setdefault(owner, []).append(case)
         labels = (
             self.cases.keys()
@@ -241,8 +252,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         stopped_early = self.finished is None or self.finished.stop_reason is not StopReason.COMPLETED
         rows = []
         for label in labels:
-            operation = find_operation(label)
-            if operation is None:
+            if not names_operation(label):
                 continue
             cases = failing_cases.get(label, [])
             failures = sorted({failure.title for case in cases for failure in case.failures})
@@ -264,7 +274,12 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                 if label in statistic.operations_without_checks:
                     reasons = reasons | {"No checks ran"}
                 note = ", ".join(sorted(reasons)) or None
-            continue_on_failure = ctx.config.continue_on_failure_for(operation=operation)
+            operation = operations.get(label)
+            stops_at_first_failure = (
+                operation is not None
+                and label in failed_directly
+                and not ctx.config.continue_on_failure_for(operation=operation)
+            )
             rows.append(
                 OperationRow(
                     label=label,
@@ -272,7 +287,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                     failures=failures,
                     cases=self.cases[label],
                     note=note,
-                    stops_at_first_failure=label in failed_directly and not continue_on_failure,
+                    stops_at_first_failure=stops_at_first_failure,
                     failing_cases=cases,
                     errors=errors,
                     known_failures=known.get(label, []),
@@ -281,7 +296,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         unattributed_errors = [
             (label, error)
             for label, errors in sorted(self.errors.items())
-            if find_operation(label) is None
+            if not names_operation(label)
             for error in errors.values()
         ]
         return Rows(
