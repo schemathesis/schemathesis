@@ -287,6 +287,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         pytest.param("a{1,3}+a", None, 4, "a{1,3}+a", marks=SKIP_BEFORE_PY11),
         pytest.param("(?:ab)++ab", None, 4, "(?:ab)++ab", marks=SKIP_BEFORE_PY11),
         pytest.param("a+b++c", 1, 4, "a+b++c", marks=SKIP_BEFORE_PY11),
+        pytest.param(r"^(a*+)[ab]$", 2, 3, r"^(a*+)[ab]$", marks=SKIP_BEFORE_PY11),
         # Anchored only at the start, with more than one part: the budget still lands, and encoding
         # a maximum closes the pattern so longer strings stop matching.
         ("^[a-zA-Z][a-zA-Z0-9_]*", 63, 63, "^[a-zA-Z][a-zA-Z0-9_]{62}$"),
