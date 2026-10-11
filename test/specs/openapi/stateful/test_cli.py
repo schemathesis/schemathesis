@@ -296,6 +296,51 @@ def test_missing_body_parameter(ctx, cli, snapshot_cli):
     )
 
 
+EXTRACTION_FAILURE_LINKS = ["Link5", "Link2", "Link6", "Link1", "Link4", "Link3"]
+
+
+def test_extraction_failures_order_is_stable(ctx, cli):
+    links = {
+        name: {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}}
+        for name in EXTRACTION_FAILURE_LINKS
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {"201": {"description": "Created", "links": links}},
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"name": "x"}), 201
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        return jsonify({}), 404
+
+    result = cli.run_openapi_app(app, "--phases=stateful", "-n 50", "--workers=1", "--seed=42", "-c not_a_server_error")
+    reported = [
+        line.strip()
+        for line in result.stdout.split("Failed to extract data from response:")[1].splitlines()
+        if line.strip().startswith("POST /users -> ")
+    ]
+    assert reported == [
+        f"POST /users -> [201] {name} -> GET /users/{{userId}}" for name in sorted(EXTRACTION_FAILURE_LINKS)
+    ]
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=3, min_passes=1)
 def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, snapshot_cli):
