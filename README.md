@@ -32,9 +32,9 @@ Schemathesis tests OpenAPI and GraphQL APIs by generating inputs from your schem
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/docs/img/html-report.png" alt="Schemathesis HTML report with a failing operation expanded" width="600"/>
+  <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/docs/img/html-report-overview.png" alt="Schemathesis HTML report with the verdict, run details, timeline and failing operations" width="700"/>
   <br>
-  <i>Every failure with a <code>curl</code> command to reproduce it: <code>--report html</code></i>
+  <i>Verdict, timeline and every failure in one offline page: <code>--report html</code></i>
 </p>
 
 ## Try it now
