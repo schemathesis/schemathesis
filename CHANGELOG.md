@@ -42,6 +42,7 @@
 - Top-level `[[operations]]` overriding `[[project.operations]]` for the same operation.
 - `st fuzz` crashing with `Inconsistent data generation` when the server stops responding.
 - `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
+- Root-level `[servers.variables]` ignored for the schema-wide `servers` URL.
 - Allure reports missing coverage failures for undeclared HTTP methods.
 - Fuzzing sending examples of query parameters the server rejected as unknown.
 - WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.

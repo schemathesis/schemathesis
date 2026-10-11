@@ -527,7 +527,7 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def _get_base_path(self) -> str:
-        return self.adapter.get_base_path(self.raw_schema)
+        return self.adapter.get_base_path(self.raw_schema, self.config.servers.variables or None)
 
     @cached_property
     def _schema_document_path(self) -> str | None:
