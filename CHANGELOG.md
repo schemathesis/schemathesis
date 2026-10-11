@@ -20,6 +20,7 @@
 ### :bug: Fixed
 
 - Missing unresolvable-reference warning for responses whose `$ref` reaches it through a cycle.
+- Crash in negative mode on schemas with a boolean `not`, e.g. `not: false`.
 - Traceback and early stateful phase exit with `--mode negative` for steps with nothing to negate.
 - Check failures shown as a bare `Failure()` in `repr` and pytest assertion messages.
 - Missing or broken inferred stateful links for paginated lists of wrapped items, e.g. `{items: [{track}]}`.
