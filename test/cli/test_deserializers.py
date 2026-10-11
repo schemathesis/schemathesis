@@ -1,6 +1,9 @@
 import pytest
 from flask import Response
 
+import schemathesis
+from schemathesis.openapi.checks import JsonSchemaError
+
 
 def _schema(ctx, path, media_type, schema):
     return ctx.openapi.build_schema(
@@ -203,3 +206,28 @@ def deserialize_custom(ctx, response):
 """)
 
     assert cli.run_openapi_app(app, "--checks=response_schema_conformance", hooks=hooks_module) == snapshot_cli
+
+
+def test_wildcard_deserializer_matches_concrete_media_type(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/msgpack": {"schema": {"type": "integer"}}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @schemathesis.deserializer("application/*")
+    def deserialize_any_application(ctx, response):
+        return response.content.decode()
+
+    response = response_factory.requests(content=b"not-an-integer", content_type="application/msgpack")
+    with pytest.raises(JsonSchemaError, match='"not-an-integer" is not of type "integer"'):
+        schema["/data"]["GET"].validate_response(response)

@@ -38,7 +38,7 @@ _DESERIALIZERS: dict[str, ResponseDeserializer] = {}
 
 
 def _iter_matching_deserializers(media_type: str) -> Iterator[tuple[str, ResponseDeserializer]]:
-    main, sub = media_types.parse(media_type)
+    parsed = media_types.parse(media_type)
     checks = [
         media_types.is_json,
         media_types.is_xml,
@@ -46,12 +46,9 @@ def _iter_matching_deserializers(media_type: str) -> Iterator[tuple[str, Respons
         media_types.is_yaml,
     ]
     for registered_media_type, deserializer in _DESERIALIZERS.items():
-        if any(check(media_type) and check(registered_media_type) for check in checks):
+        same_family = any(check(media_type) and check(registered_media_type) for check in checks)
+        if same_family or media_types.matches_either(parsed, media_types.parse(registered_media_type)):
             yield registered_media_type, deserializer
-        else:
-            target_main, target_sub = media_types.parse(registered_media_type)
-            if main in ("*", target_main) and sub in ("*", target_sub):
-                yield registered_media_type, deserializer
 
 
 def has_deserializer(media_type: str) -> bool:
