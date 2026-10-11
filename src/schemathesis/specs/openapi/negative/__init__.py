@@ -4,7 +4,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlencode
 
 import jsonschema_rs
@@ -20,10 +20,11 @@ from schemathesis.core.jsonschema import (
     FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
 )
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.generation.jsonschema.strategy import DECLINED
@@ -462,7 +463,10 @@ def _with_value_channel(
             if not targets:
                 return draw(mutated_strategy)
             target_path, schema_pointer, _value, keyword, schema_at_path = draw(st.sampled_from(targets))
-            new_body, original_value, new_value = apply_value_channel(positive, target_path, keyword, schema_at_path)
+            # Breaking happens in place, and positive draws can share objects across draws (e.g. `enum` members).
+            new_body, original_value, new_value = apply_value_channel(
+                cast(JsonValue, deepclone(positive)), target_path, keyword, schema_at_path
+            )
             # Violators are no-ops on permissive schemas; fall back to schema-channel to avoid
             # false-positive `negative_data_rejection`. Strip Binary to "" before validating —
             # jsonschema_rs rejects the wrapper but structure-level keywords still fire.
