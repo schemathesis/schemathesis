@@ -57,9 +57,9 @@ class ExecutionContext(BaseExecutionContext):
         if isinstance(event, LoadingFinished):
             self.config = event.config
             collector.config = event.config
-            collector.on_unmatched_filters(self, event.statistic)
+            collector.on_unmatched_filters(event.statistic)
         elif isinstance(event, events.SchemaAnalysisWarnings):
-            collector.on_schema_warnings(self, event)
+            collector.on_schema_warnings(event)
         elif isinstance(event, events.PhaseFinished):
             # A phase repeats under a time budget; a later pass that ran out of budget or was cut short
             # must not downgrade what an earlier one already found.
@@ -82,6 +82,9 @@ class ExecutionContext(BaseExecutionContext):
             # after_run failures arrive here.
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
+                self.exit_code = ExitCode.FAILURES
+            # Decided once the run is over, since a later success withdraws a missing-auth warning.
+            if collector.fails_the_run() and self.exit_code == ExitCode.OK:
                 self.exit_code = ExitCode.FAILURES
             self.on_engine_finished(event.stop_reason)
             self._write_baseline()

@@ -582,8 +582,17 @@ def test_silent_when_the_schema_declares_no_base_path(ctx, cli, app_runner, snap
     assert cli.run(schema_url, f"--url={base}", "--max-examples=2", "--phases=fuzzing") == snapshot_cli
 
 
-def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app_runner):
-    # Rejected once, served afterwards: the run as a whole got past authentication.
+ORDERS = {
+    "/orders/{orderId}": {
+        "get": {
+            "parameters": [{"name": "orderId", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+        }
+    }
+}
+
+
+def _rejected_once_then_served(ctx, cli, app_runner, paths, routes):
     schema = ctx.openapi.build_schema(
         {
             "/thing": {
@@ -593,7 +602,8 @@ def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
-            }
+            },
+            **paths,
         }
     )
     calls = {"n": 0}
@@ -604,20 +614,42 @@ def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app
             return Response(status=401)
         return Response('{"ok": true}', status=200, content_type="application/json")
 
-    schema_url = _serve_schema(ctx, cli, app_runner, schema, [("GET", "/thing", thing)])
+    return _serve_schema(ctx, cli, app_runner, schema, [("GET", "/thing", thing), *routes])
+
+
+def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app_runner):
+    # Rejected once, served afterwards: the run as a whole got past authentication.
+    schema_url = _rejected_once_then_served(ctx, cli, app_runner, {}, [])
     result = cli.run(schema_url, "-c not_a_server_error", "--max-examples=5", "--phases=examples,fuzzing")
 
     assert "Authentication failed" not in result.stdout
 
 
-ORDERS = {
-    "/orders/{orderId}": {
-        "get": {
-            "parameters": [{"name": "orderId", "in": "path", "required": True, "schema": {"type": "string"}}],
-            "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
-        }
-    }
-}
+def _not_found(order_id):
+    return Response(status=404)
+
+
+@pytest.mark.parametrize(
+    ("paths", "routes", "final_line"),
+    [
+        ({}, [], "No issues found"),
+        (ORDERS, [("GET", "/orders/<order_id>", _not_found)], "1 warning"),
+    ],
+    ids=["no-other-warnings", "other-warning-not-in-fail-on"],
+)
+def test_withdrawn_missing_auth_warning_does_not_fail_the_run(ctx, cli, app_runner, paths, routes, final_line):
+    schema_url = _rejected_once_then_served(ctx, cli, app_runner, paths, routes)
+    result = cli.run(
+        schema_url,
+        "-c not_a_server_error",
+        "--max-examples=5",
+        "--phases=examples,fuzzing",
+        config={"warnings": {"fail-on": ["missing_auth"]}},
+    )
+    assert (result.exit_code, result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0]) == (
+        ExitCode.OK,
+        final_line,
+    )
 
 
 LOW_VALID_RATE_ARGS = ("--max-examples=10", "--phases=fuzzing", "-m", "positive", "--warnings=low_valid_rate")

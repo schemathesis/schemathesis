@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from schemathesis.cli.commands.run.filters import describe_filter
-from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.summary import WarningData
 from schemathesis.config import ProjectConfig, SchemathesisWarning
@@ -276,11 +275,21 @@ class WarningCollector:
     data: WarningData
     # Operations that got past authentication at some point in the run.
     authenticated: set[str]
+    # Whether a warning configured with `fail-on` was recorded that nothing withdraws later.
+    fails: bool
+    # Operations whose missing-auth warning is configured with `fail-on`; a later success withdraws them.
+    fails_on_auth: set[str]
 
     def __init__(self, config: ProjectConfig) -> None:
         self.config = config
         self.data = WarningData()
         self.authenticated = set()
+        self.fails = False
+        self.fails_on_auth = set()
+
+    def fails_the_run(self) -> bool:
+        """Whether a warning configured with `fail-on` still stands."""
+        return self.fails or bool(self.fails_on_auth)
 
     def on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING):
@@ -292,7 +301,7 @@ class WarningCollector:
         ):
             self._check_stateful_warnings(ctx, event)
 
-    def on_schema_warnings(self, ctx: BaseExecutionContext, event: events.SchemaAnalysisWarnings) -> None:
+    def on_schema_warnings(self, event: events.SchemaAnalysisWarnings) -> None:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
             if warning.kind is SchemathesisWarning.MISSING_DESERIALIZER:
@@ -300,40 +309,34 @@ class WarningCollector:
                 assert warning.operation_label is not None
                 assert warning.group is not None
                 self._handle_warning(
-                    ctx,
                     warning.kind,
                     self._record_missing_deserializer_warning(warning.operation_label, warning.group, warning.message),
                 )
             elif warning.kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
                 # UnusedOpenAPIAuthWarning has no operation_label (schema-level)
                 self._handle_warning(
-                    ctx,
                     warning.kind,
                     self._record_unused_openapi_auth_warning(warning.message),
                 )
             elif warning.kind is SchemathesisWarning.UNSUPPORTED_REGEX:
                 assert warning.operation_label is not None
                 self._handle_warning(
-                    ctx,
                     warning.kind,
                     self._record_unsupported_regex_warning(warning.operation_label, warning.message),
                 )
             elif warning.kind is SchemathesisWarning.UNRESOLVABLE_REFERENCE:
                 assert warning.operation_label is not None
                 self._handle_warning(
-                    ctx,
                     warning.kind,
                     self._record_unresolvable_reference_warning(warning.operation_label, warning.message),
                 )
             elif warning.kind is SchemathesisWarning.DICTIONARY_MISMATCH:
                 self._handle_warning(
-                    ctx,
                     warning.kind,
                     self._record_dictionary_mismatch_warning(warning.message),
                 )
             elif warning.kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
                 self._handle_warning(
-                    ctx,
                     warning.kind,
                     self._record_constants_extraction_warning(warning.message),
                 )
@@ -372,13 +375,12 @@ class WarningCollector:
                     self.data.auth_flow_suggestion = auth_flow_suggestion(operation.schema)
                 # Check if this warning should cause test failure
                 if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
-                    ctx.exit_code = ExitCode.FAILURES
+                    self.fails_on_auth.add(event.recorder.label)
 
         if statistic.ratio_for(429) >= RATE_LIMITED_THRESHOLD and warnings.should_display(
             SchemathesisWarning.RATE_LIMITED
         ):
             self._handle_warning(
-                ctx,
                 SchemathesisWarning.RATE_LIMITED,
                 lambda: self.data.rate_limited.add(event.recorder.label),
             )
@@ -397,7 +399,6 @@ class WarningCollector:
                 assert operation is not None
                 self.data.base_url_suggestion = f"{(operation.schema.config.base_url or '').rstrip('/')}{missing}"
                 self._handle_warning(
-                    ctx,
                     SchemathesisWarning.BASE_URL_MISMATCH,
                     lambda: self.data.base_url_mismatch.add(event.recorder.label),
                 )
@@ -415,13 +416,11 @@ class WarningCollector:
         ):
             if positive.should_warn_about_missing_test_data():
                 self._handle_warning(
-                    ctx,
                     SchemathesisWarning.MISSING_TEST_DATA,
                     lambda: self._record_missing_test_data(event.recorder.label, operation),
                 )
             if positive.should_warn_about_validation_mismatch():
                 self._handle_warning(
-                    ctx,
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
                 )
@@ -431,7 +430,6 @@ class WarningCollector:
                 SpecificationFeature.STATUS_CODE_ANALYSIS
             ):
                 self._handle_warning(
-                    ctx,
                     SchemathesisWarning.MISSING_TEST_DATA,
                     lambda: self._record_missing_test_data(event.recorder.label, operation),
                 )
@@ -455,7 +453,6 @@ class WarningCollector:
                 and outcomes.rate < self.config.warnings.low_valid_rate.threshold
             ):
                 self._handle_warning(
-                    ctx,
                     SchemathesisWarning.LOW_VALID_RATE,
                     lambda: self.data.low_valid_rate.add(event.recorder.label),
                 )
@@ -474,20 +471,19 @@ class WarningCollector:
     def _mark_authenticated(self, label: str) -> None:
         """Take an operation out of the auth warning, and keep it out for the rest of the run."""
         self.authenticated.add(label)
+        self.fails_on_auth.discard(label)
         for status_code, labels in list(self.data.missing_auth.items()):
             labels.discard(label)
             if not labels:
                 del self.data.missing_auth[status_code]
 
-    def _handle_warning(
-        self, ctx: BaseExecutionContext, kind: SchemathesisWarning, record_callback: Callable[[], None]
-    ) -> None:
+    def _handle_warning(self, kind: SchemathesisWarning, record_callback: Callable[[], None]) -> None:
         """Handle a warning by checking display/fail config and recording it."""
         if not self.config.warnings.should_display(kind):
             return
         record_callback()
         if self.config.warnings.should_fail(kind):
-            ctx.exit_code = ExitCode.FAILURES
+            self.fails = True
 
     def _record_skip_warning(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         """Record a warning surfaced via a supervisor-driven scenario skip."""
@@ -501,7 +497,7 @@ class WarningCollector:
         ):
             self.data.method_not_allowed.add(event.label)
             if warnings.should_fail(SchemathesisWarning.METHOD_NOT_ALLOWED):
-                ctx.exit_code = ExitCode.FAILURES
+                self.fails = True
 
     def _record_missing_deserializer_warning(
         self, operation_label: str, media_type: str, status_code: str
@@ -539,13 +535,13 @@ class WarningCollector:
 
         return record
 
-    def on_unmatched_filters(self, ctx: BaseExecutionContext, statistic: ApiStatistic) -> None:
+    def on_unmatched_filters(self, statistic: ApiStatistic) -> None:
         """Record filter expressions that no operation matched."""
         for entry in statistic.unmatched_filters:
             message = describe_filter(entry)
             if entry.suggestion is not None:
                 message += f" (did you mean {entry.suggestion!r}?)"
-            self._handle_warning(ctx, SchemathesisWarning.UNMATCHED_FILTER, self._record_unmatched_filter(message))
+            self._handle_warning(SchemathesisWarning.UNMATCHED_FILTER, self._record_unmatched_filter(message))
 
     def _record_unmatched_filter(self, message: str) -> Callable[[], None]:
         def record() -> None:
