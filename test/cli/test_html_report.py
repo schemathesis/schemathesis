@@ -321,6 +321,26 @@ def test_html_report_some_operations_errored(ctx, cli, app_runner, report_dir, s
     assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
 
 
+def test_html_report_operation_not_loaded(ctx, cli, app_runner, report_dir, snapshot_html):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/broken": {
+                "get": {
+                    "parameters": [{"$ref": "#/components/parameters/Missing"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/api/success": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/api/success")
+    def success():
+        return "{}"
+
+    assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
+
+
 # Slow requests time out after other cases of the same operation passed; the invalid body errors before any case.
 def test_html_report_operations_errored_after_cases(ctx, cli, app_runner, report_dir):
     parameter = {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}
