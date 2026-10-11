@@ -374,7 +374,9 @@ def _validate_scenario(
     check_context_cache: CheckContextCache,
     continue_on_failure_by_label: dict[str, bool],
 ) -> Status:
-    """Run all checks against every answered step; raises on the first failure unless it may continue."""
+    """Run all checks against every answered step; raises the first failure unless it may continue."""
+    # Every step is already sent, so a failure only ends the run after the remaining responses are checked.
+    first_failure: FailureGroup | None = None
     for case_id, node in recorder.cases.items():
         interaction = recorder.interactions.get(case_id)
         if interaction is None or interaction.response is None:
@@ -386,14 +388,19 @@ def _validate_scenario(
             phase=None,
             auth_enforced_operations=ctx.auth_enforced_operations,
         )
-        validate_response(
-            case=case,
-            ctx=check_ctx,
-            response=interaction.response,
-            continue_on_failure=continue_on_failure_by_label[case.operation.label],
-            recorder=recorder,
-            baseline=ctx.config.load_baseline(),
-        )
+        try:
+            validate_response(
+                case=case,
+                ctx=check_ctx,
+                response=interaction.response,
+                continue_on_failure=continue_on_failure_by_label[case.operation.label],
+                recorder=recorder,
+                baseline=ctx.config.load_baseline(),
+            )
+        except FailureGroup as exc:
+            first_failure = first_failure or exc
+    if first_failure is not None:
+        raise first_failure
     # Failures under `continue_on_failure` were recorded without raising.
     if has_new_failures(recorder, ctx.config.load_baseline()):
         return Status.FAILURE
