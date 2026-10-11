@@ -188,6 +188,13 @@ def test_fuzz_fatal_error_loader(cli, snapshot_cli):
     assert_cli_snapshot(cli.main("fuzz", "http://127.0.0.1:1/openapi.json"), snapshot_cli)
 
 
+def test_fuzz_fatal_error_loader_omits_wait_for_schema_tip_when_set(cli):
+    result = cli.main("fuzz", "http://127.0.0.1:1/openapi.json", "--wait-for-schema=1")
+
+    assert "Connection failed" in result.stdout, result.stdout
+    assert "Tip:" not in result.stdout, result.stdout
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_rejects_conflicting_color_flags(cli, snapshot_cli):
     assert_cli_snapshot(

@@ -41,7 +41,7 @@ class BaseOutputHandler(EventHandler[T]):
 
     def _on_fatal_error(self, ctx: T, event: events.FatalError) -> None:
         self.shutdown(ctx)
-        display_fatal_error(self.console, self.loading_manager, event)
+        display_fatal_error(self.console, self.loading_manager, event, wait_for_schema=ctx.config.wait_for_schema)
 
 
 TextOutput = IO[str] | StringIO | Path
