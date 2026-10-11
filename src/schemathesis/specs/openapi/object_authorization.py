@@ -146,8 +146,10 @@ def listings(case: Case) -> Iterator[Case]:
     if node is None:
         return
     resources = {slot.resource.name for slot in node.inputs if slot.parameter_location == ParameterLocation.PATH}
+    # `/things` lists what `/things/{id}` reads even when its items are named differently.
+    parent = naming.collection_path(case.operation.path)
     for label, other in graph.operations.items():
-        if any(output.resource.name in resources for output in other.outputs):
+        if other.path == parent or any(output.resource.name in resources for output in other.outputs):
             listing = listing_case(case, case.operation.schema.find_operation_by_label(label))
             if listing is not None:
                 yield listing
