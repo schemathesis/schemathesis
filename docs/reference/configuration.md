@@ -330,7 +330,7 @@ Rules:
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, or `html`. `ndjson`, `json` and `wfc` are CLI-only. With `pytest-xdist`, results from all workers are merged into one report.
+    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, or `html`. `ndjson`, `json` and `wfc` are CLI-only.
 
     ```toml
     [reports.junit]

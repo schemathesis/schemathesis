@@ -1701,13 +1701,13 @@ def test_negative_data_rejection_reports_invalid_serialized_query(
         negative_data_rejection(check_context(), response, case)
 
 
-_UNPARSEABLE_INTEGER_TEXTS = pytest.mark.parametrize(
+_UNPARSABLE_INTEGER_TEXTS = pytest.mark.parametrize(
     "value", ["1_0", " 5", "\u0665"], ids=["underscore", "whitespace", "non-ascii"]
 )
 
 
-@_UNPARSEABLE_INTEGER_TEXTS
-def test_negative_data_rejection_reports_unparseable_integer_in_query_array(ctx, response_factory, value):
+@_UNPARSABLE_INTEGER_TEXTS
+def test_negative_data_rejection_reports_unparsable_integer_in_query_array(ctx, response_factory, value):
     schema = ctx.openapi.load_schema(
         {"/items": {"get": {"parameters": [{"in": "query", "name": "value", "schema": {"type": "integer"}}]}}}
     )
@@ -1719,9 +1719,9 @@ def test_negative_data_rejection_reports_unparseable_integer_in_query_array(ctx,
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
-@_UNPARSEABLE_INTEGER_TEXTS
+@_UNPARSABLE_INTEGER_TEXTS
 @pytest.mark.parametrize("location", [ParameterLocation.PATH, ParameterLocation.QUERY], ids=["path", "query"])
-def test_negative_data_rejection_reports_unparseable_integer_type_mutation(ctx, response_factory, value, location):
+def test_negative_data_rejection_reports_unparsable_integer_type_mutation(ctx, response_factory, value, location):
     schema = ctx.openapi.load_schema(
         {
             "/items/{value}": {
@@ -1746,8 +1746,8 @@ def test_negative_data_rejection_reports_unparseable_integer_type_mutation(ctx, 
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
-@_UNPARSEABLE_INTEGER_TEXTS
-def test_negative_data_rejection_reports_unparseable_integer_in_path_array(ctx, response_factory, value):
+@_UNPARSABLE_INTEGER_TEXTS
+def test_negative_data_rejection_reports_unparsable_integer_in_path_array(ctx, response_factory, value):
     schema = ctx.openapi.load_schema(
         {
             "/items/{values}": {
