@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Iterator
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
 from hypothesis.errors import Unsatisfiable
@@ -235,12 +235,11 @@ class ExamplesGenerator:
     def _materialize_strategy_cases(self) -> list[Case]:
         operation = self._operation
         try:
-            # The examples phase never draws from extracted constants.
             return [
                 generate_one(strategy)
                 for strategy in operation.get_strategies_from_examples(
                     fill_missing=self._fill_missing,
-                    feedback=replace(self._feedback, constants_value_source=None),
+                    feedback=self._feedback.for_examples(),
                     **self._as_strategy_kwargs,
                 )
             ]
