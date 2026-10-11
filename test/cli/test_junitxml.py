@@ -368,3 +368,24 @@ def test_after_run_failure_in_junit(ctx, cli, ensure_reachability_module, tmp_pa
     assert run_checks is not None, list(testcases_by_name)
     assert run_checks[0].tag == "failure"
     assert "never returned 2xx" in (run_checks[0].text or run_checks[0].attrib.get("message", ""))
+
+
+def test_after_run_failures_in_junit_are_sorted_and_deduplicated(
+    ctx, cli, unsorted_run_check_failures_module, tmp_path
+):
+    api = ctx.openapi.apps.success()
+    xml_path = tmp_path / "junit.xml"
+    cli.main(
+        "run",
+        api.schema_url,
+        "-c",
+        "ZRunCheck,ARunCheck",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        f"--report-junit-path={xml_path}",
+        hooks=unsorted_run_check_failures_module,
+    )
+    testcases_by_name = {testcase.attrib["name"]: testcase for testcase in ElementTree.parse(xml_path).getroot()[0]}
+    assert testcases_by_name["Run checks"][0].text == (
+        "\n- dup\n\n    aaa duplicated\n\n- Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
+    )

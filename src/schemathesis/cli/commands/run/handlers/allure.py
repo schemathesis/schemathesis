@@ -8,7 +8,6 @@ from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.statistic import GroupedFailures
 from schemathesis.reporting.recorders import (
     recorder_failures,
     scenario_elapsed,
@@ -73,12 +72,13 @@ class AllureHandler(EventHandler):
             self.writer.record_error(label=event.label, message=event.info.format())
         elif isinstance(event, events.EngineFinished):
             if event.failures:
-                group = GroupedFailures(case_id=None, code_sample=None, failures=event.failures, response=None)
+                # Recorded by the execution context before handlers run, deduplicated and sorted.
+                groups = list(ctx.statistic.failures[RUN_CHECKS_LABEL].values())
                 self.writer.record_scenario(
                     label=RUN_CHECKS_LABEL,
                     elapsed_sec=0.0,
                     status=Status.FAILURE,
-                    failures=[group],
+                    failures=groups,
                     skip_reason=None,
                     tags=None,
                 )
