@@ -4063,11 +4063,15 @@ def nested_object(name, schema):
     return {"type": "object", "properties": {name: schema}}
 
 
+LINES_COMPONENTS = {"schemas": {"Lines": {"type": "array", "items": nested_object("warehouse_id", {"type": "string"})}}}
+
+
 @pytest.mark.parametrize(
-    ["body", "expected"],
+    ["body", "components", "expected"],
     [
         (
             nested_object("shipping", nested_object("address", nested_object("warehouse_id", {"type": "string"}))),
+            {},
             {"shipping": {"address": {"warehouse_id": "$response.body#/id"}}},
         ),
         (
@@ -4075,17 +4079,28 @@ def nested_object(name, schema):
                 "shipping",
                 nested_object("lines", {"type": "array", "items": nested_object("warehouse_id", {"type": "string"})}),
             ),
+            {},
+            {"shipping": {"lines": [{"warehouse_id": "$response.body#/id"}]}},
+        ),
+        (
+            nested_object("lines", component_ref("Lines")),
+            LINES_COMPONENTS,
+            {"lines": [{"warehouse_id": "$response.body#/id"}]},
+        ),
+        (
+            nested_object("shipping", nested_object("lines", component_ref("Lines"))),
+            LINES_COMPONENTS,
             {"shipping": {"lines": [{"warehouse_id": "$response.body#/id"}]}},
         ),
     ],
-    ids=["object-in-object", "array-in-object"],
+    ids=["object-in-object", "array-in-object", "array-ref", "array-ref-in-object"],
 )
-def test_nested_body_fk_links_from_producer(ctx, body, expected):
+def test_nested_body_fk_links_from_producer(ctx, body, components, expected):
     paths = {
         **operation("post", "/warehouses", "201", SCHEMA_WITH_ID, operation_id="createWarehouse"),
         **operation_with_body("post", "/orders", "201", body, operation_id="createOrder"),
     }
-    _, graph = analyze_dependencies(ctx, paths)
+    _, graph = analyze_dependencies(ctx, paths, components=components)
     assert inferred_links(graph) == [
         [
             "#/paths/~1warehouses/post",
