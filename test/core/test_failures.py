@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from schemathesis.core.failures import get_origin
+from schemathesis.core.failures import Failure, Severity, get_origin
 
 
 def origin_of_assertion_at(path: Path) -> tuple:
@@ -22,3 +22,11 @@ def test_origin_is_the_same_in_two_checkouts(tmp_path, monkeypatch):
         origins.append(origin_of_assertion_at(root / "tests" / "checks.py"))
 
     assert origins[0] == origins[1]
+
+
+def test_failure_repr_shows_its_fields():
+    failure = Failure(operation="GET /x", title="Title", message="Message", case_id="abc", severity=Severity.HIGH)
+
+    assert repr(failure) == (
+        "Failure(operation='GET /x', title='Title', message='Message', case_id='abc', severity=<Severity.HIGH: 'high'>)"
+    )
