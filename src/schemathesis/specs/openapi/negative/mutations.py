@@ -694,6 +694,7 @@ def change_type(
         _ensure_path_string_not_numeric(ctx, schema, old_types)
         _ensure_boolean_not_coercible(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
+        _ensure_number_not_whole(schema, old_types)
     else:
         candidate = draw(st.sampled_from(sorted(candidates)))
         candidates.remove(candidate)
@@ -710,6 +711,7 @@ def change_type(
         _ensure_path_string_not_numeric(ctx, schema, old_types)
         _ensure_boolean_not_coercible(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
+        _ensure_number_not_whole(schema, old_types)
 
     mutation = Mutation(
         path=(),
@@ -766,6 +768,16 @@ def _ensure_boolean_not_coercible(ctx: MutationContext, schema: Schema, old_type
         schema["not"] = {"pattern": r"^(?:[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]|0|1)$"}
 
 
+def _ensure_number_not_whole(schema: Schema, old_types: list[str]) -> None:
+    if schema.get("type") != "number" or "integer" not in old_types:
+        return
+    # Whole floats like `2.0` still validate as integers; a real fraction violates `integer` regardless of
+    # the original bounds, which could otherwise leave no fraction to draw (e.g. `multipleOf: 2`).
+    for keyword in TYPE_SPECIFIC_KEYS["number"]:
+        schema.pop(keyword, None)
+    schema["not"] = {"multipleOf": 1}
+
+
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     types = set(get_type(schema))
     if ctx.is_path_location:
@@ -779,10 +791,7 @@ def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     if "boolean" in types and ctx.is_query_location:
         candidates.discard("array")
         candidates.discard("object")
-    # Every integer is a number and vice versa from the validator's perspective —
-    # neither swap produces values the original schema rejects.
-    if "integer" in types and "number" in candidates:
-        candidates.remove("number")
+    # Every integer is a valid number, so `integer` never violates `number`.
     if "number" in types and "integer" in candidates:
         candidates.remove("integer")
     return candidates

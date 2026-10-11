@@ -1,3 +1,4 @@
+import math
 import uuid
 from urllib.parse import unquote, urlparse
 
@@ -1423,6 +1424,52 @@ def test_negative_boolean_query_not_mutated_to_object(ctx):
         assert not isinstance(value, dict), f"boolean query mutated to coercible object: {value!r}"
 
     test()
+
+
+def _is_fractional(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return False
+    try:
+        number = float(value)
+    except ValueError:
+        return False
+    return math.isfinite(number) and not number.is_integer()
+
+
+@pytest.mark.parametrize("location", ["body", "query"])
+def test_negative_integer_produces_fractional_numbers(ctx, location):
+    if location == "body":
+        operation_schema = {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
+                    }
+                },
+            }
+        }
+    else:
+        operation_schema = {
+            "parameters": [{"name": "n", "in": "query", "required": True, "schema": {"type": "integer"}}]
+        }
+    schema = ctx.openapi.load_schema(
+        {"/items": {"post": {**operation_schema, "responses": {"200": {"description": "OK"}}}}}
+    )
+    operation = schema["/items"]["POST"]
+    values = []
+
+    # High count: a fraction needs a type change to `number` among many other mutation kinds.
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @seed(1)
+    @settings(deadline=None, max_examples=300, database=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        container = case.body if location == "body" else case.query
+        if isinstance(container, dict) and "n" in container:
+            values.append(container["n"])
+
+    test()
+    assert any(_is_fractional(value) for value in values)
 
 
 @pytest.mark.hypothesis_nested
