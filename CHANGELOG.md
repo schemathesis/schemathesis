@@ -24,6 +24,7 @@
 - `st fuzz` skipping checks for requests sent after the first failure in a scenario.
 - `st fuzz` not naming filters that matched no operations.
 - `st fuzz` showing "Stop reason: Completed" when no operation was tested.
+- `st fuzz` ignoring `warnings.fail-on` for unmatched filters.
 - `st fuzz` summaries not accounting for operations they did not test.
 - Phase line showing only passes when the server stopped responding during the phase.
 - Baseline file written from partial results when the run is interrupted with Ctrl-C.

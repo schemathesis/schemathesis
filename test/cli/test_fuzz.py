@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 import pytest
 import requests
 import yaml
+from _pytest.main import ExitCode
 from flask import jsonify, request
 
 import schemathesis
@@ -294,6 +295,19 @@ def test_fuzz_final_line_empty_test_suite(cli, app_runner, ctx, snapshot_cli):
 def test_fuzz_unmatched_filter_suggests_the_operation_it_nearly_names(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert_cli_snapshot(cli.main("fuzz", api.schema_url, "--include-path=/api/succes"), snapshot_cli)
+
+
+@pytest.mark.parametrize(
+    ("config", "expected"),
+    [({"warnings": {"fail-on": ["unmatched_filter"]}}, ExitCode.TESTS_FAILED), ({}, ExitCode.OK)],
+    ids=["fail-on", "default"],
+)
+def test_fuzz_unmatched_filter_with_fail_on(cli, ctx, config, expected):
+    api = ctx.openapi.apps.success()
+    result = cli.main(
+        "fuzz", api.schema_url, "--include-path=/api/success", "--include-path=/api/nope", "--max-time=1", config=config
+    )
+    assert (result.exit_code, "Unmatched filters" in result.stdout) == (expected, True)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
