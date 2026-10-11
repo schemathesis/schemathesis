@@ -223,6 +223,57 @@ def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, res
     assert [o.parameter_path for o in obs] == [("zipcode",), ("city",)]
 
 
+def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/items": {
+                "post": {
+                    "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/api/items"]["POST"]
+    case = operation.Case(query={"limit": 100}, body={"name": "item"}, _meta=_meta_for(GenerationMode.POSITIVE))
+    response = Response.from_any(
+        response_factory.requests(
+            content=json.dumps(
+                {
+                    "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                    "title": "One or more validation errors occurred.",
+                    "status": 400,
+                    "errors": {"limit": ["The field limit must be between 1 and 10."]},
+                }
+            ).encode(),
+            status_code=400,
+        )
+    )
+    store = ErrorFeedbackStore()
+    record_response(store=store, operation=operation, case=case, response=response)
+
+    query_schema = operation.query.schema
+    adjusted = apply_adjustments(
+        operation=operation,
+        location=ParameterLocation.QUERY,
+        schema=query_schema,
+        store=store,
+    )
+    _assert_valid_schema_object(query_schema, adjusted)
+    assert adjusted == {
+        "type": "object",
+        "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 10}},
+        "additionalProperties": False,
+    }
+
+
 def test_pipeline_skips_responses_with_no_known_deserializer(case_factory, response_factory):
     case = case_factory()
     response = Response.from_any(

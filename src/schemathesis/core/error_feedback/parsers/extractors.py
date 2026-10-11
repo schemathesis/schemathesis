@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
@@ -16,17 +17,29 @@ from schemathesis.core.error_feedback.store import (
 )
 from schemathesis.core.parameters import ParameterLocation
 
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
+
 ClassificationResult = tuple[ObservationKind, ObservationPayload | None]
 RegexHandler = Callable[[re.Match[str]], ClassificationResult]
 DictHandler = Callable[[dict], tuple[ClassificationResult, ...]]
 
-# Operations using these methods bind from query, not body — observations
-# attribute under QUERY for them.
+# Operations using these methods bind from query, not body; undeclared fields attribute under QUERY for them.
 QUERY_METHODS = frozenset({"GET", "DELETE", "HEAD"})
 
 
 def location_for_method(method: str) -> ParameterLocation:
     return ParameterLocation.QUERY if method.upper() in QUERY_METHODS else ParameterLocation.BODY
+
+
+def location_for_parameter(operation: APIOperation, parameter_path: ParameterPath) -> ParameterLocation:
+    # A field named like a declared path/query/header parameter belongs there, whatever the method.
+    if parameter_path and isinstance(parameter_path[0], str):
+        name = parameter_path[0]
+        for location in (ParameterLocation.PATH, ParameterLocation.QUERY, ParameterLocation.HEADER):
+            if name in operation.get_parameter_set(location):
+                return location
+    return location_for_method(operation.method)
 
 
 _FIELD_PATH_SEGMENT = re.compile(r"([^.\[\]]+)|\[(\d+)\]")

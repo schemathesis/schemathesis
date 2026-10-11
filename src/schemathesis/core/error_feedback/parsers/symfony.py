@@ -9,7 +9,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     DictHandler,
     format_handler,
     int_or_none,
-    location_for_method,
+    location_for_parameter,
     number_or_none,
     required_handler,
     split_field_path,
@@ -209,7 +209,6 @@ class SymfonyParser:
         violations = _extract_violations(body)
         if violations is None or not _has_symfony_signature(violations):
             return ()
-        location = location_for_method(operation.method)
         observations: list[Observation] = []
         for violation in violations:
             path = split_field_path(violation["propertyPath"])
@@ -227,7 +226,7 @@ class SymfonyParser:
                 observations.append(
                     Observation(
                         operation_label=operation.label,
-                        location=location,
+                        location=location_for_parameter(operation, path),
                         parameter_path=path,
                         kind=kind,
                         raw_message=raw_message,

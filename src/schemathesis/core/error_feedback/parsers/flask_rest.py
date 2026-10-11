@@ -7,7 +7,7 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
-    location_for_method,
+    location_for_parameter,
     numeric_bound,
     size_bound,
 )
@@ -197,7 +197,6 @@ class FlaskRestParser:
         issues = _extract_issues(body)
         if issues is None:
             return ()
-        location = location_for_method(operation.method)
         observations: list[Observation] = []
         for field, message in issues.items():
             classification = _classify(message)
@@ -208,7 +207,7 @@ class FlaskRestParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location,
+                    location=location_for_parameter(operation, (target,)),
                     parameter_path=(target,),
                     kind=kind,
                     raw_message=message,

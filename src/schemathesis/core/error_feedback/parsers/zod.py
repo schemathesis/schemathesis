@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_method
+from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_parameter
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     EnumPayload,
@@ -157,7 +157,6 @@ class ZodParser:
         issues = _extract_issues(body)
         if issues is None or not _has_zod_signature(issues):
             return ()
-        location = location_for_method(operation.method)
         observations: list[Observation] = []
         for issue in issues:
             path = _extract_path(issue)
@@ -165,6 +164,7 @@ class ZodParser:
                 continue
             message = issue.get("message")
             raw_message = message if isinstance(message, str) else ""
+            location = location_for_parameter(operation, path)
             for kind, payload in _classify(issue):
                 if not path and (
                     location is not ParameterLocation.BODY or kind is not ObservationKind.MUST_NOT_BE_BLANK

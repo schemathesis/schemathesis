@@ -8,7 +8,7 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
-    location_for_method,
+    location_for_parameter,
     lowercase_first_letter,
     numeric_bound,
     parse_number,
@@ -197,14 +197,13 @@ class AspNetParser:
         errors = _extract_errors(body)
         if errors is None:
             return ()
-        location = location_for_method(operation.method)
         observations: list[Observation] = []
         for path, message in _walk(errors):
             for kind, payload in _classify(message):
                 observations.append(
                     Observation(
                         operation_label=operation.label,
-                        location=location,
+                        location=location_for_parameter(operation, path),
                         parameter_path=path,
                         kind=kind,
                         raw_message=message,

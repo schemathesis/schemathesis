@@ -8,7 +8,7 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
-    location_for_method,
+    location_for_parameter,
     numeric_bound,
     size_bound,
     size_bound_exact,
@@ -245,7 +245,6 @@ class RailsParser:
         return _has_rails_vocabulary(messages)
 
     def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
-        location = location_for_method(operation.method)
         observations: list[Observation] = []
         for path, message in _walk_observations(_unwrap_ar_envelope(body)):
             classification = _classify_message(message)
@@ -255,7 +254,7 @@ class RailsParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location,
+                    location=location_for_parameter(operation, path),
                     parameter_path=path,
                     kind=kind,
                     raw_message=message,
