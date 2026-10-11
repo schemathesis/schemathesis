@@ -4895,8 +4895,60 @@ def test_externally_tagged_items_behind_one_of_keep_their_fields(ctx):
     )
 
     output = graph.operations["GET /playlists/{playlist_id}/tracks"].outputs[0]
-    assert output.pointer == "/items/track"
+    assert output.pointer == "/items/*/track"
     assert output.resource.fields == ["album_id", "id", "name"]
+
+
+def test_paginated_list_of_externally_tagged_items_links_every_item_to_read(ctx):
+    paths = {
+        **operation("post", "/tracks", "201", component_ref("Track"), operation_id="createTrack"),
+        **operation(
+            "get",
+            "/playlists/{playlist_id}/tracks",
+            "200",
+            component_ref("TrackPage"),
+            [path_param("playlist_id")],
+            "listPlaylistTracks",
+        ),
+        **operation("get", "/tracks/{track_id}", "200", parameters=[path_param("track_id")], operation_id="getTrack"),
+    }
+    components = {
+        "schemas": {
+            "TrackPage": {
+                "type": "object",
+                "properties": {
+                    "total": {"type": "integer"},
+                    "items": {"type": "array", "items": component_ref("TrackEntry")},
+                },
+            },
+            "TrackEntry": {
+                "type": "object",
+                "properties": {"added_at": {"type": "string"}, "track": component_ref("Track")},
+            },
+            "Track": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1tracks/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1tracks~1{track_id}/get",
+                "parameters": {"path.track_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1playlists~1{playlist_id}~1tracks/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1tracks~1{track_id}/get",
+                "parameters": {"path.track_id": "$response.body#/items/*/track/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
 
 
 def test_nested_list_wrapper_without_resource_items_is_not_descended_into(ctx):
