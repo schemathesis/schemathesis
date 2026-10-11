@@ -193,6 +193,38 @@ def test_fill_missing(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
+def test_examples_fill_missing_uses_parameter_overrides_and_examples_phase(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[parameters]
+code = "OVR"
+""",
+    )
+    testdir.make_test(
+        """
+config = SchemathesisConfig.from_path("schemathesis.toml")
+schema = schemathesis.openapi.from_dict(raw_schema, config=config)
+schema.config.phases.examples.fill_missing = True
+schema.config.phases.fuzzing.enabled = False
+schema.config.phases.coverage.enabled = False
+
+@schema.include(path_regex="test").parametrize()
+def test_fill_missing(case):
+    assert (case.query, case.meta.phase.name.value) == ({"code": "OVR"}, "examples")
+""",
+        paths={
+            "/test": {
+                "get": {
+                    "parameters": [{"name": "code", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    testdir.runpytest("-q").assert_outcomes(passed=1)
+
+
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
 )
