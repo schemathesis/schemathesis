@@ -932,6 +932,68 @@ def openapi_31_case_factory(openapi_31):
     return factory
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_adjustments_reach_properties_behind_ref(ctx, version):
+    address = {"type": "object", "properties": {"street": {"type": "string"}, "zip": {"type": "string"}}}
+    operation = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+        components={
+            "schemas": {
+                "User": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}, "address": {"$ref": "#/components/schemas/Address"}},
+                },
+                "Address": address,
+            }
+        },
+    )["/users"]["POST"]
+    store = ErrorFeedbackStore()
+    for path, kind, payload in [
+        (("address", "street"), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),
+        (("address", "zip"), ObservationKind.MUST_NOT_BE_BLANK, None),
+    ]:
+        store.record(
+            Observation(
+                operation_label=operation.label,
+                location=ParameterLocation.BODY,
+                parameter_path=path,
+                kind=kind,
+                raw_message="invalid",
+                payload=payload,
+            )
+        )
+    schema = operation.body[0].optimized_schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
+    assert adjusted == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "address": {"$ref": "#/x-bundled/schema000002"}},
+            },
+            "schema000002": {
+                "type": "object",
+                "properties": {
+                    "street": {"type": "string", "minLength": 3},
+                    "zip": {"type": "string", "minLength": 1},
+                },
+                "required": ["zip"],
+            },
+        },
+    }
+
+
 @pytest.mark.parametrize(
     "input_schema, items, expected",
     [
