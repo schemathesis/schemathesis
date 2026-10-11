@@ -139,7 +139,10 @@ def find_dictionary_mismatches(operation: OpenApiOperation) -> list[DictionaryMi
         ParameterLocation.HEADER,
         ParameterLocation.COOKIE,
     ):
-        properties = cast("OpenApiParameterSet", operation.get_parameter_set(location)).schema.get("properties", {})
+        try:
+            properties = cast("OpenApiParameterSet", operation.get_parameter_set(location)).schema.get("properties", {})
+        except InvalidSchema:
+            continue
         bindings = resolve_parameter_bindings(
             operation=operation, location=location, properties=properties, generation_config=generation_config
         )
