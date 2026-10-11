@@ -1104,6 +1104,14 @@ def _requires_authentication(operation: APIOperation) -> bool:
     return bool(get_effective_security_scheme_names(operation, operation.schema.raw_schema))
 
 
+def _declared_public(operation: APIOperation) -> bool:
+    """Whether the schema says anyone may call `operation`."""
+    if _requires_authentication(operation):
+        return False
+    # Without schema-wide `security` the server may still require credentials; the anonymous replay decides.
+    return "security" in operation.schema.raw_schema
+
+
 def _targets_generated_resource(ctx: CheckContext, operation: APIOperation) -> bool:
     """Whether the resource this request targets was drawn rather than supplied by the user."""
     if "{" not in operation.path:
@@ -1605,7 +1613,7 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
         return None
     provider = escalating_provider(case.operation.schema)
     owner = case._auth_identity
-    if provider is None or owner not in provider.peers or not _requires_authentication(case.operation):
+    if provider is None or owner not in provider.peers or _declared_public(case.operation):
         return None
     content_types = response.headers.get("content-type")
     content_type = content_types[0] if content_types else None

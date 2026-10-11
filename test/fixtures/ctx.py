@@ -281,8 +281,10 @@ class OpenAPIApps:
     def wfc_accounts_seeded_later(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_accounts_seeded_later())
 
-    def wfc_owned_orders(self, policy: str, listing: str | None = None, writes: bool = False) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_owned_orders(policy, listing, writes))
+    def wfc_owned_orders(
+        self, policy: str, listing: str | None = None, writes: bool = False, security: str = "declared"
+    ) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_owned_orders(policy, listing, writes, security))
 
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())

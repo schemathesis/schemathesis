@@ -65,6 +65,27 @@ def test_stateful_peer_read_is_reported(cli, ctx, tmp_path, snapshot_cli):
 
 
 @pytest.mark.parametrize("phases", ["fuzzing", "stateful"])
+@pytest.mark.parametrize(
+    ("policy", "exit_code"),
+    [("vulnerable", 1), ("owner_checked", 0), ("fully_public", 0)],
+    ids=["vulnerable", "owner-checked", "public"],
+)
+def test_server_enforced_auth_missing_from_the_schema_is_probed(cli, ctx, tmp_path, phases, policy, exit_code):
+    # Servers often require credentials the schema never declares; the anonymous replay still tells public data apart.
+    api = ctx.openapi.apps.wfc_owned_orders(policy, security="undeclared")
+    result = _run(cli, api, tmp_path, phases=phases)
+    assert (result.exit_code, bool(_peer_reads(api))) == (exit_code, True), result.stdout
+
+
+@pytest.mark.parametrize("phases", ["fuzzing", "stateful"])
+@pytest.mark.parametrize("security", ["public_read", "public_root"])
+def test_read_declared_public_is_not_probed(cli, ctx, tmp_path, phases, security):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable", security=security)
+    result = _run(cli, api, tmp_path, phases=phases)
+    assert (result.exit_code, _peer_reads(api)) == (0, []), result.stdout
+
+
+@pytest.mark.parametrize("phases", ["fuzzing", "stateful"])
 @pytest.mark.parametrize("policy", ["owner_checked", "public_view", "fully_public", "peer_html"])
 def test_correct_or_public_access_is_not_reported(cli, ctx, tmp_path, policy, phases):
     api = ctx.openapi.apps.wfc_owned_orders(policy)
