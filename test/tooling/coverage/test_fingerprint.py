@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from schemathesis.generation import GenerationMode
 from scripts.coverage import fingerprint as cli_fingerprint
 from tools.coverage.fingerprint import diff_rows, fingerprint_schema
 
@@ -80,3 +81,26 @@ def test_cli_round_trip_reports_diff_and_exit_code(ctx, tmp_path, capsys):
     out = capsys.readouterr().out
     assert "POST /users" in out
     assert "- " in out and "+ " in out
+
+
+def test_fingerprint_keeps_negative_cases_outside_an_unserializable_body(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/u": {
+                "post": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/x-custom": {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    rows = fingerprint_schema(raw, generation_modes=[GenerationMode.NEGATIVE]).rows
+    assert [row[1:6] for row in rows if row[0] == "POST /u"] == [
+        *[("incorrect_type", "negative", "query", "q", "/type")] * 4,
+        ("missing_parameter", "negative", "body", "", ""),
+        ("missing_parameter", "negative", "query", "q", ""),
+    ]
