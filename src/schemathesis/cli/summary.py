@@ -318,7 +318,7 @@ def _reduce_operations(
     if skipped > len(explained.keys() | without_checks):
         if stop_reason.skip_explanation is not None:
             reasons.add(stop_reason.skip_explanation)
-        elif any(phases.get(phase, (Status.SKIP, None))[0] == Status.ERROR for phase in UNIT_PHASES):
+        elif any(status == Status.ERROR for status, _ in phases.values()):
             reasons.add("Phase errored")
     return OperationsSummary(
         total=api_statistic.operations.total,

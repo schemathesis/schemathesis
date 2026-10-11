@@ -27,6 +27,7 @@
 - `st fuzz` ignoring `warnings.fail-on` for unmatched filters.
 - `st fuzz` summaries not accounting for operations they did not test.
 - Double blank lines in output piped to a file or CI log.
+- "No checks ran" given as the skip reason for operations whose requests got no response.
 - Phase line showing only passes when the server stopped responding during the phase.
 - Baseline file written from partial results when the run is interrupted with Ctrl-C.
 - Final line reporting "No issues found" or "Empty test suite" after Ctrl-C.

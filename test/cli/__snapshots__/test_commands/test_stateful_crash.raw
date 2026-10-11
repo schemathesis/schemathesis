@@ -53,7 +53,7 @@ API Operations:
   Selected: 2/2
   Tested: 1
   Skipped: 1
-    - No checks ran
+    - Server stopped responding
 
 Test Phases:
   ⏭  Examples (disabled)

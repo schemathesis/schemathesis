@@ -40,6 +40,7 @@ API Operations:
   Selected: 2/2
   Tested: 0
   Skipped: 2
+    - Phase errored
 
 Test Phases:
   ⏭  Examples (disabled)
