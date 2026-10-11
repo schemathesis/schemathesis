@@ -8,14 +8,12 @@ Schemathesis dev
 
 ⚠️  `max_response_time = 30000` is 8 hours; Schemathesis takes seconds. Did you mean `max_response_time = 30`?
 
-
  ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
      Configuration:    /tmp/config.toml
-
 
  ✅  API capabilities:
 

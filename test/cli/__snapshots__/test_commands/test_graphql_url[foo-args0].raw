@@ -4,13 +4,11 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-
  ✅  Loaded specification from http://127.0.0.1/foo (in 0.00s)
 
      Base URL:         http://127.0.0.1/foo
      Specification:    GraphQL
      Operations:       4 selected / 4 total
-
 
  ✅  API capabilities:
 

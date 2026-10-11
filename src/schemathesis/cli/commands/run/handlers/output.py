@@ -625,6 +625,8 @@ class ProbingProgressManager:
             RenderableColumn(Text("Probing API capabilities", style="bright_white")),
             transient=True,
             console=console,
+            # A spinner has nothing to show outside a terminal, and stopping it there prints a blank line.
+            disable=not console.is_interactive,
         )
         self.progress_task_id = None
         self.is_interrupted = False

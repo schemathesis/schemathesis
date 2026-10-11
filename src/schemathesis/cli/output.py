@@ -228,6 +228,8 @@ class LoadingProgressManager:
             RenderableColumn(progress_message),
             console=console,
             transient=True,
+            # A spinner has nothing to show outside a terminal, and stopping it there prints a blank line.
+            disable=not console.is_interactive,
         )
         self.progress_task_id = None
         self.is_interrupted = False

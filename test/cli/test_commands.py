@@ -191,6 +191,19 @@ def test_config_file_error_exit_code(cli, command):
     assert result.exit_code == 2, result.stdout
 
 
+@pytest.mark.parametrize(
+    "args",
+    [["run", "--max-examples=1"], ["fuzz", "--max-time=1"]],
+    ids=["run", "fuzz"],
+)
+def test_piped_output_has_no_double_blank_lines(ctx, cli, args):
+    api = ctx.openapi.apps.success()
+    command, *options = args
+    stdout = cli.main(command, api.schema_url, *options).stdout
+    lines = [line.strip() for line in stdout.splitlines()]
+    assert not any(not first and not second for first, second in zip(lines, lines[1:], strict=False)), stdout
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_runtime_config_error_exit_code(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()

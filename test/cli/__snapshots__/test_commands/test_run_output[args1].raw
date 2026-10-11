@@ -4,7 +4,6 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-
 Usage: schemathesis run [OPTIONS] LOCATION
 Try 'schemathesis run --help' for help.
 
