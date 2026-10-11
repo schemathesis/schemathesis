@@ -4066,6 +4066,20 @@ def test_negative_additional_property_values_next_to_explicit_true(ctx, app_runn
     ]
 
 
+@pytest.mark.parametrize(
+    "sibling",
+    [{"required": ["a"]}, {"maxProperties": 1}],
+    ids=["required", "max-properties"],
+)
+def test_negative_object_baseline_independent_of_key_order(ctx, sibling):
+    properties = {"properties": {"a": {"type": "integer"}}}
+    produced = []
+    for body in ({"type": "array", **properties, **sibling}, {"type": "array", **sibling, **properties}):
+        cases = iter_cases(body_operation(ctx, body), GenerationMode.NEGATIVE)
+        produced.append(sorted((case.meta.phase.data.description, repr(case.body)) for case in cases))
+    assert produced[0] == produced[1]
+
+
 def test_positive_multipart_value_for_binary_one_of_branch(ctx, app_runner):
     raw_schema = build_schema(
         ctx,

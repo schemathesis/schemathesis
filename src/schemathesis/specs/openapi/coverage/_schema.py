@@ -2540,6 +2540,7 @@ def cover_schema_iter(
             yield from _filter_against_not(_cover_positive_for_type(ctx, schema, ty), schema, ctx)
     if GenerationMode.NEGATIVE in ctx.generation_modes:
         template = None
+        baseline_emitted = False
         if not ctx.wire.can_be_negated(schema):
             return
         # Snapshot: walking a keyword can push examples down into a schema shared with this one,
@@ -2554,13 +2555,16 @@ def cover_schema_iter(
                     if key == "items" and types and "array" not in types and _implies_array_type(schema):
                         yield from _negative_array_for_conflicting_type(ctx, schema)
                 elif key == "properties":
-                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
+                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template, baseline_emitted)
+                    baseline_emitted = True
                     yield from _negative_properties(ctx, template, value)
                 elif key == "patternProperties":
-                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
+                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template, baseline_emitted)
+                    baseline_emitted = True
                     yield from _negative_pattern_properties(ctx, template, value)
                 elif key == "propertyNames" and isinstance(value, dict):
-                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
+                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template, baseline_emitted)
+                    baseline_emitted = True
                     if isinstance(template, dict):
                         yield from _negative_property_names(ctx, template, value)
                 elif key == "required":
@@ -2948,15 +2952,14 @@ def _type_excludes_object(schema: JsonSchemaObject) -> bool:
 
 
 def _ensure_object_template_with_baseline(
-    ctx: CoverageContext, schema: JsonSchemaObject, template: Any
+    ctx: CoverageContext, schema: JsonSchemaObject, template: Any, baseline_emitted: bool
 ) -> Generator[GeneratedValue, None, Any]:
-    # First-time object template build emits a baseline `NegativeValue` when the outer type
-    # excludes object; the inner `properties` applicator otherwise never sees an
-    # all-children-valid case (per-leaf negatives each break one child).
-    if template is not None:
-        return template
-    template = _generate_template_with_deflation_fallback(ctx, schema, _get_template_schema(schema, "object", ctx))
-    if isinstance(template, dict) and _type_excludes_object(schema):
+    # The first object applicator emits a baseline `NegativeValue` when the outer type excludes
+    # object; the inner `properties` applicator otherwise never sees an all-children-valid case
+    # (per-leaf negatives each break one child).
+    if template is None:
+        template = _generate_template_with_deflation_fallback(ctx, schema, _get_template_schema(schema, "object", ctx))
+    if not baseline_emitted and isinstance(template, dict) and _type_excludes_object(schema):
         yield NegativeValue(
             template,
             scenario=CoverageScenario.INCORRECT_TYPE,
