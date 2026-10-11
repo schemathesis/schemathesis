@@ -105,6 +105,23 @@ def _collect_object_targets(schema: dict[str, Any]) -> list[dict[str, Any]]:
     return targets
 
 
+def _collect_property_names_through_all_of(schema: dict[str, Any], bundled: object, seen: set[int]) -> tuple[str, ...]:
+    schema = resolve_bundled_ref(schema, bundled)
+    schema_id = id(schema)
+    if schema_id in seen:
+        return ()
+    seen.add(schema_id)
+
+    properties = schema.get("properties")
+    names = tuple(properties) if isinstance(properties, dict) else ()
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list):
+        for branch in all_of:
+            if isinstance(branch, dict):
+                names += _collect_property_names_through_all_of(branch, bundled, seen)
+    return names
+
+
 def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
     """Mark `leaf` as required on `obj`, injecting a non-blank string property when absent."""
     properties = obj.setdefault("properties", {})
@@ -639,9 +656,10 @@ class AdditionalPropertiesAdjustment:
         if not isinstance(schema, dict):
             return schema
 
+        bundled = schema.get(BUNDLE_STORAGE_KEY)
         for observation in observations:
             path = observation.parameter_path
-            root = schema if not path else _walk_to_property(schema, path, schema.get(BUNDLE_STORAGE_KEY))
+            root = schema if not path else _walk_to_property(schema, path, bundled)
             if not isinstance(root, dict):
                 continue
             # A closed `allOf` branch would forbid the properties its siblings declare.
@@ -649,6 +667,12 @@ class AdditionalPropertiesAdjustment:
             siblings = {id(branch) for branch in all_of} if isinstance(all_of, list) else set()
             for target in _collect_object_targets(root):
                 if id(target) not in siblings:
+                    # Closing an object that composes through `allOf` must keep the properties its branches declare.
+                    if isinstance(target.get("allOf"), list):
+                        properties = target.setdefault("properties", {})
+                        if isinstance(properties, dict):
+                            for name in _collect_property_names_through_all_of(target, bundled, set()):
+                                properties.setdefault(name, {})
                     target["additionalProperties"] = False
 
         return schema
