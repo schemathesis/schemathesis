@@ -210,6 +210,13 @@ class EngineErrorInfo:
     def suggestion(self, *, bold: Callable[[str], str] = str) -> str | None:
         if isinstance(self._error, UnsupportedType):
             return self._error.suggestion
+        import requests
+
+        if isinstance(self._error, requests.ConnectionError) and is_connection_refused(self._error):
+            # Nothing listened at the address; resets and proxy errors come from a server that did answer.
+            return (
+                f"Check that the API is running and reachable at its base URL; set the address with {bold('`--url`')}."
+            )
         return get_runtime_error_suggestion(self._kind, bold=bold)
 
     def format(self, *, bold: Callable[[str], str] = str, indent: str = "    ") -> str:

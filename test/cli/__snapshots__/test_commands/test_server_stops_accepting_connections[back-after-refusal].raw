@@ -33,6 +33,8 @@ Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
 
+Tip: Check that the API is running and reachable at its base URL; set the address with `--url`.
+
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
