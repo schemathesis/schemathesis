@@ -19,6 +19,9 @@ Validate API responses against your schema in existing test suites without using
 
 ## Integration
 
+### [HTML Report](html-report.md)
+Write a run to one offline page with the verdict, warnings and a command to reproduce every failure.
+
 ### [Allure Integration](allure.md)
 Export test results as Allure report files with per-operation status, failure steps, and severity labels.
 

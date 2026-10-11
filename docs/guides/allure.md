@@ -2,6 +2,8 @@
 
 Export Schemathesis test results as [Allure report](https://allurereport.org/) files and turn them into an HTML report.
 
+For a single run, the built-in [HTML report](html-report.md) needs no extra tools.
+
 ## Prerequisites
 
 - The [Allure CLI](https://allurereport.org/docs/install/) to generate and view the HTML report

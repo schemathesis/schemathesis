@@ -66,7 +66,7 @@ The JUnit report is written to `schemathesis-report/junit-<timestamp>.xml` by de
 
 Allure reports are also supported — see [Allure Integration](allure.md).
 
-`--report html` writes a page to `schemathesis-report/html-<timestamp>/index.html` with the verdict, warnings, and every failure with a command to reproduce it. The page works offline, and the artifact upload above already includes it.
+`--report html` writes a page to `schemathesis-report/html-<timestamp>/index.html` with the verdict, warnings, and every failure with a command to reproduce it. The page works offline, and the artifact upload above already includes it. See [HTML Report](html-report.md).
 
 ## GitLab CI
 

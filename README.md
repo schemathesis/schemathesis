@@ -31,6 +31,12 @@ Schemathesis tests OpenAPI and GraphQL APIs by generating inputs from your schem
   <i>Finding bugs that manual testing missed</i>
 </p>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/docs/img/html-report.png" alt="Schemathesis HTML report with a failing operation expanded" width="600"/>
+  <br>
+  <i>Every failure with a <code>curl</code> command to reproduce it: <code>--report html</code></i>
+</p>
+
 ## Try it now
 
 ```console
@@ -60,7 +66,7 @@ uvx schemathesis run https://your-api.com/openapi.json
 - ✅ **Custom checks** - [assert your own business rules](https://schemathesis.readthedocs.io/en/stable/guides/extending/#custom-validation-checks) next to the built-in ones.
 - 📖 **Fuzz dictionaries** - [mix real ids, wordlists, or LLM-generated payloads](https://schemathesis.readthedocs.io/en/stable/guides/fuzz-dictionary/) into generated data.
 - 🐌 **Rate limiting** - cap the request rate, or use `auto` to follow [`Retry-After` on 429](https://schemathesis.readthedocs.io/en/stable/reference/configuration/#rate-limit).
-- 📊 **Reports** - [JUnit, VCR, HAR, NDJSON, JSON](https://schemathesis.readthedocs.io/en/stable/reference/configuration/#reporting), and [Allure](https://schemathesis.readthedocs.io/en/stable/guides/allure/).
+- 📊 **Reports** - an [offline HTML page](https://schemathesis.readthedocs.io/en/stable/guides/html-report/) with every failure and its `curl` command, plus [JUnit, VCR, HAR, NDJSON, JSON](https://schemathesis.readthedocs.io/en/stable/reference/configuration/#reporting), and [Allure](https://schemathesis.readthedocs.io/en/stable/guides/allure/).
 - 🎯 **Schema coverage** - [keyword-level coverage report](https://schemathesis.readthedocs.io/en/stable/guides/coverage/) showing which constraints your tests exercised.
 - 🔁 **Replay & baseline** - [re-run past failures](https://schemathesis.readthedocs.io/en/stable/guides/crash-reproduction/) and [fail CI only on new ones](https://schemathesis.readthedocs.io/en/stable/guides/baseline/).
 
