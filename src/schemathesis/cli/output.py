@@ -113,7 +113,8 @@ def display_final_line(
         message = f"{', '.join([*parts, 'interrupted']) if parts else 'Interrupted'} after {running_time:.2f}s"
         color = "red" if failures or errors else "yellow"
     elif failures or errors:
-        message = f"{', '.join(parts)} in {running_time:.2f}s"
+        labels = [*parts, "baseline not saved"] if baseline_not_saved else parts
+        message = f"{', '.join(labels)} in {running_time:.2f}s"
         color = "red"
     elif baseline_not_saved:
         reason = ", ".join([*parts, "baseline not saved"]) if parts else "Baseline not saved"
