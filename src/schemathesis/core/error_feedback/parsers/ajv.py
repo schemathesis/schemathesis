@@ -334,7 +334,7 @@ def _array_observations(errors: list[dict], operation: APIOperation, case: Case)
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, path),
+                    location=location_for_parameter(operation, path, case),
                     parameter_path=path,
                     kind=kind,
                     raw_message=raw_message,

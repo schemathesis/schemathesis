@@ -118,7 +118,7 @@ class ConfluentParser:
                 observations.append(
                     Observation(
                         operation_label=operation.label,
-                        location=location_for_parameter(operation, path),
+                        location=location_for_parameter(operation, path, case),
                         parameter_path=path,
                         kind=ObservationKind.SIZE_BOUND,
                         raw_message=message,
@@ -129,7 +129,7 @@ class ConfluentParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, _DATA_FIELD),
+                    location=location_for_parameter(operation, _DATA_FIELD, case),
                     parameter_path=_DATA_FIELD,
                     kind=ObservationKind.SIZE_BOUND,
                     raw_message=message,
@@ -140,7 +140,7 @@ class ConfluentParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, _TOPIC_NAME_FIELD),
+                    location=location_for_parameter(operation, _TOPIC_NAME_FIELD, case),
                     parameter_path=_TOPIC_NAME_FIELD,
                     kind=ObservationKind.PATTERN,
                     raw_message=message,

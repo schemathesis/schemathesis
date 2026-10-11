@@ -207,7 +207,7 @@ class FlaskRestParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, (target,)),
+                    location=location_for_parameter(operation, (target,), case),
                     parameter_path=(target,),
                     kind=kind,
                     raw_message=message,

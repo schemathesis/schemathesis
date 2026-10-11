@@ -164,7 +164,7 @@ class ZodParser:
                 continue
             message = issue.get("message")
             raw_message = message if isinstance(message, str) else ""
-            location = location_for_parameter(operation, path)
+            location = location_for_parameter(operation, path, case)
             for kind, payload in _classify(issue):
                 if not path and (
                     location is not ParameterLocation.BODY or kind is not ObservationKind.MUST_NOT_BE_BLANK

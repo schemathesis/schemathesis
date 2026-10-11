@@ -177,7 +177,7 @@ class LaravelParser:
             observations.append(
                 Observation(
                     operation_label=operation.label,
-                    location=location_for_parameter(operation, path),
+                    location=location_for_parameter(operation, path, case),
                     parameter_path=path,
                     kind=kind,
                     raw_message=message,

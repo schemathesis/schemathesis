@@ -18,7 +18,7 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.collector import record_response
+from schemathesis.core.error_feedback.collector import parse_observations, record_response
 from schemathesis.core.error_feedback.parsers.drf import DRFParser
 from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.error_feedback.pipeline import FeedbackPipeline, _reset_pipeline_for_tests
@@ -272,6 +272,88 @@ def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, r
         "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 10}},
         "additionalProperties": False,
     }
+
+
+@pytest.mark.parametrize(
+    ("response_body", "expected_kinds"),
+    [
+        (
+            {"id": ["Ensure this value is less than or equal to 10."]},
+            [ObservationKind.NUMERIC_BOUND],
+        ),
+        (
+            {
+                "message": "The id field must not be greater than 10.",
+                "errors": {"id": ["The id field must not be greater than 10."]},
+            },
+            [ObservationKind.NUMERIC_BOUND],
+        ),
+        (
+            {
+                "type": "https://symfony.com/errors/validation",
+                "title": "Validation Failed",
+                "detail": "id: This value should be less than or equal to 10.",
+                "violations": [
+                    {
+                        "propertyPath": "id",
+                        "title": "This value should be less than or equal to 10.",
+                        "template": "This value should be less than or equal to {{ compared_value }}.",
+                        "parameters": {"{{ value }}": "500", "{{ compared_value }}": "10"},
+                        "type": "urn:uuid:30fbb013-d015-4232-8b3b-8f3be97a7e14",
+                    }
+                ],
+            },
+            [ObservationKind.NUMERIC_BOUND],
+        ),
+        (
+            {
+                "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                "title": "One or more validation errors occurred.",
+                "status": 400,
+                "errors": {"Id": ["The field Id must be between 1 and 10."]},
+            },
+            [ObservationKind.NUMERIC_BOUND, ObservationKind.NUMERIC_BOUND],
+        ),
+    ],
+    ids=["drf", "laravel", "symfony", "aspnet"],
+)
+def test_pipeline_prefers_sent_body_field_over_declared_path_parameter(
+    ctx, case_factory, response_factory, response_body, expected_kinds
+):
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/items/{id}": {
+                "put": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/api/items/{id}"]["PUT"]
+    response = Response.from_any(response_factory.requests(content=json.dumps(response_body).encode(), status_code=400))
+
+    case = case_factory(operation=operation, path_parameters={"id": "abc"}, body={"id": 500, "name": "x"})
+    assert [
+        (observation.location, observation.parameter_path, observation.kind)
+        for observation in parse_observations(operation=operation, case=case, response=response)
+    ] == [(ParameterLocation.BODY, ("id",), kind) for kind in expected_kinds]
+
+    case = case_factory(operation=operation, path_parameters={"id": "abc"}, body={"name": "x"})
+    assert [
+        (observation.location, observation.parameter_path, observation.kind)
+        for observation in parse_observations(operation=operation, case=case, response=response)
+    ] == [(ParameterLocation.PATH, ("id",), kind) for kind in expected_kinds]
 
 
 def test_pipeline_skips_responses_with_no_known_deserializer(case_factory, response_factory):
