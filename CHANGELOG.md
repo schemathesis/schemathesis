@@ -25,6 +25,7 @@
 - Crash on schemas whose `info` is not an object or whose `info.title` is not a string.
 - `st fuzz` crashing with `Inconsistent data generation` instead of reporting a server that stopped responding.
 - Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
+- Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
