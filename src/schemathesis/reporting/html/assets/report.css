@@ -385,7 +385,7 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
 a.w-op:hover .path{text-decoration:underline}
 .w-item-note{color:var(--color-text-secondary);overflow-wrap:anywhere}
 .w-details{flex-basis:100%;margin:0;padding-left:2px;font-size:11px;color:var(--color-text-secondary);white-space:pre-wrap;overflow-wrap:anywhere}
-.w-tip{margin:0;font-size:12px;line-height:1.5;color:var(--color-text-secondary)}
+.w-tip{margin:0;font-size:12px;line-height:1.5;color:var(--color-text-secondary);white-space:pre-wrap}
 .w-tip b{font-weight:600;color:var(--color-text-primary)}
 .hs-caveat{align-self:flex-start;font:12px/1.4 var(--font-family-monospace);color:var(--color-brand-warning);text-decoration:none;border-bottom:1px dotted var(--color-brand-warning)}
 .hs-caveat:hover{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary)}
