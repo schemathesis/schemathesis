@@ -295,8 +295,10 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         if ctx.api_statistic is not None:
             _display_api_operations(ctx)
 
-        click.echo(f"Stop reason: {_STOP_REASON_LABELS.get(event.stop_reason, str(event.stop_reason))}")
-        click.echo()
+        # The final line says why nothing was tested; a stop reason next to it would read as a normal run.
+        if ctx.nothing_tested_reason is None:
+            click.echo(f"Stop reason: {_STOP_REASON_LABELS.get(event.stop_reason, str(event.stop_reason))}")
+            click.echo()
 
         if ctx.statistic.failures:
             display_failures_summary(reduce_failures(ctx.statistic))
