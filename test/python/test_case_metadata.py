@@ -15,6 +15,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
+from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 
 
@@ -865,3 +866,15 @@ def test_case_metadata_round_trip_preserves_fuzzing_mutations():
     restored = CaseMetadata.from_dict(meta.to_dict())
 
     assert restored.phase.data.mutations == (mutation,)
+
+
+def test_case_metadata_round_trip_preserves_pool_draw_provenance():
+    draw = PoolDraw("path", "order_id", "Order", "id", "POST /orders/{order_id}/notes", 201, "alice", True)
+    meta = CaseMetadata(
+        generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE),
+        components={},
+        phase=PhaseInfo(name=TestPhase.FUZZING, data=FuzzingPhaseData("", None, None, None)),
+        pool_draws=(draw,),
+    )
+
+    assert CaseMetadata.from_dict(meta.to_dict()).pool_draws == (draw,)

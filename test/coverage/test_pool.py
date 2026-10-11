@@ -621,6 +621,7 @@ def test_coverage_pool_draws_multi_slot_correlated(ctx):
             resource_field="id",
             source_operation=expected_source,
             source_status=201,
+            source_input=True,
         ),
         "postId": PoolDraw(
             location=ParameterLocation.PATH.value,

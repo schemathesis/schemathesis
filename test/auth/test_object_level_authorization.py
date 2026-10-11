@@ -290,6 +290,76 @@ def test_stateful_owner_sent_the_id_in_the_linked_request(ctx, tmp_path, respons
         object_level_authorization(check_context(recorder=recorder), case.call(), case)
 
 
+def _alice_write(ctx, tmp_path, method, path, **kwargs):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable", writes=True)
+    requests.post(f"{api.base_url}/api/orders", json={"item": "book"}, headers={"Authorization": "ApiKey bob"})
+    config = schemathesis.Config.from_dict({"auth": {"wfc": {"path": _auth_file(tmp_path), "peers": ["alice", "bob"]}}})
+    schema = schemathesis.openapi.from_url(api.schema_url, config=config)
+    write = schema[path][method].Case(body={"text": "hi", "item": "book"}, **kwargs)
+    write._auth_identity = "alice"
+    return api, schema, write, write.call(headers={"Authorization": "ApiKey alice"})
+
+
+def _read_as_alice(schema, order_id, draws=()):
+    operation = schema["/api/orders/{order_id}"]["GET"]
+    meta = CaseMetadata(
+        generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE),
+        components={},
+        phase=PhaseInfo(name=TestPhase.FUZZING, data=FuzzingPhaseData("", None, None, None)),
+        pool_draws=draws,
+    )
+    case = operation.Case(_meta=meta, path_parameters={"order_id": order_id})
+    schema.auth.set(case, AuthContext(operation=operation, app=None))
+    return case
+
+
+def _bob_reads(api):
+    return [r for r in api.requests if r.method == "GET" and r.headers.get("Authorization") == "ApiKey bob"]
+
+
+# Bob's order 1 is only referenced by alice's note, while the order alice puts under id 5 is hers.
+WRITES = [
+    ("POST", "/api/orders/{order_id}/notes", {"path_parameters": {"order_id": 1}}, 1, nullcontext()),
+    (
+        "PUT",
+        "/api/orders/{order_id}",
+        {"path_parameters": {"order_id": 5}},
+        5,
+        pytest.raises(ObjectLevelAuthorizationViolation, match=OWNED_ORDER),
+    ),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "kwargs", "order_id", "expectation"), WRITES, ids=["referenced", "created"])
+def test_pooled_write_owns_only_what_it_created(ctx, tmp_path, method, path, kwargs, order_id, expectation):
+    api, schema, write, response = _alice_write(ctx, tmp_path, method, path, **kwargs)
+    data_source = schema.create_extra_data_source()
+    data_source.record_request(operation=write.operation, case=write, status_code=response.status_code)
+    data_source.record_response(operation=write.operation, response=response, case=write)
+    draws = data_source.pick_correlated_values(operation=schema["/api/orders/{order_id}"]["GET"]).draws
+    case = _read_as_alice(schema, order_id, draws)
+    with expectation:
+        object_level_authorization(check_context(), case.call(), case)
+    assert bool(_bob_reads(api)) is (order_id == 5)
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "kwargs", "order_id", "expectation"),
+    [*WRITES, ("POST", "/api/notes", {"query": {"order_id": 1}}, 1, nullcontext())],
+    ids=["referenced-in-path", "created", "referenced-in-query"],
+)
+def test_linked_write_owns_only_what_it_created(ctx, tmp_path, method, path, kwargs, order_id, expectation):
+    api, schema, write, response = _alice_write(ctx, tmp_path, method, path, **kwargs)
+    case = _read_as_alice(schema, order_id)
+    recorder = ScenarioRecorder(label="test")
+    recorder.record_case(parent_id=None, case=write, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=write.id, response=response)
+    recorder.record_case(parent_id=write.id, case=case, transition=None, is_transition_applied=False)
+    with expectation:
+        object_level_authorization(check_context(recorder=recorder), case.call(), case)
+    assert bool(_bob_reads(api)) is (order_id == 5)
+
+
 def test_without_peers_no_probe_is_sent(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     _run(cli, api, tmp_path, peers=())

@@ -289,6 +289,7 @@ class CaseMetadata:
                     "source_operation": draw.source_operation,
                     "source_status": draw.source_status,
                     "source_identity": draw.source_identity,
+                    "source_input": draw.source_input,
                 }
                 for draw in self.pool_draws
             ],
@@ -356,6 +357,7 @@ class CaseMetadata:
                 source_operation=draw["source_operation"],
                 source_status=draw["source_status"],
                 source_identity=draw.get("source_identity"),
+                source_input=draw.get("source_input", False),
             )
             for draw in data.get("pool_draws", [])
         )

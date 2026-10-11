@@ -413,19 +413,60 @@ _OWNED_ORDERS = {
 }
 
 
-def wfc_owned_orders(policy: str, listing: str | None = None) -> OpenAPIApp:
+_NOTE = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}, "order_id": {"type": "integer"}, "text": {"type": "string"}},
+    "required": ["id", "order_id", "text"],
+}
+_NOTE_BODY = {
+    "required": True,
+    "content": {
+        "application/json": {
+            "schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+        }
+    },
+}
+_NOTE_RESPONSES = {
+    "201": {"description": "Created", "content": {"application/json": {"schema": _NOTE}}},
+    "404": {"description": "Not found"},
+}
+_ORDER_ID = {"name": "order_id", "required": True, "schema": {"type": "integer"}}
+_ORDER_NOTES = {
+    "/api/orders/{order_id}/notes": {
+        "post": {"parameters": [{**_ORDER_ID, "in": "path"}], "requestBody": _NOTE_BODY, "responses": _NOTE_RESPONSES}
+    },
+    "/api/notes": {
+        "post": {"parameters": [{**_ORDER_ID, "in": "query"}], "requestBody": _NOTE_BODY, "responses": _NOTE_RESPONSES}
+    },
+}
+
+_KEYED_CREATE = {
+    "put": {
+        "parameters": [{**_ORDER_ID, "in": "path"}],
+        "requestBody": _OWNED_ORDERS["/api/orders"]["post"]["requestBody"],
+        "responses": {"201": {"description": "Created", **_ORDER_RESPONSE}, "409": {"description": "Exists"}},
+    }
+}
+
+
+def wfc_owned_orders(policy: str, listing: str | None = None, writes: bool = False) -> OpenAPIApp:
     """Orders owned by the caller; `policy` decides what another caller sees.
 
     `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only.
+    `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note writes open to any caller
+    that take the order id in the path or query and echo it.
     """
     paths = _OWNED_ORDERS
+    if writes:
+        keyed = {"/api/orders/{order_id}": {**_OWNED_ORDERS["/api/orders/{order_id}"], **_KEYED_CREATE}}
+        paths = {**_OWNED_ORDERS, **_ORDER_NOTES, **keyed}
     if listing is not None:
         listed = {
             "type": "array",
             "items": _ORDER if listing != "ids" else {"type": "object", "properties": {"id": {"type": "integer"}}},
         }
         paths = {
-            **_OWNED_ORDERS,
+            **paths,
             "/api/orders": {
                 **_OWNED_ORDERS["/api/orders"],
                 "get": {
@@ -487,5 +528,26 @@ def wfc_owned_orders(policy: str, listing: str | None = None) -> OpenAPIApp:
         if policy == "peer_html":
             return "<html>Sign in as the owner</html>", 200, {"Content-Type": "text/html"}
         return jsonify({"detail": "not found"}), 404
+
+    @app.route("/api/orders/<int:order_id>", methods=["PUT"])
+    def create_keyed_order(order_id: int) -> object:
+        user = caller()
+        if user is None:
+            return jsonify({"detail": "unauthorized"}), 401
+        if order_id in orders:
+            return jsonify({"detail": "exists"}), 409
+        orders[order_id] = {"id": order_id, "item": "book", "owner": user}
+        return jsonify(orders[order_id]), 201
+
+    @app.route("/api/notes", methods=["POST"])
+    @app.route("/api/orders/<int:order_id>/notes", methods=["POST"])
+    def add_note(order_id: int | None = None) -> object:
+        if caller() is None:
+            return jsonify({"detail": "unauthorized"}), 401
+        if order_id is None:
+            order_id = request.args.get("order_id", type=int)
+        if order_id not in orders:
+            return jsonify({"detail": "not found"}), 404
+        return jsonify({"id": 7, "order_id": order_id, "text": "note"}), 201
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
