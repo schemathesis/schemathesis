@@ -280,6 +280,12 @@ def test_fuzz_connection_error_cases_are_not_reported_as_skipped(cli, ctx):
     assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
 
 
+def test_fuzz_unreachable_server_has_no_passed_scenarios(cli, ctx, snapshot_cli):
+    api = ctx.openapi.apps.success()
+
+    assert_cli_snapshot(cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=30"), snapshot_cli)
+
+
 @pytest.mark.snapshot(replace_test_cases=False, replace_traceback=True)
 def test_fuzz_crashed_check_cases_are_reported_as_errored(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
