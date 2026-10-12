@@ -29,7 +29,7 @@ Once authentication works, the operations you authenticated disappear from that 
 If the schema declares a sign-up operation and a login operation that returns a bearer token or API key, Schemathesis creates a fresh account and logs in before testing. You don't configure anything:
 
 ```
- ✅  Auth: signed up via POST /auth/register and logged in; disable with [auth] auto-signup = false
+ ✅  Auth: signed up via POST /auth/register and logged in; disable with `auto-signup = false` under `[auth]`
 ```
 
 Schemathesis recognizes the pair when:

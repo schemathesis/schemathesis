@@ -66,7 +66,9 @@ def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> 
 
     if payload.status == Status.SUCCESS:
         icon, color = "✅  ", "green"
-        text = f"signed up via {spec.register_operation} and logged in; disable with [auth] auto-signup = false"
+        text = (
+            f"signed up via {spec.register_operation} and logged in; disable with `auto-signup = false` under `[auth]`"
+        )
     else:
         icon, color = "🚫  ", "red"
         detail = " ".join(f"{payload.status_code or ''} {payload.message or ''}".split())[:100]

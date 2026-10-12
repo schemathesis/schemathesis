@@ -17,6 +17,7 @@
 - HTML report exit note giving no reason when a startup warning fails the run.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.
+- Auth sign-up line showing `[auth] auto-signup = false`, which is not valid TOML on one line.
 - HTML report "Top failures" showing "+1 more" instead of the fourth failure.
 - `--checks object_level_authorization` reporting a clean run without warning when no `peers` are configured.
 

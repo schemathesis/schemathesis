@@ -19,6 +19,14 @@ def test_auth_bootstrap_output(ctx, cli, snapshot_cli, behavior, args):
     assert cli.run(api.schema_url, "--phases=examples", *args) == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_auth_bootstrap_output_on_narrow_terminal(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.sign_up_and_login("ok")
+    # Dropping PYTEST_VERSION lifts the fixed console width; drop FORCE_COLOR too, or CI renders live progress
+    env = {"PYTEST_VERSION": None, "FORCE_COLOR": None, "COLUMNS": "80"}
+    assert cli.run(api.schema_url, "--phases=examples", env=env) == snapshot_cli
+
+
 @pytest.mark.parametrize("behavior", ["ok", "undeclared-security"])
 def test_signed_up_token_reaches_protected_operations(ctx, cli, behavior):
     api = ctx.openapi.apps.sign_up_and_login(behavior)
