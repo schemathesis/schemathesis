@@ -47,6 +47,7 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 uvx schemathesis run https://your-api.com/openapi.json
 ```
 
+Schemathesis sends real requests that create, change and delete data. Point it at a dev or staging environment, not production.
 
 ## What problems does it solve?
 
@@ -55,13 +56,14 @@ uvx schemathesis run https://your-api.com/openapi.json
 - 🚪 **Validation bypasses** where invalid data gets accepted
 - 🔗 **Integration failures** when responses don't match client expectations
 - 🔄 **Stateful bugs** where operations work individually but fail in realistic workflows
+- 🕵️ **Broken object-level authorization** where one user can read another user's objects
 
 
 ## What can it do?
 
 - ⚙️ **Config file** - auth, phases, and per-operation overrides in [`schemathesis.toml`](https://schemathesis.readthedocs.io/en/stable/configuration/). No Python.
 - 🔐 **Authentication** - static headers, Basic, per-security-scheme credentials, or [custom refresh logic](https://schemathesis.readthedocs.io/en/stable/guides/auth/).
-- 🔗 **Stateful testing** - [operation links inferred from your schema](https://schemathesis.readthedocs.io/en/stable/explanations/stateful/), no manual wiring.
+- 🔗 **Stateful testing** - [operation links inferred from your OpenAPI schema, or the GraphQL type graph](https://schemathesis.readthedocs.io/en/stable/explanations/stateful/), no manual wiring.
 - 🧠 **Adaptive testing** - [learns constraints, ids, and auth from responses](https://schemathesis.readthedocs.io/en/stable/explanations/adaptive-testing/), reusing them mid-run.
 - ✅ **Custom checks** - [assert your own business rules](https://schemathesis.readthedocs.io/en/stable/guides/extending/#custom-validation-checks) next to the built-in ones.
 - 📖 **Fuzz dictionaries** - [mix real ids, wordlists, or LLM-generated payloads](https://schemathesis.readthedocs.io/en/stable/guides/fuzz-dictionary/) into generated data.
@@ -69,8 +71,6 @@ uvx schemathesis run https://your-api.com/openapi.json
 - 📊 **Reports** - an [offline HTML page](https://schemathesis.readthedocs.io/en/stable/guides/html-report/) with every failure and its `curl` command, plus [JUnit, VCR, HAR, NDJSON, JSON](https://schemathesis.readthedocs.io/en/stable/reference/configuration/#reporting), and [Allure](https://schemathesis.readthedocs.io/en/stable/guides/allure/).
 - 🎯 **Schema coverage** - [keyword-level coverage report](https://schemathesis.readthedocs.io/en/stable/guides/coverage/) showing which constraints your tests exercised.
 - 🔁 **Replay & baseline** - [re-run past failures](https://schemathesis.readthedocs.io/en/stable/guides/crash-reproduction/) and [fail CI only on new ones](https://schemathesis.readthedocs.io/en/stable/guides/baseline/).
-
-> ⚠️ **Upgrading from older versions?** Check our [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
 
 ## Installation & Usage
 
@@ -88,6 +88,10 @@ rate-limit = "auto"
 ```
 
 **Python Tests:**
+```console
+uv add --dev schemathesis
+```
+
 ```python
 import schemathesis
 
@@ -137,6 +141,8 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 - [Quick Start](https://schemathesis.readthedocs.io/en/stable/quick-start/) - 5 minutes
 - [CLI Tutorial](https://schemathesis.readthedocs.io/en/stable/tutorials/cli/) - 20 minutes
 - [Pytest Tutorial](https://schemathesis.readthedocs.io/en/stable/tutorials/pytest/) - 15 minutes
+
+> ⚠️ **Upgrading from older versions?** Check our [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
 
 ## Get Help
 
