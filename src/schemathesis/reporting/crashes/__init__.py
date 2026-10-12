@@ -43,13 +43,15 @@ def _failure_fingerprint(failure: Failure) -> str:
 
 @dataclass(slots=True)
 class CrashManifest:
-    """Run-level metadata for a crash directory: format version, schema location, base URL."""
+    """Run-level metadata for a crash directory: format version, schema location, base URL, TLS verification."""
 
     format_version: int
     schemathesis_version: str
     schema_location: str
     base_url: str
     created_at: str
+    # `None` for manifests written before the setting was recorded.
+    tls_verify: bool | str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CrashManifest:
@@ -62,6 +64,7 @@ class CrashManifest:
             schema_location=data["schema_location"],
             base_url=data["base_url"],
             created_at=data["created_at"],
+            tls_verify=data.get("tls_verify"),
         )
 
 
@@ -224,7 +227,7 @@ class CrashWriter:
         self._directory = directory
         self._written: set[str] = set()
 
-    def open(self, *, schema_location: str, base_url: str) -> None:
+    def open(self, *, schema_location: str, base_url: str, tls_verify: bool | str | None = True) -> None:
         self._directory.mkdir(parents=True, exist_ok=True)
         manifest = CrashManifest(
             format_version=CRASH_FORMAT_VERSION,
@@ -232,6 +235,7 @@ class CrashWriter:
             schema_location=schema_location,
             base_url=base_url,
             created_at=format_timestamp(time.time()),
+            tls_verify=tls_verify,
         )
         atomic_write_text(self._directory / MANIFEST_FILENAME, json.dumps(asdict(manifest), indent=2))
 
