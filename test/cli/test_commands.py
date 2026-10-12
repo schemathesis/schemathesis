@@ -34,7 +34,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.config._output import MAX_PAYLOAD_SIZE
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.shell import ShellType
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, control, events
 from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.engine.run.unit._pool import DefaultScheduler
 from schemathesis.specs.openapi import unregister_string_format
@@ -5126,7 +5126,9 @@ def test_stateful_flaky_replay_keeps_network_error(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
-def test_max_time_does_not_count_unsent_stateful_case(ctx, cli, snapshot_cli):
+def test_max_time_does_not_count_unsent_stateful_case(ctx, cli, snapshot_cli, monkeypatch):
+    # The hook moves the engine clock past the deadline; restore the real one afterwards
+    monkeypatch.setattr(control, "time", time)
     app, _ = ctx.openapi.make_flask_app(linked_users())
 
     @app.route("/users", methods=["POST"])
@@ -5141,27 +5143,35 @@ def test_max_time_does_not_count_unsent_stateful_case(ctx, cli, snapshot_cli):
         """
 import time
 
+from schemathesis.engine import control
+
 draws = 0
 
 
-def delay_second_case(case):
+class ExpiredClock:
+    @staticmethod
+    def monotonic():
+        return time.monotonic() + 3600
+
+
+def expire_before_second_case(case):
     global draws
     draws += 1
     if draws == 2:
-        time.sleep(2)
+        control.time = ExpiredClock
     return case
 
 
 @schemathesis.hook
 def before_generate_case(context, strategy):
-    return strategy.map(delay_second_case)
+    return strategy.map(expire_before_second_case)
 """
     )
 
     assert (
         cli.run_openapi_app(
             app,
-            "--max-time=1",
+            "--max-time=60",
             "--max-examples=5",
             "--generation-database=none",
             "--phases=stateful",
