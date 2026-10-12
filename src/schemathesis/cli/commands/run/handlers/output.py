@@ -1170,7 +1170,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
-        for message in ctx.startup_warnings:
+        for _, message in ctx.startup_warnings:
             click.secho(f"⚠️  {message}\n", fg="yellow")
 
     def shutdown(self, ctx: ExecutionContext) -> None:
@@ -1786,7 +1786,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         display_final_line(
             failures=unique_failures,
             errors=len(ctx.errors),
-            warnings=ctx.warnings.kind_count + bool(ctx.startup_warnings),
+            warnings=ctx.warnings.kind_count + len({kind for kind, _ in ctx.startup_warnings}),
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
             nothing_tested_reason=ctx.nothing_tested_reason,

@@ -72,6 +72,7 @@ In a [WFC report](../reference/cli.md#-report-wfc-path-filename), these failures
 
 A clean run covers only the objects Schemathesis could tie to a user. If it ties none, it sends no extra requests and reports nothing. Check for:
 
+- No `peers` under `[auth.wfc]`: the check does not run at all. When you select it with `--checks object_level_authorization`, Schemathesis warns about this before loading the schema.
 - Failing creates, such as `POST /orders` always returning `422`. Fix those first; see [Triaging Failures](triage.md).
 - A create response without the id, in an API with no list operation.
 - Responses whose schemas declare no fields, so ids in them are never tied to a user.

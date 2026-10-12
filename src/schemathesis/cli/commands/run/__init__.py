@@ -91,6 +91,7 @@ load_all_checks()
 DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 # Timeouts this long are almost always milliseconds, the unit Schemathesis 3 took.
 LIKELY_MILLISECONDS = 1000
+OBJECT_LEVEL_AUTHORIZATION_GUIDE = "https://schemathesis.readthedocs.io/en/stable/guides/object-level-authorization/"
 
 
 @click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
@@ -398,8 +399,18 @@ def run(
         config=config.projects.get_default(),
         args=ctx.args,
         params=ctx.params,
-        startup_warnings=list(_iter_timeouts_in_milliseconds(ctx, config.projects.get_default())),
+        startup_warnings=_startup_warnings(ctx, config, included_check_names),
     )
+
+
+def _startup_warnings(
+    ctx: click.Context, config: SchemathesisConfig, included_check_names: list[str] | None
+) -> list[tuple[SchemathesisWarning | None, str]]:
+    timeouts = _iter_timeouts_in_milliseconds(ctx, config.projects.get_default())
+    return [
+        *((SchemathesisWarning.TIMEOUT_UNITS, message) for message in timeouts),
+        *((None, message) for message in _iter_unrunnable_checks(config, included_check_names)),
+    ]
 
 
 def _iter_timeouts_in_milliseconds(ctx: click.Context, config: ProjectConfig) -> Iterator[str]:
@@ -416,6 +427,19 @@ def _iter_timeouts_in_milliseconds(ctx: click.Context, config: ProjectConfig) ->
         else:
             given, suggested = f"{option}={value:g}", f"{option}={value / 1000:g}"
         yield f"`{given}` is {_describe_duration(value)}; Schemathesis takes seconds. Did you mean `{suggested}`?"
+
+
+def _iter_unrunnable_checks(config: SchemathesisConfig, included_check_names: list[str] | None) -> Iterator[str]:
+    # Only a check selected by name: one enabled by default or by `all` is not something the user asked for.
+    if "object_level_authorization" not in (included_check_names or []):
+        return
+    projects = (config.projects.default, *config.projects.named.values())
+    if any(project.auth.wfc is not None and project.auth.wfc.peers for project in projects):
+        return
+    yield (
+        "`object_level_authorization` will not run: list at least 2 users as `peers` under `[auth.wfc]`. "
+        f"See {OBJECT_LEVEL_AUTHORIZATION_GUIDE}"
+    )
 
 
 def _describe_duration(seconds: float) -> str:

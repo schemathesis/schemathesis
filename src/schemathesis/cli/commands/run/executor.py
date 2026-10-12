@@ -6,7 +6,7 @@ from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.executor import execute_event_loop
 from schemathesis.cli.loaders import into_event_stream
-from schemathesis.config import ProjectConfig
+from schemathesis.config import ProjectConfig, SchemathesisWarning
 from schemathesis.engine import from_schema
 from schemathesis.engine.events import EventGenerator
 
@@ -18,7 +18,7 @@ def execute(
     filter_set: dict[str, Any],
     args: list[str],
     params: dict[str, Any],
-    startup_warnings: list[str],
+    startup_warnings: list[tuple[SchemathesisWarning | None, str]],
 ) -> None:
     event_stream = into_event_stream(
         location=location,
@@ -35,7 +35,7 @@ def _execute(
     config: ProjectConfig,
     args: list[str],
     params: dict[str, Any],
-    startup_warnings: list[str],
+    startup_warnings: list[tuple[SchemathesisWarning | None, str]],
 ) -> None:
     execute_event_loop(
         event_stream,
