@@ -1,6 +1,7 @@
 import itertools
 import json
 import re
+import sys
 import threading
 import time
 
@@ -194,6 +195,12 @@ def test_html_report_passed(ctx, cli, report_dir, snapshot_html):
     api = ctx.openapi.apps.success()
     assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
     assert list(report_dir.iterdir()) == [report_dir / "index.html"]
+
+
+def test_html_report_unknown_command(ctx, cli, report_dir, snapshot_html, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["/venv/bin/python"])
+    api = ctx.openapi.apps.success()
+    assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
 
 
 def test_html_report_failed(ctx, cli, report_dir, snapshot_html):

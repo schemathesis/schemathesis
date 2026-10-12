@@ -68,6 +68,10 @@ def sanitize_args(args: Sequence[str], *, config: SanitizationConfig) -> list[st
     return result
 
 
+UNKNOWN_ENTRYPOINT = "<unknown entrypoint>"
+_MODULE_ENTRYPOINTS = ("schemathesis", "pytest")
+
+
 def get_command_representation(sanitization: SanitizationConfig | None = None) -> str:
     """Get how the current process was invoked."""
     basename = os.path.basename(sys.argv[0])
@@ -78,4 +82,9 @@ def get_command_representation(sanitization: SanitizationConfig | None = None) -
         return f"st {args}"
     if "pytest" in basename or executable == "py.test":
         return f"pytest {args}"
-    return "<unknown entrypoint>"
+    if basename == "__main__.py":
+        # `python -m <package>` puts the path to the package's `__main__.py` into `argv[0]`
+        package = os.path.basename(os.path.dirname(sys.argv[0]))
+        if package in _MODULE_ENTRYPOINTS:
+            return f"python -m {package} {args}"
+    return UNKNOWN_ENTRYPOINT

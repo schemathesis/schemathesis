@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import platform
 import re
+import sys
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -570,7 +571,10 @@ def snapshot_cli(request, snapshot):
 
 
 @pytest.fixture
-def snapshot_html(snapshot):
+def snapshot_html(snapshot, monkeypatch):
+    # The report shows the command only for a known entrypoint, and xdist workers run with `argv[0] == "-c"`
+    monkeypatch.setattr(sys, "argv", ["/venv/bin/pytest"])
+
     class HtmlSnapshotExtension(SingleFileSnapshotExtension):
         _write_mode = WriteMode.TEXT
         file_extension = "html"
