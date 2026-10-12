@@ -26,10 +26,10 @@ def _build(auth_info: AuthenticationInfo, config: WFCAuthConfig) -> AuthProvider
     return provider
 
 
-def register_wfc_auth(schema: BaseSchema, config: WFCAuthConfig, user: str | None = None) -> None:
+def register_wfc_auth(schema: BaseSchema, config: WFCAuthConfig) -> None:
     """Load the configured WFC file and register its auth provider on the schema."""
     entries = load_from_file(config.path)
-    selected = user or config.user
+    selected = config.user
     names = [entry.name for entry in entries]
     peers = tuple(config.peers or ())
     for peer in peers:

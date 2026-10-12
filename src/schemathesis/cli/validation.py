@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import click
 
 from schemathesis.cli.ext.options import CsvEnumChoice
-from schemathesis.config import ReportFormat, SchemathesisWarning, get_workers_count
+from schemathesis.config import ReportFormat, SchemathesisConfig, SchemathesisWarning, get_workers_count
 from schemathesis.core import errors, rate_limit, string_to_boolean, validation
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
@@ -34,6 +34,15 @@ INVALID_ORIGIN_MESSAGE = (
     "from the schema. Use `--url` if you want to set the path yourself."
 )
 CONFLICTING_URL_MESSAGE = "The `--url` and `--origin` options are mutually exclusive."
+WFC_USER_REQUIRES_PATH_MESSAGE = "--auth-wfc-user requires --auth-wfc or path under [auth.wfc]"
+
+
+def validate_wfc_user(config: SchemathesisConfig, path: str | None, user: str | None) -> None:
+    if user is None or path is not None:
+        return
+    projects = (config.projects.default, *config.projects.named.values())
+    if not any(project.auth.wfc is not None and project.auth.wfc.path for project in projects):
+        raise click.UsageError(WFC_USER_REQUIRES_PATH_MESSAGE)
 
 
 def validate_schema_location(ctx: click.core.Context, param: click.core.Parameter, location: str) -> str:

@@ -152,8 +152,6 @@ class AuthConfig(DiffBase):
     dynamic: OpenAPIDynamicAuthConfig
     wfc: WFCAuthConfig | None
     auto_signup: bool
-    # Set only from the CLI so a user can be selected without overriding the configured WFC path.
-    wfc_user: str | None
 
     def __init__(
         self,
@@ -175,7 +173,6 @@ class AuthConfig(DiffBase):
         else:
             self.basic = None
 
-        self.wfc_user = None
         self.openapi = OpenAPIAuthConfig(schemes=openapi)
 
         self.dynamic = OpenAPIDynamicAuthConfig(schemes=dynamic.get("openapi") if dynamic else None)
@@ -243,12 +240,13 @@ class AuthConfig(DiffBase):
             self.wfc._mark_source_keys(("path", "user") if wfc_user is not None else ("path",))
             self._mark_source_keys(("wfc",))
         elif wfc_user is not None:
-            self.wfc_user = wfc_user
-            self._mark_source_keys(("wfc_user",))
+            self.wfc = WFCAuthConfig(user=resolve(wfc_user))._mark_source_keys(("user",))
+            self._mark_source_keys(("wfc",))
 
     @classmethod
     def from_hierarchy(cls, configs: list[AuthConfig]) -> AuthConfig:  # type: ignore[override]  # reads `wfc`
-        output = super().from_hierarchy(configs)
+        # Bare `super()` breaks under `@dataclass(slots=True)` on Python < 3.13.
+        output: AuthConfig = DiffBase.from_hierarchy.__func__(cls, configs)  # type: ignore[attr-defined]
         # `wfc` is unset by default, so the generic merge would take the whole section from one level.
         wfc_configs = [config.wfc for config in configs if config.wfc is not None]
         if len(wfc_configs) > 1:

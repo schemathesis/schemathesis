@@ -115,6 +115,34 @@ def test_wfc_user_flag_selects_within_a_configured_file(cli, ctx, tmp_path):
     assert all(_header(c, "X-Api-Key") == "bob-key" for c in _protected_calls(api))
 
 
+def test_wfc_user_requires_path(cli, tmp_path):
+    schema = _write(
+        tmp_path,
+        {"openapi": "3.0.0", "info": {"title": "Test", "version": "1.0"}, "paths": {}},
+        name="schema.json",
+    )
+
+    result = cli.run(schema, "--url=http://127.0.0.1", "--auth-wfc-user=bob")
+
+    assert result.exit_code == 2
+    assert result.stderr == (
+        "Usage: schemathesis run [OPTIONS] LOCATION\n"
+        "Try 'schemathesis run --help' for help.\n\n"
+        "Error: --auth-wfc-user requires --auth-wfc or path under [auth.wfc]\n"
+    )
+
+
+def test_replay_wfc_user_requires_path(cli):
+    result = cli.main("replay", "--auth-wfc-user=bob")
+
+    assert result.exit_code == 2
+    assert result.stderr == (
+        "Usage: schemathesis replay [OPTIONS] [PATH]\n"
+        "Try 'schemathesis replay --help' for help.\n\n"
+        "Error: --auth-wfc-user requires --auth-wfc or path under [auth.wfc]\n"
+    )
+
+
 def test_wfc_fixed_headers_reach_requests(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(tmp_path, {"auth": [{"name": "u", "fixedHeaders": [{"name": "X-Api-Key", "value": "static"}]}]})

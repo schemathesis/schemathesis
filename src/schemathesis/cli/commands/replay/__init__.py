@@ -12,7 +12,7 @@ from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.options import AUTH, AUTH_WFC, AUTH_WFC_USER, HEADER
 from schemathesis.cli.output import make_console, make_progress_bar
-from schemathesis.cli.validation import validate_auth_overlap
+from schemathesis.cli.validation import validate_auth_overlap, validate_wfc_user
 from schemathesis.core import storage
 from schemathesis.core.timing import Instant
 
@@ -55,6 +55,7 @@ def replay(
 ) -> None:
     """Replay stored crash files."""
     validate_auth_overlap(auth, headers)
+    validate_wfc_user(ctx.obj, auth_wfc, auth_wfc_user)
     # Credentials override every project's config, as in `st run`.
     ctx.obj.projects.override.update(
         headers=headers or None, basic_auth=auth, wfc_auth=auth_wfc, wfc_user=auth_wfc_user
