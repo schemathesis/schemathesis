@@ -21,82 +21,116 @@
 
 ### :bug: Fixed
 
-- `st fuzz` skipping checks for requests sent after the first failure in a scenario.
-- `st fuzz` not naming filters that matched no operations.
-- `st fuzz` showing "Stop reason: Completed" when no operation was tested.
-- `st fuzz` ignoring `warnings.fail-on` for unmatched filters.
-- `st fuzz` summaries not accounting for operations they did not test.
-- Double blank lines in output piped to a file or CI log.
-- Trailing spaces in output piped to a file or CI log.
+#### `st fuzz`
+
+- Skipping checks for requests sent after the first failure in a scenario.
+- Not naming filters that matched no operations.
+- Showing "Stop reason: Completed" when no operation was tested.
+- Ignoring `warnings.fail-on` for unmatched filters.
+- Summaries not accounting for operations they did not test.
+- Summary missing the "Baseline" and "Filtered" counts.
+- Suggesting `--wait-for-schema` on connection errors when it is already set.
+- Crashing with `Inconsistent data generation` when the server stops responding.
+- Success icon for an interrupted run.
+
+#### Output and exit codes
+
+- Double blank lines and trailing spaces in output piped to a file or CI log.
 - "No checks ran" given as the skip reason for operations whose requests got no response.
 - Phase line showing only passes when the server stopped responding during the phase.
-- Baseline file written from partial results when the run is interrupted with Ctrl-C.
-- Final line reporting "No issues found" or "Empty test suite" after Ctrl-C.
-- API capabilities reported as unsupported when the server is unreachable.
-- Missing unresolvable-reference warning for responses whose `$ref` reaches it through a cycle.
-- Crash in negative mode on schemas with a boolean `not`, e.g. `not: false`.
-- Traceback and early stateful phase exit with `--mode negative` for steps with nothing to negate.
-- Check failures shown as a bare `Failure()` in `repr` and pytest assertion messages.
-- Missing or broken inferred stateful links for paginated lists of wrapped items, e.g. `{items: [{track}]}`.
-- Error feedback attributing query and path parameter errors of `POST`/`PUT` requests to the body.
-- Error feedback ignoring "required" errors on array item fields like `items.0.name`.
+- Phase shown as passed when no checks ran on any of its operations.
+- Phase line claiming passed scenarios when no checks ran.
+- Final line reporting "No issues found" when no checks ran.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
 - Exit code 1 from a `fail-on` missing-auth warning withdrawn after a later successful response.
 - Exit code 1 from a `fail-on` missing-test-data warning withdrawn during stateful testing.
-- Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
+- API capabilities reported as unsupported when the server is unreachable.
+
+#### Interrupting with Ctrl-C
+
+- Baseline file written from partial results.
+- Final line reporting "No issues found" or "Empty test suite".
+- Phase line counting not-yet-run operations twice as skipped.
+
+#### Missing inferred stateful links
+
+- Paginated lists of wrapped items, e.g. `{items: [{track}]}`.
+- Deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
+- Ids returned next to the created resource, e.g. `{bookingid, booking}`.
+- Request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
+- Paths with a version segment after the collection, e.g. `/books/v1`.
+- `POST /books` to `GET /books/{title}` via request body `title`.
+
+#### Stateful testing
+
+- Broken inferred links for paginated lists of wrapped items.
 - Inferred update links filling nested body foreign keys with the updated item's id, e.g. `recipient.clientId`.
+- Inferred links sending a numeric `id` to string path parameters when a string `uuid` exists.
+- Traceback and early stateful phase exit with `--mode negative` for steps with nothing to negate.
+- Extraction failures listed in a different order between runs with the same seed.
+- Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
+- Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
+
+#### Error feedback
+
+- Attributing query and path parameter errors of `POST`/`PUT` requests to the body.
+- Ignoring "required" errors on array item fields like `items.0.name`.
+- Dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
+- Ignoring server errors on fields of `$ref` objects nested in the request body.
+- Rounding large integer bounds, e.g. Java `long` maximum written as `2**63`.
+- Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
+
+#### Data generation
+
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
-- Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
-- `st fuzz` suggesting `--wait-for-schema` on connection errors when it is already set.
-- pytest examples phase ignoring `[parameters]` overrides in `fill-missing` cases.
-- Coverage cases dropped when a schema `filter_case` hook depends on a global `map_case`.
+- Coverage phase dropping `$ref` target constraints when sibling keywords are looser in Open API 3.1.
+- Coverage phase skipping the valid array when every `example`, `examples` and `default` is invalid.
+- Coverage phase skipping the object-body negative for non-object `type` when `required` precedes `properties`.
 - Application constants drawn in the examples phase.
-- Phase line counting not-yet-run operations twice as skipped after Ctrl-C.
+- Crash in the examples phase when a response example field holds a list of scalars.
+- Crash in negative mode on schemas with a boolean `not`, e.g. `not: false`.
+- Negative request bodies for `enum` or `const` schemas changing after they were generated.
+- Fuzzing negative mode never generating fractional numbers for `integer` values.
+- Fuzzing sending examples of query parameters the server rejected as unknown.
 - Generated strings failing `pattern` when a group holds a possessive quantifier, e.g. `(a*+)`.
+- Positive cases treated as negative when an auth hook adds an undeclared or differently-cased header.
+
+#### `negative_data_rejection`
+
+- Missed failures for integer parameters sent as `1_0`, ` 5` or non-ASCII digits.
+- False positive for header values invalid only through surrounding whitespace.
+- False positive for a configured `User-Agent` the schema declares as a header.
+
+#### Configuration
+
 - `st run` ignoring `checks` and `generation` under `[phases.<phase>]` for examples, coverage and stateful phases.
-- Crash on schemas with a non-object `info` or a non-string `info.title`.
 - Top-level `[[operations]]` overriding `[[project.operations]]` for the same operation.
-- `st fuzz` crashing with `Inconsistent data generation` when the server stops responding.
 - `[[operations]] continue-on-failure = false` not overriding a project-level `true`.
 - Root-level `[servers.variables]` ignored for the schema-wide `servers` URL.
-- `as_strategy(headers=...)` modifying the passed headers dictionary.
-- Stateful extraction failures listed in a different order between runs with the same seed.
-- Duplicated and unsorted run-level check failures in JUnit and Allure reports.
-- Success icon for an interrupted `st fuzz` run.
-- Allure reports missing coverage failures for undeclared HTTP methods.
-- Fuzzing sending examples of query parameters the server rejected as unknown.
-- WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.
-- Error feedback dropping nested-field errors like `items[0].name` or sending them as dotted body keys.
-- Missing inferred stateful links for ids returned next to the created resource, e.g. `{bookingid, booking}`.
-- Error feedback ignoring server errors on fields of `$ref` objects nested in the request body.
-- Final line reporting "No issues found" when no checks ran.
-- Missing inferred stateful links for request body fields declared in referenced schemas, e.g. `allOf: [$ref]`.
-- Negative request bodies for `enum` or `const` schemas changing after they were generated.
-- Misleading additional-properties hint when a Pydantic error names a declared field.
-- Missing `negative_data_rejection` failures for integer parameters sent as `1_0`, ` 5` or non-ASCII digits.
-- Stateful-only runs repeatedly calling operations that always return `405 Method Not Allowed`.
-- False positive `negative_data_rejection` for header values invalid only through surrounding whitespace.
-- `st fuzz` summary missing the "Baseline" and "Filtered" counts.
 - Header `[parameters]` overrides and configured `headers` dropping each other when both are set.
-- Phase shown as passed when no checks ran on any of its operations.
-- Unsatisfiable `allOf` request bodies after the server rejects unknown fields.
-- pytest negative testing skipped as impossible on operations with configured basic auth.
-- Missing inferred stateful links on paths with a version segment after the collection, e.g. `/books/v1`.
-- Crash in the examples phase when a response example field holds a list of scalars.
-- Missing inferred stateful links from `POST /books` to `GET /books/{title}` via request body `title`.
-- Coverage phase dropping `$ref` target constraints when sibling keywords are looser in Open API 3.1.
-- Inferred links sending a numeric `id` to string path parameters when a string `uuid` exists.
-- Coverage phase skipping the valid array when every `example`, `examples` and `default` is invalid.
-- Stateful phase repeating an operation's error, e.g. an unknown GraphQL scalar, as a run-level error.
-- False positive `negative_data_rejection` for a configured `User-Agent` the schema declares as a header.
-- Fuzzing negative mode never generating fractional numbers for `integer` values.
-- Coverage phase skipping the object-body negative for non-object `type` when `required` precedes `properties`.
-- Positive cases treated as negative when an auth hook adds an undeclared or differently-cased header.
-- Error feedback rounding large integer bounds, e.g. Java `long` maximum written as `2**63`.
-- Wildcard response deserializers like `@schemathesis.deserializer("application/*")` never matching.
 - Raw `oneOf` validation text in config errors for wrong-typed `request-retries` and operation filters.
-- Phase line claiming passed scenarios when no checks ran.
 
+#### pytest, Python API and hooks
+
+- pytest examples phase ignoring `[parameters]` overrides in `fill-missing` cases.
+- pytest negative testing skipped as impossible on operations with configured basic auth.
+- Check failures shown as a bare `Failure()` in `repr` and pytest assertion messages.
+- `as_strategy(headers=...)` modifying the passed headers dictionary.
+- Wildcard response deserializers like `@schemathesis.deserializer("application/*")` never matching.
+- Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
+- Coverage cases dropped when a schema `filter_case` hook depends on a global `map_case`.
+
+#### Reports
+
+- Duplicated and unsorted run-level check failures in JUnit and Allure reports.
+- Allure reports missing coverage failures for undeclared HTTP methods.
+
+#### Others
+
+- Missing unresolvable-reference warning for responses whose `$ref` reaches it through a cycle.
+- Crash on schemas with a non-object `info` or a non-string `info.title`.
+- WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.
+- Misleading additional-properties hint when a Pydantic error names a declared field.
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
 ### :wrench: Changed
