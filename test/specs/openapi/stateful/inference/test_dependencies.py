@@ -5477,6 +5477,48 @@ def test_nested_body_fk_inside_composition_branch(ctx):
     assert (nested_slot.resource.name, nested_slot.resource_field) == ("Warehouse", "id")
 
 
+def test_nested_body_fk_on_update_keeps_its_target(ctx):
+    # A nested `recipient.clientId` on `PUT /devices/{device_id}` names a client, not the device being updated.
+    device = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "recipient": {"type": "object", "properties": {"clientId": {"type": "string"}}},
+        },
+    }
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/clients": {
+                "get": {
+                    "parameters": [{"name": "clientId", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/devices": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": device}}},
+                    "responses": {"201": {"content": {"application/json": {"schema": device}}}},
+                }
+            },
+            "/devices/{device_id}": {
+                "put": {
+                    "parameters": [{"name": "device_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {"content": {"application/json": {"schema": device}}},
+                    "responses": {"200": {"content": {"application/json": {"schema": device}}}},
+                }
+            },
+        },
+    )
+
+    assert [
+        (operation, slot.resource.name, slot.resource_field)
+        for operation, node in graph.operations.items()
+        for slot in node.inputs
+        if slot.parameter_name == "recipient/clientId"
+    ] == [("POST /devices", "Client", "id"), ("PUT /devices/{device_id}", "Client", "id")]
+
+
 def test_body_plural_id_array_field_produces_input_slot(ctx):
     # Plural FK array fields like `site_ids` are FKs to Site.id; the analyzer used
     # to recognize only singular `_id` body fields.

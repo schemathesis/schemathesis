@@ -257,7 +257,29 @@
       "outputs": []
     },
     "POST /oauth2/1/token": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "Get access token using authorization code/client_id",
+          "resource": "Client",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "Get access token using device code and OTP/client_id",
+          "resource": "Client",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "Get access token using refresh token/client_id",
+          "resource": "Client",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",

@@ -29,6 +29,7 @@
 - Error feedback ignoring "required" errors on array item fields like `items.0.name`.
 - Final line not naming why the run failed: unsaved baseline or warnings with `fail-on`.
 - Missing inferred stateful links for deeply nested body foreign keys, e.g. `shipping.address.warehouse_id`.
+- Inferred update links filling nested body foreign keys with the updated item's id, e.g. `recipient.clientId`.
 - Coverage phase generating no valid values for schemas with keywords but no `type`.
 - Hooks loaded from a file path in `SCHEMATHESIS_HOOKS` running several times per call.
 - `st fuzz` suggesting `--wait-for-schema` on connection errors when it is already set.
