@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 from flask import jsonify
 from hypothesis import given
 from hypothesis import strategies as st
@@ -109,11 +110,15 @@ def test_malformed_registered_media_type_is_skipped(ctx):
     test()
 
 
+# Pure-Python PyYAML closes top-level plain scalars with an explicit document end marker.
+YAML_SCALAR_END = "" if yaml.__with_libyaml__ else "...\n"
+
+
 @pytest.mark.parametrize(
     ("media_type", "body", "expected"),
     [
-        ("application/yaml", "hello", "hello\n"),
-        ("application/yaml", 42, "42\n"),
+        ("application/yaml", "hello", f"hello\n{YAML_SCALAR_END}"),
+        ("application/yaml", 42, f"42\n{YAML_SCALAR_END}"),
         ("application/xml", b"<a>1</a>", b"<a>1</a>"),
     ],
     ids=["yaml-string", "yaml-integer", "xml-bytes"],

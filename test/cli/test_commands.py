@@ -1370,6 +1370,7 @@ def test_negative_mode_with_unsupported_regex_in_body(cli, ctx, snapshot_cli):
     )
 
 
+@pytest.mark.skipif(not yaml.__with_libyaml__, reason="Pure-Python PyYAML words the error differently")
 def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli, ctx):
     api = ctx.openapi.apps.success()
     schema = yaml.dump(simple_openapi)
