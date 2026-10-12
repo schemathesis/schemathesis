@@ -447,3 +447,22 @@ def test_override_check_selection_beats_project_selection(override, project, exp
     config.projects.default.checks.update(**project)
 
     assert config.projects.get_default().checks.not_a_server_error.enabled is expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("Bearer ${API_TOKEN}", "Missing environment variable: `API_TOKEN`"),
+        (
+            "${API_USER}:${API_TOKEN}@${API_USER}",
+            "Missing environment variables: `API_USER`, `API_TOKEN`",
+        ),
+    ],
+    ids=["single", "several"],
+)
+def test_missing_env_var_error_names_the_variable(monkeypatch, value, expected):
+    monkeypatch.delenv("API_TOKEN", raising=False)
+    monkeypatch.delenv("API_USER", raising=False)
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_dict({"headers": {"Authorization": value}})
+    assert str(exc.value) == expected
