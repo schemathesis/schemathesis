@@ -50,8 +50,8 @@ BADGE_PX = 22
 TIP_END_SHARE = 0.8
 # Ticks past this share put their badge on the left, so it stays inside the track.
 BADGE_END_SHARE = 0.97
-# Above this many failures ticks cover the lanes, and the curve alone shows when they were found.
-MAX_TICKED_FAILURES = 50
+# Above this many ticks across all lanes the chart is cluttered, and the curve alone shows when failures were found.
+MAX_DRAWN_TICKS = 50
 # The curve tops out at this height of 100, so its stroke at the final count stays inside the track.
 CURVE_HEADROOM = 92
 
@@ -136,6 +136,13 @@ def tick_groups(markers: list[Marker], total: float) -> list[list[Marker]]:
                 groups[-1].append(marker)
                 continue
         groups.append([marker])
+    return groups
+
+
+def lane_ticks(lanes: list[Lane], total: float) -> list[list[list[Marker]]]:
+    groups = [tick_groups(lane.markers, total) for lane in lanes]
+    if sum(len(lane_groups) for lane_groups in groups) > MAX_DRAWN_TICKS:
+        return [[] for _ in lanes]
     return groups
 
 
