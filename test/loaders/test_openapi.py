@@ -211,7 +211,7 @@ if platform.python_implementation() == "PyPy":
 else:
     JSON_ERROR = ["Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"]
 YAML_ERROR = [
-    "unacceptable character #x0080: control characters are not allowed",
+    f"unacceptable character #x0080: {'control' if yaml.__with_libyaml__ else 'special'} characters are not allowed",
     '  in "<unicode string>", position 2',
 ]
 

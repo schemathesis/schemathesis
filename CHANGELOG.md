@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Python 3.15 support.
 - Tip to check the base URL when the API refuses connections.
 - `ctx.add_report()` for CLI extensions to list their reports in the terminal and HTML report.
 - `auth.auto-signup` config option to disable automatic sign-up.
