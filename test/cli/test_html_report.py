@@ -488,17 +488,48 @@ def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot
     assert html == snapshot_html
 
 
-def test_html_report_top_failures_count_hidden_kinds(ctx, cli, app_runner, report_dir):
+def top_failures_items(html):
+    tf_list = re.search(r'<ul class="tf-list">(.*?)</ul>', html).group(1)
+    return re.findall(
+        r'<li>(?:<span class="tf-n">\d+</span><span class="tf-name"[^>]*>([^<]+)</span>|<a[^>]*>([^<]+)</a>)</li>',
+        tf_list,
+    )
+
+
+@pytest.mark.parametrize(
+    ("with_schema_failure", "expected"),
+    [
+        (
+            False,
+            [
+                "Missing required headers",
+                "Server error",
+                "Undocumented Content-Type",
+                "Undocumented HTTP status code",
+            ],
+        ),
+        (
+            True,
+            [
+                "Missing required headers",
+                "Response violates schema",
+                "Server error",
+                "+2 more",
+            ],
+        ),
+    ],
+    ids=["one-hidden-shown", "two-hidden-collapsed"],
+)
+def test_html_report_top_failures_count_hidden_kinds(ctx, cli, app_runner, report_dir, with_schema_failure, expected):
     header = {"X-Token": {"required": True, "schema": {"type": "string"}}}
     json_body = {"application/json": {"schema": {"type": "object"}}}
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/api/failure": {"get": {"responses": {"200": {"description": "OK"}}}},
-            "/api/text": {
-                "get": {"responses": {"200": {"description": "OK", "headers": header, "content": json_body}}}
-            },
-        }
-    )
+    paths = {
+        "/api/failure": {"get": {"responses": {"200": {"description": "OK"}}}},
+        "/api/text": {"get": {"responses": {"200": {"description": "OK", "headers": header, "content": json_body}}}},
+    }
+    if with_schema_failure:
+        paths["/api/array"] = {"get": {"responses": {"200": {"description": "OK", "content": json_body}}}}
+    app, _ = ctx.openapi.make_flask_app(paths)
 
     @app.route("/api/failure")
     def failure():
@@ -508,9 +539,13 @@ def test_html_report_top_failures_count_hidden_kinds(ctx, cli, app_runner, repor
     def text():
         return Response("plain", content_type="text/plain")
 
+    @app.route("/api/array")
+    def array():
+        return jsonify([])
+
     html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
-    assert len(re.findall(r'<span class="tf-n">', html)) == 3
-    assert re.search(r'<a class="tf-more" href="#operations">\+1 more</a>', html)
+    items = ["".join(item) for item in top_failures_items(html)]
+    assert items == expected
 
 
 def test_html_report_continue_on_failure(ctx, cli, report_dir, snapshot_html):
