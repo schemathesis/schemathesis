@@ -10,7 +10,7 @@ Reports:
   - HTML: schemathesis-report/html-20261011T121716Z/index.html
 ```
 
-Pass `--report-html-path ./html-report` for a fixed directory, and keep `assets/` next to `index.html` when you move the page.
+Pass `--report-html-path ./html-report` for a fixed directory.
 
 [![HTML report for a failed run, with one failing operation expanded](../img/html-report.png)](../img/html-report.png)
 
