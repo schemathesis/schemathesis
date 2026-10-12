@@ -68,6 +68,10 @@ checks.object_level_authorization.enabled = false
 
 In a [WFC report](../reference/cli.md#-report-wfc-path-filename), these failures use the Schemathesis-specific fault code `906`.
 
+!!! warning "Replaying stateful failures"
+
+    `st replay` sends every step of a recorded failure as the first configured user. A failure found in the stateful phase then replays without the peer's request and is reported as fixed, even when the API still leaks the object. Verify those by re-running the reproduction commands from the report instead.
+
 ## When nothing is reported
 
 A clean run covers only the objects Schemathesis could tie to a user. If it ties none, it sends no extra requests and reports nothing. Check for:

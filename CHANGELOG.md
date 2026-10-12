@@ -12,6 +12,10 @@
 - HTML report counting tested operations as errored when some of their cases errored.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
 
+### :memo: Documentation
+
+- `st replay` limitation for `object_level_authorization` failures found in the stateful phase.
+
 ## [4.31.0](https://github.com/schemathesis/schemathesis/compare/v4.30.1...v4.31.0) - 2026-10-12
 
 ### :rocket: Added
