@@ -25,7 +25,7 @@ ________________________________ OPTIONS /items ________________________________
 
 - Invalid Allow header
 
-    `Allow` header does not match the schema — missing documented methods: POST
+    `Allow: GET, HEAD, OPTIONS` does not match the schema. Missing documented methods: POST
 
     List exactly the methods this resource supports in `Allow`
 

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.31.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- `allow_header_conformance` failures show the received `Allow` header value.
+
 ### :bug: Fixed
 
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
