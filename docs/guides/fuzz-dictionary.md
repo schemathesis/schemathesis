@@ -49,6 +49,9 @@ In the fuzzing and stateful phases, positive-mode requests to `/users/{user_id}`
 Lower the probability to mix dictionary draws with random IDs:
 
 ```toml
+[dictionaries.users]
+values = [42, 100, 9999]
+
 [parameters]
 "path.user_id" = { dictionary = "users", probability = 0.5 }
 ```
@@ -97,6 +100,9 @@ values = ["Dune", "Solaris"]
 Use `*` for any type or any field - `*.*.title` covers every `title` argument in the schema, `Query.*.title` every one on `Query`:
 
 ```toml
+[dictionaries.titles]
+values = ["Dune", "Solaris"]
+
 [parameters]
 "*.*.title" = { dictionary = "titles" }
 ```
