@@ -295,9 +295,8 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
 .repro .copy-btn{position:absolute;top:6px;right:6px;background:var(--color-surface-1)}
 .cmd{margin:0;padding:7px 10px;overflow-x:auto;white-space:pre;font:12px/1.6 var(--font-family-monospace);color:var(--color-text-primary);scrollbar-width:thin;border-radius:var(--radius-sm)}
 /* A scroll box's padding only shows at the end of the scroll, so a single command sits beside Copy, not under it. */
-.repro:has(>.cmd){display:flex;align-items:flex-start}
-.repro:has(>.cmd)>.cmd{flex:1;min-width:0}
-.repro:has(>.cmd) .copy-btn{position:static;flex:none;margin:6px 6px 0 0}
+.repro>.cmd{padding-right:76px}
+.repro>.cmd+.copy-btn{box-shadow:0 0 0 6px var(--color-surface-1)}
 .cmd:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:-2px}
 .steps{list-style:none;margin:0;padding:8px 0;counter-reset:step;display:flex;flex-direction:column;gap:6px}
 .steps>li{counter-increment:step;display:grid;grid-template-columns:28px minmax(0,1fr);row-gap:0}
