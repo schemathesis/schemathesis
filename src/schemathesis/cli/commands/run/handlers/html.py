@@ -242,14 +242,14 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             cases = failing_cases.get(label, [])
             failures = sorted({failure.title for case in cases for failure in case.failures})
             errors = list(self.errors.get(label, {}).values())
-            note = None
+            note = errors[0].title if errors else None
             if failures:
                 status = OperationStatus.FAILED
-            elif errors or (label in statistic.errored_operations and label not in statistic.tested_operations):
-                status = OperationStatus.ERRORED
-                note = errors[0].title if errors else None
             elif label in statistic.tested_operations:
+                # The terminal summary counts an operation that was also tested as tested, not errored.
                 status = OperationStatus.PASSED
+            elif errors or label in statistic.errored_operations:
+                status = OperationStatus.ERRORED
             elif stopped_early:
                 # The footer counts these as not run, matching the operations count in the hero.
                 continue
