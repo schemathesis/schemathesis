@@ -446,7 +446,8 @@ def _verdict_line(data: ReportData) -> tuple[str, str]:
     if data.summary.failures:
         return "", "Failures not tied to an operation"
     if data.verdict is Verdict.ERRORED:
-        errored = sum(row.status is OperationStatus.ERRORED for row in data.operations)
+        # Tested operations keep their errors in their rows.
+        errored = sum(bool(row.errors) or row.status is OperationStatus.ERRORED for row in data.operations)
         return "", f"{plural(errored, 'operation')} errored" if errored else "Errors not tied to an operation"
     text = "1 tested operation passed" if tested == 1 else f"All {tested} tested operations passed"
     bar = (

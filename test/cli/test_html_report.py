@@ -427,12 +427,44 @@ def test_html_report_operations_errored_after_cases(ctx, cli, app_runner, report
     )
     release.set()
     groups = re.findall(r'<span class="group-title">(\w+)</span><span class="group-count">(\d+)</span>', html)
-    assert groups == [("Passed", "1"), ("Errored", "2")]
+    assert groups == [("Passed", "2"), ("Errored", "1")]
     operations = re.search(r'Operations</span><span class="m-value">(\d+)</span><span class="m-sub">([^<]*)<', html)
-    assert operations.groups() == ("3", "1 passed, 2 errored")
+    assert operations.groups() == ("3", "2 passed, 1 errored")
     phases = re.findall(r'<span class="ph-name">(\w+)</span><span class="ph-outcome">([^<]*)</span>', html)
     assert [name for name, _ in phases] == ["Examples", "Coverage", "Fuzzing", "Stateful"]
     assert all(re.fullmatch(r"\d+ errors?", outcome) for name, outcome in phases if name in ("Coverage", "Fuzzing"))
+
+
+# The undecodable body errors only for non-integer `q`; other cases of the same operation pass.
+def test_html_report_operation_tested_and_errored(ctx, cli, app_runner, report_dir, snapshot_html):
+    parameter = {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/flaky": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}},
+            "/api/success": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/api/flaky")
+    def flaky():
+        if not request.args.get("q", "").isdigit():
+            return Response(b"not gzip", headers={"Content-Encoding": "gzip"})
+        return jsonify({})
+
+    @app.route("/api/success")
+    def success():
+        return "{}"
+
+    html = run_with_report(
+        cli,
+        report_dir,
+        app_runner.openapi_url(app),
+        "--checks=not_a_server_error",
+        "--max-examples=10",
+        phases="coverage",
+        exit_code=ExitCode.FAILURES,
+    )
+    assert html == snapshot_html
 
 
 def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot_html):
