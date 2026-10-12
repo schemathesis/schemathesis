@@ -15,6 +15,7 @@ nav:
       - Triaging Failures: guides/triage.md
       - Replaying Failures: guides/crash-reproduction.md
       - guides/auth.md
+      - Object-Level Authorization: guides/object-level-authorization.md
       - guides/schema-conformance.md
       - guides/cicd.md
       - Baseline: guides/baseline.md

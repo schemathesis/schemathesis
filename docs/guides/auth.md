@@ -274,6 +274,7 @@ The `[auth.wfc]` keys in `schemathesis.toml` do support `${VAR}`, so `path = "${
 | `path` | `--auth-wfc` | required | Path to the WFC auth document (JSON or YAML) |
 | `user` | `--auth-wfc-user` | unset | `name` of the auth entry to use for every request |
 | `refresh_interval` | — | `300` | Seconds before re-running the login flow |
+| `peers` | — | unset | At least two users whose objects must stay private to each other; see [Testing Object-Level Authorization](object-level-authorization.md) |
 
 If the document lists several users and `user` is unset, Schemathesis chooses an identity per operation. It starts with the first user, and each time the operation answers `401` or `403` it moves on: next to sending no credentials, then to the remaining users in document order. Once the operation answers with a `2xx` or `3xx` status, it keeps that identity for the rest of the run. Set `user` to send one identity with every request.
 

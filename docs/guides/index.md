@@ -14,6 +14,9 @@ Re-run the exact cases that failed a previous run with `st replay` to confirm fi
 ### [Authentication](auth.md)
 Set up authentication for APIs that require credentials. Covers static tokens, config-based token fetch, Web Fuzzing Commons auth files, dynamic refresh, and endpoint-specific auth strategies.
 
+### [Testing Object-Level Authorization](object-level-authorization.md)
+Check that one user cannot read objects another user owns, using two sets of credentials.
+
 ### [Adding Schema Validation to Existing Tests](schema-conformance.md)
 Validate API responses against your schema in existing test suites without using Schemathesis for data generation.
 
