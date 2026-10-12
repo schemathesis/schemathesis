@@ -137,7 +137,7 @@ class WFCAuthConfig(DiffBase):
     peers: list[str] | None
 
     def __init__(
-        self, *, path: str, user: str | None = None, refresh_interval: int = 300, peers: list[str] | None = None
+        self, *, path: str = "", user: str | None = None, refresh_interval: int = 300, peers: list[str] | None = None
     ) -> None:
         self.path = path
         self.user = user
@@ -152,8 +152,7 @@ class AuthConfig(DiffBase):
     dynamic: OpenAPIDynamicAuthConfig
     wfc: WFCAuthConfig | None
     auto_signup: bool
-    # Set only from the CLI. `wfc` merges as a whole, so values named there would be dropped
-    # when the file itself comes from the config.
+    # Set only from the CLI so a user can be selected without overriding the configured WFC path.
     wfc_user: str | None
 
     def __init__(
@@ -193,7 +192,7 @@ class AuthConfig(DiffBase):
             )
 
         if wfc is not None:
-            self.wfc = WFCAuthConfig(**{key: resolve(value) for key, value in wfc.items()})
+            self.wfc = WFCAuthConfig(**{key: resolve(value) for key, value in wfc.items()})._mark_source_keys(wfc)
         else:
             self.wfc = None
 
@@ -239,11 +238,22 @@ class AuthConfig(DiffBase):
             self._mark_source_keys(("basic",))
 
         if wfc_path is not None:
+            # Only the options named on the command line override the configured ones.
             self.wfc = WFCAuthConfig(path=resolve(wfc_path), user=resolve(wfc_user))
+            self.wfc._mark_source_keys(("path", "user") if wfc_user is not None else ("path",))
             self._mark_source_keys(("wfc",))
         elif wfc_user is not None:
             self.wfc_user = wfc_user
             self._mark_source_keys(("wfc_user",))
+
+    @classmethod
+    def from_hierarchy(cls, configs: list[AuthConfig]) -> AuthConfig:  # type: ignore[override]  # reads `wfc`
+        output = super().from_hierarchy(configs)
+        # `wfc` is unset by default, so the generic merge would take the whole section from one level.
+        wfc_configs = [config.wfc for config in configs if config.wfc is not None]
+        if len(wfc_configs) > 1:
+            output.wfc = WFCAuthConfig.from_hierarchy(wfc_configs)
+        return output
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AuthConfig:

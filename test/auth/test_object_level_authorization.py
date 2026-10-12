@@ -145,6 +145,22 @@ def test_without_peers_no_probe_is_sent(cli, ctx, tmp_path):
     assert _peer_requests(api.requests) == []
 
 
+def test_cli_wfc_path_preserves_configured_peers(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    auth = _auth_file(tmp_path)
+
+    result = cli.run(
+        api.schema_url,
+        "--max-examples=10",
+        "--phases=fuzzing",
+        "--checks=object_level_authorization",
+        f"--auth-wfc={auth}",
+        config={"auth": {"wfc": {"path": auth, "peers": ["alice", "bob"]}}},
+    )
+
+    assert (result.exit_code, bool(_peer_requests(api.requests))) == (1, True), result.stdout
+
+
 @pytest.mark.parametrize(
     ("listing", "operation", "draw", "kwargs", "reported", "probed"),
     [
