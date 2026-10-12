@@ -74,7 +74,7 @@ class Probe:
         raise NotImplementedError
 
 
-class ProbeOutcome(str, enum.Enum):
+class ProbeOutcome(enum.StrEnum):
     # Capability is supported
     SUCCESS = "success"
     # Capability is not supported

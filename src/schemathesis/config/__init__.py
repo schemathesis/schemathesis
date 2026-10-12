@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import sys
+import tomllib
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -43,11 +43,6 @@ from schemathesis.config._phases import (
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig, get_workers_count
 from schemathesis.config._report import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat, ReportsConfig
 from schemathesis.config._warnings import SchemathesisWarning, WarningsConfig
-
-if sys.version_info < (3, 11):
-    import tomli
-else:
-    import tomllib as tomli
 
 __all__ = [
     "SchemathesisConfig",
@@ -225,7 +220,7 @@ class SchemathesisConfig(DiffBase):
     @classmethod
     def from_str(cls, data: str, *, base_dir: str | None = None) -> SchemathesisConfig:
         """Parse configuration from a string."""
-        parsed = tomli.loads(data)
+        parsed = tomllib.loads(data)
         return cls.from_dict(parsed, base_dir=base_dir)
 
     @classmethod

@@ -284,8 +284,7 @@ def _resolve_document_fragment(target_resolver: Resolver, fragment: str, target_
     except RefResolutionError as exc:
         # A bare `#/fragment` note reads like a broken reference in the main schema; attribute
         # it to the document that actually missed the key.
-        # `add_note` is 3.11+, and this error is ours, so mypy has no `__notes__` to see.
-        exc.__notes__ = [target_uri]  # type: ignore[attr-defined]
+        exc.__notes__ = [target_uri]
         raise
 
 
@@ -323,11 +322,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
         resolved = resolver.lookup(reference)
     except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:
         error = RefResolutionError(str(exc))
-        if sys.version_info >= (3, 11):
-            error.add_note(reference)
-        else:
-            # `add_note` is 3.11+, and this error is ours, so mypy has no `__notes__` to see.
-            error.__notes__ = [reference]  # type: ignore[attr-defined]
+        error.add_note(reference)
         raise error from exc
     # Bind `resolved.contents` so subsequent local-fragment walks land in the right document.
     return resolved_uri, Resolver(resolved.resolver, resolved.contents), resolved.contents

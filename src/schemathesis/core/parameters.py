@@ -94,7 +94,8 @@ def split_delimited_query(params: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return "&".join(raw_parts), rest
 
 
-class ParameterLocation(str, Enum):
+# `StrEnum` rejects the `None` value of `UNKNOWN`.
+class ParameterLocation(str, Enum):  # noqa: UP042
     """API parameter location."""
 
     QUERY = "query"

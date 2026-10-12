@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 
 
-class SchemathesisWarning(str, enum.Enum):
+class SchemathesisWarning(enum.StrEnum):
     MISSING_AUTH = "missing_auth"
     MISSING_TEST_DATA = "missing_test_data"
     BASE_URL_MISMATCH = "base_url_mismatch"

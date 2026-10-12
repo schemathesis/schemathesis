@@ -24,7 +24,7 @@ I try to answer every issue within a few days. If you hear nothing, comment on t
 
 ## Submitting Pull Requests
 
-You need Python 3.10+, [uv](https://docs.astral.sh/uv/) and `curl`. The tests run the curl commands Schemathesis generates, so install `curl` with your OS package manager, e.g. `apt install curl` or `brew install curl`.
+You need Python 3.11+, [uv](https://docs.astral.sh/uv/) and `curl`. The tests run the curl commands Schemathesis generates, so install `curl` with your OS package manager, e.g. `apt install curl` or `brew install curl`.
 
 [`just`](https://github.com/casey/just) is optional. It wraps the commands below, and `just --list` shows them all.
 
@@ -33,7 +33,7 @@ You need Python 3.10+, [uv](https://docs.astral.sh/uv/) and `curl`. The tests ru
 3. Install the development dependencies:
 
     ```bash
-    uv venv --python 3.10    # any version from 3.10 up works
+    uv venv --python 3.11    # any version from 3.11 up works
     source .venv/bin/activate    # fish: .venv/bin/activate.fish
     uv pip install -e ".[dev]"
     ```

@@ -1,6 +1,5 @@
 import platform
 import re
-import sys
 from xml.etree import ElementTree
 
 import pytest
@@ -102,7 +101,7 @@ def with_error(ctx, response, case):
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 11) or platform.system() == "Windows",
+    platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
 def test_error_with_traceback(ctx, with_error, cli, tmp_path):

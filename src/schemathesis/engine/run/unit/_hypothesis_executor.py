@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from warnings import catch_warnings
 
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures

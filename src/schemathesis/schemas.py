@@ -52,13 +52,14 @@ from .hooks import (
 )
 
 if TYPE_CHECKING:
+    from typing import Self
+
     import httpx
     import httpx2
     import requests
     from hypothesis import HealthCheck
     from hypothesis.strategies import SearchStrategy
     from requests.structures import CaseInsensitiveDict
-    from typing_extensions import Self
     from werkzeug.test import TestResponse
 
     from schemathesis.auths import AuthContext, AuthProvider

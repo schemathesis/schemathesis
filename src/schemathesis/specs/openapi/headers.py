@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import UTC
 from email.utils import format_datetime
 from typing import TYPE_CHECKING
 
@@ -41,7 +41,7 @@ def if_match_values() -> st.SearchStrategy[str]:
 def http_date_values() -> st.SearchStrategy[str]:
     from hypothesis import strategies as st
 
-    return st.datetimes(timezones=st.just(timezone.utc)).map(lambda dt: format_datetime(dt, usegmt=True))
+    return st.datetimes(timezones=st.just(UTC)).map(lambda dt: format_datetime(dt, usegmt=True))
 
 
 def _range_spec() -> st.SearchStrategy[str]:

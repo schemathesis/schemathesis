@@ -1525,7 +1525,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     )
 
 
-class AuthKind(str, enum.Enum):
+class AuthKind(enum.StrEnum):
     EXPLICIT = "explicit"
     GENERATED = "generated"
 

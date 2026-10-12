@@ -16,7 +16,7 @@ from schemathesis.engine.recorder import CheckNode, RecordedScenario, Request
 from schemathesis.generation.meta import CoveragePhaseData
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 TextOutput = IO[str] | StringIO | Path
 

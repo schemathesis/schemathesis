@@ -32,7 +32,7 @@ NOT_SET = NotSet()
 Body: TypeAlias = "JsonValue | bytes | NotSet"
 
 
-class SpecificationFeature(str, enum.Enum):
+class SpecificationFeature(enum.StrEnum):
     """Features that Schemathesis can provide for different specifications."""
 
     SCHEMA_ANALYSIS = "schema_analysis"
@@ -66,7 +66,7 @@ class Specification:
         return feature in _FEATURES[self.kind]
 
 
-class SpecificationKind(str, enum.Enum):
+class SpecificationKind(enum.StrEnum):
     """Specification of the given schema."""
 
     OPENAPI = "openapi"

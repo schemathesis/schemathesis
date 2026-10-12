@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeAlias
+from typing import Any, NotRequired, TypeAlias
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 Reference = TypedDict("Reference", {"$ref": str})
 """JSON Reference object with $ref key."""

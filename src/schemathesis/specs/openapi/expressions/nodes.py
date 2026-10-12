@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, unique
+from enum import StrEnum, unique
 from typing import TYPE_CHECKING, Any, cast
 
 from requests.structures import CaseInsensitiveDict
@@ -26,7 +26,7 @@ class Node:
 
 
 @unique
-class NodeType(str, Enum):
+class NodeType(StrEnum):
     URL = "$url"
     METHOD = "$method"
     STATUS_CODE = "$statusCode"

@@ -19,7 +19,6 @@ from anyio.from_thread import start_blocking_portal
 from anyio.streams.stapled import StapledObjectStream
 from urllib3.exceptions import ReadTimeoutError
 
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.transport import (
     DEFAULT_MAX_STREAM_EVENTS,
     STREAM_CUT_SHORT_ATTRIBUTE,

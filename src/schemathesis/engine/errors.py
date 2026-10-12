@@ -291,7 +291,7 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
 
 
 @enum.unique
-class RuntimeErrorKind(str, enum.Enum):
+class RuntimeErrorKind(enum.StrEnum):
     """Classification of runtime errors."""
 
     # Connection related issues
@@ -436,7 +436,7 @@ def canonicalize_error_message(error: Exception, with_traceback: bool = True) ->
     return URL_IN_ERROR_MESSAGE_RE.sub("", message)
 
 
-def clear_hypothesis_notes(exc: Exception) -> None:
+def clear_hypothesis_notes(exc: BaseException) -> None:
     notes = getattr(exc, "__notes__", [])
     if not notes:
         return
@@ -447,7 +447,7 @@ def clear_hypothesis_notes(exc: Exception) -> None:
         note for note in notes if not ("while generating" in note or note.strip().startswith("You can reproduce this "))
     ]
     if filtered_notes != notes:
-        exc.__notes__ = filtered_notes  # type: ignore[attr-defined]
+        exc.__notes__ = filtered_notes
 
 
 def is_inconsistent_replay(exc: BaseException) -> bool:

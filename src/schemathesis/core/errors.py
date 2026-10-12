@@ -37,7 +37,7 @@ class SchemathesisError(Exception):
     """Base exception class for all Schemathesis errors."""
 
 
-class DefinitionKind(str, enum.Enum):
+class DefinitionKind(enum.StrEnum):
     SCHEMA = "Schema Object"
     SECURITY_SCHEME = "Security Scheme Object"
     RESPONSES = "Responses Object"
@@ -374,7 +374,7 @@ class UnsupportedRegexPattern(InvalidRegexPattern):
         )
 
 
-def is_regex_validation_error(exc: Exception) -> bool:
+def is_regex_validation_error(exc: BaseException) -> bool:
     """Check if exception is a jsonschema_rs.ValidationError for invalid regex."""
     return isinstance(exc, ValidationError) and exc.kind.name == "format" and exc.kind.value == "regex"
 
@@ -582,7 +582,7 @@ class OperationNotFound(LookupError, SchemathesisError):
 
 
 @enum.unique
-class LoaderErrorKind(str, enum.Enum):
+class LoaderErrorKind(enum.StrEnum):
     # Connection related issues
     CONNECTION_SSL = "connection_ssl"
     CONNECTION_OTHER = "connection_other"

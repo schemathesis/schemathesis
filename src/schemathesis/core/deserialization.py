@@ -4,9 +4,9 @@ import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, NotRequired, TextIO
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.transport import Response

@@ -4,7 +4,7 @@ import asyncio
 import inspect
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from functools import wraps
 from typing import Any
 
@@ -47,7 +47,7 @@ from schemathesis.schemas import APIOperation
 setup()
 
 
-class HypothesisTestMode(str, Enum):
+class HypothesisTestMode(StrEnum):
     EXAMPLES = "examples"
     COVERAGE = "coverage"
     FUZZING = "fuzzing"

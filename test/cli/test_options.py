@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 
 import click
 import pytest
@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 from schemathesis.cli.ext.options import CsvEnumChoice
 
 
-class Options(str, Enum):
+class Options(StrEnum):
     FIRST = "first"
     SECOND = "second"
 

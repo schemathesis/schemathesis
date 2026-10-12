@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.mutations import Mutation
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from schemathesis.python._constants.pool import ConstantDraw
 
 
-class TestPhase(str, Enum):
+class TestPhase(StrEnum):
     __test__ = False
 
     EXAMPLES = "examples"
@@ -27,7 +27,7 @@ class TestPhase(str, Enum):
     STATEFUL = "stateful"
 
 
-class CoverageScenario(str, Enum):
+class CoverageScenario(StrEnum):
     """Coverage test scenario types."""
 
     # Positive scenarios - Valid values

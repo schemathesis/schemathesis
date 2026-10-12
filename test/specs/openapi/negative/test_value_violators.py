@@ -38,7 +38,7 @@ def test_violate_email_breaks_validation():
 def test_violate_date_time_breaks_validation():
     violated = violate_date_time("2024-01-01T12:30:00Z")
     with pytest.raises(ValueError):
-        datetime.datetime.fromisoformat(violated.replace("Z", "+00:00"))
+        datetime.datetime.fromisoformat(violated)
 
 
 def test_violate_date_breaks_validation():

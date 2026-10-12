@@ -286,7 +286,7 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             "schemaVersion": SCHEMA_VERSION,
             "toolName": "Schemathesis",
             "toolVersion": SCHEMATHESIS_VERSION,
-            "creationTime": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "creationTime": datetime.datetime.now(datetime.UTC).isoformat(),
             "faults": {
                 "totalNumber": exported.distinct_faults,
                 "foundFaults": exported.found_faults,

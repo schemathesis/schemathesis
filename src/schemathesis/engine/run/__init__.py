@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.events import EventGenerator
 
 
-class PhaseName(str, enum.Enum):
+class PhaseName(enum.StrEnum):
     """Available execution phases."""
 
     PROBING = "probing"
@@ -41,7 +41,7 @@ INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_
 ELASTIC_PHASES = (PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
 
 
-class PhaseSkipReason(str, enum.Enum):
+class PhaseSkipReason(enum.StrEnum):
     """Reasons why a phase might not be executed."""
 
     # Explicitly disabled via config

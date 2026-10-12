@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.error_feedback.store import ParameterPath
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonValue
 
 
-class OperatorKind(str, Enum):
+class OperatorKind(StrEnum):
     # Swaps the JSON-Schema `type` keyword.
     CHANGE_TYPE = "change_type"
     # Wraps the schema in `not:` to violate one or more keywords at once.
@@ -26,7 +26,7 @@ class OperatorKind(str, Enum):
     SYNTAX_FUZZING = "syntax_fuzzing"
 
 
-class MutationChannel(str, Enum):
+class MutationChannel(StrEnum):
     """Where a mutation lives in the per-case pipeline."""
 
     SCHEMA = "schema"

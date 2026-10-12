@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, NotRequired, TypeAlias
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef, _SecurityTypeKey
 

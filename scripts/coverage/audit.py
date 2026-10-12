@@ -217,8 +217,7 @@ def _run_pool(
     phase = worker_kwargs["phase"]
     cursor = 0
     while cursor < len(queue):
-        # `max_tasks_per_child` exists since 3.11 but typeshed's overloads don't expose it yet.
-        executor = ProcessPoolExecutor(  # type: ignore[call-overload]
+        executor = ProcessPoolExecutor(
             max_workers=max_workers, mp_context=ctx, max_tasks_per_child=_MAX_TASKS_PER_CHILD
         )
         in_flight: dict[Future[_WorkerOutput], _Ref] = {}

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +12,7 @@ from schemathesis.config._env import resolve
 DEFAULT_REPORT_DIRECTORY = Path("./schemathesis-report")
 
 
-class ReportFormat(str, Enum):
+class ReportFormat(StrEnum):
     """Available report formats."""
 
     JUNIT = "junit"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from schemathesis.engine import Status, StopReason
@@ -28,7 +28,7 @@ def split_label(label: str) -> tuple[str | None, str]:
     return None, label
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     PASSED = "Passed"
     FAILED = "Failed"
     ERRORED = "Errored"
@@ -113,7 +113,7 @@ class NothingTested:
     tip: str | None
 
 
-class OperationStatus(str, Enum):
+class OperationStatus(StrEnum):
     FAILED = "Failed"
     PASSED = "Passed"
     ERRORED = "Errored"

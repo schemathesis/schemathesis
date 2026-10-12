@@ -16,7 +16,7 @@ from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
 from schemathesis.core.transforms import resolve_pointer
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from schemathesis.schemas import APIOperation
 

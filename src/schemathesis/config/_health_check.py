@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum, unique
+from enum import StrEnum, unique
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 @unique
-class HealthCheck(str, Enum):
+class HealthCheck(StrEnum):
     data_too_large = "data_too_large"
     filter_too_much = "filter_too_much"
     too_slow = "too_slow"

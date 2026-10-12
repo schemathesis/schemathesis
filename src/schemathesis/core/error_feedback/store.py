@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field, replace
-from enum import Enum
+from enum import StrEnum
 from typing import TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
@@ -15,7 +15,7 @@ ParameterPath: TypeAlias = tuple[str | int, ...]
 MAX_ENTRIES_PER_BUCKET = 100
 
 
-class ObservationKind(str, Enum):
+class ObservationKind(StrEnum):
     """Kinds of signal a parser can extract from a 4xx body."""
 
     MUST_NOT_BE_BLANK = "must_not_be_blank"
@@ -57,7 +57,7 @@ class FormatPayload:
     name: str
 
 
-class BoundDirection(str, Enum):
+class BoundDirection(StrEnum):
     """Which side of a numeric range a `NumericBoundPayload` constrains."""
 
     MIN = "min"

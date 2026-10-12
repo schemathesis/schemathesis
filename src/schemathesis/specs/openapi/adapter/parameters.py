@@ -7,11 +7,10 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from random import Random
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, assert_never, cast
 from urllib.parse import unquote
 
 import jsonschema_rs
-from typing_extensions import assert_never
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet

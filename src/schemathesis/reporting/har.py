@@ -18,7 +18,7 @@ from schemathesis.core.transport import Headers, Response
 from schemathesis.engine.recorder import RecordedScenario
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 TextOutput = IO[str] | StringIO | Path
 

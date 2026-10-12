@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class GenerationMode(str, Enum):
+class GenerationMode(StrEnum):
     """Defines what data Schemathesis generates for tests."""
 
     # Generate data, that fits the API schema

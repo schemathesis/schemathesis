@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 FORMAT_VERSION = 1
 
 
-class Kind(str, Enum):
+class Kind(StrEnum):
     ERROR_FEEDBACK = "error_feedback"
     AUTH_REQUIRED = "auth_required"
     METHOD_NOT_ALLOWED = "method_not_allowed"

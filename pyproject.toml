@@ -9,7 +9,7 @@ description = "Adaptive API testing for OpenAPI and GraphQL"
 keywords = ["pytest", "hypothesis", "openapi", "graphql", "testing", "fuzzing", "adaptive"]
 authors = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
 maintainers = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 readme = "README.md"
 include = ["src/schemathesis/py.typed"]
@@ -22,7 +22,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -43,7 +42,6 @@ dependencies = [
   "PyYAML>=5.1,<7.0",
   "requests>=2.22,<3",
   "rich>=13.9.4",
-  "tomli>=2.2.1; python_version < '3.11'",
   "typing-extensions>=4.12.2",
   "werkzeug>=0.16.0,<4",
 ]
@@ -157,7 +155,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [
