@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Report seed under `pytest-xdist` not reproducing operations run on other workers.
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
 - HTML report counting tested operations as errored when some of their cases errored.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.

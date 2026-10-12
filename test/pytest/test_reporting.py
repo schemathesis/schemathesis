@@ -543,6 +543,45 @@ def test_api(case):
     assert len(cassette["http_interactions"]) >= 2
 
 
+@pytest.mark.parametrize("explicit_seed", [None, 42])
+def test_xdist_workers_share_reported_seed(testdir, ctx, explicit_seed):
+    api = ctx.openapi.apps.success()
+    cassette_path = testdir.tmpdir.join("cassette.yaml")
+    seeds_dir = testdir.mkdir("seeds")
+    schema_dict = ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    seed_setup = "" if explicit_seed is None else f"schema.config.seed = {explicit_seed}"
+    content = f"""
+import os
+import pathlib
+
+import schemathesis
+from hypothesis import settings
+
+schema = schemathesis.openapi.from_dict({schema_dict!r})
+schema.config.update(base_url="{api.base_url}/api")
+{seed_setup}
+schema.config.reports.update(vcr_path=r"{cassette_path}")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    case.call()
+    worker = os.environ["PYTEST_XDIST_WORKER"]
+    pathlib.Path(r"{seeds_dir}", worker).write_text(str(schema.config.seed))
+"""
+    # `loadfile` sends one file to each worker
+    testdir.makepyfile(test_first=content, test_second=content)
+
+    result = testdir.runpytest("-n", "2", "--dist=loadfile")
+    result.assert_outcomes(passed=2)
+
+    reported_seed = load_yaml_or_fail(str(cassette_path))["seed"]
+    worker_seeds = {path.basename: int(path.read_text("utf-8")) for path in seeds_dir.listdir()}
+    assert worker_seeds == {"gw0": reported_seed, "gw1": reported_seed}
+    if explicit_seed is not None:
+        assert reported_seed == explicit_seed
+
+
 def test_vcr_report_network_error_via_xdist(testdir, ctx):
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     _make_xdist_test(
