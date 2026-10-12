@@ -6,7 +6,6 @@ import anyio
 import pytest
 import requests
 
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.errors import get_request_error_message
 from schemathesis.python.asgi import ASGIClient, shutdown_lifespans
 
@@ -201,7 +200,6 @@ def test_shutdown_failure_at_interpreter_exit_is_silent():
     source = """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.errors import get_request_error_message
 from schemathesis.python.asgi import ASGIClient, shutdown_lifespans
 

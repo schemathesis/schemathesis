@@ -12,7 +12,7 @@ In this tutorial you add Schemathesis to a `pytest` suite, let it find a server 
 - **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API
 - **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - included in Docker Desktop
 - **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - to install `pytest` and Schemathesis
-- **Python 3.10+**
+- **Python 3.11+**
 
 --8<-- "docs/tutorials/_booking-api.md"
 

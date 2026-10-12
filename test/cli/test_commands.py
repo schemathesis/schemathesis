@@ -121,11 +121,7 @@ def test_hooks_invalid(ctx, cli):
     # And a helpful message should be displayed in the output
     lines = result.stdout.strip().split("\n")
     assert lines[0] == "Unable to load Schemathesis extension hooks"
-    if sys.version_info >= (3, 11):
-        idx = 8
-    else:
-        idx = 7
-    assert lines[idx] == "ZeroDivisionError: division by zero"
+    assert lines[8] == "ZeroDivisionError: division by zero"
 
 
 def test_certificate_only_key(cli, tmp_path, snapshot_cli):
@@ -1395,7 +1391,7 @@ def with_error(ctx, response, case):
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 11) or sys.version_info >= (3, 13) or platform.system() == "Windows",
+    sys.version_info >= (3, 13) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
 def test_useful_traceback(ctx, cli, snapshot_cli, with_error):

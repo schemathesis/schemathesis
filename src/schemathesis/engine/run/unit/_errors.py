@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Protocol
 import hypothesis.errors
 from jsonschema_rs import ValidationError
 
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.errors import (
     AuthenticationError,
     InternalError,
@@ -234,7 +233,7 @@ def _iter_group_errors(
                 yield non_fatal_error(sub_exc)
         else:
             code_sample = state.get_code_sample_for(sub_exc)
-            if code_sample is not None:
+            if code_sample is not None and isinstance(sub_exc, Exception):
                 reported = True
                 clear_hypothesis_notes(sub_exc)
                 yield non_fatal_error(sub_exc, code_sample=code_sample)

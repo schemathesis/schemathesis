@@ -5,12 +5,11 @@ import itertools
 import textwrap
 import traceback
 from collections.abc import Callable, Sequence
-from enum import Enum
+from enum import StrEnum
 from json import JSONDecodeError
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import (
     BINARY_PAYLOAD,
     EMPTY_PAYLOAD,
@@ -40,7 +39,7 @@ def reason_phrase(status_code: int) -> str:
     return _RFC9110_PHRASES.get(status_code) or http.client.responses.get(status_code, "Unknown")
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     # For server errors, security issues like ignored auth
     CRITICAL = "critical"
     # For schema violations
@@ -349,10 +348,10 @@ class AcceptedNegativeData(Failure):
         return str(self.status_code)
 
 
-class FailureGroup(BaseExceptionGroup):
+class FailureGroup(BaseExceptionGroup[Failure]):
     """Multiple distinct check failures."""
 
-    exceptions: Sequence[Failure]
+    exceptions: tuple[Failure, ...]
 
     def __init__(self, exceptions: Sequence[Failure], message: str = "", /) -> None:
         super().__init__(message, exceptions)
@@ -376,7 +375,7 @@ def as_reported_failure(exc: FailureGroup) -> FailureGroup:
     return reported.with_traceback(exc.__traceback__)
 
 
-class MessageBlock(str, Enum):
+class MessageBlock(StrEnum):
     CASE_ID = "case_id"
     FAILURE = "failure"
     STATUS = "status"

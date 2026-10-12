@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, assert_never
 from urllib.parse import urlsplit
 
 import jsonschema_rs
 from jsonschema_rs import Validator
-from typing_extensions import assert_never
 
 from schemathesis import transport
 from schemathesis.auths import reauth_and_replay
@@ -453,12 +452,10 @@ class Case(Generic[OperationT]):
             raise
         except Exception as exc:
             # Add reproduction code for check failures and app errors (e.g., ASGI/WSGI internal errors)
-            if not hasattr(exc, "__notes__"):
-                exc.__notes__ = []  # type: ignore[attr-defined]
             verify = kwargs.get("verify", True)
             try:
                 curl = self.as_curl_command(headers=headers, verify=verify)
-                exc.__notes__.append(f"\nReproduce with:\n\n    {curl}")  # type: ignore[attr-defined]
+                exc.add_note(f"\nReproduce with:\n\n    {curl}")
             except Exception:
                 # Curl generation can fail for the same reason as the original error
                 # (e.g., malformed path template). Skip adding curl command to avoid

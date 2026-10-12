@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from schemathesis.core.parameters import ParameterLocation
 
 
-class Cardinality(str, enum.Enum):
+class Cardinality(enum.StrEnum):
     """Whether a response contains one resource or many resources."""
 
     ONE = "ONE"

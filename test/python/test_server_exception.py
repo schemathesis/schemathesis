@@ -32,8 +32,7 @@ def test_wsgi_server_exception_keeps_its_own_notes(ctx):
     @app.route("/api/crash", methods=["GET"])
     def crash():
         error = ValueError("something broke")
-        # `add_note` needs Python 3.11; Python 3.10 users attach notes this way.
-        error.__notes__ = ["Raised by the app"]
+        error.add_note("Raised by the app")
         raise error
 
     schema = ctx.openapi.load_schema({"/api/crash": {"get": {"responses": {"200": {"description": "OK"}}}}})

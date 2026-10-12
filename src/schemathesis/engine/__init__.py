@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     SUCCESS = "success"
     FAILURE = "failure"
     ERROR = "error"
@@ -22,7 +22,7 @@ class Status(str, Enum):
 _STATUS_ORDER = {Status.SUCCESS: 0, Status.FAILURE: 1, Status.ERROR: 2, Status.INTERRUPTED: 3, Status.SKIP: 4}
 
 
-class StopReason(str, Enum):
+class StopReason(StrEnum):
     """Why the engine stopped."""
 
     COMPLETED = "completed"

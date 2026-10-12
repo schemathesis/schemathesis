@@ -350,7 +350,7 @@ class EnsureResourceAvailability(Failure):
         return ""
 
 
-class AuthScenario(str, enum.Enum):
+class AuthScenario(enum.StrEnum):
     NO_AUTH = "no_auth"
     INVALID_AUTH = "invalid_auth"
     GENERATED_AUTH = "generated_auth"

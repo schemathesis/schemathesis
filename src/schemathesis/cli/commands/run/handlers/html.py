@@ -325,7 +325,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         outcomes = self._phase_outcomes(summary.phases, stop_reason)
         data = ReportData(
             meta=ReportMeta(
-                generated_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                generated_at=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
                 location=sanitized(self.location, sanitization_config),
                 base_url=sanitized(self.base_url, sanitization_config),
                 command=get_command_representation(sanitization_config),

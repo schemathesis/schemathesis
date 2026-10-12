@@ -6,7 +6,7 @@ import sys
 import time
 from collections.abc import Generator, Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -74,7 +74,7 @@ _KNOWN_UNSUPPORTED_PREFIXES: tuple[str, ...] = (
 )
 
 
-class PhaseName(str, Enum):
+class PhaseName(StrEnum):
     FUZZING = "fuzzing"
     COVERAGE = "coverage"
     EXAMPLES = "examples"

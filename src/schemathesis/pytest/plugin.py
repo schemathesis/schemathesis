@@ -15,7 +15,6 @@ from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from pluggy import Result as PluggyResult
 
 from schemathesis.checks import collect_after_run_failures, run_checks_for
-from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,

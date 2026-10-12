@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from math import inf, nextafter
 from unittest.mock import ANY
 
@@ -38,10 +37,6 @@ from test.coverage.helpers import scenario_values
 from test.utils import to_float32
 
 UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-
-SKIP_BEFORE_PY11 = pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="Possessive repeats and atomic groups are only available in Python 3.11+"
-)
 
 PATTERN = "^\\d+$"
 
@@ -1460,7 +1455,7 @@ def test_positive_string_reaches_lengths_far_from_what_the_pattern_emits_natural
         (r"^(a)(?:\1)*$", 40),
         (r"^(?:ab|abcd)+$", 8),
         (r"^(?:ab|abcd){2}$", 8),
-        pytest.param(r"^(?:ab)++$", 40, marks=SKIP_BEFORE_PY11),
+        (r"^(?:ab)++$", 40),
         (r"^(?:^)*[a-z]+$", 8),
         (r"^(?:abc){1,2}$", 6),
     ],
@@ -1476,7 +1471,7 @@ def test_positive_string_conforms_for_a_pattern_the_length_walk_cannot_pin(pctx,
 
 @pytest.mark.parametrize(
     "pattern",
-    [pytest.param(r"^(?>[a-z]+)[0-9]$", marks=SKIP_BEFORE_PY11), r"^(?=[a-z]{3})[a-z]+$"],
+    [r"^(?>[a-z]+)[0-9]$", r"^(?=[a-z]{3})[a-z]+$"],
     ids=["atomic", "lookahead"],
 )
 def test_positive_string_absent_where_a_length_bound_meets_a_shape_neither_path_handles(pctx, pattern):

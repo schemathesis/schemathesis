@@ -1,12 +1,13 @@
 import os
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
 
 from schemathesis.checks import CHECKS
-from schemathesis.config import SchemathesisConfig, tomli
+from schemathesis.config import SchemathesisConfig
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.transforms import resolve_pointer
 from schemathesis.errors import HookError
@@ -133,8 +134,8 @@ TOML_SNIPPETS = collect_all_toml_snippets()
 @pytest.mark.parametrize(["filename", "snippet"], TOML_SNIPPETS)
 def test_toml_snippets_are_valid(filename: str, snippet: str):
     try:
-        tomli.loads(snippet)
-    except tomli.TOMLDecodeError as exc:
+        tomllib.loads(snippet)
+    except tomllib.TOMLDecodeError as exc:
         pytest.fail(f"Invalid TOML in {filename}:\n{exc}")
 
 

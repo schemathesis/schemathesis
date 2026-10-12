@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import perf_counter
 
 
@@ -23,4 +23,4 @@ class Instant:
 
 def format_timestamp(value: float) -> str:
     """UTC timestamp for report payloads, from a `time.time()` value."""
-    return datetime.fromtimestamp(value, timezone.utc).isoformat()
+    return datetime.fromtimestamp(value, UTC).isoformat()

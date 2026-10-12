@@ -136,6 +136,10 @@
 - Misleading additional-properties hint when a Pydantic error names a declared field.
 - `st replay` failing to load the schema for crashes recorded with `--tls-verify=false`.
 
+### :fire: Removed
+
+- Python 3.10 support.
+
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
 ### :wrench: Changed

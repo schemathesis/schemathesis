@@ -15,7 +15,7 @@ from schemathesis.engine import Status
 from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from schemathesis.config import OutputConfig
     from schemathesis.engine.recorder import RecordedScenario

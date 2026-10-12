@@ -8,7 +8,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 NOT_A_SERVER_ERROR_EXPECTED_STATUSES = ["2xx", "3xx", "4xx"]
 NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES = [
