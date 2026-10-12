@@ -479,7 +479,11 @@ def _run_step(
     unique_inputs: bool,
 ) -> StepOutput | None:
     """Send one scenario step and record its outcome; `None` when this input already passed."""
-    _raise_if_stopped(engine)
+    try:
+        _raise_if_stopped(engine)
+    except BudgetExpired:
+        machine.recorder.forget_case(case_id=case.id)
+        raise
     _reject_unusable_operation(engine, case.operation.label)
     try:
         if unique_inputs and _replay_cached_outcome(ctx, case):
