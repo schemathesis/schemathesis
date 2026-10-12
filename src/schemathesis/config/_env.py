@@ -17,14 +17,22 @@ def resolve(value: Any) -> Any:
     if not isinstance(value, str):
         return value
 
+    missing: dict[str, None] = {}
+
     def replace(match: re.Match[str]) -> str:
         if match.group("escaped") is not None:
             return "$"
         if match.group("invalid") is not None:
             raise ConfigError(f"Invalid placeholder in string: `{value}`")
-        try:
-            return os.environ[match.group("name")]
-        except KeyError:
-            raise ConfigError(f"Missing environment variable: `{value}`") from None
+        name = match.group("name")
+        if name not in os.environ:
+            missing[name] = None
+            return ""
+        return os.environ[name]
 
-    return PLACEHOLDER.sub(replace, value)
+    resolved = PLACEHOLDER.sub(replace, value)
+    if missing:
+        noun = "variable" if len(missing) == 1 else "variables"
+        names = ", ".join(f"`{name}`" for name in missing)
+        raise ConfigError(f"Missing environment {noun}: {names}")
+    return resolved
