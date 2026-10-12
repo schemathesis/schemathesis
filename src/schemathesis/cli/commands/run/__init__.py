@@ -73,7 +73,7 @@ from schemathesis.cli.options import (
     WARNINGS,
     WORKERS,
 )
-from schemathesis.cli.validation import CONFLICTING_URL_MESSAGE, validate_auth_overlap
+from schemathesis.cli.validation import CONFLICTING_URL_MESSAGE, validate_auth_overlap, validate_wfc_user
 from schemathesis.config import (
     DEFAULT_REPORT_DIRECTORY,
     HealthCheck,
@@ -287,6 +287,7 @@ def run(
     ensure_color(ctx, color)
 
     validate_auth_overlap(auth, headers)
+    validate_wfc_user(config, auth_wfc, auth_wfc_user)
 
     if base_url is not None and origin is not None:
         raise click.UsageError(CONFLICTING_URL_MESSAGE)

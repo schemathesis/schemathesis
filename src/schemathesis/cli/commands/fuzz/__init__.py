@@ -65,7 +65,7 @@ from schemathesis.cli.options import (
     WARNINGS,
     WORKERS,
 )
-from schemathesis.cli.validation import validate_auth_overlap
+from schemathesis.cli.validation import validate_auth_overlap, validate_wfc_user
 from schemathesis.config import (
     DEFAULT_REPORT_DIRECTORY,
     FuzzConfig,
@@ -257,6 +257,7 @@ def fuzz(
     ensure_color(ctx, color)
 
     validate_auth_overlap(auth, headers)
+    validate_wfc_user(config, auth_wfc, auth_wfc_user)
 
     config.update(
         color=color,
