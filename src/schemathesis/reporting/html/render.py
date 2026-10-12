@@ -415,12 +415,18 @@ _TOP_FAILURES_SHOWN = 3
 
 def _second_cell(data: ReportData) -> str:
     if data.top_failures:
+        # A "+1 more" line takes the space the hidden item would, so show that item instead.
+        shown = (
+            data.top_failures
+            if len(data.top_failures) <= _TOP_FAILURES_SHOWN + 1
+            else data.top_failures[:_TOP_FAILURES_SHOWN]
+        )
         rows = "".join(
             f'<li><span class="tf-n">{group.count}</span>'
             f'<span class="tf-name" title="{esc(group.title)}">{esc(group.title)}</span></li>'
-            for group in data.top_failures[:_TOP_FAILURES_SHOWN]
+            for group in shown
         )
-        hidden = len(data.top_failures) - _TOP_FAILURES_SHOWN
+        hidden = len(data.top_failures) - len(shown)
         if hidden > 0:
             rows += f'<li><a class="tf-more" href="#operations">+{hidden} more</a></li>'
         return (

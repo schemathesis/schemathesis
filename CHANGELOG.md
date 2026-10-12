@@ -16,6 +16,7 @@
 - HTML report exit note giving no reason when a startup warning fails the run.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.
+- HTML report "Top failures" showing "+1 more" instead of the fourth failure.
 
 ## [4.31.0](https://github.com/schemathesis/schemathesis/compare/v4.30.1...v4.31.0) - 2026-10-12
 
