@@ -1,0 +1,39 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 N errors
+
+==================================== ERRORS ====================================
+_______________________________ GET /api/success _______________________________
+Network Error
+
+Connection failed
+
+    Failed to establish a new connection: [Error NUM] Connection refused
+
+Tip: Check that the API is running and reachable at its base URL; set the address with `--url`.
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+  Errored: 1
+
+Stop reason: Completed
+
+Errors:
+  🚫 Network Error: 1
+
+Test cases:
+  N generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================
