@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from schemathesis.cli.commands.run.context import ExecutionContext
+    from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.core.spec import AuthFlowSteps
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
@@ -555,6 +556,15 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             )
         )
     return blocks
+
+
+def display_reports(ctx: BaseExecutionContext) -> None:
+    reports = ctx.all_reports()
+    if reports:
+        click.echo(_style("Reports:", bold=True))
+        for name, path in reports:
+            click.echo(_style(f"  - {name}: {path}"))
+        click.echo()
 
 
 def display_warning_blocks(blocks: list[WarningBlock]) -> None:
@@ -1786,14 +1796,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             interrupted=event.stop_reason == StopReason.INTERRUPTED,
         )
 
-    def display_reports(self, ctx: ExecutionContext) -> None:
-        reports = ctx.all_reports()
-        if reports:
-            click.echo(_style("Reports:", bold=True))
-            for name, path in reports:
-                click.echo(_style(f"  - {name}: {path}"))
-            click.echo()
-
     def display_seed(self) -> None:
         display_seed(self.config)
 
@@ -1874,6 +1876,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             click.echo()
 
         display_test_cases(summary.test_cases)
-        self.display_reports(ctx)
+        display_reports(ctx)
         self.display_seed()
         self.display_final_line(ctx, event)

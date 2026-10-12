@@ -730,6 +730,27 @@ def test_fuzz_custom_handler(cli, app_runner, ctx, snapshot_cli):
     assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_reports_section(cli, app_runner, ctx, tmp_path, snapshot_cli):
+    @schemathesis.cli.handler()
+    class CoverageReport(EventHandler):
+        def handle_event(self, run_ctx, event):
+            if isinstance(event, EngineFinished):
+                run_ctx.add_report("Schema coverage", "coverage.html")
+
+    url = _make_fuzz_app(ctx, app_runner)
+    assert_cli_snapshot(
+        cli.main(
+            "fuzz",
+            url,
+            "--max-time=30",
+            f"--report-junit-path={tmp_path / 'junit.xml'}",
+            f"--report-html-path={tmp_path / 'html'}",
+        ),
+        snapshot_cli,
+    )
+
+
 def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
     group = schemathesis.cli.add_group("Fuzz custom group")
     group.add_option("--fuzz-counter", type=int, default=0)
