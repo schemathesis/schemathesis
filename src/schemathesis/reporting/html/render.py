@@ -12,7 +12,6 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
 from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, plural, split_label
 from schemathesis.reporting.html.timeline import (
-    MAX_TICKED_FAILURES,
     Lane,
     Marker,
     axis_end,
@@ -22,12 +21,12 @@ from schemathesis.reporting.html.timeline import (
     collect_markers,
     curve_path,
     failure_count,
+    lane_ticks,
     last_phase,
     mark_classes,
     position,
     quiet_stretch,
     short_duration,
-    tick_groups,
     tick_lines,
     total_duration,
 )
@@ -582,8 +581,8 @@ def _lane_blocks(lane: Lane, total: float, *, stopped: bool) -> str:
     return "".join(blocks)
 
 
-def _lane_row(lane: Lane, total: float, *, ticks: bool, stopped: bool) -> str:
-    marks = "".join(_tick(group, total) for group in tick_groups(lane.markers, total)) if ticks else ""
+def _lane_row(lane: Lane, total: float, *, ticks: list[list[Marker]], stopped: bool) -> str:
+    marks = "".join(_tick(group, total) for group in ticks)
     return (
         f'<div class="tl-row"><div class="tl-label"><span class="tl-lane-name">{esc(lane.phase)}</span>'
         f'<span class="tl-sub">{esc(lane.details())}</span></div>'
@@ -612,9 +611,11 @@ def _found_row(markers: list[Marker], total: float) -> str:
 
 def _chart(lanes: list[Lane], markers: list[Marker], total: float, *, stopped: bool) -> str:
     rows = [_found_row(markers, total)]
-    ticks = len(markers) <= MAX_TICKED_FAILURES
     cut = last_phase(lanes) if stopped else None
-    rows.extend(_lane_row(lane, total, ticks=ticks, stopped=lane.phase == cut) for lane in lanes)
+    rows.extend(
+        _lane_row(lane, total, ticks=ticks, stopped=lane.phase == cut)
+        for lane, ticks in zip(lanes, lane_ticks(lanes, total), strict=True)
+    )
     rows.append(_axis_row(total, stopped=stopped))
     return f'<div class="tl-rows">{"".join(rows)}</div>'
 

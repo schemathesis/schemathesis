@@ -22,6 +22,7 @@ from schemathesis.reporting.html.timeline import (
     Lane,
     Marker,
     axis_ticks,
+    lane_ticks,
     mark_classes,
     phase_blocks,
     short_duration,
@@ -1008,6 +1009,16 @@ def test_timeline_ticks_never_overlap():
     for previous, current in itertools.pairwise(groups):
         gap = (current[0].found_at - previous[0].found_at) / 100.0 * TRACK_PX
         assert gap >= (BADGE_PX if len(previous) > 1 else TICK_GAP_PX)
+
+
+def test_timeline_ticks_drawn_for_many_failures_found_close_together():
+    lane = Lane("Fuzzing", [], [marker(index * 0.01) for index in range(200)])
+    assert [len(groups) for groups in lane_ticks([lane], 100.0)] == [1]
+
+
+def test_timeline_ticks_hidden_when_too_many_to_draw():
+    lanes = [Lane(phase, [], [marker(index * 3.0, phase) for index in range(30)]) for phase in ("Coverage", "Fuzzing")]
+    assert lane_ticks(lanes, 100.0) == [[], []]
 
 
 def test_timeline_blocks_split_only_where_another_phase_ran():
