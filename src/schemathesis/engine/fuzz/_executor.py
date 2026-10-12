@@ -263,10 +263,13 @@ def _run_forever(
     except KeyboardInterrupt:
         ctx.stop()
         yield events.Interrupted(phase=None)
+    except GeneratorExit:
+        # The consumer stopped reading events, so wind workers down instead of fuzzing forever.
+        ctx.stop()
+        raise
     finally:
-        # ctx.stop() has been called (either by interrupt or a worker), so threads won't start new
-        # scenarios. They'll finish their current in-flight HTTP call and exit. join() waits for
-        # that bounded cleanup — important for Python API callers where the process doesn't exit.
+        # Workers won't start new scenarios once stopped; they finish their in-flight HTTP call and exit.
+        # join() waits for that bounded cleanup - important for Python API callers where the process doesn't exit.
         for thread in threads:
             thread.join()
     outage = ctx.server.take_report(None)

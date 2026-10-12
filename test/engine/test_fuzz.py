@@ -830,3 +830,18 @@ def test_iter_link_candidates_edge_links(ctx, case_factory, response_factory, li
         excluded_labels=set(),
     )
     assert candidates == []
+
+
+# A consumer that raises mid-run closes the stream; workers must stop instead of fuzzing forever.
+def test_fuzz_closing_stream_mid_run_stops_workers(ctx):
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = from_schema(schema).fuzz(FuzzConfig())
+    for event in stream:
+        if isinstance(event, events.FuzzScenarioFinished):
+            break
+    closer = threading.Thread(target=stream.generator.close, daemon=True)
+    closer.start()
+    closer.join(timeout=10)
+    assert not closer.is_alive()
+    assert not [thread for thread in threading.enumerate() if thread.name.startswith("schemathesis_fuzz")]
