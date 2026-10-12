@@ -191,6 +191,20 @@
         {
           "is_suffix_matched": false,
           "parameter_location": "body",
+          "parameter_name": "id",
+          "resource": "ContainerGroup",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "location",
+          "resource": "ContainerGroup",
+          "resource_field": "location"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
           "parameter_name": "properties",
           "resource": "ContainerGroup",
           "resource_field": "properties"

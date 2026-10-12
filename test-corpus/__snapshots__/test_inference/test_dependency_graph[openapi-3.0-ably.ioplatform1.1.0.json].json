@@ -392,6 +392,20 @@
           "parameter_name": "id",
           "resource": "DeviceDetails",
           "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "push.recipient/clientId",
+          "resource": "Client",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "push.recipient/deviceId",
+          "resource": "Device",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -463,6 +477,20 @@
           "parameter_name": "keyName",
           "resource": "Key",
           "resource_field": "keyName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "keyName",
+          "resource": "Key",
+          "resource_field": "keyName"
         }
       ],
       "outputs": [
@@ -517,6 +545,20 @@
           "parameter_name": "id",
           "resource": "DeviceRegistration",
           "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "push.recipient/clientId",
+          "resource": "Client",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "push.recipient/deviceId",
+          "resource": "Device",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -548,7 +590,22 @@
       ]
     },
     "POST /push/publish": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "recipient/clientId",
+          "resource": "Client",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "recipient/deviceId",
+          "resource": "Device",
+          "resource_field": "id"
+        }
+      ],
       "outputs": []
     },
     "PUT /push/deviceRegistrations/{device_id}": {
@@ -572,6 +629,20 @@
           "parameter_location": "body",
           "parameter_name": "id",
           "resource": "DeviceDetails",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "push.recipient/clientId",
+          "resource": "Client",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "push.recipient/deviceId",
+          "resource": "Device",
           "resource_field": "id"
         }
       ],

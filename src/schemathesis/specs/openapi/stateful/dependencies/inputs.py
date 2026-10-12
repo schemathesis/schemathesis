@@ -1185,7 +1185,8 @@ def try_merge_input_resource(
 
         # Try to match the input parameter to producer's fields
         param_name = input_slot.parameter_name
-        if not isinstance(param_name, str):
+        # A nested body field (`recipient/clientId`) already names its own target, not the producer's resource.
+        if not isinstance(param_name, str) or "/" in param_name:
             continue
 
         for resource_name in (input_slot.resource.name, producer_resource.name):
