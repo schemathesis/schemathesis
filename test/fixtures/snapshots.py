@@ -335,12 +335,12 @@ def _mask_invalid_component(data: str) -> str:
 
 
 def _mask_reproduce_commands(data: str) -> str:
-    # One placeholder per run of curl lines: a stateful reproduction has a varying number of steps.
-    # The `st replay <id>` line is masked separately by `replace_test_case_id`.
+    # One placeholder per run of curl lines and the identity labels above them: a stateful reproduction
+    # has a varying number of steps. The `st replay <id>` line is masked separately by `replace_test_case_id`.
     lines = []
     seen = False
     for line in data.splitlines():
-        if "curl" in line:
+        if "curl" in line or line.lstrip().startswith("# as "):
             if not seen:
                 lines.append("    <PLACEHOLDER>")
                 seen = True

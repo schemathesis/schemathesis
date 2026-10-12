@@ -31,7 +31,12 @@ def validate_response(
         collected.add(failure)
         checked_by.setdefault(failure, name)
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
-        step = ReproductionStep.from_case(failure_data.case, headers=failure_data.headers, verify=failure_data.verify)
+        step = ReproductionStep.from_case(
+            failure_data.case,
+            headers=failure_data.headers,
+            verify=failure_data.verify,
+            roles=failure.identity_roles(),
+        )
         recorder.record_check_failure(
             name=name, case_id=failure_data.case.id, code_sample=step.curl, failure=failure, steps=[step]
         )

@@ -306,13 +306,20 @@ class ReproductionStep:
     curl: str
 
     @classmethod
-    def from_case(cls, case: Case, *, headers: dict[str, Any] | None, verify: bool) -> ReproductionStep:
+    def from_case(
+        cls, case: Case, *, headers: dict[str, Any] | None, verify: bool, roles: Mapping[str, str]
+    ) -> ReproductionStep:
+        curl = case.as_curl_command(headers=headers, verify=verify)
+        # Requests sent as different identities look alike once credentials are masked.
+        role = roles.get(case._auth_identity) if case._auth_identity is not None else None
+        if role is not None:
+            curl = f"# as {case._auth_identity} ({role})\n{curl}"
         return cls(
             case_id=case.id,
             operation=case.operation.label,
             method=case.method,
             path=case.formatted_path,
-            curl=case.as_curl_command(headers=headers, verify=verify),
+            curl=curl,
         )
 
 
