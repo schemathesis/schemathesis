@@ -10,6 +10,7 @@ from schemathesis.core.failures import reason_phrase
 from schemathesis.core.output import TRUNCATED, escape_surrogates
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
+from schemathesis.reporting._command import UNKNOWN_ENTRYPOINT
 from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, plural, split_label
 from schemathesis.reporting.html.timeline import (
     Lane,
@@ -527,7 +528,8 @@ def _target_block(data: ReportData) -> str:
         # A local spec cannot be opened from a copied-around report, so it is plain text.
         value = _link(meta.location) if _is_url(meta.location) else esc(meta.location)
         rows.append(_row("Spec", value, _copy_button(meta.location, "spec")))
-    rows.append(_row("Command", _command(meta.command), _copy_button(meta.command, "command")))
+    if meta.command != UNKNOWN_ENTRYPOINT:
+        rows.append(_row("Command", _command(meta.command), _copy_button(meta.command, "command")))
     if meta.seed is not None:
         rows.append(_row("Seed", f"<code>{meta.seed}</code>", _copy_button(str(meta.seed), "seed")))
     if data.phases:
