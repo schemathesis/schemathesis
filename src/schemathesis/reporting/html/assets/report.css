@@ -89,6 +89,7 @@ a:hover{color:#fff}
 .tv a{text-decoration:none;border-bottom:1px solid var(--color-border)}
 .tv a:hover{border-bottom-color:var(--color-text-primary)}
 .copy-btn{flex:none;font-family:var(--font-family-monospace);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-text-secondary);background:transparent;border:1px solid var(--color-border-subtle);border-radius:var(--radius-sm);padding:1px 7px;cursor:pointer;line-height:1.6}
+.copy-btn::after{content:"Copied";display:block;height:0;overflow:hidden;visibility:hidden}
 .copy-btn:hover{color:var(--color-text-primary);border-color:var(--color-border)}
 .copy-btn:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:2px}
 
