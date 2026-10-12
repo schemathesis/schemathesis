@@ -3894,8 +3894,13 @@ class Handler(BaseHTTPRequestHandler):
     def handle(self):
         if KILLED and MODE == "proxy":
             # A port proxy in front of a dead process accepts every connection, reads the request, then resets it.
-            while self.rfile.readline() not in (b"\\r\\n", b"\\n", b""):
-                pass
+            # Reading the body too keeps the reset after the client's last write, so it always sees the reset.
+            length = 0
+            while (line := self.rfile.readline()) not in (b"\\r\\n", b"\\n", b""):
+                name, _, value = line.partition(b":")
+                if name.strip().lower() == b"content-length":
+                    length = int(value)
+            self.rfile.read(length)
             self.rfile.close()
             self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
             self.connection.close()
