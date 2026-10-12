@@ -131,6 +131,8 @@
 - Crash on schemas with a non-object `info` or a non-string `info.title`.
 - WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.
 - Misleading additional-properties hint when a Pydantic error names a declared field.
+- `st replay` failing to load the schema for crashes recorded with `--tls-verify=false`.
+
 ## [4.30.1](https://github.com/schemathesis/schemathesis/compare/v4.30.0...v4.30.1) - 2026-10-09
 
 ### :wrench: Changed

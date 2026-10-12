@@ -137,6 +137,7 @@ def initialize_report_handlers(
                 cache_directory=config.cache.directory,
                 schema_location=params.get("location") or "",
                 base_url=config.base_url or "",
+                tls_verify=config.tls_verify,
                 sanitization=config.output.sanitization,
             )
         )

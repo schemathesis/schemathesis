@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class CrashHandler(EventHandler):
     """CLI event handler that writes crash reproduction files on test failures."""
 
-    __slots__ = ("cache_directory", "schema_location", "base_url", "sanitization", "queue", "worker")
+    __slots__ = ("cache_directory", "schema_location", "base_url", "tls_verify", "sanitization", "queue", "worker")
 
     def __init__(
         self,
@@ -29,11 +29,13 @@ class CrashHandler(EventHandler):
         cache_directory: Path | None,
         schema_location: str,
         base_url: str,
+        tls_verify: bool | str | None,
         sanitization: SanitizationConfig,
     ) -> None:
         self.cache_directory = cache_directory
         self.schema_location = schema_location
         self.base_url = base_url
+        self.tls_verify = tls_verify
         self.sanitization = sanitization
         self.queue: Queue[_Process | None] = Queue()
         self.worker: WriterWorker | None = None
@@ -58,6 +60,7 @@ class CrashHandler(EventHandler):
                 "directory": directory,
                 "schema_location": self.schema_location,
                 "base_url": self.base_url,
+                "tls_verify": self.tls_verify,
                 "sanitization": self.sanitization,
                 "queue": self.queue,
             },
@@ -74,12 +77,13 @@ def _run(
     directory: Path,
     schema_location: str,
     base_url: str,
+    tls_verify: bool | str | None,
     sanitization: SanitizationConfig,
     queue: Queue[_Process | None],
 ) -> None:
     try:
         writer = CrashWriter(directory=directory)
-        writer.open(schema_location=schema_location, base_url=base_url)
+        writer.open(schema_location=schema_location, base_url=base_url, tls_verify=tls_verify)
 
         failed: set[str] = set()
         succeeded: set[str] = set()

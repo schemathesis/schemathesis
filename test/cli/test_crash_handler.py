@@ -56,6 +56,7 @@ def _drive(queue: Queue, directory: Path) -> None:
         directory=directory,
         schema_location="http://x/schema",
         base_url="http://x",
+        tls_verify=True,
         sanitization=SanitizationConfig(),
         queue=queue,
     )

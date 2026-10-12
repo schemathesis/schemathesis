@@ -151,6 +151,9 @@ def _replay_directory(
     if not effective_schema_location:
         click.echo("Error: cannot replay without a schema. Pass --schema-location <url-or-path>.", err=True)
         return False, True, False
+    # Reach the API the same way the recorded run did, e.g. a server with a self-signed certificate.
+    if manifest is not None and manifest.tls_verify is not None:
+        ctx.obj.projects.override.update(tls_verify=manifest.tls_verify)
 
     schema = _load_schema(ctx, effective_schema_location)
     if schema is None:
