@@ -4144,6 +4144,73 @@ def test_answered_case_survives_a_refused_check_request(subprocess_runner, cli, 
     )
 
 
+DIES_AFTER_FIRST_OPERATION_SERVER = (
+    STOP_LISTENING
+    + """
+import json
+import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+ADDRESS = ("127.0.0.1", int(os.environ["PORT"]))
+PARAMETER = {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 1}
+SCHEMA = {
+    "openapi": "3.0.0",
+    "info": {"title": "Dies after first operation", "version": "1.0.0"},
+    "paths": {
+        "/first": {"get": {"parameters": [PARAMETER], "responses": {"200": {"description": "OK"}}}},
+        "/second": {"get": {"parameters": [PARAMETER], "responses": {"200": {"description": "OK"}}}},
+    },
+}
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        if self.path == "/openapi.json":
+            self.send_json(SCHEMA)
+            return
+        if not self.path.startswith("/first"):
+            self.send_json({"ok": True})
+            return
+        # Stop listening before answering: the next request is refused, never queued.
+        stop_listening(self.server)
+        self.send_json({"ok": True})
+        os._exit(1)
+
+    def send_json(self, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        self.wfile.flush()
+
+
+ThreadingHTTPServer(ADDRESS, Handler).serve_forever()
+"""
+)
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_operation_refused_on_its_first_request_is_skipped(subprocess_runner, cli, snapshot_cli):
+    port = subprocess_runner.run_app(DIES_AFTER_FIRST_OPERATION_SERVER)
+    assert (
+        cli.main(
+            "run",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=examples",
+            "--checks=not_a_server_error",
+            "--workers=1",
+        )
+        == snapshot_cli
+    )
+
+
 SLOW_AND_DYING_SERVER = (
     STOP_LISTENING
     + """

@@ -1,0 +1,57 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.0
+     Operations:       2 selected / 2 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Examples (in 0.00s)
+
+     ✅ 1 passed  ⏭  1 skipped  🚫 server stopped responding
+
+==================================== ERRORS ====================================
+____________________________________ Server ____________________________________
+Server Unavailable
+
+http://127.0.0.1 stopped responding. Last request before it went away:
+
+    <PLACEHOLDER>
+
+Tip: If the server crashed, the request that caused it may be older than these.
+Record every request sent with `--report=har`.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 1
+  Skipped: 1
+    - Server stopped responding
+
+Test Phases:
+  🚫 Examples
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Server Unavailable: 1
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

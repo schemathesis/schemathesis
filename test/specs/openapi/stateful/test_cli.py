@@ -342,6 +342,60 @@ def test_extraction_failures_order_is_stable(ctx, cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_link_with_multiple_failing_parameters(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                            "links": {
+                                "GetItem": {
+                                    "operationId": "getItem",
+                                    "parameters": {"id": "$response.body#/id", "owner": "$response.body#/owner"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "owner", "in": "query", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"name": "x"}), 201
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=stateful",
+            "--max-examples=5",
+            "-c not_a_server_error",
+            config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=3, min_passes=1)
 def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, snapshot_cli):
     openapi = {

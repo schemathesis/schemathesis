@@ -669,6 +669,8 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
         {"detail": "RFC 7807 prose"},
         {"detail": [{"type": "missing"}]},
         {"detail": [{"type": "unknown_code", "loc": ["body", "x"], "msg": "..."}]},
+        {"detail": [{"type": "unknown_code", "loc": ["body", "x"], "msg": 42}]},
+        {"detail": [{"type": "unknown_code", "loc": ["body", "x"], "msg": None}]},
         {"detail": [{"type": "missing", "loc": [], "msg": "..."}]},
     ],
     ids=[
@@ -678,6 +680,8 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
         "detail-string",
         "missing-loc",
         "unknown-type-code",
+        "unknown-type-code-numeric-message",
+        "unknown-type-code-null-message",
         "empty-loc",
     ],
 )
