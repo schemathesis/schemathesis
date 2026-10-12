@@ -32,6 +32,7 @@
 - Suggesting `--wait-for-schema` on connection errors when it is already set.
 - Crashing with `Inconsistent data generation` when the server stops responding.
 - Success icon for an interrupted run.
+- Hanging and fuzzing forever when the event consumer raises mid-run.
 
 #### Output and exit codes
 
