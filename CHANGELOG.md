@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.31.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- `errored` count in the summary including stateful cases cut off by `--max-time`.
+
 ## [4.31.0](https://github.com/schemathesis/schemathesis/compare/v4.30.1...v4.31.0) - 2026-10-12
 
 ### :rocket: Added

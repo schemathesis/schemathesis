@@ -5125,6 +5125,53 @@ def test_stateful_flaky_replay_keeps_network_error(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--phases=stateful", "--seed=4", "--checks=not_a_server_error") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
+def test_max_time_does_not_count_unsent_stateful_case(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return jsonify({"id": user_id})
+
+    module = ctx.write_pymodule(
+        """
+import time
+
+draws = 0
+
+
+def delay_second_case(case):
+    global draws
+    draws += 1
+    if draws == 2:
+        time.sleep(2)
+    return case
+
+
+@schemathesis.hook
+def before_generate_case(context, strategy):
+    return strategy.map(delay_second_case)
+"""
+    )
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-time=1",
+            "--max-examples=5",
+            "--generation-database=none",
+            "--phases=stateful",
+            "--checks=not_a_server_error",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
+
+
 # Every repeated stateful pass folds into the single block reported at the end.
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
