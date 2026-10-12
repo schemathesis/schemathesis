@@ -6,7 +6,7 @@ from unittest.mock import ANY
 
 import jsonschema_rs
 import pytest
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 from hypothesis import strategies as st
 from requests import Request
 
@@ -7564,7 +7564,7 @@ def test_ref_parameter_schema_keeps_combination_coverage(ctx):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_allow_header_conformance(ctx, cli, snapshot_cli):
-    # Flask builds `Allow` from its own routing table, so a documented but unimplemented method is missing from it.
+    # The server leaves the documented POST out of `Allow`; a fixed value keeps the reported header stable.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -7574,8 +7574,10 @@ def test_allow_header_conformance(ctx, cli, snapshot_cli):
         }
     )
 
-    @app.route("/items", methods=["GET"])
+    @app.route("/items", methods=["GET", "OPTIONS"], provide_automatic_options=False)
     def items():
+        if request.method == "OPTIONS":
+            return Response(headers={"Allow": "GET, HEAD, OPTIONS"})
         return jsonify([])
 
     assert (

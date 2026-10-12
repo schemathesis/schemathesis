@@ -4179,16 +4179,20 @@ ALLOW_SCHEMA_PATHS = {
         ({"Allow": "GET, POST, HEAD, OPTIONS"}, "OPTIONS", None),
         ({"Allow": "get,post"}, "OPTIONS", None),
         ({"Allow": "GET ,   POST"}, "OPTIONS", None),
-        ({"Allow": "GET, HEAD, OPTIONS"}, "OPTIONS", "missing documented methods: POST"),
+        (
+            {"Allow": "GET, HEAD, OPTIONS"},
+            "OPTIONS",
+            "`Allow: GET, HEAD, OPTIONS` does not match the schema. Missing documented methods: POST",
+        ),
         (
             {"Allow": "GET, POST, DELETE"},
             "OPTIONS",
-            "undocumented methods advertised: DELETE",
+            "`Allow: GET, POST, DELETE` does not match the schema. Undocumented methods advertised: DELETE",
         ),
         (
             {"Allow": "GET, DELETE"},
             "OPTIONS",
-            "missing documented methods: POST; undocumented methods advertised: DELETE",
+            "Missing documented methods: POST. Undocumented methods advertised: DELETE",
         ),
         ({}, "OPTIONS", None),
         ({"Allow": ""}, "OPTIONS", None),

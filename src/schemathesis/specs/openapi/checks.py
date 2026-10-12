@@ -1187,15 +1187,15 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
         return None
     parts = []
     if missing:
-        parts.append(f"missing documented methods: {', '.join(method.upper() for method in missing)}")
+        parts.append(f"Missing documented methods: {', '.join(method.upper() for method in missing)}")
     if undocumented:
-        parts.append(f"undocumented methods advertised: {', '.join(method.upper() for method in undocumented)}")
+        parts.append(f"Undocumented methods advertised: {', '.join(method.upper() for method in undocumented)}")
     raise AllowHeaderMismatch(
         operation=case.operation.label,
         allow_header=allow_header,
         missing_methods=[method.upper() for method in missing],
         undocumented_methods=[method.upper() for method in undocumented],
-        message=f"`Allow` header does not match the schema — {'; '.join(parts)}\n\nList exactly the methods this resource supports in `Allow`",
+        message=f"`Allow: {allow_header}` does not match the schema. {'. '.join(parts)}\n\nList exactly the methods this resource supports in `Allow`",
     )
 
 
