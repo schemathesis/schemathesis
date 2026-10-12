@@ -291,7 +291,12 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
                 display_section_name(label, "_", fg="red")
                 _errors = list(group_errors)
                 for idx, error in enumerate(_errors, 1):
-                    click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
+                    click.echo(
+                        error.info.format(
+                            bold=lambda x: click.style(x, bold=True),
+                            base_url_is_set=ctx.config.base_url is not None,
+                        )
+                    )
                     if idx < len(_errors):
                         click.echo()
 

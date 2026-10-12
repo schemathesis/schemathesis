@@ -57,7 +57,9 @@ class JunitXMLHandler(EventHandler):
                     config=ctx.config.output,
                 )
         elif isinstance(event, events.NonFatalError):
-            self.writer.record_error(label=event.label, message=event.info.format())
+            self.writer.record_error(
+                label=event.label, message=event.info.format(base_url_is_set=ctx.config.base_url is not None)
+            )
         elif isinstance(event, events.EngineFinished):
             if event.failures:
                 # Recorded by the execution context before handlers run, deduplicated and sorted.
