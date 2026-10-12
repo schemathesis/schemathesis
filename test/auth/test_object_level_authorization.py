@@ -13,7 +13,7 @@ from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.checks import object_level_authorization
 from schemathesis.specs.openapi.extra_data_source import referenced_by
 from schemathesis.specs.openapi.object_authorization import is_equivalent, listing_case, listings, path_resource
-from test.utils import check_context
+from test.utils import check_context, crash_cache_dir
 
 ORDER_SCHEMA = {
     "type": "object",
@@ -111,6 +111,23 @@ def _verdict(api, context, case):
 def test_peer_read_is_reported(cli, ctx, tmp_path, snapshot_cli, phases):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     assert _run(cli, api, tmp_path, phases=phases) == snapshot_cli
+
+
+def test_reproduction_names_the_sender(cli, ctx, tmp_path, snapshot_cli):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    assert _run(cli, api, tmp_path) == snapshot_cli
+
+
+def test_stateful_reproduction_names_each_sender(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    _run(cli, api, tmp_path, phases="stateful")
+    (crash_file,) = crash_cache_dir(tmp_path).glob("*_object_level_authorization_*.json")
+    code_sample = json.loads(crash_file.read_text())["code_sample"]
+    assert [line for line in code_sample.splitlines() if line.startswith("#")] == [
+        "# as alice (owner)",
+        "# as alice (owner)",
+        "# as bob (peer)",
+    ]
 
 
 @pytest.mark.parametrize("phases", ["fuzzing", "stateful"])

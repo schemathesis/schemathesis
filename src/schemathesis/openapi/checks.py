@@ -417,6 +417,9 @@ class ObjectLevelAuthorizationViolation(Failure):
     def related_case_ids(self) -> tuple[str, ...]:
         return (self.owner_case_id,)
 
+    def identity_roles(self) -> dict[str, str]:
+        return {self.owner: "owner", self.peer: "peer"}
+
 
 class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""

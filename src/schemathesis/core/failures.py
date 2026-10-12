@@ -130,6 +130,10 @@ class Failure(AssertionError):
         """
         return ()
 
+    def identity_roles(self) -> dict[str, str]:
+        """Roles of the identities this failure involves, by identity name, to label their requests."""
+        return {}
+
 
 def _portable_filename(filename: str) -> str:
     # Origins are part of a stored failure's identity, so an absolute checkout root would tie it to one machine.
