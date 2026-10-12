@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from random import Random
+from typing import ClassVar
 
 from schemathesis.config._analysis import AnalysisConfig, ConstantsConfig
 from schemathesis.config._auth import (
@@ -102,6 +103,8 @@ class SchemathesisConfig(DiffBase):
     output: OutputConfig
     projects: ProjectsConfig
     dictionaries: dict[str, DictionaryDefinition]
+    # Seed for configs without an explicit one, shared by all processes of a run (e.g. pytest-xdist workers)
+    shared_seed: ClassVar[int | None] = None
 
     def __init__(
         self,
@@ -137,7 +140,7 @@ class SchemathesisConfig(DiffBase):
     @property
     def seed(self) -> int:
         if self._seed is None:
-            self._seed = Random().getrandbits(128)
+            self._seed = self.shared_seed if self.shared_seed is not None else Random().getrandbits(128)
         return self._seed
 
     @property
