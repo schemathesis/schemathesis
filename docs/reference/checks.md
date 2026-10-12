@@ -321,7 +321,7 @@ The check gives no verdict when an explicitly configured `Authorization` header 
 
 ### `object_level_authorization`
 
-Verifies that one user cannot read an object another user owns (OWASP API1, Broken Object Level Authorization). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists at least two `peers`: users whose objects must stay private to each other. Operations the schema declares public (no requirement under a schema-wide `security`) are skipped; when the schema declares no `security` at all, every operation is checked, since the server may still require credentials.
+Verifies that one user cannot read an object another user owns (OWASP API1, Broken Object Level Authorization). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists at least two `peers`: users whose objects must stay private to each other; see [Testing Object-Level Authorization](../guides/object-level-authorization.md) for setup. Operations the schema declares public (no requirement under a schema-wide `security`) are skipped; when the schema declares no `security` at all, every operation is checked, since the server may still require credentials.
 
 A peer owns an identifier when:
 
