@@ -1408,6 +1408,19 @@ def test_html_report_warnings_fail_the_run(ctx, cli, report_dir, snapshot_html):
     assert html == snapshot_html
 
 
+def test_html_report_startup_warning_fails_the_run(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.success()
+    html = run_with_report(
+        cli,
+        report_dir,
+        api.schema_url,
+        "--request-timeout=5000",
+        exit_code=ExitCode.FAILURES,
+        config={"warnings": {"fail-on": ["timeout_units"]}},
+    )
+    assert html == snapshot_html
+
+
 def test_html_report_handler_error_after_passed_run(ctx, cli, report_dir, snapshot_html):
     module = ctx.write_pymodule(
         """

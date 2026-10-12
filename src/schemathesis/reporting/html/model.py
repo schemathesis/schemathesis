@@ -273,4 +273,6 @@ class ReportData:
         # Rendering links this to the first warning.
         if self.warnings:
             return f"Exit code {self.exit_code}: warnings fail the run", "warnings"
+        if self.startup_warnings:
+            return f"Exit code {self.exit_code}: warnings fail the run", "w-heading"
         return f"Exit code {self.exit_code}", ""
