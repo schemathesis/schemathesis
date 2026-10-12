@@ -1,20 +1,54 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
+
+from schemathesis.config import ReportFormat
 from schemathesis.engine import Status
 from schemathesis.engine.recorder import ScenarioRecorder
 
 if TYPE_CHECKING:
     import requests
+    from _pytest.terminal import TerminalReporter
 
     from schemathesis.checks import CheckResult
+    from schemathesis.config import ReportsConfig
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.hooks import HookContext
+
+
+# Reports written during the run, as path -> format name, in the order they were opened.
+REPORT_LOCATIONS_KEY: pytest.StashKey[dict[Path, str]] = pytest.StashKey()
+# Listed in the order the CLI lists them.
+_PYTEST_FORMATS = (ReportFormat.JUNIT, ReportFormat.VCR, ReportFormat.HAR, ReportFormat.ALLURE, ReportFormat.HTML)
+
+
+def remember_report_locations(
+    config: pytest.Config, reports: ReportsConfig, path_of: Callable[[ReportFormat], Path]
+) -> None:
+    locations = config.stash.setdefault(REPORT_LOCATIONS_KEY, {})
+    for format in _PYTEST_FORMATS:
+        if getattr(reports, format.value).enabled:
+            path = path_of(format)
+            # Point at the page itself so it opens in one click.
+            if format == ReportFormat.HTML:
+                path = path / "index.html"
+            locations.setdefault(path, format.display_name)
+
+
+def write_report_locations(terminalreporter: TerminalReporter, config: pytest.Config) -> None:
+    locations = config.stash.get(REPORT_LOCATIONS_KEY, {})
+    if locations:
+        terminalreporter.write_sep("=", "Schemathesis reports")
+        for path, name in locations.items():
+            terminalreporter.write_line(f"  - {name}: {path}")
 
 
 @dataclass(frozen=True, slots=True)

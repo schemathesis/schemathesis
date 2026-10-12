@@ -50,7 +50,7 @@ from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest._test_builder import schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.pytest.reporting import PytestReportOutcome
+from schemathesis.pytest.reporting import PytestReportOutcome, remember_report_locations, write_report_locations
 from schemathesis.pytest.warnings import (
     emit_constants_warnings,
     emit_openapi_auth_warnings,
@@ -62,6 +62,7 @@ from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
+    from _pytest.terminal import TerminalReporter
 
     from schemathesis.config import OutputConfig, ReportsConfig
     from schemathesis.core.spec import SchemaMetadata
@@ -518,7 +519,9 @@ def _has_reports(reports: ReportsConfig) -> bool:
     return any(report.enabled for report in (reports.vcr, reports.har, reports.junit, reports.allure, reports.html))
 
 
-def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
+def _open_writers(
+    schema: SchemaMetadata, pytest_config: pytest.Config
+) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
     from schemathesis.config._report import ReportFormat
     from schemathesis.reporting._command import get_command_representation
     from schemathesis.reporting.har import HarWriter
@@ -566,6 +569,7 @@ def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitX
                 started_at=time.time(),
             )
         )
+    remember_report_locations(pytest_config, reports, reports.get_path)
     return writers
 
 
@@ -761,7 +765,7 @@ def report_subtest(
     schema_id = _writers_key(schema)
     entry = item.config.stash[_CASSETTE_KEY].get(schema_id)
     if entry is None:
-        writers = [] if _is_xdist_worker(item.config) else _open_writers(schema)
+        writers = [] if _is_xdist_worker(item.config) else _open_writers(schema, item.config)
         if not writers and not _is_xdist_worker(item.config):
             yield
             return
@@ -817,7 +821,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
                 item.stash[_STATEFUL_WRITERS_KEY] = []
                 StatefulCallbackMark.set(item.cls, _xdist_stateful_callback)
         else:
-            writers = _open_writers(_schema)
+            writers = _open_writers(_schema, item.config)
             item.stash[_STATEFUL_WRITERS_KEY] = writers
             if writers:
 
@@ -866,7 +870,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             item.stash[_ALLURE_FORWARDER_KEY] = forwarder
         return
 
-    writers = _open_writers(schema)
+    writers = _open_writers(schema, item.config)
     if not writers:
         return
 
@@ -933,6 +937,10 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         for writer in writers:
             writer.close()
     _run_after_run_checks(session)
+
+
+def pytest_terminal_summary(terminalreporter: TerminalReporter, config: pytest.Config) -> None:
+    write_report_locations(terminalreporter, config)
 
 
 def _run_after_run_checks(session: pytest.Session) -> None:

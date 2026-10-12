@@ -10,6 +10,7 @@
 
 - HTML report showing a copyable `<unknown entrypoint>` command under `python -m pytest` or `python -m schemathesis`.
 - Report seed under `pytest-xdist` not reproducing operations run on other workers.
+- pytest runs not printing where reports were written.
 - Missing environment variable error naming the whole config value instead of the variable.
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
 - `st fuzz` phase line counting failed and errored scenarios as passed.
