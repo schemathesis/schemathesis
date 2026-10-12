@@ -4,6 +4,7 @@ import base64
 import dataclasses
 import hashlib
 import time
+from functools import partial
 from pathlib import Path
 from random import Random
 from typing import TYPE_CHECKING
@@ -22,7 +23,7 @@ from schemathesis.config import (
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.pytest.reporting import PytestReportOutcome
+from schemathesis.pytest.reporting import PytestReportOutcome, remember_report_locations
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
 
@@ -299,7 +300,7 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
 
 
 def _open_writers_from_config(
-    writer_config: dict, *, started_at: float, suffix: str | None = None
+    writer_config: dict, pytest_config: pytest.Config, *, started_at: float, suffix: str | None = None
 ) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
     """Open report writers on the controller using serialized writer configuration."""
     from schemathesis.reporting.har import HarWriter
@@ -383,6 +384,7 @@ def _open_writers_from_config(
         for writer in writers:
             writer.close()
         raise
+    remember_report_locations(pytest_config, reports, partial(reports.get_stable_path, suffix=suffix))
     return writers
 
 
@@ -432,7 +434,9 @@ class XdistReportingPlugin:
         multi = len(data) > 1
         for schema_id, payload in data.items():
             suffix = schema_id[:8] if multi else None
-            writers = _open_writers_from_config(payload["writer_config"], started_at=self.started_at, suffix=suffix)
+            writers = _open_writers_from_config(
+                payload["writer_config"], session.config, started_at=self.started_at, suffix=suffix
+            )
             try:
                 for record in payload["records"]:
                     recorder, elapsed_sec = deserialize_recorder(record)

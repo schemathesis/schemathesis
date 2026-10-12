@@ -1000,3 +1000,42 @@ def test_api(case):
     testdir.runpytest("-n", "2").assert_outcomes(passed=1, failed=1)
 
     assert testdir.tmpdir.join("report", "index.html").read_text("utf-8") == snapshot_html
+
+
+def reports_section(lines):
+    start = next((index for index, line in enumerate(lines) if "Schemathesis reports" in line), len(lines))
+    end = next((index for index in range(start + 1, len(lines)) if lines[index].startswith("=")), len(lines))
+    return lines[start:end]
+
+
+@pytest.mark.parametrize("args", [(), ("-n", "2")], ids=["single-process", "xdist"])
+def test_report_paths_in_terminal_summary(testdir, ctx, args):
+    api = ctx.openapi.apps.success()
+    testdir.makefile(
+        ".toml",
+        schemathesis='[reports.junit]\npath = "junit.xml"\n\n[reports.html]\nenabled = true\npath = "report"\n',
+    )
+    testdir.makepyfile(
+        f"""
+import schemathesis
+from hypothesis import settings, Phase
+
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call()
+"""
+    )
+    result = testdir.runpytest(*args)
+    result.assert_outcomes(passed=1)
+
+    header, *entries = reports_section(result.outlines)
+    # The separator width follows the terminal, which is one column narrower on Windows
+    assert header.strip("= ") == "Schemathesis reports"
+    # Paths are printed with native separators, as in the CLI's Reports section
+    assert entries == [
+        "  - JUnit: junit.xml",
+        f"  - HTML: {pathlib.Path('report', 'index.html')}",
+    ]
