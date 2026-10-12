@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from schemathesis.reporting.html.model import ErrorEntry, FailingCase, OperationRow, ReportData
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
+_CSS = (files("schemathesis.reporting.html") / "assets" / "report.css").read_text(encoding="utf-8").strip()
 
 
 def esc(value: object) -> str:
@@ -84,7 +85,7 @@ def page(*, title: str, body: str) -> str:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{esc(title)}</title>
-  <link rel="stylesheet" href="assets/report.css">
+  <style>{_CSS}</style>
 </head>
 <body>
   <main class="container">

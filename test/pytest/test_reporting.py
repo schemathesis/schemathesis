@@ -882,7 +882,7 @@ def test_api(case):
     testdir.runpytest().assert_outcomes(failed=1)
 
     assert report_dir.join("index.html").read_text("utf-8") == snapshot_html
-    assert report_dir.join("assets", "report.css").check(file=True)
+    assert report_dir.listdir() == [report_dir.join("index.html")]
 
 
 def test_html_report_passed(testdir, ctx, snapshot_html):

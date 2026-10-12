@@ -192,7 +192,7 @@ def run_with_report(cli, report_dir, *args, exit_code=ExitCode.OK, phases="fuzzi
 def test_html_report_passed(ctx, cli, report_dir, snapshot_html):
     api = ctx.openapi.apps.success()
     assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
-    assert (report_dir / "assets" / "report.css").is_file()
+    assert list(report_dir.iterdir()) == [report_dir / "index.html"]
 
 
 def test_html_report_failed(ctx, cli, report_dir, snapshot_html):
@@ -794,8 +794,7 @@ def test_html_report_multiline_warning_tip(ctx, cli, report_dir, snapshot_html):
         cli, report_dir, api.schema_url, "--max-examples=5", "--checks=not_a_server_error", phases="examples,fuzzing"
     )
     assert html == snapshot_html
-    css = (report_dir / "assets" / "report.css").read_text(encoding="utf-8")
-    assert "white-space:pre-wrap" in re.search(r"\.w-tip\{([^}]*)\}", css).group(1)
+    assert "white-space:pre-wrap" in re.search(r"\.w-tip\{([^}]*)\}", html).group(1)
 
 
 @pytest.fixture
@@ -1391,7 +1390,7 @@ def test_html_report_default_location(ctx, cli, tmp_path):
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     (index,) = tmp_path.glob("html-*/index.html")
-    assert (index.parent / "assets" / "report.css").is_file()
+    assert list(index.parent.iterdir()) == [index]
     assert f"HTML: {index}" in result.stdout
 
 
