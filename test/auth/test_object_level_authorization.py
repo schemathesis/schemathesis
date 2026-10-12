@@ -145,6 +145,27 @@ def test_without_peers_no_probe_is_sent(cli, ctx, tmp_path):
     assert _peer_requests(api.requests) == []
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    "checks", ["--checks=object_level_authorization", "--exclude-checks=ignored_auth"], ids=["selected", "default"]
+)
+def test_without_peers_warns_only_when_selected(cli, ctx, snapshot_cli, checks):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=10",
+            "--phases=fuzzing",
+            # Negative bodies fail `POST /api/orders` with a platform-dependent minimal example
+            "--mode=positive",
+            checks,
+            "-H",
+            "Authorization: ApiKey alice",
+        )
+        == snapshot_cli
+    )
+
+
 def test_cli_wfc_path_preserves_configured_peers(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     auth = _auth_file(tmp_path)

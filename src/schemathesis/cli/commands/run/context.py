@@ -41,7 +41,8 @@ class ExecutionContext(BaseExecutionContext):
     baseline_update: bool = False
     baseline_prune: bool = False
     # Problems with the invocation itself, shown before the schema is loaded.
-    startup_warnings: list[str] = field(default_factory=list)
+    # The kind is `None` for a warning `[warnings]` cannot silence.
+    startup_warnings: list[tuple[SchemathesisWarning | None, str]] = field(default_factory=list)
     baseline_recorded: int | None = None
     baseline_pruned: list[str] | None = None
     baseline_write_error: str | None = None
@@ -49,9 +50,9 @@ class ExecutionContext(BaseExecutionContext):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.warning_collector = WarningCollector(config=self.config)
-        # Every startup warning is a timeout given in milliseconds.
-        if self.startup_warnings:
-            self.warning_collector.on_startup_warning(SchemathesisWarning.TIMEOUT_UNITS)
+        for kind, _ in self.startup_warnings:
+            if kind is not None:
+                self.warning_collector.on_startup_warning(kind)
 
     def on_event(self, event: events.EngineEvent) -> None:
         super().on_event(event)

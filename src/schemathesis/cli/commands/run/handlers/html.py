@@ -340,7 +340,9 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             unattributed_cases=rows.unattributed_cases,
             unattributed_errors=rows.unattributed_errors,
             warnings=warnings,
-            startup_warnings=ctx.startup_warnings if isinstance(ctx, ExecutionContext) else [],
+            startup_warnings=(
+                [message for _, message in ctx.startup_warnings] if isinstance(ctx, ExecutionContext) else []
+            ),
             phases=_phases(summary.phases, outcomes),
             checks=enabled_checks(ctx.config.checks_config_for()),
             reports=_report_links(ctx, self.output_dir),
