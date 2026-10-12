@@ -833,11 +833,18 @@ def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
     ]
 
 
-def test_connection_error_suggests_checking_the_base_url(ctx, cli):
+@pytest.mark.parametrize(
+    ("command", "args"),
+    [
+        ("run", ("--phases=fuzzing", "-n", "1")),
+        ("fuzz", ("--max-time=30",)),
+    ],
+)
+def test_connection_error_tip_names_the_address(ctx, cli, command, args):
     api = ctx.openapi.apps.success()
-    stdout = cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "1").stdout
+    stdout = cli.main(command, api.schema_url, "--url=http://127.0.0.1:1/api", *args).stdout
     assert [line for line in stdout.splitlines() if line.startswith("Tip:")] == [
-        "Tip: Check that the API is running and reachable at its base URL; set the address with `--url`."
+        "Tip: Check that the API is running and reachable at `http://127.0.0.1:1`."
     ]
 
 

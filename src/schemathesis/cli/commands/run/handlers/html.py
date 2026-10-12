@@ -108,7 +108,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         elif isinstance(event, events.FuzzScenarioFinished):
             self._on_fuzz_scenario_finished(ctx, event)
         elif isinstance(event, events.NonFatalError):
-            self._on_error(event)
+            self._on_error(event, base_url_is_set=ctx.config.base_url is not None)
         elif isinstance(event, events.FatalError):
             self.fatal_error = _fatal_entry(event.exception, wait_for_schema=ctx.config.wait_for_schema)
         elif isinstance(event, events.EngineFinished):
@@ -147,12 +147,12 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         self._record(event.recorder)
         self._record_found(ctx, event.recorder, PhaseName.FUZZING.display, event.timestamp)
 
-    def _on_error(self, event: events.NonFatalError) -> None:
+    def _on_error(self, event: events.NonFatalError, *, base_url_is_set: bool) -> None:
         entries = self.errors.setdefault(event.label, {})
         if event.related_to_operation:
             self.errored_labels.add(event.label)
         if type(event.value) not in entries:
-            entries[type(event.value)] = _error_entry(event.info)
+            entries[type(event.value)] = _error_entry(event.info, base_url_is_set=base_url_is_set)
         if event.phase is not None:
             self.phase_errors.setdefault(event.phase, set()).add((event.label, type(event.value)))
 
@@ -496,11 +496,11 @@ def _extraction_commands(failure: ExtractionFailure) -> list[Command]:
     return commands
 
 
-def _error_entry(info: EngineErrorInfo) -> ErrorEntry:
+def _error_entry(info: EngineErrorInfo, *, base_url_is_set: bool) -> ErrorEntry:
     return ErrorEntry(
         title=info.title,
         message=info.message or str(info),
-        tip=info.suggestion(),
+        tip=info.suggestion(base_url_is_set=base_url_is_set),
         details=info.details,
         reproduce=info.code_sample,
     )
