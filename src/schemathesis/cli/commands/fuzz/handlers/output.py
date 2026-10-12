@@ -9,6 +9,7 @@ import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
 from schemathesis.cli.commands.run.handlers.output import (
+    display_reports,
     display_warning_blocks,
     get_status_icon,
     unmatched_filter_block,
@@ -335,6 +336,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             click.echo()
 
         display_test_cases(reduce_test_cases(ctx.statistic))
+        display_reports(ctx)
         display_seed(ctx.config)
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()

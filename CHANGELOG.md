@@ -12,6 +12,7 @@
 - Missing environment variable error naming the whole config value instead of the variable.
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
 - `st fuzz` phase line counting failed and errored scenarios as passed.
+- Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
 - HTML report counting tested operations as errored when some of their cases errored.
 - HTML report exit note giving no reason when a startup warning fails the run.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
