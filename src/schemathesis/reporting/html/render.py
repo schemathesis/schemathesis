@@ -873,8 +873,16 @@ def _row_items(row: OperationRow) -> list[str]:
     return items
 
 
-def _operation_order(row: OperationRow) -> tuple[int, str, str]:
-    return (-len(row.failures), row.path, row.method)
+_DIGITS = re.compile(r"(\d+)")
+
+
+def _natural_key(text: str) -> tuple[str | int, ...]:
+    # Splitting on a capture group puts digit runs at odd positions, so `/4` sorts before `/12`.
+    return tuple(int(part) if index % 2 else part for index, part in enumerate(_DIGITS.split(text)))
+
+
+def _operation_order(row: OperationRow) -> tuple[int, tuple[str | int, ...], str]:
+    return (-len(row.failures), _natural_key(row.path), row.method)
 
 
 def _group_header(status: OperationStatus, rows: list[OperationRow], *, collapsible: bool) -> str:

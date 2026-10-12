@@ -14,6 +14,7 @@
 - `st fuzz` phase line counting failed and errored scenarios as passed.
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
 - HTML report counting tested operations as errored when some of their cases errored.
+- HTML report sorting operations as text, listing `/12` before `/4`.
 - HTML report exit note giving no reason when a startup warning fails the run.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.

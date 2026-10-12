@@ -613,6 +613,32 @@ def test_html_report_large_api(ctx, cli, app_runner, report_dir, snapshot_html):
     assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
 
 
+def test_html_report_operations_in_natural_order(ctx, cli, app_runner, report_dir):
+    ok = {"responses": {"200": {"description": "OK"}}}
+    paths = {f"/number/{index}": {"get": ok} for index in (12, 4, 0, 16, 8)}
+    paths["/number/4/items"] = {"get": ok, "post": ok}
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/number/<index>", methods=["GET"])
+    def number(index):
+        return "{}"
+
+    @app.route("/number/<index>/items", methods=["GET", "POST"])
+    def items(index):
+        return "{}"
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app))
+    assert re.findall(r'<tr class="op-row[^"]*" id="([^"]+)"', html) == [
+        "op-get-number-0",
+        "op-get-number-4",
+        "op-get-number-4-items",
+        "op-post-number-4-items",
+        "op-get-number-8",
+        "op-get-number-12",
+        "op-get-number-16",
+    ]
+
+
 def test_html_report_graphql(ctx, cli, report_dir, snapshot_html):
     api = ctx.graphql.apps.books()
     assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
