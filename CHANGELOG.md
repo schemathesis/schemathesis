@@ -128,6 +128,7 @@
 
 #### Others
 
+- `--auth-wfc` discarding `peers`, `refresh_interval` and `user` set under `[auth.wfc]`.
 - Missing unresolvable-reference warning for responses whose `$ref` reaches it through a cycle.
 - Crash on schemas with a non-object `info` or a non-string `info.title`.
 - WFC auth abandoning the first user when a Swagger 2.0 `basic` case omits credentials.
