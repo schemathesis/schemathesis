@@ -1,0 +1,2 @@
+[auth.openapi]
+ApiKeyAuth = "secret"

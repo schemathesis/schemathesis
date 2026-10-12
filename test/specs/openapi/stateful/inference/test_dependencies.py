@@ -4064,6 +4064,17 @@ def nested_object(name, schema):
 
 
 LINES_COMPONENTS = {"schemas": {"Lines": {"type": "array", "items": nested_object("warehouse_id", {"type": "string"})}}}
+RECURSIVE_LINES_COMPONENTS = {
+    "schemas": {
+        "Lines": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"warehouse_id": {"type": "string"}, "children": component_ref("Lines")},
+            },
+        }
+    }
+}
 
 
 @pytest.mark.parametrize(
@@ -4092,8 +4103,13 @@ LINES_COMPONENTS = {"schemas": {"Lines": {"type": "array", "items": nested_objec
             LINES_COMPONENTS,
             {"shipping": {"lines": [{"warehouse_id": "$response.body#/id"}]}},
         ),
+        (
+            nested_object("lines", component_ref("Lines")),
+            RECURSIVE_LINES_COMPONENTS,
+            {"lines": [{"warehouse_id": "$response.body#/id", "children": [{"warehouse_id": "$response.body#/id"}]}]},
+        ),
     ],
-    ids=["object-in-object", "array-in-object", "array-ref", "array-ref-in-object"],
+    ids=["object-in-object", "array-in-object", "array-ref", "array-ref-in-object", "recursive-array-ref"],
 )
 def test_nested_body_fk_links_from_producer(ctx, body, components, expected):
     paths = {
@@ -4108,6 +4124,28 @@ def test_nested_body_fk_links_from_producer(ctx, body, components, expected):
             {
                 "operationRef": "#/paths/~1orders/post",
                 "requestBody": expected,
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
+def test_nested_body_fk_links_from_producer_next_to_boolean_schema_reference(ctx):
+    body = nested_object(
+        "shipping", {"allOf": [component_ref("Any"), nested_object("warehouse_id", {"type": "string"})]}
+    )
+    paths = {
+        **operation("post", "/warehouses", "201", SCHEMA_WITH_ID, operation_id="createWarehouse"),
+        **operation_with_body("post", "/orders", "201", body, operation_id="createOrder"),
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components={"schemas": {"Any": True}})
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1warehouses/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "requestBody": {"shipping": {"warehouse_id": "$response.body#/id"}},
                 "x-schemathesis": {"is_inferred": True, "merge_body": True},
             },
         ]
@@ -5016,6 +5054,52 @@ def test_paginated_list_of_externally_tagged_items_links_every_item_to_read(ctx)
                 "x-schemathesis": {"is_inferred": True},
             },
         ],
+    ]
+
+
+def test_paginated_list_of_items_tagged_after_response_schema_links_every_item_to_read(ctx):
+    paths = {
+        **operation("get", "/feed", "200", component_ref("Activity"), operation_id="getFeed"),
+        **operation(
+            "get",
+            "/activities/{activity_id}",
+            "200",
+            parameters=[path_param("activity_id")],
+            operation_id="getActivity",
+        ),
+    }
+    components = {
+        "schemas": {
+            "Activity": {
+                "type": "object",
+                "properties": {
+                    "has_more": {"type": "boolean"},
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "seen": {"type": "boolean"},
+                                "activity": component_ref("Event"),
+                            },
+                        },
+                    },
+                },
+            },
+            "Event": {"type": "object", "properties": {"id": {"type": "string"}, "kind": {"type": "string"}}},
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1feed/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1activities~1{activity_id}/get",
+                "parameters": {"path.activity_id": "$response.body#/data/*/activity/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
     ]
 
 

@@ -2072,6 +2072,17 @@ def test_apply_adjustments_bounds_an_untyped_property(case_factory):
             id="allof-root-with-own-properties",
         ),
         pytest.param(
+            {"type": "object", "allOf": [True, {"type": "object", "properties": {"b": {}}}]},
+            (),
+            {
+                "type": "object",
+                "allOf": [True, {"type": "object", "properties": {"b": {}}}],
+                "properties": {"b": {}},
+                "additionalProperties": False,
+            },
+            id="allof-boolean-branch",
+        ),
+        pytest.param(
             {"type": "object", "properties": {"address": {"type": "object", "properties": {"city": {}}}}},
             ("address",),
             {
@@ -2110,7 +2121,38 @@ def test_additional_properties_adjustment_forbids_extras(input_schema, path, exp
     )
 
 
-def test_additional_properties_adjustment_preserves_allof_ref_properties(ctx, case_factory, response_factory):
+@pytest.mark.parametrize(
+    "schemas",
+    [
+        {
+            "Pet": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+            "Dog": {
+                "type": "object",
+                "allOf": [
+                    {"$ref": "#/components/schemas/Pet"},
+                    {"type": "object", "properties": {"bark": {"type": "boolean"}}},
+                ],
+            },
+        },
+        {
+            "Pet": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "allOf": [{"$ref": "#/components/schemas/Dog"}],
+            },
+            "Dog": {
+                "type": "object",
+                "allOf": [
+                    {"$ref": "#/components/schemas/Pet"},
+                    {"type": "object", "properties": {"bark": {"type": "boolean"}}},
+                ],
+            },
+        },
+    ],
+    ids=["ref", "cycle"],
+)
+def test_additional_properties_adjustment_preserves_allof_ref_properties(ctx, case_factory, response_factory, schemas):
     operation = ctx.openapi.load_schema(
         {
             "/api/pets": {
@@ -2123,22 +2165,7 @@ def test_additional_properties_adjustment_preserves_allof_ref_properties(ctx, ca
                 }
             }
         },
-        components={
-            "schemas": {
-                "Pet": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}},
-                    "required": ["name"],
-                },
-                "Dog": {
-                    "type": "object",
-                    "allOf": [
-                        {"$ref": "#/components/schemas/Pet"},
-                        {"type": "object", "properties": {"bark": {"type": "boolean"}}},
-                    ],
-                },
-            }
-        },
+        components={"schemas": schemas},
     )["/api/pets"]["POST"]
     store = ErrorFeedbackStore()
     _record(

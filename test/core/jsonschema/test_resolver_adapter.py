@@ -170,6 +170,24 @@ def test_find_unresolvable_reference_reuses_memoized_success():
     assert len(memo) == 1
 
 
+def test_find_unresolvable_reference_memoizes_every_reference_in_a_cycle():
+    memo = {}
+    schema = {
+        "$defs": {
+            "a": {"properties": {"b": {"$ref": "#/$defs/b"}}},
+            "b": {"properties": {"c": {"$ref": "#/$defs/c"}}},
+            "c": {"properties": {"a": {"$ref": "#/$defs/a"}}},
+        }
+    }
+
+    assert _find(schema, memo) is None
+    assert memo == {
+        "urn:schemathesis:root#/$defs/a": None,
+        "urn:schemathesis:root#/$defs/b": None,
+        "urn:schemathesis:root#/$defs/c": None,
+    }
+
+
 def test_unreachable_remote_reference_is_a_resolution_error():
     resolver = make_root_resolver({})
     with pytest.raises(RefResolutionError):

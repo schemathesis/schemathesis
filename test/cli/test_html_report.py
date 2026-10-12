@@ -24,6 +24,7 @@ from schemathesis.reporting.html.timeline import (
     axis_ticks,
     mark_classes,
     phase_blocks,
+    short_duration,
     tick_groups,
 )
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
@@ -1042,6 +1043,15 @@ def test_timeline_mark_classes(seconds, expected):
     assert mark_classes(seconds, 100.0) == expected
 
 
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [(0.25, "250ms"), (12.0, "12s"), (120.0, "2m"), (125.4, "2m 5s"), (7200.0, "2h"), (7380.0, "2h 3m")],
+    ids=["milliseconds", "seconds", "minutes", "minutes-and-seconds", "hours", "hours-and-minutes"],
+)
+def test_timeline_short_duration(seconds, expected):
+    assert short_duration(seconds) == expected
+
+
 def test_html_report_timeline_interrupted_run(ctx, cli, report_dir):
     api = ctx.openapi.apps.success_and_failure()
     module = ctx.write_pymodule(INTERRUPT_ON_SECOND_CALL)
@@ -1394,6 +1404,15 @@ def test_html_report_via_config(ctx, cli, report_dir):
         config={"reports": {"html": {"path": str(report_dir)}}},
     )
     assert (report_dir / "index.html").is_file()
+
+
+def test_html_report_fuzz_operation_errored(ctx, cli, app_runner, report_dir, snapshot_html):
+    app, _ = ctx.openapi.make_flask_app({"/api/broken": INVALID_BODY})
+    result = cli.main(
+        "fuzz", app_runner.openapi_url(app), "--max-time=1", "--seed=42", f"--report-html-path={report_dir}"
+    )
+    assert result.exit_code == ExitCode.FAILURES, result.stdout
+    assert read_report(report_dir) == snapshot_html
 
 
 def test_html_report_for_fuzz_command(ctx, cli, report_dir):
