@@ -14,6 +14,7 @@
 - Missing environment variable error naming the whole config value instead of the variable.
 - Timeout units warning showing large values in exponent notation, like `--request-timeout=1e+09`.
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
+- Stateful request timeouts counted as errored without an entry under "ERRORS".
 - `st fuzz` phase line counting failed and errored scenarios as passed.
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
 - HTML report counting tested operations as errored when some of their cases errored.

@@ -221,6 +221,19 @@ def _unresponsive_operation_error(
     )
 
 
+def _absorbed_timeout_error(
+    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
+) -> events.NonFatalError:
+    transport_kwargs = engine.get_transport_kwargs(operation=case.operation)
+    return events.NonFatalError(
+        error=exc,
+        phase=PhaseName.STATEFUL_TESTING,
+        label=case.operation.label,
+        related_to_operation=True,
+        code_sample=build_code_sample(case, exc.request, transport_kwargs),
+    )
+
+
 def _unrecoverable_network_error(
     exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
 ) -> UnrecoverableNetworkError | None:
@@ -300,16 +313,27 @@ def _absorb_transport_failure(
     *,
     case: Case,
     engine: EngineContext,
+    ctx: StatefulContext,
     event_queue: queue.Queue,
 ) -> NoReturn:
-    """Skip the step, reporting the operation once when it stops answering."""
-    if engine.health.mark_unresponsive(case.operation.label):
+    """Skip the step, reporting its operation's first timeout and again once the operation stops answering."""
+    label = case.operation.label
+    if engine.health.mark_unresponsive(label):
+        ctx.mark_timeout_reported(label)
         event_queue.put(_unresponsive_operation_error(exc, case=case, engine=engine))
+    elif ctx.mark_timeout_reported(label):
+        event_queue.put(_absorbed_timeout_error(exc, case=case, engine=engine))
     raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
 
 
 def _record_network_error(
-    exc: Exception, *, case: Case, engine: EngineContext, state: TestingState, event_queue: queue.Queue
+    exc: Exception,
+    *,
+    case: Case,
+    engine: EngineContext,
+    ctx: StatefulContext,
+    state: TestingState,
+    event_queue: queue.Queue,
 ) -> None:
     """Keep a connection-level failure for the suite report; a timeout the health monitor absorbs skips the step."""
     # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level failures
@@ -318,7 +342,7 @@ def _record_network_error(
         return
     network_error = _unrecoverable_network_error(exc, case=case, engine=engine)
     if network_error is None:
-        _absorb_transport_failure(exc, case=case, engine=engine, event_queue=event_queue)
+        _absorb_transport_failure(exc, case=case, engine=engine, ctx=ctx, event_queue=event_queue)
     state.store_unrecoverable_network_error(network_error)
 
 
@@ -499,7 +523,7 @@ def _run_step(
         raise
     except Exception as exc:
         outage = _detect_outage(exc, engine)
-        _record_network_error(exc, case=case, engine=engine, state=state, event_queue=event_queue)
+        _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
         _remember_step_outcome(ctx, case, exc, unique_inputs=unique_inputs)
         ctx.step_errored()
         if outage:

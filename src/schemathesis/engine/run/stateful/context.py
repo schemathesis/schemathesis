@@ -31,6 +31,8 @@ class StatefulContext:
     # Metrics collector for targeted testing
     metric_collector: MetricCollector = field(default_factory=MetricCollector)
     step_outcomes: dict[int, BaseException | None] = field(default_factory=dict)
+    # Operations whose skipped timed-out steps are already reported
+    reported_timeouts: set[str] = field(default_factory=set)
 
     @property
     def current_scenario_status(self) -> Status | None:
@@ -62,6 +64,13 @@ class StatefulContext:
 
     def mark_current_suite_as_seen_in_run(self) -> None:
         self.seen_in_run.update(self.seen_in_suite)
+
+    def mark_timeout_reported(self, operation_label: str) -> bool:
+        """`True` only the first time an operation's timeout is reported."""
+        if operation_label in self.reported_timeouts:
+            return False
+        self.reported_timeouts.add(operation_label)
+        return True
 
     def is_seen_in_run(self, exc: Failure) -> bool:
         return exc in self.seen_in_run

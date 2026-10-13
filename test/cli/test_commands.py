@@ -575,6 +575,37 @@ def test_connection_timeout(ctx, cli, workers):
         assert "Read timed out" in result.stdout, result.stdout
 
 
+@pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
+def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+    release = threading.Event()
+    calls = count()
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    # Too few timeouts to flag the operation as unresponsive
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        if next(calls) < 3:
+            release.wait()
+        return jsonify({"id": user_id})
+
+    try:
+        result = cli.run_openapi_app(
+            app,
+            "--max-examples=1",
+            "--generation-deterministic",
+            "--phases=stateful",
+            "--checks=not_a_server_error",
+            "--request-timeout=0.05",
+        )
+    finally:
+        release.set()
+    assert result == snapshot_cli
+
+
 def test_read_content_timeout(ctx, cli, mocker, snapshot_cli):
     api = ctx.openapi.apps.success()
     original = urllib3.response.HTTPResponse.stream
