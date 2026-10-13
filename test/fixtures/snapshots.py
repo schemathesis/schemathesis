@@ -213,9 +213,9 @@ def _mask_fuzz_counters(data: str) -> str:
     if "Stop reason:" not in data:
         return data
     # Fuzz-specific output: scenario count and counters vary with time and machine speed
-    data = re.sub(r"✅ \d+ scenarios", "✅ N scenarios", data)
+    data = re.sub(r"✅ \d+ scenarios?\b", "✅ N scenarios", data)
     data = re.sub(r"⏭  \d+ without checks", "⏭  N without checks", data)
-    data = re.sub(r"❌ \d+ unique failures", "❌ N unique failures", data)
+    data = re.sub(r"❌ \d+ unique failures?\b", "❌ N unique failures", data)
     data = re.sub(r"🚫 \d+ errors?", "🚫 N errors", data)
     return re.sub(r"Tested: \d+", "Tested: N", data)
 

@@ -256,12 +256,12 @@ def after_call(context, case, response):
         (
             _make_fuzz_failure_app,
             [],
-            r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios\n\n    ❌ [1-9]\d* unique failures\n    Last new failure: \d+\.\d{2}s ago\n",
+            r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios?\n\n    ❌ (?:1 unique failure|(?!1 )\d+ unique failures)\n    Last new failure: \d+\.\d{2}s ago\n",
         ),
         (
             _make_slow_fuzz_app,
             ["--request-timeout=0.001"],
-            r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios\n\n    🚫 1 errors\n    Last new failure: none yet\n",
+            r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios?\n\n    🚫 1 error\n    Last new failure: none yet\n",
         ),
     ],
     ids=["failures", "errors"],
@@ -307,6 +307,16 @@ def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner
 
     assert "No scenarios were run" not in result.stdout, result.stdout
     assert "Tested: 1" in result.stdout, result.stdout
+
+
+def test_fuzz_single_scenario_is_singular(cli, app_runner, ctx):
+    url = _make_fuzz_app(ctx, app_runner)
+
+    result = cli.main("fuzz", url, "--max-time=0", "--workers=1")
+
+    assert [line for line in result.stdout.splitlines() if "✅" in line and "scenario" in line] == [
+        "     ✅ 1 scenario"
+    ]
 
 
 # Steps after the first failure in a scenario were already sent, so their responses are checked too.

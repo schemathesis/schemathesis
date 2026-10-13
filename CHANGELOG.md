@@ -16,6 +16,7 @@
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
 - Stateful request timeouts counted as errored without an entry under "ERRORS".
 - `st fuzz` phase line counting failed and errored scenarios as passed.
+- Wrong plurals in `st fuzz` progress, such as `1 scenarios` and `1 errors`.
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
 - HTML report counting tested operations as errored when some of their cases errored.
 - HTML report sorting operations as text, listing `/12` before `/4`.
