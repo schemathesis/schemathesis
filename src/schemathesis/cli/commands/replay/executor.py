@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.schemas import APIOperation, BaseSchema
+    from schemathesis.wfc.escalation import EscalatingAuthProvider
 
 
 class ReplayStatus(Enum):
@@ -238,6 +239,7 @@ def _replay_sequence(
     from schemathesis.auths import AuthContext, set_on_case
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.stateful.state_machine import StepOutput
+    from schemathesis.wfc.escalation import escalating_provider
 
     step_outcomes: list[StepOutcome] = []
     instant = Instant()
@@ -246,7 +248,6 @@ def _replay_sequence(
     recorder = ScenarioRecorder(label="replay", config=schema.config.output)
     step_outputs: list[StepOutput] = []
 
-    terminal_case: Case | None = None
     terminal_response: Response | None = None
     last_index = len(sequence) - 1
     replacement = schema.config.output.sanitization.replacement
@@ -254,6 +255,15 @@ def _replay_sequence(
     unsupplied: list[tuple[ParameterLocation, str]] = []
     # The first step the API rejected for authentication where the recorded request was accepted.
     rejected: RejectedStep | None = None
+
+    identities = escalating_provider(schema)
+    for index, step in enumerate(sequence):
+        if step.auth_identity is not None and (identities is None or step.auth_identity not in identities.names):
+            # Sending it as anyone else would replay a different scenario.
+            return _errored_outcome(
+                _unknown_identity_message(step.auth_identity, number=index + 1, steps=len(sequence)),
+                elapsed=instant.elapsed_ms,
+            )
 
     for index, step in enumerate(sequence):
         step_operation = operation if index == last_index else _step_operation(schema, step)
@@ -276,6 +286,13 @@ def _replay_sequence(
 
         # Credentials come from the current config, CLI options and auth providers, as in a run.
         set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), None)
+        # Each step goes out as the identity that sent it, so a peer's request is not replayed as the owner.
+        if (
+            identities is not None
+            and step.auth_identity is not None
+            and case._auth_identity not in (None, step.auth_identity)
+        ):
+            _send_as(case, identities, step.auth_identity)
 
         # A link extracts from its recorded parent step, not always the previous one (older crashes lack it).
         parent_output: StepOutput | None = None
@@ -329,16 +346,16 @@ def _replay_sequence(
         )
         step_outputs.append(StepOutput(response=response, case=case))
         if index == last_index:
-            terminal_case = case
             terminal_response = response
 
     elapsed = instant.elapsed_ms
-    assert terminal_case is not None and terminal_response is not None
+    assert terminal_response is not None
     terminal = sequence[-1]
+    checked = step_outputs[_checked_index(sequence)]
     try:
         check_outcomes, check_failures = _evaluate_checks(
-            case=terminal_case,
-            response=terminal_response,
+            case=checked.case,
+            response=checked.response,
             recorded_checks=terminal.checks,
             recorder=recorder,
         )
@@ -359,6 +376,31 @@ def _replay_sequence(
         unsupplied_masked=unsupplied,
         rejected=rejected,
     )
+
+
+def _checked_index(sequence: list[CrashStep]) -> int:
+    """The step the recorded checks ran on."""
+    terminal = sequence[-1]
+    parent = terminal.parent_index
+    # Sent as another identity than its parent without a link: a peer's request a check sent from the parent,
+    # so the checks run on the parent and send it again.
+    if (
+        terminal.link is None
+        and parent is not None
+        and terminal.auth_identity is not None
+        and sequence[parent].auth_identity not in (None, terminal.auth_identity)
+    ):
+        return parent
+    return len(sequence) - 1
+
+
+def _send_as(case: Case, identities: EscalatingAuthProvider, name: str) -> None:
+    """Replace the credentials on `case` with the ones `name` sends."""
+    from schemathesis.specs.openapi.object_authorization import apply_as
+
+    sent = apply_as(case, identities.provider_for(name), name)
+    case.headers, case.query, case.cookies = sent.headers, sent.query, sent.cookies
+    case._auth_identity = name
 
 
 def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> list[LinkedValue]:
@@ -593,6 +635,14 @@ def _rejected_credentials_message(rejected: RejectedStep, *, steps: int) -> str:
         f"replay was not authenticated: the API answered {rejected.status_code}{location} "
         f"where the recorded request got {rejected.recorded_status_code}; "
         "check the credentials passed via config, -H, --auth or an auth hook"
+    )
+
+
+def _unknown_identity_message(name: str, *, number: int, steps: int) -> str:
+    location = f"step {number} was" if steps > 1 else "the request was"
+    return (
+        f"{location} sent as `{name}`, but replay cannot send requests as `{name}`; "
+        "pass the WFC auth document the run used via `--auth-wfc` or `[auth.wfc]`"
     )
 
 

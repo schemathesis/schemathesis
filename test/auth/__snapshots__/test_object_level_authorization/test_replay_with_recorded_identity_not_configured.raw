@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
+
+  ! ERROR  GET /api/orders/{order_id}
+
+    step 3 was sent as `bob`, but replay cannot send requests as `bob`; pass the WFC auth document the run used via `--auth-wfc` or `[auth.wfc]`
+
+============================== 1 errored in 1.00s ==============================
