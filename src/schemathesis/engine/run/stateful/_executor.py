@@ -503,15 +503,18 @@ def _run_step(
     unique_inputs: bool,
 ) -> StepOutput | None:
     """Send one scenario step and record its outcome; `None` when this input already passed."""
+    will_send = False
     try:
         _raise_if_stopped(engine)
-    except BudgetExpired:
-        machine.recorder.forget_case(case_id=case.id)
-        raise
-    _reject_unusable_operation(engine, case.operation.label)
-    try:
+        _reject_unusable_operation(engine, case.operation.label)
         if unique_inputs and _replay_cached_outcome(ctx, case):
             return None
+        will_send = True
+    finally:
+        if not will_send:
+            # The request is never sent, so the case must not count in the summary
+            machine.recorder.forget_case(case_id=case.id)
+    try:
         response = _send_step(machine, case, engine=engine, event_queue=event_queue)
         result = StepOutput(response, case)
         ctx.step_succeeded()

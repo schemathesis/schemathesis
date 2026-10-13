@@ -13,7 +13,7 @@
 - pytest runs not printing where reports were written.
 - Missing environment variable error naming the whole config value instead of the variable.
 - Timeout units warning showing large values in exponent notation, like `--request-timeout=1e+09`.
-- `errored` count in the summary including stateful cases cut off by `--max-time`.
+- `errored` count in the summary including stateful steps never sent, e.g. after `--max-time`.
 - Stateful request timeouts counted as errored without an entry under "ERRORS".
 - `st fuzz` phase line counting failed and errored scenarios as passed.
 - Wrong plurals in `st fuzz` progress, such as `1 scenarios` and `1 errors`.
