@@ -29,6 +29,7 @@ Can not generate data for query parameter `q`! Its schema should be an object or
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+
 =================================== WARNINGS ===================================
 
 Dictionary mismatch: 1 dictionary binding with entries that mostly fail the bound parameter's schema

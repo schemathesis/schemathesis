@@ -34,6 +34,7 @@ Error in `before_call` hook: ValueError: Called for GET /api/success
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+
 =================================== FAILURES ===================================
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>

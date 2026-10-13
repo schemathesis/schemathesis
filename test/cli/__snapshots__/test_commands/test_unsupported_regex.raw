@@ -45,6 +45,7 @@ Narrow it, or supply examples for this operation.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+
 =================================== WARNINGS ===================================
 
 Unsupported regex patterns: 3 operations with regex patterns Schemathesis cannot use as written

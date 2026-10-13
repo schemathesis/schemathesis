@@ -1832,6 +1832,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                     fg="red",
                 )
             )
+            click.echo()
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
         if not ctx.warnings.is_empty:
             self.display_warnings(ctx)

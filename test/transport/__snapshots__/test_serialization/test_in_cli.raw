@@ -36,6 +36,7 @@ Check your schema or add custom serializers: https://schemathesis.readthedocs.io
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+
 =================================== FAILURES ===================================
 ________________________________ POST /api/csv _________________________________
 1. Test Case ID: <PLACEHOLDER>
