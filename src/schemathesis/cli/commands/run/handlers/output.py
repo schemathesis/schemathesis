@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 UNMATCHED_FILTER_TIP = "Check the filter for a typo, or update it if the operation was renamed"
+DICTIONARY_MISMATCH_REASON = "with entries that mostly fail the bound parameter's schema"
 
 
 def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> Text:
@@ -508,7 +509,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             _list_block(
                 "Dictionary mismatch",
                 warnings.dictionary_mismatch,
-                " with entries that mostly fail the bound parameter's schema",
+                f" {DICTIONARY_MISMATCH_REASON}",
                 ["Fix the entries, or bind the dictionary to a parameter whose schema they match"],
                 entity="dictionary binding",
             )
@@ -1739,7 +1740,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 len(ctx.warnings.dictionary_mismatch),
                 "Dictionary mismatch",
                 "dictionary binding",
-                "with entries that mostly fail the parameter schema",
+                DICTIONARY_MISMATCH_REASON,
             ),
             (
                 len(ctx.warnings.unmatched_filter),
