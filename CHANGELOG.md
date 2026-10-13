@@ -10,6 +10,7 @@
 
 - Report seed under `pytest-xdist` not reproducing operations run on other workers.
 - Missing environment variable error naming the whole config value instead of the variable.
+- Timeout units warning showing large values in exponent notation, like `--request-timeout=1e+09`.
 - `errored` count in the summary including stateful cases cut off by `--max-time`.
 - `st fuzz` phase line counting failed and errored scenarios as passed.
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.

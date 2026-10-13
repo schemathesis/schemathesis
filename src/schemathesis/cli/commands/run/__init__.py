@@ -423,9 +423,9 @@ def _iter_timeouts_in_milliseconds(ctx: click.Context, config: ProjectConfig) ->
         if value is None or value < LIKELY_MILLISECONDS:
             continue
         if ctx.get_parameter_source(parameter) is ParameterSource.DEFAULT:
-            given, suggested = f"{key} = {value:g}", f"{key} = {value / 1000:g}"
+            given, suggested = f"{key} = {_format_number(value)}", f"{key} = {_format_number(value / 1000)}"
         else:
-            given, suggested = f"{option}={value:g}", f"{option}={value / 1000:g}"
+            given, suggested = f"{option}={_format_number(value)}", f"{option}={_format_number(value / 1000)}"
         yield f"`{given}` is {_describe_duration(value)}; Schemathesis takes seconds. Did you mean `{suggested}`?"
 
 
@@ -440,6 +440,10 @@ def _iter_unrunnable_checks(config: SchemathesisConfig, included_check_names: li
         "`object_level_authorization` will not run: list at least 2 users as `peers` under `[auth.wfc]`. "
         f"See {OBJECT_LEVEL_AUTHORIZATION_GUIDE}"
     )
+
+
+def _format_number(value: float) -> str:
+    return f"{value:f}".rstrip("0").rstrip(".")
 
 
 def _describe_duration(seconds: float) -> str:
