@@ -79,6 +79,7 @@ class CliSnapshotConfig:
     replace_seed: bool = True
     replace_reproduce_with: bool = False
     replace_test_cases: bool = True
+    replace_generated: bool = False
     replace_phase_statistic: bool = False
     replace_cycle_metrics: bool = False
     replace_stateful_statistic: bool = True
@@ -109,6 +110,7 @@ class CliSnapshotConfig:
         # Order matters: later steps match the text earlier steps produce.
         flagged = [
             (self.replace_test_cases, _mask_test_cases),
+            (self.replace_generated, _mask_generated),
             (self.replace_server_host, self._mask_server_host),
             (True, _mask_local_ports),
             (self.replace_tmp_dir, self._mask_tmp_dir),
@@ -171,6 +173,10 @@ def _mask_test_cases(data: str) -> str:
         "Test cases:\n  N generated, N passed",
         data,
     )
+
+
+def _mask_generated(data: str) -> str:
+    return re.sub(r"\d+ generated", "N generated", data)
 
 
 def _mask_local_ports(data: str) -> str:

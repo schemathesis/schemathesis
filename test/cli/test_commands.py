@@ -35,6 +35,7 @@ from schemathesis.config._output import MAX_PAYLOAD_SIZE
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.shell import ShellType
 from schemathesis.engine import Status, control, events
+from schemathesis.engine.health import HealthState
 from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.engine.run.unit._pool import DefaultScheduler
 from schemathesis.specs.openapi import unregister_string_format
@@ -5236,6 +5237,58 @@ def before_generate_case(context, strategy):
             "--phases=stateful",
             "--checks=not_a_server_error",
             hooks=module,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_test_cases=False, replace_generated=True, replace_reproduce_with=True)
+def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, cli, mocker, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return jsonify({"id": user_id})
+
+    # Hanging requests are what flag an operation in a real run; flagging it directly keeps the test fast
+    mocker.patch.object(HealthState, "is_unresponsive", lambda self, label: label == "GET /users/{userId}")
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-examples=1",
+            "--generation-deterministic",
+            "--phases=stateful",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
+def test_stateful_step_skipped_as_already_passed_is_not_counted(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return jsonify({"id": user_id})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-examples=1",
+            "--generation-deterministic",
+            "--generation-unique-inputs",
+            "--phases=stateful",
+            "--checks=not_a_server_error",
         )
         == snapshot_cli
     )
