@@ -3828,6 +3828,29 @@ def always_fails(ctx, response, case):
         )
 
 
+@pytest.mark.parametrize(
+    ("report", "message"),
+    [
+        ("html", "Could not create directory '{path}': Not a directory"),
+        ("junit", "Could not create parent directory for '{path}': Not a directory"),
+    ],
+)
+def test_unwritable_report_dir_names_option_and_full_path(ctx, cli, tmp_path, report, message):
+    api = ctx.openapi.apps.success()
+    parent = tmp_path / "file"
+    parent.write_text("", encoding="utf-8")
+
+    result = cli.run(api.schema_url, f"--report={report}", f"--report-dir={parent / 'y'}")
+
+    assert result.exit_code == 2
+    path = str(parent / "y" / f"{report}-TIMESTAMP{'.xml' if report == 'junit' else ''}")
+    assert re.sub(r"\d{8}T\d{6}Z", "TIMESTAMP", result.stderr) == (
+        "Usage: schemathesis run [OPTIONS] LOCATION\n"
+        "Try 'schemathesis run --help' for help.\n\n"
+        f"Error: Invalid value for '--report-dir': {message.format(path=path)}\n"
+    )
+
+
 STOP_LISTENING = """
 import socket
 

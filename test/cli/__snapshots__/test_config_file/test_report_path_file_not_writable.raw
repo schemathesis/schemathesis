@@ -4,4 +4,4 @@ Stdout:
 Usage: schemathesis run [OPTIONS] LOCATION
 Try 'schemathesis run --help' for help.
 
-Error: Invalid value: Could not open file 'report.xml': Permission denied
+Error: Invalid value: Could not open file '/tmp/readonly/report.xml': Permission denied

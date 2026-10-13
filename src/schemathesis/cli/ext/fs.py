@@ -11,24 +11,29 @@ if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
 
 
-def open_file(file: Path) -> None:
+def open_file(file: Path, option: str | None) -> None:
     try:
         ensure_parent(file, fail_silently=False)
     except (OSError, ValueError) as exc:
         raise click.BadParameter(
-            f"Could not create parent directory for {file.name!r}: {describe_path_error(exc)}"
+            f"Could not create parent directory for '{display_path(file)}': {describe_path_error(exc)}",
+            param_hint=option,
         ) from exc
     try:
         file.open("w", encoding="utf-8")
     except (OSError, ValueError) as exc:
-        raise click.BadParameter(f"Could not open file {file.name!r}: {describe_path_error(exc)}") from exc
+        raise click.BadParameter(
+            f"Could not open file '{display_path(file)}': {describe_path_error(exc)}", param_hint=option
+        ) from exc
 
 
-def prepare_directory(directory: Path) -> None:
+def prepare_directory(directory: Path, option: str | None) -> None:
     try:
         directory.mkdir(parents=True, exist_ok=True)
     except (OSError, ValueError) as exc:
-        raise click.BadParameter(f"Could not create directory {directory.name!r}: {describe_path_error(exc)}") from exc
+        raise click.BadParameter(
+            f"Could not create directory '{display_path(directory)}': {describe_path_error(exc)}", param_hint=option
+        ) from exc
 
 
 def load_baseline(config: ProjectConfig) -> None:
@@ -41,6 +46,11 @@ def load_baseline(config: ProjectConfig) -> None:
         raise click.BadParameter(
             f"Could not load baseline file {config.baseline!r}: {describe_path_error(exc)}"
         ) from exc
+
+
+def display_path(path: Path) -> str:
+    # Escapes control characters like `repr` does, but keeps Windows backslashes single.
+    return "".join(char if char.isprintable() else repr(char)[1:-1] for char in str(path))
 
 
 def describe_path_error(exc: OSError | ValueError) -> str:
