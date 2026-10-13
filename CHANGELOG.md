@@ -19,6 +19,7 @@
 - HTML report sorting operations as text, listing `/12` before `/4`.
 - HTML report exit note giving no reason when a startup warning fails the run.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
+- Dictionary mismatch warning title differing between the warnings block and the summary.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.
 - HTML report "Top failures" showing "+1 more" instead of the fourth failure.
 - Wrong plural in `found 1 unique failures` in the summary.

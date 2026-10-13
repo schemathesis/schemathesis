@@ -42,7 +42,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Dictionary mismatch: 1 dictionary binding with entries that mostly fail the parameter schema
+  ⚠️ Dictionary mismatch: 1 dictionary binding with entries that mostly fail the bound parameter's schema
 
 Test cases:
   N generated, N passed
