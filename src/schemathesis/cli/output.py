@@ -461,10 +461,11 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
     parts = [f"  {click.style(str(test_cases.generated), bold=True)} generated"]
 
     if test_cases.without_checks + test_cases.errored != test_cases.generated:
-        if test_cases.unique_failures > 0:
+        unique = test_cases.unique_failures
+        if unique > 0:
             parts.append(
                 f"{click.style(str(test_cases.with_failures), bold=True)} found "
-                f"{click.style(str(test_cases.unique_failures), bold=True)} unique failures"
+                f"{click.style(str(unique), bold=True)} unique failure{'' if unique == 1 else 's'}"
             )
         else:
             parts.append(f"{click.style(str(test_cases.generated), bold=True)} passed")

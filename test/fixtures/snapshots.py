@@ -161,7 +161,7 @@ def _mask_test_cases(data: str) -> str:
     data = re.sub(r"Test cases:\n  \d+ generated, \d+ errored, \d+ skipped", "Test cases:\n  N generated", data)
     # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
     data = re.sub(
-        r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ errored)?(?:, \d+ skipped)?",
+        r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures?(?:, \d+ errored)?(?:, \d+ skipped)?",
         "Test cases:\n  N generated, N found N unique failures",
         data,
     )
