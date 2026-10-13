@@ -126,6 +126,8 @@ class CrashStep:
     media_type: str | None = None
     # Index of the step this link extracts from — the recorded parent, not always the previous step. None at root.
     parent_index: int | None = None
+    # The configured identity that sent this step; None when no named identity did, or in older crash files.
+    auth_identity: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -149,6 +151,7 @@ class CrashStep:
             "case_body": encode_case_body(self.case_body),
             "media_type": self.media_type,
             "parent_index": self.parent_index,
+            "auth_identity": self.auth_identity,
         }
 
     @classmethod
@@ -173,6 +176,7 @@ class CrashStep:
             case_body=decode_case_body(data["case_body"]) if "case_body" in data else NOT_SET,
             media_type=data.get("media_type"),
             parent_index=data.get("parent_index"),
+            auth_identity=data.get("auth_identity"),
         )
 
 
@@ -393,6 +397,7 @@ def build_crashes_from_recorder(
                 case_body=case_body,
                 media_type=case.media_type,
                 parent_index=index_by_case_id.get(node.parent_id) if node.parent_id is not None else None,
+                auth_identity=case._auth_identity,
             )
         )
 
