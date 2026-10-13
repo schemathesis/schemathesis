@@ -2110,6 +2110,34 @@ def test_max_time_reports_the_first_cycle_in_full(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_unresponsive_operation_counted_as_errored(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(linked_users())
+    release = threading.Event()
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        release.wait()
+        return jsonify({"id": user_id})
+
+    try:
+        result = cli.run_openapi_app(
+            app,
+            "--max-examples=20",
+            "--generation-deterministic",
+            "--phases=stateful",
+            "--checks=not_a_server_error",
+            "--request-timeout=0.25",
+        )
+    finally:
+        release.set()
+    assert result == snapshot_cli
+
+
 def test_max_time_live_cycle_line_counts_errors(ctx, cli):
     api = ctx.openapi.apps.slow()
     result = cli.main(

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.statistic import Statistic
 
 # Phases whose operations can error out before any test runs.
-UNIT_PHASES = (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
+TESTING_PHASES = (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
 
 
 @dataclass(slots=True)
@@ -292,7 +292,7 @@ def _reduce_operations(
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]],
     skip_reasons: dict[str, set[str]],
     stop_reason: StopReason,
-    error_phases: tuple[PhaseName, ...] | None = UNIT_PHASES,
+    error_phases: tuple[PhaseName, ...] | None = TESTING_PHASES,
 ) -> OperationsSummary:
     errored = len(
         statistic.errored_operations - statistic.tested_operations
