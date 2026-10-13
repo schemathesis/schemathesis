@@ -17,6 +17,7 @@
 - Timeout units warning showing large values in exponent notation, like `--request-timeout=1e+09`.
 - `errored` count in the summary including stateful steps never sent, e.g. after `--max-time`.
 - Stateful request timeouts counted as errored without an entry under "ERRORS".
+- Unresponsive operations in the stateful phase shown as skipped, not errored, in the summary.
 - `st fuzz` phase line counting failed and errored scenarios as passed.
 - Wrong plurals in `st fuzz` progress, such as `1 scenarios` and `1 errors`.
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
