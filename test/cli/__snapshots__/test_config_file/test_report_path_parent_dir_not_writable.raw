@@ -4,4 +4,4 @@ Stdout:
 Usage: schemathesis run [OPTIONS] LOCATION
 Try 'schemathesis run --help' for help.
 
-Error: Invalid value: Could not create parent directory for 'report.xml': Permission denied
+Error: Invalid value: Could not create parent directory for '/tmp/readonly/missing/report.xml': Permission denied

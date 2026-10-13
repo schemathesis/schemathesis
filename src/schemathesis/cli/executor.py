@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import click
@@ -21,7 +22,7 @@ from schemathesis.cli.ext.fs import load_baseline, open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
 from schemathesis.cli.wfc_report import WfcReportHandler
-from schemathesis.config import ReportFormat
+from schemathesis.config import DEFAULT_REPORT_DIRECTORY, ReportFormat
 from schemathesis.core.errors import format_exception
 
 if TYPE_CHECKING:
@@ -85,6 +86,15 @@ def is_built_in_handler(handler: EventHandler) -> bool:
     return type(handler) in _BUILT_IN_HANDLERS
 
 
+def _report_option(config: ProjectConfig, params: dict[str, Any], format: ReportFormat) -> str | None:
+    """CLI option that set the report location, if any."""
+    if getattr(config.reports, format.value).path is not None:
+        return f"'--report-{format.value}-path'" if params.get(f"report_{format.value}_path") is not None else None
+    if Path(params.get("report_directory", DEFAULT_REPORT_DIRECTORY)) != DEFAULT_REPORT_DIRECTORY:
+        return "'--report-dir'"
+    return None
+
+
 def initialize_report_handlers(
     *,
     config: ProjectConfig,
@@ -96,27 +106,27 @@ def initialize_report_handlers(
 
     if config.reports.junit.enabled:
         path = config.reports.get_path(ReportFormat.JUNIT)
-        open_file(path)
+        open_file(path, _report_option(config, params, ReportFormat.JUNIT))
         handlers.append(JunitXMLHandler(path))
     if config.reports.vcr.enabled:
         path = config.reports.get_path(ReportFormat.VCR)
-        open_file(path)
+        open_file(path, _report_option(config, params, ReportFormat.VCR))
         handlers.append(VcrHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes))
     if config.reports.har.enabled:
         path = config.reports.get_path(ReportFormat.HAR)
-        open_file(path)
+        open_file(path, _report_option(config, params, ReportFormat.HAR))
         handlers.append(HarHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes))
     if config.reports.ndjson.enabled:
         path = config.reports.get_path(ReportFormat.NDJSON)
-        open_file(path)
+        open_file(path, _report_option(config, params, ReportFormat.NDJSON))
         handlers.append(NdjsonHandler(output=path, config=config))
     if config.reports.json.enabled:
         path = config.reports.get_path(ReportFormat.JSON)
-        open_file(path)
+        open_file(path, _report_option(config, params, ReportFormat.JSON))
         handlers.append(JsonReportHandler(path))
     if config.reports.wfc.enabled:
         path = config.reports.get_path(ReportFormat.WFC)
-        open_file(path)
+        open_file(path, _report_option(config, params, ReportFormat.WFC))
         handlers.append(WfcReportHandler(path))
     if config.reports.allure.enabled:
         try:
@@ -124,11 +134,11 @@ def initialize_report_handlers(
         except ImportError as exc:
             raise click.ClickException(str(exc)) from exc
         allure_path = config.reports.get_path(ReportFormat.ALLURE)
-        prepare_directory(allure_path)
+        prepare_directory(allure_path, _report_option(config, params, ReportFormat.ALLURE))
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
     if config.reports.html.enabled:
         html_path = config.reports.get_path(ReportFormat.HTML)
-        prepare_directory(html_path)
+        prepare_directory(html_path, _report_option(config, params, ReportFormat.HTML))
         handlers.append(HtmlReportHandler(html_path))
 
     if config.cache.enabled:
