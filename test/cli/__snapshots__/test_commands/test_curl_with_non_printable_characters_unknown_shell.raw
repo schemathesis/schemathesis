@@ -39,6 +39,7 @@ Ensure the header examples comply with RFC 7230, Section 3.2
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+
 =================================== FAILURES ===================================
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>

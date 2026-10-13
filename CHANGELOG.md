@@ -15,6 +15,7 @@
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
 - HTML report counting tested operations as errored when some of their cases errored.
 - HTML report exit note giving no reason when a startup warning fails the run.
+- Missing blank line between the Discord help link and the next output section.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.
 - HTML report "Top failures" showing "+1 more" instead of the fourth failure.
