@@ -1283,18 +1283,25 @@ def test_assignment_is_restored_from_cache(cli, ctx, tmp_path):
     assert {(r.headers.get("Authorization") or "").removeprefix("ApiKey ") for r in second} == {"admin"}
 
 
-def test_failure_names_the_identity(cli, ctx, tmp_path):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_failure_names_the_identity(cli, ctx, tmp_path, snapshot_cli):
     # With several identities in play, a report that does not say which one ran is ambiguous.
+    # The name alone is not actionable; the flag that reproduces it is.
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
 
-    result = cli.run(
-        api.schema_url, "--max-examples=8", "--phases=fuzzing", f"--auth-wfc={auth}", "-c", "not_a_server_error"
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=8",
+            "--phases=fuzzing",
+            f"--auth-wfc={auth}",
+            "-c",
+            "not_a_server_error",
+            "--include-path=/api/admin-boom/{itemId}",
+        )
+        == snapshot_cli
     )
-
-    assert "Server error" in result.stdout
-    # The name alone is not actionable; the flag that reproduces it is.
-    assert "Identity: admin (reproduce with --auth-wfc-user admin)" in result.stdout
 
 
 def test_ndjson_records_the_identity(cli, ctx, tmp_path):
