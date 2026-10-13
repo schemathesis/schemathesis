@@ -1520,6 +1520,20 @@ def test_html_report_unwritable_path(ctx, cli, tmp_path, snapshot_cli):
     assert cli.run(api.schema_url, f"--report-html-path={parent / 'report'}") == snapshot_cli
 
 
+def test_html_report_path_printed_when_run_aborts_before_testing(ctx, cli, tmp_path, report_dir, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.run(
+            api.schema_url,
+            f"--report-html-path={report_dir}",
+            f"--report-junit-path={tmp_path / 'junit.xml'}",
+            config={"auth": {"wfc": {"path": str(tmp_path / "auth.json")}}},
+        )
+        == snapshot_cli
+    )
+    assert (report_dir / "index.html").is_file()
+
+
 def test_html_report_links_other_reports(ctx, cli, tmp_path, report_dir):
     coverage = tmp_path / "coverage.html"
 
