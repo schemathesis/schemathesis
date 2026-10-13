@@ -1,0 +1,15 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ❌  Failed to load specification from http://127.0.0.1/openapi.json after 0.00s
+
+ Schema Loading Error
+
+ Failed to load Web Fuzzing Commons authentication: WFC auth file not found: /tmp/auth.json
+
+Reports:
+  - JUnit: /tmp/junit.xml
+  - HTML: /tmp/report/index.html

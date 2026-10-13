@@ -18,6 +18,7 @@
 - `st fuzz` phase line counting failed and errored scenarios as passed.
 - Wrong plurals in `st fuzz` progress, such as `1 scenarios` and `1 errors`.
 - Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
+- Missing "Reports:" section when `st run` stops before testing, such as on schema loading errors.
 - HTML report counting tested operations as errored when some of their cases errored.
 - HTML report sorting operations as text, listing `/12` before `/4`.
 - HTML report exit note giving no reason when a startup warning fails the run.

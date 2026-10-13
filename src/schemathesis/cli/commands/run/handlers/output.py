@@ -1612,6 +1612,13 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         )
         self.console.print(Indent(message))
 
+    def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
+        try:
+            super()._on_fatal_error(ctx, event)
+        finally:
+            # Reports are written even when the run stops before testing
+            display_reports(ctx)
+
     def _on_interrupted(self, event: events.Interrupted) -> None:
 
         if self.unit_tests_manager is not None:

@@ -539,7 +539,7 @@ def display_fatal_error(
             suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
             if suggestion is not None:
                 suggestion = re.sub(r"`[^`]+`", lambda match: _bold(match.group()), suggestion)
-                click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
+                click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}\n"))
 
         raise click.Abort
 
@@ -552,7 +552,7 @@ def display_fatal_error(
         for extra in split_traceback(info.traceback):
             console.print(Indent(Text(extra), left=5, right=0))
         console.print()
-        click.echo(f"For more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
+        click.echo(f"For more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}\n")
         raise click.Abort
 
     traceback = format_exception(event.exception, with_traceback=True)
@@ -562,5 +562,5 @@ def display_fatal_error(
     click.echo()
     click.echo(DEFAULT_INTERNAL_ERROR_MESSAGE)
     _display_extras(extras)
-    click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
+    click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}\n"))
     raise click.Abort
