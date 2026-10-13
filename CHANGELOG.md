@@ -24,6 +24,7 @@
 - HTML report sorting operations as text, listing `/12` before `/4`.
 - HTML report exit note giving no reason when a startup warning fails the run.
 - Missing blank line between the Discord help link and the next output section.
+- Missing blank line between the response body and the `Identity` line in failure output.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
 - Dictionary mismatch warning title differing between the warnings block and the summary.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.

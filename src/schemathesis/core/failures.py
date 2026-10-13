@@ -446,7 +446,7 @@ def format_failures(
         else:
             output += textwrap.indent(f"\n`{payload}`", prefix="    ")
     if auth_identity is not None and reproducible_by_identity(failures):
-        output += formatter(
+        output += "\n" + formatter(
             MessageBlock.STATUS, f"\nIdentity: {auth_identity} (reproduce with --auth-wfc-user {auth_identity})"
         )
     # `response`/`curl` are None for failures not tied to a case (e.g. after_run): nothing to show.
