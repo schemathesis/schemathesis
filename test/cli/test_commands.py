@@ -1993,6 +1993,22 @@ def test_timeouts_given_in_milliseconds_warning(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_timeouts_given_in_milliseconds_warning_large_values(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+
+    assert (
+        cli.run(
+            api.schema_url,
+            "--request-timeout=1e6",
+            "--phases=fuzzing",
+            "--max-examples=1",
+            config={"checks": {"max_response_time": 2.5e6}},
+        )
+        == snapshot_cli
+    )
+
+
 def test_no_timeout_units_warning_below_1000_seconds(ctx, cli):
     api = ctx.openapi.apps.success()
 
