@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, Body
@@ -41,6 +41,28 @@ def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseIn
     if headers:
         default_headers.update(headers)
     return default_headers
+
+
+# RFC 6265 cookie-octets, minus `%` so an encoded value decodes back unambiguously.
+_COOKIE_SAFE_CHARACTERS = "".join(chr(code) for code in range(0x21, 0x7F) if chr(code) not in '",;\\%')
+
+
+def prepare_cookies(cookies: dict[str, Any]) -> dict[str, Any]:
+    """Percent-encode cookie values that cannot go on the wire as Latin-1 header bytes."""
+    if not any(isinstance(value, str) and not _is_latin1(value) for value in cookies.values()):
+        return cookies
+    return {
+        name: quote(value, safe=_COOKIE_SAFE_CHARACTERS) if isinstance(value, str) and not _is_latin1(value) else value
+        for name, value in cookies.items()
+    }
+
+
+def _is_latin1(value: str) -> bool:
+    try:
+        value.encode("latin-1")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def get_exclude_headers(case: Case) -> list[str]:

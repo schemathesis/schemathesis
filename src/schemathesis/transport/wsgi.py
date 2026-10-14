@@ -21,6 +21,7 @@ from schemathesis.transport.prepare import (
     get_exclude_headers,
     normalize_base_url,
     prepare_body,
+    prepare_cookies,
     prepare_headers,
     prepare_path,
 )
@@ -130,7 +131,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             data["auth"] = auth
 
         client = session or wsgi.get_client(application)
-        cookies = {**(case.cookies or {}), **(cookies or {})}
+        cookies = prepare_cookies({**(case.cookies or {}), **(cookies or {})})
 
         config = case.operation.schema.config
         rate_limit = config.rate_limit_for(operation=case.operation)
