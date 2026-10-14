@@ -8,41 +8,61 @@
 
 ### :bug: Fixed
 
+#### `st fuzz`
+
+- Phase line counting failed and errored scenarios as passed.
+- Wrong plurals in progress, such as `1 scenarios` and `1 errors`.
+- Missing "Reports:" section, including reports added via `ctx.add_report()`.
+
+#### Output and summary
+
 - Request timeouts not reported for operations that also fail a check.
-- `--phases` not disabling the stateful phase when links are inferred for GraphQL schemas.
-- HTML report showing a copyable `<unknown entrypoint>` command under `python -m pytest` or `python -m schemathesis`.
-- Report seed under `pytest-xdist` not reproducing operations run on other workers.
-- pytest runs not printing where reports were written.
-- Missing environment variable error naming the whole config value instead of the variable.
-- Timeout units warning showing large values in exponent notation, like `--request-timeout=1e+09`.
 - `errored` count in the summary including stateful steps never sent, e.g. after `--max-time`.
 - Stateful request timeouts counted as errored without an entry under "ERRORS".
 - Unresponsive operations in the stateful phase shown as skipped, not errored, in the summary.
-- `st fuzz` phase line counting failed and errored scenarios as passed.
-- Wrong plurals in `st fuzz` progress, such as `1 scenarios` and `1 errors`.
-- Missing "Reports:" section in `st fuzz` output, including reports added via `ctx.add_report()`.
+- Wrong plural in `found 1 unique failures` in the summary.
 - Missing "Reports:" section when `st run` stops before testing, such as on schema loading errors.
-- Crash when calling a `Case` built with an object or array cookie value.
-- HTML report counting tested operations as errored when some of their cases errored.
-- HTML report sorting operations as text, listing `/12` before `/4`.
-- HTML report exit note giving no reason when a startup warning fails the run.
 - Missing blank line between the Discord help link and the next output section.
 - Missing blank line between the response body and the `Identity` line in failure output.
-- HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
-- Slow phase startup in processes with large memory use, eating into `--max-time`.
 - Dictionary mismatch warning title differing between the warnings block and the summary.
+- Timeout units warning showing large values in exponent notation, like `--request-timeout=1e+09`.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.
 - Auth sign-up line showing `[auth] auto-signup = false`, which is not valid TOML on one line.
+- Missing environment variable error naming the whole config value instead of the variable.
 - Report directory errors omitting the `--report-dir` option and the full path that failed.
-- HTML report "Top failures" showing "+1 more" instead of the fourth failure.
-- Wrong plural in `found 1 unique failures` in the summary.
-- `--checks object_level_authorization` reporting a clean run without warning when no `peers` are configured.
-- `object_level_authorization` reproduction commands not saying which user sends each request.
+
+#### HTML report
+
+- Copyable `<unknown entrypoint>` command under `python -m pytest` or `python -m schemathesis`.
+- Tested operations counted as errored when some of their cases errored.
+- Operations sorted as text, listing `/12` before `/4`.
+- Exit note giving no reason when a startup warning fails the run.
+- Horizontal scrollbar stopping short of the reproduction command's "Copy" button.
+- "Top failures" showing "+1 more" instead of the fourth failure.
+
+#### `object_level_authorization`
+
+- Clean run reported without warning when no `peers` are configured.
+- Reproduction commands not saying which user sends each request.
+- `st replay` sending every step as one user, so failures replayed as fixed.
+
+#### `negative_data_rejection` in the stateful phase
+
+- False failures for `"5"` sent to numeric path or query parameters.
+- Missed failures for invalid array and object non-body parameters.
+- False failures for unknown query parameters beside `null` values of nullable parameters.
+
+#### pytest, Python API and hooks
+
+- Report seed under `pytest-xdist` not reproducing operations run on other workers.
+- pytest runs not printing where reports were written.
+- Crash when calling a `Case` built with an object or array cookie value.
+
+#### Others
+
+- `--phases` not disabling the stateful phase when links are inferred for GraphQL schemas.
 - `UnicodeEncodeError` for cookie values with non-Latin-1 characters.
-- False `negative_data_rejection` in the stateful phase for `"5"` sent to numeric path or query parameters.
-- Missed `negative_data_rejection` failures in the stateful phase for invalid array and object non-body parameters.
-- False `negative_data_rejection` in the stateful phase for unknown query parameters beside `null` values of nullable parameters.
-- `st replay` sending every step as one user, so `object_level_authorization` failures replayed as fixed.
+- Slow phase startup in processes with large memory use, eating into `--max-time`.
 
 ## [4.31.0](https://github.com/schemathesis/schemathesis/compare/v4.30.1...v4.31.0) - 2026-10-12
 
