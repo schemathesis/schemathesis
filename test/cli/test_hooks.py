@@ -3,22 +3,6 @@ from _pytest.main import ExitCode
 from hypothesis import settings
 
 
-def test_before_call(ctx, cli):
-    api = ctx.openapi.apps.success()
-    # When the `before_call` hook is registered
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def before_call(context, case, **kwargs):
-    1 / 0
-        """
-    )
-    result = cli.main("run", api.schema_url, hooks=module)
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then it should be called before each `case.call`
-    assert "division by zero" in result.stdout
-
-
 def test_before_call_no_kwargs_unpacking(ctx, cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(

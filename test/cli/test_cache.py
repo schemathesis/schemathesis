@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import platform
 import socket
@@ -78,71 +79,30 @@ def test_cache_row_shows_replayed_count(ctx, cli, snapshot_cli, tmp_path):
             )
         ],
     )
+    ndjson_path = tmp_path / "events.ndjson"
 
     assert (
         cli.run(
             api.schema_url,
             "--max-examples=1",
             "--phases=fuzzing",
-            config={"cache": {"directory": str(cache_dir)}},
+            config={
+                "cache": {"directory": str(cache_dir)},
+                "reports": {"ndjson": {"enabled": True, "path": str(ndjson_path)}},
+            },
         )
         == snapshot_cli
     )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_cache_row_shows_stale_removed(ctx, cli, snapshot_cli, tmp_path):
-    # Operation that does not exist in the success() schema -> dropped at pre-flight.
-    api = ctx.openapi.apps.success()
-    cache_dir = tmp_path / "cache"
-    _seed(
-        cache_dir,
-        [
-            Entry(
-                id=1,
-                kind=Kind.METHOD_NOT_ALLOWED,
-                operation="POST /vanished",
-                request=Request(method="POST"),
-            )
-        ],
-    )
-
-    assert (
-        cli.run(
-            api.schema_url,
-            "--max-examples=1",
-            "--phases=fuzzing",
-            config={"cache": {"directory": str(cache_dir)}},
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_cache_row_shows_stale_removed_method(ctx, cli, snapshot_cli, tmp_path):
-    # The path is still in the schema, but not with this method.
-    api = ctx.openapi.apps.success()
-    cache_dir = tmp_path / "cache"
-    _seed(
-        cache_dir,
-        [
-            Entry(
-                id=1,
-                kind=Kind.METHOD_NOT_ALLOWED,
-                operation="POST /api/success",
-                request=Request(method="POST"),
-            )
-        ],
-    )
-
-    assert (
-        cli.run(
-            api.schema_url,
-            "--max-examples=1",
-            "--phases=fuzzing",
-            config={"cache": {"directory": str(cache_dir)}},
-        )
-        == snapshot_cli
+    events = [json.loads(line) for line in ndjson_path.read_text(encoding="utf-8").splitlines()]
+    (probing,) = [
+        event["PhaseFinished"]["payload"]["cache"]
+        for event in events
+        if event.get("PhaseFinished", {}).get("phase", {}).get("name") == "probing"
+    ]
+    (summary,) = [event["EngineFinished"]["payload"]["cache"] for event in events if "EngineFinished" in event]
+    assert (probing, summary) == (
+        {"replayed": 1, "dropped": 0, "skipped": 0, "available": True},
+        {"observations_total": 0},
     )
 
 
@@ -178,7 +138,14 @@ def test_run_succeeds_when_cache_directory_is_read_only(ctx, cli, snapshot_cli, 
                 kind=Kind.METHOD_NOT_ALLOWED,
                 operation="POST /vanished",
                 request=Request(method="POST"),
-            )
+            ),
+            # The path is still in the schema, but not with this method.
+            Entry(
+                id=2,
+                kind=Kind.METHOD_NOT_ALLOWED,
+                operation="POST /api/success",
+                request=Request(method="POST"),
+            ),
         ],
     )
     # Crash records go to a subdirectory; keep it writable so only the cache write fails.
@@ -194,7 +161,7 @@ def test_run_succeeds_when_cache_directory_is_read_only(ctx, cli, snapshot_cli, 
     finally:
         cache_dir.chmod(0o755)
     assert result == snapshot_cli
-    assert [entry.operation for entry in load(cache_dir)[1]] == ["POST /vanished"]
+    assert [entry.operation for entry in load(cache_dir)[1]] == ["POST /vanished", "POST /api/success"]
 
 
 @pytest.mark.parametrize("kind", [Kind.ERROR_FEEDBACK, Kind.AUTH_REQUIRED])

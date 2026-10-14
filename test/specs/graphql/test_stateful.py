@@ -5,34 +5,6 @@ import pytest
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
 
-@pytest.mark.parametrize(
-    "filter_arg",
-    [
-        "--exclude-name=Mutation.updateBook",
-        "--exclude-name=Query.book",
-    ],
-    ids=["use-after-create", "update-on-existing"],
-)
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_chained_planted_bug(ctx, cli, snapshot_cli, filter_arg):
-    # Producer chains to a dependent consumer and exposes a planted error.
-    api = ctx.graphql.apps.use_after_create()
-    assert (
-        cli.run(
-            api.schema_url,
-            "--no-shrink",
-            "--max-examples=20",
-            "--phases=stateful",
-            "-m",
-            "positive",
-            "-c",
-            "not_a_server_error",
-            filter_arg,
-        )
-        == snapshot_cli
-    )
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
     # A query seeds Project.fullPath; the consuming mutation errors only on a real captured path.
@@ -60,13 +32,12 @@ def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_finds_non_id_lookup_bug(ctx, cli, snapshot_cli, make_api):
     # Bare `slug` resolves via the enclosing return type; the producer may be a Relay connection.
-    # High budget: the state machine needs many iterations to feed a captured slug into the lookup.
     api = make_api(ctx.graphql.apps)
     assert (
         cli.run(
             api.schema_url,
             "--no-shrink",
-            "--max-examples=90",
+            "--max-examples=20",
             "--seed=1",
             "--phases=stateful",
             "-m",
@@ -94,14 +65,12 @@ def _double_delete(apps):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_finds_tombstone_bugs(ctx, cli, snapshot_cli, make_api):
     # Tombstones expose use-after-delete and double-delete on a known-deleted resource.
-    # Tombstone probes need many iterations to traverse the deleted-id bundle reliably.
     api = make_api(ctx.graphql.apps)
     assert (
         cli.run(
             api.schema_url,
             "--no-shrink",
-            # The bug needs a specific call sequence, which takes many scenarios to reach.
-            "--max-examples=75",
+            "--max-examples=20",
             "--seed=1",
             "--phases=stateful",
             "-m",

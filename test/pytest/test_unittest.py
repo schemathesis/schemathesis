@@ -11,7 +11,7 @@ def pythonpath_fix(monkeypatch):
     monkeypatch.setenv("PYTHONPATH", os.path.dirname(HERE))
 
 
-def test_unittest_success(testdir):
+def test_unittest_success_and_failure(testdir):
     module = testdir.make_test(
         """
 from unittest import TestCase
@@ -19,28 +19,15 @@ from unittest import TestCase
 class TestSchema(TestCase):
 
     @given(case=schema["/users"]["GET"].as_strategy())
-    def test_something(self, case):
+    def test_passes(self, case):
         assert case.method == "GET"
-"""
-    )
-    result = testdir.run(sys.executable, "-m", "unittest", str(module))
-    assert result.ret == 0
-    result.stderr.re_match_lines(["Ran 1 test in.*", "OK"])
-
-
-def test_unittest_failure(testdir):
-    module = testdir.make_test(
-        """
-from unittest import TestCase
-
-class TestSchema(TestCase):
 
     @given(case=schema["/users"]["GET"].as_strategy())
-    def test_something(self, case):
+    def test_fails(self, case):
         assert 0
 """
     )
     result = testdir.run(sys.executable, "-m", "unittest", str(module))
     assert result.ret == 1
-    result.stderr.re_match_lines([".* assert 0.*", "FAILED (failures=1)"])
+    result.stderr.re_match_lines([".* assert 0.*", "Ran 2 tests in.*", "FAILED \\(failures=1\\)"])
     assert has_hypothesis_failure_header(result.stderr.str())

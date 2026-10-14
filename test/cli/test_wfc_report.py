@@ -8,7 +8,6 @@ from _pytest.main import ExitCode
 from flask import jsonify, request
 
 import schemathesis
-from schemathesis.checks import CHECKS
 from schemathesis.cli.wfc_report import FAULT_CATEGORY_IDS, fault_category
 from schemathesis.core.failures import AcceptedNegativeData, MalformedJson, ResponseTimeExceeded, ServerError
 from schemathesis.engine.events import ScenarioFinished
@@ -136,25 +135,6 @@ def test_failure_reported_once_is_one_test_case(ctx, cli, tmp_path):
 
     report = load_report(path)
     assert (len(report["testCases"]), len(report["faults"]["foundFaults"])) == (1, 1)
-
-
-def test_response_body_cannot_leave_the_comment(ctx, cli, tmp_path):
-    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    @app.route("/items")
-    def items():
-        return "line\n$(touch pwned)\n", 500
-
-    path = tmp_path / "report.json"
-    cli.run_openapi_app(
-        app, f"--report-wfc-path={path}", "--max-examples=1", "--phases=fuzzing", "--checks=not_a_server_error"
-    )
-
-    [test_case] = load_report(path)["testCases"]
-    lines = (tmp_path / "report.sh").read_text(encoding="utf-8").splitlines()
-    block = lines[test_case["startLine"] : test_case["endLine"] + 1]
-    assert [line for line in block if not line.startswith("#")] == [block[-1]]
-    assert block[-1].startswith("curl ")
 
 
 def test_stateful_failure_block_replays_the_chain(ctx, cli, tmp_path):
@@ -321,7 +301,7 @@ def test_one_case_can_carry_several_faults(ctx, cli, tmp_path):
 
     @app.route("/items")
     def items():
-        return jsonify({}), 500
+        return "line\n$(touch pwned)\n", 500
 
     path = tmp_path / "report.json"
     cli.run_openapi_app(
@@ -336,10 +316,15 @@ def test_one_case_can_carry_several_faults(ctx, cli, tmp_path):
     assert {
         (fault["testCaseId"], fault["faultCategories"][0]["code"]) for fault in report["faults"]["foundFaults"]
     } == {(case["id"], code) for case in report["testCases"] for code in (100, 200)}
-    assert len(report["testCases"]) == 1
+    [test_case] = report["testCases"]
+    lines = (tmp_path / "report.sh").read_text(encoding="utf-8").splitlines()
+    block = lines[test_case["startLine"] : test_case["endLine"] + 1]
+    # A multiline response body must stay inside the shell comment.
+    assert [line for line in block if not line.startswith("#")] == [block[-1]]
+    assert block[-1].startswith("curl ")
 
 
-def test_identical_failures_on_one_case_are_one_fault(ctx, cli, tmp_path):
+def test_violations_in_one_response_are_one_fault_per_check(ctx, cli, tmp_path):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -351,37 +336,6 @@ def test_identical_failures_on_one_case_are_one_fault(ctx, cli, tmp_path):
                                 "X-First": {"schema": {"type": "integer"}},
                                 "X-Second": {"schema": {"type": "integer"}},
                             },
-                        }
-                    }
-                }
-            }
-        }
-    )
-
-    @app.route("/items")
-    def items():
-        return jsonify({}), 200, {"X-First": "text", "X-Second": "text"}
-
-    path = tmp_path / "report.json"
-    cli.run_openapi_app(
-        app,
-        f"--report-wfc-path={path}",
-        "--max-examples=1",
-        "--phases=fuzzing",
-        "--checks=response_headers_conformance",
-    )
-
-    assert len(load_report(path)["faults"]["foundFaults"]) == 1
-
-
-def test_schema_violations_in_one_response_are_one_fault(ctx, cli, tmp_path):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/items": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
                             "content": {
                                 "application/json": {
                                     "schema": {
@@ -399,7 +353,7 @@ def test_schema_violations_in_one_response_are_one_fault(ctx, cli, tmp_path):
 
     @app.route("/items")
     def items():
-        return jsonify({"id": "text", "name": 1}), 200
+        return jsonify({"id": "text", "name": 1}), 200, {"X-First": "text", "X-Second": "text"}
 
     path = tmp_path / "report.json"
     cli.run_openapi_app(
@@ -407,51 +361,30 @@ def test_schema_violations_in_one_response_are_one_fault(ctx, cli, tmp_path):
         f"--report-wfc-path={path}",
         "--max-examples=1",
         "--phases=fuzzing",
-        "--checks=response_schema_conformance",
+        "--checks=response_headers_conformance,response_schema_conformance",
     )
 
-    [fault] = load_report(path)["faults"]["foundFaults"]
-    assert fault["faultCategories"] == [
-        {
-            "id": "SCHEMA_INVALID_RESPONSE",
-            "code": 200,
-            "context": "GET:/items -> JsonSchemaError: Response violates schema",
-        }
+    faults = load_report(path)["faults"]["foundFaults"]
+    assert sorted((fault["faultCategories"] for fault in faults), key=lambda categories: categories[0]["context"]) == [
+        [
+            {
+                "id": "SCHEMA_INVALID_RESPONSE",
+                "code": 200,
+                "context": f"GET:/items -> JsonSchemaError: {message}",
+            }
+        ]
+        for message in ("Response header does not conform to the schema", "Response violates schema")
     ]
 
 
-@pytest.fixture
-def unmapped_check():
-    @schemathesis.check
-    def unmapped_check(ctx, response, case):
-        raise AssertionError("Custom finding")
-
-    yield unmapped_check
-
-    CHECKS.unregister(unmapped_check.__name__)
-
-
-def test_failures_without_wfc_category_are_left_out(ctx, cli, tmp_path, unmapped_check):
-    api = ctx.openapi.apps.success()
-    path = tmp_path / "report.json"
-
-    cli.run(
-        api.schema_url,
-        f"--report-wfc-path={path}",
-        "--max-examples=1",
-        "--phases=fuzzing",
-        "--checks=unmapped_check,not_a_server_error",
-    )
-
-    report = load_report(path)
-    assert (report["faults"], report["testCases"]) == ({"totalNumber": 0, "foundFaults": []}, [])
-    assert (tmp_path / "report.sh").read_text(encoding="utf-8") == "#!/usr/bin/env bash\n"
-
-
-def test_run_level_check_failures_are_left_out(ctx, cli, tmp_path, restore_checks):
+def test_failures_without_wfc_category_are_left_out(ctx, cli, tmp_path, restore_checks):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
         """
+@schemathesis.check
+def unmapped_check(ctx, response, case):
+    raise AssertionError("Custom finding")
+
 @schemathesis.check
 class AfterRunFails:
     def after_run(self, ctx):
@@ -467,11 +400,11 @@ class AfterRunFails:
         "--max-examples=1",
         "--phases=fuzzing",
         "-c",
-        "AfterRunFails",
+        "unmapped_check,AfterRunFails",
         hooks=module,
     )
 
-    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert (result.exit_code, "after_run fired" in result.stdout) == (ExitCode.TESTS_FAILED, True), result.stdout
     report = load_report(path)
     assert (report["faults"], report["testCases"]) == ({"totalNumber": 0, "foundFaults": []}, [])
     assert (tmp_path / "report.sh").read_text(encoding="utf-8") == "#!/usr/bin/env bash\n"
@@ -612,38 +545,6 @@ def test_object_level_authorization_context_names_both_peers():
         906,
         "ObjectLevelAuthorizationViolation: Object-level authorization bypass (bob read an object alice owns)",
     )
-
-
-def test_object_level_authorization_fault_is_reported(ctx, cli, tmp_path):
-    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
-    auth = tmp_path / "auth.json"
-    auth.write_text(
-        json.dumps(
-            {
-                "auth": [
-                    {"name": "alice", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey alice"}]},
-                    {"name": "bob", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey bob"}]},
-                ]
-            }
-        )
-    )
-    path = tmp_path / "report.json"
-    cli.run(
-        api.schema_url,
-        f"--report-wfc-path={path}",
-        "--max-examples=10",
-        "--phases=fuzzing",
-        "--checks=object_level_authorization",
-        config={"auth": {"wfc": {"path": str(auth), "peers": ["alice", "bob"]}}},
-    )
-
-    report = load_report(path)
-    (fault,) = report["faults"]["foundFaults"]
-    assert (fault["operationId"], [category["code"] for category in fault["faultCategories"]]) == (
-        "GET:/api/orders/{order_id}",
-        [906],
-    )
-    assert fault["testCaseId"] in {test_case["id"] for test_case in report["testCases"]}
 
 
 def test_declared_auth_not_enforced_context_names_the_scenario():

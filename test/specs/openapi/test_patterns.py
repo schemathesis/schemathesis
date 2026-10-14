@@ -1165,10 +1165,11 @@ def test_response_schema_is_not_mutated(cli, ctx, snapshot_cli):
     assert cli.run_openapi_app(app, "-call", "--phases=fuzzing", "-n 1") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, snapshot_cli):
-    # Pattern from amazonaws.com/cleanrooms schema - surrogate code points are invalid in regex
-    invalid_pattern = "([\\u0020-\\uD7FF\\uE000-\\uFFFD\\uD800\\uDBFF-\\uDC00\\uDFFF\\t\\r\\n]){0,255}"
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
+def test_unicode_surrogate_patterns_are_dropped_with_warning(cli, ctx, snapshot_cli):
+    # Surrogate code points are invalid in regex engines.
+    query_pattern = "([\\u0020-\\uD7FF\\uE000-\\uFFFD\\uD800\\uDBFF-\\uDC00\\uDFFF\\t\\r\\n]){0,255}"
+    body_pattern = "[\\uD800-\\uDBFF]"
 
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1178,37 +1179,11 @@ def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, snapshot_cli):
                         {
                             "name": "description",
                             "in": "query",
-                            "schema": {"type": "string", "pattern": invalid_pattern},
+                            "schema": {"type": "string", "pattern": query_pattern},
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/test")
-    def test_endpoint():
-        return jsonify({"status": "ok"})
-
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--max-examples=10",
-            "--phases=fuzzing",
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
-def test_unicode_surrogate_pattern_in_request_body(cli, ctx, snapshot_cli):
-    # Surrogate code point range - invalid in regex engine
-    invalid_pattern = "[\\uD800-\\uDBFF]"
-
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/test": {
+                },
                 "post": {
                     "requestBody": {
                         "required": True,
@@ -1217,19 +1192,19 @@ def test_unicode_surrogate_pattern_in_request_body(cli, ctx, snapshot_cli):
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "message": {"type": "string", "pattern": invalid_pattern},
+                                        "message": {"type": "string", "pattern": body_pattern},
                                     },
                                 }
                             }
                         },
                     },
                     "responses": {"200": {"description": "OK"}},
-                }
+                },
             }
         }
     )
 
-    @app.route("/test", methods=["POST"])
+    @app.route("/test", methods=["GET", "POST"])
     def test_endpoint():
         return jsonify({"status": "ok"})
 

@@ -138,10 +138,12 @@ def test_crash_file_written_on_failure(cli, ctx, tmp_path):
     def boom():
         return jsonify({"error": "crash"}), 500
 
-    cli.run_openapi_app(app, "--max-examples=1")
+    cli.run_openapi_app(app, "--max-examples=1", config={"project": [{"title": "Test"}]})
 
-    crash_files = _crash_files(crash_cache_dir(tmp_path))
+    # Crashes co-locate with the project's cache: a named project writes under <title>/cache/crashes.
+    crash_files = _crash_files(tmp_path / ".schemathesis" / "test" / "cache" / "crashes")
     assert len(crash_files) == 1, crash_files
+    assert not _crash_files(crash_cache_dir(tmp_path))
 
     crash = json.loads(crash_files[0].read_text())
     step = crash["sequence"][0]
@@ -166,22 +168,6 @@ def test_crash_file_written_for_failures_in_errored_scenario(cli, ctx, tmp_path)
         check["name"] for f in crash_files for step in json.loads(f.read_text())["sequence"] for check in step["checks"]
     }
     assert checks == {"status_code_conformance"}
-
-
-def test_crash_file_uses_named_project_directory(cli, ctx, tmp_path):
-    # Crashes co-locate with the project's cache: a named project writes under <title>/cache/crashes, not default/.
-    app, _ = ctx.openapi.make_flask_app({"/boom": {"get": {"responses": {"500": {"description": "Error"}}}}})
-
-    @app.route("/boom")
-    def boom():
-        return jsonify({"error": "crash"}), 500
-
-    cli.run_openapi_app(app, "--max-examples=1", config={"project": [{"title": "Test"}]})
-
-    titled = tmp_path / ".schemathesis" / "test" / "cache" / "crashes"
-    default = tmp_path / ".schemathesis" / "default" / "cache" / "crashes"
-    assert _crash_files(titled), list(titled.parent.glob("*")) if titled.parent.exists() else "no titled dir"
-    assert not _crash_files(default)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -233,42 +219,6 @@ def test_crash_file_sanitizes_url_and_response_headers(cli, ctx, tmp_path):
     assert "SECRETVALUE" not in step["url"], step["url"]
     assert "%5BFiltered%5D" in step["url"] or "[Filtered]" in step["url"], step["url"]
     assert step["response"]["headers"].get("authorization") == "[Filtered]"
-
-
-def test_crash_file_does_not_persist_raw_request_body(cli, ctx, tmp_path):
-    # Cache files strip body fields before persistence; the raw wire body (which can carry secrets) is not stored.
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"500": {"description": "Error"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/items", methods=["POST"])
-    def items():
-        if request.is_json and isinstance(request.get_json(silent=True), dict):
-            return jsonify({"error": "boom"}), 500
-        return jsonify({}), 200
-
-    cli.run_openapi_app(app, "--max-examples=5", "--phases=fuzzing")
-
-    crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
-    assert "body" not in crash["sequence"][0]
 
 
 def test_crash_file_respects_disabled_sanitization(cli, ctx, tmp_path):
@@ -331,6 +281,8 @@ def test_crash_file_stores_structured_case(cli, ctx, tmp_path):
 
     crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     step = crash["sequence"][0]
+    # The raw wire body can carry secrets, so only the structured case body is persisted.
+    assert "body" not in step
     # The generated body value varies, so assert its shape; the rest of the structured case is fixed.
     assert step["case_body"]["encoding"] == "json"
     assert isinstance(step["case_body"]["value"], dict)

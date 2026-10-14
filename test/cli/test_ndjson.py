@@ -142,6 +142,7 @@ def test_store_ndjson(ctx, cli, ndjson_path, hypothesis_max_examples):
     # Should have PhaseStarted events
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
     assert len(phase_started) >= 1
+    assert any(get_event_type(e) == "PhaseFinished" for e in events)
 
     # Should have ScenarioFinished events with recorder data
     scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
@@ -258,41 +259,6 @@ def test_report_dir(ctx, cli, tmp_path, in_config):
     assert list(report_dir.glob("*.ndjson"))
 
 
-def test_all_event_types(ctx, cli, ndjson_path):
-    api = ctx.openapi.apps.success()
-    cli.run(
-        api.schema_url,
-        f"--report-ndjson-path={ndjson_path}",
-        "--max-examples=1",
-        "--seed=1",
-    )
-    events = load_ndjson(ndjson_path)
-    event_types = {get_event_type(e) for e in events}
-
-    assert "Initialize" in event_types
-    assert "EngineStarted" in event_types
-    assert "PhaseStarted" in event_types
-    assert "ScenarioFinished" in event_types
-    assert "PhaseFinished" in event_types
-    assert "EngineFinished" in event_types
-
-
-def test_phase_data_in_events(ctx, cli, ndjson_path):
-    api = ctx.openapi.apps.success()
-    cli.run(
-        api.schema_url,
-        f"--report-ndjson-path={ndjson_path}",
-        "--max-examples=1",
-        "--seed=1",
-        "--phases=coverage",
-    )
-    events = load_ndjson(ndjson_path)
-    phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
-    assert len(phase_started) >= 1
-    for event in phase_started:
-        assert "phase" in get_event_data(event)
-
-
 def test_binary_body_base64(ctx, cli, ndjson_path):
     api = ctx.openapi.apps.success()
     cli.run_and_assert(
@@ -317,7 +283,7 @@ def test_binary_body_base64(ctx, cli, ndjson_path):
                     assert "$base64" in body
 
 
-def test_enum_serialization(cli, ctx, ndjson_path):
+def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/users")
@@ -330,8 +296,11 @@ def test_enum_serialization(cli, ctx, ndjson_path):
         "--max-examples=10",
         "--seed=1",
         "--phases=coverage",
+        "--output-sanitize=false",
     )
     events = load_ndjson(ndjson_path)
+    assert get_event_type(events[0]) == "Initialize"
+    assert get_event_type(events[-1]) == "EngineFinished"
 
     # PhaseName enum should be serialized as string value
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
@@ -409,29 +378,6 @@ def test_form_data_string_body(cli, ctx, ndjson_path):
                 assert isinstance(body, dict) and "$base64" in body
                 found_form_request = True
     assert found_form_request
-
-
-def test_sanitization_disabled(cli, ctx, ndjson_path):
-    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    @app.route("/users")
-    def users():
-        return jsonify([])
-
-    cli.run_openapi_app(
-        app,
-        f"--report-ndjson-path={ndjson_path}",
-        "--max-examples=10",
-        "--seed=1",
-        "--output-sanitize=false",
-    )
-    events = load_ndjson(ndjson_path)
-
-    assert get_event_type(events[0]) == "Initialize"
-    assert get_event_type(events[-1]) == "EngineFinished"
-
-    phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
-    assert len(phase_started) >= 1
 
 
 @pytest.mark.parametrize(

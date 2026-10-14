@@ -215,11 +215,15 @@ def test_unmatched_filters(ctx, cli, snapshot_cli, filters):
     assert _run_with_filters(cli, ctx, api, *filters) == snapshot_cli
 
 
-@pytest.mark.parametrize("name", ["Query.getNope", "Query.getBooks"], ids=["dead-filter", "live-filter"])
+@pytest.mark.parametrize(
+    "arg",
+    ["--include-name=Query.getNope", "--include-name=Query.getBooks", "--exclude-name=Query.getBooks"],
+    ids=["dead-filter", "live-filter", "exclude"],
+)
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unmatched_filters_for_graphql(ctx, cli, snapshot_cli, name):
+def test_unmatched_filters_for_graphql(ctx, cli, snapshot_cli, arg):
     api = ctx.graphql.apps.books()
-    assert cli.run(api.schema_url, "--max-examples=1", "--mode=positive", f"--include-name={name}") == snapshot_cli
+    assert cli.run(api.schema_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

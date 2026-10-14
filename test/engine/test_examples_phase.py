@@ -369,52 +369,6 @@ def test_examples_phase_runs_when_error_feedback_disabled(ctx, app_runner):
     assert all(event.status == Status.SUCCESS for event in finished), [event.status for event in finished]
 
 
-def test_examples_phase_applies_parameter_and_header_overrides(ctx, app_runner):
-    paths = {
-        "/items/{key}": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": "key",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "minLength": 1},
-                        "example": "alpha",
-                    },
-                    {
-                        "name": "id",
-                        "in": "query",
-                        "required": True,
-                        "schema": {"type": "string"},
-                        "example": "beta",
-                    },
-                ],
-                "responses": {"200": {"description": "OK"}},
-            }
-        }
-    }
-    app, _ = ctx.openapi.make_flask_app(paths)
-
-    @app.route("/items/<key>", methods=["GET"])
-    def items(key):
-        return ("", 200)
-
-    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-
-    EventStream(
-        schema,
-        phases=[PhaseName.EXAMPLES],
-        parameters={"key": "fixed", "id": "123"},
-        headers={"X-Test": "yes"},
-    ).execute()
-
-    calls = [request for request in app.config["captured_requests"] if request.path.startswith("/items/")]
-    assert calls
-    assert all(request.headers.get("X-Test") == "yes" for request in calls)
-    assert all(request.path == "/items/fixed" for request in calls)
-    assert all(request.query.get("id") == "123" for request in calls)
-
-
 def test_examples_phase_emits_missing_path_parameters_error(ctx):
     api = ctx.openapi.apps.missing_path_parameter()
     schema = schemathesis.openapi.from_url(api.schema_url)

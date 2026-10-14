@@ -92,54 +92,47 @@ def test_passing():
     assert "FailureGroup" in result.stdout.str()
 
 
-@pytest.mark.parametrize(
-    ("body", "status"),
-    [
-        ('case.call(); raise RuntimeError("bug")', "broken"),
-        ('pytest.skip("x")', "skipped"),
-        ('case.call(); assert False, "user"', "failed"),
-    ],
-)
-def test_non_check_outcomes_are_unchanged(testdir, tmp_path, ctx, body, status):
+def test_non_check_outcomes_are_unchanged(testdir, tmp_path, ctx):
     api = ctx.openapi.apps.success()
+    unsatisfiable_api = ctx.openapi.apps.unsatisfiable()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 schema = schemathesis.openapi.from_url("{api.schema_url}")
+unsatisfiable = schemathesis.openapi.from_url("{unsatisfiable_api.schema_url}")
+unsatisfiable.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @schema.parametrize()
 @settings(max_examples=1)
-def test_api(case):
-    {body}
+def test_runtime_error(case):
+    case.call()
+    raise RuntimeError("bug")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_skip(case):
+    pytest.skip("x")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_assertion(case):
+    case.call()
+    assert False, "user"
+
+@unsatisfiable.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_unsatisfiable(case):
+    case.call_and_validate()
 """
     )
 
     testdir.runpytest("--alluredir", str(allure_dir))
 
     assert {name: result[0] for name, result in _allure_results(allure_dir).items()} == {
-        "test_api[GET /api/success]": status
-    }
-
-
-def test_unsatisfiable_operation_stays_broken(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.unsatisfiable()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-schema = schemathesis.openapi.from_url("{api.schema_url}")
-schema.config.generation.update(modes=[GenerationMode.POSITIVE])
-
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    case.call_and_validate()
-""",
-    )
-
-    testdir.runpytest("--alluredir", str(allure_dir))
-
-    assert {name: result[0] for name, result in _allure_results(allure_dir).items()} == {
-        "test_api[POST /api/unsatisfiable]": "broken"
+        "test_runtime_error[GET /api/success]": "broken",
+        "test_skip[GET /api/success]": "skipped",
+        "test_assertion[GET /api/success]": "failed",
+        "test_unsatisfiable[POST /api/unsatisfiable]": "broken",
     }
 
 

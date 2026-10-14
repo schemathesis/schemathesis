@@ -1,0 +1,160 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       7 selected / 7 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Coverage (in 0.00s)
+
+     ❌ 1 failed  🚫 6 errors
+
+==================================== ERRORS ====================================
+____________________________ POST /body-min-length _____________________________
+Schema Error
+
+Invalid `minLength` definition
+
+Location:
+    properties -> name -> minLength
+
+Problematic definition:
+    "x"
+
+Error details:
+    "x" is not of type "integer"
+
+Ensure that the definition complies with the OpenAPI specification
+___________________ POST /query-disallowed-empty-min-length ____________________
+Schema Error
+
+Invalid `minLength` definition
+
+Location:
+    properties -> q -> minLength
+
+Problematic definition:
+    "x"
+
+Error details:
+    "x" is not of type "integer"
+
+Ensure that the definition complies with the OpenAPI specification
+____________________________ POST /query-max-items _____________________________
+Schema Error
+
+Invalid `maxItems` definition
+
+Location:
+    properties -> q -> maxItems
+
+Problematic definition:
+    "x"
+
+Error details:
+    "x" is not of type "integer"
+
+Ensure that the definition complies with the OpenAPI specification
+_____________________________ POST /query-maximum ______________________________
+Schema Error
+
+Invalid `maximum` definition
+
+Location:
+    properties -> q -> maximum
+
+Problematic definition:
+    "x"
+
+Error details:
+    "x" is not of type "number"
+
+Ensure that the definition complies with the OpenAPI specification
+____________________________ POST /query-min-items _____________________________
+Schema Error
+
+Invalid `minItems` definition
+
+Location:
+    properties -> q -> minItems
+
+Problematic definition:
+    "x"
+
+Error details:
+    "x" is not of type "integer"
+
+Ensure that the definition complies with the OpenAPI specification
+____________________________ POST /query-min-length ____________________________
+Schema Error
+
+Invalid `minLength` definition
+
+Location:
+    properties -> q -> minLength
+
+Problematic definition:
+    "x"
+
+Error details:
+    "x" is not of type "integer"
+
+Ensure that the definition complies with the OpenAPI specification
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== FAILURES ===================================
+_______________________ POST /body-contains-unknown-type _______________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 404
+    Documented: 200
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 7/7
+  Tested: 1
+  Errored: 6
+
+Test Phases:
+  ⏭  Examples (disabled)
+  🚫 Coverage
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Errors:
+  🚫 Schema Error: 6
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+========================= 1 failure, 6 errors in 1.00s =========================

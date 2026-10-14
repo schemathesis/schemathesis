@@ -297,6 +297,7 @@ def test_stateful_phase_attaches_token_after_inference(ctx):
     schema.config.phases.examples.enabled = False
     schema.config.phases.coverage.enabled = False
     schema.config.phases.fuzzing.enabled = False
+    schema.config.generation.update(max_examples=5)
 
     saw_2xx_in_stateful_phase = False
     for event in schemathesis.engine.from_schema(schema).execute():

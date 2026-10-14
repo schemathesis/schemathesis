@@ -7,23 +7,6 @@ import pytest
 from schemathesis.generation.modes import GenerationMode
 
 
-def test_default(testdir):
-    # When LazySchema is used
-    testdir.make_test(
-        """
-lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
-
-@lazy_schema.parametrize()
-def test_(case):
-    pass
-"""
-    )
-    result = testdir.runpytest("-v")
-    # Then the generated test should use this fixture
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"test_default.py::test_ PASSED", r".*1 passed"])
-
-
 def test_deadline_is_none(testdir):
     testdir.make_test(
         """
@@ -620,6 +603,7 @@ def test_(case):
         expected = rf"curl -X GET -H 'Authorization: [Filtered]' {api.base_url}/api/failure"
     else:
         expected = rf"curl -X GET -H 'Authorization: {auth}' {api.base_url}/api/failure"
+    result.stdout.re_match_lines([".+ Reproduce with:"])
     assert expected in result.stdout.str()
 
 

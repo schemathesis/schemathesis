@@ -44,6 +44,9 @@ Failures:
 Test cases:
   N generated, N passed
 
+Reports:
+  - Allure: /tmp/allure-results
+
 Seed: 42
 
 ============================== 1 failure in 1.00s ==============================

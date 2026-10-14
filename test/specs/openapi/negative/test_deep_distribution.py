@@ -31,9 +31,9 @@ def test_deep_leaf_bug_detected_via_negative_fuzzing(ctx, cli, snapshot_cli):
     )
 
 
-def test_negative_fuzzing_distributes_across_depths(ctx):
-    # `continue_on_failure` so the whole budget runs: stopping at the first failure leaves a handful
-    # of mutations, too few for every depth to appear and too few to mean anything if they do.
+def test_negative_fuzzing_spreads_mutations_across_depths_and_operators(ctx):
+    # `continue_on_failure` so the whole budget runs: stopping at the first failure leaves too few mutations
+    # for every depth to appear, and heterogeneous cases (~9% chance each secondary fires) never show up.
     api = ctx.openapi.apps.deep_leaf_bug()
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.seed = 42
@@ -45,6 +45,7 @@ def test_negative_fuzzing_distributes_across_depths(ctx):
     schema.config.phases.fuzzing.generation.update(max_examples=500)
 
     per_depth: Counter[int] = Counter()
+    operator_sets: list[set[str]] = []
     for event in schemathesis.engine.from_schema(schema).execute():
         if not isinstance(event, ScenarioFinished):
             continue
@@ -57,38 +58,11 @@ def test_negative_fuzzing_distributes_across_depths(ctx):
                 continue
             for mutation in data.mutations:
                 per_depth[len(mutation.path)] += 1
-
-    assert set(per_depth) >= {0, 1, 2, 3}, f"only saw depths {sorted(per_depth.items())}"
-
-
-def test_operator_swarm_yields_homogeneous_and_heterogeneous_cases(ctx):
-    # 500 examples with continue_on_failure: heterogeneous cases (~9% chance each secondary fires)
-    # only appear when Hypothesis isn't stopped by the first single-mutation failure.
-    api = ctx.openapi.apps.deep_leaf_bug()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.seed = 42
-    schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
-    schema.config.phases.examples.enabled = False
-    schema.config.phases.coverage.enabled = False
-    schema.config.phases.stateful.enabled = False
-    schema.config.update(continue_on_failure=True)
-    schema.config.phases.fuzzing.generation.update(max_examples=500)
-
-    operator_sets: list[set[str]] = []
-    for event in schemathesis.engine.from_schema(schema).execute():
-        if not isinstance(event, ScenarioFinished):
-            continue
-        for case_node in event.recorder.cases.values():
-            case = case_node.value
-            if case.meta is None:
-                continue
-            data = case.meta.phase.data
-            if not isinstance(data, FuzzingPhaseData):
-                continue
             operators = {mutation.operator for mutation in data.mutations}
             if operators:
                 operator_sets.append(operators)
 
+    assert set(per_depth) >= {0, 1, 2, 3}, f"only saw depths {sorted(per_depth.items())}"
     assert any(len(s) == 1 for s in operator_sets), "expected at least one homogeneous case"
     assert any(len(s) > 1 for s in operator_sets), "expected at least one heterogeneous case"
 

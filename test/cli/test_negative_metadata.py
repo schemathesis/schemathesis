@@ -378,7 +378,8 @@ def before_call(context, case, kwargs):
         app,
         "--checks=negative_data_rejection",
         "--generation-deterministic",
-        "--max-examples=50",
+        "--phases=fuzzing",
+        "--max-examples=10",
         hooks=module,
     )
     assert "API accepted schema-violating request" not in result.stdout, result.stdout

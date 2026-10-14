@@ -365,58 +365,17 @@ def test_call_without_base_url_ignores_malformed_swagger_schemes():
         schema["/users"]["GET"].Case().call()
 
 
-def test_validate_response(testdir):
-    testdir.make_test(
-        r"""
-import pytest
-from requests import Response, Request
-from schemathesis.openapi.checks import UndefinedStatusCode
-from schemathesis.core.failures import FailureGroup
-from schemathesis.generation.meta import CONTENT_TYPE_PROBES, coverage_scenario
-
-@schema.parametrize()
-def test_(case):
-    # Content-Type probes are only checked for server errors.
-    if coverage_scenario(case) in CONTENT_TYPE_PROBES:
-        return
-    response = Response()
-    response.headers["Content-Type"] = "application/json"
-    response.status_code = 418
-    request = Request(method="GET", url="http://localhost/v1/users")
-    response.request = request.prepare()
+def test_validate_response(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    case = schema["/users"]["GET"].Case()
     with pytest.raises(FailureGroup):
-        case.validate_response(response)
-"""
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
+        case.validate_response(response_factory.requests(status_code=418))
 
 
-def test_validate_response_no_errors(testdir):
-    testdir.make_test(
-        r"""
-import requests
-from io import BytesIO
-from urllib3 import HTTPResponse
-from schemathesis.core.transport import Response
-
-@schema.parametrize()
-def test_(case):
-    response = requests.Response()
-    response._content = b"{}"
-    response.headers["Content-Type"] = "application/json"
-
-    response.raw = HTTPResponse(body=BytesIO(response._content), status=200, headers=response.headers)
-    response.status_code = 200
-    request = requests.PreparedRequest()
-    request.prepare("GET", "http://127.0.0.1")
-    response.request = request
-    assert case.validate_response(response) is None
-""",
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    result = testdir.runpytest("--tb=long", "-sv")
-    result.assert_outcomes(passed=1)
+def test_validate_response_no_errors(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    case = schema["/users"]["GET"].Case()
+    assert case.validate_response(response_factory.requests(status_code=200)) is None
 
 
 def test_validate_response_custom_check_raising_while_handling_error(ctx, response_factory):

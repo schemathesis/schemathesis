@@ -5,27 +5,6 @@ from flask import jsonify, make_response
 from schemathesis.core.rate_limit import RATE_LIMIT_AUTO_MAX_RETRIES
 
 
-def test_auto_retries_429_then_succeeds(ctx, cli):
-    calls = {"n": 0}
-    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    @app.route("/users")
-    def users():
-        calls["n"] += 1
-        if calls["n"] == 1:
-            resp = make_response("", 429)
-            resp.headers["Retry-After"] = "0"
-            return resp
-        return jsonify([])
-
-    result = cli.run_openapi_app(
-        app, "--rate-limit=auto", "--phases=fuzzing", "--max-examples=1", "--checks=not_a_server_error"
-    )
-    assert result.exit_code == 0, result.stdout
-    # One case: the 429 is retried once and the retry returns 200. Without retry this would be a single call.
-    assert calls["n"] == 2, calls["n"]
-
-
 def test_auto_exhausts_retries_on_persistent_429(ctx, cli):
     calls = {"n": 0}
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
@@ -81,6 +60,7 @@ def test_auto_reports_long_wait(ctx, cli, monkeypatch):
         app, "--rate-limit=auto", "--phases=fuzzing", "--max-examples=1", "--checks=not_a_server_error"
     )
     assert result.exit_code == 0, result.stdout
+    # One case: the 429 is retried once and the retry returns 200.
     assert calls["n"] == 2, calls["n"]
     assert "Rate limited" in result.stdout
 

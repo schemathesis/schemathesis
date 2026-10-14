@@ -220,53 +220,40 @@ def test_hooks_combination(ctx):
     test()
 
 
-def test_map_hooks_receive_dict_in_negative_mode(testdir, simple_openapi):
-    # Regression test for GH-3471
-    # map_* hooks should receive raw dict values, not GeneratedValue wrappers
-    testdir.make_test(
-        """
-def replacement(context, query):
-    # Should always receive a dict, never a GeneratedValue
-    assert isinstance(query, dict), f"Expected dict, got {type(query).__name__}"
-    return {"id": "fixed"}
-
-@schema.hooks.apply(replacement, name="map_query")
-@schema.parametrize()
-@settings(max_examples=5)
-def test_hook_receives_dict(case):
-    pass
-""",
-        schema=simple_openapi,
-        generation_modes=[GenerationMode.NEGATIVE],
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
-
-
-def test_flatmap_hooks_work_in_negative_mode(testdir, simple_openapi):
-    # See GH-3652
+def test_map_and_flatmap_hooks_work_in_negative_mode(testdir, simple_openapi):
+    # Regression for GH-3471 and GH-3652: hooks receive raw dicts, not generated-value wrappers.
     testdir.make_test(
         """
 from hypothesis import strategies as st
+
+def map_replacement(context, query):
+    assert isinstance(query, dict), f"Expected dict, got {type(query).__name__}"
+    return {"id": "fixed"}
+
+@schema.hooks.apply(map_replacement, name="map_query")
+@schema.parametrize()
+@settings(max_examples=5)
+def test_map_hook_receives_dict(case):
+    pass
 
 @st.composite
 def new_query(draw, query):
     return {"id": str(draw(st.integers(min_value=1, max_value=100)))}
 
-def replacement(context, query):
+def flatmap_replacement(context, query):
     return new_query(query)
 
-@schema.hooks.apply(replacement, name="flatmap_query")
+@schema.hooks.apply(flatmap_replacement, name="flatmap_query")
 @schema.parametrize()
 @settings(max_examples=5)
-def test_hook_works(case):
+def test_flatmap_hook_works(case):
     pass
 """,
         schema=simple_openapi,
         generation_modes=[GenerationMode.NEGATIVE],
     )
     result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=2)
 
 
 def test_per_test_hooks(testdir, simple_openapi):

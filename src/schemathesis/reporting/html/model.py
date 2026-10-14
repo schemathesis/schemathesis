@@ -221,10 +221,6 @@ class ReportData:
         return self.untested_operations if self.stop_reason is not StopReason.COMPLETED else 0
 
     @property
-    def skipped_operations(self) -> int:
-        return self.untested_operations if self.stop_reason is StopReason.COMPLETED else 0
-
-    @property
     def errored_operations(self) -> int:
         return self.summary.operations.errored if self.summary.operations is not None else 0
 

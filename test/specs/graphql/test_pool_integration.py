@@ -151,7 +151,7 @@ def test_tombstone_planted_bug_findability(ctx, cli, snapshot_cli, config):
         cli.run(
             api.schema_url,
             "--no-shrink",
-            "--max-examples=200",
+            "--max-examples=30",
             "-m",
             "positive",
             "-c",

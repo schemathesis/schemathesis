@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
+     Operations:       8 selected / 8 total
 
  ✅  API capabilities:
 
@@ -17,17 +17,62 @@ Schemathesis dev
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  2 skipped
+     ⏭  8 skipped
 
  ✅  Coverage (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 8 passed
 
  ❌  Fuzzing (in 0.00s)
 
-     ✅ 1 passed  ❌ 1 failed
+     ✅ 4 passed  ❌ 4 failed
 
 =================================== FAILURES ===================================
+_______________________________ POST /api/events _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+______________________________ POST /api/messages ______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+_______________________________ POST /api/orders _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
 ______________________________ POST /api/webhooks ______________________________
 1. Test Case ID: <PLACEHOLDER>
 
@@ -46,8 +91,8 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
-  Tested: 2
+  Selected: 8/8
+  Tested: 8
 
 Test Phases:
   ⏭  Examples
@@ -56,11 +101,11 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Server error: 1
+  ❌ Server error: 4
 
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-============================== 1 failure in 1.00s ==============================
+============================= 4 failures in 1.00s ==============================

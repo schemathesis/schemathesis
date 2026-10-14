@@ -33,6 +33,10 @@ Errors:
 Test cases:
   12 generated, 12 errored
 
+Reports:
+  - JUnit: /tmp/junit.xml
+  - Allure: /tmp/allure-results
+
 Seed: 42
 
 =============================== 1 error in 1.00s ===============================

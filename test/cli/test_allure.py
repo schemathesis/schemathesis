@@ -153,47 +153,6 @@ def test_allure_path_with_null_byte_reports_clean_error(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, config={"reports": {"allure": {"path": "d\x00"}}}) == snapshot_cli
 
 
-def test_after_run_failure_in_allure(ctx, cli, ensure_reachability_module, tmp_path):
-    api = ctx.openapi.apps.success_and_failure()
-    allure_dir = tmp_path / "allure-results"
-    cli.main(
-        "run",
-        api.schema_url,
-        "-c",
-        "EnsureReachability",
-        "--max-examples=5",
-        "--phases=fuzzing",
-        f"--report-allure-path={allure_dir}",
-        hooks=ensure_reachability_module,
-    )
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
-    run_check_results = [r for r in results if r.get("name") == "Run checks"]
-    assert run_check_results, [r.get("name") for r in results]
-    assert run_check_results[0]["status"] == "failed"
-
-
-def test_after_run_failures_in_allure_are_sorted_and_deduplicated(
-    ctx, cli, unsorted_run_check_failures_module, tmp_path
-):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
-    cli.main(
-        "run",
-        api.schema_url,
-        "-c",
-        "ZRunCheck,ARunCheck",
-        "--max-examples=1",
-        "--phases=fuzzing",
-        f"--report-allure-path={allure_dir}",
-        hooks=unsorted_run_check_failures_module,
-    )
-    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
-    [run_checks] = [result for result in results if result["name"] == "Run checks"]
-    assert [step["statusDetails"]["message"] for step in run_checks["steps"]] == [
-        "- dup\n\n    aaa duplicated\n\n- Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
-    ]
-
-
 def test_allure_path_displayed(ctx, cli, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert (

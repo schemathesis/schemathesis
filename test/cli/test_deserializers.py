@@ -5,109 +5,79 @@ import schemathesis
 from schemathesis.openapi.checks import JsonSchemaError
 
 
-def _schema(ctx, path, media_type, schema):
-    return ctx.openapi.build_schema(
-        {path: {"get": {"responses": {"200": {"description": "OK", "content": {media_type: {"schema": schema}}}}}}},
-        version="3.0.0",
-    )
+def _response(media_type, schema):
+    return {"get": {"responses": {"200": {"description": "OK", "content": {media_type: {"schema": schema}}}}}}
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_custom_deserializer_successful(ctx, cli, snapshot_cli):
-    raw_schema = _schema(
-        ctx,
-        "/data",
-        "application/vnd.custom",
+def test_custom_deserializers(ctx, cli, snapshot_cli):
+    raw_schema = ctx.openapi.build_schema(
         {
-            "type": "object",
-            "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
-            "required": ["key", "value"],
+            "/ok": _response(
+                "application/vnd.ok",
+                {
+                    "type": "object",
+                    "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
+                    "required": ["key", "value"],
+                },
+            ),
+            "/broken": _response(
+                "application/vnd.broken",
+                {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]},
+            ),
+            "/mismatch": _response(
+                "application/vnd.lines",
+                {
+                    "type": "object",
+                    "properties": {"count": {"type": "integer"}, "name": {"type": "string"}},
+                    "required": ["count", "name"],
+                },
+            ),
+            "/image": _response("image/png", {"type": "string", "format": "binary"}),
+            "/multi": _response(
+                "application/vnd.multi",
+                {
+                    "type": "object",
+                    "properties": {"parsed_by": {"type": "string", "enum": ["second"]}},
+                    "required": ["parsed_by"],
+                },
+            ),
         },
+        version="3.0.0",
     )
-
     app = ctx.openapi.make_flask_app_from_schema(raw_schema)
+    bodies = {
+        "ok": ("name=Alice", "application/vnd.ok"),
+        "broken": ("malformed_data", "application/vnd.broken"),
+        "mismatch": ("count=notanumber\nname=Alice", "application/vnd.lines"),
+        "image": (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00", "image/png"),
+        "multi": ("test", "application/vnd.multi"),
+    }
 
-    @app.route("/data", methods=["GET"])
-    def get_data():
-        return Response("name=Alice", content_type="application/vnd.custom")
+    @app.route("/<name>", methods=["GET"])
+    def endpoint(name):
+        content, content_type = bodies[name]
+        return Response(content, content_type=content_type)
 
     hooks_module = ctx.write_pymodule("""
-@schemathesis.deserializer("application/vnd.custom")
-def deserialize_custom(ctx, response):
+@schemathesis.deserializer("application/vnd.ok")
+def deserialize_ok(ctx, response):
     text = response.content.decode("utf-8")
     parts = text.split("=", 1)
     if len(parts) == 2:
         return {"key": parts[0], "value": parts[1]}
     raise ValueError("Invalid format")
-""")
 
-    assert cli.run_openapi_app(app, "--checks=response_schema_conformance", hooks=hooks_module) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_custom_deserializer_with_exception(ctx, cli, snapshot_cli):
-    raw_schema = _schema(
-        ctx,
-        "/data",
-        "application/vnd.custom",
-        {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]},
-    )
-
-    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
-
-    @app.route("/data", methods=["GET"])
-    def get_data():
-        return Response("malformed_data", content_type="application/vnd.custom")
-
-    hooks_module = ctx.write_pymodule("""
-@schemathesis.deserializer("application/vnd.custom")
-def deserialize_custom(ctx, response):
+@schemathesis.deserializer("application/vnd.broken")
+def deserialize_broken(ctx, response):
     text = response.content.decode("utf-8")
     if "=" not in text:
         raise ValueError(f"Invalid custom format: expected 'key=value', got '{text}'")
     key, value = text.split("=", 1)
     return {"key": key, "value": value}
-""")
 
-    assert cli.run_openapi_app(app, "--checks=response_schema_conformance", hooks=hooks_module) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unsupported_media_type_silent_skip(ctx, cli, snapshot_cli):
-    raw_schema = _schema(ctx, "/image", "image/png", {"type": "string", "format": "binary"})
-
-    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
-
-    @app.route("/image", methods=["GET"])
-    def get_image():
-        fake_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00"
-        return Response(fake_png, content_type="image/png")
-
-    assert cli.run_openapi_app(app, "--checks=response_schema_conformance") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_custom_deserializer_schema_mismatch(ctx, cli, snapshot_cli):
-    raw_schema = _schema(
-        ctx,
-        "/data",
-        "application/vnd.custom",
-        {
-            "type": "object",
-            "properties": {"count": {"type": "integer"}, "name": {"type": "string"}},
-            "required": ["count", "name"],
-        },
-    )
-
-    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
-
-    @app.route("/data", methods=["GET"])
-    def get_data():
-        return Response("count=notanumber\nname=Alice", content_type="application/vnd.custom")
-
-    hooks_module = ctx.write_pymodule("""
-@schemathesis.deserializer("application/vnd.custom")
-def deserialize_custom(ctx, response):
+@schemathesis.deserializer("application/vnd.lines")
+def deserialize_lines(ctx, response):
     text = response.content.decode("utf-8")
     result = {}
     for line in text.split("\\n"):
@@ -115,36 +85,12 @@ def deserialize_custom(ctx, response):
             key, value = line.split("=", 1)
             result[key] = value
     return result
-""")
 
-    assert cli.run_openapi_app(app, "--checks=response_schema_conformance", hooks=hooks_module) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_multiple_deserializers_for_same_type(ctx, cli, snapshot_cli):
-    raw_schema = _schema(
-        ctx,
-        "/data",
-        "application/vnd.custom",
-        {
-            "type": "object",
-            "properties": {"parsed_by": {"type": "string", "enum": ["second"]}},
-            "required": ["parsed_by"],
-        },
-    )
-
-    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
-
-    @app.route("/data", methods=["GET"])
-    def get_data():
-        return Response("test", content_type="application/vnd.custom")
-
-    hooks_module = ctx.write_pymodule("""
-@schemathesis.deserializer("application/vnd.custom")
+@schemathesis.deserializer("application/vnd.multi")
 def deserialize_first(ctx, response):
     return {"parsed_by": "first"}
 
-@schemathesis.deserializer("application/vnd.custom")
+@schemathesis.deserializer("application/vnd.multi")
 def deserialize_second(ctx, response):
     return {"parsed_by": "second"}
 """)

@@ -7,8 +7,8 @@ Schemathesis dev
  ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/
-     Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Specification:    Open API 3.0.0
+     Operations:       5 selected / 5 total
 
  ✅  API capabilities:
 
@@ -17,27 +17,46 @@ Schemathesis dev
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  1 skipped
+     ⏭  5 skipped
 
  ❌  Coverage (in 0.00s)
 
-     ❌ 1 failed
+     ✅ 3 passed  ❌ 2 failed
 
  ❌  Fuzzing (in 0.00s)
 
-     ❌ 1 failed
+     ✅ 3 passed  ❌ 2 failed
 
 =================================== FAILURES ===================================
-__________________________________ GET /data ___________________________________
+_________________________________ GET /broken __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema (2 violations)
+- Content deserialization error
 
-    "not-an-int" is not of type "integer"
+    Failed to deserialize response content:
+
+      Invalid custom format: expected 'key=value', got 'malformed_data'
+
+[200] OK:
+
+    `malformed_data`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+________________________________ GET /mismatch _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    "notanumber" is not of type "integer"
 
     Validated against the response schema for status code 200.
 
-    Schema at /properties/id:
+    Schema at /properties/count:
 
         {
             "type": "integer"
@@ -45,25 +64,12 @@ __________________________________ GET /data ___________________________________
 
     Value:
 
-        "not-an-int"
-
-    42 is not of type "string"
-
-    Validated against the response schema for status code 200.
-
-    Schema at /properties/name:
-
-        {
-            "type": "string"
-        }
-
-    Value:
-
-        42
+        "notanumber"
 
 [200] OK:
 
-    `{"id":"not-an-int","name":42}`
+    `count=notanumber
+    name=Alice`
 
 Reproduce with:
 
@@ -74,8 +80,8 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 5/5
+  Tested: 5
 
 Test Phases:
   ⏭  Examples
@@ -84,7 +90,8 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Response violates schema: 2
+  ❌ Response violates schema: 1
+  ❌ Content deserialization error: 1
 
 Test cases:
   N generated, N found N unique failures

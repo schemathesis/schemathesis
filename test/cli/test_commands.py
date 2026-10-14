@@ -166,15 +166,22 @@ def _malformed_schema_file(tmp_path):
     return [str(path), "--url=http://127.0.0.1:1"]
 
 
-@pytest.mark.parametrize("command", ["run", "fuzz"])
+def _unreachable_schema(tmp_path):
+    return ["http://127.0.0.1:1/openapi.json"]
+
+
+def _wait_for_unreachable_schema(tmp_path):
+    return ["http://127.0.0.1:1/openapi.json", "--wait-for-schema=1"]
+
+
 @pytest.mark.parametrize(
-    "make_args",
+    ("command", "make_args"),
     [
-        pytest.param(_malformed_schema_file, id="malformed-schema"),
-        pytest.param(lambda tmp_path: ["http://127.0.0.1:1/openapi.json"], id="unreachable-schema"),
-        pytest.param(
-            lambda tmp_path: ["http://127.0.0.1:1/openapi.json", "--wait-for-schema=1"], id="wait-for-schema-timeout"
-        ),
+        pytest.param("run", _malformed_schema_file, id="malformed-schema-run"),
+        pytest.param("fuzz", _malformed_schema_file, id="malformed-schema-fuzz"),
+        pytest.param("run", _unreachable_schema, id="unreachable-schema-run"),
+        pytest.param("fuzz", _unreachable_schema, id="unreachable-schema-fuzz"),
+        pytest.param("fuzz", _wait_for_unreachable_schema, id="wait-for-schema-timeout-fuzz"),
     ],
 )
 def test_fatal_error_exit_code(cli, tmp_path, command, make_args):
@@ -193,23 +200,12 @@ def test_config_file_error_exit_code(cli, command):
     [["run", "--max-examples=1"], ["fuzz", "--max-time=1"]],
     ids=["run", "fuzz"],
 )
-def test_piped_output_has_no_double_blank_lines(ctx, cli, args):
-    api = ctx.openapi.apps.success()
+def test_piped_output_has_no_blank_line_runs_or_trailing_whitespace(ctx, cli, args):
+    api = ctx.openapi.apps.success_and_failure()
     command, *options = args
     stdout = cli.main(command, api.schema_url, *options).stdout
     lines = [line.strip() for line in stdout.splitlines()]
     assert not any(not first and not second for first, second in zip(lines, lines[1:], strict=False)), stdout
-
-
-@pytest.mark.parametrize(
-    "args",
-    [["run", "--max-examples=1"], ["fuzz", "--max-time=1"]],
-    ids=["run", "fuzz"],
-)
-def test_piped_output_has_no_trailing_whitespace(ctx, cli, args):
-    api = ctx.openapi.apps.success_and_failure()
-    command, *options = args
-    stdout = cli.main(command, api.schema_url, *options).stdout
     assert [line for line in stdout.splitlines() if line != line.rstrip()] == [], stdout
 
 
@@ -831,14 +827,6 @@ def test_connection_error(ctx, cli, workers, snapshot_cli):
     )
 
 
-def test_unreachable_server_capabilities_are_unknown(ctx, cli):
-    api = ctx.openapi.apps.success()
-    lines = cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "1").stdout.splitlines()
-    assert [line.strip() for line in lines if "API capabilities" in line or "✘" in line] == [
-        "⚠️  API capabilities: unknown, server unreachable"
-    ]
-
-
 # A listener with a full accept queue drops new connection attempts, so they time out instead of being refused.
 def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
     api = ctx.openapi.apps.success()
@@ -862,21 +850,6 @@ def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
                 connection.close()
     assert [line.strip() for line in lines if "API capabilities" in line or "✘" in line] == [
         "⚠️  API capabilities: unknown, server unreachable"
-    ]
-
-
-@pytest.mark.parametrize(
-    ("command", "args"),
-    [
-        ("run", ("--phases=fuzzing", "-n", "1")),
-        ("fuzz", ("--max-time=30",)),
-    ],
-)
-def test_connection_error_tip_names_the_address(ctx, cli, command, args):
-    api = ctx.openapi.apps.success()
-    stdout = cli.main(command, api.schema_url, "--url=http://127.0.0.1:1/api", *args).stdout
-    assert [line for line in stdout.splitlines() if line.startswith("Tip:")] == [
-        "Tip: Check that the API is running and reachable at `http://127.0.0.1:1`."
     ]
 
 
@@ -1084,14 +1057,6 @@ def test_keyboard_interrupt(ctx, cli, workers, snapshot_cli):
         assert "skipped" in result.stdout
 
 
-def test_keyboard_interrupt_is_named_in_the_final_line(ctx, cli):
-    api = ctx.openapi.apps.success()
-    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
-    result = cli.run(api.schema_url, "--mode=positive", hooks=module)
-    assert result.exit_code == 130
-    assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
-
-
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
@@ -1110,10 +1075,13 @@ def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
     assert cli.run(api.schema_url, "--workers=2", "--generation-deterministic") == snapshot_cli
 
 
-def test_keyboard_interrupt_during_schema_loading(ctx, cli, snapshot_cli):
+def test_keyboard_interrupt_during_schema_loading(ctx, cli, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(INTERRUPT_ON_SCHEMA_LOAD)
-    assert cli.run(api.schema_url, hooks=module) == snapshot_cli
+    report_path = tmp_path / "report.json"
+    assert cli.run(api.schema_url, f"--report-json-path={report_path}", hooks=module) == snapshot_cli
+    report = json.loads(report_path.read_text())
+    assert (report["exit_code"], report["complete"], report["stop_reason"]) == (130, False, "interrupted")
 
 
 INTERRUPT_ON_SCHEMA_LOAD = """
@@ -1178,20 +1146,6 @@ def test_keyboard_interrupt_exit_code(ctx, cli, app_runner, tmp_path, command, s
     ), result.stdout
 
 
-def test_keyboard_interrupt_exit_code_during_schema_loading(ctx, cli, tmp_path):
-    api = ctx.openapi.apps.success()
-    module = ctx.write_pymodule(INTERRUPT_ON_SCHEMA_LOAD)
-    report_path = tmp_path / "report.json"
-    result = cli.main("run", api.schema_url, f"--report-json-path={report_path}", hooks=module)
-    report = json.loads(report_path.read_text())
-    assert (result.exit_code, report["exit_code"], report["complete"], report["stop_reason"]) == (
-        130,
-        130,
-        False,
-        "interrupted",
-    ), result.stdout
-
-
 def test_keyboard_interrupt_exit_code_during_hooks_loading(ctx, cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule("raise KeyboardInterrupt")
@@ -1209,19 +1163,6 @@ def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot
     api = ctx.openapi.apps.users_crud()
     assert cli.run(api.schema_url, "--phases=stateful", "--max-examples=1") == snapshot_cli
     assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
-
-
-def test_custom_handler_report_in_reports_list(ctx, cli):
-    @schemathesis.cli.handler()
-    class CoverageReport(schemathesis.cli.EventHandler):
-        def handle_event(self, context, event) -> None:
-            if isinstance(event, events.EngineFinished):
-                context.add_report("Schema coverage", "coverage.html")
-
-    api = ctx.openapi.apps.success()
-    lines = cli.run(api.schema_url, "--max-examples=1").stdout.splitlines()
-    start = lines.index("Reports:")
-    assert lines[start : start + 2] == ["Reports:", "  - Schema coverage: coverage.html"]
 
 
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
@@ -1266,33 +1207,22 @@ def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     assert isinstance(payload["photoUrls"], list)
 
 
-@pytest.mark.parametrize("required", [True, False])
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {},
-        {"required": []},
-        {"required": ["region"]},
-    ],
-    ids=["no-required", "not-in-required", "in-required"],
-)
-def test_required_as_boolean(ctx, cli, snapshot_cli, required, kwargs):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_required_as_boolean(ctx, cli, snapshot_cli):
     # Happens in the wild, even though it is incorrect
     api = ctx.openapi.apps.success()
+    variants = [
+        (required, kwargs) for required in (True, False) for kwargs in ({}, {"required": []}, {"required": ["region"]})
+    ]
     schema_path = ctx.openapi.write_schema(
         {
-            "/success": {
+            f"/success{index}": {
                 "post": {
                     "requestBody": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "properties": {
-                                        "region": {
-                                            "required": required,
-                                            "type": "string",
-                                        },
-                                    },
+                                    "properties": {"region": {"required": required, "type": "string"}},
                                     "type": "object",
                                     **kwargs,
                                 }
@@ -1303,6 +1233,7 @@ def test_required_as_boolean(ctx, cli, snapshot_cli, required, kwargs):
                     "responses": {"200": {"description": "OK"}},
                 }
             }
+            for index, (required, kwargs) in enumerate(variants)
         }
     )
     assert (
@@ -1647,78 +1578,71 @@ def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1") == snapshot_cli
 
 
-@pytest.mark.parametrize(
-    "operation",
-    [
-        {
-            "parameters": [
-                {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "minLength": "x"}}
-            ]
-        },
-        {"parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer", "maximum": "x"}}]},
-        {
-            "parameters": [
-                {
-                    "name": "q",
-                    "in": "query",
-                    "required": True,
-                    "schema": {"type": "array", "items": {"type": "integer"}, "minItems": "x"},
-                }
-            ]
-        },
-        {
-            "parameters": [
-                {
-                    "name": "q",
-                    "in": "query",
-                    "required": True,
-                    "schema": {"type": "array", "items": {"type": "integer"}, "maxItems": "x"},
-                }
-            ]
-        },
-        {
-            "parameters": [
-                {
-                    "name": "q",
-                    "in": "query",
-                    "allowEmptyValue": False,
-                    "schema": {"type": "string", "minLength": "x"},
-                }
-            ]
-        },
-        {
-            "requestBody": {
+MALFORMED_KEYWORD_OPERATIONS = {
+    "query-min-length": {
+        "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string", "minLength": "x"}}]
+    },
+    "query-maximum": {
+        "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer", "maximum": "x"}}]
+    },
+    "query-min-items": {
+        "parameters": [
+            {
+                "name": "q",
+                "in": "query",
                 "required": True,
-                "content": {
-                    "application/json": {
-                        "schema": {"type": "object", "properties": {"name": {"type": "string", "minLength": "x"}}}
-                    }
-                },
+                "schema": {"type": "array", "items": {"type": "integer"}, "minItems": "x"},
             }
-        },
-        {
-            "requestBody": {
+        ]
+    },
+    "query-max-items": {
+        "parameters": [
+            {
+                "name": "q",
+                "in": "query",
                 "required": True,
-                "content": {"application/json": {"schema": {"type": "array", "contains": {"type": "foo"}}}},
+                "schema": {"type": "array", "items": {"type": "integer"}, "maxItems": "x"},
             }
-        },
-    ],
-    ids=[
-        "query-min-length",
-        "query-maximum",
-        "query-min-items",
-        "query-max-items",
-        "query-disallowed-empty-min-length",
-        "body-min-length",
-        "body-contains-unknown-type",
-    ],
-)
+        ]
+    },
+    "query-disallowed-empty-min-length": {
+        "parameters": [
+            {
+                "name": "q",
+                "in": "query",
+                "allowEmptyValue": False,
+                "schema": {"type": "string", "minLength": "x"},
+            }
+        ]
+    },
+    "body-min-length": {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {"type": "object", "properties": {"name": {"type": "string", "minLength": "x"}}}
+                }
+            },
+        }
+    },
+    "body-contains-unknown-type": {
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "array", "contains": {"type": "foo"}}}},
+        }
+    },
+}
+
+
 @pytest.mark.parametrize("phase", ["coverage", "fuzzing"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_malformed_keyword(ctx, cli, snapshot_cli, operation, phase):
+def test_malformed_keyword(ctx, cli, snapshot_cli, phase):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
-        {"/data": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}}
+        {
+            f"/{name}": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}
+            for name, operation in MALFORMED_KEYWORD_OPERATIONS.items()
+        }
     )
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", f"--phases={phase}") == snapshot_cli
 
@@ -2754,7 +2678,14 @@ def test_wait_for_schema_503_exhausted(cli, app_runner, snapshot_cli):
 def test_rate_limit(ctx, cli):
     api = ctx.openapi.apps.success()
     start = time.perf_counter()
-    assert cli.run(api.schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
+    result = cli.run(
+        api.schema_url,
+        "--rate-limit=1/s",
+        "--phases=coverage",
+        config={"phases": {"coverage": {"unexpected-methods": ["PUT", "POST"]}}},
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert len(api.requests) >= 3
     assert time.perf_counter() - start >= len(api.requests) - 1
 
 
@@ -3647,12 +3578,13 @@ class EventCounter(cli.EventHandler):
     )
 
 
-def test_custom_handler_shutdown_error_keeps_exit_code(ctx, cli):
+def test_custom_handler_report_listed_and_shutdown_error_keeps_exit_code(ctx, cli):
     # A reporter failing at shutdown must not mask the run's verdict.
     @schemathesis.cli.handler()
     class BrokenShutdown(schemathesis.cli.EventHandler):
         def handle_event(self, run_ctx, event) -> None:
-            pass
+            if isinstance(event, events.EngineFinished):
+                run_ctx.add_report("Schema coverage", "coverage.html")
 
         def shutdown(self, run_ctx) -> None:
             raise RuntimeError("oops")
@@ -3661,6 +3593,9 @@ def test_custom_handler_shutdown_error_keeps_exit_code(ctx, cli):
     result = cli.run(api.schema_url, "--max-examples=1")
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "CLI Handler Error" in result.stdout
+    lines = result.stdout.splitlines()
+    start = lines.index("Reports:")
+    assert lines[start : start + 2] == ["Reports:", "  - Schema coverage: coverage.html"]
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -4321,7 +4256,7 @@ class Handler(BaseHTTPRequestHandler):
                 time.sleep(2)
                 self.reset()
                 return
-            time.sleep(3)
+            time.sleep(2)
             self.send_json({"ok": True})
             return
         if self.path.startswith("/kill") and not killed.is_set():

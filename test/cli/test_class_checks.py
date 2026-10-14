@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from _pytest.main import ExitCode
 
@@ -28,8 +30,9 @@ class FailEveryResponse:
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_after_run_failure_rendering(ctx, cli, snapshot_cli, ensure_reachability_module):
+def test_after_run_failure_rendering(ctx, cli, snapshot_cli, ensure_reachability_module, tmp_path):
     api = ctx.openapi.apps.success_and_failure()
+    allure_dir = tmp_path / "allure-results"
     assert (
         cli.main(
             "run",
@@ -38,7 +41,12 @@ def test_after_run_failure_rendering(ctx, cli, snapshot_cli, ensure_reachability
             "EnsureReachability",
             "--max-examples=5",
             "--phases=fuzzing",
+            f"--report-allure-path={allure_dir}",
             hooks=ensure_reachability_module,
         )
         == snapshot_cli
     )
+    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    run_check_results = [r for r in results if r.get("name") == "Run checks"]
+    assert run_check_results, [r.get("name") for r in results]
+    assert run_check_results[0]["status"] == "failed"

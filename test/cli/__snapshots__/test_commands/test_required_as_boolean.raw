@@ -8,8 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
-     Configuration:    /tmp/config.toml
+     Operations:       6 selected / 6 total
 
  ✅  API capabilities:
 
@@ -18,21 +17,34 @@ Schemathesis dev
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  1 skipped
+     ⏭  6 skipped
 
  ✅  Coverage (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 6 passed
 
  ✅  Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 6 passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 6 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - POST /success0
+  - POST /success1
+  - POST /success2
+  - POST /success3
+  - POST /success4
+  - POST /success5
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 6/6
+  Tested: 6
 
 Test Phases:
   ⏭  Examples
@@ -40,9 +52,12 @@ Test Phases:
   ✅ Fuzzing
   ⏭  Stateful (not applicable)
 
+Warnings:
+  ⚠️ Missing test data: 6 operations repeatedly returned 404 responses
+
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 warning in 1.00s ==============================

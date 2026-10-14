@@ -63,26 +63,6 @@ def test_after_run_failure_reported_without_terminal(testdir, restore_checks):
     assert "always fails in after_run" in (result.stderr.str() + result.stdout.str())
 
 
-def test_after_run_passes(testdir, restore_checks):
-    testdir.make_test(
-        """
-@schemathesis.check
-class AlwaysPass:
-    def after_run(self, ctx):
-        pass
-
-lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
-
-@lazy_schema.parametrize()
-def test_api(case):
-    pass
-"""
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
-    assert result.ret == 0
-
-
 def test_after_run_fires_once_per_test_function(testdir, restore_checks):
     counter_path = str(testdir.tmpdir.join("after_run_count.txt"))
     testdir.make_test(

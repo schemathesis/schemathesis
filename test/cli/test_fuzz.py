@@ -84,15 +84,13 @@ def _make_slow_fuzz_app(ctx, app_runner):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
-    url = _make_fuzz_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
-    assert cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}}) == snapshot_cli
+    result = cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}})
+    assert result == snapshot_cli
+    counts, reasons = _parse_operations_summary(result.stdout)
+    assert counts["selected"] == counts["tested"] + counts["skipped"] + counts.get("errored", 0), result.stdout
+    assert "No checks ran" in reasons, result.stdout
 
 
 def test_fuzz_operations_summary_accounts_for_failure_limit(ctx, cli, app_runner):
@@ -137,16 +135,6 @@ def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx
     )
 
     assert (operations.tested, operations.skipped, operations.skip_reasons) == (1, 1, ["Failure limit reached"])
-
-
-def test_fuzz_operations_summary_accounts_for_disabled_checks(ctx, cli):
-    api = ctx.openapi.apps.success()
-
-    result = cli.main("fuzz", api.schema_url, "--max-time=30", config={"checks": {"enabled": False}})
-    counts, reasons = _parse_operations_summary(result.stdout)
-
-    assert counts["selected"] == counts["tested"] + counts["skipped"] + counts.get("errored", 0), result.stdout
-    assert "No checks ran" in reasons, result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -194,9 +182,21 @@ class NoServerErrors:
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_fuzz_final_line_with_failure(cli, app_runner, ctx, snapshot_cli):
+def test_fuzz_final_line_with_failure(cli, app_runner, ctx, tmp_path, snapshot_cli):
     url = _make_fuzz_failure_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
+    xml_path = tmp_path / "junit.xml"
+    allure_dir = tmp_path / "allure-results"
+    result = cli.main(
+        "fuzz", url, "--max-time=30", f"--report-junit-path={xml_path}", f"--report-allure-path={allure_dir}"
+    )
+    assert_cli_snapshot(result, snapshot_cli)
+    testcase = next(tc for tc in ElementTree.parse(xml_path).getroot()[0] if tc.attrib["name"] == "GET /users")
+    assert testcase[0].tag == "failure"
+    assert "Server error" in ((testcase[0].text or "") + testcase[0].attrib.get("message", ""))
+    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    failure = next(item for item in results if item["name"] == "GET /users")
+    assert failure["status"] == "failed"
+    assert any("Server error" in step["statusDetails"]["message"] for step in failure.get("steps", []))
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -272,23 +272,19 @@ def test_fuzz_live_progress_on_terminal(cli, app_runner, ctx, make_app, args, ex
     assert re.search(expected, result.stdout)
 
 
-def test_fuzz_connection_error_cases_are_not_reported_as_skipped(cli, ctx):
-    api = ctx.openapi.apps.success()
-
-    result = cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=30")
-
-    assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
-
-
 def test_fuzz_unreachable_server_has_no_passed_scenarios(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
 
-    assert_cli_snapshot(cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=30"), snapshot_cli)
+    result = cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=30")
+    assert_cli_snapshot(result, snapshot_cli)
+    assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
 
 
 @pytest.mark.snapshot(replace_test_cases=False, replace_traceback=True)
-def test_fuzz_crashed_check_cases_are_reported_as_errored(cli, ctx, snapshot_cli):
+def test_fuzz_crashed_check_cases_are_reported_as_errored(cli, ctx, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.success()
+    xml_path = tmp_path / "junit.xml"
+    allure_dir = tmp_path / "allure-results"
     with ctx.check(
         """
 @schemathesis.check
@@ -296,7 +292,19 @@ def broken_check(ctx, response, case):
     raise ZeroDivisionError("boom")
 """
     ) as module:
-        assert cli.main("fuzz", api.schema_url, "--checks=broken_check", hooks=module) == snapshot_cli
+        result = cli.main(
+            "fuzz",
+            api.schema_url,
+            "--checks=broken_check",
+            f"--report-junit-path={xml_path}",
+            f"--report-allure-path={allure_dir}",
+            hooks=module,
+        )
+        assert result == snapshot_cli
+    testcases = list(ElementTree.parse(xml_path).getroot()[0])
+    assert [(testcase.attrib["name"], testcase[0].tag) for testcase in testcases] == [("Fuzz tests", "error")]
+    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
+    assert [(item["name"], item["status"]) for item in results] == [("Fuzz tests", "broken")]
 
 
 def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner, ctx):
@@ -492,111 +500,6 @@ def _make_fuzz_multi_operation_event(ctx):
     return event, elapsed_by_label
 
 
-def test_fuzz_report_junit(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_app(ctx, app_runner)
-    xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-junit-path={xml_path}")
-    assert result.exit_code == 0, result.output
-    assert xml_path.exists()
-    ElementTree.parse(xml_path)
-
-
-def test_fuzz_report_junit_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_failure_app(ctx, app_runner)
-    xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-junit-path={xml_path}")
-    assert result.exit_code == 1, result.output
-
-    tree = ElementTree.parse(xml_path)
-    testcases = list(tree.getroot()[0])
-    testcase = next(tc for tc in testcases if tc.attrib["name"] == "GET /users")
-    assert testcase[0].tag == "failure"
-    assert "Server error" in ((testcase[0].text or "") + testcase[0].attrib.get("message", ""))
-
-
-def test_fuzz_report_vcr(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_app(ctx, app_runner)
-    vcr_path = tmp_path / "cassette.yaml"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-vcr-path={vcr_path}")
-    assert result.exit_code == 0, result.output
-    assert vcr_path.exists()
-    cassette = yaml.safe_load(vcr_path.read_text())
-    assert "http_interactions" in cassette
-
-
-def test_fuzz_report_har(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_app(ctx, app_runner)
-    har_path = tmp_path / "recording.har"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-har-path={har_path}")
-    assert result.exit_code == 0, result.output
-    assert har_path.exists()
-    har = json.loads(har_path.read_text())
-    assert "log" in har
-
-
-def test_fuzz_report_ndjson(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_app(ctx, app_runner)
-    ndjson_path = tmp_path / "events.ndjson"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-ndjson-path={ndjson_path}")
-    assert result.exit_code == 0, result.output
-    assert ndjson_path.exists()
-    events = [json.loads(line) for line in ndjson_path.read_text().splitlines() if line]
-    assert len(events) > 0
-
-
-def test_fuzz_report_allure(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_app(ctx, app_runner)
-    allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-allure-path={allure_dir}")
-    assert result.exit_code == 0, result.output
-    assert any(allure_dir.glob("*-result.json"))
-
-
-def test_fuzz_report_allure_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
-    url = _make_fuzz_failure_app(ctx, app_runner)
-    allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=30", f"--report-allure-path={allure_dir}")
-    assert result.exit_code == 1, result.output
-
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
-    failure = next(item for item in results if item["name"] == "GET /users")
-    assert failure["status"] == "failed"
-    assert any("Server error" in step["statusDetails"]["message"] for step in failure.get("steps", []))
-
-
-def test_fuzz_reports_record_erroring_scenario(cli, ctx, app_runner, tmp_path, restore_checks):
-    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
-
-    @app.route("/users")
-    def users():
-        return jsonify([])
-
-    module = ctx.write_pymodule(
-        """
-@schemathesis.check
-def broken_check(ctx, response, case):
-    raise ZeroDivisionError("division by zero")
-        """
-    )
-    xml_path = tmp_path / "junit.xml"
-    allure_dir = tmp_path / "allure-results"
-    result = cli.main(
-        "fuzz",
-        app_runner.openapi_url(app),
-        "--max-time=30",
-        "-c",
-        "broken_check",
-        f"--report-junit-path={xml_path}",
-        f"--report-allure-path={allure_dir}",
-        hooks=module,
-    )
-    assert result.exit_code == 1, result.output
-    testcases = list(ElementTree.parse(xml_path).getroot()[0])
-    assert [(testcase.attrib["name"], testcase[0].tag) for testcase in testcases] == [("Fuzz tests", "error")]
-    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
-    assert [(item["name"], item["status"]) for item in results] == [("Fuzz tests", "broken")]
-
-
 def test_fuzz_junit_report_does_not_duplicate_old_failures(ctx, response_factory):
     schema = ctx.openapi.load_schema(USERS_OK_PATHS)
     operation = schema["/users"]["GET"]
@@ -680,16 +583,7 @@ def test_fuzz_all_operations_have_schema_errors(cli, app_runner, ctx, snapshot_c
     assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
-@pytest.mark.parametrize(
-    "config",
-    [
-        {"fuzz": {"max-time": 1}},
-        {"max-time": 1},
-        {"max-time": 60, "fuzz": {"max-time": 1}},
-    ],
-    ids=["fuzz-section", "root", "fuzz-section-over-root"],
-)
-def test_fuzz_max_time_from_config(cli, ctx, app_runner, tmp_path, config):
+def test_fuzz_section_max_time_overrides_root(cli, ctx, app_runner, tmp_path):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
@@ -707,7 +601,11 @@ def test_fuzz_max_time_from_config(cli, ctx, app_runner, tmp_path, config):
 
     report_path = tmp_path / "report.json"
     result = cli.main(
-        "fuzz", app_runner.openapi_url(app), "--mode=positive", f"--report-json-path={report_path}", config=config
+        "fuzz",
+        app_runner.openapi_url(app),
+        "--mode=positive",
+        f"--report-json-path={report_path}",
+        config={"max-time": 60, "fuzz": {"max-time": 1}},
     )
     report = json.loads(report_path.read_text())
     assert (result.exit_code, report["stop_reason"], report["running_time"] < 30) == (0, "max_time", True), (
@@ -727,64 +625,41 @@ def test_fuzz_custom_handler_error(cli, app_runner, ctx, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_fuzz_custom_handler(cli, app_runner, ctx, snapshot_cli):
-    class SummaryHandler(EventHandler):
-        def handle_event(self, run_ctx, event):
-            if isinstance(event, schemathesis.cli.LoadingFinished):
-                run_ctx.add_initialization_line("custom: fuzzing initialized")
-            elif isinstance(event, EngineFinished):
-                run_ctx.add_summary_line("custom: fuzzing done")
-
-    schemathesis.cli.handler()(SummaryHandler)
-    url = _make_fuzz_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_fuzz_reports_section(cli, app_runner, ctx, tmp_path, snapshot_cli):
-    @schemathesis.cli.handler()
-    class CoverageReport(EventHandler):
-        def handle_event(self, run_ctx, event):
-            if isinstance(event, EngineFinished):
-                run_ctx.add_report("Schema coverage", "coverage.html")
-
-    url = _make_fuzz_app(ctx, app_runner)
-    assert_cli_snapshot(
-        cli.main(
-            "fuzz",
-            url,
-            "--max-time=30",
-            f"--report-junit-path={tmp_path / 'junit.xml'}",
-            f"--report-html-path={tmp_path / 'html'}",
-        ),
-        snapshot_cli,
-    )
-
-
-def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
+def test_fuzz_custom_handler_and_reports(cli, app_runner, ctx, tmp_path, snapshot_cli):
     group = schemathesis.cli.add_group("Fuzz custom group")
     group.add_option("--fuzz-counter", type=int, default=0)
 
     @schemathesis.cli.handler()
-    class EventCounter(EventHandler):
+    class SummaryHandler(EventHandler):
         def __init__(self, *args, **params):
             self.counter = params["fuzz_counter"]
 
-        def handle_event(self, run_ctx, event) -> None:
-            if isinstance(event, EngineFinished):
-                run_ctx.add_summary_line(f"Counter: {self.counter}")
+        def handle_event(self, run_ctx, event):
+            if isinstance(event, schemathesis.cli.LoadingFinished):
+                run_ctx.add_initialization_line("custom: fuzzing initialized")
+            elif isinstance(event, EngineFinished):
+                run_ctx.add_summary_line(f"custom: fuzzing done, counter {self.counter}")
+                run_ctx.add_report("Schema coverage", "coverage.html")
 
     url = _make_fuzz_app(ctx, app_runner)
-
     result = cli.main(
         "fuzz",
         url,
         "--max-time=30",
         "--fuzz-counter=42",
+        f"--report-junit-path={tmp_path / 'junit.xml'}",
+        f"--report-vcr-path={tmp_path / 'cassette.yaml'}",
+        f"--report-har-path={tmp_path / 'recording.har'}",
+        f"--report-ndjson-path={tmp_path / 'events.ndjson'}",
+        f"--report-allure-path={tmp_path / 'allure-results'}",
+        f"--report-html-path={tmp_path / 'html'}",
     )
-
-    assert result.exit_code == 0, result.output
-    assert "Counter: 42" in result.output
+    assert_cli_snapshot(result, snapshot_cli)
+    ElementTree.parse(tmp_path / "junit.xml")
+    assert "http_interactions" in yaml.safe_load((tmp_path / "cassette.yaml").read_text())
+    assert "log" in json.loads((tmp_path / "recording.har").read_text())
+    assert [json.loads(line) for line in (tmp_path / "events.ndjson").read_text().splitlines() if line]
+    assert any((tmp_path / "allure-results").glob("*-result.json"))
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

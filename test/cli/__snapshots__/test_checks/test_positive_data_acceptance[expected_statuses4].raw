@@ -35,7 +35,7 @@ __________________________________ GET /test ___________________________________
 - API rejected schema-compliant request
 
     Valid data should have been accepted
-    Expected: 200
+    Expected: 2xx
 
 [404] Not Found:
 

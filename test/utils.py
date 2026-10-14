@@ -400,6 +400,23 @@ def test_api(case):
     return label
 
 
+def allure_results(allure_dir: str | os.PathLike) -> list[Any]:
+    result_files = list(Path(allure_dir).glob("*-result.json"))
+    assert result_files
+    return [load_json_or_fail(path) for path in result_files]
+
+
+def allure_outcomes(allure_dir: str | os.PathLike) -> dict[str, tuple[str, str]]:
+    outcomes = {}
+    for result in allure_results(allure_dir):
+        raw_message = result.get("statusDetails", {}).get("message", "")
+        message = raw_message.splitlines()[0] if raw_message else ""
+        if message.startswith("ConnectionError: "):
+            message = "ConnectionError"
+        outcomes[result["name"]] = (result["status"], message)
+    return outcomes
+
+
 def crash_cache_dir(tmp_path: Path) -> Path:
     return tmp_path / ".schemathesis" / "default" / "cache" / "crashes"
 

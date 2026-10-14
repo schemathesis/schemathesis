@@ -7,18 +7,6 @@ from flask import Response
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])
-def test_bad_charset_response_does_not_crash(ctx, cli, snapshot_cli, charset):
-    app, _ = ctx.openapi.make_flask_app({"/boom": {"get": {"responses": {"500": {"description": "Error"}}}}})
-
-    @app.route("/boom")
-    def boom():
-        return Response(b"boom", content_type=f"text/plain; charset={charset}", status=500)
-
-    assert cli.run_openapi_app(app, "--max-examples=1", "--checks=not_a_server_error") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])
 def test_bad_charset_on_successful_response_does_not_crash(ctx, cli, snapshot_cli, charset):
     # A 2xx JSON response with a bad charset is recorded for reuse in later tests; it must not abort the run.
     item_schema = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}

@@ -20,53 +20,6 @@ def test_base_url_not_truncated_on_narrow_terminal(ctx, cli):
     assert long_url in "".join(click.unstyle(result.output).split())
 
 
-def test_cli_displays_config_path(ctx, cli, app_runner, snapshot_cli):
-    paths = {
-        "/test": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        }
-    }
-    base_url, schema_path = _serve(ctx, app_runner, paths)
-
-    # Run with config parameter - cli fixture will write config file
-    assert (
-        cli.run(
-            str(schema_path),
-            f"--url={base_url}/api",
-            "-c",
-            "not_a_server_error",
-            "--max-examples=1",
-            config={"headers": {"X-Test": "value"}},
-        )
-        == snapshot_cli
-    )
-
-
-def test_cli_no_config_display_without_file(ctx, cli, app_runner, snapshot_cli):
-    paths = {
-        "/test": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        }
-    }
-    base_url, schema_path = _serve(ctx, app_runner, paths)
-
-    # Run without config parameter - no config file used
-    assert (
-        cli.run(
-            str(schema_path),
-            f"--url={base_url}/api",
-            "-c",
-            "not_a_server_error",
-            "--max-examples=1",
-        )
-        == snapshot_cli
-    )
-
-
 def test_cli_displays_dictionary_stats(ctx, cli, app_runner, snapshot_cli):
     paths = {
         "/test": {

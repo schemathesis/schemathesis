@@ -1,3 +1,4 @@
+import json
 import platform
 import re
 from xml.etree import ElementTree
@@ -369,11 +370,12 @@ def test_after_run_failure_in_junit(ctx, cli, ensure_reachability_module, tmp_pa
     assert "never returned 2xx" in (run_checks[0].text or run_checks[0].attrib.get("message", ""))
 
 
-def test_after_run_failures_in_junit_are_sorted_and_deduplicated(
+def test_after_run_failures_in_reports_are_sorted_and_deduplicated(
     ctx, cli, unsorted_run_check_failures_module, tmp_path
 ):
     api = ctx.openapi.apps.success()
     xml_path = tmp_path / "junit.xml"
+    allure_dir = tmp_path / "allure-results"
     cli.main(
         "run",
         api.schema_url,
@@ -382,9 +384,15 @@ def test_after_run_failures_in_junit_are_sorted_and_deduplicated(
         "--max-examples=1",
         "--phases=fuzzing",
         f"--report-junit-path={xml_path}",
+        f"--report-allure-path={allure_dir}",
         hooks=unsorted_run_check_failures_module,
     )
     testcases_by_name = {testcase.attrib["name"]: testcase for testcase in ElementTree.parse(xml_path).getroot()[0]}
     assert testcases_by_name["Run checks"][0].text == (
         "\n- dup\n\n    aaa duplicated\n\n- Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
     )
+    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
+    [run_checks] = [result for result in results if result["name"] == "Run checks"]
+    assert [step["statusDetails"]["message"] for step in run_checks["steps"]] == [
+        "- dup\n\n    aaa duplicated\n\n- Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
+    ]
