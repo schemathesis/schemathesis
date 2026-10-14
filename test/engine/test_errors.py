@@ -1,4 +1,5 @@
 import re
+import time
 
 import hypothesis.errors
 import jsonschema_rs
@@ -346,6 +347,36 @@ def test_tls_handshake_with_plain_http_server_reports_ssl_error(ctx):
     assert errors[0].info.format().startswith("Network Error\n\nSSL verification problem\n\n")
     assert errors[0].info.format().endswith("\n\nTip: Bypass SSL verification with `--tls-verify=false`.")
     assert statuses == [Status.ERROR]
+
+
+def test_timeout_found_alongside_a_check_failure_is_reported(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        if int(request.args["q"]) < 0:
+            return jsonify({}), 500
+        time.sleep(0.3)
+        return jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = EventStream(
+        schema, phases=[PhaseName.FUZZING], max_examples=10, modes=[GenerationMode.POSITIVE], request_timeout=0.1
+    ).execute()
+    errors = stream.find_all(events.NonFatalError)
+    assert [(type(event.value), event.info.message) for event in errors] == [
+        (requests.exceptions.ReadTimeout, "Read timed out after 0.1 seconds")
+    ]
+    assert errors[0].info.code_sample.endswith("/items?q=0'")
 
 
 def test_xml_prefix_without_namespace_reports_serialization_error(ctx):

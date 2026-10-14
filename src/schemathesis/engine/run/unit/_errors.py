@@ -132,6 +132,10 @@ def classify_test_exception(
 ) -> tuple[Status, list[events.NonFatalError]]:
     """Map an exception raised by a Hypothesis-driven test into a scenario status and events to report."""
     if isinstance(exc, FailureGroup | Failure):
+        # A request that timed out or dropped before the failure was found is still this operation's finding.
+        stored = state.take_unrecoverable_network_error()
+        if stored is not None:
+            return Status.FAILURE, [non_fatal_error(stored.error, code_sample=stored.code_sample)]
         return Status.FAILURE, []
     if isinstance(exc, UnexpectedError):
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
