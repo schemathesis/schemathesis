@@ -12,11 +12,11 @@ def test_one_slow_resolver_does_not_abort_stateful_phase(ctx, cli):
         api.schema_url,
         "--phases=stateful",
         "--max-examples=20",
-        "--request-timeout=0.5",
         "-m",
         "positive",
         "-c",
         "not_a_server_error",
+        config={"operations": [{"include-name": "Mutation.deleteBook", "request-timeout": 0.5}]},
     )
     assert "Unhealthy API" not in result.stdout
     assert "UnhealthyAPIError" not in result.stdout
