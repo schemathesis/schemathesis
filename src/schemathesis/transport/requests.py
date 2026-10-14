@@ -32,7 +32,13 @@ from schemathesis.core.transport import (
 )
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
-from schemathesis.transport.prepare import get_exclude_headers, prepare_body, prepare_headers, prepare_url
+from schemathesis.transport.prepare import (
+    get_exclude_headers,
+    prepare_body,
+    prepare_cookies,
+    prepare_headers,
+    prepare_url,
+)
 from schemathesis.transport.serialization import (
     Binary,
     _serialize_xml,
@@ -171,6 +177,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 merge_at(data, "params", params_override)
         if cookies is not None:
             merge_at(data, "cookies", cookies)
+        data["cookies"] = prepare_cookies(data["cookies"])
 
         excluded_headers = get_exclude_headers(case)
         for name in excluded_headers:

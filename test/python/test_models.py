@@ -762,6 +762,16 @@ def test_call_overrides(app_runner, echo_app, arg):
     assert {key: received[key] for key in original} == {"A": "X", "B": "Y"}
 
 
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+def test_call_percent_encodes_non_latin1_cookies(app_runner, echo_app, transport):
+    if transport == "requests":
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
+    else:
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", echo_app)
+    case = schema["/users"]["GET"].Case(cookies={"ascii": "a%b", "wide": "k,╯°□°%"})
+    assert case.call().json()["cookies"] == {"ascii": "a%b", "wide": "k%2C%E2%95%AF%C2%B0%E2%96%A1%C2%B0%25"}
+
+
 @pytest.mark.parametrize("with_config", [True, False])
 def test_call_verify_override(app_runner, echo_app, with_config):
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
