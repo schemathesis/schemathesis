@@ -17,6 +17,7 @@
 #### Output and summary
 
 - Request timeouts not reported for operations that also fail a check.
+- Fuzzing request timeouts outlasting the `--max-time` budget counted as errored but not reported.
 - `errored` count in the summary including stateful steps never sent, e.g. after `--max-time`.
 - Stateful request timeouts counted as errored without an entry under "ERRORS".
 - Unresponsive operations in the stateful phase shown as skipped, not errored, in the summary.

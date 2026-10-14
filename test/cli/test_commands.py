@@ -603,6 +603,40 @@ def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
     assert result == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
+def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
+    # Each request times out after its operation's share of `--max-time` has run out.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/first": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/second": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+    release = threading.Event()
+
+    @app.route("/first")
+    def first():
+        release.wait()
+        return jsonify({})
+
+    @app.route("/second")
+    def second():
+        release.wait()
+        return jsonify({})
+
+    try:
+        result = cli.run_openapi_app(
+            app,
+            "--max-time=3",
+            "--request-timeout=2",
+            "--phases=fuzzing",
+            "--checks=not_a_server_error",
+        )
+    finally:
+        release.set()
+    assert result == snapshot_cli
+
+
 def test_read_content_timeout(ctx, cli, mocker, snapshot_cli):
     api = ctx.openapi.apps.success()
     original = urllib3.response.HTTPResponse.stream
