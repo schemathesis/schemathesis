@@ -276,19 +276,19 @@ def test_flaky_assertions(engine_factory, kwargs):
         assert "Second" in messages
 
 
-@flaky(max_runs=10, min_passes=1)
 @pytest.mark.usefixtures("restore_checks")
 def test_failure_hidden_behind_another_failure(engine_factory):
-    # The same API operation, but one error is far less frequent and is located behind another one that happens more often, so it is not found in the first test suite
+    # The same API operation fails in two ways, and the second one is checked only after the first is found,
+    # so it surfaces in a later test suite
 
-    suite_number = 0
+    first_failure_found = False
 
     @schemathesis.check
     def dynamic_check(*args, **kwargs):
-        if suite_number == 0:
-            not_a_server_error(*args, **kwargs)
-        else:
+        if first_failure_found:
             response_schema_conformance(*args, **kwargs)
+        else:
+            not_a_server_error(*args, **kwargs)
 
     engine = engine_factory(
         FailureBehindFailure(),
@@ -298,8 +298,9 @@ def test_failure_hidden_behind_another_failure(engine_factory):
     )
     failures = []
     for event in engine:
-        if isinstance(event, events.SuiteFinished):
-            suite_number += 1
+        # A suite may also restart without a failure, e.g. when a replayed scenario draws different data
+        if isinstance(event, events.SuiteFinished) and failures:
+            first_failure_found = True
         if isinstance(event, events.ScenarioFinished):
             failures.extend(
                 [

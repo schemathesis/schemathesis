@@ -44,6 +44,8 @@ SEED_SCHEMA: JsonSchemaObject = {
     },
     "required": ["name"],
 }
+# Examples load `externalValue` over the network, and a drawn URL may point at a real host that never answers.
+EXTERNAL_VALUE = "http://127.0.0.1:1/example.json"
 # A drawn media type names no serializer; these do.
 MEDIA_TYPES = (
     "application/json",
@@ -357,6 +359,8 @@ def _rewritten(document: dict[str, Any], media_types: list[str], pointer: str) -
             result: dict[str, JsonValue] = {key: walk(item) for key, item in value.items()}
             if isinstance(result.get("$ref"), str):
                 result["$ref"] = pointer
+            if isinstance(result.get("externalValue"), str):
+                result["externalValue"] = EXTERNAL_VALUE
             content = result.get("content")
             if isinstance(content, dict):
                 entries = list(content.values()) or [{"schema": {"$ref": pointer}}]
