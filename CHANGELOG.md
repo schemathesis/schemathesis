@@ -33,6 +33,7 @@
 - `--checks object_level_authorization` reporting a clean run without warning when no `peers` are configured.
 - `object_level_authorization` reproduction commands not saying which user sends each request.
 - `UnicodeEncodeError` for cookie values with non-Latin-1 characters.
+- False `negative_data_rejection` in the stateful phase for `"5"` sent to numeric path or query parameters.
 
 ## [4.31.0](https://github.com/schemathesis/schemathesis/compare/v4.30.1...v4.31.0) - 2026-10-12
 

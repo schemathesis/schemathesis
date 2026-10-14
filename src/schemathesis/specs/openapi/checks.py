@@ -35,6 +35,7 @@ from schemathesis.generation.meta import (
     CoveragePhaseData,
     CoverageScenario,
     FuzzingPhaseData,
+    StatefulPhaseData,
     coverage_scenario,
 )
 from schemathesis.openapi.checks import (
@@ -615,7 +616,7 @@ def _type_mutations_become_valid_after_serialization(case: Case) -> bool:
         return False
 
     phase_data = meta.phase.data
-    if not isinstance(phase_data, FuzzingPhaseData) or not phase_data.mutations:
+    if not isinstance(phase_data, FuzzingPhaseData | StatefulPhaseData) or not phase_data.mutations:
         return False
 
     locations = set()
