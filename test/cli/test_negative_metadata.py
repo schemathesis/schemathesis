@@ -384,3 +384,73 @@ def before_call(context, case, kwargs):
     )
     assert "API accepted schema-violating request" not in result.stdout, result.stdout
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.parametrize(
+    ("replacement", "accepted_invalid"),
+    [("5", False), ("five", True)],
+    ids=["numeric-string", "non-numeric-string"],
+)
+def test_hook_writing_path_identifier_as_string(ctx, cli, replacement, accepted_invalid):
+    # The pool feeds `4` from the list response; the hook redirects it, as text, to another user.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": ["id"],
+                                            "properties": {"id": {"type": "integer"}},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/users/{id}/lock": {
+                "delete": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["GET"])
+    def list_users():
+        return jsonify([{"id": 4}])
+
+    @app.route("/users/<id>/lock", methods=["DELETE"])
+    def unlock_user(id):
+        if id in ("4", "5", "five"):
+            return jsonify({}), 200
+        return jsonify({}), 404
+
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    if case.operation.label == "DELETE /users/{{id}}/lock" and case.path_parameters.get("id") == 4:
+        case.path_parameters["id"] = {replacement!r}
+        """
+    )
+
+    result = cli.run_openapi_app(
+        app,
+        "--checks=negative_data_rejection",
+        "--generation-deterministic",
+        "--phases=fuzzing",
+        "--mode=all",
+        "--max-examples=10",
+        hooks=module,
+    )
+    assert ("API accepted schema-violating request" in result.stdout) is accepted_invalid, result.stdout
