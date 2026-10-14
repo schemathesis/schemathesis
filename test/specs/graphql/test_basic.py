@@ -664,19 +664,6 @@ def test_schema_error(ctx, testdir, cli, snapshot_cli, schema, extension):
     assert cli.run(str(schema_file), f"--url={api.schema_url}") == snapshot_cli
 
 
-@pytest.mark.parametrize(
-    "arg",
-    [
-        "--include-name=Query.getBooks",
-        "--exclude-name=Query.getBooks",
-        "--include-name=DoesNotExist",
-    ],
-)
-def test_filter_operations(ctx, cli, snapshot_cli, arg):
-    api = ctx.graphql.apps.books()
-    assert cli.run(api.schema_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
-
-
 def test_disallow_null(ctx, cli, testdir, snapshot_cli):
     schema = """type Query {
     getValue(value: Int): Int

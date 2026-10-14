@@ -173,7 +173,7 @@ def test_coverage_phase_runs_when_error_feedback_disabled(ctx):
     assert all(event.status == Status.SUCCESS for event in finished), [event.status for event in finished]
 
 
-def test_coverage_phase_applies_parameter_and_header_overrides(ctx, app_runner):
+def test_examples_and_coverage_phases_apply_parameter_and_header_overrides(ctx, app_runner):
     paths = {
         "/items/{key}": {
             "get": {
@@ -183,18 +183,21 @@ def test_coverage_phase_applies_parameter_and_header_overrides(ctx, app_runner):
                         "in": "path",
                         "required": True,
                         "schema": {"type": "string", "minLength": 1},
+                        "example": "alpha",
                     },
                     {
                         "name": "id",
                         "in": "query",
                         "required": True,
                         "schema": {"type": "string"},
+                        "example": "beta",
                     },
                     {
                         "name": "session",
                         "in": "cookie",
                         "required": True,
                         "schema": {"type": "string"},
+                        "example": "gamma",
                     },
                 ],
                 "responses": {"200": {"description": "OK"}},
@@ -212,7 +215,7 @@ def test_coverage_phase_applies_parameter_and_header_overrides(ctx, app_runner):
 
     EventStream(
         schema,
-        phases=[PhaseName.COVERAGE],
+        phases=[PhaseName.EXAMPLES, PhaseName.COVERAGE],
         parameters={"key": "fixed", "id": "123", "session": "abc"},
         headers={"X-Test": "yes"},
     ).execute()

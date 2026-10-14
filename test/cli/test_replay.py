@@ -657,13 +657,28 @@ def test_replay_re_extracts_request_body_link(cli, app_runner, ctx, tmp_path, cr
     assert received == ["fresh"]
 
 
-def test_replay_reproduces_recorded_unit_failures(cli, ctx, tmp_path):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_reproduces_recorded_unit_failures(cli, ctx, tmp_path, snapshot_cli):
     api = ctx.openapi.apps.failure_multiple_failures_unsatisfiable()
 
     cli.run(api.schema_url, "--max-examples=3")
 
     crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files, "Expected `schemathesis run` to record at least one crash"
+    case_ids = [json.loads(f.read_text())["case_id"] for f in crash_files]
+    # A case failing several checks is merged into a single block with one ID and all checks, not one per check.
+    shared = next((cid for cid in case_ids if case_ids.count(cid) > 1), None)
+    assert shared is not None, "Expected a case that failed multiple checks"
+
+    assert cli.main("replay", "ZZZZZZ") == snapshot_cli
+
+    by_id = cli.main("replay", shared, "--keep")
+    assert (by_id.exit_code, "1 case" in by_id.output, f"{case_ids.count(shared)} failed" in by_id.output) == (
+        1,
+        True,
+        True,
+    ), by_id.output
+    assert by_id.output.count(f"Test Case ID: {shared}") == 1
 
     result = cli.main("replay", "--keep")
 
@@ -672,23 +687,6 @@ def test_replay_reproduces_recorded_unit_failures(cli, ctx, tmp_path):
     assert "FIXED" not in result.output
     assert "CHANGED" not in result.output
     assert "ERROR" not in result.output
-
-
-def test_replay_by_case_id(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.failure()
-
-    cli.run(api.schema_url)
-
-    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
-    assert crash_files
-
-    data = json.loads(crash_files[0].read_text())
-    case_id = data["case_id"]
-
-    result = cli.main("replay", case_id, "--keep")
-
-    assert result.exit_code == 1
-    assert "1 case" in result.output
 
 
 def test_replay_reuses_disabled_tls_verification(cli, tmp_path):
@@ -706,26 +704,6 @@ def test_replay_reuses_disabled_tls_verification(cli, tmp_path):
 
     assert result.exit_code == 1, result.output
     assert "1 failed" in result.output
-
-
-def test_replay_by_case_id_replays_all_checks(cli, ctx, tmp_path):
-    # A case failing several checks is merged into a single block with one ID and all checks, not one per check.
-    api = ctx.openapi.apps.multiple_failures()
-
-    cli.run(api.schema_url)
-
-    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
-    case_ids = [json.loads(f.read_text())["case_id"] for f in crash_files]
-    shared = next((cid for cid in case_ids if case_ids.count(cid) > 1), None)
-    assert shared is not None, "Expected a case that failed multiple checks"
-    count = case_ids.count(shared)
-
-    result = cli.main("replay", shared, "--keep")
-
-    assert result.exit_code == 1
-    assert "1 case" in result.output
-    assert f"{count} failed" in result.output
-    assert result.output.count(f"Test Case ID: {shared}") == 1
 
 
 def test_replay_failure_order_matches_run(cli, app_runner, ctx, tmp_path):
@@ -775,15 +753,6 @@ def test_timing_only_failure_not_recorded_or_hinted(cli, ctx, tmp_path):
     assert "Response time" in result.output
     assert "st replay" not in result.output
     assert not _list_crash_files(crash_cache_dir(tmp_path))
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_unknown_case_id(cli, ctx, tmp_path, snapshot_cli):
-    api = ctx.openapi.apps.failure()
-
-    cli.run(api.schema_url)
-
-    assert cli.main("replay", "ZZZZZZ") == snapshot_cli
 
 
 def test_replay_kitchen_sink_at_scale(cli, ctx, tmp_path):
@@ -2019,7 +1988,7 @@ def test_replay_nonexistent_path_errors(cli, tmp_path, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_without_manifest_or_schema_location_bails(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
+def test_replay_without_manifest_needs_schema_location(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
     crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
@@ -2036,6 +2005,7 @@ def test_replay_without_manifest_or_schema_location_bails(cli, app_runner, ctx, 
 
     assert cli.main("replay") == snapshot_cli
     assert crash_file.exists()
+    assert cli.main("replay", f"--schema-location={schema_url}") == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2286,51 +2256,6 @@ def test_replay_credentials_from_cli(cli, ctx, tmp_path, modifiers, args, config
 )
 def test_replay_invalid_credentials_options(cli, tmp_path, args, snapshot_cli):
     assert cli.main("replay", *args) == snapshot_cli
-
-
-def test_replay_credentials_from_wfc_file(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
-    wfc_file = tmp_path / "auth.json"
-    wfc_file.write_text(
-        json.dumps(
-            {
-                "auth": [
-                    {"name": "stale", "fixedHeaders": [{"name": "Authorization", "value": "Bearer stale"}]},
-                    {"name": "valid", "fixedHeaders": [{"name": "Authorization", "value": f"Bearer {VALID_TOKEN}"}]},
-                ]
-            }
-        )
-    )
-    args = (f"--auth-wfc={wfc_file}", "--auth-wfc-user=valid")
-    cli.main("run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", *args)
-    assert _list_crash_files(crash_cache_dir(tmp_path))
-    api.requests.clear()
-
-    result = cli.main("replay", *args)
-
-    assert result.exit_code == 1, result.output
-    assert _replayed_authorization(api) == [f"Bearer {VALID_TOKEN}"]
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_masked_credentials_not_supplied_is_errored(cli, ctx, tmp_path, snapshot_cli):
-    # Without the credential the API answers 401, which must not read as a fix.
-    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
-    config = {"headers": {"Authorization": f"Bearer {VALID_TOKEN}"}}
-    cli.main(
-        "run",
-        api.schema_url,
-        "--phases=examples,fuzzing",
-        "--max-examples=1",
-        "-c",
-        "not_a_server_error",
-        config=config,
-    )
-    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
-    assert crash_files
-
-    assert cli.main("replay") == snapshot_cli
-    assert _list_crash_files(crash_cache_dir(tmp_path)) == crash_files
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2608,8 +2533,8 @@ class TokenAuth:
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_with_rejected_credentials_is_errored(cli, ctx, tmp_path, snapshot_cli):
-    # A wrong token turns the recorded 500 into a 401, which must not read as a fix.
+def test_replay_masked_credentials(cli, ctx, tmp_path, snapshot_cli):
+    # The API answers 500 only to the valid token; a missing or wrong one gets 401, which must not read as a fix.
     api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
     cli.main(
         "run",
@@ -2624,8 +2549,27 @@ def test_replay_with_rejected_credentials_is_errored(cli, ctx, tmp_path, snapsho
     crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files
 
+    assert cli.main("replay") == snapshot_cli
     assert cli.main("replay", "-H", "Authorization: Bearer nope") == snapshot_cli
     assert _list_crash_files(crash_cache_dir(tmp_path)) == crash_files
+
+    wfc_file = tmp_path / "auth.json"
+    wfc_file.write_text(
+        json.dumps(
+            {
+                "auth": [
+                    {"name": "stale", "fixedHeaders": [{"name": "Authorization", "value": "Bearer stale"}]},
+                    {"name": "valid", "fixedHeaders": [{"name": "Authorization", "value": f"Bearer {VALID_TOKEN}"}]},
+                ]
+            }
+        )
+    )
+    api.requests.clear()
+
+    result = cli.main("replay", f"--auth-wfc={wfc_file}", "--auth-wfc-user=valid")
+
+    assert result.exit_code == 1, result.output
+    assert _replayed_authorization(api) == [f"Bearer {VALID_TOKEN}"]
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

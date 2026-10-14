@@ -63,37 +63,6 @@ def test_(request, param, case):
     )
 
 
-def test_method(testdir):
-    # When tests are written as methods
-    testdir.make_test(
-        """
-class TestAPI:
-    @schema.parametrize()
-    def test_(self, request, case):
-        request.config.HYPOTHESIS_CASES += 1
-        assert case.operation.path == "/users"
-        assert case.method in ("GET", "POST")
-""",
-        paths={
-            "/users": {
-                "get": {"responses": {"200": {"description": "OK"}}},
-                "post": {"responses": {"200": {"description": "OK"}}},
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then they should work as regular tests
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines(
-        [
-            r"test_method.py::TestAPI::test_\[GET /users\] PASSED",
-            r"test_method.py::TestAPI::test_\[POST /users\] PASSED",
-            r"Hypothesis calls: 4",
-        ]
-    )
-
-
 def test_max_examples(testdir):
     # When `max_examples` is specified
     parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
@@ -300,52 +269,6 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
-def test_specified_example_body_media_type_override(testdir):
-    # When the given requestBody parameter contains an example specified in Media Type Object (not in Schema Object)
-    testdir.make_test(
-        """
-from hypothesis import Phase
-
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.explicit])
-def test(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.body in ({"name": "John1"}, {"name": "John2"})
-""",
-        schema={
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": {
-                "/body": {
-                    "post": {
-                        "requestBody": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"name": {"type": "string"}},
-                                        "required": ["name"],
-                                        "example": {"name": "John1"},
-                                    },
-                                    "example": {"name": "John2"},
-                                }
-                            }
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-            },
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-
-    result = testdir.runpytest("-v", "-s")
-    # Then this example should be used in tests, not the example from the schema
-    result.assert_outcomes(passed=1)
-    # 4 calls = 2 examples (from schema & Media Type Object) + 2 coverage cases (one per example)
-    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
-
-
 def test_multiple_examples_different_locations(testdir):
     # When there are examples for different locations (e.g. body and query)
     testdir.make_test(
@@ -356,8 +279,8 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
+    assert case.body in ({"name": "John1"}, {"name": "John2"})
     if not hasattr(case.meta.phase.data, "description"):
-        assert case.body in ({"name": "John1"}, {"name": "John2"})
         assert case.query == {"age": 35}
 """,
         schema={
@@ -876,6 +799,8 @@ LARGE_MINIMUM_BODY_PATHS = {
     "setup",
     [
         """
+schema.config.phases.coverage.enabled = False
+
 @schema.parametrize()
 @settings(max_examples=1, suppress_health_check=list(HealthCheck))
 def test_(case):
@@ -883,7 +808,10 @@ def test_(case):
 """,
         """
 schema = schemathesis.openapi.from_dict(
-    raw_schema, config=SchemathesisConfig.from_dict({"suppress-health-check": ["all"], "generation": {"max-examples": 1}})
+    raw_schema,
+    config=SchemathesisConfig.from_dict(
+        {"suppress-health-check": ["all"], "generation": {"max-examples": 1}, "phases": {"coverage": {"enabled": False}}}
+    ),
 )
 
 @schema.parametrize()

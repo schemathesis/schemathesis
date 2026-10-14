@@ -146,46 +146,15 @@ def auth_schema_url(ctx, cli, app_runner):
     return app_runner.openapi_url(app)
 
 
-@pytest.mark.parametrize(
-    "config_section,endpoint",
-    [
-        ("ApiKeyHeader", "/api-key-header"),
-        ("ApiKeyQuery", "/api-key-query"),
-        ("ApiKeyCookie", "/api-key-cookie"),
-        ("BasicAuth", "/basic-auth"),
-        ("BearerAuth", "/bearer-auth"),
-    ],
-)
-def test_openapi_auth_schemes(cli, auth_schema_url, snapshot_cli, config_section, endpoint):
+def test_openapi_auth_schemes(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
             auth_schema_url,
-            f"--include-path={endpoint}",
+            "--include-path-regex=^/(api-key-|basic-auth|bearer-auth|multiple-auth-and)",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
-            config={"auth": {"openapi": {config_section: AUTH_CONFIGS[config_section]}}},
-        )
-        == snapshot_cli
-    )
-
-
-def test_multiple_auth_and_semantics(cli, auth_schema_url, snapshot_cli):
-    assert (
-        cli.run(
-            auth_schema_url,
-            "--include-path=/multiple-auth-and",
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 5",
-            config={
-                "auth": {
-                    "openapi": {
-                        "ApiKeyHeader": {"api_key": "valid-key"},
-                        "BearerAuth": {"bearer": "valid-token"},
-                    }
-                }
-            },
+            config={"auth": {"openapi": AUTH_CONFIGS}},
         )
         == snapshot_cli
     )

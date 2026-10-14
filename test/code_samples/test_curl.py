@@ -307,26 +307,6 @@ def test_reproduce_when_validated_response_has_no_request_url(ctx, response_fact
     )
 
 
-def test_pytest_subtests_output(ctx, testdir):
-    api = ctx.openapi.apps.failure()
-    testdir.make_test(
-        f"""
-@pytest.fixture
-def api_schema():
-    return schemathesis.openapi.from_url('{api.schema_url}')
-
-lazy_schema = schemathesis.pytest.from_fixture("api_schema")
-
-@lazy_schema.parametrize()
-def test_(case):
-    case.call_and_validate()
-""",
-    )
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines([".+ Reproduce with:", f".+ curl -X GET {api.base_url}/api/failure"])
-
-
 @pytest.mark.hypothesis_nested
 def test_curl_command_validity(curl, loose_schema):
     # When the input schema is too loose

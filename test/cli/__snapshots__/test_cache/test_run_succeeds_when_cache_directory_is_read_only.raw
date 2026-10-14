@@ -15,7 +15,7 @@ Schemathesis dev
 
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
-     Cache:                                                    1 stale removed
+     Cache:                                                    2 stale removed
 
  ✅  Fuzzing (in 0.00s)
 

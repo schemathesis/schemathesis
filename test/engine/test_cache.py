@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import socket
 import threading
 from pathlib import Path
@@ -687,66 +686,6 @@ def test_flush_does_not_duplicate_known_observations(ctx, tmp_path):
 
     _, surviving = load(tmp_path)
     assert [entry.id for entry in surviving] == [1]
-
-
-def test_cache_metrics_serialize_in_ndjson(ctx, cli, tmp_path):
-    api = ctx.openapi.apps.unimplemented_method()
-    cache_dir = tmp_path / "cache"
-    _seed(
-        cache_dir,
-        [
-            Entry(
-                id=1,
-                kind=Kind.METHOD_NOT_ALLOWED,
-                operation="POST /missing",
-                request=Request(
-                    method="POST",
-                    headers={"content-type": "application/json"},
-                    body={"name": "x"},
-                ),
-            )
-        ],
-    )
-    ndjson_path = tmp_path / "events.ndjson"
-    result = cli.run(
-        api.schema_url,
-        "--max-examples=1",
-        "--phases=fuzzing",
-        config={
-            "cache": {"directory": str(cache_dir)},
-            "reports": {"ndjson": {"enabled": True, "path": str(ndjson_path)}},
-        },
-    )
-    assert result.exit_code == 0
-
-    cache_report = None
-    for line in ndjson_path.read_text(encoding="utf-8").splitlines():
-        if not line:
-            continue
-        event = json.loads(line)
-        ((name, payload),) = event.items()
-        if name != "PhaseFinished":
-            continue
-        phase = payload.get("phase") or {}
-        if phase.get("name") != "probing":
-            continue
-        cache_report = payload.get("payload", {}).get("cache")
-        break
-    assert cache_report is not None, "PhaseFinished(PROBING) should carry a `cache` payload"
-    assert cache_report.get("replayed") == 1
-    assert cache_report.get("dropped", 0) == 0
-
-    summary = None
-    for line in ndjson_path.read_text(encoding="utf-8").splitlines():
-        if not line:
-            continue
-        event = json.loads(line)
-        ((name, payload),) = event.items()
-        if name == "EngineFinished":
-            summary = payload.get("payload")
-            break
-    assert summary is not None, "EngineFinished should carry a RunSummary payload"
-    assert isinstance(summary["cache"]["observations_total"], int)
 
 
 def test_error_feedback_dedups_by_observation_not_by_request(ctx, tmp_path):

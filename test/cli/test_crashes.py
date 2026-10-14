@@ -14,6 +14,9 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.metrics import METRICS
 
+# Each example is a full CLI run; the scheduled `CI` Hypothesis profile keeps its own, larger budget.
+MAX_EXAMPLES = 20 if settings().max_examples == 100 else settings().max_examples
+
 
 @pytest.fixture(scope="module")
 def mocked_schema():
@@ -68,6 +71,7 @@ def csv_strategy(enum, exclude=()):
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
     phases=[Phase.explicit, Phase.reuse, Phase.target, Phase.generate],
     deadline=None,
+    max_examples=MAX_EXAMPLES,
 )
 @given(
     params=st.fixed_dictionaries(
@@ -140,6 +144,7 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
     phases=[Phase.explicit, Phase.reuse, Phase.target, Phase.generate],
     deadline=None,
+    max_examples=MAX_EXAMPLES,
 )
 @given(
     params=st.fixed_dictionaries(
@@ -203,6 +208,7 @@ def test_random_parameters_combos(cli, schema_url, params, flags, multiple_param
 @settings(
     deadline=None,
     phases=[Phase.explicit, Phase.generate],
+    max_examples=MAX_EXAMPLES,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
 )
 @given(schema=urls() | paths() | st.text(), base_url=urls() | paths() | st.text() | st.none())

@@ -19,10 +19,19 @@ API Operations:
 
 Stop reason: Completed
 
-custom: fuzzing done
+custom: fuzzing done, counter 42
 
 Test cases:
   N generated, N passed
+
+Reports:
+  - JUnit: /tmp/junit.xml
+  - VCR: /tmp/cassette.yaml
+  - HAR: /tmp/recording.har
+  - NDJSON: /tmp/events.ndjson
+  - Allure: /tmp/allure-results
+  - HTML: /tmp/html/index.html
+  - Schema coverage: coverage.html
 
 Seed: 42
 

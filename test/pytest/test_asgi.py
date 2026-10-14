@@ -297,7 +297,7 @@ def test_api(case):
     case.call_and_validate()
 """
     )
-    testdir.runpytest_subprocess("-v").assert_outcomes(passed=1)
+    testdir.runpytest("-v").assert_outcomes(passed=1)
     assert events.read_text().split() == ["startup", "shutdown"]
 
 
@@ -383,7 +383,7 @@ def test_app(sink):
     inner()
 """
     )
-    testdir.runpytest_subprocess("-v").assert_outcomes(passed=1)
+    testdir.runpytest("-v").assert_outcomes(passed=1)
     assert marker.read_text() == "shutdown finished\n"
 
 
@@ -418,7 +418,7 @@ def test_app():
     inner()
 """
     )
-    result = testdir.runpytest_subprocess("-v")
+    result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, errors=1)
     assert "shutdown exploded" in result.stdout.str()
 
@@ -513,4 +513,4 @@ def test_second():
     gc.collect()
 """
     )
-    testdir.runpytest_subprocess("-v").assert_outcomes(passed=2)
+    testdir.runpytest("-v").assert_outcomes(passed=2)

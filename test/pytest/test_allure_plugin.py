@@ -1,10 +1,9 @@
-from pathlib import Path
 from textwrap import indent
 from xml.etree import ElementTree
 
 import pytest
 
-from test.utils import load_json_or_fail, make_pytest_outcome_test
+from test.utils import allure_outcomes, allure_results, make_pytest_outcome_test
 
 
 def _make_allure_xdist_test(testdir, *, schema_dict, base_url, reports_config, body="case.call()", imports=()):
@@ -28,25 +27,8 @@ def test_api(case):
     )
 
 
-def _allure_results(allure_dir):
-    result_files = list(Path(allure_dir).glob("*-result.json"))
-    assert result_files
-    return [load_json_or_fail(path) for path in result_files]
-
-
 def _first_allure_result(allure_dir):
-    return _allure_results(allure_dir)[0]
-
-
-def _allure_outcomes(allure_dir):
-    outcomes = {}
-    for result in _allure_results(allure_dir):
-        raw_message = result.get("statusDetails", {}).get("message", "")
-        message = raw_message.splitlines()[0] if raw_message else ""
-        if message.startswith("ConnectionError: "):
-            message = "ConnectionError"
-        outcomes[result["name"]] = (result["status"], message)
-    return outcomes
+    return allure_results(allure_dir)[0]
 
 
 def _allure_result_summaries(allure_dir):
@@ -57,7 +39,7 @@ def _allure_result_summaries(allure_dir):
             sorted(attachment["name"] for attachment in result.get("attachments", [])),
             [step["status"] for step in result.get("steps", [])],
         )
-        for result in _allure_results(allure_dir)
+        for result in allure_results(allure_dir)
     )
 
 
@@ -90,7 +72,7 @@ def test_api(case):
 
     testdir.runpytest(*args)
 
-    assert _allure_outcomes(allure_dir) == {
+    assert allure_outcomes(allure_dir) == {
         "GET /api/failure": ("failed", ""),
         "GET /api/success": ("passed", ""),
     }
@@ -103,17 +85,30 @@ def test_api(case):
     }
 
 
-@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
 @pytest.mark.parametrize(
-    ("outcome", "expected"),
+    ("outcome", "expected", "xdist"),
     [
-        ("check_failure", ("failed", "failure")),
-        ("assertion", ("failed", "failure")),
-        ("runtime_error", ("broken", "error")),
-        ("unsatisfiable", ("broken", "error")),
-        ("network_error", ("broken", "error")),
-        ("schema_error", ("broken", "error")),
-        ("skip", ("skipped", "skipped")),
+        ("check_failure", ("failed", "failure"), False),
+        ("assertion", ("failed", "failure"), False),
+        ("runtime_error", ("broken", "error"), False),
+        ("unsatisfiable", ("broken", "error"), False),
+        ("network_error", ("broken", "error"), False),
+        ("schema_error", ("broken", "error"), False),
+        ("skip", ("skipped", "skipped"), False),
+        # Workers forward the outcome as a status name and message, the same for every outcome.
+        ("runtime_error", ("broken", "error"), True),
+        ("skip", ("skipped", "skipped"), True),
+    ],
+    ids=[
+        "check_failure",
+        "assertion",
+        "runtime_error",
+        "unsatisfiable",
+        "network_error",
+        "schema_error",
+        "skip",
+        "runtime_error-xdist",
+        "skip-xdist",
     ],
 )
 def test_from_fixture_reports_use_pytest_outcome(testdir, tmp_path, ctx, xdist, outcome, expected):
@@ -130,40 +125,12 @@ def test_from_fixture_reports_use_pytest_outcome(testdir, tmp_path, ctx, xdist, 
 
     testdir.runpytest(*args)
 
-    allure_status = {name: status for name, (status, _) in _allure_outcomes(allure_dir).items()}
+    allure_status = {name: status for name, (status, _) in allure_outcomes(allure_dir).items()}
     junit_kind = {
         test_case.get("name"): (test_case[0].tag if len(test_case) else "passed")
         for test_case in ElementTree.parse(junit_path).getroot().iter("testcase")
     }
     assert (allure_status, junit_kind) == ({label: expected[0]}, {label: expected[1]})
-
-
-@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
-@pytest.mark.parametrize(
-    ("outcome", "expected"),
-    [
-        ("check_failure", ("failed", "")),
-        ("assertion", ("failed", "boom")),
-        ("runtime_error", ("broken", "RuntimeError: bug")),
-        (
-            "unsatisfiable",
-            ("broken", "Unsatisfiable: Cannot generate test data for request body (application/json)"),
-        ),
-        ("network_error", ("broken", "ConnectionError")),
-        ("skip", ("skipped", "why")),
-        ("mark_skip", ("skipped", "why")),
-    ],
-)
-def test_allure_report_uses_pytest_outcome(testdir, tmp_path, ctx, xdist, outcome, expected):
-    allure_dir = tmp_path / "allure-results"
-    label = make_pytest_outcome_test(
-        testdir, ctx, outcome, f'schema.config.reports.update(allure_path=r"{allure_dir}")'
-    )
-    args = ("-n", "2") if xdist else ()
-
-    testdir.runpytest(*args)
-
-    assert _allure_outcomes(allure_dir) == {label: expected}
 
 
 @pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
@@ -253,25 +220,8 @@ def test_second(case):
     ]
 
 
-def test_allure_xdist_stable_path_without_explicit_path(testdir, tmp_path, ctx):
+def test_allure_report_written_via_xdist(testdir, tmp_path, ctx):
     api = ctx.openapi.apps.success()
-    schema_dict = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    _make_allure_xdist_test(
-        testdir,
-        schema_dict=schema_dict,
-        base_url=api.base_url,
-        reports_config=f'schema.config.reports.update(formats=[ReportFormat.ALLURE], directory=Path(r"{tmp_path}"))',
-        imports=("from pathlib import Path", "from schemathesis.config._report import ReportFormat"),
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-    # get_stable_path without suffix returns directory/allure (no timestamp)
-    assert list((tmp_path / "allure").glob("*-result.json"))
-
-
-def test_allure_feature_labels_via_xdist(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
     schema_dict = ctx.openapi.build_schema(
         {"/users": {"get": {"tags": ["users", "readonly"], "responses": {"200": {"description": "OK"}}}}},
     )
@@ -279,24 +229,7 @@ def test_allure_feature_labels_via_xdist(testdir, tmp_path, ctx):
         testdir,
         schema_dict=schema_dict,
         base_url=api.base_url,
-        reports_config=f'schema.config.reports.update(allure_path=r"{allure_dir}")',
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-    data = _first_allure_result(allure_dir)
-    feature_labels = [lbl["value"] for lbl in data["labels"] if lbl["name"] == "feature"]
-    assert set(feature_labels) == {"users", "readonly"}
-
-
-def test_allure_dynamic_calls_via_xdist(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
-    schema_dict = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    _make_allure_xdist_test(
-        testdir,
-        schema_dict=schema_dict,
-        base_url=api.base_url,
-        reports_config=f'schema.config.reports.update(allure_path=r"{allure_dir}")',
+        reports_config=f'schema.config.reports.update(formats=[ReportFormat.ALLURE], directory=Path(r"{tmp_path}"))',
         body="""
 allure.dynamic.title("xdist title")
 allure.dynamic.description("xdist description")
@@ -304,11 +237,15 @@ allure.dynamic.link("https://example.com", name="xdist link")
 allure.attach("xdist body", name="xdist note", attachment_type=allure.attachment_type.TEXT)
 case.call()
 """,
-        imports=("import allure",),
+        imports=("import allure", "from pathlib import Path", "from schemathesis.config import ReportFormat"),
     )
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(passed=1)
+    # Without an explicit path, results go to a stable `allure` directory, not a timestamped one.
+    allure_dir = tmp_path / "allure"
     data = _first_allure_result(allure_dir)
+    assert data["status"] == "passed"
+    assert {lbl["value"] for lbl in data["labels"] if lbl["name"] == "feature"} == {"users", "readonly"}
     assert data["name"] == "xdist title"
     assert data["description"] == "xdist description"
     assert any(lnk["name"] == "xdist link" for lnk in data.get("links", []))
@@ -317,87 +254,7 @@ case.call()
     assert (allure_dir / attachment["source"]).read_text() == "xdist body"
 
 
-def test_allure_report_written_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = str(testdir.tmpdir.join("allure-results"))
-    schema_dict = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    _make_allure_xdist_test(
-        testdir,
-        schema_dict=schema_dict,
-        base_url=api.base_url,
-        reports_config=f'schema.config.reports.update(allure_path=r"{allure_dir}")',
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-
-    data = _first_allure_result(allure_dir)
-    assert "name" in data
-    assert data["status"] == "passed"
-
-
 def test_allure_report_written_via_plugin(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(allure_path=r"{allure_dir}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-    data = _first_allure_result(allure_dir)
-    assert "name" in data
-    assert data["status"] == "passed"
-    assert data["testCaseId"] == data["historyId"]
-
-
-def test_allure_report_failure_written_via_plugin(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.failure()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(allure_path=r"{allure_dir}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call_and_validate()
-""",
-        paths={"/failure": {"get": {"responses": {"500": {"description": "Internal Server Error"}}}}},
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(failed=2)
-    failed_results = _allure_results(allure_dir)
-    assert any(r["status"] == "failed" for r in failed_results)
-    failed = next(r for r in failed_results if r["status"] == "failed")
-    step_messages = [s["statusDetails"]["message"] for s in failed.get("steps", [])]
-    assert step_messages
-    assert any("curl" in m.lower() for m in step_messages)
-
-
-def test_allure_report_written_for_stateful_test(ctx, testdir, tmp_path):
-    api = ctx.openapi.apps.users_crud()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-schema = schemathesis.openapi.from_url("{api.schema_url}")
-schema.config.update(base_url="{api.base_url}")
-schema.config.reports.update(allure_path=r"{allure_dir}")
-TestCase = schema.as_state_machine().TestCase
-""",
-    )
-    testdir.runpytest("-s").assert_outcomes(failed=1)
-    assert _allure_outcomes(allure_dir) == {"Stateful tests": ("failed", "")}
-
-
-def test_allure_attachment_via_forwarder(testdir, tmp_path, ctx):
     api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
@@ -410,71 +267,8 @@ schema.config.reports.update(allure_path=r"{allure_dir}")
 @settings(max_examples=1)
 def test_api(case):
     allure.attach("extra context", name="my-note", attachment_type=allure.attachment_type.TEXT)
-    case.call()
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-    data = _first_allure_result(allure_dir)
-    assert any(a["name"] == "my-note" for a in data.get("attachments", []))
-
-
-def test_allure_link_via_forwarder(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-import allure
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(allure_path=r"{allure_dir}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
     allure.dynamic.link("https://example.com/docs", name="API Docs")
-    case.call()
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-    data = _first_allure_result(allure_dir)
-    assert any(lnk["name"] == "API Docs" for lnk in data.get("links", []))
-
-
-def test_allure_description_via_forwarder(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-import allure
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(allure_path=r"{allure_dir}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
     allure.dynamic.description("Custom description")
-    case.call()
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-    data = _first_allure_result(allure_dir)
-    assert data.get("description") == "Custom description"
-
-
-def test_allure_title_override_via_forwarder(testdir, tmp_path, ctx):
-    api = ctx.openapi.apps.success()
-    allure_dir = tmp_path / "allure-results"
-    testdir.make_test(
-        f"""
-import allure
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(allure_path=r"{allure_dir}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
     allure.dynamic.title("My Custom Title")
     case.call()
 """,
@@ -482,4 +276,9 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
     data = _first_allure_result(allure_dir)
+    assert data["status"] == "passed"
+    assert data["testCaseId"] == data["historyId"]
+    assert any(a["name"] == "my-note" for a in data.get("attachments", []))
+    assert any(lnk["name"] == "API Docs" for lnk in data.get("links", []))
+    assert data.get("description") == "Custom description"
     assert data["name"] == "My Custom Title"

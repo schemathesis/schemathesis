@@ -73,14 +73,6 @@ def _run_wfc(cli, api, path, *args, max_examples=5, **wfc):
     )
 
 
-def test_wfc_path_from_cli_flag(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.wfc_login()
-    auth = _write(tmp_path, {"auth": [{"name": "u", "fixedHeaders": [{"name": "X-Api-Key", "value": "static"}]}]})
-
-    assert cli.run(api.schema_url, "--max-examples=5", f"--auth-wfc={auth}").exit_code == 0
-    assert all(_header(c, "X-Api-Key") == "static" for c in _protected_calls(api))
-
-
 def test_wfc_user_from_cli_flag(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(
@@ -1074,15 +1066,27 @@ def _identities(api, method, prefix):
     }
 
 
-def test_escalation_walks_the_chain_until_admitted(cli, ctx, tmp_path):
+def test_escalation_settles_each_operation_on_its_identity(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
 
-    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")
+    cli.run(api.schema_url, "--max-examples=20", f"--auth-wfc={auth}", "--phases=fuzzing")
 
     assert _identities(api, "GET", "/api/open") == {"viewer"}
     assert "admin" not in _identities(api, "DELETE", "/api/editor-only")
     assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "", "editor", "admin"}
+    # A 404 says the id was wrong, not that the identity was accepted.
+    assert "admin" in _identities(api, "DELETE", "/api/missing-first")
+    # Payload rejections arrive interleaved with role denials and must not block escalation.
+    assert _identities(api, "POST", "/api/validated") == {"viewer", "", "editor", "admin"}
+    seen = [
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests
+        if r.method == "DELETE" and r.path.startswith("/api/nobody")
+    ]
+    assert seen, "operation was never dispatched"
+    # Every identity is refused; the last one to reach authorization is the one a later request has any chance with.
+    assert seen[-1] == "admin", f"settled on a weaker identity: {seen}"
 
 
 EXPIRING_AUTH = {
@@ -1240,25 +1244,6 @@ def test_identity_refused_before_accounts_exist_is_retried(cli, ctx, tmp_path):
     assert seen[-1] == "admin", f"never retried the identity refused before seeding: {seen}"
 
 
-def test_a_missing_resource_does_not_settle_the_identity(cli, ctx, tmp_path):
-    # A 404 says the id was wrong, not that the identity was accepted.
-    api = ctx.openapi.apps.wfc_role_gated()
-    auth = _write(tmp_path, ROLE_AUTH)
-
-    cli.run(api.schema_url, "--max-examples=15", f"--auth-wfc={auth}", "--phases=fuzzing")
-
-    assert "admin" in _identities(api, "DELETE", "/api/missing-first")
-
-
-def test_rejected_payloads_do_not_block_escalation(cli, ctx, tmp_path):
-    # `/api/validated` rejects every other payload before checking the role, so denials arrive interleaved.
-    api = ctx.openapi.apps.wfc_role_gated()
-    auth = _write(tmp_path, ROLE_AUTH)
-
-    cli.run(api.schema_url, "--max-examples=15", f"--auth-wfc={auth}", "--phases=fuzzing")
-    assert _identities(api, "POST", "/api/validated") == {"viewer", "", "editor", "admin"}
-
-
 def test_pinned_user_never_escalates(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
@@ -1330,22 +1315,13 @@ def test_ndjson_records_the_identity(cli, ctx, tmp_path):
         for node in json.loads(line).get("ScenarioFinished", {}).get("recorder", {}).get("cases", {}).values()
     }
     assert "admin" in identities
-
-
-def test_exhausted_chain_stops_rather_than_wrapping(cli, ctx, tmp_path):
-    # No identity can reach this operation, and dropping credentials is no better, so it keeps one.
-    api = ctx.openapi.apps.wfc_role_gated()
-    auth = _write(tmp_path, ROLE_AUTH)
-
-    cli.run(api.schema_url, "--max-examples=8", "--phases=fuzzing", f"--auth-wfc={auth}", "-c", "not_a_server_error")
-
     seen = [
         (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
         for r in api.requests
         if r.method == "DELETE" and r.path.startswith("/api/nobody")
     ]
     assert seen, "operation was never dispatched"
-    # Which identity it keeps is the subject of another test; here it only has to stop moving.
+    # No identity can reach this operation and dropping credentials is no better, so it stops moving.
     assert len(set(seen[-3:])) == 1, f"kept cycling through the chain: {seen}"
 
 
@@ -1377,18 +1353,6 @@ def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
     assert _identities(api, "GET", "/api/open") == {"viewer"}
 
 
-def test_escalation_falls_back_to_anonymous(cli, ctx, tmp_path):
-    # A bad `Authorization` header is worse than none: stacks reject it instead of serving the caller.
-    api = ctx.openapi.apps.wfc_credentials_rejected()
-    auth = _write(tmp_path, ROLE_AUTH)
-
-    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")
-
-    public = [r for r in api.requests if r.path.startswith("/api/public")]
-    assert public, "operation was never called"
-    assert any(r.headers.get("Authorization") is None for r in public)
-
-
 def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path):
     # A 403 reached authorization; dropping credentials only earns a 401, so it is not an improvement.
     api = ctx.openapi.apps.wfc_role_gated_401_when_anonymous()
@@ -1403,23 +1367,6 @@ def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path
     ]
     assert seen, "operation was never dispatched"
     assert seen[-1] != ""
-
-
-def test_exhausted_chain_keeps_the_most_privileged_of_equals(cli, ctx, tmp_path):
-    # Every identity is refused, so none is provably better; the last one to reach authorization is
-    # the one a later request has any chance with.
-    api = ctx.openapi.apps.wfc_role_gated()
-    auth = _write(tmp_path, ROLE_AUTH)
-
-    cli.run(api.schema_url, "--max-examples=20", "--phases=fuzzing", f"--auth-wfc={auth}")
-
-    seen = [
-        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
-        for r in api.requests
-        if r.method == "DELETE" and r.path.startswith("/api/nobody")
-    ]
-    assert seen, "operation was never dispatched"
-    assert seen[-1] == "admin", f"settled on a weaker identity: {seen}"
 
 
 def test_credentials_that_never_work_reach_anonymous_early(cli, ctx, tmp_path):

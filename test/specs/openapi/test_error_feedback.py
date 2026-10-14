@@ -2083,6 +2083,17 @@ def test_apply_adjustments_bounds_an_untyped_property(case_factory):
             id="allof-boolean-branch",
         ),
         pytest.param(
+            {"type": "object", "properties": [], "allOf": [{"type": "object", "properties": {"b": {}}}]},
+            (),
+            {
+                "type": "object",
+                "properties": [],
+                "allOf": [{"type": "object", "properties": {"b": {}}}],
+                "additionalProperties": False,
+            },
+            id="allof-root-with-non-object-properties",
+        ),
+        pytest.param(
             {"type": "object", "properties": {"address": {"type": "object", "properties": {"city": {}}}}},
             ("address",),
             {

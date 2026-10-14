@@ -1,59 +1,11 @@
-Exit code: 0
+Exit code: 2
 ---
 Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+❌  Failed to load configuration file from config.toml
 
-     Base URL:         http://127.0.0.1/api
-     Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
-     Configuration:    /tmp/config.toml
+The loaded configuration is incorrect
 
- ✅  API capabilities:
-
-     Supports NULL byte in headers:                            ✓
-     Accepts backslash and control characters in URL paths:    ✓
-
- ⏭   Examples (in 0.00s)
-
-     ⏭  1 skipped
-
- ✅  Coverage (in 0.00s)
-
-     ✅ 1 passed
-
- ✅  Fuzzing (in 0.00s)
-
-     ✅ 1 passed
-
-=================================== WARNINGS ===================================
-
-Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
-
-  - GET /test
-
-💡 Check `--url`, and whether the schema describes everything these operations need
-
-=================================== SUMMARY ====================================
-
-API Operations:
-  Selected: 1/1
-  Tested: 1
-
-Test Phases:
-  ⏭  Examples
-  ✅ Coverage
-  ✅ Fuzzing
-  ⏭  Stateful (not applicable)
-
-Warnings:
-  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
-
-Test cases:
-  N generated, N passed
-
-Seed: 42
-
-============================== 1 warning in 1.00s ==============================
+Invalid status code(s): xxx. Use valid 3-digit codes between 100 and 599, or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit.

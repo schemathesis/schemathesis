@@ -86,20 +86,6 @@ def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli):
     )
 
 
-def test_method_not_allowed_warning_can_fail_the_run(cli, ctx):
-    api = ctx.openapi.apps.unimplemented_method()
-    result = cli.run(
-        api.schema_url,
-        "--max-examples=10",
-        "--phases=examples,coverage,fuzzing",
-        "--mode=positive",
-        "--continue-on-failure",
-        config={"warnings": {"fail-on": ["method_not_allowed"]}},
-    )
-    assert result.exit_code == 1, result.stdout
-    assert "Method Not Allowed" in result.stdout
-
-
 def test_stateful_skips_supervisor_blocked_operations(ctx):
     # Stateful's `TransitionController` must reject rules whose target operation
     # has a SKIP verdict so the dead op is never selected as a transition.

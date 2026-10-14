@@ -4,11 +4,12 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
- ✅  Loaded specification from http://127.0.0.1/graphql (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/graphql
-     Specification:    GraphQL
-     Operations:       1 selected / 4 total
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.0
+     Operations:       6 selected / 8 total
+     Configuration:    /tmp/config.toml
 
  ✅  API capabilities:
 
@@ -17,19 +18,19 @@ Schemathesis dev
 
  ✅  Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 6 passed
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/4
-  Tested: 1
+  Selected: 6/8
+  Tested: 6
 
 Test Phases:
-  ⏭  Examples (not supported)
-  ⏭  Coverage (not supported)
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ✅ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Test cases:
   N generated, N passed

@@ -829,119 +829,68 @@ def test_restgym_user_management_email_login_chain(ctx, case_factory, response_f
     assert "DE" in _lookup_by_descriptor(extra_data_source.semantic_index, country_desc)
 
 
-_HARVESTED_EMAIL = "harvested@example.com"
-_HARVESTED_CURRENCY = "EUR"
-_HARVESTED_DATETIME = "2026-05-08T10:00:00Z"
-_HARVESTED_URL = "https://example.com/cb"
+# Each consumer crashes only on the exact value its producer returns, so only the matching pool can reach it.
+_PLANTED_BUGS = [
+    ("/api/contacts", "email", "harvested@example.com", "/api/messages", "recipient_email", {"format": "email"}),
+    ("/api/catalog", "currency", "EUR", "/api/orders", "currency", {}),
+    ("/api/calendar", "start_at", "2026-05-08T10:00:00Z", "/api/events", "start_at", {"format": "date-time"}),
+    ("/api/integrations", "url", "https://example.com/cb", "/api/webhooks", "callback_url", {"format": "uri"}),
+]
 
 
-def _attach_planted_bug(app, producer_path, producer_payload, consumer_path, trigger):
-    @app.route(producer_path)
+def _object_with(name, property_schema):
+    return {"type": "object", "properties": {name: {"type": "string", **property_schema}}, "required": [name]}
+
+
+def _attach_planted_bug(app, producer_path, producer_property, value, consumer_path, consumer_property):
+    @app.route(producer_path, endpoint=f"producer {producer_path}")
     def _producer():
-        return jsonify(producer_payload)
+        return jsonify({producer_property: value})
 
-    @app.route(consumer_path, methods=["POST"])
+    @app.route(consumer_path, methods=["POST"], endpoint=f"consumer {consumer_path}")
     def _consumer():
-        body = request.get_json(silent=True) or {}
-        if trigger(body):
+        body = request.get_json(silent=True)
+        if isinstance(body, dict) and body.get(consumer_property) == value:
             raise RuntimeError("planted bug")
         return Response(status=200)
 
 
-_PLANTED_BUG_ARGS = (
-    "--max-examples=30",
-    "--seed=42",
-    "--checks=not_a_server_error",
-    "--suppress-health-check=filter_too_much",
-)
-
-
-def _planted_bug_app(ctx, producer_path, producer_property, consumer_path, consumer_property, property_schema):
-    def body(name):
-        return {"type": "object", "properties": {name: property_schema}, "required": [name]}
-
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            producer_path: {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": body(producer_property)}},
-                        }
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_planted_bugs_surface_via_semantic_pools(ctx, cli, snapshot_cli):
+    paths = {}
+    for producer_path, producer_property, _, consumer_path, consumer_property, property_schema in _PLANTED_BUGS:
+        paths[producer_path] = {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": _object_with(producer_property, property_schema)}},
                     }
                 }
-            },
-            consumer_path: {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body(consumer_property)}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
+            }
         }
+        paths[consumer_path] = {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": _object_with(consumer_property, property_schema)}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    app, _ = ctx.openapi.make_flask_app(paths)
+    for producer_path, producer_property, value, consumer_path, consumer_property, _ in _PLANTED_BUGS:
+        _attach_planted_bug(app, producer_path, producer_property, value, consumer_path, consumer_property)
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-examples=30",
+            "--seed=42",
+            "--checks=not_a_server_error",
+            "--suppress-health-check=filter_too_much",
+        )
+        == snapshot_cli
     )
-    return app
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_planted_bug_surfaces_via_email_format_pool(ctx, cli, snapshot_cli):
-    app = _planted_bug_app(
-        ctx, "/api/contacts", "email", "/api/messages", "recipient_email", {"type": "string", "format": "email"}
-    )
-    _attach_planted_bug(
-        app,
-        "/api/contacts",
-        {"email": _HARVESTED_EMAIL},
-        "/api/messages",
-        lambda body: body.get("recipient_email") == _HARVESTED_EMAIL,
-    )
-    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_planted_bug_surfaces_via_named_fallback_pool(ctx, cli, snapshot_cli):
-    app = _planted_bug_app(ctx, "/api/catalog", "currency", "/api/orders", "currency", {"type": "string"})
-    _attach_planted_bug(
-        app,
-        "/api/catalog",
-        {"currency": _HARVESTED_CURRENCY},
-        "/api/orders",
-        lambda body: body.get("currency") == _HARVESTED_CURRENCY,
-    )
-    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_planted_bug_surfaces_via_date_time_format_pool(ctx, cli, snapshot_cli):
-    app = _planted_bug_app(
-        ctx, "/api/calendar", "start_at", "/api/events", "start_at", {"type": "string", "format": "date-time"}
-    )
-    _attach_planted_bug(
-        app,
-        "/api/calendar",
-        {"start_at": _HARVESTED_DATETIME},
-        "/api/events",
-        lambda body: body.get("start_at") == _HARVESTED_DATETIME,
-    )
-    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_planted_bug_surfaces_via_uri_format_pool(ctx, cli, snapshot_cli):
-    app = _planted_bug_app(
-        ctx, "/api/integrations", "url", "/api/webhooks", "callback_url", {"type": "string", "format": "uri"}
-    )
-    _attach_planted_bug(
-        app,
-        "/api/integrations",
-        {"url": _HARVESTED_URL},
-        "/api/webhooks",
-        lambda body: isinstance(body, dict) and body.get("callback_url") == _HARVESTED_URL,
-    )
-    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
 
 
 def test_overlay_skips_candidate_violating_consumer_constraint():

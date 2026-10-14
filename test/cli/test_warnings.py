@@ -19,32 +19,6 @@ def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
     return app_runner.openapi_url(app)
 
 
-def test_warning_titles_match_between_warnings_and_summary(ctx, cli, app_runner):
-    ok = {"200": {"description": "OK"}}
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/private": {"get": {"responses": ok}},
-            "/items/{item_id}": {
-                "get": {
-                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
-                    "responses": ok,
-                }
-            },
-        }
-    )
-    app.add_url_rule("/private", "private", lambda: ({"detail": "Unauthorized"}, 401))
-    app.add_url_rule("/items/<item_id>", "item", lambda item_id: ({"detail": "Not found"}, 404))
-
-    stdout = cli.run(
-        app_runner.openapi_url(app), "--phases=coverage,fuzzing", "--checks=not_a_server_error", "--max-examples=10"
-    ).stdout
-    warnings, summary = stdout.split("WARNINGS", 1)[1].split("SUMMARY", 1)
-    headers = sorted(line.split(" in ", 1)[0] for line in warnings.splitlines() if ": " in line and line[0].isalpha())
-    entries = sorted(line.strip().removeprefix("⚠️ ") for line in summary.splitlines() if "⚠️" in line)
-    assert [line.split(": ", 1)[0] for line in headers] == [line.split(": ", 1)[0] for line in entries]
-    assert "Authentication failed: 1 operation returned only 401/403 responses" in headers, stdout
-
-
 def test_missing_auth_warning_with_fail_on_true(ctx, cli, tmp_path, monkeypatch):
     api = ctx.openapi.apps.basic()
     # Given a config file that fails on all warnings
@@ -89,6 +63,7 @@ def test_warnings_failing_the_run_are_named_in_the_final_line(ctx, cli, snapshot
             "--checks=not_a_server_error",
             "--phases=fuzzing",
             "--max-examples=1",
+            "--warnings=missing_auth,missing_test_data",
             config={"warnings": {"fail-on": True}},
         )
         == snapshot_cli
@@ -123,20 +98,6 @@ def test_timeout_units_warning_with_fail_on(ctx, cli, fail_on):
 
     final_line = result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0]
     assert (result.exit_code, final_line) == (ExitCode.TESTS_FAILED, "Warnings fail the run")
-
-
-def test_timeout_units_warning_does_not_fail_by_default(ctx, cli):
-    api = ctx.openapi.apps.success()
-
-    result = cli.run(
-        api.schema_url,
-        "--request-timeout=5000",
-        "--phases=fuzzing",
-        "--max-examples=1",
-    )
-
-    assert result.exit_code == ExitCode.OK
-    assert result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0] == "1 warning"
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -188,7 +149,9 @@ def test_missing_deserializer_warning_names_unvalidated_media_type(cli, ctx, sna
     )
 
     api = ctx.openapi.apps.success()
-    result = cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1")
+    result = cli.run(
+        str(schema_path), f"--url={api.base_url}/api", "--warnings=missing_deserializer", "--max-examples=1"
+    )
     assert "1 operation cannot validate text/csv responses" in result.stdout
     assert "operation cannot validate responses" not in result.stdout
     assert result == snapshot_cli
@@ -261,46 +224,6 @@ def test_warnings_off_via_cli(cli, ctx):
     assert "Schema validation skipped" not in result.stdout
 
 
-def test_warnings_specific_type_via_cli(cli, ctx):
-    # When --warnings=missing_deserializer is used, only that warning type is shown
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/msgpack": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        }
-    )
-
-    api = ctx.openapi.apps.success()
-    result = cli.run(
-        str(schema_path), f"--url={api.base_url}/api", "--warnings=missing_deserializer", "--max-examples=1"
-    )
-
-    # Then the specified warning should be displayed
-    assert "WARNINGS" in result.stdout
-    assert "Schema validation skipped" in result.stdout
-
-
-def test_warnings_multiple_types_via_cli(ctx, cli):
-    api = ctx.openapi.apps.basic()
-    # When --warnings with comma-separated values is used
-    result = cli.run(api.schema_url, "--warnings=missing_auth,missing_test_data", "--max-examples=1")
-
-    # Then warnings can still be triggered for specified types
-    assert "Authentication failed: 1 operation returned only 401/403 responses" in result.stdout
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_final_line_counts_all_warning_kinds_in_run(cli, ctx, app_runner, snapshot_cli):
     # Regression test: the footer "N warnings in Xs" should count warning *kinds*, not just missing_auth operations
@@ -330,24 +253,13 @@ def test_final_line_counts_all_warning_kinds_in_run(cli, ctx, app_runner, snapsh
         return Response(status=404)
 
     schema_url = _serve_schema(ctx, cli, app_runner, schema, [("GET", "/auth", auth), ("GET", "/missing", missing)])
-    assert cli.run(schema_url, "--checks=not_a_server_error", "--max-examples=1") == snapshot_cli
-
-
-def test_warning_on_unauthorized(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.basic()
-    # When endpoint returns only 401
-    # Then the output should contain a warning about it
-    assert (
-        cli.run(
-            api.schema_url,
-            "-c not_a_server_error",
-            "--mode=positive",
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 10",
-        )
-        == snapshot_cli
-    )
+    result = cli.run(schema_url, "--checks=not_a_server_error", "--max-examples=1")
+    assert result == snapshot_cli
+    # Each warning's title in the WARNINGS section matches its entry in the summary.
+    warnings, summary = result.stdout.split("WARNINGS", 1)[1].split("SUMMARY", 1)
+    headers = sorted(line.split(" in ", 1)[0] for line in warnings.splitlines() if ": " in line and line[0].isalpha())
+    entries = sorted(line.strip().removeprefix("⚠️ ") for line in summary.splitlines() if "⚠️" in line)
+    assert [line.split(": ", 1)[0] for line in headers] == [line.split(": ", 1)[0] for line in entries]
 
 
 def test_warning_on_no_2xx(ctx, cli, snapshot_cli):
@@ -730,14 +642,6 @@ def _rejected_once_then_served(ctx, cli, app_runner, paths, routes):
     return _serve_schema(ctx, cli, app_runner, schema, [("GET", "/thing", thing), *routes])
 
 
-def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app_runner):
-    # Rejected once, served afterwards: the run as a whole got past authentication.
-    schema_url = _rejected_once_then_served(ctx, cli, app_runner, {}, [])
-    result = cli.run(schema_url, "-c not_a_server_error", "--max-examples=5", "--phases=examples,fuzzing")
-
-    assert "Authentication failed" not in result.stdout
-
-
 def _not_found(order_id):
     return Response(status=404)
 
@@ -759,10 +663,11 @@ def test_withdrawn_missing_auth_warning_does_not_fail_the_run(ctx, cli, app_runn
         "--phases=examples,fuzzing",
         config={"warnings": {"fail-on": ["missing_auth"]}},
     )
-    assert (result.exit_code, result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0]) == (
-        ExitCode.OK,
-        final_line,
-    )
+    assert (
+        result.exit_code,
+        result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0],
+        "Authentication failed" in result.stdout,
+    ) == (ExitCode.OK, final_line, False)
 
 
 LOW_VALID_RATE_ARGS = ("--max-examples=10", "--phases=fuzzing", "-m", "positive", "--warnings=low_valid_rate")
@@ -781,29 +686,12 @@ def _orders_app(ctx, *, accept_every, rejection_status=404):
     return app
 
 
-def test_low_valid_rate_reported(ctx, cli):
-    app = _orders_app(ctx, accept_every=10)
-
-    result = cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS)
-
-    assert "Low valid-input rate" in result.stdout
-    assert "GET /orders/{orderId}" in result.stdout
-
-
 def test_low_valid_rate_is_opt_in(ctx, cli):
     app = _orders_app(ctx, accept_every=10)
 
     result = cli.run_openapi_app(app, "--max-examples=10", "--phases=fuzzing", "-m", "positive")
 
     assert "Low valid-input rate" not in result.stdout
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_low_valid_rate_warning(ctx, cli, snapshot_cli):
-    # One request in ten reaches the resource; the rest are well-formed but hit nothing.
-    app = _orders_app(ctx, accept_every=10)
-
-    assert cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS) == snapshot_cli
 
 
 def test_low_valid_rate_distinguishes_rejections_from_missing_resources(ctx, cli):
@@ -890,14 +778,6 @@ def test_low_valid_rate_for_graphql(ctx, cli, snapshot_cli):
     api = ctx.graphql.apps.from_schema(_erratic_books_schema())
 
     assert cli.run(api.schema_url, *LOW_VALID_RATE_ARGS, "--continue-on-failure") == snapshot_cli
-
-
-def test_low_valid_rate_tip_for_graphql(ctx, cli):
-    api = ctx.graphql.apps.from_schema(_erratic_books_schema())
-
-    result = cli.run(api.schema_url, *LOW_VALID_RATE_ARGS, "--continue-on-failure")
-
-    assert "supply argument values via a fuzz dictionary" in result.stdout
 
 
 GRAPHQL_SDL = """

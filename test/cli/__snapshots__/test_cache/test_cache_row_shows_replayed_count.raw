@@ -49,6 +49,9 @@ Warnings:
 Test cases:
   N generated, N passed
 
+Reports:
+  - NDJSON: /tmp/events.ndjson
+
 Seed: 42
 
 ============================== 1 warning in 1.00s ==============================

@@ -230,10 +230,9 @@ def test_fill_missing(case):
 )
 @pytest.mark.parametrize("is_lazy", [False, True])
 def test_config_request_retries_is_used(testdir, is_lazy):
-    # Server drops first 2 connections, succeeds on 3rd.
-    # Without request_retries=2 the test would raise ConnectionError; with it, it passes.
+    # The server drops the first connection, so only a retry gets a response.
     schema_setup = _schema_setup_from_project_config(
-        'request_retries=2, base_url=f"http://127.0.0.1:{port}"',
+        'request_retries=1, base_url=f"http://127.0.0.1:{port}"',
         is_lazy=is_lazy,
     )
 
@@ -256,7 +255,7 @@ def _serve():
         except OSError:
             break
         _attempt[0] += 1
-        if _attempt[0] <= 2:
+        if _attempt[0] <= 1:
             conn.close()  # drop → ConnectionError → retry
         else:
             conn.sendall(

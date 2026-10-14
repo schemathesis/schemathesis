@@ -455,26 +455,6 @@ def test(case):
     result.assert_outcomes(failed=1)
 
 
-def test_failure_reproduction_message(testdir, ctx):
-    # When a test fails
-    api = ctx.openapi.apps.failure()
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-
-@schema.include(path_regex="failure").parametrize()
-def test(case):
-    case.call_and_validate()
-    """,
-        paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
-    )
-    # Then there should be a helpful message in the output
-    result = testdir.runpytest()
-    result.assert_outcomes(failed=1)
-    assert "Reproduce with" in result.stdout.str()
-    assert "Undocumented HTTP status code" in result.stdout.str()
-
-
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_fail_on_operations_with_infinite_recursive_references(testdir, schema_with_recursive_references):
     # When the test schema contains infinite recursive references
@@ -877,6 +857,8 @@ def test(case):
     else:
         expected = rf"curl -X GET -H 'Authorization: {auth}' {base_url}/failure"
     assert expected in result.stdout.str()
+    assert "Reproduce with" in result.stdout.str()
+    assert "Undocumented HTTP status code" in result.stdout.str()
 
 
 def test_content_type_probe_control_request_keeps_call_auth(testdir, ctx, app_runner):

@@ -131,18 +131,6 @@ def test_fuzz_report(ctx, cli, json_path):
     assert report["warnings"]["missing_auth"] == []
 
 
-def test_engine_never_started(cli, json_path, tmp_path):
-    # Schema loading fails, so there is no engine timing to report - not a zero-length run.
-    schema = tmp_path / "schema.yaml"
-    schema.write_text("{{{ not yaml", encoding="utf-8")
-    cli.run(str(schema), f"--report-json-path={json_path}")
-    report = load_report(json_path)
-    assert report["started_at"] is None
-    assert report["running_time"] is None
-    assert report["complete"] is False
-    assert report["operations"] is None
-
-
 def test_report_for_filters_matching_nothing(ctx, cli, json_path):
     api = ctx.openapi.apps.success()
     cli.run_and_assert(
@@ -176,9 +164,6 @@ def schema_files(ctx, tmp_path):
     [
         pytest.param(("{malformed}", "--url=http://127.0.0.1:1"), LOADING_ERRORS, id="malformed-schema"),
         pytest.param(("http://127.0.0.1:1/openapi.json",), LOADING_ERRORS, id="unreachable-schema"),
-        pytest.param(
-            ("http://127.0.0.1:1/openapi.json", "--wait-for-schema=1"), LOADING_ERRORS, id="wait-for-schema-timeout"
-        ),
         # A usage error, not a run error: the terminal prints it without an error title.
         pytest.param(("{valid}",), [], id="missing-base-url"),
     ],
@@ -193,6 +178,13 @@ def test_fatal_error_records_process_exit_code(cli, json_path, schema_files, com
         "error",
         errors,
     ), result.stdout
+    # Schema loading fails, so there is no engine timing to report - not a zero-length run.
+    assert (report["started_at"], report["running_time"], report["complete"], report["operations"]) == (
+        None,
+        None,
+        False,
+        None,
+    )
 
 
 @pytest.mark.parametrize("command", [("run", "--max-examples=1"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])

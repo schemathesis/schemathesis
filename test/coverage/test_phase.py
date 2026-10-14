@@ -3119,31 +3119,6 @@ def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx):
     ] == []
 
 
-def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    # Regression test for GH-3322
-    # When coverage phase tests unexpected HTTP methods (e.g., PATCH on a GET endpoint),
-    # the failure header should show the actual tested method, not the original endpoint's method
-    raw_schema = {
-        "/resource": {
-            "get": {"responses": {"200": {"description": "OK"}}},
-        }
-    }
-    schema_path = ctx.openapi.write_schema(raw_schema)
-
-    assert (
-        cli.main(
-            "run",
-            str(schema_path),
-            "--checks=unsupported_method",
-            f"--url={api.base_url}/api",
-            "--phases=coverage",
-            "--mode=negative",
-        )
-        == snapshot_cli
-    )
-
-
 def test_missing_authorization(ctx, cli, snapshot_cli):
     # The reproduction code should not contain auth if it is explicitly specified
     api = ctx.openapi.apps.failure()

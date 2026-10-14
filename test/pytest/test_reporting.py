@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 import pytest
 
-from test.utils import load_json_or_fail, load_yaml_or_fail, make_pytest_outcome_test
+from test.utils import allure_outcomes, allure_results, load_json_or_fail, load_yaml_or_fail, make_pytest_outcome_test
 
 
 def _make_xdist_test(ctx, testdir, content, base_url, paths=None):
@@ -40,42 +40,69 @@ def _junit_outcomes(report_path):
     return outcomes
 
 
-@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
 @pytest.mark.parametrize(
-    ("outcome", "expected"),
+    ("outcome", "junit", "allure", "xdist"),
     [
-        ("check_failure", ("failure", "")),
-        ("assertion", ("failure", "boom")),
-        ("runtime_error", ("error", "RuntimeError: bug")),
+        ("check_failure", ("failure", ""), ("failed", ""), False),
+        ("assertion", ("failure", "boom"), ("failed", "boom"), False),
+        ("runtime_error", ("error", "RuntimeError: bug"), ("broken", "RuntimeError: bug"), False),
         (
             "unsatisfiable",
             ("error", "Unsatisfiable: Cannot generate test data for request body (application/json)"),
+            ("broken", "Unsatisfiable: Cannot generate test data for request body (application/json)"),
+            False,
         ),
-        ("network_error", ("error", "ConnectionError")),
-        ("schema_error", ("error", "InvalidSchema: Unresolvable reference in the schema")),
-        ("skip", ("skipped", "why")),
-        ("mark_skip", ("skipped", "why")),
+        ("network_error", ("error", "ConnectionError"), ("broken", "ConnectionError"), False),
+        (
+            "schema_error",
+            ("error", "InvalidSchema: Unresolvable reference in the schema"),
+            ("broken", "InvalidSchema: Unresolvable reference in the schema"),
+            False,
+        ),
+        ("skip", ("skipped", "why"), ("skipped", "why"), False),
+        ("mark_skip", ("skipped", "why"), ("skipped", "why"), False),
+        # Workers forward the outcome as a status name and message, the same for every outcome.
+        ("runtime_error", ("error", "RuntimeError: bug"), ("broken", "RuntimeError: bug"), True),
+        ("skip", ("skipped", "why"), ("skipped", "why"), True),
+    ],
+    ids=[
+        "check_failure",
+        "assertion",
+        "runtime_error",
+        "unsatisfiable",
+        "network_error",
+        "schema_error",
+        "skip",
+        "mark_skip",
+        "runtime_error-xdist",
+        "skip-xdist",
     ],
 )
-def test_junit_report_uses_pytest_outcome(testdir, tmp_path, ctx, xdist, outcome, expected):
-    report_path = tmp_path / "report.xml"
+def test_reports_use_pytest_outcome(testdir, tmp_path, ctx, outcome, junit, allure, xdist):
+    junit_path = tmp_path / "report.xml"
+    allure_dir = tmp_path / "allure-results"
     label = make_pytest_outcome_test(
-        testdir, ctx, outcome, f'schema.config.reports.update(junit_path=r"{report_path}")'
+        testdir,
+        ctx,
+        outcome,
+        f'schema.config.reports.update(junit_path=r"{junit_path}", allure_path=r"{allure_dir}")',
     )
     args = ("-n", "2") if xdist else ()
 
     testdir.runpytest(*args)
 
-    assert _junit_outcomes(report_path) == {label: expected}
+    assert (_junit_outcomes(junit_path), allure_outcomes(allure_dir)) == ({label: junit}, {label: allure})
 
 
-def test_vcr_report_written_via_config(testdir, ctx):
+def test_reports_written_via_config(testdir, ctx):
     api = ctx.openapi.apps.success()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    har_path = str(testdir.tmpdir.join("cassette.har"))
+    report_path = str(testdir.tmpdir.join("report.xml"))
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(vcr_path=r"{cassette_path}")
+schema.config.reports.update(vcr_path=r"{cassette_path}", har_path=r"{har_path}", junit_path=r"{report_path}")
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -86,18 +113,22 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
 
-    cassette = load_yaml_or_fail(cassette_path)
-    assert "http_interactions" in cassette
-    assert len(cassette["http_interactions"]) >= 1
+    assert load_yaml_or_fail(cassette_path)["http_interactions"]
+    assert load_json_or_fail(har_path)["log"]["entries"]
+    test_cases = ElementTree.parse(report_path).findall(".//testcase")
+    assert test_cases
+    assert all(tc.find("failure") is None for tc in test_cases)
 
 
-def test_vcr_report_records_check_failures(testdir, ctx):
+def test_reports_record_check_failures(testdir, tmp_path, ctx):
     api = ctx.openapi.apps.failure()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(vcr_path=r"{cassette_path}")
+schema.config.reports.update(vcr_path=r"{cassette_path}", junit_path=r"{report_path}", allure_path=r"{allure_dir}")
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -113,6 +144,9 @@ def test_api(case):
     cassette = load_yaml_or_fail(cassette_path)
     all_checks = [c for i in cassette["http_interactions"] for c in i["checks"]]
     assert any(c["status"] == "FAILURE" for c in all_checks)
+    assert ElementTree.parse(report_path).findall(".//testcase/failure")
+    failed = next(r for r in allure_results(allure_dir) if r["status"] == "failed")
+    assert any("curl" in step["statusDetails"]["message"].lower() for step in failed.get("steps", []))
 
 
 def test_vcr_report_hand_built_case_has_null_metadata(testdir, ctx):
@@ -164,83 +198,22 @@ def test_api(case):
     assert cassette["http_interactions"] is None
 
 
-def test_har_report_written_via_config(testdir, ctx):
+def test_reports_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
-    cassette_path = str(testdir.tmpdir.join("cassette.har"))
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(har_path=r"{cassette_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-
-    har = load_json_or_fail(cassette_path)
-    assert "log" in har
-    assert len(har["log"]["entries"]) >= 1
-
-
-def test_junit_report_written_via_config(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    report_path = str(testdir.tmpdir.join("report.xml"))
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(junit_path=r"{report_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-
-    tree = ElementTree.parse(report_path)
-    test_cases = tree.findall(".//testcase")
-    assert len(test_cases) >= 1
-    assert all(tc.find("failure") is None for tc in test_cases)
-
-
-def test_junit_report_records_check_failures(testdir, ctx):
-    api = ctx.openapi.apps.failure()
-    report_path = str(testdir.tmpdir.join("report.xml"))
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(junit_path=r"{report_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call_and_validate()
-""",
-        schema_name="simple_openapi.yaml",
-        paths={"/failure": {"get": {"responses": {"500": {"description": "Internal Server Error"}}}}},
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(failed=2)
-
-    tree = ElementTree.parse(report_path)
-    failures = tree.findall(".//testcase/failure")
-    assert len(failures) >= 1
-
-
-def test_vcr_report_written_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    report_dir = testdir.tmpdir.mkdir("reports")
+    har_path = str(testdir.tmpdir.join("cassette.har"))
+    junit_path = str(testdir.tmpdir.join("report.xml"))
+    ok = {"responses": {"200": {"description": "OK"}}}
     _make_xdist_test(
         ctx,
         testdir,
         f"""
-schema.config.reports.update(vcr_path=r"{cassette_path}")
+from pathlib import Path
+from schemathesis.config import ReportFormat
+
+schema.config.reports.update(
+    formats=[ReportFormat.VCR], directory=Path(r"{report_dir}"), har_path=r"{har_path}", junit_path=r"{junit_path}"
+)
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -248,17 +221,48 @@ def test_api(case):
     case.call()
 """,
         base_url=f"{api.base_url}/api",
+        paths={
+            "/users": {
+                "get": ok,
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"first_name": {"type": "string"}},
+                                    "required": ["first_name"],
+                                },
+                                "example": {"first_name": "John"},
+                            }
+                        },
+                        "required": True,
+                    },
+                    **ok,
+                },
+            },
+            "/health": {"get": ok},
+        },
     )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
+    testdir.runpytest("-n", "2").assert_outcomes(passed=3)
 
-    cassette = load_yaml_or_fail(cassette_path)
-    assert "http_interactions" in cassette
-    interactions = cassette["http_interactions"]
-    assert len(interactions) >= 1
-    # Generation metadata must survive the worker→controller boundary
-    assert all("generation" in i for i in interactions)
-    assert all("phase" in i for i in interactions)
+    interactions = load_yaml_or_fail(str(report_dir.join("vcr.yaml")))["http_interactions"]
+    # The coverage phase also records probes with undeclared methods.
+    assert {(i["request"]["method"], i["request"]["uri"]) for i in interactions} >= {
+        ("GET", f"{api.base_url}/api/users"),
+        ("POST", f"{api.base_url}/api/users"),
+        ("GET", f"{api.base_url}/api/health"),
+    }
+    assert all("generation" in i and "phase" in i for i in interactions)
+    examples = [i for i in interactions if i["phase"]["name"] == "examples"]
+    assert examples
+    assert all(i["request"]["body"] is not None for i in examples)
+    assert len(load_json_or_fail(har_path)["log"]["entries"]) == len(interactions)
+    assert _junit_outcomes(junit_path) == {
+        "GET /users": ("passed", ""),
+        "POST /users": ("passed", ""),
+        "GET /health": ("passed", ""),
+    }
 
 
 def test_lazy_vcr_report_via_xdist_skips_tests_without_calls(testdir, ctx):
@@ -294,63 +298,15 @@ def test_api(case):
     ]
 
 
-def test_har_report_written_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    cassette_path = str(testdir.tmpdir.join("cassette.har"))
-    _make_xdist_test(
-        ctx,
-        testdir,
-        f"""
-schema.config.reports.update(har_path=r"{cassette_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-        base_url=f"{api.base_url}/api",
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-
-    har = load_json_or_fail(cassette_path)
-    assert "log" in har
-    assert len(har["log"]["entries"]) >= 1
-
-
-def test_junit_report_written_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    report_path = str(testdir.tmpdir.join("report.xml"))
-    _make_xdist_test(
-        ctx,
-        testdir,
-        f"""
-schema.config.reports.update(junit_path=r"{report_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-        base_url=f"{api.base_url}/api",
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-
-    tree = ElementTree.parse(report_path)
-    test_cases = tree.findall(".//testcase")
-    assert len(test_cases) >= 1
-    assert all(tc.find("failure") is None for tc in test_cases)
-
-
-def test_junit_report_records_check_failures_via_xdist(testdir, ctx):
+def test_reports_record_check_failures_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.failure()
     report_path = str(testdir.tmpdir.join("report.xml"))
+    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     _make_xdist_test(
         ctx,
         testdir,
         f"""
-schema.config.reports.update(junit_path=r"{report_path}")
+schema.config.reports.update(junit_path=r"{report_path}", vcr_path=r"{cassette_path}")
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -360,119 +316,11 @@ def test_api(case):
         base_url=f"{api.base_url}/api",
         paths={"/failure": {"get": {"responses": {"500": {"description": "Internal Server Error"}}}}},
     )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(failed=1)
+    testdir.runpytest("-n", "2").assert_outcomes(failed=1)
 
-    tree = ElementTree.parse(report_path)
-    failures = tree.findall(".//testcase/failure")
-    assert len(failures) >= 1
-
-
-def test_vcr_report_records_check_failures_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.failure()
-    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
-    _make_xdist_test(
-        ctx,
-        testdir,
-        f"""
-schema.config.reports.update(vcr_path=r"{cassette_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call_and_validate()
-""",
-        base_url=f"{api.base_url}/api",
-        paths={"/failure": {"get": {"responses": {"500": {"description": "Internal Server Error"}}}}},
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(failed=1)
-
-    cassette = load_yaml_or_fail(cassette_path)
-    all_checks = [c for i in cassette["http_interactions"] for c in i["checks"]]
-    assert any(c["status"] == "FAILURE" for c in all_checks)
-
-
-def test_vcr_report_examples_phase_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
-    paths = {
-        "/users/": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "first_name": {"type": "string"},
-                                    "last_name": {"type": "string"},
-                                },
-                                "required": ["first_name", "last_name"],
-                            },
-                            "example": {"first_name": "John", "last_name": "Doe"},
-                        }
-                    },
-                    "required": True,
-                },
-                "responses": {"201": {"description": "Created"}},
-            }
-        }
-    }
-    _make_xdist_test(
-        ctx,
-        testdir,
-        f"""
-schema.config.reports.update(vcr_path=r"{cassette_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-        base_url=f"{api.base_url}/api",
-        paths=paths,
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-
-    cassette = load_yaml_or_fail(cassette_path)
-    interactions = cassette["http_interactions"]
-    assert len(interactions) >= 1
-    # ExamplesPhaseData round-trip via worker→controller boundary
-    assert any(i.get("phase", {}).get("name") == "examples" for i in interactions)
-    # Request body preserved through serialization
-    assert all(i["request"]["body"] is not None for i in interactions if i.get("phase", {}).get("name") == "examples")
-
-
-def test_vcr_report_via_directory_via_xdist(testdir, ctx):
-    api = ctx.openapi.apps.success()
-    # enable VCR via `formats=` without an explicit path so get_stable_path()
-    # falls through to the directory-based filename branch
-    report_dir = str(testdir.tmpdir.mkdir("reports"))
-    _make_xdist_test(
-        ctx,
-        testdir,
-        f"""
-from schemathesis.config._report import ReportFormat
-from pathlib import Path
-
-schema.config.reports.update(formats=[ReportFormat.VCR], directory=Path(r"{report_dir}"))
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-        base_url=f"{api.base_url}/api",
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=1)
-
-    cassette_path = testdir.tmpdir.join("reports", "vcr.yaml")
-    cassette = load_yaml_or_fail(str(cassette_path))
-    assert "http_interactions" in cassette
-    assert len(cassette["http_interactions"]) >= 1
+    assert ElementTree.parse(report_path).findall(".//testcase/failure")
+    checks = [check for i in load_yaml_or_fail(cassette_path)["http_interactions"] for check in i["checks"]]
+    assert any(check["status"] == "FAILURE" for check in checks)
 
 
 def test_xdist_no_report_configured(testdir, ctx):
@@ -512,35 +360,6 @@ def test_api(case):
     )
     result = testdir.runpytest("-n", "1")
     assert "INTERNALERROR" not in "\n".join(result.outlines + result.errlines)
-
-
-def test_vcr_report_multiple_operations_via_xdist(testdir, ctx):
-    # two operations share the same schema_id; the second pytest_testnodedown call
-    # must reuse already-opened writers rather than opening new ones
-    api = ctx.openapi.apps.success()
-    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
-    _make_xdist_test(
-        ctx,
-        testdir,
-        f"""
-schema.config.reports.update(vcr_path=r"{cassette_path}")
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_api(case):
-    case.call()
-""",
-        base_url=f"{api.base_url}/api",
-        paths={
-            "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
-            "/health": {"get": {"responses": {"200": {"description": "OK"}}}},
-        },
-    )
-    result = testdir.runpytest("-n", "2")
-    result.assert_outcomes(passed=2)
-
-    cassette = load_yaml_or_fail(cassette_path)
-    assert len(cassette["http_interactions"]) >= 2
 
 
 @pytest.mark.parametrize("explicit_seed", [None, 42])
@@ -692,68 +511,35 @@ def test_api(case):
     assert "recorded_with" in content
 
 
-def test_vcr_report_written_for_stateful_test(ctx, testdir):
+def test_reports_written_for_stateful_test(ctx, testdir, tmp_path):
     api = ctx.openapi.apps.users_crud()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    har_path = str(testdir.tmpdir.join("cassette.har"))
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 schema = schemathesis.openapi.from_url("{api.schema_url}")
 schema.config.update(base_url="{api.base_url}")
-schema.config.reports.update(vcr_path=r"{cassette_path}")
+schema.config.reports.update(
+    vcr_path=r"{cassette_path}", har_path=r"{har_path}", junit_path=r"{report_path}", allure_path=r"{allure_dir}"
+)
 TestCase = schema.as_state_machine().TestCase
 """,
     )
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=1)
 
-    cassette = load_yaml_or_fail(cassette_path)
-    interactions = cassette["http_interactions"]
-    assert len(interactions) >= 1
+    interactions = load_yaml_or_fail(cassette_path)["http_interactions"]
     assert "request" in interactions[0]
     assert "response" in interactions[0]
-
-
-def test_har_report_written_for_stateful_test(ctx, testdir):
-    api = ctx.openapi.apps.users_crud()
-    har_path = str(testdir.tmpdir.join("cassette.har"))
-    testdir.make_test(
-        f"""
-schema = schemathesis.openapi.from_url("{api.schema_url}")
-schema.config.update(base_url="{api.base_url}")
-schema.config.reports.update(har_path=r"{har_path}")
-TestCase = schema.as_state_machine().TestCase
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(failed=1)
-
-    har = load_json_or_fail(har_path)
-    entries = har["log"]["entries"]
-    assert len(entries) >= 1
+    entries = load_json_or_fail(har_path)["log"]["entries"]
     assert "request" in entries[0]
     assert "response" in entries[0]
-
-
-def test_junit_report_written_for_stateful_test(ctx, testdir):
-    api = ctx.openapi.apps.users_crud()
-    report_path = str(testdir.tmpdir.join("report.xml"))
-    testdir.make_test(
-        f"""
-schema = schemathesis.openapi.from_url("{api.schema_url}")
-schema.config.update(base_url="{api.base_url}")
-schema.config.reports.update(junit_path=r"{report_path}")
-TestCase = schema.as_state_machine().TestCase
-""",
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(failed=1)
-
     tree = ElementTree.parse(report_path)
-    test_cases = tree.findall(".//testcase")
-    assert len(test_cases) >= 1
-    # The bug is found → at least one check failed → JUnit records a failure
-    failures = tree.findall(".//failure")
-    assert len(failures) >= 1
+    assert tree.findall(".//testcase")
+    assert tree.findall(".//failure")
+    assert allure_outcomes(allure_dir) == {"Stateful tests": ("failed", "")}
 
 
 def test_vcr_report_written_for_stateful_test_via_xdist(ctx, testdir):
@@ -798,59 +584,6 @@ def test_api(case):
     assert _junit_outcomes(report_path) == {}
 
 
-def test_junit_report_only_for_schema_that_configures_it(testdir, ctx):
-    report_path = str(testdir.tmpdir.join("report.xml"))
-    api = ctx.openapi.apps.success()
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(junit_path=r"{report_path}")
-other = schemathesis.openapi.from_dict({{**raw_schema, "info": {{"title": "Other", "version": "1.0"}}}})
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_with_report(case):
-    case.call()
-
-@other.parametrize()
-def test_without_report(case):
-    raise AssertionError("not reported")
-""",
-        paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
-        schema_name="simple_openapi.yaml",
-    )
-    testdir.runpytest("-p", "no:randomly").assert_outcomes(passed=2, failed=2)
-
-    assert _junit_outcomes(report_path) == {"GET /success": ("passed", ""), "GET /users": ("passed", "")}
-
-
-@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
-def test_junit_report_only_for_schema_that_configures_it_with_identical_content(testdir, ctx, xdist):
-    report_path = str(testdir.tmpdir.join("report.xml"))
-    api = ctx.openapi.apps.success()
-    testdir.make_test(
-        f"""
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.reports.update(junit_path=r"{report_path}")
-other = schemathesis.openapi.from_dict(raw_schema)
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_with_report(case):
-    case.call()
-
-@other.parametrize()
-def test_without_report(case):
-    raise AssertionError("not reported")
-""",
-        paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
-    )
-    args = ("-n", "1") if xdist else ()
-    testdir.runpytest("-p", "no:randomly", *args).assert_outcomes(passed=2, failed=2)
-
-    assert _junit_outcomes(report_path) == {"GET /success": ("passed", ""), "GET /users": ("passed", "")}
-
-
 @pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
 def test_junit_reports_for_schemas_with_identical_content(testdir, ctx, xdist):
     first_report_path = str(testdir.tmpdir.join("first.xml"))
@@ -863,6 +596,7 @@ schema.config.reports.update(junit_path=r"{first_report_path}")
 other = schemathesis.openapi.from_dict(raw_schema)
 other.config.update(base_url="{api.base_url}/api")
 other.config.reports.update(junit_path=r"{second_report_path}")
+unreported = schemathesis.openapi.from_dict(raw_schema)
 
 @schema.include(path="/success").parametrize()
 @settings(max_examples=1)
@@ -873,11 +607,15 @@ def test_first_report(case):
 @settings(max_examples=1)
 def test_second_report(case):
     case.call()
+
+@unreported.parametrize()
+def test_without_report(case):
+    raise AssertionError("not reported")
 """,
         paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
     )
     args = ("-n", "1") if xdist else ()
-    testdir.runpytest("-p", "no:randomly", *args).assert_outcomes(passed=2)
+    testdir.runpytest("-p", "no:randomly", *args).assert_outcomes(passed=2, failed=2)
 
     assert _junit_outcomes(first_report_path) == {"GET /success": ("passed", "")}
     assert _junit_outcomes(second_report_path) == {"GET /users": ("passed", "")}

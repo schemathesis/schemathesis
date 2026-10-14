@@ -1082,6 +1082,7 @@ def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, pr
         cli.run_openapi_app(
             app,
             "--phases=stateful",
+            "--max-examples=10",
             "--mode=positive",
         )
         == snapshot_cli

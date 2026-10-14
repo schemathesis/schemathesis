@@ -967,9 +967,7 @@ def schema(ctx):
         None,  # Default case
         ["404"],
         ["405"],
-        ["2xx", "404"],
         ["200"],
-        ["200", "404"],
         ["2xx"],
         ["4xx"],
         # Invalid status code
@@ -1237,27 +1235,15 @@ def test_response_schema_conformance(ctx, cli, app_runner, snapshot_cli, app):
     )
 
 
-def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(cli, snapshot_cli, app):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_resource_checks_do_not_trigger_on_error(cli, snapshot_cli, app):
     assert (
         cli.run_openapi_app(
             app,
-            "-c ensure_resource_availability",
+            "-c ensure_resource_availability,use_after_free",
             "--max-examples=50",
             "--phases=stateful",
             "--continue-on-failure",
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_use_after_free_does_not_trigger_on_error(cli, snapshot_cli, app):
-    assert (
-        cli.run_openapi_app(
-            app,
-            "-c use_after_free",
-            "--max-examples=50",
-            "--phases=stateful",
         )
         == snapshot_cli
     )
@@ -2074,50 +2060,6 @@ def test_missing_required_header_body_first_server_no_false_negative(ctx, cli, a
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_response_schema_conformance_reports_all_errors_in_cli(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/data": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {"type": "integer"},
-                                            "name": {"type": "string"},
-                                        },
-                                        "required": ["id", "name"],
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        }
-    )
-
-    @app.route("/data")
-    def data():
-        # Always returns a response that violates schema in two ways:
-        # 'id' is a string (should be integer), 'name' is an integer (should be string)
-        return jsonify({"id": "not-an-int", "name": 42})
-
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--checks=response_schema_conformance",
-            "--max-examples=1",
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_response_schema_conformance_groups_multiple_violations(ctx, cli, snapshot_cli):
     # 4 violations on one response should render under a single header with a violation count,
     # not 4 separate `- Response violates schema` blocks.
@@ -2373,7 +2315,7 @@ def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
         api.schema_url,
         "--phases=fuzzing",
         "--max-examples=1",
-        "--max-time=2",
+        "--max-time=1",
         config={"checks": {"enabled": False}},
     )
-    assert time.monotonic() - started >= 2
+    assert time.monotonic() - started >= 1

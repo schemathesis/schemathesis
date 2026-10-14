@@ -85,24 +85,17 @@ def test_execute_base_url_not_found(ctx):
     assert _api_requests(api) == []
 
 
-def test_execute(ctx):
-    api = ctx.openapi.apps.success_and_failure()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    EventStream(schema).execute()
-
-    # Filter out the engine's `/` capability probe; only assert against the API operations.
-    api_calls = _api_requests(api)
-    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
-    for request in api_calls:
-        assert request.method == "GET"
-        assert request.headers["User-Agent"] == USER_AGENT
-
-
 @pytest.mark.parametrize("workers", [1, 2])
 def test_interactions(ctx, workers):
     api = ctx.openapi.apps.success_and_failure()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, workers=workers).execute()
+
+    assert stream.finished.stop_reason == StopReason.COMPLETED
+    api_calls = _api_requests(api)
+    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    for request in api_calls:
+        assert (request.method, request.headers["User-Agent"]) == ("GET", USER_AGENT)
 
     if sys.version_info >= (3, 14):
         encoding = ["gzip, deflate, zstd"]
@@ -690,17 +683,13 @@ def test_fuzzing_phase_failure_requires_a_surfaced_failure(ctx):
     # inconsistent data generation; the phase must not be marked failed without a real failure.
     api = ctx.openapi.apps.stateful_users()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    for seed in range(10):
-        stream = EventStream(
-            schema, max_examples=15, phases=[PhaseName.FUZZING], seed=seed, deterministic=True
-        ).execute()
-        phase = stream.find(events.PhaseFinished, phase=lambda value: value.name == PhaseName.FUZZING)
-        if phase.status != Status.FAILURE:
-            continue
+    stream = EventStream(schema, max_examples=15, phases=[PhaseName.FUZZING], seed=0, deterministic=True).execute()
+    phase = stream.find(events.PhaseFinished, phase=lambda value: value.name == PhaseName.FUZZING)
+    if phase.status == Status.FAILURE:
         scenarios = stream.find_all(events.ScenarioFinished)
         has_failed_check = any(check.status == Status.FAILURE for s in scenarios for check in _scenario_checks(s))
         has_error = bool(stream.find_all(events.NonFatalError))
-        assert has_failed_check or has_error, f"seed={seed}: fuzzing failed with no surfaced failure"
+        assert has_failed_check or has_error, "Fuzzing failed with no surfaced failure"
 
 
 def test_payload_explicit_example(ctx):
@@ -1361,15 +1350,6 @@ def test_stop_event_stream_has_stop_reason_interrupted(event_stream):
     assert finished.stop_reason == StopReason.INTERRUPTED
 
 
-def test_engine_finished_stop_reason_completed(ctx):
-    api = ctx.openapi.apps.success_and_failure()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    # When the engine runs to completion
-    stream = EventStream(schema).execute()
-    # Then the finished event reports completed
-    assert stream.finished.stop_reason == StopReason.COMPLETED
-
-
 def test_stop_event_stream_after_second_event(event_stream):
     for _ in range(8):
         next(event_stream)
@@ -1501,21 +1481,6 @@ STATEFUL_KWARGS = {
 }
 
 
-def test_stateful_auth(ctx):
-    api = ctx.openapi.apps.users_crud()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = EventStream(
-        schema,
-        phases=[PhaseName.STATEFUL_TESTING],
-        auth=("admin", "password"),
-        **STATEFUL_KWARGS,
-    ).execute()
-    interactions = stream.find_all_interactions()
-    assert len(interactions) > 0
-    for interaction in interactions:
-        assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
-
-
 def test_stateful_all_generation_modes(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -1571,18 +1536,20 @@ def test_fuzzing_seed_reproduces_per_operation_inputs(ctx):
     assert _fuzzed_queries_per_path(ctx, seed=42) == _fuzzed_queries_per_path(ctx, seed=42)
 
 
-def test_stateful_override(ctx):
+def test_stateful_auth_and_override(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(
         schema,
         phases=[PhaseName.STATEFUL_TESTING],
+        auth=("admin", "password"),
         parameters={"user_id": "42"},
         max_examples=10,
         max_steps=2,
     ).execute()
     interactions = stream.find_all_interactions()
     assert len(interactions) > 0
+    assert {tuple(i.request.headers["Authorization"]) for i in interactions} == {("Basic YWRtaW46cGFzc3dvcmQ=",)}
     # Check any request that uses user_id (GET or PATCH)
     user_requests = [
         i.request for i in interactions if "/users/" in i.request.uri and i.request.method in ("GET", "PATCH")

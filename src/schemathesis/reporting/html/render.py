@@ -817,15 +817,13 @@ _FRAMEWORK_FRAME = re.compile(r"[/\\](?:src|site-packages)[/\\]schemathesis[/\\]
 
 def _traceback(lines: list[str]) -> str:
     frames = [match for match in map(_FRAME.match, lines) if match is not None]
-    summary = "Traceback"
-    if frames:
-        # The last frame outside Schemathesis, or the last frame when every one is inside it.
-        where = ([frame for frame in frames if not _FRAMEWORK_FRAME.search(frame["path"])] or frames)[-1]
-        name = re.split(r"[/\\]", where["path"])[-1]
-        summary = (
-            f"Traceback ({plural(len(frames), 'frame')}), raised in "
-            f'<span class="trace-where"><code>{esc(name)}:{where["line"]}</code></span>'
-        )
+    # The last frame outside Schemathesis, or the last frame when every one is inside it.
+    where = ([frame for frame in frames if not _FRAMEWORK_FRAME.search(frame["path"])] or frames)[-1]
+    name = re.split(r"[/\\]", where["path"])[-1]
+    summary = (
+        f"Traceback ({plural(len(frames), 'frame')}), raised in "
+        f'<span class="trace-where"><code>{esc(name)}:{where["line"]}</code></span>'
+    )
     text = "\n".join(lines)
     return (
         f'<details class="trace"><summary><span class="dchev" aria-hidden="true"></span>{summary}</summary>'

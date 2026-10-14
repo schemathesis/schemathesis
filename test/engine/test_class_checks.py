@@ -108,11 +108,19 @@ def test_check_build_error_surfaces_as_event_not_crash(ctx, restore_checks):
     assert any("BadInit" in str(error.value) for error in errors), errors
 
 
-def test_after_run_receives_global_config(ctx, restore_checks):
+def test_class_check_lifecycle(ctx, restore_checks):
+    instances = []
+    seen_phases = set()
     captured = {}
 
     @schemathesis.check
-    class Capture:
+    class Tracker:
+        def __init__(self):
+            instances.append(self)
+
+        def after_response(self, ctx, response, case):
+            seen_phases.add(ctx.phase)
+
         def after_run(self, ctx):
             captured["auth"] = ctx._auth
             captured["headers"] = dict(ctx._headers) if ctx._headers is not None else None
@@ -122,63 +130,17 @@ def test_after_run_receives_global_config(ctx, restore_checks):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(
         schema,
-        checks=[Capture],
-        phases=[PhaseName.FUZZING],
+        checks=[Tracker],
+        phases=[PhaseName.COVERAGE, PhaseName.FUZZING],
         max_examples=3,
         headers={"X-Token": "secret"},
         auth=("user", "pass"),
     ).execute()
 
-    assert captured["auth"] == ("user", "pass")
-    assert captured["headers"]["X-Token"] == "secret"
-    assert captured["transport"] is not None
-
-
-def test_single_instance_across_phases_and_operations(ctx, restore_checks):
-    instances = []
-
-    @schemathesis.check
-    class Tracker:
-        def __init__(self):
-            instances.append(self)
-
-        def after_response(self, ctx, response, case):
-            return None
-
-        def after_run(self, ctx):
-            return None
-
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    EventStream(
-        schema,
-        checks=[Tracker],
-        phases=[PhaseName.COVERAGE, PhaseName.FUZZING],
-        max_examples=3,
-    ).execute()
-
     assert len(instances) == 1
-
-
-def test_after_response_observes_phase(ctx, restore_checks):
-    seen_phases = set()
-
-    @schemathesis.check
-    class RecordPhase:
-        def after_response(self, ctx, response, case):
-            seen_phases.add(ctx.phase)
-
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    EventStream(
-        schema,
-        checks=[RecordPhase],
-        phases=[PhaseName.COVERAGE, PhaseName.FUZZING],
-        max_examples=3,
-    ).execute()
-
-    assert PhaseName.COVERAGE in seen_phases, seen_phases
-    assert PhaseName.FUZZING in seen_phases, seen_phases
+    assert {PhaseName.COVERAGE, PhaseName.FUZZING} <= seen_phases, seen_phases
+    assert (captured["auth"], captured["headers"]["X-Token"]) == (("user", "pass"), "secret")
+    assert captured["transport"] is not None
 
 
 def test_after_response_observes_stateful_phase(ctx, restore_checks):

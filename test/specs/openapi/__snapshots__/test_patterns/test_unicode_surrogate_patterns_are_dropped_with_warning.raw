@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Operations:       2 selected / 2 total
 
  ✅  API capabilities:
 
@@ -17,7 +17,7 @@ Schemathesis dev
 
  ❌  Fuzzing (in 0.00s)
 
-     ❌ 1 failed
+     ✅ 1 passed  ❌ 1 failed
 
 =================================== FAILURES ===================================
 __________________________________ POST /test __________________________________
@@ -41,7 +41,10 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Unsupported regex patterns: 1 operation with regex patterns Schemathesis cannot use as written
+Unsupported regex patterns: 2 operations with regex patterns Schemathesis cannot use as written
+
+  - GET /test
+    Dropped `([\u0020-\uD7FF\uE000-\uFFFD\uD800\uDBFF-\uDC00\uDFFF\t\r\n]){0,255}` - generated values may not match it
 
   - POST /test
     Dropped `[\uD800-\uDBFF]` - generated values may not match it
@@ -51,8 +54,8 @@ Unsupported regex patterns: 1 operation with regex patterns Schemathesis cannot 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 2/2
+  Tested: 2
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -64,7 +67,7 @@ Failures:
   ❌ API accepted schema-violating request: 1
 
 Warnings:
-  ⚠️ Unsupported regex: 1 operation had unusable regex patterns
+  ⚠️ Unsupported regex: 2 operations had unusable regex patterns
 
 Test cases:
   N generated, N found N unique failures

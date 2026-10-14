@@ -186,6 +186,7 @@ def test_without_peers_warns_only_when_selected(cli, ctx, snapshot_cli, checks):
 def test_cli_wfc_path_preserves_configured_peers(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
     auth = _auth_file(tmp_path)
+    path = tmp_path / "report.json"
 
     result = cli.run(
         api.schema_url,
@@ -193,10 +194,18 @@ def test_cli_wfc_path_preserves_configured_peers(cli, ctx, tmp_path):
         "--phases=fuzzing",
         "--checks=object_level_authorization",
         f"--auth-wfc={auth}",
+        f"--report-wfc-path={path}",
         config={"auth": {"wfc": {"path": auth, "peers": ["alice", "bob"]}}},
     )
 
     assert (result.exit_code, bool(_peer_requests(api.requests))) == (1, True), result.stdout
+    report = json.loads(path.read_text(encoding="utf-8"))
+    (fault,) = report["faults"]["foundFaults"]
+    assert (fault["operationId"], [category["code"] for category in fault["faultCategories"]]) == (
+        "GET:/api/orders/{order_id}",
+        [906],
+    )
+    assert fault["testCaseId"] in {test_case["id"] for test_case in report["testCases"]}
 
 
 def _replay(cli, tmp_path, *, users=PEERS_AUTH["auth"], peers=("alice", "bob")):

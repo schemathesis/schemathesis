@@ -251,7 +251,7 @@ def test_har_format(ctx, cli, cassette_path, hypothesis_max_examples, args, valu
 LARGE_RESPONSE_BODY = json.dumps({"padding": "x" * 2000}).encode()
 
 
-def test_har_marks_truncated_response_body(ctx, cli, cassette_path):
+def test_cassettes_mark_truncated_response_body(ctx, cli, cassette_path):
     app, _ = ctx.openapi.make_flask_app({"/api/large": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/api/large")
@@ -262,6 +262,7 @@ def test_har_marks_truncated_response_body(ctx, cli, cassette_path):
     cli.run_openapi_app(
         app,
         f"--report-har-path={har_path}",
+        f"--report-vcr-path={cassette_path}",
         "--max-examples=1",
         "--phases=fuzzing",
         "--mode=positive",
@@ -271,23 +272,6 @@ def test_har_marks_truncated_response_body(ctx, cli, cassette_path):
         (entry["response"]["content"]["size"], entry["response"]["content"]["text"], entry["response"]["bodySize"])
         for entry in load_json_or_fail(har_path)["log"]["entries"]
     ] == [(len(LARGE_RESPONSE_BODY), LARGE_RESPONSE_BODY[:64].decode(), len(LARGE_RESPONSE_BODY))]
-
-
-def test_vcr_marks_truncated_response_body(ctx, cli, cassette_path):
-    app, _ = ctx.openapi.make_flask_app({"/api/large": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    @app.route("/api/large")
-    def large():
-        return flask.Response(LARGE_RESPONSE_BODY, content_type="application/json")
-
-    cli.run_openapi_app(
-        app,
-        f"--report-vcr-path={cassette_path}",
-        "--max-examples=1",
-        "--phases=fuzzing",
-        "--mode=positive",
-        config={"output": {"truncation": {"max-recorded-payload-size": 64}}},
-    )
     assert [
         (load_response_body(load_cassette(cassette_path), index), interaction["response"]["truncated_from"])
         for index, interaction in enumerate(load_cassette(cassette_path)["http_interactions"])
