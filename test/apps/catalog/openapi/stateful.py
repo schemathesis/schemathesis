@@ -291,9 +291,10 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
             return response, 201
 
         if config.failure_behind_failure:
-            if len(name) % 10 < 7:
+            # Both branches are common, so the first suite reaches the server error regardless of the seed
+            if len(name) % 2 == 0:
                 return jsonify({"invalid": "user structure"}), 201
-            return jsonify({"error": "Error - rare"}), 500
+            return jsonify({"error": "Error - odd name length"}), 500
 
         if config.reuse_deleted_ids and store.freed_ids:
             new_id = store.freed_ids.pop(0)

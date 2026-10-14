@@ -4,6 +4,7 @@ import re
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 from flask import Response, jsonify, request
@@ -1006,12 +1007,13 @@ def test_html_report_timeline_short_run_has_chart(ctx, cli, report_dir):
 
 
 # Each operation's two failures arrive with one response, so every tick carries a count badge.
-def test_html_report_timeline_quiet_tail(ctx, cli, app_runner, report_dir):
+# Responses are stamped at the epoch, so every failure is found at the run's start however slow the machine is.
+def test_html_report_timeline_quiet_tail(ctx, cli, app_runner, report_dir, monkeypatch):
+    monkeypatch.setattr("schemathesis.engine.recorder.time", SimpleNamespace(time=lambda: 0.0))
     html = run_with_report(
         cli,
         report_dir,
         app_runner.openapi_url(two_failing_operations(ctx)),
-        "--max-time=2",
         phases="coverage,fuzzing",
         exit_code=ExitCode.FAILURES,
     )
