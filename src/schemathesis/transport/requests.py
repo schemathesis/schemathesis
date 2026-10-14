@@ -38,6 +38,7 @@ from schemathesis.transport.prepare import (
     prepare_cookies,
     prepare_headers,
     prepare_url,
+    serialize_cookies,
 )
 from schemathesis.transport.serialization import (
     Binary,
@@ -164,7 +165,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         data = {
             "method": case.method,
             "url": url,
-            "cookies": case.cookies,
+            "cookies": serialize_cookies(case),
             "headers": final_headers,
             "params": params,
             **extra,
