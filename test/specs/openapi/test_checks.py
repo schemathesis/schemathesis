@@ -1512,6 +1512,18 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             "http://127.0.0.1/thumb?full_size=true&compressed=null",
             True,
         ),
+        (
+            "3.0.2",
+            [
+                {"in": "query", "name": "full_size", **_NULLABLE_FLAG},
+                {"in": "query", "name": "compressed", **_NULLABLE_FLAG},
+            ],
+            {"compressed": "null", "": "false"},
+            (_ADDITIONAL_PROPERTIES_MUTATION,),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=null&=false",
+            True,
+        ),
     ],
     ids=[
         "openapi-30-nullable",
@@ -1524,10 +1536,12 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
         "another-invalid-parameter",
         "other-path",
         "unsent-extra-parameter",
+        "sent-extra-parameter",
     ],
 )
+@pytest.mark.parametrize("phase", [TestPhase.FUZZING, TestPhase.STATEFUL], ids=["fuzzing", "stateful"])
 def test_negative_data_rejection_validates_null_text_for_nullable_query(
-    ctx, response_factory, version, parameters, query, mutations, path, url, accepted
+    ctx, response_factory, version, parameters, query, mutations, path, url, accepted, phase
 ):
     schema = ctx.openapi.load_schema(
         {"/thumb": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}},
@@ -1535,7 +1549,10 @@ def test_negative_data_rejection_validates_null_text_for_nullable_query(
     )
     case = schema["/thumb"]["GET"].Case(
         _meta=build_metadata(
-            query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE], mutations=mutations
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=mutations,
+            phase=phase,
         ),
         query=query,
     )

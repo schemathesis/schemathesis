@@ -1249,7 +1249,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                     for k, v in value.items()
                     if k in container
                 }
-                if isinstance(phase_data, FuzzingPhaseData):
+                if isinstance(phase_data, FuzzingPhaseData | StatefulPhaseData):
                     # Generated nulls are sent as the text `null`, but in a mutated parameter it may be a negated string.
                     mutated = {
                         mutation.parameter
