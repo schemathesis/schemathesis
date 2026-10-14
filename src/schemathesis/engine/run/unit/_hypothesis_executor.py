@@ -68,7 +68,12 @@ def run_test(
     except BudgetExpired:
         # The operation ran out of its share, not the whole run — keep whatever it already produced,
         # errors included: running out of time does not undo them.
-        if errors:
+        stored = state.unrecoverable_network_error
+        if stored is not None:
+            # The request that outlasted the budget timed out before the next case found it expired.
+            status = Status.ERROR
+            yield non_fatal_error(stored.error, code_sample=stored.code_sample)
+        elif errors:
             status = Status.ERROR
         elif not recorder.interactions:
             status = Status.SKIP

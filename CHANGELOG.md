@@ -17,6 +17,7 @@
 #### Output and summary
 
 - Request timeouts not reported for operations that also fail a check.
+- Fuzzing request timeouts outlasting the `--max-time` budget counted as errored but not reported.
 - `errored` count in the summary including stateful steps never sent, e.g. after `--max-time`.
 - Stateful request timeouts counted as errored without an entry under "ERRORS".
 - Unresponsive operations in the stateful phase shown as skipped, not errored, in the summary.
@@ -57,6 +58,7 @@
 - Report seed under `pytest-xdist` not reproducing operations run on other workers.
 - pytest runs not printing where reports were written.
 - Crash when calling a `Case` built with an object or array cookie value.
+- False `negative_data_rejection` failures after hooks write `"5"` to numeric parameters.
 
 #### Others
 
