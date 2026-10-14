@@ -1236,7 +1236,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
 
             if _has_serialization_sensitive_types(schema, container):
                 # Wire-serialized arrays and objects can't be re-validated, so only mutation metadata can tell.
-                if isinstance(phase_data, FuzzingPhaseData) and any(
+                if isinstance(phase_data, FuzzingPhaseData | StatefulPhaseData) and any(
                     _negates_declared_parameter(mutation, location, schema) for mutation in phase_data.mutations
                 ):
                     return False

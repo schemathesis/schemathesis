@@ -39,6 +39,7 @@
 - `object_level_authorization` reproduction commands not saying which user sends each request.
 - `UnicodeEncodeError` for cookie values with non-Latin-1 characters.
 - False `negative_data_rejection` in the stateful phase for `"5"` sent to numeric path or query parameters.
+- Missed `negative_data_rejection` failures in the stateful phase for invalid array and object non-body parameters.
 - False `negative_data_rejection` in the stateful phase for unknown query parameters beside `null` values of nullable parameters.
 - `st replay` sending every step as one user, so `object_level_authorization` failures replayed as fixed.
 
