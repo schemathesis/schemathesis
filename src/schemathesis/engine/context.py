@@ -24,7 +24,7 @@ from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
-from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.feedback import AuthHeaderLog, FeedbackSources
 from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.schemas import APIOperation
@@ -103,6 +103,7 @@ class EngineContext:
         "coverage_session",
         "coverage_unexpected_methods_seen",
         "auth_enforced_operations",
+        "auth_header_log",
         "reauth",
     )
 
@@ -151,6 +152,7 @@ class EngineContext:
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Operations whose missing and invalid credentials were already rejected in this run.
         self.auth_enforced_operations: set[str] = set()
+        self.auth_header_log = AuthHeaderLog()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -225,6 +227,8 @@ class EngineContext:
             extra_data_source=self._extra_data_source_for(operation=operation, phase=phase),
             error_feedback=self.error_feedback,
             constants_value_source=self.constants_value_source(),
+            auth_header_log=self.auth_header_log,
+            auth_headers=self.auth_header_log.get(operation.label),
         )
 
     def _extra_data_source_for(self, *, operation: APIOperation, phase: PhaseName) -> ExtraDataSource | None:
