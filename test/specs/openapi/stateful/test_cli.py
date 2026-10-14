@@ -544,7 +544,6 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, sn
     )
 
 
-@flaky(max_runs=3, min_passes=1)
 @pytest.mark.parametrize("content", ["", "User data as plain text"])
 def test_non_json_response(ctx, cli, snapshot_cli, content):
     api = ctx.openapi.apps.stateful_users(ReturnPlainText(body=content))
