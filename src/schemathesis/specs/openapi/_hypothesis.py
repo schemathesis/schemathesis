@@ -193,6 +193,10 @@ def openapi_cases(
             error_feedback=feedback.error_feedback,
             mix_examples=mix_examples,
             constants_value_source=feedback.constants_value_source,
+            # Configured auth overwrites these on the wire, so drawing them only repeats the same request.
+            exclude=feedback.auth_headers
+            if location == ParameterLocation.HEADER and generation_mode.is_positive
+            else frozenset(),
         )
         for location, explicit in (
             (ParameterLocation.PATH, path_parameters),
@@ -270,7 +274,15 @@ def openapi_cases(
         app=operation.app,
     )
     supplied = _supplied_parameters(headers, query, cookies, pool_draws)
+    log = feedback.auth_header_log if generation_mode.is_positive and operation.headers else None
+    declared = [parameter.name for parameter in operation.headers] if log is not None else []
+    before = {name: instance.headers.get(name) for name in declared}
     auths.set_on_generated_case(instance, auth_context, auth_storage, supplied)
+    if log is not None:
+        # Auth may replace the container with a plain dict, so look names up case-insensitively.
+        after = CaseInsensitiveDict(instance.headers)
+        written = {name for name in declared if name in after and after[name] is not before[name]}
+        log.record(operation.label, written=written, kept=set(declared) - written)
     return instance
 
 
@@ -791,6 +803,7 @@ def get_parameters_value(
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
     constants_value_source: ConstantsPool | None = None,
+    exclude: frozenset[str] = frozenset(),
 ) -> GeneratedValue:
     """Get the final value for the specified location.
 
@@ -803,6 +816,7 @@ def get_parameters_value(
             generation_mode,
             location,
             generation_config,
+            exclude=exclude,
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
@@ -819,7 +833,7 @@ def get_parameters_value(
         generation_mode,
         location,
         generation_config,
-        exclude=value.keys(),
+        exclude=value.keys() | exclude,
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
@@ -941,6 +955,7 @@ def generate_parameter(
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
     constants_value_source: ConstantsPool | None = None,
+    exclude: frozenset[str] = frozenset(),
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -966,6 +981,7 @@ def generate_parameter(
         error_feedback=error_feedback,
         mix_examples=mix_examples,
         constants_value_source=constants_value_source,
+        exclude=exclude,
     )
     value = generated.value
     if value is not None and location == ParameterLocation.PATH:

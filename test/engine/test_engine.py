@@ -884,6 +884,68 @@ def test_max_time_reaches_every_operation(ctx, workers):
     assert tested == {"POST /users/", "GET /users/{user_id}", "PATCH /users/{user_id}"}
 
 
+def _authorization_header_schema(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [{"name": "authorization", "in": "header", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return flask.jsonify({})
+
+    return schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+
+def _fuzzing_cycles(schema, **options):
+    stream = execute(
+        schema, max_examples=10, max_time=2, modes=[GenerationMode.POSITIVE], phases=[PhaseName.FUZZING], **options
+    )
+    cycles = [len(event.recorder.interactions) for event in stream.find_all(events.ScenarioFinished)]
+    assert len(cycles) > 2
+    # The last cycle may be cut by the time limit before sending anything.
+    return cycles[1:-1]
+
+
+@pytest.mark.parametrize("auth_kind", ["basic", "hook"])
+def test_header_set_by_auth_is_not_generated_in_later_cycles(ctx, app_runner, auth_kind):
+    # Configured auth replaces the generated value, so drawing it repeats one request until max examples.
+    schema = _authorization_header_schema(ctx, app_runner)
+    if auth_kind == "hook":
+
+        @schema.auth()
+        class TokenAuth:
+            def get(self, case, context):
+                return "token"
+
+            def set(self, case, data, context):
+                case.headers = case.headers or {}
+                case.headers["Authorization"] = f"Bearer {data}"
+
+    assert set(_fuzzing_cycles(schema, auth=("user", "pass") if auth_kind == "basic" else None)) == {1}
+
+
+def test_header_auth_sets_only_sometimes_is_still_generated(ctx, app_runner):
+    schema = _authorization_header_schema(ctx, app_runner)
+
+    @schema.auth()
+    class FallbackAuth:
+        def get(self, case, context):
+            return "token"
+
+        def set(self, case, data, context):
+            case.headers = case.headers or {}
+            case.headers.setdefault("Authorization", f"Bearer {data}")
+
+    assert max(_fuzzing_cycles(schema)) > 1
+
+
 def test_max_time_in_unit_phase_is_not_an_interrupt(ctx):
     # Same misattribution as the stateful phase: the clock is not the user pressing Ctrl-C.
     api = ctx.openapi.apps.users_crud()
