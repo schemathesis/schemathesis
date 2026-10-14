@@ -337,8 +337,8 @@ class ExecutionPlan:
         # Phase can be enabled if certain conditions are met
         if phase.name == PhaseName.STATEFUL_TESTING:
             inference = engine.apply_stateful_inference()
-            # Enable stateful testing if we successfully inferred any transitions
-            if inference.inferred:
+            # Enable stateful testing if links were only missing statically, not disabled by the user
+            if inference.inferred and phase.skip_reason in (None, PhaseSkipReason.NOT_APPLICABLE):
                 phase.enable()
             return StatefulPhasePayload(
                 inferred_transitions=inference.inferred,

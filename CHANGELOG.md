@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - Request timeouts not reported for operations that also fail a check.
+- `--phases` not disabling the stateful phase when links are inferred for GraphQL schemas.
 - HTML report showing a copyable `<unknown entrypoint>` command under `python -m pytest` or `python -m schemathesis`.
 - Report seed under `pytest-xdist` not reproducing operations run on other workers.
 - pytest runs not printing where reports were written.
