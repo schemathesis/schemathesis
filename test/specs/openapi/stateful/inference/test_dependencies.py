@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from urllib.parse import quote, unquote
 
 import pytest
 from flask import jsonify, request
@@ -7471,16 +7472,18 @@ def test_iter_links_with_circular_refs(ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=5, min_passes=1)
 def test_stateful_discovers_bug_with_custom_deserializer(cli, snapshot_cli, ctx):
     @schemathesis.deserializer("application/vnd.custom")
     def deserialize_custom(ctx, response):
         text = response.content.decode(response.encoding or "utf-8")
         result = {}
+        # Values are percent-encoded, so no generated string can pass for a null, which is a key without a value
         for line in text.strip().split("\n"):
             if "=" in line:
                 key, value = line.split("=", 1)
-                result[key] = None if value == "None" else value
+                result[key] = unquote(value, errors="surrogatepass")
+            else:
+                result[line] = None
         return result
 
     app, schema = ctx.openapi.make_flask_app(
@@ -7601,9 +7604,9 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, snapshot_cli, ctx)
 
         # If user is corrupted, return None for full_name (violates schema expecting string)
         if user.get("corrupted"):
-            return f"id={user['id']}\nfull_name=None", 200, {"Content-Type": "application/vnd.custom"}
+            return f"id={user['id']}\nfull_name", 200, {"Content-Type": "application/vnd.custom"}
 
-        full_name = user["first_name"] + " " + user["last_name"]
+        full_name = quote(user["first_name"] + " " + user["last_name"], safe="", errors="surrogatepass")
         return f"id={user['id']}\nfull_name={full_name}", 200, {"Content-Type": "application/vnd.custom"}
 
     @app.route("/users/<user_id>", methods=["PATCH"])
@@ -7627,8 +7630,8 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, snapshot_cli, ctx)
                 user["last_name"] = str(data["last_name"])
 
         # Always return success (bug hidden in response)
-        response_first = str(user.get("first_name", ""))
-        response_last = str(user.get("last_name", ""))
+        response_first = quote(user["first_name"], safe="", errors="surrogatepass")
+        response_last = quote(user["last_name"], safe="", errors="surrogatepass")
         return (
             f"id={user['id']}\nfirst_name={response_first}\nlast_name={response_last}",
             200,

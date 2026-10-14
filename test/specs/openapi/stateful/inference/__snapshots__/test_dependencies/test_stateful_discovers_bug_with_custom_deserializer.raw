@@ -45,7 +45,7 @@ ________________________________ Stateful tests ________________________________
 [200] OK:
 
     `id=1
-    full_name=None`
+    full_name`
 
 Reproduce with:
 

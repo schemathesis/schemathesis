@@ -290,6 +290,9 @@ class ReturnPlainText:
         spec = app.config["schema"]
         # Pin name to a fixed value so snapshots stay stable.
         spec["components"]["schemas"]["NewUser"]["properties"]["name"] = {"enum": ["fixed-name"]}
+        # Every user gets the same ID, so a `GET` linked from `DELETE` finds a re-created user and the reported chain
+        # would depend on which path a seed reaches first
+        spec["paths"]["/users/{userId}"]["delete"]["responses"]["204"].pop("links")
 
 
 @dataclass(slots=True)
