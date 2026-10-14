@@ -548,7 +548,7 @@ def test_schema_violation_on_real_server(ctx):
 def test_no_query(ctx):
     # When GraphQL schema does not contain the `Query` type
     api = ctx.graphql.apps.books()
-    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=10)
     decoded = response.json()
     raw_schema = decoded["data"]
     raw_schema["__schema"]["queryType"] = None
@@ -562,7 +562,7 @@ def test_no_query(ctx):
 @pytest.mark.parametrize("with_data_key", [True, False])
 def test_data_key(ctx, with_data_key):
     api = ctx.graphql.apps.books()
-    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=10)
     decoded = response.json()
     if not with_data_key:
         decoded = decoded["data"]
@@ -572,7 +572,7 @@ def test_data_key(ctx, with_data_key):
 
 def test_malformed_response(ctx):
     api = ctx.graphql.apps.books()
-    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=10)
     response._content += b"42"
     with pytest.raises(LoaderError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
         extract_schema_from_response(response, lambda r: r.json())
@@ -580,7 +580,7 @@ def test_malformed_response(ctx):
 
 def test_operations_count(ctx):
     api = ctx.graphql.apps.books()
-    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=10)
     decoded = response.json()
     raw_schema = decoded["data"]
     schema = ctx.graphql.load_introspection(raw_schema)

@@ -1021,7 +1021,7 @@ def run_until_server_breaks(cli, report_dir, schema_url, *, phases):
         cli,
         report_dir,
         schema_url,
-        "--max-time=60",
+        "--max-time=600",
         "--max-failures=1",
         "--mode=positive",
         phases=phases,

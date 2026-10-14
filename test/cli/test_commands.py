@@ -596,7 +596,7 @@ def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
             "--generation-deterministic",
             "--phases=stateful",
             "--checks=not_a_server_error",
-            "--request-timeout=0.05",
+            config={"operations": [{"include-name": "GET /users/{userId}", "request-timeout": 0.05}]},
         )
     finally:
         release.set()
@@ -2089,7 +2089,7 @@ def test_stateful_unresponsive_operation_counted_as_errored(ctx, cli, snapshot_c
             "--generation-deterministic",
             "--phases=stateful",
             "--checks=not_a_server_error",
-            "--request-timeout=0.25",
+            config={"operations": [{"include-name": "GET /users/{userId}", "request-timeout": 0.25}]},
         )
     finally:
         release.set()
