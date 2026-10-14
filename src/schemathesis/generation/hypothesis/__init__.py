@@ -15,6 +15,7 @@ _first_param_cache: Final[BoundedCache] = BoundedCache(maxsize=1024)
 
 def setup() -> None:
     from hypothesis import core as root_core
+    from hypothesis.internal import entropy
     from hypothesis.internal.conjecture import engine
     from hypothesis.internal.entropy import deterministic_PRNG
     from hypothesis.internal.reflection import is_first_param_referenced_in_function
@@ -30,6 +31,20 @@ def setup() -> None:
     # if e.g. Schemathesis CLI is used with multiple workers
     with deterministic_PRNG():
         pass
+
+    threadlocal = getattr(root_core, "threadlocal", None)
+    if threadlocal is not None:
+        register_random = entropy.register_random
+
+        def _register_random(r: entropy.RandomLike) -> None:
+            # Every new worker thread registers its own Hypothesis PRNG, and the check for an unreferenced
+            # instance runs a full garbage collection, which takes seconds on large heaps
+            if r is threadlocal._hypothesis_global_random:
+                entropy.RANDOMS_TO_MANAGE[next(entropy._RKEY)] = r
+            else:
+                register_random(r)
+
+        entropy.register_random = _register_random
 
     def _is_first_param_referenced_in_function(f: Callable) -> bool:
         code = getattr(f, "__code__", None)

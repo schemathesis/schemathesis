@@ -29,6 +29,7 @@
 - Missing blank line between the Discord help link and the next output section.
 - Missing blank line between the response body and the `Identity` line in failure output.
 - HTML report horizontal scrollbar stopping short of the reproduction command's "Copy" button.
+- Slow phase startup in processes with large memory use, eating into `--max-time`.
 - Dictionary mismatch warning title differing between the warnings block and the summary.
 - Connection-refused tip suggesting `--url` when it is already set, without naming the address.
 - Auth sign-up line showing `[auth] auto-signup = false`, which is not valid TOML on one line.
