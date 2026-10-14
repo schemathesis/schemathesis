@@ -23,6 +23,7 @@ from schemathesis.generation.meta import (
     FuzzingPhaseData,
     GenerationInfo,
     PhaseInfo,
+    StatefulPhaseData,
     TestPhase,
 )
 from schemathesis.generation.overrides import Override
@@ -124,6 +125,7 @@ def build_metadata(
     parameter_location=None,
     location=None,
     mutations=None,
+    phase=TestPhase.FUZZING,
 ):
     # When the test pins a type-mutation description, also populate the structured
     # Mutation record so the case carries what the engine produces for the same case.
@@ -163,8 +165,8 @@ def build_metadata(
             if value is not None
         },
         phase=PhaseInfo(
-            name=TestPhase.FUZZING,
-            data=FuzzingPhaseData(
+            name=phase,
+            data=(StatefulPhaseData if phase == TestPhase.STATEFUL else FuzzingPhaseData)(
                 description=description,
                 parameter=parameter,
                 parameter_location=parameter_location,
@@ -4230,7 +4232,7 @@ def test_allow_header_conformance_repeated_header(ctx, response_factory):
     assert allow_header_conformance(check_context(), Response.from_requests(raw, verify=True), case) is None
 
 
-def _negative_case(operation, location, parameter, mutation=None, **kwargs):
+def _negative_case(operation, location, parameter, mutation=None, phase=TestPhase.FUZZING, **kwargs):
     return operation.Case(
         _meta=build_metadata(
             generation_modes=[GenerationMode.NEGATIVE],
@@ -4238,6 +4240,7 @@ def _negative_case(operation, location, parameter, mutation=None, **kwargs):
             parameter_location=location,
             mutations=(mutation,) if mutation else (),
             description="Invalid component",
+            phase=phase,
             **{location.container_name: GenerationMode.NEGATIVE},
         ),
         **kwargs,
@@ -4298,8 +4301,9 @@ PAGE_SIZE = {"type": "integer", "minimum": 1, "maximum": 100}
         ),
     ],
 )
+@pytest.mark.parametrize("phase", [TestPhase.FUZZING, TestPhase.STATEFUL], ids=["fuzzing", "stateful"])
 def test_negative_data_rejection_single_parameter(
-    ctx, response_factory, location, parameter_schema, value, type_mutation, reported
+    ctx, response_factory, location, parameter_schema, value, type_mutation, reported, phase
 ):
     path = "/items/{value}" if location == ParameterLocation.PATH else "/items"
     parameter = {
@@ -4314,7 +4318,9 @@ def test_negative_data_rejection_single_parameter(
     mutation = (
         _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="value", location=location) if type_mutation else None
     )
-    case = _negative_case(operation, location, "value", mutation, **{location.container_name: {"value": value}})
+    case = _negative_case(
+        operation, location, "value", mutation, phase=phase, **{location.container_name: {"value": value}}
+    )
     response = response_factory.requests(status_code=200)
     if reported:
         with pytest.raises(AcceptedNegativeData):
