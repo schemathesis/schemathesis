@@ -1198,7 +1198,13 @@ def _pattern_values(
     if len(matched) == 1:
         return patterns[matched[0]].values
     # A name several patterns claim answers to all of them at once.
-    return from_schema(_intersection([patterns[index].schema for index in matched]), ctx)
+    schemas = [patterns[index].schema for index in matched]
+    try:
+        return from_schema(_intersection(schemas), ctx)
+    except jsonschema_rs.canonical.UnsupportedResult:
+        # Inexpressible intersection: draw for one pattern, keep what the others accept.
+        others = [_validator(schema) for schema in schemas[1:]]
+        return patterns[matched[0]].values.filter(lambda value: all(is_valid(value) for is_valid in others))
 
 
 @st.composite  # type: ignore[untyped-decorator]

@@ -65,6 +65,7 @@
 - `--phases` not disabling the stateful phase when links are inferred for GraphQL schemas.
 - `UnicodeEncodeError` for cookie values with non-Latin-1 characters.
 - Slow phase startup in processes with large memory use, eating into `--max-time`.
+- `UnsupportedResult` crash for property names matched by several `patternProperties`.
 
 ## [4.31.0](https://github.com/schemathesis/schemathesis/compare/v4.30.1...v4.31.0) - 2026-10-12
 
