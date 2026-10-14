@@ -58,6 +58,7 @@
 - Report seed under `pytest-xdist` not reproducing operations run on other workers.
 - pytest runs not printing where reports were written.
 - Crash when calling a `Case` built with an object or array cookie value.
+- False `negative_data_rejection` failures after hooks write `"5"` to numeric parameters.
 
 #### Others
 
