@@ -457,7 +457,7 @@ def test_negative_data_rejection_ignores_extras_next_to_allow_empty_value_string
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
-def _array_query_case(ctx, query, mutation):
+def _array_query_case(ctx, query, mutation, phase):
     schema = ctx.openapi.load_schema(
         {
             "/tags": {
@@ -483,20 +483,28 @@ def _array_query_case(ctx, query, mutation):
             parameter=mutation.parameter,
             parameter_location=ParameterLocation.QUERY,
             mutations=(mutation,),
+            phase=phase,
         ),
         query=query,
     )
 
 
-def test_negative_data_rejection_reports_negated_array_query_parameter(ctx, response_factory):
-    case = _array_query_case(ctx, {"tag": ["", ""]}, _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("maxItems",), "tag"))
+_PHASES = pytest.mark.parametrize("phase", [TestPhase.FUZZING, TestPhase.STATEFUL], ids=["fuzzing", "stateful"])
+
+
+@_PHASES
+def test_negative_data_rejection_reports_negated_array_query_parameter(ctx, response_factory, phase):
+    case = _array_query_case(
+        ctx, {"tag": ["", ""]}, _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("maxItems",), "tag"), phase
+    )
     assert has_only_additional_properties_in_non_body_parameters(case) is False
     with pytest.raises(AcceptedNegativeData):
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
-def test_negative_data_rejection_ignores_extras_next_to_array_query_parameter(ctx, response_factory):
-    case = _array_query_case(ctx, {"tag": ["a"], "unknown": "junk"}, _ADDITIONAL_PROPERTIES_MUTATION)
+@_PHASES
+def test_negative_data_rejection_ignores_extras_next_to_array_query_parameter(ctx, response_factory, phase):
+    case = _array_query_case(ctx, {"tag": ["a"], "unknown": "junk"}, _ADDITIONAL_PROPERTIES_MUTATION, phase)
     assert has_only_additional_properties_in_non_body_parameters(case) is True
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
