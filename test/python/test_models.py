@@ -772,6 +772,50 @@ def test_call_percent_encodes_non_latin1_cookies(app_runner, echo_app, transport
     assert case.call().json()["cookies"] == {"ascii": "a%b", "wide": "k%2C%E2%95%AF%C2%B0%E2%96%A1%C2%B0%25"}
 
 
+@pytest.mark.parametrize(
+    ("schema", "explode", "value", "expected"),
+    [
+        ({"type": "object"}, True, {"k": "v", "n": 1}, "k=v,n=1"),
+        ({"type": "object"}, False, {"k": "v", "n": 1}, "k,v,n,1"),
+        ({"type": "array"}, False, ["x", True], "x,true"),
+    ],
+    ids=["object-explode", "object", "array"],
+)
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+def test_call_serializes_container_cookie_values(ctx, app_runner, transport, schema, explode, value, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/cookies": {
+                "get": {
+                    "parameters": [{"name": "p", "in": "cookie", "schema": schema, "explode": explode}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/cookies")
+    def cookies():
+        return flask.jsonify(flask.request.cookies)
+
+    if transport == "requests":
+        loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    else:
+        loaded = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    case = loaded["/cookies"]["GET"].Case(cookies={"p": value, "plain": "kept"})
+    assert case.call().json() == {"p": expected, "plain": "kept"}
+
+
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+def test_call_sends_undeclared_container_cookies_as_json(app_runner, echo_app, transport):
+    if transport == "requests":
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
+    else:
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", echo_app)
+    case = schema["/users"]["GET"].Case(cookies={"obj": {"k": "v"}, "arr": ["x", 1]})
+    assert case.call().json()["cookies"] == {"obj": "{%22k%22:%20%22v%22}", "arr": "[%22x%22%2C%201]"}
+
+
 @pytest.mark.parametrize("with_config", [True, False])
 def test_call_verify_override(app_runner, echo_app, with_config):
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))

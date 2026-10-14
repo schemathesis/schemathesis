@@ -13,7 +13,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, to_wire_text
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData, StatefulPhaseData
 
@@ -63,6 +63,24 @@ def _is_latin1(value: str) -> bool:
     except UnicodeEncodeError:
         return False
     return True
+
+
+def serialize_cookies(case: Case) -> dict[str, Any] | None:
+    """Cookies of `case`, with object and array values in the wire form the schema declares for them."""
+    cookies = case.cookies
+    if not cookies:
+        return cookies
+    containers = {name: value for name, value in cookies.items() if isinstance(value, (dict, list))}
+    if not containers:
+        return cookies
+    serializer = case.operation.get_parameter_serializer(ParameterLocation.COOKIE)
+    if serializer is not None:
+        cookies = {**cookies, **serializer(containers)}
+    # Containers the schema has no style for, such as undeclared cookies, go as percent-encoded JSON text
+    return {
+        name: quote(to_wire_text(value), safe=_COOKIE_SAFE_CHARACTERS) if isinstance(value, (dict, list)) else value
+        for name, value in cookies.items()
+    }
 
 
 def get_exclude_headers(case: Case) -> list[str]:
