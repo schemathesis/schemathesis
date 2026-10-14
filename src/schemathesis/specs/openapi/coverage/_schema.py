@@ -1036,6 +1036,20 @@ class CoverageContext:
             doomed = min_length is not None and min_length > pattern_min
             if doomed and pattern_length_is_unreachable(pattern, min_length, max_length):
                 raise Unsatisfiable
+            # A length-aware format generator can supply a boundary value without the rejection
+            # search that broad character classes need. Check one candidate against the original
+            # schema; a restrictive pattern still gets its own generator below.
+            lengths = format_lengths_for(self.custom_formats).get(schema.get("format", ""))
+            if lengths is not None and lengths.within is not None and schema.get("format") in VALIDATED_FORMATS:
+                strategy = lengths.within(min_length or 0, max_length if max_length is not None else inf)
+                if strategy is not None:
+                    try:
+                        candidate = cached_draw(self.session, strategy)
+                    except Unsatisfiable:
+                        pass
+                    else:
+                        if _is_strictly_valid(candidate, schema, self):
+                            return candidate
             updated = pattern
             if self.update_pattern is not None:
                 updated = self.update_pattern(pattern, min_length, max_length)

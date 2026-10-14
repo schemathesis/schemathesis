@@ -60,6 +60,7 @@
 
 #### Others
 
+- Slow coverage generation for email patterns combined with length bounds.
 - `--phases` not disabling the stateful phase when links are inferred for GraphQL schemas.
 - `UnicodeEncodeError` for cookie values with non-Latin-1 characters.
 - Slow phase startup in processes with large memory use, eating into `--max-time`.

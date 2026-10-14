@@ -73,7 +73,9 @@ A drop between releases of the same schema indicates a change in the schema or i
 
 ## Improving Coverage
 
-Schemathesis automatically targets schema constraints through its coverage phase, generating boundary values, pattern-matching strings, enum values, and more. For constraints that remain partially covered (yellow), add explicit examples to your schema. Schemathesis uses `example` (single value) and `examples` (map of example objects) as test cases:
+Schemathesis automatically targets schema constraints through its coverage phase, generating boundary values, pattern-matching strings, enum values, and more. For strings with both `format` and `pattern`, positive length-boundary values must satisfy both constraints.
+
+For constraints that remain partially covered (yellow), add explicit examples to your schema. Schemathesis uses `example` (single value) and `examples` (map of example objects) as test cases:
 
 ```yaml
 paths:

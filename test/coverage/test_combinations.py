@@ -2464,6 +2464,47 @@ def test_generate_from_schema_pattern_length_incompatible(pctx, schema):
         pctx.generate_from_schema(schema)
 
 
+@pytest.mark.parametrize("update_pattern", [None, update_quantifier])
+@pytest.mark.parametrize(
+    ("fmt", "pattern", "length"),
+    [("email", r"^[^@]+@[^@]+\.[^@]+$", length) for length in [63, 64, 253, 254]]
+    + [("uri", r"^https?://.+$", 100), ("date-time", r"^.+T.+$", 26)],
+)
+def test_bounded_format_pattern_keeps_exact_length(ctx_factory, update_pattern, fmt, pattern, length):
+    ctx = ctx_factory(update_pattern=update_pattern)
+    schema = {
+        "type": "string",
+        "format": fmt,
+        "pattern": pattern,
+        "minLength": length,
+        "maxLength": length,
+    }
+    value = ctx.generate_from_schema(schema)
+    assert len(value) == length
+    assert_conform([value], schema)
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "string", "format": "email", "pattern": r"^ab@example\.com$", "maxLength": 14}, "ab@example.com"),
+        # The URI generator cannot supply such a short value at all.
+        ({"type": "string", "format": "uri", "pattern": "^a:b$", "maxLength": 3}, "a:b"),
+    ],
+)
+def test_bounded_format_candidate_rejected_by_pattern_uses_regex(pctx, schema, expected):
+    # The length-aware email generator uses a one-character local part, so the
+    # literal pattern must still get a chance to supply its only valid value.
+    assert pctx.generate_from_schema(schema) == expected
+
+
+def test_bounded_pattern_does_not_use_builtin_for_custom_format(pctx):
+    # A caller's generator does not inherit the length-aware behavior of the built-in.
+    pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
+    schema = {"type": "string", "format": "email", "pattern": r"^[a-z]+@example\.com$", "maxLength": 254}
+    assert pctx.generate_from_schema(schema) == "a@example.com"
+
+
 def test_positive_string_skips_infeasible_boundary_lengths(pctx):
     # Pattern minimum match is ~30 chars; minLength=1 boundary variant (exact len=1) is
     # structurally impossible and must be skipped instead of timing out in Hypothesis.
