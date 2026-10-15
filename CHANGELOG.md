@@ -22,6 +22,7 @@
 
 ### :bug: Fixed
 
+- Unsorted expected statuses in `missing_required_header` failure messages.
 - Inferred `Location` links overwriting each other when several targets share a status code.
 - Slow coverage generation for email patterns combined with length bounds.
 - Stateful scenarios mostly starting from the alphabetically first operation.

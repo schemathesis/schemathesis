@@ -48,7 +48,7 @@ Reproduce with:
 
 - Missing header not rejected
 
-    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406, 415
+    Got 201 when missing required 'X-Required-Header' header, expected 400, 401, 403, 406, 415, 422
 
 [201] Created:
 

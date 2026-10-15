@@ -2637,7 +2637,7 @@ def test_missing_required_header_default_statuses(ctx, response_factory, status_
     )
     context = check_context()
     if should_raise:
-        with pytest.raises(Failure):
+        with pytest.raises(Failure, match="header, expected 400, 401, 403, 406, 415, 422$"):
             missing_required_header(context, response, case)
     else:
         assert missing_required_header(context, response, case) is None
