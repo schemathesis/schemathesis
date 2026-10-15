@@ -27,6 +27,7 @@
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
 - Clicks in the HTML report opening an unrelated row in Safari.
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
+- Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 

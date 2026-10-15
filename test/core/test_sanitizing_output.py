@@ -128,3 +128,21 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
 )
 def test_sanitize_url(input_url, expected_url):
     assert sanitize_url(input_url, config=SanitizationConfig()) == expected_url
+
+
+@pytest.mark.parametrize(
+    ("input_url", "expected_url"),
+    [
+        ("http://127.0.0.1/path?a=1&b=2&a=3", "http://127.0.0.1/path?a=1&b=2&a=3"),
+        ("http://127.0.0.1/path?flag", "http://127.0.0.1/path?flag"),
+        ("http://127.0.0.1/path?q=%FF", "http://127.0.0.1/path?q=%FF"),
+        ("http://127.0.0.1/path?q=a+b%20c", "http://127.0.0.1/path?q=a+b%20c"),
+        (
+            "http://127.0.0.1/path?a=1&token=secret&b=%FF&flag&a=3",
+            f"http://127.0.0.1/path?a=1&token={URLENCODED_REPLACEMENT}&b=%FF&flag&a=3",
+        ),
+    ],
+    ids=["repeated-keys", "bare-flag", "invalid-utf8", "mixed-space-encoding", "sensitive-among-others"],
+)
+def test_sanitize_url_preserves_query(input_url, expected_url):
+    assert sanitize_url(input_url, config=SanitizationConfig()) == expected_url
