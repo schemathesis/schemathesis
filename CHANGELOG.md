@@ -32,6 +32,7 @@
 - Empty response `mimeType` and `redirectURL` in HAR reports.
 - Slow coverage generation for email patterns combined with length bounds.
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
+- Unmasked URL credentials in the terminal's schema location and `Base URL` lines.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - Crash or wrong URL for server variable names containing dots or brackets.
 - Internal error instead of a failure for non-object GraphQL responses in negative mode.

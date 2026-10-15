@@ -2337,6 +2337,13 @@ def test_auth_override_on_protected_operation(ctx, cli, extra, snapshot_cli):
     assert cli.run(api.schema_url, "--output-sanitize=false", "--phases=fuzzing", extra) == snapshot_cli
 
 
+@pytest.mark.parametrize("sanitize", ["true", "false"])
+def test_url_credentials_in_output(ctx, cli, snapshot_cli, sanitize):
+    api = ctx.openapi.apps.success()
+    schema_url = api.schema_url.replace("http://", "http://user:secret@")
+    assert cli.run(schema_url, f"--output-sanitize={sanitize}", "--max-examples=1", "--phases=fuzzing") == snapshot_cli
+
+
 def test_explicit_headers_in_output_on_errors(ctx, cli, snapshot_cli):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly

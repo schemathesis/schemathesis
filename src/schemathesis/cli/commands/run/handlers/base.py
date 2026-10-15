@@ -8,6 +8,7 @@ from typing import IO, TYPE_CHECKING, Any, Generic, TypeVar
 
 from schemathesis.cli.events import LoadingStarted
 from schemathesis.cli.output import LoadingProgressManager, display_fatal_error
+from schemathesis.reporting.html.build import sanitized
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -35,8 +36,11 @@ class BaseOutputHandler(EventHandler[T]):
     console: Console
     loading_manager: LoadingProgressManager | None
 
-    def _on_loading_started(self, event: LoadingStarted) -> None:
-        self.loading_manager = LoadingProgressManager(console=self.console, location=event.location)
+    def _on_loading_started(self, ctx: T, event: LoadingStarted) -> None:
+        sanitization = ctx.config.output.sanitization
+        location = sanitized(event.location, sanitization if sanitization.enabled else None)
+        assert location is not None
+        self.loading_manager = LoadingProgressManager(console=self.console, location=location)
         self.loading_manager.start()
 
     def _on_fatal_error(self, ctx: T, event: events.FatalError) -> None:
