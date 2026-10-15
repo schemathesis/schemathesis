@@ -28,6 +28,7 @@
 - Slow coverage generation for email patterns combined with length bounds.
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
 - Stateful scenarios mostly starting from the alphabetically first operation.
+- Crash or wrong URL for server variable names containing dots or brackets.
 - "Response violates schema" messages embedding the whole response value on one line.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.

@@ -92,6 +92,23 @@ def test_variable_substitution_from_defaults(ctx):
     assert schema["/items"]["GET"].base_url == "https://api.example.com/v3"
 
 
+@pytest.mark.parametrize(
+    ("url", "variables", "expected"),
+    [
+        ("http://h/{v}/{v.x}", {"v": {"default": "a"}, "v.x": {"default": "b"}}, "/a/b/"),
+        ("http://h/{api.version}", {"api.version": {"default": "v2"}}, "/v2/"),
+        ("http://h/{v[0]}", {"v[0]": {"default": "first"}}, "/first/"),
+    ],
+    ids=["dotted-and-plain", "dotted", "brackets"],
+)
+def test_variable_names_with_format_syntax(ctx, url, variables, expected):
+    schema = ctx.openapi.load_schema(
+        {"/items": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        servers=[{"url": url, "variables": variables}],
+    )
+    assert schema.base_path == expected
+
+
 def test_absolute_url_passes_through(ctx):
     schema = ctx.openapi.load_schema(
         {
