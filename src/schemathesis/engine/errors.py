@@ -596,7 +596,7 @@ class TestingState:
 
     @property
     def unrecoverable_network_error(self) -> UnrecoverableNetworkError | None:
-        """Return any stored unrecoverable network error (for backward compatibility)."""
+        """Return any stored unrecoverable network error."""
         if self._unrecoverable_network_errors:
             return next(iter(self._unrecoverable_network_errors.values()))
         return None

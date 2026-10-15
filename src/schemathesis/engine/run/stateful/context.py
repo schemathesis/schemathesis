@@ -24,8 +24,6 @@ class StatefulContext:
     current_step_status: Status | None = None
     # The currently processed response
     current_response: Response | None = None
-    # Total number of failures
-    failures_count: int = 0
     # The total number of completed test scenario
     completed_scenarios: int = 0
     # Metrics collector for targeted testing

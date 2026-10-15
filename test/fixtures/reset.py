@@ -22,7 +22,7 @@ from schemathesis.transport.wsgi import WSGI_TRANSPORT
 @pytest.fixture(autouse=True)
 def reset_hooks():
     # Store built-in deserializers to restore after test
-    builtin_deserializers = deserialization.deserializers().copy()
+    builtin_deserializers = dict(deserialization._DESERIALIZERS)
     builtin_string_formats = set(STRING_FORMATS.keys())
     builtin_groups = set(GROUPS.keys())
 
@@ -40,10 +40,8 @@ def reset_hooks():
         transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
     media_types.unregister_all()
     # Restore built-in deserializers
-    current = list(deserialization.deserializers().keys())
-    deserialization.unregister_deserializer(*current)
-    for media_type, func in builtin_deserializers.items():
-        deserialization.register_deserializer(func, media_type)
+    deserialization._DESERIALIZERS.clear()
+    deserialization._DESERIALIZERS.update(builtin_deserializers)
     # Remove any string formats registered during the test
     for name in list(STRING_FORMATS.keys()):
         if name not in builtin_string_formats:

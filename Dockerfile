@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM alpine:3.21 AS python-builder
+FROM alpine:3.24 AS python-builder
 
 WORKDIR /tmp
 
@@ -22,7 +22,7 @@ RUN apk add --no-cache \
         tk-dev \
         util-linux-dev
 
-ARG PYTHON_VERSION=3.14.3
+ARG PYTHON_VERSION=3.14.8
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz && \
     tar -xf Python-${PYTHON_VERSION}.tar.xz
 
@@ -56,7 +56,7 @@ RUN find /opt/python -depth \
            /opt/python/lib/python3.14/turtledemo \
            /opt/python/lib/python3.14/idlelib
 
-FROM alpine:3.21 AS app-builder
+FROM alpine:3.24 AS app-builder
 
 WORKDIR /app
 
@@ -94,7 +94,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
 RUN find /opt/venv -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete && \
     find /opt/venv -type d -name __pycache__ -delete
 
-FROM alpine:3.21 AS runtime
+FROM alpine:3.24 AS runtime
 
 LABEL Name=Schemathesis
 

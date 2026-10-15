@@ -181,7 +181,6 @@ class _Entry:
 
     canonical: Observation
     count: int = 0
-    last_message: str = ""
 
 
 @dataclass(slots=True)
@@ -243,12 +242,10 @@ class ErrorFeedbackStore:
                 bucket.entries[entry_key] = _Entry(
                     canonical=observation,
                     count=1,
-                    last_message=observation.raw_message,
                 )
                 bucket.inserted += 1
             else:
                 entry.count += 1
-                entry.last_message = observation.raw_message
                 # Some validators report only the violated side of a size bound;
                 # fold complementary observations together so the canonical payload
                 # carries both edges once they have both been seen.

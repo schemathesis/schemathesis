@@ -239,10 +239,7 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def get_coverage_capabilities(self) -> CoverageCapabilities:
-        from schemathesis.specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
-
         return CoverageCapabilities(
-            format_strategies={**get_default_format_strategies(), **STRING_FORMATS},
             update_pattern=update_quantifier,
             validator_cls=self.adapter.jsonschema_validator_cls,
         )

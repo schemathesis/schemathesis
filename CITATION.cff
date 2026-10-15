@@ -7,8 +7,6 @@ authors:
   - family-names: "Dygalo"
     given-names: "Dmitry"
 title: "Schemathesis"
-version: 3.8.15
-date-released: 2023-02-18
 url: "https://github.com/schemathesis/schemathesis"
 preferred-citation:
   type: article

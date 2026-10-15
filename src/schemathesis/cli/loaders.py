@@ -26,8 +26,6 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
     from schemathesis.schemas import BaseSchema
 
-Loader = Callable[["ProjectConfig"], "BaseSchema"]
-
 
 def into_event_stream(
     *,
