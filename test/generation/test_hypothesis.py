@@ -2390,6 +2390,18 @@ CANONICAL_CASES = [
         },
         (),
     ),
+    # Values for a key both patterns claim need an intersection the canonical algebra cannot express.
+    (
+        {
+            "type": "object",
+            "patternProperties": {
+                "^a": {"type": "object", "patternProperties": {"^a": {"type": "null"}}},
+                "b$": {"type": "object", "additionalProperties": {"type": "string"}, "patternProperties": {"x$": {}}},
+            },
+            "additionalProperties": False,
+        },
+        (lambda value: any(key.startswith("a") and key.endswith("b") for key in value),),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
