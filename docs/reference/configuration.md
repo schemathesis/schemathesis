@@ -330,7 +330,7 @@ Rules:
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, or `html`. `ndjson`, `json` and `wfc` are CLI-only.
+    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `pytest`, `allure`, or `html`. `ndjson`, `json`, `wfc` and `pytest` are CLI-only.
 
     ```toml
     [reports.junit]
@@ -344,7 +344,7 @@ Rules:
     **Type**: `String`  
     **Default**: `null`  
 
-    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, or `html`. For `allure` and `html`, this is a directory path.
+    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `pytest`, `allure`, or `html`. For `allure` and `html`, this is a directory path.
 
     Setting this path automatically enables report generation without requiring `enabled = true`.
 

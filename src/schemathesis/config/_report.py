@@ -21,6 +21,7 @@ class ReportFormat(StrEnum):
     NDJSON = "ndjson"
     JSON = "json"
     WFC = "wfc"
+    PYTEST = "pytest"
     ALLURE = "allure"
     HTML = "html"
 
@@ -33,6 +34,7 @@ class ReportFormat(StrEnum):
             self.NDJSON: "NDJSON",
             self.JSON: "JSON",
             self.WFC: "WFC",
+            self.PYTEST: "pytest",
             self.ALLURE: "Allure",
             self.HTML: "HTML",
         }[self]
@@ -47,6 +49,7 @@ class ReportFormat(StrEnum):
             self.NDJSON: "ndjson",
             self.JSON: "json",
             self.WFC: "json",
+            self.PYTEST: "py",
             # directory output — no file extension
             self.ALLURE: "",
             self.HTML: "",
@@ -85,6 +88,7 @@ class ReportsConfig(DiffBase):
     ndjson: ReportConfig
     json: ReportConfig
     wfc: ReportConfig
+    pytest: ReportConfig
     allure: ReportConfig
     html: ReportConfig
     _timestamp: str
@@ -100,6 +104,7 @@ class ReportsConfig(DiffBase):
         ndjson: ReportConfig | None = None,
         json: ReportConfig | None = None,
         wfc: ReportConfig | None = None,
+        pytest: ReportConfig | None = None,
         allure: ReportConfig | None = None,
         html: ReportConfig | None = None,
     ) -> None:
@@ -111,6 +116,7 @@ class ReportsConfig(DiffBase):
         self.ndjson = ndjson or ReportConfig()
         self.json = json or ReportConfig()
         self.wfc = wfc or ReportConfig()
+        self.pytest = pytest or ReportConfig()
         self.allure = allure or ReportConfig()
         self.html = html or ReportConfig()
         self._timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
@@ -126,6 +132,7 @@ class ReportsConfig(DiffBase):
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
             json=ReportConfig.from_dict(data.get("json", {})),
             wfc=ReportConfig.from_dict(data.get("wfc", {})),
+            pytest=ReportConfig.from_dict(data.get("pytest", {})),
             allure=ReportConfig.from_dict(data.get("allure", {})),
             html=ReportConfig.from_dict(data.get("html", {})),
         )._mark_source_keys(data)
@@ -140,6 +147,7 @@ class ReportsConfig(DiffBase):
         ndjson_path: str | None = None,
         json_path: str | None = None,
         wfc_path: str | None = None,
+        pytest_path: str | None = None,
         allure_path: str | None = None,
         html_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
@@ -164,6 +172,9 @@ class ReportsConfig(DiffBase):
         if wfc_path is not None or ReportFormat.WFC in formats:
             self.wfc.enabled = True
             self.wfc.path = Path(wfc_path) if wfc_path is not None else wfc_path
+        if pytest_path is not None or ReportFormat.PYTEST in formats:
+            self.pytest.enabled = True
+            self.pytest.path = Path(pytest_path) if pytest_path is not None else pytest_path
         if allure_path is not None or ReportFormat.ALLURE in formats:
             self.allure.enabled = True
             self.allure.path = Path(allure_path) if allure_path is not None else allure_path
@@ -183,6 +194,9 @@ class ReportsConfig(DiffBase):
 
         if format.is_directory:
             return self.directory / f"{format.value}-{self._timestamp}"
+        if format == ReportFormat.PYTEST:
+            # pytest collects only `test_*.py` files, and a module name can't contain a hyphen.
+            return self.directory / f"test_schemathesis_{self._timestamp}.py"
 
         return self.directory / f"{format.value}-{self._timestamp}.{format.extension}"
 

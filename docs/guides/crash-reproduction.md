@@ -198,6 +198,16 @@ Reproduce with:
 
 A `~` marks a step whose status or body changed since the crash was recorded; `500 -> 503` shows the recorded and the current status. Values a step takes from an earlier response are listed as `name = replayed (was recorded, from step N)` (here the `itemId` of the item the replay just created, taken from step 1); an unchanged value shows only `(from step N)`, and a new ID alone does not count as a change. The curls use the replayed values, so they run against the current server state. If a linked value is no longer in the response, replay sends the recorded value and marks it `(recorded, not re-extracted)`.
 
+## Keep failures as pytest tests
+
+To add the failures to your API's own test suite, write them as a pytest file that needs only `requests`:
+
+```console
+uvx schemathesis run http://localhost:8000/openapi.json --report-pytest-path ./test_regressions.py
+```
+
+Each test sends the recorded requests and asserts the status codes the run saw, so it passes while the bug exists and fails once the fix changes the response. Stateful chains replay the recorded values as-is, so a server that issues a new ID per creation breaks the chain. Masked credentials need to be filled in before running.
+
 ## Exit codes
 
 - `0` - every replayed case is fixed, or there was nothing to replay

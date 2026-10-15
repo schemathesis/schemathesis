@@ -527,6 +527,13 @@ REPORT_WFC_PATH = OptionSpec(
     is_eager=True,
 )
 
+REPORT_PYTEST_PATH = OptionSpec(
+    "--report-pytest-path",
+    help="Custom path for the pytest file reproducing failures",
+    type=click.File("w", encoding="utf-8"),
+    is_eager=True,
+)
+
 REPORT_ALLURE_PATH = OptionSpec(
     "--report-allure-path",
     help="Directory for Allure result files",

@@ -21,6 +21,7 @@ from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACK
 from schemathesis.cli.ext.fs import load_baseline, open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
+from schemathesis.cli.pytest_report import PytestReportHandler
 from schemathesis.cli.wfc_report import WfcReportHandler
 from schemathesis.config import DEFAULT_REPORT_DIRECTORY, ReportFormat
 from schemathesis.core.errors import format_exception
@@ -46,6 +47,7 @@ try:
         NdjsonHandler: ReportFormat.NDJSON,
         JsonReportHandler: ReportFormat.JSON,
         WfcReportHandler: ReportFormat.WFC,
+        PytestReportHandler: ReportFormat.PYTEST,
         AllureHandler: ReportFormat.ALLURE,
         HtmlReportHandler: ReportFormat.HTML,
     }
@@ -55,6 +57,7 @@ try:
         JunitXMLHandler,
         NdjsonHandler,
         WfcReportHandler,
+        PytestReportHandler,
         OutputHandler,
         CrashHandler,
         HtmlReportHandler,
@@ -68,6 +71,7 @@ except ImportError:
         NdjsonHandler: ReportFormat.NDJSON,
         JsonReportHandler: ReportFormat.JSON,
         WfcReportHandler: ReportFormat.WFC,
+        PytestReportHandler: ReportFormat.PYTEST,
         HtmlReportHandler: ReportFormat.HTML,
     }
     _BUILT_IN_HANDLERS = (
@@ -76,6 +80,7 @@ except ImportError:
         JunitXMLHandler,
         NdjsonHandler,
         WfcReportHandler,
+        PytestReportHandler,
         OutputHandler,
         CrashHandler,
         HtmlReportHandler,
@@ -128,6 +133,10 @@ def initialize_report_handlers(
         path = config.reports.get_path(ReportFormat.WFC)
         open_file(path, _report_option(config, params, ReportFormat.WFC))
         handlers.append(WfcReportHandler(path))
+    if config.reports.pytest.enabled:
+        path = config.reports.get_path(ReportFormat.PYTEST)
+        open_file(path, _report_option(config, params, ReportFormat.PYTEST))
+        handlers.append(PytestReportHandler(path))
     if config.reports.allure.enabled:
         try:
             from schemathesis.cli.commands.run.handlers.allure import AllureHandler

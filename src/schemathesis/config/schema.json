@@ -62,6 +62,9 @@
         "wfc": {
           "$ref": "#/$defs/ReportConfig"
         },
+        "pytest": {
+          "$ref": "#/$defs/ReportConfig"
+        },
         "allure": {
           "$ref": "#/$defs/ReportConfig"
         },
