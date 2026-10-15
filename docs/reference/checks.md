@@ -26,7 +26,7 @@ expected-statuses = ["400", "422"]
 See [CLI reference](../reference/cli.md#-c-checks-checks) and [configuration reference](../reference/configuration.md#checks) for details.
 
 !!! note "Exception: max_response_time"
-    The `max_response_time` check is **disabled by default**. Enable it with `--max-response-time <seconds>` or `[checks.max_response_time]` in configuration. It is independent from `--checks`/`--exclude-checks`.
+    The `max_response_time` check is **disabled by default**. Enable it with `--max-response-time <seconds>` or `max_response_time = <seconds>` under `[checks]` in configuration. It is independent from `--checks`/`--exclude-checks`.
 
 ## Response timing
 
