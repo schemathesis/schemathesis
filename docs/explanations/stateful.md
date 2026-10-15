@@ -60,7 +60,7 @@ From these connections, Schemathesis generates random workflows such as:
 
 Schemathesis discovers connections per spec:
 
-- **OpenAPI**: schema analysis, `Location` headers, and explicit OpenAPI Links.
+- **OpenAPI**: schema analysis, URLs in responses (`Location` headers and body fields), and explicit OpenAPI Links.
 - **GraphQL**: the type graph itself encodes the connections — a mutation returning `Book!` is automatically connected to a query taking a `Book` id-typed argument.
 
 ### 1. Automatic Schema Analysis (OpenAPI)
@@ -122,9 +122,9 @@ Schemathesis builds the chain `addBook -> book` (and `addBook -> deleteBook`) au
 
 Argument-name conventions are recognized: `bookId`, `book_id`, `bookIds` all resolve to the `Book` type. Bespoke `<Type>ID` scalars (e.g. `BookID`) work the same way.
 
-### 3. Location Header Learning
+### 3. Learning from Response URLs
 
-While running tests, Schemathesis can also learn connections by observing `Location` headers in responses. When a response carries a `Location` header that points to another operation in the schema, Schemathesis adds a link to that operation under the status code the response had.
+While running tests, Schemathesis can also learn connections by observing URLs in responses. When a response carries a `Location` header that points to another operation in the schema, Schemathesis adds a link to that operation under the status code the response had.
 
 ```http
 POST /users -> 201 Created
@@ -133,7 +133,17 @@ Location: /users/123
 # Learns: GET /users/123, PUT /users/123, DELETE /users/123
 ```
 
-The headers are collected while the CLI runs the examples, coverage, and fuzzing phases, and the learned links are used by the stateful phase that follows. If you disable those phases, or run the stateful tests from Python or pytest, nothing is learned this way.
+The same applies to URLs inside successful JSON response bodies, as returned by hyperlinked APIs such as Django REST Framework. A body string counts when it is a root-relative path or an absolute URL on the same host as the request:
+
+```http
+GET /teams -> 200 OK
+
+{"results": [{"url": "http://localhost:8000/teams/3"}]}
+
+# Learns: GET /teams/3, using `$response.body#/results/0/url#regex:/teams/(.+)`
+```
+
+For arrays, only the first item is inspected. The URLs are collected while the CLI runs the examples, coverage, and fuzzing phases, and the learned links are used by the stateful phase that follows. If you disable those phases, or run the stateful tests from Python or pytest, nothing is learned this way.
 
 ### 4. Manual OpenAPI Links
 
@@ -161,7 +171,7 @@ Use manual links when automatic schema analysis misses a connection, or when you
 All sources add links; none of them disables another.
 
 - Links from schema analysis are added next to your manual links. An inferred link is skipped when it targets the same operation as an existing link and its parameters and request body are a subset of that link's. If its name is already taken, it gets a unique name.
-- Links learned from `Location` headers are added regardless of manual links. Duplicates among the learned links are skipped.
+- Links learned from response URLs are added regardless of manual links. Duplicates among the learned links are skipped.
 
 ## How Schemathesis Extends OpenAPI Links
 

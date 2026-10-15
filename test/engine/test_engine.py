@@ -2109,6 +2109,73 @@ def test_links_inferred_from_location_headers(ctx, app_runner):
     assert started.payload.inferred_transitions > 0
 
 
+TEAM_ID = 982451653
+
+
+@pytest.mark.parametrize(
+    ("body", "status_code", "content_type", "expected"),
+    [
+        ('{"results": [{"url": "{host}teams/982451653"}]}', 200, "application/json", True),
+        ('{"url": "/teams/982451653"}', 200, "application/json", True),
+        (json.dumps({f"field{i}": f"/teams/{TEAM_ID}" for i in range(25)}), 200, "application/json", True),
+        ('{"url": "http://example.com/teams/982451653"}', 200, "application/json", False),
+        ('{"a}b": "/teams/982451653"}', 200, "application/json", False),
+        ('{"url": "/teams/982451653"}', 404, "application/json", False),
+        ('{"url": "/teams/982451653"', 200, "application/json", False),
+        ('{"url": "/teams/982451653"}', 200, "application.json", False),
+    ],
+    ids=[
+        "absolute-same-origin",
+        "root-relative",
+        "many-urls",
+        "other-origin",
+        "key-closes-expression",
+        "error-status",
+        "invalid-json",
+        "malformed-content-type",
+    ],
+)
+def test_links_inferred_from_urls_in_response_bodies(ctx, app_runner, body, status_code, content_type, expected):
+    # Hyperlinked APIs (e.g. DRF) expose identifiers only inside URLs in the body.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/teams": {"get": {"responses": {"default": {"description": "OK"}}}},
+            "/teams/{pk}": {
+                "get": {
+                    "parameters": [{"name": "pk", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    fetched = []
+
+    @app.route("/teams")
+    def list_teams():
+        content = body.replace("{host}", flask.request.host_url)
+        return flask.Response(content, status=status_code, headers={"Content-Type": content_type})
+
+    @app.route("/teams/<int:pk>")
+    def get_team(pk):
+        fetched.append(pk)
+        return flask.jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_examples=5,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+    started = stream.find(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+
+    assert (started.payload.inferred_transitions > 0, TEAM_ID in fetched, stream.find_all(events.NonFatalError)) == (
+        expected,
+        expected,
+        [],
+    )
+
+
 def test_max_time_reserves_for_stateful_while_links_may_still_appear(ctx, app_runner):
     # Runtime-inferred links only show up once fuzzing has run, so the share has to be held before that.
     app, _ = ctx.openapi.make_flask_app(

@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Stateful links inferred from same-origin URLs in response bodies (e.g. DRF hyperlinked fields).
 - HTML report filters by path, failure kind and method.
 - `#regex:` extractor for `$response.body#/pointer` link expressions.
 

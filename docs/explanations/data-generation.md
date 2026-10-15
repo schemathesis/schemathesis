@@ -59,7 +59,7 @@ Generates random data based on the schema constraints.
 
 ### Stateful Phase
 
-Runs when Schemathesis knows how operations connect: OpenAPI links in the schema, links inferred by dependency analysis, links learned from `Location` headers during earlier CLI phases, or, for GraphQL, the connections in the type graph. Creates sequences where response data feeds into subsequent requests. See [Stateful Testing](stateful.md).
+Runs when Schemathesis knows how operations connect: OpenAPI links in the schema, links inferred by dependency analysis, links learned from URLs in responses (`Location` headers and body fields) during earlier CLI phases, or, for GraphQL, the connections in the type graph. Creates sequences where response data feeds into subsequent requests. See [Stateful Testing](stateful.md).
 
 ```yaml
 # Connection: POST /users -> GET /users/{id}
