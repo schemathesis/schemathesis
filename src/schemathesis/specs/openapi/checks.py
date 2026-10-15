@@ -1106,12 +1106,13 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
             # A drawn identifier rarely exists, so the server can reject the request before reading headers.
             if response.status_code == 404 and _targets_generated_resource(ctx, case.operation):
                 return None
-            allowed = ", ".join(map(str, expected_statuses))
+            sorted_statuses = sorted(expected_statuses)
+            allowed = ", ".join(map(str, sorted_statuses))
             raise MissingHeaderNotRejected(
                 operation=f"{case.method} {case.path}",
                 header_name=data.parameter,
                 status_code=response.status_code,
-                expected_statuses=list(expected_statuses),
+                expected_statuses=sorted_statuses,
                 message=f"Got {response.status_code} when missing required '{data.parameter}' header, expected {allowed}",
             )
     return None
