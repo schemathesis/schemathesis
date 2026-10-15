@@ -17,7 +17,7 @@ def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | 
     return FailingCase(
         case_id=group.case_id,
         failures=[
-            FailureEntry(title=title, messages=[failure.message for failure in failures])
+            FailureEntry(title=title, severity=failures[0].severity, messages=[failure.message for failure in failures])
             for title, failures in group_failures(group.failures)
         ],
         status_code=response.status_code if response is not None else None,
@@ -26,6 +26,12 @@ def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | 
         replay=replay,
         auth_identity=group.auth_identity if reproducible_by_identity(group.failures) else None,
     )
+
+
+def failure_titles(cases: list[FailingCase]) -> list[str]:
+    """Distinct failure titles, most severe first."""
+    severities = {failure.title: failure.severity for case in cases for failure in case.failures}
+    return sorted(severities, key=lambda title: (severities[title], title))
 
 
 def _commands(group: GroupedFailures) -> list[Command]:

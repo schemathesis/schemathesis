@@ -34,6 +34,7 @@ from schemathesis.reporting.html.timeline import (
 
 if TYPE_CHECKING:
     from schemathesis.cli.commands.run.handlers.output import WarningBlock, WarningGroup, WarningItem
+    from schemathesis.core.failures import Severity
     from schemathesis.reporting.html.model import ErrorEntry, FailingCase, OperationRow, ReportData
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
@@ -113,8 +114,8 @@ def render_index(data: ReportData) -> str:
     parts = [
         report_top(generated_at=data.meta.generated_at),
         _hero(data),
-        _warnings(data, anchors),
         _target_block(data),
+        _warnings(data, anchors),
         _timeline(data, anchors),
         _operations_table(data, anchors),
         _extraction_failures(data),
@@ -145,11 +146,22 @@ def _warning_item(item: WarningItem, anchors: dict[str, str]) -> str:
     return f'<li><a class="w-op" href="#{anchor}">{badge}<span class="path">{esc(path)}</span></a>{note}{extra}</li>'
 
 
+# A warning can name hundreds of operations; the rest wait behind an expander so the table stays in view.
+_WARNING_ITEMS_SHOWN = 10
+
+
 def _warning_group(group: WarningGroup, anchors: dict[str, str]) -> str:
     heading = f'<h4 class="w-group-title">{esc(group.heading)}</h4>' if group.heading is not None else ""
-    items = "".join(_warning_item(item, anchors) for item in group.items)
+    shown, rest = group.items[:_WARNING_ITEMS_SHOWN], group.items[_WARNING_ITEMS_SHOWN:]
+    items = f'<ul class="w-items">{"".join(_warning_item(item, anchors) for item in shown)}</ul>'
+    if rest:
+        more = (
+            f'<span class="more"><span class="m-closed">+{len(rest)} more</span><span class="m-open">less</span></span>'
+        )
+        others = "".join(_warning_item(item, anchors) for item in rest)
+        items += f'<details class="fails w-more"><summary>{more}</summary><ul class="w-items">{others}</ul></details>'
     tips = "".join(f'<p class="w-tip"><b>Tip:</b> {_code_spans(tip)}</p>' for tip in group.tips or [])
-    return f'<div class="w-group">{heading}<ul class="w-items">{items}</ul>{tips}</div>'
+    return f'<div class="w-group">{heading}{items}{tips}</div>'
 
 
 def _affecting_warnings(data: ReportData) -> list[WarningBlock]:
@@ -881,8 +893,8 @@ def _natural_key(text: str) -> tuple[str | int, ...]:
     return tuple(int(part) if index % 2 else part for index, part in enumerate(_DIGITS.split(text)))
 
 
-def _operation_order(row: OperationRow) -> tuple[int, tuple[str | int, ...], str]:
-    return (-len(row.failures), _natural_key(row.path), row.method)
+def _operation_order(row: OperationRow) -> tuple[Severity, int, tuple[str | int, ...], str]:
+    return (row.severity, -len(row.failures), _natural_key(row.path), row.method)
 
 
 def _group_header(status: OperationStatus, rows: list[OperationRow], *, collapsible: bool) -> str:

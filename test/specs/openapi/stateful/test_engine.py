@@ -1525,3 +1525,185 @@ def test_suites_start_from_different_roots(ctx, app_runner, stop_event):
     first_steps = [_first_step_of_first_scenario(app_runner, app, stop_event, seed) for seed in range(12)]
     assert first_steps.count("GET /alpha") <= 6, first_steps
     assert len(set(first_steps)) >= 3, first_steps
+
+
+ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+    "required": ["id", "name"],
+}
+
+
+def _listed_items_app(ctx):
+    return ctx.openapi.make_flask_app(
+        {
+            "/announcements": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "array", "items": ITEM_SCHEMA}}},
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/0/id"}}
+                            },
+                        },
+                        "401": {"description": "Unauthorized"},
+                    }
+                }
+            },
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": ITEM_SCHEMA}},
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+
+def _run_items_app(app, app_runner, stop_event, *, max_examples):
+    config = schemathesis.Config.from_dict(
+        {
+            "seed": 1,
+            "checks": {"enabled": False},
+            "generation": {"mode": "positive", "max-examples": max_examples, "database": "none"},
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
+    return collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+
+def _root_steps(result):
+    return [
+        [
+            f"{node.value.method} {node.value.path}"
+            for node in event.recorder.cases.values()
+            if node.parent_id is None and node.transition is None
+        ]
+        for event in result.events
+        if isinstance(event, events.ScenarioFinished)
+    ]
+
+
+@pytest.mark.parametrize(
+    "unproductive_response",
+    [({"detail": "Unauthorized"}, 401), ([], 200)],
+    ids=["unauthorized", "empty-list"],
+)
+def test_root_that_feeds_no_link_is_not_repeated(ctx, app_runner, stop_event, unproductive_response):
+    app, _ = _listed_items_app(ctx)
+    items = {}
+
+    @app.route("/announcements", methods=["GET"])
+    def list_announcements():
+        return jsonify(unproductive_response[0]), unproductive_response[1]
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        item_id = len(items) + 1
+        items[item_id] = {"id": item_id, "name": "item"}
+        return jsonify(items[item_id]), 201
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id not in items:
+            return jsonify({"detail": "Not found"}), 404
+        return jsonify(items[item_id]), 200
+
+    scenarios = _root_steps(_run_items_app(app, app_runner, stop_event, max_examples=50))
+
+    assert [steps for steps in scenarios if steps.count("GET /announcements") > 2] == []
+
+
+def _run_items_app_with_server_errors(app, app_runner, stop_event):
+    config = schemathesis.Config.from_dict(
+        {
+            "seed": 1,
+            "checks": {"enabled": False, "not_a_server_error": {"enabled": True}},
+            "generation": {"mode": "positive", "max-examples": 50, "database": "none"},
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
+    return collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+
+def test_server_error_on_root_that_feeds_no_link_is_reported(ctx, app_runner, stop_event):
+    app, _ = _listed_items_app(ctx)
+
+    @app.route("/announcements", methods=["GET"])
+    def list_announcements():
+        return jsonify({"detail": "Internal Server Error"}), 500
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1, "name": "item"}), 201
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({"id": item_id, "name": "item"}), 200
+
+    result = _run_items_app_with_server_errors(app, app_runner, stop_event)
+
+    assert {failure.failure_info.failure.title for failure in result.failures} == {"Server error"}
+
+
+def test_bug_behind_root_that_feeds_links_once_data_exists(ctx, app_runner, stop_event):
+    # Listing is empty until an item is created; only the listing exposes item ids.
+    app, _ = _listed_items_app(ctx)
+    items = set()
+
+    @app.route("/announcements", methods=["GET"])
+    def list_announcements():
+        return jsonify([{"id": item_id, "name": "item"} for item_id in sorted(items)]), 200
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        item_id = 10_000_000 + len(items)
+        items.add(item_id)
+        return jsonify({"id": 0, "name": "item"}), 201
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id in items:
+            return jsonify({"detail": "Internal Server Error"}), 500
+        return jsonify({"detail": "Not found"}), 404
+
+    result = _run_items_app_with_server_errors(app, app_runner, stop_event)
+
+    assert {failure.failure_info.failure.title for failure in result.failures} == {"Server error"}

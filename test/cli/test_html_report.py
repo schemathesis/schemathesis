@@ -4,6 +4,7 @@ import re
 import sys
 import threading
 import time
+from html import escape
 from types import SimpleNamespace
 
 import pytest
@@ -646,6 +647,51 @@ def test_html_report_operations_in_natural_order(ctx, cli, app_runner, report_di
     ]
 
 
+def failed_rows(html):
+    return [
+        (anchor, [first, *re.findall(r"<li>([^<]+)</li>", rest)])
+        for anchor, first, rest in re.findall(
+            r'<tr class="op-row row-failed[^"]*" id="([^"]+)">.*?<span class="failure-title">([^<]+)</span>(.*?)</td>',
+            html,
+        )
+    ]
+
+
+def test_html_report_failures_ordered_by_severity(ctx, cli, app_runner, report_dir):
+    header = {"X-Token": {"required": True, "schema": {"type": "string"}}}
+    json_body = {"application/json": {"schema": {"type": "object"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/array": {
+                "get": {"responses": {"200": {"description": "OK", "headers": header, "content": json_body}}}
+            },
+            "/api/crash": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/text": {
+                "get": {"responses": {"200": {"description": "OK", "headers": header, "content": json_body}}}
+            },
+        }
+    )
+
+    @app.route("/api/array")
+    def array():
+        return jsonify([])
+
+    @app.route("/api/crash")
+    def crash():
+        return "", 500
+
+    @app.route("/api/text")
+    def text():
+        return Response("plain", content_type="text/plain")
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
+    assert failed_rows(html) == [
+        ("op-get-api-crash", ["Server error", "Undocumented HTTP status code"]),
+        ("op-get-api-array", ["Response violates schema", "Missing required headers"]),
+        ("op-get-api-text", ["Missing required headers", "Undocumented Content-Type"]),
+    ]
+
+
 def test_html_report_graphql(ctx, cli, report_dir, snapshot_html):
     api = ctx.graphql.apps.books()
     assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
@@ -729,6 +775,41 @@ def test_html_report_failure_details(ctx, cli, app_runner, report_dir, snapshot_
 
     html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
     assert html == snapshot_html
+
+
+def test_html_report_schema_violation_message_truncates_large_value(ctx, cli, app_runner, report_dir):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    }
+                }
+            },
+        }
+    )
+
+    @app.route("/api/items")
+    def items():
+        return jsonify([{"id": index, "name": f"item-{index}"} for index in range(1000)])
+
+    result = cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--checks=response_schema_conformance",
+        f"--report-html-path={report_dir}",
+        exit_code=ExitCode.FAILURES,
+    )
+    expected = (
+        '[{"id":0,"name":"item-0"},{"id":1,"name":"item-1"},{"id":2,"name":"item-2"}, ... is not of type "object"'
+    )
+    assert [line.strip() for line in result.stdout.splitlines() if line.endswith('is not of type "object"')] == [
+        expected
+    ]
+    messages = re.findall(r'<pre class="msg">([^<]*)</pre>', read_report(report_dir))
+    assert [message.split("\n", 1)[0] for message in messages] == [escape(expected)]
 
 
 # Under an unknown shell, curl commands for invalid bodies end with warning lines.
@@ -1291,6 +1372,27 @@ def test_html_report_caveat_counts_affecting_warnings(ctx, cli, app_runner, repo
         "--mode=positive",
     )
     assert re.findall(r'<a class="hs-caveat"[^>]*>([^<]*)</a>', html) == ["2 warnings affect results"]
+
+
+def test_html_report_long_warning_shows_first_operations(ctx, cli, app_runner, report_dir):
+    app, _ = ctx.openapi.make_flask_app(
+        {f"/api/users/{name}": {"get": {"responses": {"200": {"description": "OK"}}}} for name in "abcdefghijkl"}
+    )
+
+    @app.route("/api/users/<name>")
+    def users(name):
+        return jsonify({"detail": "Unauthorized"}), 401
+
+    html = run_with_report(
+        cli, report_dir, app_runner.openapi_url(app), "--checks=not_a_server_error", "--mode=positive"
+    )
+    warning = re.search(r'<details id="w-authentication-failed".*?</details></li>', html, flags=re.DOTALL).group(0)
+    shown, hidden = warning.split('<details class="fails w-more">')
+    path = r'<span class="path">/api/users/(\w)</span>'
+    assert re.findall(path, shown) == list("abcdefghij")
+    assert re.findall(path, hidden) == ["k", "l"]
+    assert '<span class="m-closed">+2 more</span>' in hidden
+    assert html.index('<section class="target-block">') < html.index('<section class="warnings"')
 
 
 # An unrecognised entrypoint hides the Command row instead of showing an uncopyable placeholder.
