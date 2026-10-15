@@ -584,6 +584,31 @@ def test_path_parameters_encoding(ctx):
     stream.assert_no_failures()
 
 
+def test_path_enum_value_with_slash_is_sent_encoded(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{item}": {
+                "get": {
+                    "parameters": [
+                        {"name": "item", "in": "path", "required": True, "schema": {"type": "string", "enum": ["a/b"]}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    raw_paths = []
+
+    @app.before_request
+    def capture():
+        raw_paths.append(flask.request.environ["RAW_URI"])
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(schema, phases=[PhaseName.FUZZING], max_examples=1, modes=[GenerationMode.POSITIVE])
+    stream.assert_no_errors()
+    assert {path for path in raw_paths if path.startswith("/items/")} == {"/items/a%2Fb"}
+
+
 def test_exceptions(ctx):
     api = ctx.openapi.apps.slow()
     schema = schemathesis.openapi.from_url(api.schema_url)
