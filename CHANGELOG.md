@@ -27,6 +27,7 @@
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - "Response violates schema" messages embedding the whole response value on one line.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
+- Nested objects in inline query parameter schemas serialized as their property names only.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
 - `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
 - Clicks in the HTML report opening an unrelated row in Safari.

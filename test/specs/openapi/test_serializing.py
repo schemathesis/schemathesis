@@ -1404,8 +1404,8 @@ _NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][p
         pytest.param(
             {"name": "request", "in": "query", "required": True, "schema": NESTED_OBJECT_SCHEMA},
             {"request": _NESTED_INPUT},
-            {"pagination": _NESTED_INPUT["pagination"]},
-            id="inline-nested-keeps-extract",
+            {"pagination[pageNumber]": 1, "pagination[pageSize]": 10},
+            id="inline-nested",
         ),
         pytest.param(
             {
@@ -1417,8 +1417,8 @@ _NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][p
                 "schema": NESTED_OBJECT_SCHEMA,
             },
             {"request": _NESTED_INPUT},
-            {"request[pagination]": _NESTED_INPUT["pagination"]},
-            id="deepObject-inline-stays-one-level",
+            _NESTED_EXPECTED,
+            id="deepObject-inline-nested",
         ),
         pytest.param(
             {
@@ -1448,8 +1448,8 @@ _NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][p
                 },
             },
             {"q": {"foo-1": "value", "spam-1": {"pagination": {"pageNumber": 1, "pageSize": 10}}}},
-            {"foo-1": "value", "spam-1": {"pagination": {"pageNumber": 1, "pageSize": 10}}},
-            id="inline-object-with-ref-property-keeps-extract",
+            {"foo-1": "value", "spam-1[pagination][pageNumber]": 1, "spam-1[pagination][pageSize]": 10},
+            id="inline-object-with-ref-property",
         ),
         pytest.param(
             {"name": "page", "in": "query", "required": True, "schema": {"type": "integer"}},
@@ -1593,6 +1593,21 @@ def test_optional_querystring_is_omitted_or_sent_raw(ctx, content, expected):
     assert fuzzing_rendered(operation, prepared_query_string) == expected
 
 
+_INLINE_NESTED_FILTER = {
+    "type": "object",
+    "properties": {
+        "inner": {
+            "type": "object",
+            "properties": {"a": {"enum": ["x"]}},
+            "required": ["a"],
+            "additionalProperties": False,
+        }
+    },
+    "required": ["inner"],
+    "additionalProperties": False,
+}
+
+
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize(
     ("schema", "style", "expected"),
@@ -1602,6 +1617,18 @@ def test_optional_querystring_is_omitted_or_sent_raw(ctx, content, expected):
             "deepObject",
             "filter%5Binner%5D%5Ba%5D=x",
             id="recursive-ref-deepObject-nested",
+        ),
+        pytest.param(
+            _INLINE_NESTED_FILTER,
+            "deepObject",
+            "filter%5Binner%5D%5Ba%5D=x",
+            id="inline-deepObject-nested",
+        ),
+        pytest.param(
+            _INLINE_NESTED_FILTER,
+            "form",
+            "inner%5Ba%5D=x",
+            id="inline-form-nested",
         ),
         pytest.param(
             {"enum": [{"a": "x"}], "anyOf": [{"properties": {"a": {}}}]},

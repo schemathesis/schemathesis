@@ -510,7 +510,8 @@ def deep_object(item: Generated, name: str) -> None:
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
     if generated or isinstance(generated, dict):
-        item.update({f"{name}[{key}]": value for key, value in force_dict(generated).items()})
+        for key, value in force_dict(generated).items():
+            item.update(_expanded(f"{name}[{key}]", value))
     else:
         item[name] = ""
 
@@ -531,11 +532,21 @@ def extracted_object(item: Generated, name: str) -> None:
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
     if isinstance(generated, dict):
-        # A declared parameter of the same name keeps its own value.
         for key, value in generated.items():
-            item.setdefault(key, value)
+            # A declared parameter of the same name keeps its own value.
+            for expanded_key, expanded_value in _expanded(key, value).items():
+                item.setdefault(expanded_key, expanded_value)
     else:
         item[name] = ""
+
+
+def _expanded(key: str, value: object) -> dict[str, object]:
+    # A nested object has no wire form of its own, so it expands into bracketed keys.
+    if isinstance(value, dict) and value:
+        flat: dict[str, object] = {}
+        _flatten_nested(value, key, flat)
+        return flat
+    return {key: value}
 
 
 @conversion
