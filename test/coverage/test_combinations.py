@@ -33,6 +33,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     _positive_string,
     cover_schema_iter,
 )
+from schemathesis.specs.openapi.formats import FORMAT_NARROWERS
 from test.coverage.helpers import scenario_values
 from test.utils import to_float32
 
@@ -2503,6 +2504,16 @@ def test_bounded_pattern_does_not_use_builtin_for_custom_format(pctx):
     pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
     schema = {"type": "string", "format": "email", "pattern": r"^[a-z]+@example\.com$", "maxLength": 254}
     assert pctx.generate_from_schema(schema) == "a@example.com"
+
+
+def test_bounded_broad_pattern_does_not_call_builtin_for_custom_format(pctx, monkeypatch):
+    def unexpected_narrower(min_length, max_length):
+        pytest.fail("A custom format must not use the built-in length-aware generator")
+
+    monkeypatch.setitem(FORMAT_NARROWERS, "email", unexpected_narrower)
+    pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
+    schema = {"type": "string", "format": "email", "pattern": r"^[^@]+@[^@]+\.[^@]+$", "maxLength": 254}
+    assert_conform([pctx.generate_from_schema(schema)], schema)
 
 
 def test_positive_string_skips_infeasible_boundary_lengths(pctx):
