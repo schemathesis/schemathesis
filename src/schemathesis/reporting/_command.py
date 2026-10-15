@@ -59,7 +59,12 @@ def sanitize_args(args: Sequence[str], *, config: SanitizationConfig) -> list[st
         sanitizer = _SANITIZERS.get(option)
         if sanitizer is None:
             # The schema location is positional, and any option may take a URL we don't know about
-            result.append(_sanitize_url(arg, config) if arg.startswith(("http://", "https://")) else arg)
+            if arg.startswith(("http://", "https://")):
+                result.append(_sanitize_url(arg, config))
+            elif option.startswith("--") and separator and value.startswith(("http://", "https://")):
+                result.append(f"{option}{separator}{_sanitize_url(value, config)}")
+            else:
+                result.append(arg)
         elif separator:
             result.append(f"{option}{separator}{sanitizer(value, config)}")
         else:
