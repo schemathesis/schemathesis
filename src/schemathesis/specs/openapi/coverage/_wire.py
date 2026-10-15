@@ -26,7 +26,10 @@ def jsonify(value: Any) -> Any:
 
 
 def stringify_value(val: Any, container_name: str) -> Any:
-    if val is None or isinstance(val, int | float | bool):
+    if isinstance(val, dict):
+        # String values, the usual case, stay as they are without a call each.
+        return {key: sub if type(sub) is str else stringify_value(sub, container_name) for key, sub in val.items()}
+    if val is None or isinstance(val, (int, float, bool)):
         return to_wire_string(val)
     if isinstance(val, list):
         if container_name == "query":
@@ -34,11 +37,6 @@ def stringify_value(val: Any, container_name: str) -> Any:
             return [stringify_value(item, container_name) for item in val]
         # use comma-separated values style for arrays
         return ",".join(str(stringify_value(sub, container_name)) for sub in val)
-    if isinstance(val, dict):
-        # Headers/cookies/query are typically all-string dicts; skip the per-value recursion.
-        if all(type(v) is str for v in val.values()):
-            return dict(val)
-        return {key: stringify_value(sub, container_name) for key, sub in val.items()}
     return val
 
 

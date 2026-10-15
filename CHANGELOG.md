@@ -21,12 +21,14 @@
 - HTML report up to ~20% smaller on runs with many failures.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
+- Faster coverage phase for large enums, wide objects, nested bodies and many headers.
 
 ### :bug: Fixed
 
 - `st replay` reporting "operation not found in schema" for every GraphQL failure.
 - Unsorted expected statuses in `missing_required_header` failure messages.
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
+- Generate positive coverage-phase cases for large unique arrays of UUIDs.
 - Inferred `Location` links overwriting each other when several targets share a status code.
 - Empty `cookies` lists for requests and responses in HAR reports.
 - Empty response `mimeType` and `redirectURL` in HAR reports.

@@ -18,6 +18,7 @@ class GenerationSession:
     __slots__ = (
         "_lock",
         "_pinned",
+        "distinct_elements",
         "draw_outcomes",
         "format_validators",
         "pattern_strategies",
@@ -33,6 +34,7 @@ class GenerationSession:
         self.removed_examples: BoundedCache = BoundedCache(maxsize=4096)
         self.ready_bundles: BoundedCache = BoundedCache(maxsize=64)
         self.draw_outcomes: BoundedCache = BoundedCache(maxsize=128)
+        self.distinct_elements: BoundedCache = BoundedCache(maxsize=16)
         self.pattern_strategies: BoundedCache = BoundedCache(maxsize=128)
         self.static_bundles: BoundedCache = BoundedCache(maxsize=64)
         # Pinning a registry keeps its `id` from being recycled into a colliding token.
@@ -59,6 +61,7 @@ class GenerationSession:
         self.removed_examples.clear()
         self.ready_bundles.clear()
         self.draw_outcomes.clear()
+        self.distinct_elements.clear()
         self.pattern_strategies.clear()
         self.static_bundles.clear()
         with self._lock:
