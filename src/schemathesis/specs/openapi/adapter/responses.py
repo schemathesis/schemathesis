@@ -35,6 +35,7 @@ class ResolvedSchema:
     # Set when the response documents a schema that names a component the document does not define.
     # `schema` is `None` either way, but this tells "unvalidatable" apart from "nothing documented".
     unresolvable_reference: str | None = None
+    has_discriminator: bool = False
 
 
 @dataclass(slots=True)
@@ -45,6 +46,7 @@ class CachedValidation:
     validator: jsonschema_rs.Validator | None
     name_to_uri: dict[str, str]
     unresolvable_reference: str | None = None
+    has_discriminator: bool = False
 
 
 @dataclass
@@ -109,7 +111,10 @@ class OpenApiResponse:
                 # Create cache entry with schema but no validator yet (lazy validator creation)
                 if bundled is not None:
                     self._validation_cache[cache_key] = CachedValidation(
-                        schema=bundled.schema, validator=None, name_to_uri=bundled.name_to_uri
+                        schema=bundled.schema,
+                        validator=None,
+                        name_to_uri=bundled.name_to_uri,
+                        has_discriminator=_contains_discriminator(bundled.schema),
                     )
                 else:
                     self._validation_cache[cache_key] = CachedValidation(schema=None, validator=None, name_to_uri={})
@@ -120,6 +125,7 @@ class OpenApiResponse:
             media_type=resolved_media_type,
             name_to_uri=cached.name_to_uri,
             unresolvable_reference=cached.unresolvable_reference,
+            has_discriminator=cached.has_discriminator,
         )
 
     def get_stream_schema(self, media_type: str | None) -> ResolvedSchema:
@@ -745,3 +751,16 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
                     yield name, example
             if example_keyword in definition:
                 yield name, definition[example_keyword]
+
+
+def _contains_discriminator(schema: JsonSchema) -> bool:
+    stack: list[object] = [schema]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            if isinstance(node.get("discriminator"), dict):
+                return True
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return False
