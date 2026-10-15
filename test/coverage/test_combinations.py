@@ -33,6 +33,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     _positive_string,
     cover_schema_iter,
 )
+from schemathesis.specs.openapi.formats import FORMAT_NARROWERS
 from test.coverage.helpers import scenario_values
 from test.utils import to_float32
 
@@ -2462,6 +2463,66 @@ def test_generate_from_schema_pattern_length_incompatible(pctx, schema):
     # Pattern bounds make the length constraint structurally impossible.
     with pytest.raises(Unsatisfiable):
         pctx.generate_from_schema(schema)
+
+
+@pytest.mark.parametrize("update_pattern", [None, update_quantifier])
+@pytest.mark.parametrize(
+    ("fmt", "pattern", "length"),
+    [("email", r"^[^@]+@[^@]+\.[^@]+$", length) for length in [63, 64, 253, 254]]
+    + [("uri", r"^https?://.+$", 100), ("date-time", r"^.+T.+$", 26)],
+)
+def test_bounded_format_pattern_keeps_exact_length(ctx_factory, update_pattern, fmt, pattern, length):
+    ctx = ctx_factory(update_pattern=update_pattern)
+    schema = {
+        "type": "string",
+        "format": fmt,
+        "pattern": pattern,
+        "minLength": length,
+        "maxLength": length,
+    }
+    value = ctx.generate_from_schema(schema)
+    assert len(value) == length
+    assert_conform([value], schema)
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "string", "format": "email", "pattern": r"^ab@example\.com$", "maxLength": 14}, "ab@example.com"),
+        # The URI generator cannot supply such a short value at all.
+        ({"type": "string", "format": "uri", "pattern": "^a:b$", "maxLength": 3}, "a:b"),
+        ({"type": "string", "format": "binary", "pattern": "^ab+$", "maxLength": 5}, "ab"),
+    ],
+)
+def test_bounded_format_candidate_rejected_by_pattern_uses_regex(pctx, schema, expected):
+    # The length-aware email generator uses a one-character local part, so the
+    # literal pattern must still get a chance to supply its only valid value.
+    assert pctx.generate_from_schema(schema) == expected
+
+
+@pytest.mark.parametrize("candidate_fails", [True, False])
+def test_bounded_format_candidate_falls_back_to_regex(pctx, monkeypatch, candidate_fails):
+    calls = []
+
+    def narrower(min_length, max_length):
+        calls.append((min_length, max_length))
+        if candidate_fails:
+            # Exercise a genuinely empty Hypothesis draw, not a mocked exception.
+            return st.nothing()
+        return st.just("a@example.com")
+
+    monkeypatch.setitem(FORMAT_NARROWERS, "email", narrower)
+    schema = {"type": "string", "format": "email", "pattern": r"^ab@example\.com$", "maxLength": 14}
+    value = pctx.generate_from_schema(schema)
+    assert calls == [(0, 14)]
+    assert value == "ab@example.com"
+    assert_conform([value], schema)
+
+
+def test_bounded_pattern_does_not_use_builtin_for_custom_format(pctx):
+    pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
+    schema = {"type": "string", "format": "email", "pattern": r"^[^@]+@[^@]+\.[^@]+$", "maxLength": 254}
+    assert pctx.generate_from_schema(schema) == "0@0.0"
 
 
 def test_positive_string_skips_infeasible_boundary_lengths(pctx):

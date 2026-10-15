@@ -120,6 +120,13 @@ def test_format_with_length_constraints(benchmark, schema):
     benchmark(lambda: list(cover_schema_iter(FORMAT_CONTEXT, schema)))
 
 
+@pytest.mark.benchmark(group="coverage-format-with-pattern-and-length")
+@pytest.mark.parametrize("pattern", [r"^[^@]+@[^@]+\.[^@]+$", EMAIL_PATTERN], ids=["short", "long"])
+def test_email_pattern_with_length_constraints(benchmark, pattern):
+    schema = {"type": "string", "format": "email", "pattern": pattern, "maxLength": 254}
+    benchmark(lambda: list(cover_schema_iter(FORMAT_CONTEXT, schema)))
+
+
 NUMBER_CONSTRAINTS = [
     {"type": "number", "minimum": 0, "maximum": 100},
     {"type": "integer", "multipleOf": 5},

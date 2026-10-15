@@ -10,6 +10,7 @@
 
 ### :bug: Fixed
 
+- Slow coverage generation for email patterns combined with length bounds.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - "Response violates schema" messages embedding the whole response value on one line.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
