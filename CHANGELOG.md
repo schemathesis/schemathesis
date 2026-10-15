@@ -26,6 +26,7 @@
 
 - `st replay` reporting "operation not found in schema" for every GraphQL failure.
 - Unsorted expected statuses in `missing_required_header` failure messages.
+- Unchecked discriminator values in referenced, array item, and nested property response schemas.
 - Inferred `Location` links overwriting each other when several targets share a status code.
 - Empty `cookies` lists for requests and responses in HAR reports.
 - Slow coverage generation for email patterns combined with length bounds.

@@ -9,7 +9,8 @@ import jsonschema_rs
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, SchemaLocation
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
-from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
@@ -248,12 +249,45 @@ def _check_discriminator(
     data: object,
     resolved: ResolvedSchema,
 ) -> Failure | None:
-    """Return a failure if the discriminator property value is not in the known schema mapping."""
-    if not isinstance(data, dict):
+    """Return a failure if any discriminator property value is not in its known schema mapping."""
+    root = resolved.schema
+    # Responses are walked only when some schema behind them declares a discriminator.
+    if not resolved.has_discriminator or not isinstance(root, dict):
         return None
-    schema = resolved.schema
-    if not isinstance(schema, dict):
-        return None
+    bundle = root.get(BUNDLE_STORAGE_KEY)
+    if not isinstance(bundle, dict):
+        bundle = {}
+    # Walk the schema along the response data, so the cost is bounded by the data, not by the schema size.
+    stack: list[tuple[object, object]] = [(root, data)]
+    seen: set[tuple[int, int]] = set()
+    while stack:
+        schema, value = stack.pop()
+        if not isinstance(schema, dict) or not isinstance(value, (dict, list)):
+            continue
+        key = (id(schema), id(value))
+        if key in seen:
+            continue
+        seen.add(key)
+        reference = schema.get("$ref")
+        if isinstance(reference, str) and reference.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+            stack.append((bundle.get(reference[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]), value))
+        if isinstance(value, dict):
+            failure = _discriminator_failure(operation, schema, value, resolved.name_to_uri)
+            if failure is not None:
+                return failure
+            properties = schema.get("properties")
+            if isinstance(properties, dict):
+                stack.extend((subschema, value[name]) for name, subschema in properties.items() if name in value)
+        else:
+            items = schema.get("items")
+            if isinstance(items, dict):
+                stack.extend((items, item) for item in value)
+    return None
+
+
+def _discriminator_failure(
+    operation: APIOperation, schema: JsonSchemaObject, data: dict[str, object], name_to_uri: dict[str, str]
+) -> Failure | None:
     discriminator = schema.get("discriminator")
     if not isinstance(discriminator, dict):
         return None
@@ -276,7 +310,7 @@ def _check_discriminator(
             if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
                 continue
             bundled_name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
-            schema_name = get_implicit_discriminator_value(resolved.name_to_uri.get(bundled_name, ""))
+            schema_name = get_implicit_discriminator_value(name_to_uri.get(bundled_name, ""))
             if schema_name:
                 known_values.add(schema_name)
 

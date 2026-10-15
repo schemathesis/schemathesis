@@ -3703,6 +3703,101 @@ def test_response_schema_conformance_discriminator_inline_branch(ctx, response_f
     assert exc_info.value.title == "Discriminator value not in schema mapping"
 
 
+_KIND_BRANCHES = [{"$ref": "#/components/schemas/Cat"}, {"$ref": "#/components/schemas/Dog"}]
+_KIND_MAPPING = {"propertyName": "kind", "mapping": {"cat": "#/components/schemas/Cat"}}
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+@pytest.mark.parametrize(
+    ("response_schema", "body", "should_fail"),
+    [
+        ({"$ref": "#/components/schemas/AnyPet"}, {"kind": "parrot"}, True),
+        ({"$ref": "#/components/schemas/OneOfPet"}, {"kind": "parrot"}, True),
+        ({"$ref": "#/components/schemas/AnyPet"}, {"kind": "Cat"}, False),
+        (
+            {"type": "array", "items": {"anyOf": _KIND_BRANCHES, "discriminator": _KIND_MAPPING}},
+            [{"kind": "parrot"}],
+            True,
+        ),
+        (
+            {"type": "array", "items": {"anyOf": _KIND_BRANCHES, "discriminator": _KIND_MAPPING}},
+            [{"kind": "cat"}],
+            False,
+        ),
+        (
+            {"type": "object", "properties": {"pet": {"$ref": "#/components/schemas/OneOfPet"}}},
+            {"pet": {"kind": "parrot"}},
+            True,
+        ),
+        (
+            {"type": "object", "properties": {"pet": {"$ref": "#/components/schemas/OneOfPet"}}},
+            {"pet": {"kind": "Dog"}},
+            False,
+        ),
+        (
+            {"$ref": "#/components/schemas/Tree"},
+            {"pets": [{"kind": "Cat"}], "children": [{"pets": [{"kind": "parrot"}]}]},
+            True,
+        ),
+        (
+            {"$ref": "#/components/schemas/Tree"},
+            {"pets": [{"kind": "Cat"}], "children": [{"pets": [{"kind": "Dog"}]}]},
+            False,
+        ),
+    ],
+    ids=[
+        "ref-any-of-invalid",
+        "ref-one-of-invalid",
+        "ref-component-name-valid",
+        "array-items-invalid",
+        "array-items-mapping-valid",
+        "property-invalid",
+        "property-valid",
+        "recursive-invalid",
+        "recursive-valid",
+    ],
+)
+def test_response_schema_conformance_discriminator_nested(
+    ctx, response_factory, version, response_schema, body, should_fail
+):
+    schema = ctx.openapi.load_schema(
+        {
+            "/pets": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": response_schema}}}
+                    }
+                }
+            }
+        },
+        version=version,
+        components={
+            "schemas": {
+                "Cat": {"type": "object", "properties": {"kind": {"type": "string"}}},
+                "Dog": {"type": "object", "properties": {"kind": {"type": "string"}}, "required": ["barks"]},
+                "AnyPet": {"anyOf": _KIND_BRANCHES, "discriminator": {"propertyName": "kind"}},
+                "OneOfPet": {"oneOf": _KIND_BRANCHES, "discriminator": {"propertyName": "kind"}},
+                "Tree": {
+                    "type": "object",
+                    "properties": {
+                        "pets": {"type": "array", "items": {"$ref": "#/components/schemas/AnyPet"}},
+                        "children": {"type": "array", "items": {"$ref": "#/components/schemas/Tree"}},
+                    },
+                },
+            }
+        },
+    )
+    case = schema["/pets"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(content=json.dumps(body).encode()), True)
+
+    if should_fail:
+        with pytest.raises(Failure) as exc_info:
+            response_schema_conformance(_CHECK_CTX, response, case)
+        assert exc_info.value.title == "Discriminator value not in schema mapping"
+    else:
+        assert response_schema_conformance(_CHECK_CTX, response, case) is None
+
+
 def test_response_schema_conformance_discriminator_with_file_branches(tmp_path, response_factory):
     pet = json.dumps({"type": "object", "properties": {"petType": {"type": "string"}}})
     (tmp_path / "cat.json").write_text(pet)
