@@ -29,6 +29,7 @@
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
 - Inferred `Location` links overwriting each other when several targets share a status code.
 - Empty `cookies` lists for requests and responses in HAR reports.
+- Empty response `mimeType` and `redirectURL` in HAR reports.
 - Slow coverage generation for email patterns combined with length bounds.
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
 - Stateful scenarios mostly starting from the alphabetically first operation.

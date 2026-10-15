@@ -320,6 +320,27 @@ def test_har_cookies(ctx, cli, cassette_path):
     ] == [([{"name": "theme", "value": "dark"}], [{"name": "session", "value": "abc", "path": "/"}])]
 
 
+def test_har_response_mime_type_and_redirect_url(ctx, cli, cassette_path):
+    app, _ = ctx.openapi.make_flask_app({"/api/items": {"post": {"responses": {"201": {"description": "Created"}}}}})
+
+    @app.route("/api/items", methods=["POST"])
+    def create():
+        return flask.jsonify({}), 201, {"Location": "/api/items/1"}
+
+    har_path = cassette_path.with_suffix(".har")
+    cli.run_openapi_app(
+        app,
+        f"--report-har-path={har_path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--mode=positive",
+    )
+    assert [
+        (entry["response"]["content"]["mimeType"], entry["response"]["redirectURL"])
+        for entry in load_json_or_fail(har_path)["log"]["entries"]
+    ] == [("application/json", "/api/items/1")]
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

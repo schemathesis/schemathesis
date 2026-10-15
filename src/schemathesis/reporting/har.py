@@ -68,7 +68,7 @@ class HarWriter:
             else:
                 post_data = None
             if interaction.response is not None:
-                content_type = interaction.response.headers.get("Content-Type", [""])[0]
+                content_type = interaction.response.headers.get("content-type", [""])[0]
                 content = harfile.Content(
                     size=interaction.response.body_size or 0,
                     mimeType=content_type,
@@ -95,7 +95,7 @@ class HarWriter:
                     content=content,
                     headersSize=_headers_size(resp_headers),
                     bodySize=interaction.response.body_size or 0,
-                    redirectURL=resp_headers.get("Location", [""])[0],
+                    redirectURL=resp_headers.get("location", [""])[0],
                 )
                 time = round(interaction.response.elapsed * 1000, 2)
             else:
