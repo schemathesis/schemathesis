@@ -1,6 +1,7 @@
 import pytest
 from flask import jsonify, request
 
+from schemathesis.core.transport import Response
 from schemathesis.engine.observations import LocationHeaderEntry
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
@@ -44,7 +45,9 @@ def _link_by(key: str, value: str, **parameters):
     return {
         key: value,
         "x-schemathesis": {"is_inferred": True},
-        "parameters": {key: f"$response.header.Location#regex:{regex}" for key, regex in parameters.items()},
+        "parameters": {
+            key: f"$response.header.Location#regex:^(?:https?://[^/]+)?{regex}" for key, regex in parameters.items()
+        },
     }
 
 
@@ -65,7 +68,7 @@ def _link_by(key: str, value: str, **parameters):
                 },
             },
             "/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="/users/([^/?#]+)")],
         ),
         # Without operationId (should use operationRef)
         (
@@ -75,7 +78,7 @@ def _link_by(key: str, value: str, **parameters):
                 }
             },
             "/users/123",
-            [link_by_ref("#/paths/~1users~1{userId}/get", userId="/users/(.+)")],
+            [link_by_ref("#/paths/~1users~1{userId}/get", userId="/users/([^/?#]+)")],
         ),
         # No path parameters
         # Links without parameters don't make sense
@@ -108,8 +111,8 @@ def _link_by(key: str, value: str, **parameters):
             [
                 link_by_id(
                     "getUserPost",
-                    userId="/users/(.+)/posts/[^/]+",
-                    postId="/users/[^/]+/posts/(.+)",
+                    userId="/users/([^/?#]+)/posts/[^/]+",
+                    postId="/users/[^/]+/posts/([^/?#]+)",
                 )
             ],
         ),
@@ -129,8 +132,8 @@ def _link_by(key: str, value: str, **parameters):
             },
             "/users/123",
             [
-                link_by_id("getUser", userId="/users/(.+)"),
-                link_by_id("getUserPost", userId="/users/(.+)"),
+                link_by_id("getUser", userId="/users/([^/?#]+)"),
+                link_by_id("getUserPost", userId="/users/([^/?#]+)"),
             ],
         ),
         # Partial match - Location provides first part of nested path
@@ -151,13 +154,13 @@ def _link_by(key: str, value: str, **parameters):
             [
                 link_by_id(
                     "getUserPost",
-                    userId="/api/v1/users/(.+)/posts/[^/]+",
-                    postId="/api/v1/users/[^/]+/posts/(.+)",
+                    userId="/api/v1/users/([^/?#]+)/posts/[^/]+",
+                    postId="/api/v1/users/[^/]+/posts/([^/?#]+)",
                 ),
                 link_by_id(
                     "getUserPostComment",
-                    userId="/api/v1/users/(.+)/posts/[^/]+",
-                    postId="/api/v1/users/[^/]+/posts/(.+)",
+                    userId="/api/v1/users/([^/?#]+)/posts/[^/]+",
+                    postId="/api/v1/users/[^/]+/posts/([^/?#]+)",
                 ),
             ],
         ),
@@ -187,10 +190,10 @@ def _link_by(key: str, value: str, **parameters):
             },
             "/users/123/",
             [
-                link_by_id("getUser", userId="/users/(.+)/"),
-                link_by_id("getUserPosts", userId="/users/(.+)/"),
-                link_by_id("getUserPost", userId="/users/(.+)/"),
-                link_by_id("getUserPostComment", userId="/users/(.+)/"),
+                link_by_id("getUser", userId="/users/([^/?#]+)/"),
+                link_by_id("getUserPosts", userId="/users/([^/?#]+)/"),
+                link_by_id("getUserPost", userId="/users/([^/?#]+)/"),
+                link_by_id("getUserPostComment", userId="/users/([^/?#]+)/"),
             ],
         ),
         # Root path
@@ -199,7 +202,7 @@ def _link_by(key: str, value: str, **parameters):
                 "/{id}": {"get": {"operationId": "getById"}},
             },
             "/abc123",
-            [link_by_id("getById", id="/(.+)")],
+            [link_by_id("getById", id="/([^/?#]+)")],
         ),
         # Location doesn't match any endpoint
         (
@@ -225,13 +228,13 @@ def _link_by(key: str, value: str, **parameters):
                 }
             },
             "/api/v1/users/user-123-abc",
-            [link_by_id("getUserById", userId="/api/v1/users/(.+)")],
+            [link_by_id("getUserById", userId="/api/v1/users/([^/?#]+)")],
         ),
         # Path with tildes
         (
             {"/path~with~tildes/{id}": {"get": {}}},
             "/path~with~tildes/123",
-            [link_by_ref("#/paths/~1path~0with~0tildes~1{id}/get", id="/path~with~tildes/(.+)")],
+            [link_by_ref("#/paths/~1path~0with~0tildes~1{id}/get", id="/path\\~with\\~tildes/([^/?#]+)")],
         ),
     ],
 )
@@ -257,6 +260,20 @@ def test_build_location_link_empty_path(ctx):
 
 
 @pytest.mark.parametrize(
+    ["path", "location"],
+    [
+        ("/teams/{id}/", "/teams/5"),
+        ("/teams/{id}", "/teams//5"),
+        ("/teams/", "/teams"),
+    ],
+    ids=["missing-trailing-slash", "double-slash", "static-missing-trailing-slash"],
+)
+def test_build_links_location_needing_redirect(ctx, path, location):
+    schema = ctx.openapi.load_schema({path: {"get": {"operationId": "getTeam"}}}, version="3.1.0")
+    assert build_links(LinkInferencer.from_schema(schema), location) == []
+
+
+@pytest.mark.parametrize(
     ["base_url", "paths", "location", "expected"],
     [
         # Relative Location with base_url - should work normally
@@ -264,21 +281,21 @@ def test_build_location_link_empty_path(ctx):
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api/v1)?/users/([^/?#]+)")],
         ),
         # Absolute Location matching base_url - should strip base and work
         (
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/v1/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api/v1)?/users/([^/?#]+)")],
         ),
         # Base URL without subpath
         (
             "http://localhost:8080",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="/users/([^/?#]+)")],
         ),
         # Absolute Location with different host - should not match
         (
@@ -303,8 +320,8 @@ def test_build_location_link_empty_path(ctx):
             },
             "http://localhost:8080/api/users/123",
             [
-                link_by_id("getUser", userId="/users/(.+)"),
-                link_by_id("getUserPost", userId="/users/(.+)"),
+                link_by_id("getUser", userId="(?:/api)?/users/([^/?#]+)"),
+                link_by_id("getUserPost", userId="(?:/api)?/users/([^/?#]+)"),
             ],
         ),
         # Base URL with trailing slash vs Location without
@@ -312,41 +329,48 @@ def test_build_location_link_empty_path(ctx):
             "http://localhost:8080/api/",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api)?/users/([^/?#]+)")],
         ),
         # Location with query parameters (should be ignored in matching)
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123?expand=profile",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api)?/users/([^/?#]+)")],
         ),
         # Location with fragment (should be ignored in matching)
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123#profile",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api)?/users/([^/?#]+)")],
         ),
         # Relative Location includes base path - should be stripped
         (
             "http://api.example.com/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/api/v1/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api/v1)?/users/([^/?#]+)")],
         ),
         # Multiple levels of base path
         (
             "http://api.example.com/api/v2/internal",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/api/v2/internal/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api/v2/internal)?/users/([^/?#]+)")],
         ),
         # Location has wrong base path - should not match
         (
             "http://api.example.com/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/api/v2/users/123",
+            [],
+        ),
+        # Location shares a prefix with the base path, but not a segment
+        (
+            "http://localhost:8080/api",
+            {"/v2/{id}": {"get": {"operationId": "getById"}}},
+            "http://localhost:8080/apiv2/123",
             [],
         ),
         # Location has partial base path - should not match
@@ -361,7 +385,7 @@ def test_build_location_link_empty_path(ctx):
             "http://api.example.com/api-v1.0",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/api-v1.0/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api\\-v1\\.0)?/users/([^/?#]+)")],
         ),
         # Complex prefix matching with base path
         (
@@ -372,8 +396,8 @@ def test_build_location_link_empty_path(ctx):
             },
             "/v1/users/123",
             [
-                link_by_id("getUser", userId="/users/(.+)"),
-                link_by_id("getUserPost", userId="/users/(.+)"),
+                link_by_id("getUser", userId="(?:/v1)?/users/([^/?#]+)"),
+                link_by_id("getUserPost", userId="(?:/v1)?/users/([^/?#]+)"),
             ],
         ),
         # Base path with trailing slash, Location without - should still work
@@ -381,7 +405,7 @@ def test_build_location_link_empty_path(ctx):
             "http://api.example.com/api/v1/",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/api/v1/users/123",
-            [link_by_id("getUserById", userId="/users/(.+)")],
+            [link_by_id("getUserById", userId="(?:/api/v1)?/users/([^/?#]+)")],
         ),
     ],
 )
@@ -395,6 +419,45 @@ def test_build_links_with_base_url(ctx, base_url, paths, location, expected, res
 
     if results:
         assert_links_work(response_factory, location, results, schema)
+
+
+@pytest.mark.parametrize(
+    ["base_url", "path", "location", "expected"],
+    [
+        (None, "/teams({id})", "/teams(5)", {"id": "5"}),
+        (None, "/a+b/{id}", "/a+b/5", {"id": "5"}),
+        (None, "/price$/{id}", "/price$/5", {"id": "5"}),
+        (None, "/teams/{id}", "/teams/5?expand=1", {"id": "5"}),
+        (None, "/teams/{id}", "/teams/5#details", {"id": "5"}),
+        (
+            "http://127.0.0.1:8080",
+            "/{tenant}/teams/{id}",
+            "http://127.0.0.1:8080/acme/teams/5",
+            {"tenant": "acme", "id": "5"},
+        ),
+        ("http://127.0.0.1:8080/api/v1", "/{id}", "http://127.0.0.1:8080/api/v1/5", {"id": "5"}),
+        ("http://127.0.0.1:8080/api/v1", "/{id}", "/api/v1/5", {"id": "5"}),
+        ("http://127.0.0.1:8080/api/v1", "/{id}", "/5", {"id": "5"}),
+    ],
+    ids=[
+        "parentheses",
+        "plus",
+        "dollar",
+        "query",
+        "fragment",
+        "absolute-leading-parameter",
+        "absolute-base-path",
+        "relative-base-path",
+        "relative-without-base-path",
+    ],
+)
+def test_inferred_link_extracts_path_parameters(ctx, response_factory, base_url, path, location, expected):
+    schema = ctx.openapi.load_schema({path: {"get": {"operationId": "getTeam"}}}, version="3.1.0")
+    schema.config.base_url = base_url
+    [link] = build_links(LinkInferencer.from_schema(schema), location)
+    response = Response.from_requests(response_factory.requests(headers={"Location": location}), True)
+    output = StepOutput(response=response, case=None)
+    assert {name: expressions.evaluate(expr, output) for name, expr in link["parameters"].items()} == expected
 
 
 @pytest.mark.parametrize(
@@ -412,10 +475,10 @@ def test_build_links_with_base_url(ctx, base_url, paths, location, expected, res
             },
             "/users/123",
             [
-                link_by_id("getUserById", userId="/users/(.+)"),
-                link_by_id("updateUser", userId="/users/(.+)"),
-                link_by_id("deleteUser", userId="/users/(.+)"),
-                link_by_id("patchUser", userId="/users/(.+)"),
+                link_by_id("getUserById", userId="/users/([^/?#]+)"),
+                link_by_id("updateUser", userId="/users/([^/?#]+)"),
+                link_by_id("deleteUser", userId="/users/([^/?#]+)"),
+                link_by_id("patchUser", userId="/users/([^/?#]+)"),
             ],
         ),
         # Prefix matching should find ALL methods on matching paths
@@ -437,13 +500,13 @@ def test_build_links_with_base_url(ctx, base_url, paths, location, expected, res
             },
             "/users/123",
             [
-                link_by_id("getUser", userId="/users/(.+)"),
-                link_by_id("updateUser", userId="/users/(.+)"),
-                link_by_id("getUserPosts", userId="/users/(.+)"),
-                link_by_id("createUserPost", userId="/users/(.+)"),
-                link_by_id("getUserPost", userId="/users/(.+)"),
-                link_by_id("updateUserPost", userId="/users/(.+)"),
-                link_by_id("deleteUserPost", userId="/users/(.+)"),
+                link_by_id("getUser", userId="/users/([^/?#]+)"),
+                link_by_id("updateUser", userId="/users/([^/?#]+)"),
+                link_by_id("getUserPosts", userId="/users/([^/?#]+)"),
+                link_by_id("createUserPost", userId="/users/([^/?#]+)"),
+                link_by_id("getUserPost", userId="/users/([^/?#]+)"),
+                link_by_id("updateUserPost", userId="/users/([^/?#]+)"),
+                link_by_id("deleteUserPost", userId="/users/([^/?#]+)"),
             ],
         ),
     ],
@@ -486,9 +549,9 @@ def test_build_links_path_item_with_ref(ctx):
 
     inferencer = LinkInferencer.from_schema(schema)
     assert build_links(inferencer, "/users/123") == [
-        link_by_id("getUserById", userId="/users/(.+)"),
-        link_by_id("updateUser", userId="/users/(.+)"),
-        link_by_id("deleteUser", userId="/users/(.+)"),
+        link_by_id("getUserById", userId="/users/([^/?#]+)"),
+        link_by_id("updateUser", userId="/users/([^/?#]+)"),
+        link_by_id("deleteUser", userId="/users/([^/?#]+)"),
     ]
 
 
@@ -503,7 +566,7 @@ def test_build_links_path_item_broken_ref(ctx):
     inferencer = LinkInferencer.from_schema(schema)
 
     # Broken ref should not cause crashes, should just skip that path
-    assert build_links(inferencer, "/orders/456") == [link_by_id("getOrder", orderId="/orders/(.+)")]
+    assert build_links(inferencer, "/orders/456") == [link_by_id("getOrder", orderId="/orders/([^/?#]+)")]
 
     # The broken ref path should not match anything
     assert build_links(inferencer, "/users/123") == []
@@ -526,10 +589,10 @@ def test_build_links_mixed_ref_and_inline_paths(ctx):
 
     inferencer = LinkInferencer.from_schema(schema)
     assert build_links(inferencer, "/users/123") == [
-        link_by_id("getUser", userId="/users/(.+)"),
-        link_by_id("updateUser", userId="/users/(.+)"),
-        link_by_id("getUserPosts", userId="/users/(.+)"),
-        link_by_id("createUserPost", userId="/users/(.+)"),
+        link_by_id("getUser", userId="/users/([^/?#]+)"),
+        link_by_id("updateUser", userId="/users/([^/?#]+)"),
+        link_by_id("getUserPosts", userId="/users/([^/?#]+)"),
+        link_by_id("createUserPost", userId="/users/([^/?#]+)"),
     ]
 
 
@@ -544,8 +607,8 @@ def test_build_links_no_base_url_configured(ctx):
 
     # Relative Location should work fine
     assert build_links(inferencer, "/users/123") == [
-        link_by_id("getUserById", userId="/users/(.+)"),
-        link_by_id("updateUser", userId="/users/(.+)"),
+        link_by_id("getUserById", userId="/users/([^/?#]+)"),
+        link_by_id("updateUser", userId="/users/([^/?#]+)"),
     ]
 
     # Absolute Location should be ignored (can't validate without base_url)
@@ -556,8 +619,8 @@ def test_build_links_no_base_url_configured(ctx):
 
     # Another relative path should work
     assert build_links(inferencer, "/users/456") == [
-        link_by_id("getUserById", userId="/users/(.+)"),
-        link_by_id("updateUser", userId="/users/(.+)"),
+        link_by_id("getUserById", userId="/users/([^/?#]+)"),
+        link_by_id("updateUser", userId="/users/([^/?#]+)"),
     ]
 
 
@@ -911,5 +974,29 @@ def test_inject_links_keeps_links_to_different_operations_under_one_status(ctx):
     ]
 
     assert inferencer.inject_links(operation.responses, entries) == 2
+    links = operation.responses.find_by_status_code("201").definition["links"]
+    assert sorted(link["operationId"] for link in links.values()) == ["getOrder", "getUser"]
+
+
+def test_inject_links_skips_links_already_present(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"operationId": "createUser"}},
+            "/users/{userId}": {"get": {"operationId": "getUser"}},
+            "/orders/{orderId}": {"get": {"operationId": "getOrder"}},
+        },
+        version="3.1.0",
+    )
+    inferencer = LinkInferencer.from_schema(schema)
+    operation = schema["/users"]["post"]
+    entries = [
+        LocationHeaderEntry(value="/users/123", status_code=201),
+        LocationHeaderEntry(value="/orders/456", status_code=201),
+    ]
+
+    assert (
+        inferencer.inject_links(operation.responses, entries),
+        inferencer.inject_links(operation.responses, entries),
+    ) == (2, 0)
     links = operation.responses.find_by_status_code("201").definition["links"]
     assert sorted(link["operationId"] for link in links.values()) == ["getOrder", "getUser"]

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from werkzeug.exceptions import MethodNotAllowed, NotFound
-from werkzeug.routing import Map, MapAdapter, Rule
+from werkzeug.routing import Map, MapAdapter, RequestRedirect, Rule
 
 from schemathesis.core.adapter import ResponsesContainer
 from schemathesis.core.transforms import encode_pointer
@@ -111,7 +111,7 @@ class LinkInferencer:
         """Match path to API operation and extract path parameters."""
         try:
             return self._adapter.match(path)
-        except (NotFound, MethodNotAllowed):
+        except (NotFound, MethodNotAllowed, RequestRedirect):
             return None
 
     def _build_links_from_matches(self, matches: MatchList, expression: str) -> list[dict]:
@@ -159,18 +159,21 @@ class LinkInferencer:
     ) -> dict:
         link = operation.to_link_base()
 
-        # Build regex expressions to extract path parameters
+        # The observed value may be an absolute URL and may or may not carry the base path
+        prefix = "^(?:https?://[^/]+)?"
+        base_path = self._base_path.rstrip("/")
+        if base_path:
+            prefix += f"(?:{re.escape(base_path)})?"
+        # Literal path parts at even indices, parameter names at odd ones
+        parts = re.split(r"\{([^}]+)\}", operation.path)
         parameters = {}
         for name in path_parameters:
-            # Replace the target parameter with capture group and others with non-slash matcher
-            pattern = operation.path
-            for candidate in path_parameters:
-                if candidate == name:
-                    pattern = pattern.replace(f"{{{candidate}}}", "(.+)")
-                else:
-                    pattern = pattern.replace(f"{{{candidate}}}", "[^/]+")
-
-            parameters[name] = f"{expression}#regex:{pattern}"
+            # Capture the target parameter up to the next segment, query or fragment
+            pattern = "".join(
+                re.escape(part) if index % 2 == 0 else "([^/?#]+)" if part == name else "[^/]+"
+                for index, part in enumerate(parts)
+            )
+            parameters[name] = f"{expression}#regex:{prefix}{pattern}"
 
         link["parameters"] = parameters
 
@@ -204,7 +207,7 @@ class LinkInferencer:
     def _strip_base_path_from_location(self, path: str) -> str | None:
         """Strip base path from location path if it starts with base path."""
         base_path = self._base_path.rstrip("/")
-        if not path.startswith(base_path):
+        if path != base_path and not path.startswith(f"{base_path}/"):
             return None
 
         # Strip the base path to get relative path
@@ -244,6 +247,9 @@ class LinkInferencer:
                 links = response.definition.setdefault(self._links_keyword, {})
 
             for link in self._build_links_from_matches(matches, entry.expression):
+                # Inference runs again on every `--max-time` cycle with the same observations
+                if link in links.values():
+                    continue
                 # Several observed URLs may land in the same response, so names must not collide
                 links[f"X-Inferred-Link-{len(links)}"] = link
                 injected += 1
