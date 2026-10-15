@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -80,14 +80,18 @@ def _get_max_operations_per_source(transitions: Transitions) -> int:
 class TransitionController:
     """Controls which transitions can be executed in a state machine."""
 
-    __slots__ = ("transitions", "max_operations_per_source", "statistic", "supervisor")
+    __slots__ = ("transitions", "roots", "max_operations_per_source", "statistic", "productive_roots", "supervisor")
 
-    def __init__(self, transitions: Transitions) -> None:
+    def __init__(self, transitions: Transitions, roots: Collection[str]) -> None:
         # Incoming & outgoing transitions available in the state machine
         self.transitions = transitions
+        # Labels of operations that can start a chain without data from earlier steps
+        self.roots = roots
         self.max_operations_per_source = _get_max_operations_per_source(transitions)
         # source -> derived API calls
         self.statistic: dict[str, dict[str, Counter[str]]] = {}
+        # Roots whose responses gave later steps a value to use in this scenario
+        self.productive_roots: set[str] = set()
         # Optional engine-side supervisor; the engine sets this on the per-scenario
         # state machine so transitions targeting SKIP-verdict operations are filtered out.
         self.supervisor: Supervisor | None = None
@@ -116,11 +120,18 @@ class TransitionController:
             if source in self.statistic and case_id in self.statistic[source]:
                 self.statistic[source][case_id][case.operation.label] += 1
 
+    def record_productive_root(self, label: str) -> None:
+        """Record that a root call returned data that later steps can use."""
+        self.productive_roots.add(label)
+
+    def _root_calls(self, label: str) -> int:
+        return len(self.statistic.get(label, {}))
+
     def allow_root_transition(self, source: str, bundles: dict[str, CaseInsensitiveDict]) -> bool:
         """Decide if this root transition should be allowed now."""
         if self._is_skipped(source):
             return False
-        if len(self.statistic.get(source, {})) < MAX_ROOT_SOURCES:
+        if self._root_calls(source) < MAX_ROOT_SOURCES:
             return True
 
         # If all non-root operations are blocked, then allow root ones to make progress
@@ -128,13 +139,22 @@ class TransitionController:
         for name, values in bundles.items():
             if values:
                 history.update(self.transitions.producer_labels_for_bundle(name))
-        return all(
+        if not all(
             incoming.source.label not in history
             or not self.allow_transition(incoming.source.label, incoming.target.label)
             for transitions in self.transitions.operations.values()
             for incoming in transitions.incoming
             if transitions.incoming
-        )
+        ):
+            return False
+        if source in self.productive_roots:
+            return True
+        # Calling a root again after it gave later steps nothing tends to repeat the same dead end,
+        # so prefer any other root and spread calls evenly once every root is in that state.
+        available = [root for root in self.roots if not self._is_skipped(root)]
+        if any(self._root_calls(root) < MAX_ROOT_SOURCES or root in self.productive_roots for root in available):
+            return False
+        return self._root_calls(source) == min(self._root_calls(root) for root in available)
 
     def allow_transition(self, source: str, target: str) -> bool:
         """Decide if this transition should be allowed now."""

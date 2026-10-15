@@ -35,6 +35,7 @@ class GraphQLStateMachine(APIStateMachine):
     _transitions: ClassVar[GraphQLTransitions]
     # Names of `@rule` methods that populate a bundle. Empty -> stateful testing has nothing to do.
     _producer_rule_names: ClassVar[frozenset[str]] = frozenset()
+    _root_labels: ClassVar[frozenset[str]] = frozenset()
 
     def __init__(self) -> None:
         if not type(self)._producer_rule_names:
@@ -45,7 +46,7 @@ class GraphQLStateMachine(APIStateMachine):
         self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
         self._id_origins: dict[tuple[Handle, str], str] = {}
         self._deleted_id_origins: dict[tuple[Handle, str], str] = {}
-        self.control = TransitionController(self._transitions)
+        self.control = TransitionController(self._transitions, self._root_labels)
         super().__init__()
 
     def after_call(self, response: Response, case: Case) -> None:
@@ -121,6 +122,7 @@ def create_state_machine(schema: GraphQLSchema) -> type[GraphQLStateMachine]:
     for name, decorated in rule_set.rules:
         attrs[name] = decorated
     attrs["_producer_rule_names"] = rule_set.producer_names
+    attrs["_root_labels"] = rule_set.root_labels
     return type("GraphQLStateMachine", (GraphQLStateMachine,), attrs)
 
 

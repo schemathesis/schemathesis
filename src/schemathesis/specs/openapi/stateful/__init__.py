@@ -28,6 +28,7 @@ from schemathesis.generation.stateful.state_machine import (
     APIStateMachine,
     StepInput,
     StepOutput,
+    Transition,
     _normalize_name,
 )
 from schemathesis.generation.value import prune_overwritten_body_constants
@@ -48,10 +49,11 @@ FilterFunction = Callable[["StepOutput"], bool]
 class OpenAPIStateMachine(APIStateMachine):
     _response_matchers: dict[str, Callable[[StepOutput], str | None]]
     _transitions: ApiTransitions
+    _root_labels: frozenset[str]
 
     def __init__(self) -> None:
         self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
-        self.control = TransitionController(self._transitions)
+        self.control = TransitionController(self._transitions, self._root_labels)
         super().__init__()
 
     def after_call(self, response: Response, case: Case) -> None:
@@ -78,6 +80,26 @@ class OpenAPIStateMachine(APIStateMachine):
         if matcher is None:
             return None
         return matcher(result)
+
+    def _feeds_later_steps(self, output: StepOutput) -> bool:
+        """Whether a link that can follow this response extracts at least one value from it."""
+        bundle_name = self._get_target_for_result(output)
+        if bundle_name is None:
+            return False
+        source = output.case.operation.label
+        return any(
+            _extracts_value(link.extract(output))
+            for link in self._transitions.operations[source].outgoing
+            if f"{source} -> {link.status_code}" == bundle_name
+        )
+
+
+def _extracts_value(transition: Transition) -> bool:
+    values = [extracted.value for container in transition.parameters.values() for extracted in container.values()]
+    if transition.request_body is not None:
+        values.append(transition.request_body.value)
+    # A link without parameters or body needs no data to be followed
+    return not values or any(isinstance(value, Ok) and value.ok() not in (None, UNRESOLVABLE) for value in values)
 
 
 # The proportion of negative tests generated for each step
@@ -255,6 +277,7 @@ def create_state_machine(
     #   3. Focus on transitions that are designed to work together via links
 
     roots = classify_root_transitions(operations, transitions, schema.analysis.dependency_graph)
+    root_labels: set[str] = set()
 
     for target in operations:
         if target.label in transitions.operations:
@@ -294,6 +317,7 @@ def create_state_machine(
                     input=case_strategy.map(StepInput.initial),
                 )
                 root_rules.add(name)
+                root_labels.add(target.label)
 
     return type(
         "APIWorkflow",
@@ -304,6 +328,7 @@ def create_state_machine(
             "_response_matchers": _response_matchers,
             "_transitions": transitions,
             "root_rules": frozenset(root_rules),
+            "_root_labels": frozenset(root_labels),
             **rules,
         },
     )
@@ -515,7 +540,10 @@ def transition(
         else:
             self.recorder.record_case(parent_id=None, case=input.case, transition=None, is_transition_applied=False)
         self.control.record_step(input, self.recorder)
-        return APIStateMachine._step(self, input=input)
+        output = APIStateMachine._step(self, input=input)
+        if input.transition is None and output is not None and self._feeds_later_steps(output):
+            self.control.record_productive_root(input.case.operation.label)
+        return output
 
     step_function.__name__ = name
     step_function.__qualname__ = name

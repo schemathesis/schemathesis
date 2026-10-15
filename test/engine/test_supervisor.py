@@ -97,21 +97,21 @@ def _supervisor_with_skipped(label: str) -> Supervisor:
 
 
 def test_controller_allow_transition_rejects_supervisor_skip_target():
-    controller = TransitionController(ApiTransitions())
+    controller = TransitionController(ApiTransitions(), roots=frozenset())
     controller.supervisor = _supervisor_with_skipped("POST /skipped")
     assert controller.allow_transition("POST /alive", "POST /skipped") is False
     assert controller.allow_transition("POST /alive", "POST /other") is True
 
 
 def test_controller_allow_root_transition_rejects_supervisor_skip_source():
-    controller = TransitionController(ApiTransitions())
+    controller = TransitionController(ApiTransitions(), roots=frozenset())
     controller.supervisor = _supervisor_with_skipped("POST /skipped")
     assert controller.allow_root_transition("POST /skipped", bundles={}) is False
     assert controller.allow_root_transition("POST /alive", bundles={}) is True
 
 
 def test_controller_without_supervisor_allows_everything():
-    controller = TransitionController(ApiTransitions())
+    controller = TransitionController(ApiTransitions(), roots=frozenset())
     assert controller.supervisor is None
     assert controller.allow_transition("POST /a", "POST /b") is True
     assert controller.allow_root_transition("POST /a", bundles={}) is True
@@ -119,7 +119,7 @@ def test_controller_without_supervisor_allows_everything():
 
 def test_controller_supervisor_does_not_block_run_verdicts():
     # A supervisor that has a record but verdict still RUN must not block transitions.
-    controller = TransitionController(ApiTransitions())
+    controller = TransitionController(ApiTransitions(), roots=frozenset())
     supervisor = Supervisor()
     for _ in range(METHOD_NOT_ALLOWED_THRESHOLD - 1):
         supervisor.record_response(operation_label="POST /seen", status_code=405)

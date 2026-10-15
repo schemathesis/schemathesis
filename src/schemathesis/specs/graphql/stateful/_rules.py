@@ -63,6 +63,8 @@ class _RuleSet:
 
     rules: list[tuple[str, Callable]]
     producer_names: frozenset[str]
+    # Labels of operations whose rules start a chain without data from earlier steps
+    root_labels: frozenset[str]
 
 
 def iter_operation_summaries(
@@ -171,6 +173,7 @@ def generate_rules_for(
 
     generated: list[tuple[str, Callable]] = []
     producer_names: list[str] = []
+    root_labels: list[str] = []
     for summary in summaries:
         root_label = summary.label.split(".", 1)[0]
         if summary.role == OperationRole.PRODUCER and summary.return_type_name is not None:
@@ -182,6 +185,7 @@ def generate_rules_for(
             )
             generated.append(entry)
             producer_names.append(entry[0])
+            root_labels.append(f"{root_label}.{summary.field_name}")
         elif summary.consumed:
             primary_handle = next(iter(summary.consumed.values()))
             # A cleanup op keyed on a non-id handle has no deleted bundle, so it acts as a plain consumer.
@@ -237,7 +241,7 @@ def generate_rules_for(
             generated.append(entry)
             producer_names.append(entry[0])
 
-    return _RuleSet(rules=generated, producer_names=frozenset(producer_names))
+    return _RuleSet(rules=generated, producer_names=frozenset(producer_names), root_labels=frozenset(root_labels))
 
 
 def _bundle_substituter(
@@ -288,6 +292,7 @@ def _make_producer_rule(
         ]
         if not values:
             return multiple()
+        self.control.record_productive_root(producer_label)
         for value in values:
             self._id_origins[(Handle(return_type_name, "id"), value)] = case.id
         return multiple(*values)
