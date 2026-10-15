@@ -53,7 +53,6 @@ class CoverageScenario(StrEnum):
     NEAR_BOUNDARY_NUMBER = "near_boundary_number"
 
     # Positive scenarios - Boundary values for arrays
-    MINIMUM_ITEMS_ARRAY = "minimum_items_array"
     MAXIMUM_ITEMS_ARRAY = "maximum_items_array"
     NEAR_BOUNDARY_ITEMS_ARRAY = "near_boundary_items_array"
     ENUM_VALUE_ITEMS_ARRAY = "enum_value_items_array"

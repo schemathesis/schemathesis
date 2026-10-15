@@ -480,7 +480,6 @@ except ImportError:
     import sre_constants as sre
     import sre_parse
 
-ANCHOR = sre.AT
 REPEATS: tuple[int, ...]
 POSSESSIVE_REPEATS: tuple[int, ...]
 if hasattr(sre, "POSSESSIVE_REPEAT"):

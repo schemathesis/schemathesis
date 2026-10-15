@@ -76,11 +76,6 @@ def register_deserializer(func: ResponseDeserializer, *media_types: str) -> Resp
     return func
 
 
-def unregister_deserializer(*media_types: str) -> None:
-    for media_type in media_types:
-        _DESERIALIZERS.pop(media_type, None)
-
-
 def deserializer(*media_types: str) -> Callable[[ResponseDeserializer], ResponseDeserializer]:
     """Register a deserializer for custom response media types.
 
@@ -194,11 +189,6 @@ def deserialize_yaml(stream: str | bytes | TextIO | BinaryIO) -> Any:
     import yaml
 
     return yaml.load(stream, get_yaml_loader())
-
-
-def deserializers() -> dict[str, ResponseDeserializer]:
-    """Return a snapshot of the registered deserializers."""
-    return dict(_DESERIALIZERS)
 
 
 def deserialize_response(

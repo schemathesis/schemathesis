@@ -617,9 +617,6 @@ def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]
     ]
 
 
-TRUNCATION_PLACEHOLDER = "[...]"
-
-
 @dataclass(slots=True)
 class ProbingProgressManager:
     console: Console

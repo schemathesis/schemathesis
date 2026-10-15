@@ -17,7 +17,6 @@ from schemathesis.config._error import ConfigError
 
 # Define valid parameter locations from OpenAPI
 ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
-VALID_LOCATIONS: list[ParameterLocation] = ["path", "query", "header", "cookie", "body"]
 
 
 def load_parameters(

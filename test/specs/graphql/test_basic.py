@@ -63,9 +63,7 @@ def test_tags(ctx):
 
 def test_graphql_schema_has_no_spec_specific_coverage_or_format_hooks(ctx):
     schema = _books_schema(ctx)
-    assert schema.get_coverage_capabilities() == CoverageCapabilities(
-        format_strategies={}, update_pattern=None, validator_cls=None
-    )
+    assert schema.get_coverage_capabilities() == CoverageCapabilities(update_pattern=None, validator_cls=None)
     assert schema.get_custom_format_strategies(schema.config.generation, GenerationMode.POSITIVE) == {}
     case = find(schema["Mutation"]["addBook"].as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
     case.body = "{ __typename }"

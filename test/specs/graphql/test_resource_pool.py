@@ -67,13 +67,6 @@ def test_capture_id_field(pool, rng):
     assert pool.draw(handle=Handle("Book", "id"), random=rng) == "abc-1"
 
 
-def test_capture_skips_when_errors_present(pool, rng):
-    operation = _parse('mutation { addBook(title: "x", authorId: "1") { id } }')
-    body = json.dumps({"data": {"addBook": {"id": "abc-2"}}, "errors": [{"message": "boom"}]}).encode("utf-8")
-    pool.capture_response(response_body=body, operation_node=operation)
-    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
-
-
 _RECORD_SDL = """
 type Book { id: ID! title: String! }
 type Query { getBooks: [Book!]! }
@@ -87,10 +80,26 @@ _CREATED_BOOK = json.dumps({"data": {"addBook": {"id": "b-1", "__typename": "Boo
     [
         ('mutation { addBook(title: "x") { id } }', b""),
         ('mutation { addBook(title: "x") { id } }', b"not json"),
+        ('mutation { addBook(title: "x") { id } }', b"{}"),
+        ('mutation { addBook(title: "x") { id } }', b'{"data": null}'),
+        ('mutation { addBook(title: "x") { id } }', b'{"data": "scalar"}'),
+        (
+            'mutation { addBook(title: "x") { id } }',
+            json.dumps({"data": {"addBook": {"id": "b-1"}}, "errors": [{"message": "boom"}]}).encode("utf-8"),
+        ),
         ("mutation { addBook(title: ", _CREATED_BOOK),
         ("fragment F on Book { id }", _CREATED_BOOK),
     ],
-    ids=["empty-body", "non-json-body", "unparsable-query", "no-operation"],
+    ids=[
+        "empty-body",
+        "non-json-body",
+        "empty-object",
+        "data-null",
+        "data-not-dict",
+        "errors-present",
+        "unparsable-query",
+        "no-operation",
+    ],
 )
 def test_record_response_ignores_unusable_payloads(ctx, response_factory, rng, query, content):
     schema = ctx.graphql.load_sdl(_RECORD_SDL)
@@ -250,28 +259,6 @@ def test_substitution_isolates_by_parent_type(rng):
     printed = graphql.print_ast(operation)
     assert "book-id-only" not in printed
     assert "placeholder" in printed
-
-
-@pytest.mark.parametrize(
-    "body",
-    [b"not-json", b"{}", b'{"data": null}', b'{"data": "scalar"}'],
-    ids=["malformed-json", "empty-object", "data-null", "data-not-dict"],
-)
-def test_capture_response_skips_unusable_payloads(pool, rng, body):
-    operation = _parse('mutation { addBook(title: "x", authorId: "1") { id } }')
-    pool.capture_response(response_body=body, operation_node=operation)
-    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
-
-
-@pytest.mark.parametrize(
-    ("body", "expected"),
-    [(b'{"data": {"addBook": {"id": "abc-1"}}}', "abc-1"), (b"not-json", None)],
-    ids=["successful-response", "malformed-json"],
-)
-def test_capture_response_stores_ids_only_from_usable_payloads(pool, rng, body, expected):
-    operation = _parse('mutation { addBook(title: "x", authorId: "1") { id } }')
-    pool.capture_response(response_body=body, operation_node=operation)
-    assert pool.draw(handle=Handle("Book", "id"), random=rng) == expected
 
 
 def test_capture_skips_subscription_operations(rng):

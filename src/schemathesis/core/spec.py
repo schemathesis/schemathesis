@@ -40,10 +40,9 @@ class CoverageCapabilities:
     """Coverage-phase data the engine asks of a specification.
 
     Specs that do not participate in coverage generation can return an empty instance
-    (`format_strategies={}`, `update_pattern=None`, `validator_cls=None`).
+    (`update_pattern=None`, `validator_cls=None`).
     """
 
-    format_strategies: dict[str, SearchStrategy[Any]]
     update_pattern: Callable[[str, int | None, int | None], str] | None
     validator_cls: type[jsonschema_rs.Validator] | None
 

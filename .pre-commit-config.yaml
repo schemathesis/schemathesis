@@ -42,14 +42,14 @@ repos:
     rev: v1.51.1
     hooks:
       - id: typos
-        # Report, don't rewrite: mirrors the `spell-check` CI job
+        # Report, don't rewrite
         args: [--force-exclude]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.4.0
     hooks:
       - id: mypy
-        exclude: ^(docs/|test/|test-corpus/|example/|benches/).*$
+        exclude: ^(docs/|test/|test-corpus/|examples/|benches/).*$
         args: ["--ignore-missing-imports"]
         additional_dependencies: [types-requests, types-PyYAML]
 

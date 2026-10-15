@@ -119,7 +119,7 @@ application/xml (1 operation):
 
 When this warning appears, Schemathesis skips validation of responses in that media type because it cannot deserialize the body. Responses in other media types of the same operation are still validated. Restore validation by:
 
-- Registering a deserializer for the media type via `@schemathesis.deserializer()` (or `schemathesis.deserializer.register`) so the payload is converted into Python data.
+- Registering a deserializer for the media type via `@schemathesis.deserializer()` so the payload is converted into Python data.
 - Updating the schema to advertise the actual media type (for example `application/json`) if the server already returns JSON.
 - Omitting structured schemas for truly binary responses; without a schema, Schemathesis won't expect to validate those payloads.
 

@@ -128,16 +128,6 @@ class GraphQLResourcePool:
             return
         self._walk_selection(operation_node.selection_set, root_type, response_data)
 
-    def capture_response(
-        self,
-        *,
-        response_body: bytes,
-        operation_node: graphql.OperationDefinitionNode,
-    ) -> None:
-        data = _parse_response_data(response_body)
-        if data is not None:
-            self.capture(operation_node=operation_node, response_data=data)
-
     def draw(self, *, handle: Handle, random: Random) -> str | None:
         with self._lock:
             entries = self._data.get(handle)

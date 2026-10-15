@@ -540,7 +540,7 @@ class BaseSchema(Mapping):
 
     def get_coverage_capabilities(self) -> CoverageCapabilities:
         """Return spec-specific data the coverage phase asks of a schema."""
-        return CoverageCapabilities(format_strategies={}, update_pattern=None, validator_cls=None)
+        return CoverageCapabilities(update_pattern=None, validator_cls=None)
 
     def record_runtime_observations(
         self,
@@ -1077,8 +1077,3 @@ class APIOperation(Generic[P, R, S, SchemaT]):
             multipart_content_types=multipart_content_types,
             meta=_meta,
         )
-
-    @property
-    def operation_reference(self) -> str:
-        path = self.path.replace("~", "~0").replace("/", "~1")
-        return f"#/paths/{path}/{self.method}"
