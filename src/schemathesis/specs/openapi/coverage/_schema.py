@@ -1044,13 +1044,9 @@ class CoverageContext:
             if lengths is not None and lengths.within is not None and fmt in VALIDATED_FORMATS:
                 strategy = lengths.within(min_length or 0, max_length if max_length is not None else inf)
                 if strategy is not None:
-                    try:
-                        candidate = cached_draw(self.session, strategy)
-                    except Unsatisfiable:
-                        pass
-                    else:
-                        if _is_strictly_valid(candidate, schema, self):
-                            return candidate
+                    candidate = cached_draw(self.session, strategy)
+                    if _is_strictly_valid(candidate, schema, self):
+                        return candidate
             updated = pattern
             if self.update_pattern is not None:
                 updated = self.update_pattern(pattern, min_length, max_length)
