@@ -638,6 +638,33 @@ def test_header_values_never_start_with_whitespace():
         )
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [{"type": "string"}, {"type": "string", "minLength": 3, "maxLength": 3}],
+    ids=["plain", "length-bounds"],
+)
+@pytest.mark.hypothesis_nested
+def test_positive_header_values_never_end_with_whitespace(ctx, schema):
+    # Servers strip trailing whitespace from header values, so the received value breaks length bounds.
+    operation = ctx.openapi.load_schema(
+        {
+            "/h": {
+                "get": {
+                    "parameters": [{"name": "X-A", "in": "header", "required": True, "schema": schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/h"]["GET"]
+    with pytest.raises(NoSuchExample):
+        find(
+            operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
+            lambda case: case.headers["X-A"][-1:].strip() != case.headers["X-A"][-1:],
+            # The excluded value is rare, so a small budget would pass without looking.
+            settings=settings(max_examples=1000, database=None),
+        )
+
+
 COOKIE_OCTETS = frozenset(chr(code) for code in range(0x21, 0x7F)) - frozenset('",;\\')
 
 

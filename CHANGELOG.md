@@ -34,6 +34,7 @@
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
 - `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
+- False positive `positive_data_acceptance` for header values ending with whitespace.
 - Clicks in the HTML report opening an unrelated row in Safari.
 - Double-encoded sensitive query keys in reproduction commands for raw query strings.
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)

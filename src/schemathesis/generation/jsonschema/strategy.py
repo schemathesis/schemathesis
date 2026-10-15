@@ -35,7 +35,7 @@ from schemathesis.core.jsonschema import (
 from schemathesis.core.jsonschema.patterns import normalize_regex, pattern_length_bounds
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.validation import has_leading_whitespace
+from schemathesis.core.validation import has_surrounding_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.transport.serialization import Binary, contains_binary
 
@@ -1586,8 +1586,8 @@ def _padded_text(
     strategy = st.tuples(
         st.integers(min_length, ceiling), _text(ctx, characters=characters, max_size=_PADDED_TEXT_HEAD), characters
     ).map(lambda parts: (parts[1] + parts[2] * parts[0])[: parts[0]])
-    # An empty head leaves the padding character opening the value.
-    return _leading_whitespace_check(strategy, ctx.alphabet)
+    # The padding character closes the value, and opens it after an empty head.
+    return _surrounding_whitespace_check(strategy, ctx.alphabet)
 
 
 def _content_string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
@@ -1760,7 +1760,7 @@ def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
 def _anything_for(alphabet: Alphabet) -> SearchStrategy[JsonValue]:
     # Arbitrary JSON value; containers bounded to keep draws cheap. Assembling the recursive strategy
     # costs far more than every other lifter combined, and it depends only on the alphabet.
-    text = _leading_whitespace_check(st.text(alphabet=alphabet.as_strategy()), alphabet)
+    text = _surrounding_whitespace_check(st.text(alphabet=alphabet.as_strategy()), alphabet)
     return st.recursive(
         st.none()
         | st.booleans()
@@ -1774,14 +1774,14 @@ def _anything_for(alphabet: Alphabet) -> SearchStrategy[JsonValue]:
 
 def _text(ctx: StrategyContext, *, characters: SearchStrategy[str] | None = None, **kwargs: int) -> SearchStrategy[str]:
     strategy = st.text(alphabet=characters if characters is not None else ctx.alphabet.as_strategy(), **kwargs)
-    return _leading_whitespace_check(strategy, ctx.alphabet)
+    return _surrounding_whitespace_check(strategy, ctx.alphabet)
 
 
-def _leading_whitespace_check(strategy: SearchStrategy[str], alphabet: Alphabet) -> SearchStrategy[str]:
-    """Reject an opening whitespace character, close to the draw that produced it."""
-    if alphabet.allow_leading_whitespace:
+def _surrounding_whitespace_check(strategy: SearchStrategy[str], alphabet: Alphabet) -> SearchStrategy[str]:
+    """Reject an opening or closing whitespace character, close to the draw that produced it."""
+    if alphabet.allow_surrounding_whitespace:
         return strategy
-    return strategy.filter(lambda value: not has_leading_whitespace(value))
+    return strategy.filter(lambda value: not has_surrounding_whitespace(value))
 
 
 # What each JSON type name admits. `True == 1` in Python, but `true` is not a JSON number, and a
