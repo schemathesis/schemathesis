@@ -14,6 +14,7 @@ from schemathesis.specs.openapi.adapter.security import get_effective_security_s
 from schemathesis.specs.openapi.extra_data_source import declared_response_schema, referenced_by
 from schemathesis.specs.openapi.semantic_pool import resolve_combinator, resolve_ref
 from schemathesis.specs.openapi.stateful.dependencies import naming
+from schemathesis.specs.openapi.stateful.dependencies.models import Cardinality
 from schemathesis.wfc.escalation import EscalatingAuthProvider, escalating_provider
 
 if TYPE_CHECKING:
@@ -287,7 +288,11 @@ def _lists_equivalent(listed: object, owner: object, value: object, schema: Json
 
 
 def is_collection(operation: APIOperation) -> bool:
-    return operation.method.upper() == "GET" and naming.trailing_path_parameter(operation.path) is None
+    if operation.method.upper() != "GET" or naming.trailing_path_parameter(operation.path) is not None:
+        return False
+    # A read that returns one object may create it, so only one that returns many is a list to compare against.
+    node = operation.schema.analysis.dependency_graph.operations.get(operation.label)
+    return node is not None and any(output.cardinality == Cardinality.MANY for output in node.outputs)
 
 
 def listing_case(case: Case, operation: APIOperation | None, query: dict[str, Any] | None = None) -> Case | None:

@@ -329,6 +329,16 @@ def test_replay_with_recorded_identity_not_configured(cli, ctx, tmp_path, snapsh
             True,
             id="listed-to-peer",
         ),
+        # A read that returns one object may create it, so replaying it as the peer would write and prove nothing.
+        pytest.param(
+            "issuing",
+            READ,
+            _draw("GET /api/orders"),
+            {"path_parameters": {"order_id": 1}},
+            False,
+            False,
+            id="single-object-read",
+        ),
     ],
 )
 def test_drawn_value(ctx, tmp_path, listing, operation, draw, kwargs, reported, probed):
@@ -385,6 +395,7 @@ def test_value_listed_to_the_peer_does_not_block_a_later_owned_one(ctx, tmp_path
         ),
         pytest.param(("alice",), "own", ("GET /api/orders", {}), "alice", 1, True, True, id="listed-to-owner"),
         pytest.param(("alice",), "ids", ("GET /api/orders", {}), "alice", 1, False, True, id="listed-to-peer"),
+        pytest.param(("alice",), "issuing", ("GET /api/orders", {}), "alice", 2, False, False, id="single-object-read"),
     ],
 )
 def test_linked_step(ctx, tmp_path, orders_by, listing, parent, parent_identity, read_id, reported, probed):
