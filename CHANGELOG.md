@@ -41,6 +41,8 @@
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
 - Redirects followed for operations documenting a `3xx` status, reporting the target's status instead.
 - Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
+- Inferred `Location` links extracting wrong path parameters with base paths, queries or regex characters.
+- Crash on `Location` headers differing from a schema path by a trailing or doubled slash.
 - `object_level_authorization` sending a single-object `GET` as another user, which may create data.
 - Valueless sensitive query keys gaining a masked value in reports and cassettes.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.

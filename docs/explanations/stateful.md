@@ -140,7 +140,7 @@ GET /teams -> 200 OK
 
 {"results": [{"url": "http://localhost:8000/teams/3"}]}
 
-# Learns: GET /teams/3, using `$response.body#/results/0/url#regex:/teams/(.+)`
+# Learns: GET /teams/3, using `$response.body#/results/0/url#regex:^(?:https?://[^/]+)?/teams/([^/?#]+)`
 ```
 
 For arrays, only the first item is inspected. The URLs are collected while the CLI runs the examples, coverage, and fuzzing phases, and the learned links are used by the stateful phase that follows. If you disable those phases, or run the stateful tests from Python or pytest, nothing is learned this way.
