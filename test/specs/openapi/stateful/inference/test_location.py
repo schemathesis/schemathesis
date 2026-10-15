@@ -892,3 +892,24 @@ def test_inject_links_creates_response_definition(ctx):
     response = operation.responses.find_by_status_code("201")
     assert "links" in response.definition
     assert "X-Inferred-Link-0" in response.definition["links"]
+
+
+def test_inject_links_keeps_links_to_different_operations_under_one_status(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"operationId": "createUser"}},
+            "/users/{userId}": {"get": {"operationId": "getUser"}},
+            "/orders/{orderId}": {"get": {"operationId": "getOrder"}},
+        },
+        version="3.1.0",
+    )
+    inferencer = LinkInferencer.from_schema(schema)
+    operation = schema["/users"]["post"]
+    entries = [
+        LocationHeaderEntry(value="/users/123", status_code=201),
+        LocationHeaderEntry(value="/orders/456", status_code=201),
+    ]
+
+    assert inferencer.inject_links(operation.responses, entries) == 2
+    links = operation.responses.find_by_status_code("201").definition["links"]
+    assert sorted(link["operationId"] for link in links.values()) == ["getOrder", "getUser"]
