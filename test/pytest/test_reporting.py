@@ -713,7 +713,7 @@ def test_api(case, user):
     )
     testdir.runpytest().assert_outcomes(failed=2)
 
-    assert re.findall(r'tf-name" title="([^"]+)"', report_dir.join("index.html").read_text("utf-8")) == [
+    assert re.findall(r'class="tf-name"[^>]* title="([^"]+)"', report_dir.join("index.html").read_text("utf-8")) == [
         "Server error",
         "Undocumented HTTP status code",
     ]

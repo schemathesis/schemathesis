@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.31.1...HEAD) - TBD
 
+### :rocket: Added
+
+- HTML report filters by path, failure kind and method.
+
 ### :wrench: Changed
 
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.

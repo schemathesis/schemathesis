@@ -17,6 +17,7 @@ Pass `--report-html-path ./html-report` for a fixed directory.
 - The verdict counts tests only; an amber line explains any other non-zero exit.
 - Warnings that can make a pass meaningless, like `401` everywhere, come first.
 - Each failure shows the response, a `curl` command and [`st replay`](crash-reproduction.md).
+- A filter bar narrows the operations by path, failure kind and method. Press `/` to search; the URL keeps the filters, so a filtered view can be shared.
 
 ## In CI
 

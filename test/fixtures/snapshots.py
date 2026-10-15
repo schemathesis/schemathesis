@@ -587,6 +587,7 @@ def snapshot_html(snapshot, monkeypatch):
 
         def serialize(self, data, *, exclude=None, include=None, matcher=None):
             data = re.sub(r"<style>.*?</style>", "<style><CSS></style>", data, count=1, flags=re.DOTALL)
+            data = re.sub(r"<script>.*?</script>", "<script><JS></script>", data, flags=re.DOTALL)
             data = data.replace(f"v{SCHEMATHESIS_VERSION}", "v<VERSION>")
             data = normalize_connection_errors(data)
             data = re.sub(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC", "<GENERATED-AT>", data)
