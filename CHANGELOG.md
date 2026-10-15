@@ -19,6 +19,8 @@
 ### :racing_car: Performance
 
 - HTML report up to ~20% smaller on runs with many failures.
+- Faster dependency inference on large schemas and shared or recursive references.
+- Unreachable remote references time out once per run.
 
 ### :bug: Fixed
 

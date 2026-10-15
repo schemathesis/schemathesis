@@ -500,15 +500,13 @@ def _resolve_body_dependencies(
         )
 
     # Recursively find nested FK fields in request body
-    yield from _extract_nested_body_fk_fields(resolved, resources, bundled, path="", deferred=deferred_nested_fks)
+    yield from _extract_nested_body_fk_fields(resolved, resources, bundled, deferred=deferred_nested_fks)
 
 
 def _extract_nested_body_fk_fields(
     schema: dict[str, Any],
     resources: ResourceMap,
     bundled: dict[str, Any],
-    path: str,
-    max_depth: int = 5,
     deferred: list[tuple[str, str, str]] | None = None,
 ) -> Iterator[InputSlot]:
     """Recursively extract FK fields from nested request body schemas.
@@ -520,38 +518,56 @@ def _extract_nested_body_fk_fields(
     When the FK target resource isn't yet registered, the lookup is appended to
     `deferred` so the caller can replay it once every operation has been scanned.
     """
-    if max_depth <= 0:
-        return
-
+    # Bodies reuse the same schemas at many places; each is scanned once per remaining depth.
+    cache: dict[tuple[int, int], list[tuple[str, str, str]]] = {}
     properties, _ = _flatten_composition(schema, bundled)
     for property_name, subschema in properties.items():
-        if isinstance(subschema, dict):
-            current_path = f"{path}/{property_name}" if path else property_name
-            yield from _extract_container_fk_fields(subschema, resources, bundled, current_path, max_depth, deferred)
+        if not isinstance(subschema, dict):
+            continue
+        for suffix, target_resource_name, target_field in _container_fk_fields(subschema, bundled, 5, cache):
+            nested_path = property_name + suffix
+            resource = resources.get(target_resource_name)
+            if resource is not None:
+                yield InputSlot(
+                    resource=resource,
+                    resource_field=target_field,
+                    parameter_name=nested_path,
+                    parameter_location=ParameterLocation.BODY,
+                )
+            elif deferred is not None:
+                deferred.append((target_resource_name, target_field, nested_path))
 
 
-def _extract_container_fk_fields(
+def _container_fk_fields(
     schema: dict[str, Any],
-    resources: ResourceMap,
     bundled: dict[str, Any],
-    path: str,
     max_depth: int,
-    deferred: list[tuple[str, str, str]] | None,
-) -> Iterator[InputSlot]:
+    cache: dict[tuple[int, int], list[tuple[str, str, str]]],
+) -> list[tuple[str, str, str]]:
+    """FK fields under `schema` as `(path suffix, target resource, target field)`."""
+    key = (id(schema), max_depth)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    fields: list[tuple[str, str, str]] = []
+    cache[key] = fields
     reference = schema.get("$ref")
     if isinstance(reference, str):
         target = bundled.get(reference.rsplit("/", 1)[-1])
         if isinstance(target, dict) and target.get("type") == "array":
             # Each followed reference spends depth, so an array whose items point back at it terminates.
             if max_depth <= 1:
-                return
+                return fields
             schema = target
             max_depth -= 1
     if schema.get("type") == "array":
         items = schema.get("items")
         if isinstance(items, dict):
-            yield from _extract_container_fk_fields(items, resources, bundled, f"{path}/0", max_depth, deferred)
-        return
+            fields.extend(
+                (f"/0{suffix}", resource, field)
+                for suffix, resource, field in _container_fk_fields(items, bundled, max_depth, cache)
+            )
+        return fields
 
     # Composition branches may carry the actual object shape, so flatten before treating as object.
     properties, _ = _flatten_composition(schema, bundled)
@@ -561,21 +577,17 @@ def _extract_container_fk_fields(
         fk_info = infer_fk_target(name)
         if fk_info is None:
             continue
-        nested_path = f"{path}/{name}"
         target_resource_name, target_field, _ = fk_info
-        resource = resources.get(target_resource_name)
-        if resource is not None:
-            yield InputSlot(
-                resource=resource,
-                resource_field=target_field,
-                parameter_name=nested_path,
-                parameter_location=ParameterLocation.BODY,
-            )
-        elif deferred is not None:
-            deferred.append((target_resource_name, target_field, nested_path))
+        fields.append((f"/{name}", target_resource_name, target_field))
 
-    if properties:
-        yield from _extract_nested_body_fk_fields(schema, resources, bundled, path, max_depth - 1, deferred=deferred)
+    if max_depth > 1:
+        for name, subschema in properties.items():
+            if isinstance(subschema, dict):
+                fields.extend(
+                    (f"/{name}{suffix}", resource, field)
+                    for suffix, resource, field in _container_fk_fields(subschema, bundled, max_depth - 1, cache)
+                )
+    return fields
 
 
 def rebind_inherited_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:
