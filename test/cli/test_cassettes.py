@@ -198,6 +198,22 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples):
     assert cassette["http_interactions"][0]["request"]["headers"][header_name] == [fixed_header]
 
 
+def test_cassette_uri_with_single_quote(ctx, cli, cassette_path):
+    app, _ = ctx.openapi.make_flask_app({"/api/o'brien": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/o'brien")
+    def obrien():
+        return flask.jsonify({})
+
+    cli.run_openapi_app(
+        app, f"--report-vcr-path={cassette_path}", "--max-examples=1", "--phases=fuzzing", "--mode=positive"
+    )
+    assert [
+        interaction["request"]["uri"].split("/", 3)[3]
+        for interaction in load_cassette(cassette_path)["http_interactions"]
+    ] == ["api/o'brien"]
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 def test_run_subprocess(ctx, testdir, hypothesis_max_examples, snapshot_cli):
     api = ctx.openapi.apps.success()

@@ -6,6 +6,7 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
+import yaml
 
 from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -52,6 +53,14 @@ def test_vcr_writer_writes_header_to_stream():
         "seed: 42\n"
         "http_interactions:"
     )
+
+
+def test_vcr_writer_header_with_single_quote_in_command():
+    command = 'st run http://localhost/openapi.json -H "X-Name: O\'Brien"'
+    stream = StringIO()
+    with VcrWriter(output=stream, config=ProjectConfig.from_dict({})) as writer:
+        writer.open(seed=42, command=command)
+    assert yaml.safe_load(stream.getvalue())["command"] == command
 
 
 @pytest.mark.parametrize(
