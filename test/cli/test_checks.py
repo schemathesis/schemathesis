@@ -2158,6 +2158,39 @@ def test_negative_data_rejection_nested_body_description(ctx, cli, snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_scalar_query_negation_reported_next_to_array_parameter(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "maximum": 100},
+                        },
+                        {
+                            "name": "tags",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "array", "items": {"enum": ["a", "b"]}},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({}), 200
+
+    assert cli.run_openapi_app(app, "--checks=negative_data_rejection", "--phases=coverage") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_readonly_in_allof_branch_does_not_collapse_positive_generation(ctx, cli, snapshot_cli):
     # Server bug behind valid POST body; reachable only when positive-mode generates valid data.
     app, _ = ctx.openapi.make_flask_app(

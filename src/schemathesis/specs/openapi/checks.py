@@ -1265,6 +1265,14 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                     _negates_declared_parameter(mutation, location, schema) for mutation in phase_data.mutations
                 ):
                     return False
+                # Coverage negates one parameter at a time; a scalar one reaches the wire as generated.
+                if (
+                    isinstance(phase_data, CoveragePhaseData)
+                    and phase_data.parameter_location == location
+                    and phase_data.parameter in container
+                    and not _allows_container_type(schema.get("properties", {}).get(phase_data.parameter, {}))
+                ):
+                    return False
                 continue
 
             properties = schema.get("properties", {})

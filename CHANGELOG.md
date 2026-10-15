@@ -43,6 +43,7 @@
 - `object_level_authorization` sending a single-object `GET` as another user, which may create data.
 - Valueless sensitive query keys gaining a masked value in reports and cassettes.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.
+- Missed `negative_data_rejection` failures in coverage for scalar parameters next to array or object parameters.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 
