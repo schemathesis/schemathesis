@@ -726,7 +726,7 @@ def test_examples_ref_missing_components(ctx):
     )
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
     example = examples.generate_one(strategy)
-    assert example.query == {"foo-1": "foo-11", "spam-1": {"inner": "example"}}
+    assert example.query == {"foo-1": "foo-11", "spam-1[inner]": "example"}
 
 
 @pytest.mark.parametrize("key", ["anyOf", "oneOf"])
