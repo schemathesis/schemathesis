@@ -301,6 +301,18 @@ def test_call_and_validate(ctx, kwargs):
     test()
 
 
+def test_call_and_validate_negative_case_with_body_override(ctx):
+    api = ctx.openapi.apps.payload()
+    api_schema = schemathesis.openapi.from_url(api.schema_url)
+
+    @given(case=api_schema["/api/payload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        case.call_and_validate(json={"name": "John"})
+
+    test()
+
+
 def test_metadata_has_only_relevant_components(ctx):
     api = ctx.openapi.apps.custom_format()
     api_schema = schemathesis.openapi.from_url(api.schema_url)
