@@ -826,6 +826,23 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
     return has_negative
 
 
+# Transport keyword arguments that replace the generated request body.
+_BODY_TRANSPORT_KWARGS = ("json", "data", "content", "files")
+
+
+def _negative_body_replaced_by_caller(ctx: CheckContext, case: Case) -> bool:
+    """Whether the caller sent its own body, so the only invalid part of the case never reached the server."""
+    if not ctx._transport_kwargs or not any(key in ctx._transport_kwargs for key in _BODY_TRANSPORT_KWARGS):
+        return False
+    meta = case.meta
+    assert meta is not None
+    return not any(
+        component.mode.is_negative
+        for location, component in meta.components.items()
+        if location != ParameterLocation.BODY
+    )
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -847,6 +864,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not _type_mutations_become_valid_after_serialization(case)
         and not _path_array_becomes_valid_after_serialization(case)
         and not _non_body_negative_values_match_schema(response, case)
+        and not _negative_body_replaced_by_caller(ctx, case)
     ):
         extra_info = ""
         phase = meta.phase
