@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.31.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Slow coverage generation for email patterns combined with length bounds.
+
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 
 ### :wrench: Changed
@@ -64,7 +68,6 @@
 
 #### Others
 
-- Slow coverage generation for email patterns combined with length bounds.
 - `--phases` not disabling the stateful phase when links are inferred for GraphQL schemas.
 - `UnicodeEncodeError` for cookie values with non-Latin-1 characters.
 - Slow phase startup in processes with large memory use, eating into `--max-time`.
