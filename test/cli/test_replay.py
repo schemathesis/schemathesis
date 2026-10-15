@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import requests
+import strawberry
 import trustme
 from flask import Response, jsonify, request
 from rich.console import Console
@@ -687,6 +688,22 @@ def test_replay_reproduces_recorded_unit_failures(cli, ctx, tmp_path, snapshot_c
     assert "FIXED" not in result.output
     assert "CHANGED" not in result.output
     assert "ERROR" not in result.output
+
+
+def test_replay_graphql_crash(cli, ctx, tmp_path):
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def boom(self) -> str:
+            raise RuntimeError("planted")
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
+    cli.run(api.schema_url, "--max-examples=1", "--phases=fuzzing")
+    case_id = json.loads(_list_crash_files(crash_cache_dir(tmp_path))[0].read_text())["case_id"]
+
+    result = cli.main("replay", case_id, "--keep")
+
+    assert (result.exit_code, "ERROR" in result.output, "1 failed" in result.output) == (1, False, True), result.output
 
 
 def test_replay_reuses_disabled_tls_verification(cli, tmp_path):

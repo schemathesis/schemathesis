@@ -542,6 +542,9 @@ def _make_check_context(operation: APIOperation, recorder: ScenarioRecorder) -> 
 
 
 def _resolve_operation(schema: BaseSchema, crash: CrashFile) -> APIOperation | None:
+    operation = schema.find_operation_by_label(crash.operation)
+    if operation is not None:
+        return operation
     try:
         path_map = schema[crash.path_template]
     except LookupError:
