@@ -29,7 +29,7 @@ def build_links(inferencer, location: str) -> list[dict]:
     matches = inferencer._find_matches_from_normalized_location(normalized_location)
     if matches is None:
         return []
-    return inferencer._build_links_from_matches(matches)
+    return inferencer._build_links_from_matches(matches, "$response.header.Location")
 
 
 def link_by_id(operation_id: str, **parameters):

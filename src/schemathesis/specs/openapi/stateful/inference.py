@@ -1,9 +1,9 @@
 """Inferencing connections between API operations.
 
-The current implementation extracts information from the `Location` header and
-generates OpenAPI links for exact and prefix matches.
+The current implementation extracts information from the `Location` header and same-origin URLs in
+response bodies, and generates OpenAPI links for exact and prefix matches.
 
-When a `Location` header points to `/users/123`, the inference:
+When a `Location` header (or a body field) points to `/users/123`, the inference:
 
     1. Finds the exact match: `GET /users/{userId}`
     2. Finds prefix matches: `GET /users/{userId}/posts`, `GET /users/{userId}/posts/{postId}`
@@ -26,7 +26,7 @@ from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 if TYPE_CHECKING:
-    from schemathesis.engine.observations import LocationHeaderEntry
+    from schemathesis.engine.observations import BodyUrlEntry, LocationHeaderEntry
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -70,7 +70,7 @@ class MatchList:
 
 @dataclass(slots=True)
 class LinkInferencer:
-    """Infer OpenAPI links from Location headers for stateful testing."""
+    """Infer OpenAPI links from observed URLs for stateful testing."""
 
     _adapter: MapAdapter
     # All API operations for prefix matching
@@ -114,9 +114,9 @@ class LinkInferencer:
         except (NotFound, MethodNotAllowed):
             return None
 
-    def _build_links_from_matches(self, matches: MatchList) -> list[dict]:
+    def _build_links_from_matches(self, matches: MatchList, expression: str) -> list[dict]:
         """Build links from already-found matches."""
-        exact = self._build_link_from_match(matches.exact, matches.parameters)
+        exact = self._build_link_from_match(matches.exact, matches.parameters, expression)
         parameters = exact["parameters"]
         links = [exact]
         for inexact in matches.inexact:
@@ -155,7 +155,7 @@ class LinkInferencer:
         return matches
 
     def _build_link_from_match(
-        self, operation: OperationById | OperationByRef, path_parameters: Mapping[str, Any]
+        self, operation: OperationById | OperationByRef, path_parameters: Mapping[str, Any], expression: str
     ) -> dict:
         link = operation.to_link_base()
 
@@ -170,7 +170,7 @@ class LinkInferencer:
                 else:
                     pattern = pattern.replace(f"{{{candidate}}}", "[^/]+")
 
-            parameters[name] = f"$response.header.Location#regex:{pattern}"
+            parameters[name] = f"{expression}#regex:{pattern}"
 
         link["parameters"] = parameters
 
@@ -211,7 +211,9 @@ class LinkInferencer:
         relative_path = path[len(base_path) :]
         return relative_path if relative_path.startswith("/") else "/" + relative_path
 
-    def inject_links(self, responses: ResponsesContainer, entries: list[LocationHeaderEntry]) -> int:
+    def inject_links(
+        self, responses: ResponsesContainer, entries: list[LocationHeaderEntry] | list[BodyUrlEntry]
+    ) -> int:
         # To avoid unnecessary work, we need to skip entries that we know will produce already inferred links
         seen: set[SeenLinkKey] = set()
         injected = 0
@@ -241,7 +243,7 @@ class LinkInferencer:
             else:
                 links = response.definition.setdefault(self._links_keyword, {})
 
-            for link in self._build_links_from_matches(matches):
+            for link in self._build_links_from_matches(matches, entry.expression):
                 # Several observed URLs may land in the same response, so names must not collide
                 links[f"X-Inferred-Link-{len(links)}"] = link
                 injected += 1
