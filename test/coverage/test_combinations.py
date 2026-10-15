@@ -2499,6 +2499,25 @@ def test_bounded_format_candidate_rejected_by_pattern_uses_regex(pctx, schema, e
     assert pctx.generate_from_schema(schema) == expected
 
 
+@pytest.mark.parametrize("candidate_fails", [True, False])
+def test_bounded_format_candidate_falls_back_to_regex(pctx, monkeypatch, candidate_fails):
+    calls = []
+
+    def narrower(min_length, max_length):
+        calls.append((min_length, max_length))
+        if candidate_fails:
+            # Exercise a genuinely empty Hypothesis draw, not a mocked exception.
+            return st.nothing()
+        return st.just("a@example.com")
+
+    monkeypatch.setitem(FORMAT_NARROWERS, "email", narrower)
+    schema = {"type": "string", "format": "email", "pattern": r"^ab@example\.com$", "maxLength": 14}
+    value = pctx.generate_from_schema(schema)
+    assert calls == [(0, 14)]
+    assert value == "ab@example.com"
+    assert_conform([value], schema)
+
+
 def test_bounded_pattern_does_not_use_builtin_for_custom_format(pctx):
     # A caller's generator does not inherit the length-aware behavior of the built-in.
     pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
