@@ -8,6 +8,7 @@
 - HTML report filters by path, failure kind and method.
 - HTML report permalinks to operations and failing cases that copy the URL on click.
 - `#regex:` extractor for `$response.body#/pointer` link expressions.
+- `--report pytest` writes failures as standalone pytest tests. [#2999](https://github.com/schemathesis/schemathesis/issues/2999)
 
 ### :wrench: Changed
 

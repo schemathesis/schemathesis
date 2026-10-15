@@ -120,8 +120,8 @@ Network requests options:
 Output options:
   --report FORMAT                 Generate test reports in formats specified as
                                   a comma-separated list [possible values:
-                                  junit, vcr, har, ndjson, json, wfc, allure,
-                                  html]
+                                  junit, vcr, har, ndjson, json, wfc, pytest,
+                                  allure, html]
   --report-dir DIRECTORY          Directory to store all report files  [default:
                                   schemathesis-report]
   --report-junit-path FILENAME    Custom path for JUnit XML report
@@ -130,6 +130,8 @@ Output options:
   --report-ndjson-path FILENAME   Custom path for NDJSON events file
   --report-json-path FILENAME     Custom path for the JSON run report
   --report-wfc-path FILENAME      Custom path for the WFC Report JSON file
+  --report-pytest-path FILENAME   Custom path for the pytest file reproducing
+                                  failures
   --report-allure-path DIRECTORY  Directory for Allure result files
   --report-html-path DIRECTORY    Directory for the HTML report
   --report-preserve-bytes         Retain exact byte sequence of payloads in
