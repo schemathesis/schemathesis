@@ -14,6 +14,8 @@ T = TypeVar("T", covariant=True)
 class ResponsesContainer(Protocol[T]):
     def find_by_status_code(self, status_code: int) -> T | None: ...  # pragma: no cover
     def add(self, status_code: str, definition: dict[str, Any]) -> T: ...  # pragma: no cover
+    @property
+    def status_codes(self) -> tuple[str, ...]: ...  # pragma: no cover
 
 
 class OperationParameter(Protocol):

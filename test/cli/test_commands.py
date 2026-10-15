@@ -3421,6 +3421,26 @@ def test_same_host_redirect_followed(cli, ctx, location):
     assert target_requests == ["GET"]
 
 
+def test_documented_redirect_not_followed(cli, ctx):
+    target_requests = []
+    app, _ = ctx.openapi.make_flask_app(
+        {"/redirect": {"get": {"responses": {"302": {"description": "Found"}}}}},
+    )
+
+    @app.route("/redirect")
+    def redirect_endpoint():
+        return redirect(url_for("target"), code=302)
+
+    @app.route("/target")
+    def target():
+        target_requests.append(request.method)
+        return jsonify({}), 404
+
+    result = cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=1", "--checks=status_code_conformance")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert target_requests == []
+
+
 @pytest.fixture
 def no_null_bytes(ctx):
     with ctx.check(

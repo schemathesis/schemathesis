@@ -111,6 +111,10 @@ class GraphQLResponses:
     def add(self, status_code: str, definition: dict[str, Any]) -> None:
         return None  # pragma: no cover
 
+    @property
+    def status_codes(self) -> tuple[str, ...]:
+        return ()
+
 
 @dataclass
 class GraphQLSchema(BaseSchema):

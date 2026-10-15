@@ -31,6 +31,7 @@
 - `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
 - Clicks in the HTML report opening an unrelated row in Safari.
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
+- Redirects followed for operations documenting a `3xx` status, reporting the target's status instead.
 - Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
 - `object_level_authorization` sending a single-object `GET` as another user, which may create data.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.

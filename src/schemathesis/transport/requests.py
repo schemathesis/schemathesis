@@ -229,7 +229,10 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             kwargs["headers"] = headers
 
         data = self._build_request_data(case, kwargs)
-        if max_redirects == 0:
+        # Unless redirects are configured, a documented redirect is the response under test, not its target.
+        if max_redirects == 0 or (
+            max_redirects is None and any(code.startswith("3") for code in case.operation.responses.status_codes)
+        ):
             data.setdefault("allow_redirects", False)
 
         current_session_headers: MutableMapping[str, Any] = {}
