@@ -4,6 +4,7 @@ import json
 import threading
 import time
 import uuid
+from queue import Queue
 
 import pytest
 import requests
@@ -19,9 +20,12 @@ from schemathesis.core.rate_limit import RATE_LIMIT_AUTO_MAX_RETRIES, RATE_LIMIT
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, StopReason, events, from_schema
+from schemathesis.engine.context import EngineContext
 from schemathesis.engine.control import ExecutionControl
+from schemathesis.engine.fuzz._executor import _relay_events
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
+from test.engine._late_put import attach_late_put
 
 
 def _make_flaky_repro_schema(ctx):
@@ -845,3 +849,15 @@ def test_fuzz_closing_stream_mid_run_stops_workers(ctx):
     closer.join(timeout=10)
     assert not closer.is_alive()
     assert not [thread for thread in threading.enumerate() if thread.name.startswith("schemathesis_fuzz")]
+
+
+def test_fuzz_relays_event_put_right_before_worker_exit(ctx):
+    engine = EngineContext(schema=ctx.openapi.load_schema({}), stop_event=threading.Event())
+    exited = threading.Thread(target=lambda: None)
+    exited.start()
+    exited.join()
+    event_queue: Queue = Queue()
+    late_event = events.EngineStarted()
+    attach_late_put(event_queue, late_event)
+
+    assert list(_relay_events(engine, event_queue=event_queue, threads=[exited])) == [late_event]

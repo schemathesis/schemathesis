@@ -3946,9 +3946,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global CREATED, KILLED
+        # Reading the body first keeps the reset after the client's last write, so it always sees the reset.
+        payload = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         self.reset_after_crash()
         try:
-            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            body = json.loads(payload)
         except ValueError:
             body = None
         size = body.get("size") if isinstance(body, dict) else None

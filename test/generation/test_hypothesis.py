@@ -2396,11 +2396,11 @@ CANONICAL_CASES = [
             "type": "object",
             "patternProperties": {
                 "^a": {"type": "object", "patternProperties": {"^a": {"type": "null"}}},
-                "b$": {"type": "object", "additionalProperties": {"type": "string"}, "patternProperties": {"x$": {}}},
+                "a$": {"type": "object", "additionalProperties": {"type": "string"}, "patternProperties": {"x$": {}}},
             },
             "additionalProperties": False,
         },
-        (lambda value: any(key.startswith("a") and key.endswith("b") for key in value),),
+        (lambda value: any(key.startswith("a") and key.endswith("a") for key in value),),
     ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
