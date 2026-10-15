@@ -965,6 +965,9 @@ def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -
         schema = parameter.optimized_schema
         if isinstance(schema, dict) and schema.get("format") in STRING_FORMATS:
             explicit.add(parameter.name)
+        # Values the schema lists verbatim carry the same intent as examples.
+        if isinstance(schema, dict) and _has_explicit_slash_example([*(schema.get("enum") or ()), schema.get("const")]):
+            explicit.add(parameter.name)
     return frozenset(explicit)
 
 
