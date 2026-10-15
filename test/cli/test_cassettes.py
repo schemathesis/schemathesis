@@ -294,6 +294,32 @@ def test_cassettes_mark_truncated_response_body(ctx, cli, cassette_path):
     ] == [(LARGE_RESPONSE_BODY[:64].decode(), len(LARGE_RESPONSE_BODY))]
 
 
+def test_har_cookies(ctx, cli, cassette_path):
+    app, _ = ctx.openapi.make_flask_app({"/api/cookies": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/cookies")
+    def cookies():
+        response = flask.jsonify({})
+        response.set_cookie("session", "abc", path="/")
+        return response
+
+    har_path = cassette_path.with_suffix(".har")
+    cli.run_openapi_app(
+        app,
+        f"--report-har-path={har_path}",
+        "-H",
+        "Cookie: theme=dark",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--output-sanitize=false",
+    )
+    assert [
+        (entry["request"]["cookies"], entry["response"]["cookies"])
+        for entry in load_json_or_fail(har_path)["log"]["entries"]
+    ] == [([{"name": "theme", "value": "dark"}], [{"name": "session", "value": "abc", "path": "/"}])]
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
