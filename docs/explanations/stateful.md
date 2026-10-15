@@ -167,7 +167,7 @@ All sources add links; none of them disables another.
 
 ### Regex Extraction
 
-Standard OpenAPI link expressions take a whole value. Schemathesis lets you extract part of a string value with a regular expression, for response headers (`$response.header.<name>`) and for the path, query, and header parameters of the request that was sent (`$request.path.<name>`, `$request.query.<name>`, `$request.header.<name>`):
+Standard OpenAPI link expressions take a whole value. Schemathesis lets you extract part of a string value with a regular expression, for response headers (`$response.header.<name>`), string fields of the response body (`$response.body#/<pointer>`), and for the path, query, and header parameters of the request that was sent (`$request.path.<name>`, `$request.query.<name>`, `$request.header.<name>`):
 
 ```yaml
 paths:
@@ -190,7 +190,7 @@ If the `Location` header is `/users/42`, the `userId` parameter becomes `42`. Th
 
 - The pattern is a Python regular expression with exactly one capturing group; any other number of groups makes the link expression invalid.
 - The pattern is searched anywhere in the value, not matched against the whole of it, and the captured group becomes the parameter value.
-- If the pattern does not match, or the group captures an empty string, the link does not set that parameter, and Schemathesis generates a value for it as usual.
+- If the pattern does not match, the group captures an empty string, or a body pointer resolves to a non-string value, the link does not set that parameter, and Schemathesis generates a value for it as usual.
 
 ### Enhanced RequestBody Support
 

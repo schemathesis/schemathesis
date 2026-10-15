@@ -149,9 +149,11 @@ class BodyResponse(Node):
     """A node for `$response.body` expressions."""
 
     pointer: str | None
+    extractor: RegexExtractor | None
 
-    def __init__(self, pointer: str | None = None) -> None:
+    def __init__(self, pointer: str | None = None, extractor: RegexExtractor | None = None) -> None:
         self.pointer = pointer
+        self.extractor = extractor
 
     def evaluate(self, output: StepOutput) -> Any:
         response = output.response
@@ -163,4 +165,9 @@ class BodyResponse(Node):
         if self.pointer is None:
             # We need the parsed document - data will be serialized before sending to the application
             return document
-        return resolve_pointer(document, self.pointer[1:])
+        value = resolve_pointer(document, self.pointer[1:])
+        if self.extractor is not None:
+            if not isinstance(value, str):
+                return UNRESOLVABLE
+            return self.extractor.extract(value) or UNRESOLVABLE
+        return value

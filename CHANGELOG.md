@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - HTML report filters by path, failure kind and method.
+- `#regex:` extractor for `$response.body#/pointer` link expressions.
 
 ### :wrench: Changed
 
