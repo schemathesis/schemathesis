@@ -147,9 +147,11 @@ def check_user_permissions(ctx, response, case):
 @schemathesis.check
 def check_audit_trail(ctx, response, case):
     if case.method in ("POST", "PUT", "DELETE") and response.status_code < 400:
-        if "X-Audit-ID" not in response.headers:
+        if "x-audit-id" not in response.headers:
             raise AssertionError("Data modification missing audit trail")
 ```
+
+Header names in `response.headers` are lowercase, so look them up as `"x-audit-id"`, not `"X-Audit-ID"`.
 
 ### Class-based checks
 
