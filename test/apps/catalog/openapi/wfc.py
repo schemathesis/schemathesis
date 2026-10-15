@@ -468,7 +468,8 @@ def wfc_owned_orders(
     """Orders owned by the caller; `policy` decides what another caller sees.
 
     `listing` adds `GET /api/orders`: `own` lists the caller's orders, `all` everyone's, `ids` everyone's ids only,
-    `all_renamed` everyone's under a differently named schema, `all_paged` everyone's, one per `offset` page.
+    `all_renamed` everyone's under a differently named schema, `all_paged` everyone's, one per `offset` page,
+    `issuing` creates a new order for the caller on every call and returns only it.
     `writes` adds `PUT /api/orders/{order_id}`, creating the order under that id, and note endpoints that take the
     order id in the path, query or body, accept any caller and echo the id.
     `security` is `declared` for an API key on every operation, `undeclared` for none in the schema while the server
@@ -487,7 +488,7 @@ def wfc_owned_orders(
         elif listing == "all_renamed":
             schemas = {"OrderSummary": _ORDER}
             items = {"$ref": "#/components/schemas/OrderSummary"}
-        listed = {"type": "array", "items": items}
+        listed = items if listing == "issuing" else {"type": "array", "items": items}
         list_orders_spec: dict[str, object] = {
             "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": listed}}}}
         }
@@ -545,6 +546,10 @@ def wfc_owned_orders(
         if listing == "all_paged":
             offset = request.args.get("offset", 0, type=int)
             return jsonify(list(orders.values())[offset : offset + 1])
+        if listing == "issuing":
+            order = {"id": len(orders) + 1, "item": "book", "owner": user}
+            orders[order["id"]] = order
+            return jsonify(order)
         return jsonify(list(orders.values()))
 
     @app.route("/api/orders/<int:order_id>", methods=["GET"])
