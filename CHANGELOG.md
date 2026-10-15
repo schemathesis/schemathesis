@@ -22,6 +22,7 @@
 
 ### :bug: Fixed
 
+- `st replay` reporting "operation not found in schema" for every GraphQL failure.
 - Unsorted expected statuses in `missing_required_header` failure messages.
 - Inferred `Location` links overwriting each other when several targets share a status code.
 - Slow coverage generation for email patterns combined with length bounds.
