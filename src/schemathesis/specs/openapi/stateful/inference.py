@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from werkzeug.exceptions import MethodNotAllowed, NotFound
-from werkzeug.routing import Map, MapAdapter, Rule
+from werkzeug.routing import Map, MapAdapter, RequestRedirect, Rule
 
 from schemathesis.core.adapter import ResponsesContainer
 from schemathesis.core.transforms import encode_pointer
@@ -111,7 +111,7 @@ class LinkInferencer:
         """Match path to API operation and extract path parameters."""
         try:
             return self._adapter.match(path)
-        except (NotFound, MethodNotAllowed):
+        except (NotFound, MethodNotAllowed, RequestRedirect):
             return None
 
     def _build_links_from_matches(self, matches: MatchList, expression: str) -> list[dict]:

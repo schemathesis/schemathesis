@@ -2176,6 +2176,38 @@ def test_links_inferred_from_urls_in_response_bodies(ctx, app_runner, body, stat
     )
 
 
+@pytest.mark.parametrize(
+    ("headers", "body"),
+    [({"Location": "/ollama"}, {}), ({}, {"ollama": {"url": "/ollama"}})],
+    ids=["location", "body"],
+)
+def test_link_inference_ignores_urls_missing_trailing_slash(ctx, app_runner, headers, body):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/config": {"get": {"responses": {"default": {"description": "OK"}}}},
+            "/ollama/": {"get": {"responses": {"default": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/config")
+    def config():
+        return flask.jsonify(body), 200, headers
+
+    @app.route("/ollama/")
+    def ollama():
+        return flask.jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_examples=5,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+
+    assert stream.find_all(events.FatalError) == []
+
+
 def test_max_time_reserves_for_stateful_while_links_may_still_appear(ctx, app_runner):
     # Runtime-inferred links only show up once fuzzing has run, so the share has to be held before that.
     app, _ = ctx.openapi.make_flask_app(
