@@ -274,7 +274,7 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
 .finding-title::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--color-brand-danger);transform:translateY(-1px)}
 .case-error .finding-title::before{background:var(--color-brand-error);border-radius:1px}
 .violations{font-family:var(--font-family-monospace);font-size:11px;font-weight:400;color:var(--color-text-muted)}
-.msg{margin:0 0 0 14px;font-family:var(--font-family-monospace);font-size:12px;line-height:1.6;color:var(--color-text-secondary);white-space:pre-wrap;overflow-wrap:anywhere}
+.msg{margin:0 0 0 14px;max-height:22em;overflow:auto;font-family:var(--font-family-monospace);font-size:12px;line-height:1.6;color:var(--color-text-secondary);white-space:pre-wrap;overflow-wrap:anywhere}
 .msg+.msg{margin-top:8px;padding-top:8px;border-top:1px dashed var(--color-border-subtle)}
 .case-error .msg.lead{margin-left:0;color:var(--color-text-primary)}
 .case-error .msg-detail{margin-top:4px}
@@ -384,6 +384,8 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
 .w-op .path{overflow-wrap:anywhere}
 a.w-op:hover .path{text-decoration:underline}
 .w-item-note{color:var(--color-text-secondary);overflow-wrap:anywhere}
+.w-more .more{margin-left:0}
+.w-more[open] summary{margin-bottom:4px}
 .w-details{flex-basis:100%;margin:0;padding-left:2px;font-size:11px;color:var(--color-text-secondary);white-space:pre-wrap;overflow-wrap:anywhere}
 .w-tip{margin:0;font-size:12px;line-height:1.5;color:var(--color-text-secondary);white-space:pre-wrap}
 .w-tip b{font-weight:600;color:var(--color-text-primary)}

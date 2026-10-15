@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from schemathesis.core.failures import Severity
 from schemathesis.engine import Status, StopReason
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
 
@@ -63,6 +64,7 @@ class ErrorEntry:
 @dataclass(slots=True)
 class FailureEntry:
     title: str
+    severity: Severity
     # One per violation; same-title violations on one response share an entry.
     messages: list[str]
 
@@ -128,7 +130,7 @@ class OperationStatus(StrEnum):
 class OperationRow:
     label: str
     status: OperationStatus
-    # Distinct failure titles; the run keeps one failure per kind per operation, so titles do not repeat.
+    # Distinct failure titles, most severe first; the run keeps one failure per kind per operation.
     failures: list[str]
     cases: int
     # Why the operation errored or was skipped.
@@ -141,6 +143,11 @@ class OperationRow:
     warnings: list[WarningBlock] = field(default_factory=list)
     # Titles of the failures the baseline suppressed.
     known_failures: list[str] = field(default_factory=list)
+
+    @property
+    def severity(self) -> Severity:
+        # Rows without failures are only ordered among themselves, so their value never decides anything.
+        return min((failure.severity for case in self.failing_cases for failure in case.failures), default=Severity.LOW)
 
     @property
     def method(self) -> str:

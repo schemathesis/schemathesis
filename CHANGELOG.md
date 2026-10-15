@@ -5,10 +5,14 @@
 ### :wrench: Changed
 
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
+- HTML report lists failures and failed operations most severe first.
+- HTML report shows run details above warnings and the first 10 operations of each warning.
 
 ### :bug: Fixed
 
 - Stateful scenarios mostly starting from the alphabetically first operation.
+- "Response violates schema" messages embedding the whole response value on one line.
+- Long failure messages in the HTML report not limited in height, unlike response bodies.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 

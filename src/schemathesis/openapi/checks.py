@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import textwrap
 from typing import TYPE_CHECKING, Any
 
@@ -8,7 +9,7 @@ from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.jsonschema.bundler import unbundle, unbundle_path
 from schemathesis.core.jsonschema.types import JsonValue
-from schemathesis.core.output import truncate_json
+from schemathesis.core.output import truncate_json, truncate_text
 from schemathesis.core.transforms import resolve_path
 
 if TYPE_CHECKING:
@@ -155,7 +156,7 @@ class JsonSchemaError(Failure):
                 f'Property "{name}" is not allowed' if isinstance(name, str) else "Value is not allowed"
             )
         else:
-            validation_message = exc.message
+            validation_message = _shorten_instance(exc.message, exc.instance, config or OutputConfig())
 
         # Reorder schema to prioritize the failing keyword in the output
         if isinstance(schema, dict) and exc.schema_path:
@@ -195,6 +196,16 @@ class JsonSchemaError(Failure):
             instance_path=exc.instance_path,
             instance=exc.instance,
         )
+
+
+def _shorten_instance(message: str, instance: JsonValue, config: OutputConfig) -> str:
+    # The validator message spells out the whole rejected value on one line, however large.
+    if not config.truncation.enabled:
+        return message
+    rendered = json.dumps(instance, separators=(",", ":"), ensure_ascii=False)
+    if len(rendered) <= config.truncation.max_width:
+        return message
+    return message.replace(rendered, truncate_text(rendered, config.truncation.max_width), 1)
 
 
 class MissingContentType(Failure):
