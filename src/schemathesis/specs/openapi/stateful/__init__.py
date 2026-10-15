@@ -232,6 +232,7 @@ def create_state_machine(
             _response_matchers[operation.label] = make_response_matcher(bundle_matchers)
 
     rules: dict[str, Callable[..., StepOutput | None]] = {}
+    root_rules: set[str] = set()
     catch_all = Bundle("catch_all")
 
     # We want stateful testing to be effective and focus on meaningful transitions.
@@ -292,6 +293,7 @@ def create_state_machine(
                     precondition=is_root_allowed(target.label),
                     input=case_strategy.map(StepInput.initial),
                 )
+                root_rules.add(name)
 
     return type(
         "APIWorkflow",
@@ -301,6 +303,7 @@ def create_state_machine(
             "bundles": bundles,
             "_response_matchers": _response_matchers,
             "_transitions": transitions,
+            "root_rules": frozenset(root_rules),
             **rules,
         },
     )

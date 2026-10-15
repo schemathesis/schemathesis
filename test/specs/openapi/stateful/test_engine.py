@@ -1474,3 +1474,54 @@ def test_inferred_form_body_link_sends_credentials_from_unique_producer(ctx, app
     )
 
     assert ("registered-client", "registered-secret") in sent
+
+
+def _first_step_of_first_scenario(app_runner, app, stop_event, seed):
+    config = schemathesis.Config.from_dict(
+        {
+            "seed": seed,
+            "generation": {"mode": "positive", "max-examples": 1, "database": "none"},
+            "phases": {"stateful": {"inference": {"algorithms": []}}},
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
+    result = collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+    first_scenario = next(
+        event for event in result.events if isinstance(event, events.ScenarioFinished) and event.recorder.cases
+    )
+    return next(iter(first_scenario.recorder.cases.values())).value.operation.label
+
+
+def test_suites_start_from_different_roots(ctx, app_runner, stop_event):
+    # Every suite opens with its simplest scenario, which must not always start from the alphabetically first root.
+    roots = ["alpha", "beta", "gamma", "delta"]
+    link = {"item": {"operationId": "getItem", "parameters": {"itemId": "$response.body#/itemId"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            **{f"/{name}": {"get": {"responses": {"200": {"description": "OK", "links": link}}}} for name in roots},
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/<name>", methods=["GET"])
+    def list_root(name):
+        return jsonify({"itemId": name})
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    first_steps = [_first_step_of_first_scenario(app_runner, app, stop_event, seed) for seed in range(12)]
+    assert first_steps.count("GET /alpha") <= 6, first_steps
+    assert len(set(first_steps)) >= 3, first_steps
