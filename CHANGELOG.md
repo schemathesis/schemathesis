@@ -24,6 +24,7 @@
 
 - Unsorted expected statuses in `missing_required_header` failure messages.
 - Inferred `Location` links overwriting each other when several targets share a status code.
+- Empty `cookies` lists for requests and responses in HAR reports.
 - Slow coverage generation for email patterns combined with length bounds.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - "Response violates schema" messages embedding the whole response value on one line.
