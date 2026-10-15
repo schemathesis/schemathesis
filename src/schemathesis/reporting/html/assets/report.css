@@ -327,7 +327,7 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
   .msg{margin-left:0}
 }
 
-.has-details{position:relative}
+.has-details{position:relative;transform:translateZ(0)}
 .row-toggle::after{content:"";position:absolute;inset:0;z-index:1;cursor:pointer}
 .row-open{position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
 .row-toggle:has(.row-open:focus-visible)::after{outline:2px solid var(--color-text-primary);outline-offset:-2px;border-radius:var(--radius-sm)}
