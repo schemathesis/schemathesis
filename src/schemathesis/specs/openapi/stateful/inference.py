@@ -241,7 +241,8 @@ class LinkInferencer:
             else:
                 links = response.definition.setdefault(self._links_keyword, {})
 
-            for idx, link in enumerate(self._build_links_from_matches(matches)):
-                links[f"X-Inferred-Link-{idx}"] = link
+            for link in self._build_links_from_matches(matches):
+                # Several observed URLs may land in the same response, so names must not collide
+                links[f"X-Inferred-Link-{len(links)}"] = link
                 injected += 1
         return injected
