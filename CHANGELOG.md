@@ -33,6 +33,7 @@
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - Crash or wrong URL for server variable names containing dots or brackets.
+- Internal error instead of a failure for non-object GraphQL responses in negative mode.
 - "Response violates schema" messages embedding the whole response value on one line.
 - False positive `negative_data_rejection` for valid boolean query parameters alongside `text/plain` bodies.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
