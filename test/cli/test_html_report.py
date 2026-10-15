@@ -492,6 +492,25 @@ def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot
     assert html == snapshot_html
 
 
+def test_html_report_permalinks(ctx, cli, report_dir):
+    api = ctx.openapi.apps.success_and_failure()
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.FAILURES)
+    assert re.findall(
+        r'<tr class="op-row[^"]*" id="([^"]+)">.*?<a class="permalink" href="#([^"]+)" ([^>]*)>#</a>', html
+    ) == [
+        ("op-get-api-failure", "op-get-api-failure", 'aria-label="Copy link to GET /api/failure"'),
+        ("op-get-api-success", "op-get-api-success", 'aria-label="Copy link to GET /api/success"'),
+    ]
+    cards = re.findall(
+        r'<article class="case" id="case-(\w+)"[^>]*>.*?<a class="case-id permalink-id" href="#case-(\w+)"[^>]*>(\w+)</a>',
+        html,
+        flags=re.DOTALL,
+    )
+    assert cards
+    assert all(article == href == text for article, href, text in cards)
+    assert '<div id="nav-live" class="vh" role="status" aria-live="polite"></div>' in html
+
+
 def top_failures_items(html):
     tf_list = re.search(r'<ul class="tf-list">(.*?)</ul>', html).group(1)
     return re.findall(

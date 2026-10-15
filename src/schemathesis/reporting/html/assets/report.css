@@ -489,3 +489,11 @@ html:not(.js) .js-only{display:none!important}
   .fb-select{max-width:100%}
   .fb-status{flex-basis:100%;margin-left:0}
 }
+.permalink{position:relative;z-index:2;flex:none;padding:0 4px;font:12px var(--font-family-monospace);color:var(--color-text-muted);text-decoration:none;border-radius:var(--radius-sm);opacity:0}
+.op-row:hover .permalink,.permalink:focus-visible,.permalink.copied{opacity:1}
+.permalink:hover{color:var(--color-text-primary)}
+.permalink:focus-visible,a.permalink-id:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:1px}
+.permalink.copied::after,a.permalink-id.copied::after{content:" link copied";color:var(--color-text-secondary)}
+@media (hover:none){.permalink{opacity:1}}
+a.permalink-id{text-decoration:none;border-bottom:1px dotted var(--color-border)}
+a.permalink-id:hover{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary)}
