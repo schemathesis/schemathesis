@@ -58,17 +58,24 @@ def humanize_duration(seconds: float) -> str:
     return f"{rounded:.1f}s"
 
 
-# Copies the value shown next to the button, or a reproduction's commands followed by its replay command.
-# `navigator.clipboard` is unavailable on `file://`, hence the fallback.
+# Copies the value shown next to the button, a reproduction's commands followed by its replay command,
+# or a permalink URL. `navigator.clipboard` may be unavailable or denied on `file://`, hence the fallback.
 _COPY_SCRIPT = (
-    "<script>document.querySelectorAll('.copy-btn').forEach(function(b){b.addEventListener('click',function(){"
+    "<script>(function(){function copy(t,done){function legacy(){"
+    "var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();"
+    "try{document.execCommand('copy');done()}catch(e){}a.remove()}"
+    "if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done,legacy)}else{legacy()}}"
+    "document.querySelectorAll('.copy-btn').forEach(function(b){b.addEventListener('click',function(){"
     "var r=b.closest('.repro'),t;if(r){t=[].map.call(r.querySelectorAll('.cmd'),function(c){return c.textContent})"
     ".join('\\n');var p=r.parentNode.querySelector('.replay code');if(p)t+='\\n\\n'+p.textContent}"
-    "else{t=b.previousElementSibling.textContent}var done=function(){b.textContent='Copied';"
-    "setTimeout(function(){b.textContent='Copy'},1200)};"
-    "if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done)}"
-    "else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();"
-    "try{document.execCommand('copy');done()}catch(e){}a.remove()}})})</script>"
+    "else{t=b.previousElementSibling.textContent}"
+    "copy(t,function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1200)})})});"
+    "var live=document.getElementById('nav-live');"
+    "document.addEventListener('click',function(e){"
+    "var a=e.target.closest&&e.target.closest('a.permalink,a.permalink-id');if(!a)return;"
+    "copy(location.href.split('#')[0]+a.getAttribute('href'),function(){"
+    "a.classList.add('copied');live.textContent='';setTimeout(function(){live.textContent='Link copied'},30);"
+    "setTimeout(function(){a.classList.remove('copied')},1600)})})})()</script>"
 )
 # Command arguments longer than this may break anywhere; shorter ones never break inside.
 _LONG_ARGUMENT = 40
@@ -88,6 +95,7 @@ def page(*, title: str, body: str) -> str:
   <main class="container">
 {body}
   </main>
+  <div id="nav-live" class="vh" role="status" aria-live="polite"></div>
 {_COPY_SCRIPT}<script>{_NAV_SCRIPT}</script>
 </body>
 </html>
@@ -669,7 +677,7 @@ def _path(path: str) -> str:
     return "<wbr>/".join([head + "/" + segments[0], *segments[1:]]) if segments else head
 
 
-def _operation_cell(row: OperationRow, toggle: str) -> str:
+def _operation_cell(row: OperationRow, anchor: str, toggle: str) -> str:
     method = _method(row.method) if row.method else ""
     warned = ""
     if row.warnings:
@@ -689,7 +697,7 @@ def _operation_cell(row: OperationRow, toggle: str) -> str:
         )
     return (
         f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span>'
-        f"{warned}</span></td>"
+        f'<a class="permalink" href="#{anchor}" aria-label="Copy link to {esc(row.label)}">#</a>{warned}</span></td>'
     )
 
 
@@ -816,7 +824,10 @@ def _failing_case(case: FailingCase, owner: str = "", filters: str = "") -> str:
             if case.auth_identity is not None
             else ""
         )
-        meta = f'<div class="case-meta"><span class="case-id">{esc(case.case_id)}</span>{identity}</div>'
+        meta = (
+            f'<div class="case-meta"><a class="case-id permalink-id" href="#case-{esc(case.case_id)}" '
+            f'title="Link to this case">{esc(case.case_id)}</a>{identity}</div>'
+        )
     return f'<article class="case"{case_id}{filters}><div class="case-body">{"".join(parts)}</div>{meta}</article>'
 
 
@@ -1009,13 +1020,13 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
                 toggle = _toggle(f"{anchor}-details", row.label, checked=open_details)
                 body += (
                     f'<tr class="op-row row-{status.css} has-details" id="{anchor}">'
-                    f"{_operation_cell(row, toggle)}{_failures_cell(row)}{_cases_cell(row, _CHEVRON)}</tr>"
+                    f"{_operation_cell(row, anchor, toggle)}{_failures_cell(row)}{_cases_cell(row, _CHEVRON)}</tr>"
                     f"{_detail_row(_row_items(row, kinds), anchor, status.css)}"
                 )
             else:
                 body += (
                     f'<tr class="op-row row-{status.css}" id="{anchor}">'
-                    f"{_operation_cell(row, '')}{_failures_cell(row)}{_cases_cell(row, '')}</tr>"
+                    f"{_operation_cell(row, anchor, '')}{_failures_cell(row)}{_cases_cell(row, '')}</tr>"
                 )
         groups.append(f'<tbody class="ops-group">{header}{body}</tbody>')
     footer_rows = []

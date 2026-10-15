@@ -594,7 +594,11 @@ def snapshot_html(snapshot, monkeypatch):
             data = re.sub(r"127\.0\.0\.1:\d+", "127.0.0.1:<PORT>", data)
             data = re.sub(r'(Duration</span><span class="m-value">)[^<]+', r"\1<DURATION>", data)
             data = re.sub(r"(Finished in |Stopped by user after )[^<]+", r"\1<DURATION>", data)
-            data = re.sub(r'(class="case-id">)[^<]+', r"\1<CASE-ID>", data)
+            data = re.sub(
+                r'(class="case-id permalink-id" href="#case-)\w+(" title="Link to this case">)[^<]+',
+                r"\1<CASE-ID>\2<CASE-ID>",
+                data,
+            )
             data = re.sub(r'id="case-\w+"', 'id="case-<CASE-ID>"', data)
             data = re.sub(r"st replay \w+", "st replay <CASE-ID>", data)
             data = re.sub(r"X-Schemathesis-TestCaseId: \w+", "X-Schemathesis-TestCaseId: <CASE-ID>", data)
