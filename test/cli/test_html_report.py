@@ -12,6 +12,7 @@ from flask import Response, jsonify, request
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.checks import CHECKS
 from schemathesis.cli.constants import ExitCode
 from schemathesis.engine import events
 from schemathesis.graphql import nodes
@@ -163,7 +164,7 @@ def assert_operation_counts_match(html):
 def assert_top_failures_match(html):
     shown = len(re.findall(r'<span class="tf-n">\d+</span>', html))
     more = count_of(r'<a class="tf-more"[^>]*>\+(\d+) more</a>', html)
-    ops = re.search(r'<section class="ops"[^>]*>.*?</table></section>', html, flags=re.DOTALL)
+    ops = re.search(r'<section class="ops[^"]*"[^>]*>.*?</table></section>', html, flags=re.DOTALL)
     cards = re.findall(r'<article class="case"[^>]*>.*?</article>', ops.group(0) if ops else "", flags=re.DOTALL)
     kinds = {title for card in cards for title in re.findall(r'<h4 class="finding-title">([^<]+)', card)}
     assert shown + more == len(kinds), (shown, more, sorted(kinds))
@@ -494,7 +495,7 @@ def test_html_report_operations_table(ctx, cli, app_runner, report_dir, snapshot
 def top_failures_items(html):
     tf_list = re.search(r'<ul class="tf-list">(.*?)</ul>', html).group(1)
     return re.findall(
-        r'<li>(?:<span class="tf-n">\d+</span><span class="tf-name"[^>]*>([^<]+)</span>|<a[^>]*>([^<]+)</a>)</li>',
+        r'<li>(?:<span class="tf-n">\d+</span><(?:span|a) class="tf-name"[^>]*>([^<]+)</(?:span|a)>|<a[^>]*>([^<]+)</a>)</li>',
         tf_list,
     )
 
@@ -620,6 +621,88 @@ def test_html_report_large_api(ctx, cli, app_runner, report_dir, snapshot_html):
         return "", 500
 
     assert run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES) == snapshot_html
+
+
+def test_html_report_filter_bar(ctx, cli, app_runner, report_dir, snapshot_html):
+    ok = {"responses": {"200": {"description": "OK"}}}
+    paths = {"/api/items/{index}": {"get": ok}}
+    paths["/api/failure"] = {"post": ok}
+    paths["/api/secret"] = {"get": ok}
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/api/items/<index>")
+    def item(index):
+        return "{}"
+
+    @app.route("/api/failure", methods=["POST"])
+    def failure():
+        return "", 500
+
+    @app.route("/api/secret")
+    def secret():
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
+    assert filter_controls(html) == {
+        "fields": ["fb-q", "fb-k", "fb-m"],
+        "methods": ["get", "post"],
+        "announced": ["fb-count"],
+    }
+    assert html == snapshot_html
+
+
+def filter_controls(html):
+    bar = re.search(r'<div class="filter-bar[^>]*>.*?</p></div>', html, flags=re.DOTALL).group(0)
+    return {
+        "fields": re.findall(r'<(?:input|select|div)[^>]* id="(fb-[^"]+)"', bar),
+        "methods": re.findall(r'data-m="([^"]+)"', bar),
+        "announced": re.findall(r'<[^>]* id="(fb-[^"]+)"[^>]* role="status"', bar),
+    }
+
+
+@pytest.fixture
+def checks_with_similar_names():
+    @schemathesis.check
+    def bad_body(ctx, response, case):
+        raise AssertionError("bad")
+
+    @schemathesis.check
+    def bad__body(ctx, response, case):
+        raise AssertionError("bad")
+
+    yield
+    CHECKS.unregister("bad_body")
+    CHECKS.unregister("bad__body")
+
+
+@pytest.mark.usefixtures("checks_with_similar_names")
+def test_html_report_failure_kinds_with_similar_titles(ctx, cli, report_dir):
+    api = ctx.openapi.apps.success()
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.FAILURES)
+    slugs = re.findall(r'data-slug="([^"]+)"', html)
+    assert sorted(slugs) == ["custom-check-failed-bad-body", "custom-check-failed-bad-body-2"]
+    assert sorted(re.findall(r'href="#kind=([^"]+)"', html)) == sorted(slugs)
+
+
+# Methods the schema does not declare stay out of the method toggles.
+def test_html_report_filter_bar_methods_from_schema(ctx, cli, app_runner, report_dir):
+    paths = {"/api/items/{index}": {"get": {"responses": {"200": {"description": "OK"}}}}}
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/api/items/<index>", methods=["GET", "TRACE"])
+    def item(index):
+        return jsonify({})
+
+    html = run_with_report(
+        cli,
+        report_dir,
+        app_runner.openapi_url(app),
+        "--checks=unsupported_method",
+        phases="coverage",
+        exit_code=ExitCode.FAILURES,
+    )
+    assert "TRACE" in html
+    assert filter_controls(html) == {"fields": ["fb-q", "fb-k", "fb-m"], "methods": ["get"], "announced": ["fb-count"]}
 
 
 def test_html_report_operations_in_natural_order(ctx, cli, app_runner, report_dir):

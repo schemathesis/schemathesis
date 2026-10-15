@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
 _CSS = (files("schemathesis.reporting.html") / "assets" / "report.css").read_text(encoding="utf-8").strip()
+_NAV_SCRIPT = (files("schemathesis.reporting.html") / "assets" / "nav.js").read_text(encoding="utf-8").strip()
 
 
 def esc(value: object) -> str:
@@ -69,15 +70,6 @@ _COPY_SCRIPT = (
     "else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();"
     "try{document.execCommand('copy');done()}catch(e){}a.remove()}})})</script>"
 )
-# A `#hash` link opens the row holding its target, and any `<details>` around it.
-_HASH_SCRIPT = (
-    "<script>(function(){function openTo(){var id=location.hash.slice(1);if(!id)return;"
-    "var el=document.getElementById(id);if(!el)return;var d=el.closest('.detail-row');"
-    "var row=d?d.previousElementSibling:el.closest('.has-details');var box=row&&row.querySelector('.row-open');"
-    "if(box)box.checked=true;for(var p=el;p;p=p.parentElement){if(p.tagName==='DETAILS')p.open=true}}"
-    "window.addEventListener('hashchange',openTo);openTo()})()</script>"
-)
-
 # Command arguments longer than this may break anywhere; shorter ones never break inside.
 _LONG_ARGUMENT = 40
 
@@ -88,6 +80,7 @@ def page(*, title: str, body: str) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>document.documentElement.classList.add("js")</script>
   <title>{esc(title)}</title>
   <style>{_CSS}</style>
 </head>
@@ -95,7 +88,7 @@ def page(*, title: str, body: str) -> str:
   <main class="container">
 {body}
   </main>
-{_COPY_SCRIPT}{_HASH_SCRIPT}
+{_COPY_SCRIPT}<script>{_NAV_SCRIPT}</script>
 </body>
 </html>
 """
@@ -429,6 +422,11 @@ def _metric(label: str, value: str, subtitle: str = "", *, extra_class: str = ""
 _TOP_FAILURES_SHOWN = 3
 
 
+def _top_failure_name(title: str, kinds: dict[str, Kind]) -> str:
+    kind = kinds[title]
+    return f'<a class="tf-name" href="#kind={kind.slug}" title="{esc(title)}">{esc(title)}</a>'
+
+
 def _second_cell(data: ReportData) -> str:
     if data.top_failures:
         # A "+1 more" line takes the space the hidden item would, so show that item instead.
@@ -437,9 +435,9 @@ def _second_cell(data: ReportData) -> str:
             if len(data.top_failures) <= _TOP_FAILURES_SHOWN + 1
             else data.top_failures[:_TOP_FAILURES_SHOWN]
         )
+        kinds = _failure_kinds(data)
         rows = "".join(
-            f'<li><span class="tf-n">{group.count}</span>'
-            f'<span class="tf-name" title="{esc(group.title)}">{esc(group.title)}</span></li>'
+            f'<li><span class="tf-n">{group.count}</span>{_top_failure_name(group.title, kinds)}</li>'
             for group in shown
         )
         hidden = len(data.top_failures) - len(shown)
@@ -796,7 +794,7 @@ def _reproduce(commands: list[Command], replay: str | None) -> str:
     return _evidence("Reproduce", f'<div class="repro">{content}{_copy_button("reproduction")}</div>{replay_line}')
 
 
-def _failing_case(case: FailingCase, owner: str = "") -> str:
+def _failing_case(case: FailingCase, owner: str = "", filters: str = "") -> str:
     parts = [owner]
     for failure in case.failures:
         count = len(failure.messages)
@@ -819,7 +817,7 @@ def _failing_case(case: FailingCase, owner: str = "") -> str:
             else ""
         )
         meta = f'<div class="case-meta"><span class="case-id">{esc(case.case_id)}</span>{identity}</div>'
-    return f'<article class="case"{case_id}><div class="case-body">{"".join(parts)}</div>{meta}</article>'
+    return f'<article class="case"{case_id}{filters}><div class="case-body">{"".join(parts)}</div>{meta}</article>'
 
 
 _FRAME = re.compile(r'^\s*File "(?P<path>[^"]+)", line (?P<line>\d+)')
@@ -876,8 +874,8 @@ def _detail_row(items: list[str], anchor: str, css: str) -> str:
     )
 
 
-def _row_items(row: OperationRow) -> list[str]:
-    items = [_failing_case(case) for case in row.failing_cases]
+def _row_items(row: OperationRow, kinds: dict[str, Kind]) -> list[str]:
+    items = [_failing_case(case, filters=_case_filters(case, kinds)) for case in row.failing_cases]
     # A lone error on an errored row repeats the title the row already shows.
     with_title = bool(row.failing_cases) or len(row.errors) > 1
     items.extend(_error(error, with_title=with_title) for error in row.errors)
@@ -913,9 +911,85 @@ def _group_header(status: OperationStatus, rows: list[OperationRow], *, collapsi
     return f'<tr class="group-row group-{css}"><th colspan="3" scope="rowgroup" id="group-{css}">{title}</th></tr>'
 
 
+class Kind(NamedTuple):
+    # The option value in the kind select and the index cards list in `data-k`.
+    value: int
+    slug: str
+    title: str
+    failures: int
+
+
+_METHOD_ORDER = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
+
+
+def _failure_kinds(data: ReportData) -> dict[str, Kind]:
+    counts: Counter[str] = Counter()
+    for group in data.top_failures:
+        counts[group.title] += group.count
+    kinds: dict[str, Kind] = {}
+    taken: set[str] = set()
+    for title, count in counts.items():
+        slug = base = _slug(title) or "kind"
+        suffix = 2
+        while slug in taken:
+            slug, suffix = f"{base}-{suffix}", suffix + 1
+        taken.add(slug)
+        kinds[title] = Kind(len(kinds), slug, title, count)
+    return kinds
+
+
+def _case_filters(case: FailingCase, kinds: dict[str, Kind]) -> str:
+    indexes = dict.fromkeys(str(kinds[failure.title].value) for failure in case.failures if failure.title in kinds)
+    return f' data-k="{" ".join(indexes)}"'
+
+
+def _filter_bar(data: ReportData, kinds: dict[str, Kind]) -> str:
+    controls = [
+        '<label class="fb-search"><span class="vh">Filter by method or path</span>'
+        '<input type="search" class="fb-input" id="fb-q" placeholder="Filter by path" autocomplete="off" '
+        'spellcheck="false"><kbd class="fb-key" aria-hidden="true">/</kbd></label>'
+    ]
+    if kinds:
+        options = "".join(
+            f'<option value="{kind.value}" data-slug="{kind.slug}">{esc(kind.title)} ({kind.failures:,})</option>'
+            for kind in kinds.values()
+        )
+        controls.append(
+            '<label><span class="vh">Failure kind</span><select class="fb-select" id="fb-k">'
+            f'<option value="">All failure kinds</option>{options}</select></label>'
+        )
+    present = {row.method for row in data.operations if row.method}
+    methods = sorted(
+        present, key=lambda method: (_METHOD_ORDER.index(method) if method in _METHOD_ORDER else 99, method)
+    )
+    if methods:
+        toggles = "".join(
+            f'<button type="button" class="fb-btn {esc(method.lower())}" data-m="{esc(method.lower())}" '
+            f'aria-pressed="false">{esc(method)}</button>'
+            for method in methods
+        )
+        controls.append(f'<div class="fb-set fb-methods" id="fb-m" role="group" aria-label="Method">{toggles}</div>')
+    controls.append(
+        '<p class="fb-status"><span class="fb-count" id="fb-count" role="status">'
+        f"{len(data.operations)} operations</span>"
+        '<button type="button" class="fb-clear" id="fb-clear" hidden>Clear filters</button></p>'
+    )
+    return (
+        '<div class="filter-bar js-only" id="filters" role="search" aria-label="Filter operations">'
+        f"{''.join(controls)}</div>"
+    )
+
+
+_EMPTY_RESULT = (
+    '<tbody class="fb-empty js-only" id="fb-empty" hidden><tr><td colspan="3">'
+    'No operations match these filters. <button type="button">Clear filters</button></td></tr></tbody>'
+)
+
+
 def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
     if not data.operations:
         return ""
+    kinds = _failure_kinds(data)
     has_failures = any(row.status is OperationStatus.FAILED for row in data.operations)
     collapse_passed = has_failures and len(data.operations) > _COLLAPSE_PASSED_ABOVE
     groups = []
@@ -936,7 +1010,7 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
                 body += (
                     f'<tr class="op-row row-{status.css} has-details" id="{anchor}">'
                     f"{_operation_cell(row, toggle)}{_failures_cell(row)}{_cases_cell(row, _CHEVRON)}</tr>"
-                    f"{_detail_row(_row_items(row), anchor, status.css)}"
+                    f"{_detail_row(_row_items(row, kinds), anchor, status.css)}"
                 )
             else:
                 body += (
@@ -953,7 +1027,10 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
         )
         label = f'<span class="foot-label">Not tied to an operation</span><ul>{items}</ul>'
         toggle = _toggle("run-level-details", "problems not tied to an operation", checked=open_details)
-        cases = [_failing_case(case, owner=_case_owner(owner)) for owner, case in data.unattributed_cases]
+        cases = [
+            _failing_case(case, owner=_case_owner(owner), filters=_case_filters(case, kinds))
+            for owner, case in data.unattributed_cases
+        ]
         cases.extend(
             _error(error, with_title=True, owner=_case_owner(owner)) for owner, error in data.unattributed_errors
         )
@@ -971,8 +1048,10 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
         )
     footer = f"<tfoot>{''.join(footer_rows)}</tfoot>" if footer_rows else ""
     return (
-        '<section class="ops" id="operations"><table class="ops-table" aria-label="Operations">'
+        '<section class="ops" id="operations">'
+        f"{_filter_bar(data, kinds)}"
+        '<table class="ops-table" aria-label="Operations">'
         '<thead><tr><th scope="col">Operation</th><th scope="col">Failures</th>'
         '<th scope="col" class="numeric">Cases</th></tr></thead>'
-        f"{''.join(groups)}{footer}</table></section>"
+        f"{''.join(groups)}{_EMPTY_RESULT}{footer}</table></section>"
     )
