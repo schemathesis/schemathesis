@@ -4365,6 +4365,15 @@ def test_positive_unique_array_with_a_large_floor(ctx_factory, items):
     assert_conform(values, schema)
 
 
+# Draws keep repeating small scalars, so a large floor of distinct ones takes more draws than the floor alone.
+def test_positive_unique_uuid_array_with_a_large_floor(ctx_factory):
+    schema = {"type": "array", "items": {"type": "string", "format": "uuid"}, "uniqueItems": True, "minItems": 1000}
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    values = cover_schema(ctx, schema)
+    assert values, schema
+    assert_conform(values, schema)
+
+
 @pytest.mark.parametrize("items", UNIQUE_ARRAY_ITEMS, ids=["object", "any"])
 def test_negative_unique_array_one_short_of_a_large_floor(ctx_factory, items):
     schema = {"type": "array", "items": items, "uniqueItems": True, "minItems": 500}

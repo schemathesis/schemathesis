@@ -329,9 +329,11 @@ class Case(Generic[OperationT]):
             return _NOTSET_HASH
         # Plain JSON-shaped containers (the common case for bodies) go through canonical JSON in
         # Rust; deeply-nested schemas like Kubernetes Pods are ~10x faster than recursive hashing.
-        if type(value) is dict or type(value) is list:
+        # Other mappings, like case-insensitive headers, take the same path through a plain copy.
+        plain = dict(value) if isinstance(value, Mapping) and type(value) is not dict else value
+        if type(plain) is dict or type(plain) is list:
             try:
-                return hash((type(value), jsonschema_rs.canonical.json.to_string(value)))
+                return hash((type(value), jsonschema_rs.canonical.json.to_string(plain)))
             except (TypeError, ValueError):
                 pass
         if isinstance(value, Mapping):
