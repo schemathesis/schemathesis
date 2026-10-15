@@ -7,6 +7,8 @@ from functools import lru_cache
 from schemathesis.specs.openapi.expressions import extractors, lexer, nodes
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError, UnknownToken
 
+REGEX_MARKER = "#regex:"
+
 
 @lru_cache
 def parse(expr: str) -> list[nodes.Node]:
@@ -81,6 +83,9 @@ def _parse_response(tokens: lexer.TokenGenerator, expr: str) -> nodes.HeaderResp
         try:
             token = next(tokens)
             if token.is_pointer:
+                pointer, marker, pattern = token.value.partition(REGEX_MARKER)
+                if marker:
+                    return nodes.BodyResponse(pointer, extractor=compile_extractor(pattern))
                 return nodes.BodyResponse(token.value)
         except StopIteration:
             return nodes.BodyResponse()
@@ -128,9 +133,12 @@ def take_extractor(tokens: lexer.TokenGenerator, expr: str, current_end: int) ->
     if not rest or rest.startswith("}"):
         return None
     extractor = next(tokens)
-    if not extractor.value.startswith("#regex:"):
+    if not extractor.value.startswith(REGEX_MARKER):
         raise RuntimeExpressionError(f"Invalid extractor: {expr}")
-    pattern = extractor.value[len("#regex:") :]
+    return compile_extractor(extractor.value[len(REGEX_MARKER) :])
+
+
+def compile_extractor(pattern: str) -> extractors.RegexExtractor:
     try:
         compiled = re.compile(pattern)
     except re.error as exc:

@@ -125,6 +125,11 @@ def output(case, response):
         ("eq.{$request.query.username#regex:f(.+)}", "eq.oo"),
         ("eq.{$request.query.username#regex:t(.+)}", UNRESOLVABLE),
         ("eq.{$request.query.unknown}", UNRESOLVABLE),
+        ("$response.body#/foo/0#regex:b(.+)", "ar"),
+        ("ID_{$response.body#/foo/1#regex:b(.+)}", "ID_az"),
+        ("$response.body#/foo/0#regex:q(.+)", UNRESOLVABLE),
+        ("$response.body#/g|h#regex:(.+)", UNRESOLVABLE),
+        ("$response.body#/unknown#regex:(.+)", UNRESOLVABLE),
     ],
 )
 def test_evaluate(output, expr, expected):
@@ -172,6 +177,8 @@ def test_dynamic_body(output, expr, expected):
         "$response.header.unknown#wrong",
         "$response.header.unknown#regex:[",
         "$response.header.unknown#regex:(.+)(.+)",
+        "$response.body#/foo#regex:[",
+        "$response.body#/foo#regex:(.+)(.+)",
         "$response}",
         "$request",
         "$response",
