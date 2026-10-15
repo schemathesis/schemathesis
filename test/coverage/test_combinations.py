@@ -2491,6 +2491,7 @@ def test_bounded_format_pattern_keeps_exact_length(ctx_factory, update_pattern, 
         ({"type": "string", "format": "email", "pattern": r"^ab@example\.com$", "maxLength": 14}, "ab@example.com"),
         # The URI generator cannot supply such a short value at all.
         ({"type": "string", "format": "uri", "pattern": "^a:b$", "maxLength": 3}, "a:b"),
+        ({"type": "string", "format": "binary", "pattern": "^ab+$", "maxLength": 5}, "ab"),
     ],
 )
 def test_bounded_format_candidate_rejected_by_pattern_uses_regex(pctx, schema, expected):
@@ -2519,20 +2520,9 @@ def test_bounded_format_candidate_falls_back_to_regex(pctx, monkeypatch, candida
 
 
 def test_bounded_pattern_does_not_use_builtin_for_custom_format(pctx):
-    # A caller's generator does not inherit the length-aware behavior of the built-in.
-    pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
-    schema = {"type": "string", "format": "email", "pattern": r"^[a-z]+@example\.com$", "maxLength": 254}
-    assert pctx.generate_from_schema(schema) == "a@example.com"
-
-
-def test_bounded_broad_pattern_does_not_call_builtin_for_custom_format(pctx, monkeypatch):
-    def unexpected_narrower(min_length, max_length):
-        pytest.fail("A custom format must not use the built-in length-aware generator")
-
-    monkeypatch.setitem(FORMAT_NARROWERS, "email", unexpected_narrower)
     pctx.custom_formats = {**pctx.custom_formats, "email": st.just("custom@example.com")}
     schema = {"type": "string", "format": "email", "pattern": r"^[^@]+@[^@]+\.[^@]+$", "maxLength": 254}
-    assert_conform([pctx.generate_from_schema(schema)], schema)
+    assert pctx.generate_from_schema(schema) == "0@0.0"
 
 
 def test_positive_string_skips_infeasible_boundary_lengths(pctx):

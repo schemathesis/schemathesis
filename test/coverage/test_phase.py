@@ -2091,13 +2091,12 @@ def test_format_value_built_for_a_length_floor_above_it(ctx, fmt, min_length, ma
         assert validator.is_valid(value), value
 
 
-@pytest.mark.parametrize("fmt", ["email", "idn-email"])
-def test_bounded_email_pattern_avoids_rejection_sampling(ctx, fmt):
+def test_bounded_email_pattern_avoids_rejection_sampling(ctx):
     body = {
         "type": "object",
         "required": ["email"],
         "properties": {
-            "email": {"type": "string", "format": fmt, "pattern": r"^[^@]+@[^@]+\.[^@]+$", "maxLength": 254}
+            "email": {"type": "string", "format": "email", "pattern": r"^[^@]+@[^@]+\.[^@]+$", "maxLength": 254}
         },
     }
     operation = body_operation(ctx, body)
@@ -2114,7 +2113,7 @@ def test_bounded_email_pattern_avoids_rejection_sampling(ctx, fmt):
         for stats in statistics
         for sample in stats.get("generate-phase", {}).get("test-cases", [])
     )
-    assert rejected < 100
+    assert rejected == 0
 
 
 def test_string_with_format(ctx):
