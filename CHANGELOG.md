@@ -25,6 +25,7 @@
 - Inferred `Location` links overwriting each other when several targets share a status code.
 - Slow coverage generation for email patterns combined with length bounds.
 - Stateful scenarios mostly starting from the alphabetically first operation.
+- Crash or wrong URL for server variable names containing dots or brackets.
 - "Response violates schema" messages embedding the whole response value on one line.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 from schemathesis.core.errors import InvalidSchema
+
+# Server variable names are literal, so `{v.x}` names one variable rather than an attribute lookup.
+SERVER_VARIABLE = re.compile(r"\{([^{}]*)\}")
 
 
 def format_server_url(
@@ -37,12 +41,17 @@ def format_server_url(
         for name, value in variables.items():
             if name not in defaults:
                 defaults[name] = value
-    try:
-        return url.format(**defaults)
-    except (KeyError, IndexError) as exc:
-        raise InvalidSchema(f"'{scope_label}.url' references undefined variable: {exc}") from exc
-    except ValueError as exc:
-        raise InvalidSchema(f"'{scope_label}.url' is not a valid URL template: {exc}") from exc
+    remainder = SERVER_VARIABLE.sub("", url)
+    if "{" in remainder or "}" in remainder:
+        raise InvalidSchema(f"'{scope_label}.url' is not a valid URL template: unbalanced braces")
+
+    def substitute(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in defaults:
+            raise InvalidSchema(f"'{scope_label}.url' references undefined variable: {name!r}")
+        return str(defaults[name])
+
+    return SERVER_VARIABLE.sub(substitute, url)
 
 
 def resolve_operation_base_url(
