@@ -43,6 +43,7 @@ from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
+from schemathesis.reporting.html.build import sanitized
 
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType
@@ -1164,7 +1165,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         elif isinstance(event, events.NonFatalError):
             self._on_non_fatal_error(event)
         elif isinstance(event, LoadingStarted):
-            self._on_loading_started(event)
+            self._on_loading_started(ctx, event)
         elif isinstance(event, LoadingFinished):
             self._on_loading_finished(ctx, event)
 
@@ -1217,7 +1218,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         table.add_column("Field", style=Style(color="bright_white", bold=True))
         table.add_column("Value", style="cyan", overflow="fold")
 
-        table.add_row("Base URL:", event.base_url)
+        sanitization = ctx.config.output.sanitization
+        table.add_row("Base URL:", sanitized(event.base_url, sanitization if sanitization.enabled else None))
         table.add_row("Specification:", event.specification.name)
         statistic = event.statistic.operations
         table.add_row("Operations:", f"{statistic.selected} selected / {statistic.total} total")

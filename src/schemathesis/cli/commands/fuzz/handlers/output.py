@@ -247,7 +247,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
 
     def handle_event(self, ctx: FuzzExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingStarted):
-            self._on_loading_started(event)
+            self._on_loading_started(ctx, event)
         elif isinstance(event, LoadingFinished):
             assert self.loading_manager is not None
             self.loading_manager.stop()
