@@ -29,6 +29,7 @@
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - Crash or wrong URL for server variable names containing dots or brackets.
+- Internal error instead of a failure for non-object GraphQL responses in negative mode.
 - "Response violates schema" messages embedding the whole response value on one line.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.

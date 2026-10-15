@@ -470,7 +470,7 @@ class GraphQLSchema(BaseSchema):
         is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
         try:
             data = parse_payload(response)
-            if is_negative_mode:
+            if is_negative_mode and isinstance(data, dict):
                 errors = data.get("errors")
                 if errors is None or len(errors) == 0:
                     description = ""

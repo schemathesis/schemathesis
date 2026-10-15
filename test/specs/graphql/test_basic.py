@@ -913,6 +913,20 @@ def test_not_a_server_error_graphql_negative_mode_server_error_raises(ctx):
         not_a_server_error(check_ctx, response, case)
 
 
+@pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE], ids=["positive", "negative"])
+@pytest.mark.parametrize("payload", [[], "text", 42, None], ids=["list", "string", "number", "null"])
+def test_not_a_server_error_graphql_non_object_response(ctx, response_factory, mode, payload):
+    schema = _books_schema(ctx)
+    case = _make_graphql_case_with_mode(schema, mode)
+    response = response_factory.requests(content=json.dumps(payload).encode())
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
+
+    with pytest.raises(UnexpectedGraphQLResponse, match="GraphQL response is not a JSON object"):
+        not_a_server_error(check_ctx, response, case)
+
+
 def test_negative_mode_resolver_rejection_marked_by_extensions(ctx):
     # A resolver that rejects bad input reports a `path`, so only its `extensions` tell a rejection from a crash.
     @strawberry.type
