@@ -150,9 +150,25 @@ def _looks_like_html(content_type: str | None, body: bytes) -> bool:
     return any(head.startswith(marker) for marker in _HTML_MARKERS)
 
 
-@lru_cache
+# An unreachable document fails the same way for every reference into it, so fetching it again only waits again.
+_REMOTE_FAILURES: dict[str, Exception] = {}
+
+
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
+    failure = _REMOTE_FAILURES.get(uri)
+    if failure is not None:
+        # Drop the previous traceback so repeated failures do not keep growing it
+        raise failure.with_traceback(None)
+    try:
+        return _load_remote_uri(uri)
+    except Exception as exc:
+        _REMOTE_FAILURES[uri] = exc
+        raise
+
+
+@lru_cache
+def _load_remote_uri(uri: str) -> Any:
     import requests
 
     response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT)

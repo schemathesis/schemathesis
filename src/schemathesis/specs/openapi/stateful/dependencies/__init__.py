@@ -267,7 +267,8 @@ def inject_links(schema: OpenApiSchema) -> int:
     operation_cache: dict[str, APIOperation] = {}
     # A response is visited once per inferred link, so normalize its links once and index them by
     # target - only same-target links can be subsets. Values keep the mapping alive so `id` is unique.
-    normalized_cache: dict[int, tuple[dict[str, Any], dict[tuple[str, str], list[NormalizedLink]]]] = {}
+    # Next to them, the next suffix to try per colliding link name, as names taken once stay taken.
+    normalized_cache: dict[int, tuple[dict[str, Any], dict[tuple[str, str], list[NormalizedLink]], dict[str, int]]] = {}
     _unshare_responses(schema)
     for response_links in schema.analysis.dependency_graph.iter_links():
         operation = _find_operation_by_reference(schema, response_links.producer_operation_ref, operation_cache)
@@ -284,9 +285,10 @@ def inject_links(schema: OpenApiSchema) -> int:
                     # Dangling links are reported when the stateful phase validates them
                     continue
                 index.setdefault((normalized.path, normalized.method), []).append(normalized)
-            normalized_cache[id(links)] = (links, index)
+            next_suffixes: dict[str, int] = {}
+            normalized_cache[id(links)] = (links, index, next_suffixes)
         else:
-            index = entry[1]
+            _, index, next_suffixes = entry
 
         # Compared against what was known before this response, not against each other.
         pending: list[NormalizedLink] = []
@@ -302,7 +304,7 @@ def inject_links(schema: OpenApiSchema) -> int:
                 continue
 
             # Find unique name if collision exists
-            final_name = _resolve_link_name_collision(link_name, links)
+            final_name = _resolve_link_name_collision(link_name, links, next_suffixes)
             links[final_name] = inferred_link
             pending.append(normalized)
             injected += 1
@@ -388,17 +390,18 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
     return normalized
 
 
-def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, Any]) -> str:
+def _resolve_link_name_collision(
+    proposed_name: str, existing_links: dict[str, Any], next_suffixes: dict[str, int]
+) -> str:
     """Find unique link name if collision exists."""
     if proposed_name not in existing_links:
         return proposed_name
 
-    suffix = 0
-    while True:
-        candidate = f"{proposed_name}_{suffix}"
-        if candidate not in existing_links:
-            return candidate
+    suffix = next_suffixes.get(proposed_name, 0)
+    while f"{proposed_name}_{suffix}" in existing_links:
         suffix += 1
+    next_suffixes[proposed_name] = suffix + 1
+    return f"{proposed_name}_{suffix}"
 
 
 def _is_subset_link(inferred: NormalizedLink, existing: NormalizedLink) -> bool:

@@ -71,6 +71,7 @@ class DependencyGraph:
         (needs `User.id` parameter).
         """
         encoded_paths = {id(op): encode_pointer(op.path) for op in self.operations.values()}
+        template_fields = {id(op): get_template_fields(op.path) for op in self.operations.values()}
 
         # Precomputed data for the cross-namespace scope guard (bare {id} collision check).
         # All string work happens once here rather than inside the hot inner loop.
@@ -230,9 +231,7 @@ class DependencyGraph:
                     # For /users/{userId}/posts -> /users/{userId}/posts/{postId}, userId is shared
                     # but only postId gets mapped from the response. We need to propagate userId.
                     if links:
-                        producer_params = get_template_fields(producer.path)
-                        consumer_params = get_template_fields(consumer.path)
-                        shared_params = producer_params & consumer_params
+                        shared_params = template_fields[producer_id] & template_fields[consumer_id]
 
                         for link_def in links.values():
                             # Find which path parameters are already mapped
@@ -248,18 +247,28 @@ class DependencyGraph:
                         )
 
         # Generate links from FK fields (e.g., customer_id -> GET /customers/{id})
-        yield from self._iter_fk_links(encoded_paths, consumers_by_resource)
+        yield from self._iter_fk_links(encoded_paths)
 
-    def _iter_fk_links(
-        self,
-        encoded_paths: dict[int, str],
-        consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]],
-    ) -> Iterator[ResponseLinks]:
+    def _iter_fk_links(self, encoded_paths: dict[int, str]) -> Iterator[ResponseLinks]:
         """Generate links from foreign key fields in producer responses.
 
         For example, if GET /orders/{id} returns {"id": "...", "customer_id": "..."},
         this creates a link to GET /customers/{id} using the customer_id field value.
         """
+        # Consumers by the resource field they take; FK values never fill body parameters
+        consumers_by_field: dict[tuple[int, str | None], dict[int, tuple[OperationNode, list[InputSlot]]]] = (
+            defaultdict(dict)
+        )
+        for consumer in self.operations.values():
+            consumer_id = id(consumer)
+            for input_slot in consumer.inputs:
+                if input_slot.parameter_location == ParameterLocation.BODY:
+                    continue
+                consumers = consumers_by_field[(id(input_slot.resource), input_slot.resource_field)]
+                if consumer_id not in consumers:
+                    consumers[consumer_id] = (consumer, [])
+                consumers[consumer_id][1].append(input_slot)
+
         for producer in self.operations.values():
             producer_path = encoded_paths[id(producer)]
             producer_id = id(producer)
@@ -274,6 +283,8 @@ class DependencyGraph:
 
                 resource = output_slot.resource
                 fk_links: dict[str, LinkDefinition] = {}
+                # Next suffix to try per link name, as names taken once stay taken
+                next_suffixes: dict[str, int] = {}
                 # The resource merges every schema that described it; this response may declare only some fields.
                 declared = output_slot.response_fields
 
@@ -285,8 +296,8 @@ class DependencyGraph:
                     if target_resource is None:
                         continue
 
-                    # Find consumers that need the target resource
-                    relevant_consumers = consumers_by_resource.get(id(target_resource), {})
+                    # Find consumers expecting the field the FK suffix names, e.g. customer_id -> id, user_uuid -> uuid
+                    relevant_consumers = consumers_by_field.get((id(target_resource), fk_field.target_field), {})
 
                     for consumer_id, (consumer, input_slots) in relevant_consumers.items():
                         # Skip self-references
@@ -296,15 +307,6 @@ class DependencyGraph:
                         consumer_path = encoded_paths[consumer_id]
 
                         for input_slot in input_slots:
-                            # Match FK suffix to consumer's expected field
-                            # e.g., customer_id -> id, user_uuid -> uuid
-                            if input_slot.resource_field != fk_field.target_field:
-                                continue
-
-                            # Skip body parameters for FK linking
-                            if input_slot.parameter_location == ParameterLocation.BODY:
-                                continue
-
                             # Build the body pointer to the FK field
                             if fk_field.is_array:
                                 # For array FK, fan out across every element: /data/*/site_ids/*
@@ -322,7 +324,10 @@ class DependencyGraph:
                             }
                             operation_ref = f"#/paths/{consumer_path}/{consumer.method}"
                             link_name = _unique_link_name(
-                                f"{consumer.method.capitalize()}{fk_field.target_resource}", fk_links, operation_ref
+                                f"{consumer.method.capitalize()}{fk_field.target_resource}",
+                                fk_links,
+                                operation_ref,
+                                next_suffixes,
                             )
                             if link_name is None:
                                 continue
@@ -341,7 +346,7 @@ class DependencyGraph:
                     if target_resource is None:
                         continue
 
-                    relevant_consumers = consumers_by_resource.get(id(target_resource), {})
+                    relevant_consumers = consumers_by_field.get((id(target_resource), nested_fk.target_field), {})
 
                     for consumer_id, (consumer, input_slots) in relevant_consumers.items():
                         if consumer_id == producer_id:
@@ -350,11 +355,6 @@ class DependencyGraph:
                         consumer_path = encoded_paths[consumer_id]
 
                         for input_slot in input_slots:
-                            if input_slot.resource_field != nested_fk.target_field:
-                                continue
-                            if input_slot.parameter_location == ParameterLocation.BODY:
-                                continue
-
                             # Build pointer: output_slot.pointer + nested_fk.pointer
                             if output_slot.cardinality == Cardinality.MANY:
                                 base = output_slot.pointer.rstrip("/") + "/*"
@@ -366,7 +366,10 @@ class DependencyGraph:
 
                             operation_ref = f"#/paths/{consumer_path}/{consumer.method}"
                             link_name = _unique_link_name(
-                                f"{consumer.method.capitalize()}{nested_fk.target_resource}", fk_links, operation_ref
+                                f"{consumer.method.capitalize()}{nested_fk.target_resource}",
+                                fk_links,
+                                operation_ref,
+                                next_suffixes,
                             )
                             if link_name is None:
                                 continue
@@ -889,16 +892,19 @@ class ResourceDefinition:
         )
 
 
-def _unique_link_name(base: str, links: dict[str, LinkDefinition], operation_ref: str) -> str | None:
+def _unique_link_name(
+    base: str, links: dict[str, LinkDefinition], operation_ref: str, next_suffixes: dict[str, int]
+) -> str | None:
     """Keep the first link's name, and give a different destination sharing it one of its own."""
     existing = links.get(base)
     if existing is None:
         return base
     if existing.operation_ref == operation_ref:
         return None
-    suffix = 2
+    suffix = next_suffixes.get(base, 2)
     while f"{base}{suffix}" in links:
         suffix += 1
+    next_suffixes[base] = suffix + 1
     return f"{base}{suffix}"
 
 
