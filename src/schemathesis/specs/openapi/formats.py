@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from schemathesis.config import GenerationConfig
 from schemathesis.core import MAX_STRING_LENGTH
 from schemathesis.core.file_samples import FILE_SAMPLES
-from schemathesis.core.validation import has_leading_whitespace
+from schemathesis.core.validation import has_surrounding_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.transport.serialization import Binary
 
@@ -114,9 +114,9 @@ def header_values(
         alphabet=st.characters(
             min_codepoint=0, max_codepoint=MAX_HEADER_CODEPOINT, codec=codec, exclude_characters=exclude_characters
         )
-        # `requests` refuses a value opening with whitespace. Rejecting it keeps the drawn length,
-        # where trimming it afterwards silently returned a shorter value than the one asked for.
-    ).filter(lambda value: not has_leading_whitespace(value))
+        # `requests` refuses a value opening with whitespace, and servers strip it from the end. Rejecting it keeps
+        # the drawn length, where trimming it afterwards silently returned a shorter value than the one asked for.
+    ).filter(lambda value: not has_surrounding_whitespace(value))
 
 
 HEADER_FORMAT = "_header_value"
@@ -607,7 +607,7 @@ def header_alphabet(generation_config: GenerationConfig) -> Alphabet:
         codec=codec,
         max_codepoint=MAX_HEADER_CODEPOINT,
         exclude_characters="".join(sorted(set(excluded + INVALID_HEADER_CHARS))),
-        allow_leading_whitespace=False,
+        allow_surrounding_whitespace=False,
         min_name_length=1,
         name_characters="!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters,
     )

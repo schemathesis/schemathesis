@@ -23,9 +23,9 @@ def has_invalid_characters(name: str, value: object) -> bool:
         return True
 
 
-def has_leading_whitespace(value: str) -> bool:
-    """Whether the value opens with a whitespace character."""
-    return value[:1].strip() != value[:1]
+def has_surrounding_whitespace(value: str) -> bool:
+    """Whether the value opens or closes with a whitespace character."""
+    return value[:1].strip() != value[:1] or value[-1:].strip() != value[-1:]
 
 
 def is_latin_1_encodable(value: object) -> TypeGuard[str]:

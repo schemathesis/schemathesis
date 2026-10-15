@@ -19,9 +19,9 @@ class Alphabet:
     codec: str | None = "utf-8"
     max_codepoint: int | None = None
     exclude_characters: str = ""
-    # Whether a drawn string may open with whitespace. Header values cannot, and that is a property
+    # Whether a drawn string may open or close with whitespace. Header values cannot, and that is a property
     # of the value rather than of its characters, so it rides along here as a filter on each leaf.
-    allow_leading_whitespace: bool = True
+    allow_surrounding_whitespace: bool = True
     # Shortest name a drawn key may carry. Header names cannot be empty, and that is a property of
     # the key rather than of its characters, so it rides along here too.
     min_name_length: int = 0
