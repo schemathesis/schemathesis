@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.31.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Stateful scenarios mostly starting from the alphabetically first operation.
+
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 
 ### :wrench: Changed

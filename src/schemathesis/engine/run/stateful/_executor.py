@@ -644,6 +644,7 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
+    suites_started = 0
     try:
         while True:
             # This loop is running until no new failures are found in a single iteration
@@ -655,9 +656,11 @@ def execute_state_machine_loop(
                 break
             suite_status = Status.SUCCESS
             retry = False
-            InstrumentedStateMachine = hypothesis.seed(_suite_seed(engine, hypothesis_settings))(
-                _InstrumentedStateMachine
-            )
+            seed = _suite_seed(engine, hypothesis_settings)
+            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
+            # Each suite opens with Hypothesis's simplest scenarios; a per-suite rule order varies their first step.
+            InstrumentedStateMachine.rule_order_seed = seed if seed is not None else suites_started
+            suites_started += 1
             try:
                 with catch_warnings(), ignore_hypothesis_output():
                     filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")

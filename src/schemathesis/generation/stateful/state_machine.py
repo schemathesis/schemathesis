@@ -3,11 +3,13 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from random import Random
 from typing import TYPE_CHECKING, Any, ClassVar, Final
 
 import hypothesis
+from hypothesis import strategies as st
 from hypothesis.errors import InvalidDefinition
-from hypothesis.stateful import RuleBasedStateMachine, RuleStrategy
+from hypothesis.stateful import Rule, RuleBasedStateMachine, RuleStrategy
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
@@ -181,6 +183,31 @@ class _ValidRuleFallbackFlags:
         return not self._any_valid_enabled
 
 
+def _shuffle_root_rules(strategy: RuleStrategy, machine: type[APIStateMachine], seed: int) -> None:
+    """Shuffle the order in which Hypothesis picks scenario-starting rules, keeping every other rule in place.
+
+    Hypothesis's simplest rule choice is the first valid rule, and every suite opens with its simplest scenarios,
+    so a fixed order makes one root operation start most scenarios across suites.
+    """
+    cached = machine.__dict__.get("_shuffled_rules")
+    if cached is None or cached[0] != seed:
+        ordered = list(strategy.rules)
+        positions = [index for index, rule in enumerate(ordered) if rule.function.__name__ in machine.root_rules]
+        roots = [ordered[index] for index in positions]
+        Random(seed).shuffle(roots)
+        for index, rule in zip(positions, roots, strict=True):
+            ordered[index] = rule
+        cached = (seed, ordered, st.sampled_from(ordered))
+        machine._shuffled_rules = cached
+    _, ordered, sampled = cached
+    strategy.rules = ordered
+    # Hypothesis versions differ in which of these strategies they draw rules from.
+    if hasattr(strategy, "rules_strategy"):
+        strategy.rules_strategy = sampled
+    if hasattr(strategy, "_enabled_rules_strategy"):
+        strategy._enabled_rules_strategy = sampled.filter(strategy._rule_is_enabled)
+
+
 def release_state_machines(*classes: type) -> None:
     """Drop Hypothesis' per-class caches for state machine classes that will not run again."""
     # Both are private to Hypothesis; if either moves, the classes simply stay cached as before.
@@ -208,6 +235,11 @@ class APIStateMachine(RuleBasedStateMachine):
     # attribute will be renamed in the future
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]
     schema: BaseSchema
+    # Names of rules that can start a scenario.
+    root_rules: ClassVar[frozenset[str]] = frozenset()
+    # Seeds a shuffle of the root rule order; `None` keeps Hypothesis's order by rule name.
+    rule_order_seed: ClassVar[int | None] = None
+    _shuffled_rules: ClassVar[tuple[int, list[Rule], st.SearchStrategy[Rule]] | None] = None
 
     def __init__(self) -> None:
         try:
@@ -222,6 +254,8 @@ class APIStateMachine(RuleBasedStateMachine):
                 raise NoLinksFound(message) from None
             raise
         rules = self._rules_strategy
+        if self.rule_order_seed is not None and self.root_rules:
+            _shuffle_root_rules(rules, type(self), self.rule_order_seed)
         rules.enabled_rules_strategy = rules.enabled_rules_strategy.map(
             lambda flags: _ValidRuleFallbackFlags(flags, rules)
         )
