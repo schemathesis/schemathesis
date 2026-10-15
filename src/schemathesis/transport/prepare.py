@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import quote, quote_plus, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, Body
@@ -284,7 +284,7 @@ def _sanitize_query_string(query: str, *, config: SanitizationConfig) -> str:
             key, _, value = chunk.partition("=")
             lower_key = key.lower()
             if lower_key in config.keys_to_sanitize or any(marker in lower_key for marker in config.sensitive_markers):
-                parts.append(urlencode([(key, config.replacement)]))
+                parts.append(f"{key}={quote_plus(config.replacement)}")
             else:
                 parts.append(chunk)
     return "&".join(parts)

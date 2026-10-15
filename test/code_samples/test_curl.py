@@ -564,3 +564,18 @@ def test_empty_multipart_curl_body_keeps_closing_delimiter(multipart_schema, mon
     command = case.as_curl_command()
     boundary = HEADER_BOUNDARY.search(command)[1]
     assert f"-d $'--{boundary}--\\r\\n'" in command, command
+
+
+def test_as_curl_command_keeps_encoded_sensitive_raw_query_key(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/q": {
+                "get": {
+                    "parameters": [{"name": "api key", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/q"]["GET"].Case(query={RAW_QUERY_STRING_KEY: RawQueryString("api%20key=secret&page=2")})
+    assert case.as_curl_command() == "curl -X GET 'http://localhost/q?api%20key=%5BFiltered%5D&page=2'"

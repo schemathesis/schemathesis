@@ -33,6 +33,7 @@
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
 - `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
 - Clicks in the HTML report opening an unrelated row in Safari.
+- Double-encoded sensitive query keys in reproduction commands for raw query strings.
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
 - Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
 - `object_level_authorization` sending a single-object `GET` as another user, which may create data.
