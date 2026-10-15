@@ -37,6 +37,7 @@
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
 - Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
 - `object_level_authorization` sending a single-object `GET` as another user, which may create data.
+- Valueless sensitive query keys gaining a masked value in reports and cassettes.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
