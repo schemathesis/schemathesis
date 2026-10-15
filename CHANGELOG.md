@@ -8,6 +8,10 @@
 - HTML report lists failures and failed operations most severe first.
 - HTML report shows run details above warnings and the first 10 operations of each warning.
 
+### :racing_car: Performance
+
+- HTML report up to ~20% smaller on runs with many failures.
+
 ### :bug: Fixed
 
 - Stateful scenarios mostly starting from the alphabetically first operation.

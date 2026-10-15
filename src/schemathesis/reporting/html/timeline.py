@@ -54,6 +54,8 @@ BADGE_END_SHARE = 0.97
 MAX_DRAWN_TICKS = 50
 # The curve tops out at this height of 100, so its stroke at the final count stays inside the track.
 CURVE_HEADROOM = 92
+# Above this many steps the curve merges neighbours, which sit under 2px apart on the widest track.
+CURVE_STEPS = 500
 
 
 def short_duration(seconds: float) -> str:
@@ -119,12 +121,31 @@ def quiet_stretch(markers: list[Marker], total: float) -> float | None:
 def curve_path(markers: list[Marker], total: float) -> str:
     """SVG path in a 1000x100 box that steps up at each new failure; the y axis spans 0 to the final count."""
     count = failure_count(markers)
-    path = "M0,100"
+    # Failures found by each drawn x, in tenths of a box unit.
+    reached: dict[int, int] = {}
     found = 0
     for marker in markers:
         found += marker.failures
-        path += f"H{share(marker.found_at, total) * 1000:.1f}V{100 - found / count * CURVE_HEADROOM:.1f}"
+        reached[round(share(marker.found_at, total) * 10000)] = found
+    if len(reached) > CURVE_STEPS:
+        width = 10000 // CURVE_STEPS
+        # A step moves to the end of its stretch, so the curve never rises before a failure is found.
+        reached = {-(-x // width) * width: found for x, found in reached.items()}
+    path = "M0,100"
+    previous_x, previous_y = 0, 1000
+    for x, found in reached.items():
+        y = round(1000 - found / count * CURVE_HEADROOM * 10)
+        if y == previous_y:
+            continue
+        if x != previous_x:
+            path += f"H{_tenths(x)}"
+        path += f"V{_tenths(y)}"
+        previous_x, previous_y = x, y
     return path + "H1000"
+
+
+def _tenths(value: int) -> str:
+    return f"{value / 10:.1f}".removesuffix(".0")
 
 
 def tick_groups(markers: list[Marker], total: float) -> list[list[Marker]]:
