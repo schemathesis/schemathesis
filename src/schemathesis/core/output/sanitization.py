@@ -74,8 +74,11 @@ def _sanitize_url_cached(
     # Mask values of sensitive query keys; every other pair stays byte-for-byte as sent
     pairs = parsed.query.split("&")
     for index, pair in enumerate(pairs):
-        key = pair.split("=", 1)[0]
-        if is_sensitive_key(unquote_plus(key), keys_to_sanitize=keys_to_sanitize, sensitive_markers=sensitive_markers):
+        key, separator, _ = pair.partition("=")
+        # A bare key has no value to mask
+        if separator and is_sensitive_key(
+            unquote_plus(key), keys_to_sanitize=keys_to_sanitize, sensitive_markers=sensitive_markers
+        ):
             pairs[index] = f"{key}={quote_plus(replacement)}"
     sanitized_query = "&".join(pairs)
 

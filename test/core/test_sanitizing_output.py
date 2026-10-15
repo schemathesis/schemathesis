@@ -141,8 +141,16 @@ def test_sanitize_url(input_url, expected_url):
             "http://127.0.0.1/path?a=1&token=secret&b=%FF&flag&a=3",
             f"http://127.0.0.1/path?a=1&token={URLENCODED_REPLACEMENT}&b=%FF&flag&a=3",
         ),
+        ("http://127.0.0.1/path?a=1&token", "http://127.0.0.1/path?a=1&token"),
     ],
-    ids=["repeated-keys", "bare-flag", "invalid-utf8", "mixed-space-encoding", "sensitive-among-others"],
+    ids=[
+        "repeated-keys",
+        "bare-flag",
+        "invalid-utf8",
+        "mixed-space-encoding",
+        "sensitive-among-others",
+        "bare-sensitive-key",
+    ],
 )
 def test_sanitize_url_preserves_query(input_url, expected_url):
     assert sanitize_url(input_url, config=SanitizationConfig()) == expected_url
