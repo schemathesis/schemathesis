@@ -314,9 +314,15 @@ def _declared_parameters_are_valid(case: Case, location: ParameterLocation) -> b
     if _has_serialization_sensitive_types(schema, container):
         # Arrays and objects are rewritten on the wire, so post-serialization validity is unknowable.
         return False
-    declared = {name: item for name, item in value.items() if name in container}
+    validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
+    properties = schema.get("properties", {})
     try:
-        return make_validator(schema, case.operation.schema.adapter.jsonschema_validator_cls).is_valid(declared)
+        declared = {
+            name: _boolean_from_wire_spelling(item, properties.get(name, {}), validator_cls)
+            for name, item in value.items()
+            if name in container
+        }
+        return make_validator(schema, validator_cls).is_valid(declared)
     except Exception:
         # Schema the validator cannot read (e.g. a pattern valid in Python but not ECMA 262).
         return False

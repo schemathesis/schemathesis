@@ -179,6 +179,40 @@ def test_text_plain_with_query_negative_still_fails(ctx, cli, snapshot_cli):
     )
 
 
+# High example count: a negated body with only valid declared query values is a rare draw.
+def test_text_plain_with_valid_boolean_query_not_reported(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/endpoint": {
+                "post": {
+                    "parameters": [{"in": "query", "name": "q", "required": False, "schema": {"type": "boolean"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/plain": {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/endpoint", methods=["POST"])
+    def endpoint():
+        values = request.args.getlist("q")
+        if len(values) > 1 or (values and values[0] not in ("true", "false")):
+            return jsonify({}), 400
+        return jsonify({}), 200
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=negative_data_rejection",
+        "--phases=fuzzing",
+        "--max-examples=100",
+        "--seed=1",
+        exit_code=ExitCode.OK,
+    )
+
+
 def test_removed_auth_parameter_not_reapplied_no_credentials(ctx):
     # No credentials configured — server always returns 401; negative_data_rejection must not fire.
     api = ctx.openapi.apps.basic()

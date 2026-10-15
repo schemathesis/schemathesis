@@ -26,6 +26,7 @@
 - Slow coverage generation for email patterns combined with length bounds.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - "Response violates schema" messages embedding the whole response value on one line.
+- False positive `negative_data_rejection` for valid boolean query parameters alongside `text/plain` bodies.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
 - `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
