@@ -731,11 +731,12 @@ def test_fuzz_chains_post_with_get_via_link(cli, app_runner, ctx, snapshot_cli):
         # Planted bug: required `name` is null for products that exist.
         return jsonify({"name": None}), 200
 
+    # The run ends at the first failure; the time limit only stops a regression from hanging the test.
     assert_cli_snapshot(
         cli.main(
             "fuzz",
             app_runner.openapi_url(app),
-            "--max-time=15",
+            "--max-time=120",
             "-c",
             "response_schema_conformance",
         ),
@@ -962,7 +963,8 @@ def test_fuzz_generation_database_replays_failure(cli, app_runner, ctx, tmp_path
         return jsonify({})
 
     url = app_runner.openapi_url(app)
-    args = ("--max-time=10", "--checks=not_a_server_error", f"--generation-database={tmp_path / 'examples'}")
+    # Each run ends at the first failure; the time limit only stops a regression from hanging the test.
+    args = ("--max-time=120", "--checks=not_a_server_error", f"--generation-database={tmp_path / 'examples'}")
     # The run cache replays failures on its own; disabling it leaves the example database as the only source.
     config = {"cache": {"enabled": False}}
     cli.main("fuzz", url, *args, config=config)

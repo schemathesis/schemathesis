@@ -211,7 +211,8 @@ def _relay_events(
                 ctx.control.count_failure(event.id)
             yield event
         except queue.Empty:
-            if not any(t.is_alive() for t in threads):
+            # A worker may put its last event and exit after the poll timed out.
+            if not any(t.is_alive() for t in threads) and event_queue.empty():
                 break
 
 

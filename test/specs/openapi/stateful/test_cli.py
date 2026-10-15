@@ -378,7 +378,6 @@ def test_link_with_multiple_failing_parameters(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=3, min_passes=1)
 def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, snapshot_cli):
     openapi = {
         "openapi": "3.0.0",
@@ -479,13 +478,11 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, sn
         if not isinstance(data, dict):
             return {"error": "Invalid input"}, 400
 
-        name = data.get("name", "Product")
-        if not isinstance(name, str) or not name:
-            return {"error": "Invalid name"}, 400
-
-        price = data.get("price", 9.99)
-        if not isinstance(price, (int | float)):
-            return {"error": "Invalid price"}, 400
+        name = data.get("name")
+        price = data.get("price")
+        # Rejecting negative bodies keeps the reported producer response identical across runs.
+        if name != "Product" or price != 9.99:
+            return {"error": "Invalid product"}, 400
 
         product_id = str(next_id)
         next_id += 1

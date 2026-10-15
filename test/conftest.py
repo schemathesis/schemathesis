@@ -16,6 +16,9 @@ import httpx2
 import pytest
 import requests
 
+# Import eagerly: `pytester` can drop it from `sys.modules` while the CLI is importing it.
+import rich._emoji_codes  # noqa: F401
+
 # Import eagerly: on Windows `rich` loads its console bindings on the first console, which `pytester` can race.
 import rich._windows  # noqa: F401
 import yaml
