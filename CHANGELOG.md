@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.31.1...HEAD) - TBD
 
+### :wrench: Changed
+
+- Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
+
 ### :bug: Fixed
 
 - Stateful scenarios mostly starting from the alphabetically first operation.
