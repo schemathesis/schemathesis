@@ -57,10 +57,13 @@ def humanize_duration(seconds: float) -> str:
     return f"{rounded:.1f}s"
 
 
-# Copies `data-copy` values; `navigator.clipboard` is unavailable on `file://`, hence the fallback.
+# Copies the value shown next to the button, or a reproduction's commands followed by its replay command.
+# `navigator.clipboard` is unavailable on `file://`, hence the fallback.
 _COPY_SCRIPT = (
-    "<script>document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){"
-    "var t=b.getAttribute('data-copy');var done=function(){b.textContent='Copied';"
+    "<script>document.querySelectorAll('.copy-btn').forEach(function(b){b.addEventListener('click',function(){"
+    "var r=b.closest('.repro'),t;if(r){t=[].map.call(r.querySelectorAll('.cmd'),function(c){return c.textContent})"
+    ".join('\\n');var p=r.parentNode.querySelector('.replay code');if(p)t+='\\n\\n'+p.textContent}"
+    "else{t=b.previousElementSibling.textContent}var done=function(){b.textContent='Copied';"
     "setTimeout(function(){b.textContent='Copy'},1200)};"
     "if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done)}"
     "else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();"
@@ -506,8 +509,8 @@ def _result(data: ReportData) -> str:
     )
 
 
-def _copy_button(value: str, name: str) -> str:
-    return f'<button type="button" class="copy-btn" data-copy="{esc(value)}" aria-label="Copy {name}">Copy</button>'
+def _copy_button(name: str) -> str:
+    return f'<button type="button" class="copy-btn" aria-label="Copy {name}">Copy</button>'
 
 
 def _row(key: str, value: str, copy: str = "") -> str:
@@ -535,15 +538,15 @@ def _target_block(data: ReportData) -> str:
     meta = data.meta
     rows = []
     if meta.base_url:
-        rows.append(_row("Base URL", _link(meta.base_url), _copy_button(meta.base_url, "base URL")))
+        rows.append(_row("Base URL", _link(meta.base_url), _copy_button("base URL")))
     if meta.location:
         # A local spec cannot be opened from a copied-around report, so it is plain text.
         value = _link(meta.location) if _is_url(meta.location) else esc(meta.location)
-        rows.append(_row("Spec", value, _copy_button(meta.location, "spec")))
+        rows.append(_row("Spec", value, _copy_button("spec")))
     if meta.command != UNKNOWN_ENTRYPOINT:
-        rows.append(_row("Command", _command(meta.command), _copy_button(meta.command, "command")))
+        rows.append(_row("Command", _command(meta.command), _copy_button("command")))
     if meta.seed is not None:
-        rows.append(_row("Seed", f"<code>{meta.seed}</code>", _copy_button(str(meta.seed), "seed")))
+        rows.append(_row("Seed", f"<code>{meta.seed}</code>", _copy_button("seed")))
     if data.phases:
         phases = "".join(
             f'<li class="phase phase-{kind}"><span class="ph-name">{esc(name)}</span>'
@@ -779,10 +782,8 @@ def _method(method: str) -> str:
 
 
 def _reproduce(commands: list[Command], replay: str | None) -> str:
-    curls = [command.curl for command in commands]
-    copy = "\n".join(curls) + (f"\n\n{replay}" if replay is not None else "")
     if len(commands) == 1:
-        content = f'<pre class="cmd" tabindex="0">{esc(curls[0])}</pre>'
+        content = f'<pre class="cmd" tabindex="0">{esc(commands[0].curl)}</pre>'
     else:
         steps = []
         for command in commands:
@@ -792,9 +793,7 @@ def _reproduce(commands: list[Command], replay: str | None) -> str:
             steps.append(f'<li>{label}<pre class="cmd" tabindex="0">{esc(command.curl)}</pre></li>')
         content = f'<ol class="steps">{"".join(steps)}</ol>'
     replay_line = f'<p class="replay">or <code>{esc(replay)}</code></p>' if replay is not None else ""
-    return _evidence(
-        "Reproduce", f'<div class="repro">{content}{_copy_button(copy, "reproduction")}</div>{replay_line}'
-    )
+    return _evidence("Reproduce", f'<div class="repro">{content}{_copy_button("reproduction")}</div>{replay_line}')
 
 
 def _failing_case(case: FailingCase, owner: str = "") -> str:

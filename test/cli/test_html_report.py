@@ -4,7 +4,7 @@ import re
 import sys
 import threading
 import time
-from html import escape
+from html import escape, unescape
 from types import SimpleNamespace
 
 import pytest
@@ -25,6 +25,7 @@ from schemathesis.reporting.html.timeline import (
     Lane,
     Marker,
     axis_ticks,
+    curve_path,
     lane_ticks,
     mark_classes,
     phase_blocks,
@@ -879,6 +880,102 @@ def test_html_report_stateful_failure(ctx, cli, app_runner, report_dir, snapshot
     assert "until first failure" not in html
 
 
+def copied_texts(html):
+    # A copy button copies the value shown next to it; in a reproduction, its commands and then the replay command.
+    copied = {
+        label: unescape(re.sub(r"<[^>]+>", "", value))
+        for value, label in re.findall(
+            r'<span class="tv-text">(.*?)</span><button type="button" class="copy-btn" aria-label="Copy ([^"]+)">', html
+        )
+    }
+    for content, replay in re.findall(
+        r'<div class="repro">(.*?)<button[^>]*>Copy</button></div>(?:<p class="replay">or <code>(.*?)</code></p>)?',
+        html,
+        flags=re.DOTALL,
+    ):
+        commands = re.findall(r'<pre class="cmd" tabindex="0">(.*?)</pre>', content, flags=re.DOTALL)
+        text = "\n".join(unescape(command) for command in commands)
+        copied.setdefault("reproduction", []).append(text + f"\n\n{unescape(replay)}" if replay else text)
+    return copied
+
+
+def test_html_report_copy_buttons_copy_shown_text(ctx, cli, app_runner, report_dir, monkeypatch):
+    note = "X-Note: a&b  <c>\"d'e"
+    monkeypatch.setattr(sys, "argv", ["/venv/bin/st", "run", "--header", note])
+    name = "a&b<c>\"d'e"
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string", "enum": [name]}},
+                                    "required": ["name"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {
+                                    "operationId": "getItem",
+                                    "parameters": {"item_id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/items/{item_id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/api/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/api/items/<int:item_id>")
+    def get_item(item_id):
+        return "", 500
+
+    base_url = app_runner.openapi_url(app, path="")
+    html = run_with_report(
+        cli,
+        report_dir,
+        f"{base_url}/openapi.json",
+        "--checks=not_a_server_error",
+        "--mode=positive",
+        phases="stateful",
+        exit_code=ExitCode.FAILURES,
+    )
+    replay = re.search(r'<p class="replay">or <code>(st replay \w+)</code></p>', html).group(1)
+    assert "data-copy" not in html
+    assert copied_texts(html) == {
+        "base URL": f"{base_url}/",
+        "spec": f"{base_url}/openapi.json",
+        "command": f"st run --header {note}",
+        "seed": "42",
+        "reproduction": [
+            f"curl -X POST -H 'Content-Type: application/json' -d '{{\"name\": \"a&b<c>\\\"d'\"'\"'e\"}}' "
+            f"{base_url}/api/items\n"
+            f"curl -X GET {base_url}/api/items/1\n\n{replay}"
+        ],
+    }
+
+
 def test_html_report_error_details(ctx, cli, report_dir, snapshot_html):
     api = ctx.openapi.apps.success_and_failure()
     module = ctx.write_pymodule(
@@ -1141,6 +1238,37 @@ def test_timeline_ticks_drawn_for_many_failures_found_close_together():
 def test_timeline_ticks_hidden_when_too_many_to_draw():
     lanes = [Lane(phase, [], [marker(index * 3.0, phase) for index in range(30)]) for phase in ("Coverage", "Fuzzing")]
     assert lane_ticks(lanes, 100.0) == [[], []]
+
+
+def curve_points(path):
+    points = []
+    x, y = 0.0, 100.0
+    for command, value in re.findall(r"([HV])([\d.]+)", path.removeprefix("M0,100")):
+        if command == "H":
+            x = float(value)
+        else:
+            y = float(value)
+            points.extend((x, y))
+    return points
+
+
+def test_timeline_curve_merges_failures_drawn_at_one_point():
+    markers = [marker(10.0), marker(10.00001), marker(20.0)]
+    assert curve_path(markers, 100.0) == "M0,100H100V38.7H200V8H1000"
+
+
+def test_timeline_curve_skips_steps_too_small_to_draw():
+    markers = [marker(10.0), marker(20.0), marker(30.0, count=9998)]
+    assert curve_path(markers, 100.0) == "M0,100H300V8H1000"
+
+
+# Each drawn step shows the count at the end of its stretch, so the curve never rises before a failure is found.
+def test_timeline_curve_keeps_its_shape_for_many_failures():
+    markers = [marker(index * 0.1) for index in range(1000)]
+    expected = [0.0, 99.9]
+    for step in range(1, 501):
+        expected.extend((2.0 * step, 100 - min(2 * step + 1, 1000) / 1000 * 92))
+    assert curve_points(curve_path(markers, 100.0)) == pytest.approx(expected, abs=0.051)
 
 
 def test_timeline_blocks_split_only_where_another_phase_ran():
