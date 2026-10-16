@@ -22,7 +22,7 @@ from schemathesis.core.error_feedback.collector import parse_observations, recor
 from schemathesis.core.error_feedback.parsers.drf import DRFParser
 from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.error_feedback.pipeline import FeedbackPipeline, _reset_pipeline_for_tests
-from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.patterns import normalize_regex
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
@@ -2748,3 +2748,70 @@ def test_framework_field_paths_reach_nested_properties(ctx, case_factory, respon
     adjusted = apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
     _assert_valid_schema_object(schema, adjusted)
     assert adjusted == expected
+
+
+def _named(kind):
+    return {
+        "type": "object",
+        "properties": {"kind": {"type": "string", "enum": [kind]}, "name": {"type": "string"}},
+        "required": ["kind"],
+    }
+
+
+def _adjust_after_short_data_name(ctx, case_factory, response_factory, data, schemas):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "object", "properties": {"data": data}}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"schemas": schemas},
+    )
+    body = {
+        "message": "The given data was invalid.",
+        "errors": {"data.name": ["The data.name field must be at least 3 characters."]},
+    }
+    response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
+    store = ErrorFeedbackStore()
+    for observation in FeedbackPipeline.from_registry().parse(
+        operation=operation, case=case_factory(operation=operation), response=response
+    ):
+        store.record(observation)
+    schema = operation.body[0].optimized_schema
+    return apply_adjustments(operation=operation, location=ParameterLocation.BODY, schema=schema, store=store)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"allOf": [{"$ref": "#/components/schemas/A"}, {"type": "object", "properties": {"name": {"type": "string"}}}]},
+        {"oneOf": [_named("a"), _named("b")]},
+        {"anyOf": [_named("a"), _named("b")]},
+        {"oneOf": [{"$ref": "#/components/schemas/A"}, {"$ref": "#/components/schemas/B"}]},
+        {"oneOf": [{"allOf": [{"$ref": "#/components/schemas/A"}]}, {"anyOf": [{"$ref": "#/components/schemas/B"}]}]},
+    ],
+    ids=["all-of", "one-of", "any-of", "one-of-refs", "nested-composition"],
+)
+def test_framework_field_paths_reach_every_composition_branch(ctx, case_factory, response_factory, data):
+    adjusted = _adjust_after_short_data_name(
+        ctx, case_factory, response_factory, data, {"A": _named("a"), "B": _named("b")}
+    )
+    validator = make_validator(adjusted, jsonschema_rs.Draft4Validator)
+    kinds = ["a"] if "allOf" in data else ["a", "b"]
+    assert [validator.is_valid({"data": {"kind": kind, "name": "ab"}}) for kind in kinds] == [False] * len(kinds)
+    assert [validator.is_valid({"data": {"kind": kind, "name": "abc"}}) for kind in kinds] == [True] * len(kinds)
+
+
+def test_framework_field_paths_through_self_referencing_composition(ctx, case_factory, response_factory):
+    node = {"anyOf": [_named("a"), {"$ref": "#/components/schemas/Node"}, _named("b")]}
+    adjusted = _adjust_after_short_data_name(
+        ctx, case_factory, response_factory, {"$ref": "#/components/schemas/Node"}, {"Node": node}
+    )
+    resolved = resolve_bundled_ref(adjusted["properties"]["data"], adjusted[BUNDLE_STORAGE_KEY])
+    assert [branch["properties"]["name"] for branch in resolved["anyOf"] if "properties" in branch] == [
+        {"type": "string", "minLength": 3},
+        {"type": "string", "minLength": 3},
+    ]

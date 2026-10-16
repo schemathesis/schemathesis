@@ -6,6 +6,8 @@
 
 - Stateful links inferred from same-origin URLs in response bodies (e.g. DRF hyperlinked fields).
 - Captured resource ids fill fields of array items and `$ref` objects in request bodies. [#5417](https://github.com/schemathesis/schemathesis/issues/5417)
+- Captured resource ids fill request body fields declared through nested `allOf`/`oneOf`/`anyOf`.
+- Error feedback constrains request body fields declared in every `allOf`/`oneOf`/`anyOf` branch.
 - HTML report filters by path, failure kind and method.
 - HTML report permalinks to operations and failing cases that copy the URL on click.
 - `#regex:` extractor for `$response.body#/pointer` link expressions.

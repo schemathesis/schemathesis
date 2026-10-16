@@ -158,8 +158,7 @@ def _walk_and_apply(schema: dict[str, Any], path: ParameterPath, bundled: object
     *prefix, leaf = path
     assert isinstance(leaf, str)
     if any(isinstance(step, int) for step in prefix):
-        target = _walk_to_property(schema, tuple(prefix), bundled)
-        if target is not None:
+        for target in _walk_to_properties(schema, tuple(prefix), bundled):
             _ensure_required_in_object(target, leaf)
         return
     current = schema
@@ -205,27 +204,54 @@ def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayloa
 
 
 def _walk_to_property(schema: dict[str, Any], path: ParameterPath, bundled: object) -> dict[str, Any] | None:
-    """Descend `schema` along `path`; return the leaf prop dict or None.
+    """Descend `schema` along `path`; return the first leaf prop dict or None."""
+    leaves = _walk_to_properties(schema, path, bundled)
+    return leaves[0] if leaves else None
 
-    String steps navigate `properties[<name>]` (object properties); int steps
-    navigate `items` (array elements). The index value itself is irrelevant for
+
+def _walk_to_properties(schema: dict[str, Any], path: ParameterPath, bundled: object) -> list[dict[str, Any]]:
+    """Descend `schema` along `path`; return every leaf prop dict a value at that path must satisfy.
+
+    String steps navigate `properties[<name>]` (object properties), then composition branches that declare it;
+    int steps navigate `items` (array elements). The index value itself is irrelevant for
     JSON Schema's uniform-items model — every element shares the `items` schema.
     """
     if not path:
-        return None
-    current = resolve_bundled_ref(schema, bundled)
+        return []
+    current = [resolve_bundled_ref(schema, bundled)]
     for step in path:
-        if isinstance(step, str):
-            properties = current.get("properties")
-            if not isinstance(properties, dict):
-                return None
-            nested = properties.get(step)
-        else:
-            nested = current.get("items")
-        if not isinstance(nested, dict):
-            return None
-        current = resolve_bundled_ref(nested, bundled)
+        found: list[dict[str, Any]] = []
+        for node in current:
+            if isinstance(step, str):
+                found.extend(_declared_properties(node, step, bundled, set()))
+            else:
+                items = node.get("items")
+                if isinstance(items, dict):
+                    found.append(items)
+        # Branches sharing one component resolve to the same dict; keep it once.
+        current = list({id(leaf): leaf for leaf in (resolve_bundled_ref(nested, bundled) for nested in found)}.values())
     return current
+
+
+def _declared_properties(node: dict[str, Any], name: str, bundled: object, seen: set[int]) -> list[dict[str, Any]]:
+    node = resolve_bundled_ref(node, bundled)
+    if id(node) in seen:
+        return []
+    seen.add(id(node))
+    properties = node.get("properties")
+    declared = properties.get(name) if isinstance(properties, dict) else None
+    if isinstance(declared, dict):
+        return [declared]
+    # A value may match any `oneOf`/`anyOf` branch, so each declaring branch needs the constraint;
+    # repeating it on several `allOf` branches is harmless.
+    found = []
+    for keyword in ("allOf", "oneOf", "anyOf"):
+        branches = node.get(keyword)
+        if isinstance(branches, list):
+            for branch in branches:
+                if isinstance(branch, dict):
+                    found.extend(_declared_properties(branch, name, bundled, seen))
+    return found
 
 
 def _apply_format_to_property(prop: dict[str, Any], name: str) -> None:
@@ -265,8 +291,7 @@ class FormatAdjustment:
         for observation in observations:
             assert isinstance(observation.payload, FormatPayload)
             for target in targets:
-                prop = _walk_to_property(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
-                if prop is not None:
+                for prop in _walk_to_properties(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY)):
                     _apply_format_to_property(prop, observation.payload.name)
 
         return schema
@@ -302,8 +327,7 @@ class SizeBoundAdjustment:
         for observation in observations:
             assert isinstance(observation.payload, SizeBoundPayload)
             for target in targets:
-                prop = _walk_to_property(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
-                if prop is not None:
+                for prop in _walk_to_properties(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY)):
                     _apply_size_bound_to_property(prop, observation.payload)
 
         return schema
@@ -383,8 +407,7 @@ class NumericBoundAdjustment:
         for observation in observations:
             assert isinstance(observation.payload, NumericBoundPayload)
             for target in targets:
-                prop = _walk_to_property(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
-                if prop is not None:
+                for prop in _walk_to_properties(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY)):
                     _apply_numeric_bound_to_property(prop, observation.payload, is_2020_12=is_2020_12)
 
         return schema
@@ -431,8 +454,7 @@ class PatternAdjustment:
         for observation in observations:
             assert isinstance(observation.payload, PatternPayload)
             for target in targets:
-                prop = _walk_to_property(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
-                if prop is not None:
+                for prop in _walk_to_properties(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY)):
                     _apply_pattern_to_property(prop, observation.payload.regex)
 
         return schema
@@ -504,15 +526,13 @@ class TypeMismatchAdjustment:
             assert isinstance(observation.payload, TypeMismatchPayload)
             type_name = observation.payload.type_name
             for target in targets:
-                prop = _walk_to_property(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
-                if prop is None:
-                    continue
-                if type_name in _JSON_SCHEMA_TYPES:
-                    _apply_type_correction(prop, type_name)
-                else:
-                    format_name = _JAVA_TYPE_TO_FORMAT.get(type_name)
-                    if format_name is not None:
-                        _apply_format_to_property(prop, format_name)
+                for prop in _walk_to_properties(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY)):
+                    if type_name in _JSON_SCHEMA_TYPES:
+                        _apply_type_correction(prop, type_name)
+                    else:
+                        format_name = _JAVA_TYPE_TO_FORMAT.get(type_name)
+                        if format_name is not None:
+                            _apply_format_to_property(prop, format_name)
 
         return schema
 
@@ -550,8 +570,7 @@ class EnumAdjustment:
         for observation in observations:
             assert isinstance(observation.payload, EnumPayload)
             for target in targets:
-                prop = _walk_to_property(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY))
-                if prop is not None:
+                for prop in _walk_to_properties(target, observation.parameter_path, schema.get(BUNDLE_STORAGE_KEY)):
                     _apply_enum_to_property(prop, observation.payload.values)
 
         return schema
@@ -659,20 +678,18 @@ class AdditionalPropertiesAdjustment:
         bundled = schema.get(BUNDLE_STORAGE_KEY)
         for observation in observations:
             path = observation.parameter_path
-            root = schema if not path else _walk_to_property(schema, path, bundled)
-            if not isinstance(root, dict):
-                continue
-            # A closed `allOf` branch would forbid the properties its siblings declare.
-            all_of = maybe_resolve_bundled(root).get("allOf")
-            siblings = {id(branch) for branch in all_of} if isinstance(all_of, list) else set()
-            for target in _collect_object_targets(root):
-                if id(target) not in siblings:
-                    # Closing an object that composes through `allOf` must keep the properties its branches declare.
-                    if isinstance(target.get("allOf"), list):
-                        properties = target.setdefault("properties", {})
-                        if isinstance(properties, dict):
-                            for name in _collect_property_names_through_all_of(target, bundled, set()):
-                                properties.setdefault(name, {})
-                    target["additionalProperties"] = False
+            for root in [schema] if not path else _walk_to_properties(schema, path, bundled):
+                # A closed `allOf` branch would forbid the properties its siblings declare.
+                all_of = maybe_resolve_bundled(root).get("allOf")
+                siblings = {id(branch) for branch in all_of} if isinstance(all_of, list) else set()
+                for target in _collect_object_targets(root):
+                    if id(target) not in siblings:
+                        # Closing an object that composes through `allOf` must keep the properties its branches declare.
+                        if isinstance(target.get("allOf"), list):
+                            properties = target.setdefault("properties", {})
+                            if isinstance(properties, dict):
+                                for name in _collect_property_names_through_all_of(target, bundled, set()):
+                                    properties.setdefault(name, {})
+                        target["additionalProperties"] = False
 
         return schema
