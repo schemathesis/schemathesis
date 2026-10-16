@@ -41,6 +41,7 @@ from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason, events
+from schemathesis.engine.errors import never_reached_server
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
@@ -88,15 +89,7 @@ def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> 
 
 def _server_unreachable(probes: list[ProbeRun]) -> bool:
     """Whether no probe could connect, because the connection was refused or timed out, so none reached a server."""
-    import requests
-
-    from schemathesis.engine.errors import is_connection_refused
-
-    return bool(probes) and all(
-        isinstance(probe.error, requests.ConnectTimeout)
-        or (isinstance(probe.error, requests.ConnectionError) and is_connection_refused(probe.error))
-        for probe in probes
-    )
+    return bool(probes) and all(never_reached_server(probe.error) for probe in probes)
 
 
 def _format_cache_row(report: CacheReport | None) -> Text | None:

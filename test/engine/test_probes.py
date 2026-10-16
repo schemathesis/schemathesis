@@ -1,4 +1,7 @@
 import _thread
+import contextlib
+import socket
+import struct
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -9,8 +12,10 @@ from flask import Flask, request
 from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
+from schemathesis.engine import events
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.run import probes
+from schemathesis.engine.run import PhaseName, probes
+from test.utils import EventStream, run_given
 
 
 def _make_strict_server(app_runner, reject: Callable[[], object]) -> str:
@@ -118,17 +123,82 @@ def test_detect_null_byte_with_response(engine_ctx, null_byte_strict_url, respon
     result.response = response_factory.requests(content=b'{"success": true}')
 
 
-def test_detect_null_byte_error(engine_ctx):
-    engine_ctx.schema.config.update(base_url="http://127.0.0.1:1")
-    results = probes.run(engine_ctx)
-    null_byte_result = next(r for r in results if isinstance(r.probe, probes.NullByteInHeader))
-    assert null_byte_result == probes.ProbeRun(
-        probe=probes.NullByteInHeader(),
-        outcome=probes.ProbeOutcome.FAILURE,
-        request=ANY,
-        response=None,
-        error=ANY,
+@pytest.fixture(params=["refused", "connect-timeout"])
+def unreachable_url(request):
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    port = server.getsockname()[1]
+    if request.param == "refused":
+        server.close()
+        yield f"http://127.0.0.1:{port}/"
+        return
+    # The only accept-queue slot is taken and never accepted, so the kernel drops further connection attempts.
+    server.listen(0)
+    queued = socket.create_connection(("127.0.0.1", port))
+    yield f"http://127.0.0.1:{port}/"
+    queued.close()
+    server.close()
+
+
+# A probe that never reached a server says nothing about what the API accepts.
+@pytest.mark.hypothesis_nested
+def test_unreachable_api_does_not_narrow_generation(ctx, unreachable_url):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{name}": {
+                "get": {
+                    "parameters": [
+                        {"name": "name", "in": "path", "required": True, "schema": {"type": "string", "enum": ["a\\b"]}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
     )
+    schema.config.update(base_url=unreachable_url)
+    stream = EventStream(schema, phases=[PhaseName.EXAMPLES], request_timeout=0.3).execute()
+    probing = stream.find(events.PhaseFinished, phase=lambda phase: phase.name == PhaseName.PROBING)
+    assert [(type(run.probe), run.outcome) for run in probing.payload.ok().probes] == [
+        (probes.NullByteInHeader, probes.ProbeOutcome.SKIP),
+        (probes.UnsafePathDecoder, probes.ProbeOutcome.SKIP),
+    ]
+    operation = schema["/items/{name}"]["GET"]
+
+    @run_given(case=operation.as_strategy(), max_examples=1)
+    def inner(case):
+        assert case.path_parameters == {"name": "a%5Cb"}
+
+
+@pytest.fixture
+def resetting_url():
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+
+    def reset_every_connection():
+        while True:
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            connection.close()
+
+    threading.Thread(target=reset_every_connection, daemon=True).start()
+    yield f"http://127.0.0.1:{server.getsockname()[1]}/"
+    # Wakes the blocked `accept` on Linux; Windows refuses to shut down a listening socket, and `close` is enough there.
+    with contextlib.suppress(OSError):
+        server.shutdown(socket.SHUT_RDWR)
+    server.close()
+
+
+# A server that accepts the connection and then drops it has rejected the probe.
+def test_reset_after_connecting_is_a_failure(engine_ctx, resetting_url):
+    engine_ctx.schema.config.update(base_url=resetting_url)
+    assert [(type(run.probe), run.outcome) for run in probes.run(engine_ctx)] == [
+        (probes.NullByteInHeader, probes.ProbeOutcome.FAILURE),
+        (probes.UnsafePathDecoder, probes.ProbeOutcome.FAILURE),
+    ]
 
 
 def test_detect_null_byte_skipped(engine_ctx):
