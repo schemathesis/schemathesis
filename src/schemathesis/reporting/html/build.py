@@ -4,11 +4,10 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core.failures import group_failures, reproducible_by_identity
 from schemathesis.core.output import format_response_payload
-from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.reporting.html.model import Command, FailingCase, FailureEntry, split_label
 
 if TYPE_CHECKING:
-    from schemathesis.config import ChecksConfig, OutputConfig, SanitizationConfig
+    from schemathesis.config import ChecksConfig, OutputConfig
     from schemathesis.engine.statistic import GroupedFailures
 
 
@@ -60,10 +59,3 @@ def enabled_checks(config: ChecksConfig) -> list[str]:
     if config.max_response_time.enabled:
         names.append(max_response_time.__name__)
     return sorted(names)
-
-
-def sanitized(url: str | None, sanitization_config: SanitizationConfig | None) -> str | None:
-    # The schema location may be a file path; only URLs can carry credentials.
-    if url is None or sanitization_config is None or not url.startswith(("http://", "https://")):
-        return url
-    return sanitize_url(url, config=sanitization_config)
