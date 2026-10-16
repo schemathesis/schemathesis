@@ -1593,7 +1593,8 @@ CANONICAL_CASES = [
     # A barred format and a barred pattern at once: each run has to keep filtering on its own.
     (
         {"allOf": [{"type": "string"}, {"not": {"format": "ipv4"}}, {"not": {"pattern": "^z"}}]},
-        (lambda value: value.startswith("a"),),
+        # Any lowercase first letter the pattern leaves allowed; one fixed letter is too rare a draw.
+        (lambda value: "a" <= value[:1] <= "y",),
     ),
     # Both violations need a key of their own, and the ceiling has to leave room for them while the
     # floor still reaches. Room for each is what the bounds on the base draw are computed against.
