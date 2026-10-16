@@ -1399,9 +1399,7 @@ config = schemathesis.Config.from_dict({{
         }}
     }}
 }})
-schema = schemathesis.openapi.from_url(
-    "https://127.0.0.1:{port}/openapi.json", config=config, verify=False, cert={str(client_cert_path)!r}
-)
+schema = schemathesis.openapi.from_url("https://127.0.0.1:{port}/openapi.json", config=config)
 
 def noop(*args, **kwargs):
     pass
