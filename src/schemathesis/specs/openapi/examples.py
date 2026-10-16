@@ -21,6 +21,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ContainerName, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -101,6 +102,8 @@ def _combo_dedup_key(combo: Any) -> str:
 def _get_pool_combos(
     operation: APIOperation,
     extra_data_source: OpenApiExtraDataSource,
+    *,
+    complete_bodies: bool = True,
 ) -> list[dict[str, Any]]:
     """Return pool variants as parameter dicts, merging all locations into each slot."""
     per_location: list[list[dict[str, Any]]] = []
@@ -133,7 +136,7 @@ def _get_pool_combos(
             schema=body_schema,
         )
         if variants:
-            required_fields = set(body_schema.get("required", []))
+            required_fields = set(body_schema.get("required", [])) if complete_bodies else set()
             # Overlays for array items carry single fields, never a complete array body.
             complete_variants = [
                 v for v in variants if isinstance(v.overlay, dict) and all(f in v.overlay for f in required_fields)
@@ -216,15 +219,18 @@ def get_strategies_from_examples(
     schema_combos = list(produce_combinations(schema_examples))
 
     extra_data_source = feedback.extra_data_source
+    # An example can supply the fields a captured body leaves out; the merged body is checked instead.
     pool_combos = (
-        _get_pool_combos(operation, extra_data_source) if isinstance(extra_data_source, OpenApiExtraDataSource) else []
+        _get_pool_combos(operation, extra_data_source, complete_bodies=not schema_combos)
+        if isinstance(extra_data_source, OpenApiExtraDataSource)
+        else []
     )
 
     if schema_combos and pool_combos:
         # Round-robin merge: schema as base, pool wins for overlapping keys.
         n = max(len(schema_combos), len(pool_combos))
         pool_augmented = [
-            _with_pool_values(schema_combos[i % len(schema_combos)], pool_combos[i % len(pool_combos)])
+            _with_pool_values(operation, schema_combos[i % len(schema_combos)], pool_combos[i % len(pool_combos)])
             for i in range(n)
         ]
         # Keep original schema combos; append pool-augmented ones that differ.
@@ -252,15 +258,24 @@ def get_strategies_from_examples(
     ]
 
 
-def _with_pool_values(combo: dict[str, Any], pool_combo: dict[str, Any]) -> dict[str, Any]:
+def _with_pool_values(operation: OpenApiOperation, combo: dict[str, Any], pool_combo: dict[str, Any]) -> dict[str, Any]:
     """`combo` with captured values on top; a captured field deep in the body keeps the example's other fields."""
     result = {key: dict(value) if isinstance(value, dict) else value for key, value in combo.items()}
     pool_body = pool_combo.get("body")
-    if isinstance(pool_body, dict) and isinstance(result.get("body"), dict):
-        body = deepclone(result["body"])
+    if isinstance(pool_body, dict):
+        example_body = result.get("body")
+        body: dict[str, Any] = cast("dict[str, Any]", deepclone(example_body)) if isinstance(example_body, dict) else {}
         _deep_merge_overlay(body, pool_body)
-        pool_combo = {**pool_combo, "body": body}
+        if _example_is_valid(body, _make_example_validator(_body_schema(operation, pool_combo["media_type"]))):
+            pool_combo = {**pool_combo, "body": body}
+        else:
+            # The captured fields cannot make a conforming body here, so the example's body goes as is.
+            pool_combo = {key: value for key, value in pool_combo.items() if key not in ("body", "media_type")}
     return merge_kwargs(result, pool_combo)
+
+
+def _body_schema(operation: OpenApiOperation, media_type: str) -> JsonSchema:
+    return next(candidate for candidate in operation.body if candidate.media_type == media_type).validation_schema
 
 
 def _with_complete_pool_body(operation: OpenApiOperation, combo: dict[str, Any]) -> dict[str, Any]:
@@ -269,8 +284,7 @@ def _with_complete_pool_body(operation: OpenApiOperation, combo: dict[str, Any])
     pool_body = result.get("body")
     if not isinstance(pool_body, dict):
         return result
-    body = next(candidate for candidate in operation.body if candidate.media_type == result["media_type"])
-    schema = body.validation_schema
+    schema = _body_schema(operation, combo["media_type"])
     validator = _make_example_validator(schema)
     if _example_is_valid(pool_body, validator):
         return result
