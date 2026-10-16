@@ -1,9 +1,9 @@
 """Tests for behavior not specific to forms."""
 
 import pytest
-from hypothesis import HealthCheck, given, settings
 
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.schemas import PayloadAlternatives
 from schemathesis.specs.openapi.adapter import v2, v3_0
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
@@ -94,14 +94,7 @@ def test_parameter_set_get(ctx, make_openapi_3_schema):
 
 
 def generated(operation, attribute):
-    values = []
-
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None, database=None)
-    def inner(case):
-        values.append(getattr(case, attribute))
-
-    inner()
+    values = [getattr(case, attribute) for case in generate_many(operation.as_strategy(), 10)]
     return values
 
 
@@ -201,13 +194,6 @@ def test_fuzzing_mixes_in_examples_of_boolean_schema_query_parameter(ctx):
         },
         version="3.1.0",
     )
-    values = []
-
-    @given(case=operation.as_strategy())
-    @settings(max_examples=50, suppress_health_check=list(HealthCheck), deadline=None, database=None)
-    def inner(case):
-        values.append(case.query["q"])
-
-    inner()
+    values = [case.query["q"] for case in generate_many(operation.as_strategy(), 50)]
 
     assert "picked" in values

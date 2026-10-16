@@ -30,6 +30,7 @@ from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
@@ -2543,14 +2544,7 @@ def test_optional_properties_are_size_biased():
         "additionalProperties": False,
     }
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    sizes = []
-
-    @given(built)
-    @settings(max_examples=30, deadline=None)
-    def test(value):
-        sizes.append(len(value))
-
-    test()
+    sizes = [len(value) for value in generate_many(built, 30)]
 
     assert sum(sizes) / len(sizes) < 10, sizes
 
@@ -2583,14 +2577,7 @@ def test_short_strings_keep_their_variety():
     built = _canonical_strategy(
         {"type": "string", "minLength": 40}, GenerationConfig(), jsonschema_rs.Draft202012Validator
     )
-    counts = []
-
-    @given(built)
-    @settings(max_examples=20, deadline=None)
-    def test(value):
-        counts.append(len(set(value)))
-
-    test()
+    counts = [len(set(value)) for value in generate_many(built, 20)]
 
     assert max(counts) > 8, counts
 
@@ -4272,16 +4259,10 @@ BOUNDED_INTEGER = {"type": "integer", "minimum": 1, "maximum": 100}
 
 
 def _positive_values(schema, location, media_type, validator_cls, count=25):
-    values = []
-
-    @given(make_positive_strategy(schema, "test", location, media_type, GenerationConfig(), validator_cls))
     # Both spellings need enough draws to show up.
-    @settings(max_examples=count, deadline=None, suppress_health_check=list(HealthCheck), database=None)
-    def test(value):
-        values.append(value)
-
-    test()
-    return values
+    return generate_many(
+        make_positive_strategy(schema, "test", location, media_type, GenerationConfig(), validator_cls), count
+    )
 
 
 def test_integer_json_body_drawn_as_whole_float():
@@ -4434,14 +4415,7 @@ def _query_operation(ctx, parameter_schema, config):
 )
 def test_query_dictionary_binding(ctx, parameter_schema, config, expected):
     operation = _query_operation(ctx, parameter_schema, config)
-    values = set()
-
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        values.add(case.query["q"])
-
-    collect()
+    values = {case.query["q"] for case in generate_many(operation.as_strategy(), 10)}
     assert values == expected
 
 

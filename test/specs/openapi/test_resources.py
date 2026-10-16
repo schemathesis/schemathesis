@@ -4,7 +4,7 @@ import threading
 
 import pytest
 import requests
-from hypothesis import HealthCheck, given, settings
+from hypothesis import given, settings
 from hypothesis.vendor.pretty import pretty
 
 from schemathesis.config import GenerationConfig
@@ -12,6 +12,7 @@ from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
@@ -1566,14 +1567,7 @@ def test_negative_aware_strategy_with_captured_values(ctx):
         operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source
     )
 
-    results = []
-
-    @given(strategy)
-    @settings(max_examples=20, database=None, suppress_health_check=list(HealthCheck))
-    def collect_samples(value):
-        results.append(value)
-
-    collect_samples()
+    results = generate_many(strategy, 20)
 
     assert all(isinstance(r, GeneratedValue) for r in results)
 
@@ -1882,14 +1876,7 @@ def test_negative_aware_strategy_with_captured_values_body(ctx):
 
     strategy = body.get_strategy(operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source)
 
-    results = []
-
-    @given(strategy)
-    @settings(max_examples=20, database=None, suppress_health_check=list(HealthCheck))
-    def collect_samples(value):
-        results.append(value)
-
-    collect_samples()
+    results = generate_many(strategy, 20)
 
     assert all(isinstance(r, GeneratedValue) for r in results)
 

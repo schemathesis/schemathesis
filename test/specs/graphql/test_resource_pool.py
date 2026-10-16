@@ -10,6 +10,7 @@ from hypothesis import HealthCheck, given, settings
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values, substitute_pool_values
@@ -744,13 +745,6 @@ def test_positive_case_uses_pool_values(ctx):
     strategy = schema["Query"]["book"].as_strategy(
         feedback=FeedbackSources(extra_data_source=_pool_with_captured_book(schema))
     )
-    bodies = []
-
-    @given(strategy)
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
-    def test(case):
-        bodies.append(case.body)
-
-    test()
+    bodies = [case.body for case in generate_many(strategy, 10)]
 
     assert any('id: "captured-book"' in body and 'authorId: "captured-author"' in body for body in bodies)

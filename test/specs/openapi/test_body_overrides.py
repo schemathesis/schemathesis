@@ -5,6 +5,7 @@ from hypothesis import HealthCheck, given, settings
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 
 
 def _load_schema(ctx, config: dict, paths: dict, *, version: str = "3.0.2"):
@@ -47,12 +48,7 @@ def test_top_level_literal_substitutes_every_case(ctx):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body.get("ccNumber"))
-
-    collect()
+    seen.update(case.body.get("ccNumber") for case in generate_many(operation.as_strategy(), 10))
     assert seen == {"1234-5678-9012-3456"}
 
 
@@ -78,12 +74,7 @@ def test_nested_literal_substitutes_every_case(ctx):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body["user"].get("email"))
-
-    collect()
+    seen.update(case.body["user"].get("email") for case in generate_many(operation.as_strategy(), 10))
     assert seen == {"pinned@example.com"}
 
 
@@ -109,14 +100,7 @@ def test_nested_literal_replaces_null_parent(ctx):
         ),
     )
     operation = schema["/items"]["POST"]
-    bodies = []
-
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        bodies.append(case.body)
-
-    collect()
+    bodies = [case.body for case in generate_many(operation.as_strategy(), 10)]
     assert bodies == [{"user": {"email": "pinned@example.com"}}] * 10
 
 
@@ -206,12 +190,7 @@ def test_op_scope_literal_beats_global_dict_binding(ctx):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body.get("token"))
-
-    collect()
+    seen.update(case.body.get("token") for case in generate_many(operation.as_strategy(), 10))
     assert seen == {"OP_LITERAL"}, "op-scoped literal must veto global dict binding"
 
 
@@ -234,12 +213,7 @@ def test_op_scope_dict_binding_beats_global_literal(ctx):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body.get("token"))
-
-    collect()
+    seen.update(case.body.get("token") for case in generate_many(operation.as_strategy(), 10))
     assert seen == {"DICT_VALUE"}, "op-scoped dict binding must veto global literal"
 
 

@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.examples import get_strategies_from_examples
 from schemathesis.specs.openapi.serialization import (
@@ -901,14 +902,7 @@ def prepared_query_string(case):
 
 
 def fuzzing_rendered(operation, render):
-    found = set()
-
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
-    def test(case):
-        found.add(render(case))
-
-    test()
+    found = {render(case) for case in generate_many(operation.as_strategy(), 5)}
     return found
 
 

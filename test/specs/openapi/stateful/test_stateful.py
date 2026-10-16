@@ -16,6 +16,7 @@ from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, StepOutput
@@ -764,14 +765,7 @@ def test_negative_step_with_link_supplied_parameters_falls_back_to_positive(ctx)
     strategy = operation.as_strategy(
         generation_mode=GenerationMode.NEGATIVE, phase=TestPhase.STATEFUL, path_parameters={"userId": 42}
     )
-    modes = []
-
-    @given(case=strategy)
-    @settings(max_examples=5, suppress_health_check=list(HealthCheck), database=None)
-    def test(case):
-        modes.append(case.meta.generation.mode)
-
-    test()
+    modes = [case.meta.generation.mode for case in generate_many(strategy, 5)]
     assert set(modes) == {GenerationMode.POSITIVE}
 
 

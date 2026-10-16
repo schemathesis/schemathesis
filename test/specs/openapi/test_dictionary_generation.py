@@ -14,6 +14,7 @@ from schemathesis.generation.dictionaries import (
     resolve_parameter_bindings,
 )
 from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import SemanticDraw
 
@@ -598,12 +599,7 @@ def test_body_binding_top_level_field(ctx):
     operation = schema["/items"]["POST"]
     seen_values: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=15, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen_values.add(case.body.get("ccNumber"))
-
-    collect()
+    seen_values.update(case.body.get("ccNumber") for case in generate_many(operation.as_strategy(), 15))
     assert seen_values == {"1234-5678-9012-3456"}
 
 
@@ -627,12 +623,10 @@ def test_body_binding_field_under_combinator(ctx, combinator):
     seen: set[str] = set()
 
     # 20: ten draws leave one of the three values out on some seeds.
-    @given(case=operation.as_strategy())
-    @settings(max_examples=20, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body.get("region") if isinstance(case.body, dict) else None)
-
-    collect()
+    seen.update(
+        case.body.get("region") if isinstance(case.body, dict) else None
+        for case in generate_many(operation.as_strategy(), 20)
+    )
     assert seen == {"DE", "GB", "US"}
 
 
@@ -657,12 +651,10 @@ def test_body_binding_field_under_conditional(ctx):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body.get("region") if isinstance(case.body, dict) else None)
-
-    collect()
+    seen.update(
+        case.body.get("region") if isinstance(case.body, dict) else None
+        for case in generate_many(operation.as_strategy(), 10)
+    )
     assert seen == {"DE", "GB", "US"}
 
 
@@ -730,12 +722,7 @@ def test_body_binding_nested_field(ctx):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen.add(case.body.get("user", {}).get("email"))
-
-    collect()
+    seen.update(case.body.get("user", {}).get("email") for case in generate_many(operation.as_strategy(), 10))
     assert seen == {"x@y.com"}
 
 
@@ -1035,12 +1022,7 @@ def test_operation_scoped_body_binding_applies(ctx):
     operation = schema["/items"]["POST"]
     seen_values: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen_values.add((case.body or {}).get("token"))
-
-    collect()
+    seen_values.update((case.body or {}).get("token") for case in generate_many(operation.as_strategy(), 10))
     assert "OPERATION-SCOPED" in seen_values
 
 
@@ -1066,12 +1048,7 @@ def test_operation_scoped_body_binding_wins_over_global(ctx):
     operation = schema["/items"]["POST"]
     seen_values: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(case):
-        seen_values.add((case.body or {}).get("token"))
-
-    collect()
+    seen_values.update((case.body or {}).get("token") for case in generate_many(operation.as_strategy(), 10))
     assert seen_values == {"OPERATION"}
 
 

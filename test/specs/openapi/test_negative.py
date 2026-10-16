@@ -21,6 +21,7 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.openapi.generation.filters import is_valid_header
@@ -1815,14 +1816,7 @@ ANNOTATED_HEADER = {
 # treating it as negatable spends the whole budget on cases that can never be negative.
 def test_plain_string_path_parameter_does_not_exhaust_generation(ctx):
     operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, PATTERN_HEADER])
-    cases = []
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
-    def test(case):
-        cases.append(case)
-
-    test()
+    cases = generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 1)
     assert cases
 
 
@@ -1849,14 +1843,7 @@ def test_boolean_header_schema(ctx, subschema):
         },
         version="3.1.0",
     )
-    cases = []
-
-    @given(case=schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck))
-    def test(case):
-        cases.append(case)
-
-    test()
+    cases = generate_many(schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE), 3)
     assert cases
 
 
@@ -1884,27 +1871,16 @@ def test_negative_multipart_boolean_property_with_content_type(ctx):
         },
         version="3.1.0",
     )
-    cases = []
-
-    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck))
-    def test(case):
-        cases.append(case)
-
-    test()
+    cases = generate_many(schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), 3)
     assert cases
 
 
 def test_unnegatable_path_falls_back_to_positive(ctx):
     operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, ANNOTATED_HEADER])
-    modes = []
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
-    def test(case):
-        modes.append({location.value: component.mode.value for location, component in case.meta.components.items()})
-
-    test()
+    modes = [
+        {location.value: component.mode.value for location, component in case.meta.components.items()}
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 1)
+    ]
     assert modes
     assert all(entry["path"] == "positive" and entry["header"] == "negative" for entry in modes), modes
 
@@ -2030,14 +2006,10 @@ def test_untyped_path_object_is_negated_through_its_properties(ctx):
     operation = _operation_with_parameters(
         ctx, [{**PLAIN_STRING_PARAMETER, "schema": {"properties": {"x": {"minLength": 2}}}}]
     )
-    modes = []
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), database=None)
-    def test(case):
-        modes.append(case.meta.components[ParameterLocation.PATH].mode)
-
-    test()
+    modes = [
+        case.meta.components[ParameterLocation.PATH].mode
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 10)
+    ]
     assert set(modes) == {GenerationMode.NEGATIVE}
 
 
@@ -2081,14 +2053,12 @@ def test_optional_plain_header_falls_back_to_positive(ctx, header_schema):
         },
         version="3.1.0",
     )
-    modes = []
-
-    @given(case=schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=MAX_EXAMPLES, suppress_health_check=list(HealthCheck), database=None)
-    def test(case):
-        modes.append({location.value: component.mode.value for location, component in case.meta.components.items()})
-
-    test()
+    modes = [
+        {location.value: component.mode.value for location, component in case.meta.components.items()}
+        for case in generate_many(
+            schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE), MAX_EXAMPLES
+        )
+    ]
     assert modes
     assert all(entry["header"] == "positive" and entry["query"] == "negative" for entry in modes), modes
 
@@ -2101,14 +2071,10 @@ def test_optional_plain_header_falls_back_to_positive(ctx, header_schema):
 def test_required_string_header_is_negated_by_omission(ctx, header_schema):
     header = {"name": "Authorization", "in": "header", "required": True, "schema": header_schema}
     operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, header])
-    cases = []
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=MAX_EXAMPLES, suppress_health_check=list(HealthCheck), database=None)
-    def test(case):
-        cases.append((case.meta.components[ParameterLocation.HEADER].mode, "Authorization" in (case.headers or {})))
-
-    test()
+    cases = [
+        (case.meta.components[ParameterLocation.HEADER].mode, "Authorization" in (case.headers or {}))
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), MAX_EXAMPLES)
+    ]
     assert set(cases) == {(GenerationMode.NEGATIVE, False)}
 
 
