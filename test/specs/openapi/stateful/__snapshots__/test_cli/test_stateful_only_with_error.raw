@@ -6,11 +6,14 @@ Schemathesis dev
 
  ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1:1/api
+     Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
      Operations:       3 selected / 3 total
 
- ⚠️  API capabilities: unknown, server unreachable
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✘
+     Accepts backslash and control characters in URL paths:    ✘
 
  🚫  Stateful (in 0.00s)
 
@@ -25,9 +28,11 @@ Network Error
 
 Connection failed
 
-    Failed to establish a new connection: [Error NUM] Connection refused
+    Connection aborted. [Error NUM] Connection reset by peer
 
-Tip: Check that the API is running and reachable at `http://127.0.0.1:1`.
+Reproduce with:
+
+    <PLACEHOLDER>
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

@@ -522,11 +522,12 @@ def normalize_connection_errors(data: str) -> str:
         .replace("Errno 104", "Error NUM")
         .replace("Errno 54", "Error NUM")
         .replace("WinError 10061", "Error NUM")
+        .replace("WinError 10054", "Error NUM")
         .replace("Cannot connect to proxy.", "Unable to connect to proxy")
     )
     return data.replace(
         "No connection could be made because the target machine actively refused it", "Connection refused"
-    )
+    ).replace("An existing connection was forcibly closed by the remote host", "Connection reset by peer")
 
 
 @pytest.fixture

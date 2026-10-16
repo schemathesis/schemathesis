@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import threading
@@ -190,6 +191,21 @@ def run_client_cert_flask_app(app: Flask, ca: trustme.CA) -> int:
     return _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
 
 
+def run_resetting_server() -> int:
+    """Start a server that resets every connection, so requests fail at once without a response on every platform."""
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def serve() -> None:
+        while True:
+            connection, _ = listener.accept()
+            # A zero linger timeout makes `close` send RST instead of FIN.
+            connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            connection.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return listener.getsockname()[1]
+
+
 def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
     """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
     port = run_flask_app(app, wait=wait)
@@ -220,6 +236,7 @@ class AppRunner:
     run_flask_app: Callable[..., int]
     run_https_flask_app: Callable[[Flask], int]
     run_client_cert_flask_app: Callable[[Flask, trustme.CA], int]
+    run_resetting_server: Callable[[], int]
     run_asgi_app: Callable[..., int]
     unused_port: Callable[[], int]
     openapi_url: Callable[..., str]
@@ -231,6 +248,7 @@ def app_runner():
         run_flask_app=run_flask_app,
         run_https_flask_app=run_https_flask_app,
         run_client_cert_flask_app=run_client_cert_flask_app,
+        run_resetting_server=run_resetting_server,
         run_asgi_app=run_asgi_app,
         unused_port=unused_port,
         openapi_url=openapi_url,
