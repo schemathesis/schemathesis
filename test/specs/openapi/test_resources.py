@@ -1643,9 +1643,44 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
                 assert required in value, f"required field {required!r} missing from POSITIVE body: {value!r}"
 
 
-def test_nested_body_pool_overlay_lands_pool_values(ctx):
-    # End-to-end via the body strategy: when a body has a nested object holding a foreign-key
-    # field the pool can satisfy, the pool value must reach the wire under the right path.
+_SHIPPING = {
+    "type": "object",
+    "properties": {"location_id": {"type": "integer"}, "note": {"type": "string"}},
+    # Generation always includes `note`, so a merge that replaces the whole object drops it.
+    "required": ["note"],
+}
+_SHIPPING_REF = {"$ref": "#/components/schemas/Shipping"}
+
+
+def _objects_at(value, path):
+    if not path:
+        return [value]
+    head, *rest = path
+    if head == "*":
+        return [found for item in value for found in _objects_at(item, rest)] if isinstance(value, list) else []
+    return _objects_at(value[head], rest) if isinstance(value, dict) and head in value else []
+
+
+@pytest.mark.parametrize(
+    ("shipping", "path"),
+    [
+        (_SHIPPING, ("shipping",)),
+        (_SHIPPING_REF, ("shipping",)),
+        ({"type": "array", "minItems": 1, "items": _SHIPPING}, ("shipping", "*")),
+        ({"type": "array", "minItems": 1, "items": _SHIPPING_REF}, ("shipping", "*")),
+        ({"$ref": "#/components/schemas/Shipments"}, ("shipping", "*")),
+        (
+            {
+                "type": "object",
+                "required": ["parts"],
+                "properties": {"parts": {"type": "array", "minItems": 1, "items": _SHIPPING_REF}},
+            },
+            ("shipping", "parts", "*"),
+        ),
+    ],
+    ids=["inline-object", "ref-object", "array", "array-of-refs", "ref-to-array", "array-in-object"],
+)
+def test_nested_body_pool_overlay_lands_pool_values(ctx, shipping, path):
     schema = ctx.openapi.load_schema(
         {
             "/locations": {
@@ -1675,20 +1710,7 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
                             "application/json": {
                                 "schema": {
                                     "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "shipping": {
-                                            "type": "object",
-                                            "properties": {
-                                                "location_id": {"type": "integer"},
-                                                "note": {"type": "string"},
-                                            },
-                                            # `note` is required so random nested generation always
-                                            # includes it; under deep-merge the overlay must keep
-                                            # it in place when it injects `location_id`.
-                                            "required": ["note"],
-                                        },
-                                    },
+                                    "properties": {"name": {"type": "string"}, "shipping": shipping},
                                     "required": ["shipping"],
                                 }
                             }
@@ -1697,47 +1719,44 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
                     "responses": {"201": {"description": "OK"}},
                 }
             },
-        }
+        },
+        components={
+            "schemas": {
+                "Shipping": _SHIPPING,
+                "Shipments": {"type": "array", "minItems": 1, "items": _SHIPPING_REF},
+            }
+        },
     )
     data_source = schema.create_extra_data_source()
 
-    pooled_ids = {1, 2, 3}
+    pooled_ids = {7340001, 7340002, 7340003}
     for i in pooled_ids:
         data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": i})
 
     operation = schema["/departments"]["POST"]
-    body = operation.body[0]
-    config = GenerationConfig()
-    strategy = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
+    strategy = operation.body[0].get_strategy(
+        operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=data_source
+    )
 
-    pool_hits_with_note = 0
-    pool_hits = 0
+    pool_hits = []
+    partial_hits = []
 
     # The violating draw is rare, so fewer examples would let a regression pass.
     @run_given(strategy, max_examples=100)
     def collect(value):
-        nonlocal pool_hits_with_note, pool_hits
-        # Hybrid strategy wraps in `GeneratedValue` when picking from the pool so the engine
-        # can attribute provenance; tests that compose the strategy directly unwrap here.
         if isinstance(value, GeneratedValue):
             value = value.value
-        if not isinstance(value, dict):
-            return
-        shipping = value.get("shipping")
-        if not isinstance(shipping, dict):
-            return
-        if shipping.get("location_id") in pooled_ids:
-            pool_hits += 1
-            if "note" in shipping:
-                pool_hits_with_note += 1
+        objects = _objects_at(value, path)
+        landed = [isinstance(item, dict) and item.get("location_id") in pooled_ids for item in objects]
+        if landed and all(landed):
+            pool_hits.append(objects)
+        elif any(landed):
+            partial_hits.append(objects)
 
-    assert pool_hits > 0, "Pool's Location.id values never landed under shipping.location_id"
-    # Deep-merge guard: when the overlay injects location_id, the generated `note`
-    # sibling (required by the nested schema) must survive the merge.
-    assert pool_hits_with_note == pool_hits, (
-        f"{pool_hits - pool_hits_with_note} of {pool_hits} pool-overlaid bodies dropped the "
-        "generated `note` sibling — nested overlay replaced the whole `shipping` object."
-    )
+    assert pool_hits, "Pool's Location.id values never landed under `shipping`"
+    assert not partial_hits, f"Pool value reached only some array items: {partial_hits[:3]!r}"
+    dropped = [objects for objects in pool_hits if not all("note" in item for item in objects)]
+    assert not dropped, f"Overlay dropped the generated `note` sibling: {dropped[:3]!r}"
 
 
 def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
