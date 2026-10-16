@@ -1,6 +1,8 @@
+import ssl
 import threading
 
 import pytest
+import trustme
 from django.conf import settings
 from django.core.asgi import get_asgi_application
 from django.core.wsgi import get_wsgi_application
@@ -68,6 +70,52 @@ def test_uri_loader_custom_kwargs(app_runner, app, path, loader):
     port = app_runner.run_https_flask_app(server)
     loader(f"https://127.0.0.1:{port}{path}", verify=False, headers={"X-Test": "foo"})
     assert [(headers["X-Test"], headers["User-Agent"]) for headers in received] == [("foo", USER_AGENT)]
+
+
+@pytest.mark.parametrize(
+    ("app", "path", "loader"),
+    [
+        (basic.success, "/openapi.json", schemathesis.openapi.from_url),
+        (bookstore.books, "/graphql", schemathesis.graphql.from_url),
+    ],
+    ids=["openapi", "graphql"],
+)
+def test_uri_loader_transport_from_config(app_runner, tmp_path, app, path, loader):
+    ca = trustme.CA()
+    client_cert = ca.issue_cert("test.org")
+    client_cert_path = tmp_path / "client.pem"
+    client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
+    server = app().server
+    received = []
+    server.before_request(
+        lambda: received.append(
+            (
+                request.headers.get("X-Test"),
+                request.headers.get("Authorization"),
+                ssl.PEM_cert_to_DER_cert(request.environ["SSL_CLIENT_CERT"]),
+            )
+        )
+    )
+    port = app_runner.run_client_cert_flask_app(server, ca)
+    config = schemathesis.Config.from_dict(
+        {
+            "tls-verify": False,
+            "request-cert": str(client_cert_path),
+            "headers": {"X-Test": "foo"},
+            "auth": {"basic": {"username": "test", "password": "test"}},
+        }
+    )
+    loader(f"https://127.0.0.1:{port}{path}", config=config)
+    assert received == [
+        ("foo", "Basic dGVzdDp0ZXN0", ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode()))
+    ]
+
+
+def test_uri_loader_explicit_kwargs_override_config(ctx):
+    api = ctx.openapi.apps.success()
+    config = schemathesis.Config.from_dict({"headers": {"X-Test": "config"}})
+    schemathesis.openapi.from_url(api.schema_url, config=config, headers={"X-Test": "explicit"})
+    assert api.schema_requests[0].headers["X-Test"] == "explicit"
 
 
 def test_auth_loader_options(ctx):

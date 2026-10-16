@@ -150,16 +150,7 @@ def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchem
     if loader is module.from_url:
         if config.wait_for_schema is not None:
             kwargs["wait_for_schema"] = config.wait_for_schema
-        kwargs["verify"] = config.tls_verify
-        request_cert = config.request_cert_for()
-        if request_cert:
-            kwargs["cert"] = request_cert
-        auth = config.auth_for()
-        if auth is not None:
-            kwargs["auth"] = auth
-        headers = config.headers_for()
-        if headers:
-            kwargs["headers"] = headers
+        kwargs.update(config.schema_request_kwargs())
 
     return loader(location, config=config._parent, **kwargs)
 
