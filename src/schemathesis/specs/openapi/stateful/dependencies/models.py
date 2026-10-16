@@ -231,13 +231,16 @@ class DependencyGraph:
                     # For /users/{userId}/posts -> /users/{userId}/posts/{postId}, userId is shared
                     # but only postId gets mapped from the response. We need to propagate userId.
                     if links:
-                        shared_params = template_fields[producer_id] & template_fields[consumer_id]
+                        producer_fields = template_fields[producer_id]
+                        shared_params = [name for name in template_fields[consumer_id] if name in producer_fields]
 
                         for link_def in links.values():
                             # Find which path parameters are already mapped
                             mapped_params = {name for name, _ in iter_path_parameters(link_def.parameters)}
                             # Add $request.path.X for shared params not already mapped
-                            for param in shared_params - mapped_params:
+                            for param in shared_params:
+                                if param in mapped_params:
+                                    continue
                                 link_def.parameters[f"path.{param}"] = f"$request.path.{param}"
 
                         yield ResponseLinks(

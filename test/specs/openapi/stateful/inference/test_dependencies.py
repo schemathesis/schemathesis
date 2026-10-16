@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 import uuid
 from urllib.parse import quote, unquote
 
@@ -3305,6 +3309,83 @@ def test_path_param_named_after_collection_links_create_to_read(ctx):
             },
         ]
     ]
+
+
+LINK_PARAMETERS_SCRIPT = """
+import json, sys
+import schemathesis
+from schemathesis.specs.openapi.stateful.dependencies import analyze
+graph = analyze(schemathesis.openapi.from_dict(json.load(sys.stdin)))
+print(json.dumps([list(link.parameters) for entry in graph.iter_links() for link in entry.links.values()]))
+"""
+
+
+ENTITY = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+
+
+@pytest.mark.parametrize(
+    ["paths", "components", "expected"],
+    [
+        (
+            {
+                **operation("get", "/orgs/{orgId}", "200", component_ref("Org"), [path_param("orgId")]),
+                **operation(
+                    "get",
+                    "/orgs/{orgId}/users/{userId}",
+                    "200",
+                    component_ref("User"),
+                    [path_param("orgId"), path_param("userId")],
+                ),
+                **operation(
+                    "post",
+                    "/orgs/{orgId}/users/{userId}/posts",
+                    "201",
+                    component_ref("Post"),
+                    [path_param("orgId"), path_param("userId")],
+                ),
+                **operation(
+                    "get",
+                    "/orgs/{orgId}/users/{userId}/posts/{postId}",
+                    "200",
+                    component_ref("Post"),
+                    [path_param("orgId"), path_param("userId"), path_param("postId")],
+                ),
+            },
+            {"schemas": {"Org": ENTITY, "User": ENTITY, "Post": ENTITY}},
+            [
+                ["path.orgId"],
+                ["path.orgId"],
+                ["path.orgId"],
+                ["path.userId", "path.orgId"],
+                ["path.userId", "path.orgId"],
+                ["path.postId", "path.orgId", "path.userId"],
+            ],
+        ),
+        (
+            {
+                **operation("post", "/orgs/{orgId}/teams/{teamId}/members", "201", ENTITY),
+                **operation("get", "/orgs/{orgId}/teams/{teamId}/members/{memberId}", "200", ENTITY),
+            },
+            None,
+            [["path.orgId", "path.teamId", "path.memberId"]],
+        ),
+    ],
+    ids=["shared-path-parameters", "undeclared-path-parameters"],
+)
+def test_link_parameters_identical_across_hash_seeds(ctx, paths, components, expected):
+    raw_schema = ctx.openapi.build_schema(paths, **({"components": components} if components else {}))
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", LINK_PARAMETERS_SCRIPT],
+            input=json.dumps(raw_schema),
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+        ).stdout
+        for seed in range(8)
+    }
+    assert [json.loads(output) for output in outputs] == [expected]
 
 
 BOOK = {"type": "object", "properties": {"book_title": {"type": "string"}, "owner": {"type": "string"}}}
