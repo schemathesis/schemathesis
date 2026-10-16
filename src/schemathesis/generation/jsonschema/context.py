@@ -52,7 +52,10 @@ def _characters(
     if not allow_x00 and "\x00" not in exclude_characters:
         exclude_characters += "\x00"
     if codec is None:
-        return st.characters(max_codepoint=max_codepoint, exclude_characters=exclude_characters)
+        # Lone surrogates cannot be encoded for the wire.
+        return st.characters(
+            max_codepoint=max_codepoint, exclude_characters=exclude_characters, exclude_categories=["Cs"]
+        )
     return st.characters(codec=codec, max_codepoint=max_codepoint, exclude_characters=exclude_characters)
 
 
