@@ -221,6 +221,10 @@ class GraphQLSchema(BaseSchema):
         return urlunsplit(parts)
 
     @override
+    def build_url_template(self, case: Case, base_url: str) -> str:
+        return self.build_request_url(case, base_url)
+
+    @override
     def prepare_request_body(self, case: Case) -> Body:
         body = case.body
         if isinstance(body, NotSet | bytes):

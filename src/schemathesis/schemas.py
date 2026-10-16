@@ -638,6 +638,10 @@ class BaseSchema(Mapping):
         # `quote` — decoding it would turn an escaped reserved character such as `%3F` into a live delimiter.
         return unquote(urljoin(base_url.replace("%", "%25"), quote(path)))
 
+    def build_url_template(self, case: Case, base_url: str) -> str:
+        """Construct the request URL like `build_request_url`, keeping path parameters as `{name}` placeholders."""
+        return f"{base_url.rstrip('/')}{case.path}"
+
     def prepare_request_body(self, case: Case) -> Body:
         """Apply spec-specific transformations to a generated body before sending."""
         return case.body

@@ -362,7 +362,7 @@ def build_crashes_from_recorder(
             link = CrashLink(operation_id=transition.id, parameters=link_parameters, request_body=request_body)
 
         base_url = case.operation.base_url or ""
-        url_template = sanitize_uri(f"{base_url.rstrip('/')}{case.path}")
+        url_template = sanitize_uri(case.operation.schema.build_url_template(case, base_url))
 
         meta_dict = case.meta.to_dict() if case.meta is not None else None
 
