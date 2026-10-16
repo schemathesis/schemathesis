@@ -10,7 +10,7 @@ from fractions import Fraction
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, assume, find, given, seed, settings
+from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.errors import InvalidArgument, NoSuchExample, Unsatisfiable
@@ -371,13 +371,10 @@ def test_string_body_without_codec_has_no_lone_surrogates(ctx, body_schema):
     bodies = []
 
     # Seed 43 reaches a lone surrogate within 10 draws for both schemas.
-    @seed(43)
-    @given(schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10, seed=43)
     def collect(case):
         bodies.append(case.body)
 
-    collect()
     assert [body for body in bodies if any("\ud800" <= char <= "\udfff" for char in body)] == []
 
 
@@ -1202,12 +1199,9 @@ def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_v
         },
     )
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, database=None, phases=[Phase.generate])
+    @run_given(case=operation.as_strategy(), max_examples=10, phases=[Phase.generate])
     def inner(case):
         assert case.body["petType"] in valid_values
-
-    inner()
 
 
 def test_hypothesis_observability_serialization(ctx):
@@ -1286,13 +1280,10 @@ def test_positive_integers_stay_within_format_range(ctx, format, minimum, maximu
         version="3.1.0",
     )
 
-    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(max_examples=250, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=250)
     def test(case):
         assert minimum <= case.body["value"] <= maximum, f"Out of {format} range: {case.body['value']}"
-
-    test()
 
 
 def test_integer_multiple_of_body(ctx):
@@ -2361,17 +2352,10 @@ def test_canonical_generation(schema, reaches):
     ).is_valid
 
     # A format generator cannot be steered by a pattern or a length, so those draws are discarded.
-    @given(built)
     # A starved CI runner makes metaschema draws slow enough to trip `too_slow`; validity is what this checks.
-    @settings(
-        max_examples=25,
-        deadline=None,
-        suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow],
-    )
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -3250,13 +3234,10 @@ def test_canonical_number_never_spells_a_rejected_bound(schema, rejected):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(max_examples=100, deadline=None, database=None)
+    @run_given(built, max_examples=100)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 def test_canonical_number_above_the_float_range():

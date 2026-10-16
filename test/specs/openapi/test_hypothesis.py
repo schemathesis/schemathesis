@@ -925,12 +925,9 @@ def test_filter_urlencoded(ctx):
         },
     )
 
-    @given(operation.as_strategy())
-    @settings(phases=[Phase.generate], max_examples=15, deadline=None)
+    @run_given(operation.as_strategy(), max_examples=15, phases=[Phase.generate])
     def test(case):
         assert_requests_call(case)
-
-    test()
 
 
 @pytest.mark.parametrize(

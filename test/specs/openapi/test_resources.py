@@ -4,7 +4,6 @@ import threading
 
 import pytest
 import requests
-from hypothesis import given, settings
 from hypothesis.vendor.pretty import pretty
 
 from schemathesis.config import GenerationConfig
@@ -1714,9 +1713,8 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
     pool_hits_with_note = 0
     pool_hits = 0
 
-    @given(strategy)
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(max_examples=100, database=None, deadline=None)
+    @run_given(strategy, max_examples=100)
     def collect(value):
         nonlocal pool_hits_with_note, pool_hits
         # Hybrid strategy wraps in `GeneratedValue` when picking from the pool so the engine
@@ -1732,8 +1730,6 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
             pool_hits += 1
             if "note" in shipping:
                 pool_hits_with_note += 1
-
-    collect()
 
     assert pool_hits > 0, "Pool's Location.id values never landed under shipping.location_id"
     # Deep-merge guard: when the overlay injects location_id, the generated `note`
@@ -2214,9 +2210,8 @@ def test_pool_overlay_respects_max_properties(ctx):
     pool_hits = 0
     oversized = []
 
-    @given(strategy)
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(max_examples=200, database=None, deadline=None)
+    @run_given(strategy, max_examples=200)
     def collect(value):
         nonlocal pool_hits
         if isinstance(value, GeneratedValue):
@@ -2227,8 +2222,6 @@ def test_pool_overlay_respects_max_properties(ctx):
             pool_hits += 1
         if len(value) > 2:
             oversized.append(value)
-
-    collect()
 
     assert pool_hits > 0, "Pool's Category.categoryId values never landed in the body"
     assert not oversized, f"`maxProperties` exceeded: {oversized[0]!r}"

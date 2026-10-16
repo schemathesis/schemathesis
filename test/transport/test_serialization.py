@@ -2344,12 +2344,9 @@ def test_string_params_merge_into_case_query(ctx, app_runner, transport, query, 
 def test_extra_params_appended_to_pre_encoded_query(ctx, app_runner, transport, params, parameter, version, encoded):
     operation = query_echo_operation(ctx, app_runner, transport, [parameter], version=version)
 
-    @given(operation.as_strategy())
-    @settings(max_examples=1, phases=[Phase.generate], deadline=None)
+    @run_given(operation.as_strategy(), max_examples=1, phases=[Phase.generate])
     def test(case):
         assert case.call(params=params).json() == f"{encoded}&x=1"
-
-    test()
 
 
 def test_multipart_encoded_field_absent_from_body(ctx, app_runner):
