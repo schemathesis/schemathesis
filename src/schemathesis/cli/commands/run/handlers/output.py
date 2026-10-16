@@ -36,6 +36,7 @@ from schemathesis.cli.output import (
 from schemathesis.config import ProjectConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.output import format_response_payload
+from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -43,7 +44,6 @@ from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
-from schemathesis.reporting.html.build import sanitized
 
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType

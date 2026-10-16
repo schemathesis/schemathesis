@@ -8,7 +8,7 @@ from typing import IO, TYPE_CHECKING, Any, Generic, TypeVar
 
 from schemathesis.cli.events import LoadingStarted
 from schemathesis.cli.output import LoadingProgressManager, display_fatal_error
-from schemathesis.reporting.html.build import sanitized
+from schemathesis.core.output.sanitization import sanitized
 
 if TYPE_CHECKING:
     from rich.console import Console

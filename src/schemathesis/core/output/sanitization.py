@@ -55,6 +55,13 @@ def sanitize_url(url: str, *, config: SanitizationConfig) -> str:
     )
 
 
+def sanitized(url: str | None, sanitization_config: SanitizationConfig | None) -> str | None:
+    # The schema location may be a file path; only URLs can carry credentials.
+    if url is None or sanitization_config is None or not url.startswith(("http://", "https://")):
+        return url
+    return sanitize_url(url, config=sanitization_config)
+
+
 @lru_cache(maxsize=512)
 def _sanitize_url_cached(
     url: str,
