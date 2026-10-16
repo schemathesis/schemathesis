@@ -169,32 +169,40 @@ def _malformed_json(fixed):
 
 def _slow(fixed):
     if not fixed:
-        time.sleep(0.2)
+        time.sleep(1.5)
     return jsonify({"id": 1})
 
 
 @pytest.mark.parametrize(
-    ("respond", "check", "symptom"),
+    ("respond", "options", "symptom"),
     [
-        (_missing_content_type, "content_type_conformance", "    assert 'Content-Type' not in response.headers\n"),
+        (
+            _missing_content_type,
+            ("--checks=content_type_conformance",),
+            "    assert 'Content-Type' not in response.headers\n",
+        ),
         (
             _undefined_content_type,
-            "content_type_conformance",
+            ("--checks=content_type_conformance",),
             "    assert response.headers['Content-Type'] == 'text/plain'\n",
         ),
         (
             _malformed_media_type,
-            "content_type_conformance",
+            ("--checks=content_type_conformance",),
             "    assert response.headers['Content-Type'] == 'invalid'\n",
         ),
-        (_missing_headers, "response_headers_conformance", "    assert 'X-Rate' not in response.headers\n"),
-        (_schema_violation, "response_schema_conformance", "    assert response.json()['id'] == 'x'\n"),
+        (_missing_headers, ("--checks=response_headers_conformance",), "    assert 'X-Rate' not in response.headers\n"),
+        (_schema_violation, ("--checks=response_schema_conformance",), "    assert response.json()['id'] == 'x'\n"),
         (
             _malformed_json,
-            "response_schema_conformance",
+            ("--checks=response_schema_conformance",),
             "    with pytest.raises(ValueError):\n        response.json()\n",
         ),
-        (_slow, "not_a_server_error", "    assert response.elapsed.total_seconds() > 0.05\n"),
+        (
+            _slow,
+            ("--checks=not_a_server_error", "--max-response-time=1.0"),
+            "    assert response.elapsed.total_seconds() > 1.0\n",
+        ),
     ],
     ids=[
         "missing-content-type",
@@ -206,7 +214,7 @@ def _slow(fixed):
         "response-time",
     ],
 )
-def test_symptom_is_asserted_until_fixed(ctx, cli, tmp_path, pytester, respond, check, symptom):
+def test_symptom_is_asserted_until_fixed(ctx, cli, tmp_path, pytester, respond, options, symptom):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -243,8 +251,7 @@ def test_symptom_is_asserted_until_fixed(ctx, cli, tmp_path, pytester, respond, 
         f"--report-pytest-path={path}",
         "--max-examples=1",
         "--phases=fuzzing",
-        f"--checks={check}",
-        "--max-response-time=0.05",
+        *options,
     )
 
     content = path.read_text(encoding="utf-8")
