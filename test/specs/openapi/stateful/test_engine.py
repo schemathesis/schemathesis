@@ -1191,8 +1191,19 @@ def test_reproduce_chain_renders_each_step_with_its_own_headers(ctx, app_runner,
     )
 
 
-# A POST to the resource's own URI need not have created it, so a later 404 is not proof of a bug.
-def test_no_false_positive_ensure_resource_availability_without_creation_evidence(ctx, app_runner, stop_event):
+# A POST to the resource's own URI created it only if it says so with `201` or a `Location` header.
+@pytest.mark.parametrize(
+    ("status_code", "with_location", "expected"),
+    [
+        (200, False, []),
+        (200, True, ["Resource is not available after creation"]),
+        (201, False, ["Resource is not available after creation"]),
+    ],
+    ids=["no-creation-evidence", "location-header", "created-status"],
+)
+def test_ensure_resource_availability_after_own_path_post(
+    ctx, app_runner, stop_event, status_code, with_location, expected
+):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users/{userId}": {
@@ -1200,7 +1211,7 @@ def test_no_false_positive_ensure_resource_availability_without_creation_evidenc
                 "post": {
                     "operationId": "removeUser",
                     "responses": {
-                        "200": {
+                        str(status_code): {
                             "description": "Removed",
                             "content": {
                                 "application/json": {
@@ -1223,7 +1234,8 @@ def test_no_false_positive_ensure_resource_availability_without_creation_evidenc
 
     @app.route("/users/<int:user_id>", methods=["POST"])
     def remove_user(user_id):
-        return jsonify({"userId": user_id}), 200
+        headers = {"Location": f"/users/{user_id}"} if with_location else {}
+        return jsonify({"userId": user_id}), status_code, headers
 
     @app.route("/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
@@ -1245,7 +1257,7 @@ def test_no_false_positive_ensure_resource_availability_without_creation_evidenc
         )
     )
 
-    assert result.failures == [], [failure.failure_info.failure.title for failure in result.failures]
+    assert [failure.failure_info.failure.title for failure in result.failures] == expected
 
 
 # A resource removed by a POST is as gone as one removed by DELETE; the follow-up 404 explains itself.
