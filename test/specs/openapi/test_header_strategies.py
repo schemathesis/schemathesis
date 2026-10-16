@@ -135,7 +135,8 @@ def test_negative_cases_keep_structured_values_for_known_headers(ctx, name, patt
     values = []
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    # Only about half the cases carry a structured value, so fewer draws can miss all of them.
+    @settings(max_examples=30, suppress_health_check=list(HealthCheck), deadline=None)
     def inner(case):
         values.append(case.headers.get(name))
 
