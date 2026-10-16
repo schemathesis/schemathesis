@@ -128,7 +128,7 @@ def test_case_repr(swagger_20, kwargs, expected):
 
 
 @pytest.mark.parametrize("override", [False, True])
-@pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
+@pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"], ids=["as-is", "trailing-slash"])
 def test_as_transport_kwargs(ctx, override, swagger_20, converter):
     api = ctx.openapi.apps.success()
     base_url = converter(f"{api.base_url}/api")

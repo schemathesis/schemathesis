@@ -85,6 +85,8 @@ def case_id(case):
     def fmt_item(key, value):
         if isinstance(value, list):
             return f"{key}_list"
+        if isinstance(value, str):
+            return f"{key}={value}"
         return key
 
     def fmt_kwargs(kwargs):

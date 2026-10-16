@@ -33,7 +33,6 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("league_id_or_slug", "/leagues/{league_id_or_slug}", "League"),
         ("match-id-or-slug", "/matches/{match-id-or-slug}", "Match"),
         ("_slug", "/groups/{_slug}", None),
-        ("id", "/users/{id}", "User"),
         ("_id", "/users/{_id}", None),
         ("identifier", "/images/{identifier}", "Image"),
         ("uuid", "/accounts/{uuid}", "Account"),

@@ -107,6 +107,8 @@ addopts = ["-ra", "--strict-markers", "--strict-config"]
 # Fail a test running over 5 minutes and dump every thread's stack, so a stalled CI job names the culprit.
 timeout = 300
 xfail_strict = true
+# Duplicate parametrize ids hide repeated or mislabelled cases. pytest 9+ only; the pytest 8 tox env drops `--strict-config`.
+strict_parametrization_ids = true
 # Show the full diff for failed comparisons of large dicts and lists, not only "Use -v to get more diff".
 verbosity_assertions = 1
 truncation_limit_lines = 0

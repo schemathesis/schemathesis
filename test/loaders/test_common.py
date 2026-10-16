@@ -25,6 +25,7 @@ from test.utils import graphql_url, openapi_url
         schemathesis.graphql.from_asgi,
         schemathesis.graphql.from_wsgi,
     ],
+    ids=["openapi-asgi", "openapi-wsgi", "graphql-asgi", "graphql-wsgi"],
 )
 def test_absolute_urls_for_apps(loader):
     # When an absolute URL passed to a ASGI / WSGI loader

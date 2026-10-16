@@ -1415,7 +1415,6 @@ CANONICAL_INTEGER_SCHEMAS = [
 CANONICAL_OBJECT_SCHEMAS = [
     {"type": "object"},
     {"type": "object", "properties": {"a": {"type": "integer"}}},
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
     {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "required": ["a"]},
     {"type": "object", "properties": {"a": {"type": "string", "minLength": 2}}},
     {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "integer"}}}}},
@@ -1429,7 +1428,6 @@ CANONICAL_OBJECT_SCHEMAS = [
             {"type": "object", "properties": {"a": {"minimum": 5}, "b": {"type": "string"}}},
         ]
     },
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
     {"type": "object", "additionalProperties": {"type": "integer"}},
     # The required key is absent from `properties`, so its value answers to `additionalProperties`.
     {"type": "object", "required": ["a"], "additionalProperties": {"type": "string", "minLength": 2}},

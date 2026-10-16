@@ -1,6 +1,7 @@
 import os
 import re
 import tomllib
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -69,7 +70,22 @@ def set_environment_variables(monkeypatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "test")
 
 
-@pytest.mark.parametrize("config", ALL_CONFIGS, ids=[normalize_test_name(i) for i in ALL_CONFIGS])
+def config_ids(configs: tuple[str, ...]) -> list[str]:
+    # Truncated names collide; number the colliding ones like pytest does, so snapshot names stay put.
+    names = [normalize_test_name(config) for config in configs]
+    counts = Counter(names)
+    seen: Counter[str] = Counter()
+    ids = []
+    for name in names:
+        if counts[name] > 1:
+            ids.append(f"{name}{seen[name]}")
+            seen[name] += 1
+        else:
+            ids.append(name)
+    return ids
+
+
+@pytest.mark.parametrize("config", ALL_CONFIGS, ids=config_ids(ALL_CONFIGS))
 def test_configs(monkeypatch, config, snapshot_config):
     set_environment_variables(monkeypatch)
     monkeypatch.setattr(os, "sched_getaffinity", lambda pid: {0, 1, 2, 3}, raising=False)
