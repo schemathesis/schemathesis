@@ -3581,6 +3581,20 @@ def test_slow_probe_response_does_not_adapt_generation(ctx, cli):
     assert set(names) == {"\\"}
 
 
+def test_probe_waits_as_long_as_test_requests_by_default(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.before_request
+    def delay_probe():
+        if "X-Schemathesis-Probe-Null" in request.headers:
+            time.sleep(3)
+
+    lines = cli.run_openapi_app(app, "--phases=examples").stdout.splitlines()
+    assert [line.split() for line in lines if "NULL byte" in line] == [
+        ["Supports", "NULL", "byte", "in", "headers:", "✓"]
+    ]
+
+
 @pytest.mark.skipif(sys.version_info >= (3, 13), reason="Error message is different")
 def test_malformed_schema(testdir, cli, snapshot_cli, ctx):
     api = ctx.openapi.apps.success()
