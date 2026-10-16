@@ -1571,6 +1571,49 @@ def test_multipart_encoding_content_type(ctx, cli, snapshot_cli, field_name, fie
     )
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_multipart_comma_separated_content_type(ctx, cli, snapshot_cli, version):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["file"],
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                },
+                                "encoding": {"file": {"contentType": "image/png, image/jpeg"}},
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Stored"}, "400": {"description": "Bad part"}},
+                }
+            }
+        },
+        version=version,
+    )
+    received = []
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        content_type = request.files["file"].content_type if "file" in request.files else None
+        received.append(content_type)
+        if content_type is not None and "," in content_type:
+            return jsonify({"error": content_type}), 400
+        return jsonify({}), 201
+
+    result = cli.run_openapi_app(
+        app, "--phases=coverage", "--mode=positive", "--checks=positive_data_acceptance", "--max-examples=10"
+    )
+    assert set(received) - {None} == {"image/png"}
+    assert result == snapshot_cli
+
+
 def test_no_schema_in_media_type(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {

@@ -1626,11 +1626,13 @@ class OpenApiBody(OpenApiComponent):
         """Return default type if body is a form type."""
         return "object" if self.media_type in FORM_MEDIA_TYPES else None
 
-    def get_property_content_type(self, property_name: str) -> str | list[str] | None:
-        """Get custom contentType for a form property from `encoding` definition."""
+    def get_property_content_types(self, property_name: str) -> list[str]:
+        """Get media types a form property declares via `encoding.contentType`."""
         encoding = self.definition.get("encoding", {})
-        property_encoding = encoding.get(property_name, {})
-        return property_encoding.get("contentType")
+        raw = encoding.get(property_name, {}).get("contentType")
+        # A string may list several media types separated by commas.
+        items = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
+        return [item.strip() for item in items if isinstance(item, str) and item.strip()]
 
     def get_property_filename(self, property_name: str) -> str | None:
         """Get filename from encoding.headers.Content-Disposition for a form property."""

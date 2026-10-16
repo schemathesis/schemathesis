@@ -525,13 +525,8 @@ def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[s
     has_custom_strategy = False
 
     for prop_name in properties:
-        content_type = body.get_property_content_type(prop_name)
-        if not content_type:
-            continue
-
-        content_types = content_type if isinstance(content_type, list) else content_type.split(",")
-        for ct in content_types:
-            strategy = find_media_type_strategy(ct.strip())
+        for ct in body.get_property_content_types(prop_name):
+            strategy = find_media_type_strategy(ct)
             if strategy is not None:
                 result[prop_name] = examples.generate_one(strategy)
                 has_custom_strategy = True

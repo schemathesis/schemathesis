@@ -502,8 +502,9 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
         if main not in ("*", "multipart") or sub not in ("*", "form-data", "mixed"):
             continue
         for name in body.definition.get("encoding", {}):
-            content_type = selected.get(name) or body.get_property_content_type(name)
-            if isinstance(content_type, str):
+            # Without a recorded choice, a part is sent with the first listed media type.
+            content_type = selected.get(name) or next(iter(body.get_property_content_types(name)), None)
+            if content_type is not None:
                 result[name] = content_type
         # Default nested-object / array form-parts to JSON so the wire payload is parsable.
         schema_node = body.definition.get("schema")
