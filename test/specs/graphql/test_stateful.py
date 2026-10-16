@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import pytest
+import strawberry
 
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
@@ -80,3 +79,46 @@ def test_stateful_finds_tombstone_bugs(ctx, cli, snapshot_cli, make_api):
         )
         == snapshot_cli
     )
+
+
+def test_stateful_consumers_mostly_target_created_resources(ctx, cli):
+    # Leaving a captured id unused is occasional exploration; most consumer calls must reach a created book.
+    created: set[str] = set()
+    updates = {"existing": 0, "unknown": 0}
+
+    @strawberry.type
+    class Book:
+        id: strawberry.ID
+        title: str
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def book(self, id: strawberry.ID) -> Book | None:
+            return None
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def addBook(self, title: str) -> Book:
+            book_id = strawberry.ID(f"book-{len(created)}")
+            created.add(book_id)
+            return Book(id=book_id, title=title)
+
+        @strawberry.mutation
+        def updateBook(self, id: strawberry.ID, title: str) -> Book | None:
+            updates["existing" if id in created else "unknown"] += 1
+            return None
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query, Mutation))
+    cli.run_and_assert(
+        api.schema_url,
+        "--max-examples=50",
+        "--seed=1",
+        "--phases=stateful",
+        "-m",
+        "positive",
+        "-c",
+        "not_a_server_error",
+    )
+    assert updates["existing"] / (updates["existing"] + updates["unknown"]) > 0.7, updates

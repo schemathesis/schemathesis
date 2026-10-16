@@ -652,7 +652,8 @@ def graphql_cases(
                 )
             )
         if mutate_ast is not None:
-            mutate_ast(operation_node, draw(st.randoms()))
+            # Hypothesis-driven randoms favor tiny values and would skip captured ids far above the exploration rate.
+            mutate_ast(operation_node, draw(st.randoms(use_true_random=True)))
     body = graphql.print_ast(ast_node)
 
     path_parameters_ = _generate_parameter(
