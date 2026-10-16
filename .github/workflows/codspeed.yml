@@ -50,7 +50,7 @@ jobs:
           cache-suffix: bench-3.12-v1
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
+        uses: CodSpeedHQ/action@f842b9a3ffe213dbb81768fd7f7eeb4dfcf1c369 # v5.4.2
         with:
           mode: "simulation"
           run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
@@ -84,7 +84,7 @@ jobs:
       # `benches/memory/` so the job above collects nothing from them: it globs `benches/*`, and a
       # directory is walked with the default `test_*.py` filter these modules deliberately fail.
       - name: Run memory benchmarks
-        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
+        uses: CodSpeedHQ/action@f842b9a3ffe213dbb81768fd7f7eeb4dfcf1c369 # v5.4.2
         with:
           mode: "memory"
           run: uvx --from=pytest --with=".[bench]" pytest benches/memory/engine_run.py --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
