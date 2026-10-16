@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shlex
+
 import pytest
 import tomli_w
 from _pytest.main import ExitCode
@@ -9,6 +11,16 @@ import schemathesis.cli
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 
 _DEFAULT_GENERATION_DATABASE_ARGUMENT = "--generation-database=none"
+CLI_INVOCATIONS = pytest.StashKey[list[str]]()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    report = yield
+    invocations = item.stash.get(CLI_INVOCATIONS, None)
+    if report.failed and invocations:
+        report.sections.append(("CLI invocations", "\n\n".join(invocations)))
+    return report
 
 
 def _with_default_generation_database(args, config=None):
@@ -37,7 +49,7 @@ def _has_generation_config_option(config, name: str) -> bool:
 
 
 @pytest.fixture
-def cli(tmp_path, app_runner, monkeypatch):
+def cli(request, tmp_path, app_runner, monkeypatch):
     """CLI runner helper.
 
     Provides in-process execution via `click.CliRunner`. CWD is moved to
@@ -47,6 +59,7 @@ def cli(tmp_path, app_runner, monkeypatch):
     """
     monkeypatch.chdir(tmp_path)
     cli_runner = CliRunner()
+    invocations = request.node.stash.setdefault(CLI_INVOCATIONS, [])
 
     class Runner:
         @staticmethod
@@ -67,7 +80,9 @@ def cli(tmp_path, app_runner, monkeypatch):
             if hooks is not None:
                 env = kwargs.setdefault("env", {})
                 env[HOOKS_MODULE_ENV_VAR] = hooks
+            command = shlex.join(["st", *map(str, args)])
             result = cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
+            invocations.append(f"$ {command}\nExit code: {result.exit_code}\n{result.output}")
             if result.exception and not isinstance(result.exception, SystemExit):
                 raise result.exception
             return result
