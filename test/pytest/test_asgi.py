@@ -50,25 +50,22 @@ def test_cookies(ctx):
     def cookies(token: str = Cookie(None)):
         return {"token": token}
 
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /cookies",
         {
-            "/cookies": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "token",
-                            "in": "cookie",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["test"]},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "token",
+                    "in": "cookie",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["test"]},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    strategy = schema["/cookies"]["GET"].as_strategy()
+    strategy = operation.as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
@@ -140,8 +137,9 @@ def test_null_byte_in_headers():
 def test_base_url(ctx):
     # See GH-1366
     # When base URL has non-empty base path
-    schema = ctx.openapi.load_schema(
-        {"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    operation = ctx.openapi.load_operation(
+        "GET /foo",
+        {"responses": {"200": {"description": "OK"}}},
         version="3.0.3",
         servers=[{"url": "https://example.org/v1"}],
     )
@@ -153,7 +151,7 @@ def test_base_url(ctx):
     def read_root():
         return {"Hello": "World"}
 
-    strategy = schema["/foo"]["GET"].as_strategy()
+    strategy = operation.as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=1, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)

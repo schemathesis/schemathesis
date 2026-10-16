@@ -378,21 +378,21 @@ def test_call_without_base_url_ignores_malformed_swagger_schemes():
 
 
 def test_validate_response(ctx, response_factory):
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/users"]["GET"].Case()
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case()
     with pytest.raises(FailureGroup):
         case.validate_response(response_factory.requests(status_code=418))
 
 
 def test_validate_response_no_errors(ctx, response_factory):
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/users"]["GET"].Case()
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case()
     assert case.validate_response(response_factory.requests(status_code=200)) is None
 
 
 def test_validate_response_custom_check_raising_while_handling_error(ctx, response_factory):
-    schema = ctx.openapi.load_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/x"]["GET"].Case()
+    operation = ctx.openapi.load_operation("GET /x", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case()
 
     def has_id(ctx, response, case):
         try:
@@ -630,20 +630,17 @@ def test_case_insensitive_headers(ctx):
 
 
 def test_iter_parameters(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "parameters": [
-                        {"name": "X-id", "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                },
-            },
-        }
+            "parameters": [
+                {"name": "X-id", "in": "header", "required": True, "schema": {"type": "string"}},
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    params = list(schema["/data"]["POST"].iter_parameters())
+    params = list(operation.iter_parameters())
     assert len(params) == 2
     assert params[0].name == "X-id"
     assert params[1].name == "q"
@@ -652,18 +649,15 @@ def test_iter_parameters(ctx):
 @pytest.mark.parametrize("factory_type", ["httpx", "httpx2", "requests", "wsgi"])
 def test_checks_errors_deduplication(ctx, response_factory, factory_type):
     # See GH-1394
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "responses": {
-                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
-                    },
-                },
+            "responses": {
+                "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
             },
-        }
+        },
     )
-    case = schema["/data"]["GET"].Case()
+    case = operation.Case()
     response = getattr(response_factory, factory_type)(content=b"42", content_type=None)
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup) as exc:
@@ -672,8 +666,8 @@ def test_checks_errors_deduplication(ctx, response_factory, factory_type):
 
 
 def test_validate_response_failure_is_catchable_from_public_errors(ctx, response_factory):
-    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/data"]["GET"].Case()
+    operation = ctx.openapi.load_operation("GET /data", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case()
     with pytest.raises(schemathesis.errors.FailureGroup):
         case.validate_response(response_factory.requests(status_code=500))
 
@@ -684,9 +678,7 @@ def test_operation_hash(openapi_30):
 
 
 def test_operation_and_case_never_equal_foreign_objects(ctx):
-    operation = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})["/data"][
-        "GET"
-    ]
+    operation = ctx.openapi.load_operation("GET /data", {"responses": {"200": {"description": "OK"}}})
     assert operation != "GET /data"
     assert operation.Case() != "GET /data"
 
@@ -698,9 +690,7 @@ def test_hypothesis_reports_omit_schema_and_parameter_sets(ctx):
 
 
 def test_operation_survives_deepcopy_as_the_same_object(ctx):
-    operation = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})["/data"][
-        "GET"
-    ]
+    operation = ctx.openapi.load_operation("GET /data", {"responses": {"200": {"description": "OK"}}})
     assert copy.deepcopy(operation) is operation  # noqa: TID251
 
 
@@ -909,24 +899,21 @@ def test_call_and_validate_refreshes_expired_graphql_token(ctx):
     ],
 )
 def test_get_parameter(ctx, name, location, exists):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data/",
         {
-            "/data/": {
-                "get": {
-                    "parameters": [
-                        {"name": "X-Key", "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "text/plain": {"schema": {"type": "string"}},
-                            "application/json": {"schema": {"type": "array"}},
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [
+                {"name": "X-Key", "in": "header", "required": True, "schema": {"type": "string"}},
+                {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
+            ],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "text/plain": {"schema": {"type": "string"}},
+                    "application/json": {"schema": {"type": "array"}},
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "securitySchemes": {
@@ -936,7 +923,7 @@ def test_get_parameter(ctx, name, location, exists):
         security=[{"ApiKeyAuth": []}],
     )
 
-    parameter = schema["/data/"]["GET"].get_parameter(name, location)
+    parameter = operation.get_parameter(name, location)
     assert (parameter is not None) is exists
     if exists:
         assert parameter.name == name
@@ -944,9 +931,7 @@ def test_get_parameter(ctx, name, location, exists):
 
 
 def test_parameter_containers_for_locations_without_parameters(ctx):
-    operation = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})["/data"][
-        "GET"
-    ]
+    operation = ctx.openapi.load_operation("GET /data", {"responses": {"200": {"description": "OK"}}})
     with pytest.raises(ValueError, match="`body` is not a parameter location"):
         operation.get_parameter_set(ParameterLocation.BODY)
     assert operation.Case().get_container(ParameterLocation.UNKNOWN) is None

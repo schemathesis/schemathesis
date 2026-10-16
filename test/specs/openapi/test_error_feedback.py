@@ -117,17 +117,13 @@ def _apply_body_adjustment(adjustment, schema, observations, case_factory):
 def test_spring_parser_locates_declared_query_parameters(ctx, case_factory):
     # Spring names the field without saying where it came from, so a declared query parameter
     # must not be mistaken for a body field.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /api/stats",
         {
-            "/api/stats": {
-                "get": {
-                    "parameters": [{"name": "month", "in": "query", "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "month", "in": "query", "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/api/stats"]["GET"]
     body = {"errors": [{"field": "month", "defaultMessage": "must be between 1 and 12"}]}
     obs = SpringParser().parse(operation=operation, body=body, case=case_factory(operation=operation))
     assert obs
@@ -135,10 +131,10 @@ def test_spring_parser_locates_declared_query_parameters(ctx, case_factory):
 
 
 def _drf_query_operation(ctx, parameters):
-    schema = ctx.openapi.load_schema(
-        {"/api/audio": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}
+    operation = ctx.openapi.load_operation(
+        "GET /api/audio", {"parameters": parameters, "responses": {"200": {"description": "OK"}}}
     )
-    return schema["/api/audio"]["GET"]
+    return operation
 
 
 @pytest.mark.parametrize(
@@ -224,24 +220,18 @@ def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, res
 
 
 def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, response_factory):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /api/items",
         {
-            "/api/items": {
-                "post": {
-                    "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer"}}],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
-                            }
-                        }
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer"}}],
+            "requestBody": {
+                "content": {
+                    "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
                 }
-            }
-        }
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/api/items"]["POST"]
     case = operation.Case(query={"limit": 100}, body={"name": "item"}, _meta=_meta_for(GenerationMode.POSITIVE))
     response = Response.from_any(
         response_factory.requests(
@@ -320,27 +310,23 @@ def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, r
 def test_pipeline_prefers_sent_body_field_over_declared_path_parameter(
     ctx, case_factory, response_factory, response_body, expected_kinds
 ):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PUT /api/items/{id}",
         {
-            "/api/items/{id}": {
-                "put": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
-                                }
-                            }
+            "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
                         }
-                    },
-                    "responses": {"200": {"description": "OK"}},
+                    }
                 }
-            }
-        }
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/api/items/{id}"]["PUT"]
     response = Response.from_any(response_factory.requests(content=json.dumps(response_body).encode(), status_code=400))
 
     case = case_factory(operation=operation, path_parameters={"id": "abc"}, body={"id": 500, "name": "x"})
@@ -1068,17 +1054,14 @@ def openapi_31_case_factory(openapi_31):
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
 def test_adjustments_reach_properties_behind_ref(ctx, version):
     address = {"type": "object", "properties": {"street": {"type": "string"}, "zip": {"type": "string"}}}
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /users",
         {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
         components={
@@ -1090,7 +1073,7 @@ def test_adjustments_reach_properties_behind_ref(ctx, version):
                 "Address": address,
             }
         },
-    )["/users"]["POST"]
+    )
     store = ErrorFeedbackStore()
     for path, kind, payload in [
         (("address", "street"), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),
@@ -2164,20 +2147,17 @@ def test_additional_properties_adjustment_forbids_extras(input_schema, path, exp
     ids=["ref", "cycle"],
 )
 def test_additional_properties_adjustment_preserves_allof_ref_properties(ctx, case_factory, response_factory, schemas):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /api/pets",
         {
-            "/api/pets": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Dog"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Dog"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={"schemas": schemas},
-    )["/api/pets"]["POST"]
+    )
     store = ErrorFeedbackStore()
     _record(
         store,
@@ -2561,27 +2541,24 @@ def test_unexpected_property_adjustment_drops_empty_required(case_factory):
     ids=["undeclared", "declared"],
 )
 def test_jackson_unrecognized_field_closes_body(ctx, case_factory, response_factory, rejected, expected_properties):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"a": {"type": "string"}, "b": {"type": "integer"}},
-                                    "required": ["a"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["POST"]
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"a": {"type": "string"}, "b": {"type": "integer"}},
+                            "required": ["a"],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     store = ErrorFeedbackStore()
     _record(
         store,
@@ -2654,23 +2631,18 @@ def test_body_required_per_feedback_returns_false_with_no_store(make_operation):
     ids=["jackson-long", "spring-max"],
 )
 def test_integer_bounds_above_float_precision_stay_exact(ctx, case_factory, response_factory, body, expected):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /orders",
         {
-            "/orders": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "object", "properties": {"quantity": {"type": "integer"}}}
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/orders"]["POST"]
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {"schema": {"type": "object", "properties": {"quantity": {"type": "integer"}}}}
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
     store = ErrorFeedbackStore()
     for observation in FeedbackPipeline.from_registry().parse(
@@ -2759,16 +2731,13 @@ def _nested_body(*, name=None, address=None):
     ids=["spring-index", "laravel-index", "rails-index", "aspnet-nested", "aspnet-index", "laravel-index-required"],
 )
 def test_framework_field_paths_reach_nested_properties(ctx, case_factory, response_factory, body, expected):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": _nested_body()}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["POST"]
+            "requestBody": {"required": True, "content": {"application/json": {"schema": _nested_body()}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     response = Response.from_any(response_factory.requests(content=json.dumps(body).encode(), status_code=400))
     store = ErrorFeedbackStore()
     for observation in FeedbackPipeline.from_registry().parse(

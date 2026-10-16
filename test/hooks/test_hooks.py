@@ -84,8 +84,7 @@ def test_hook_dispatch_accepts_multiple_dispatchers(dispatcher):
 
 
 def test_hook_dispatch_skips_filtered_hooks(ctx, dispatcher):
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    operation = schema["/users"]["GET"]
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
     calls = []
 
     @dispatcher.hook.apply_to(method="POST")

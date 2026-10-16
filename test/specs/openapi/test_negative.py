@@ -501,30 +501,26 @@ def test_mutated_query_with_anyof_null_bundled_ref_and_inline_enum_does_not_cras
 
 
 def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "integer",
-                                        "minimum": 1,
-                                        "exclusiveMinimum": True,
-                                    }
-                                }
-                            },
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "exclusiveMinimum": True,
+                            }
                         }
                     },
-                },
+                }
             },
         },
         version="3.1.0",
     )
-    operation = schema["/data"]["GET"]
     response_def = operation.responses.get("200")
     assert response_def is not None
     resolved = response_def.get_schema("application/json")
@@ -534,23 +530,17 @@ def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
 
 
 def test_openapi_31_legacy_exclusive_bounds_in_negative_generation(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {"schema": {"type": "number", "minimum": 0, "exclusiveMinimum": True}}
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "number", "minimum": 0, "exclusiveMinimum": True}}},
             },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-    operation = schema["/data"]["POST"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @settings(max_examples=1, suppress_health_check=list(HealthCheck))
@@ -601,34 +591,29 @@ def test_openapi_31_prefix_items_query_param_negative_generation(ctx):
 
 
 def test_openapi_31_prefix_items_body_negative_generation(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /box",
         {
-            "/box": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "box": {
-                                            "type": "array",
-                                            "prefixItems": [{"type": "integer"}],
-                                            "items": False,
-                                        }
-                                    },
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "box": {
+                                    "type": "array",
+                                    "prefixItems": [{"type": "integer"}],
+                                    "items": False,
                                 }
-                            }
+                            },
                         }
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+                    }
+                }
             },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-
-    operation = schema["/box"]["POST"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @settings(max_examples=1, suppress_health_check=list(HealthCheck))
@@ -731,10 +716,9 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
     parameter = {"name": "value", "in": "query", "required": True, "schema": parameter_schema}
     if allow_empty_value:
         parameter["allowEmptyValue"] = True
-    operation = ctx.openapi.load_schema(
-        {"/items": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}},
-        version=version,
-    )["/items"]["GET"]
+    operation = ctx.openapi.load_operation(
+        "GET /items", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version=version
+    )
     validator = make_validator(
         operation.get_parameter_set(ParameterLocation.QUERY).items[0].validation_schema,
         operation.schema.adapter.jsonschema_validator_cls,
@@ -762,35 +746,32 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
 @pytest.mark.hypothesis_nested
 def test_negative_query_does_not_negate_annotation_keywords(ctx):
     annotation_keywords = {"default", "title", "description", "deprecated", "$comment", "readOnly", "writeOnly"}
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "value",
-                            "in": "query",
-                            "required": True,
-                            "schema": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 10,
-                                "default": 5,
-                                "title": "Value",
-                                "description": "An integer value",
-                                "deprecated": True,
-                                "$comment": "Internal note",
-                                "readOnly": False,
-                                "writeOnly": True,
-                            },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "value",
+                    "in": "query",
+                    "required": True,
+                    "schema": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10,
+                        "default": 5,
+                        "title": "Value",
+                        "description": "An integer value",
+                        "deprecated": True,
+                        "$comment": "Internal note",
+                        "readOnly": False,
+                        "writeOnly": True,
+                    },
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
-    )["/items"]["GET"]
+    )
 
     # Annotation mutations are rare enough that a small sample can miss them.
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
@@ -807,27 +788,24 @@ def test_negative_query_does_not_negate_annotation_keywords(ctx):
 @pytest.mark.hypothesis_nested
 def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
     property_schema = {"oneOf": [{"type": "boolean"}, {"type": "null"}]}
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"value": property_schema},
-                                    "required": ["value"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["POST"]
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"value": property_schema},
+                            "required": ["value"],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     validator = make_validator(property_schema, operation.schema.adapter.jsonschema_validator_cls)
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
@@ -867,20 +845,17 @@ def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
 @pytest.mark.hypothesis_nested
 def test_boolean_not_in_negative_body_schema(ctx, body_schema, negated):
     body_schema["not"] = negated
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body_schema}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": body_schema}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
-    )["/items"]["POST"]
+    )
     validator = make_validator(body_schema, operation.schema.adapter.jsonschema_validator_cls)
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
@@ -1291,29 +1266,25 @@ def test_multiple_mutations_render_one_line_each():
 @pytest.mark.hypothesis_nested
 def test_ecma_regex_patterns(ctx, pattern):
     # Large quantifiers can exceed jsonschema_rs's default compiled regex size limit
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "value": {"type": "string", "pattern": pattern},
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "value": {"type": "string", "pattern": pattern},
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/test"]["POST"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
@@ -1331,34 +1302,30 @@ def test_path_parameters_never_contain_slash(ctx):
     # which could match `/api/groups/{id}/{user_id}` instead.
     #
     # This can happen when the generated value is a dict/object that gets stringified with `/` in keys
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /api/groups/{id}",
         {
-            "/api/groups/{id}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {
-                                "anyOf": [
-                                    {
-                                        "type": "string",
-                                        "examples": ["bqf7a2d9gbgud9a0jgfgt1ie"],
-                                        "pattern": "^[a-zA-Z0-9\\-]+$",
-                                    },
-                                    {"enum": ["valid-id-1", "valid-id-2"]},
-                                ]
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": True,
+                    "schema": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "examples": ["bqf7a2d9gbgud9a0jgfgt1ie"],
+                                "pattern": "^[a-zA-Z0-9\\-]+$",
                             },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+                            {"enum": ["valid-id-1", "valid-id-2"]},
+                        ]
+                    },
                 }
-            },
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
     )
-    operation = schema["/api/groups/{id}"]["GET"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
@@ -1373,20 +1340,16 @@ def test_path_parameters_never_contain_slash(ctx):
 @pytest.mark.hypothesis_nested
 def test_path_boolean_param_is_not_coerced_to_int_alongside_integer_param(ctx):
     # The integer positive-bias must not rewrite `False` into `1` for a sibling boolean param.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items/{id}/{flag}",
         {
-            "/items/{id}/{flag}": {
-                "get": {
-                    "parameters": [
-                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
-                        {"name": "flag", "in": "path", "required": True, "schema": {"type": "boolean"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        }
+            "parameters": [
+                {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                {"name": "flag", "in": "path", "required": True, "schema": {"type": "boolean"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items/{id}/{flag}"]["GET"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
@@ -1453,10 +1416,9 @@ def test_negative_integer_produces_fractional_numbers(ctx, location):
         operation_schema = {
             "parameters": [{"name": "n", "in": "query", "required": True, "schema": {"type": "integer"}}]
         }
-    schema = ctx.openapi.load_schema(
-        {"/items": {"post": {**operation_schema, "responses": {"200": {"description": "OK"}}}}}
+    operation = ctx.openapi.load_operation(
+        "POST /items", {**operation_schema, "responses": {"200": {"description": "OK"}}}
     )
-    operation = schema["/items"]["POST"]
     values = []
 
     # High count: a fraction needs a type change to `number` among many other mutation kinds.
@@ -1474,36 +1436,32 @@ def test_negative_integer_produces_fractional_numbers(ctx, location):
 
 @pytest.mark.hypothesis_nested
 def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_examples(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /api/groups/{id}",
         {
-            "/api/groups/{id}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {
-                                # Explicit slash intent for positive generation
-                                "example": "foo/bar",
-                                "anyOf": [
-                                    {
-                                        "type": "string",
-                                        "examples": ["bqf7a2d9gbgud9a0jgfgt1ie"],
-                                        "pattern": "^[a-zA-Z0-9\\-]+$",
-                                    },
-                                    {"enum": ["valid-id-1", "valid-id-2"]},
-                                ],
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": True,
+                    "schema": {
+                        # Explicit slash intent for positive generation
+                        "example": "foo/bar",
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "examples": ["bqf7a2d9gbgud9a0jgfgt1ie"],
+                                "pattern": "^[a-zA-Z0-9\\-]+$",
                             },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+                            {"enum": ["valid-id-1", "valid-id-2"]},
+                        ],
+                    },
                 }
-            },
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
     )
-    operation = schema["/api/groups/{id}"]["GET"]
 
     @seed(8)
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
@@ -1832,11 +1790,10 @@ def test_can_negate(schema, expected):
 
 
 def _operation_with_parameters(ctx, parameters, *, version="3.0.2"):
-    schema = ctx.openapi.load_schema(
-        {"/items/{itemId}": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}},
-        version=version,
+    operation = ctx.openapi.load_operation(
+        "GET /items/{itemId}", {"parameters": parameters, "responses": {"200": {"description": "OK"}}}, version=version
     )
-    return schema["/items/{itemId}"]["GET"]
+    return operation
 
 
 PLAIN_STRING_PARAMETER = {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}
@@ -2043,24 +2000,20 @@ def test_path_combinator_without_string_branch_is_negated(ctx):
 
 def test_omitting_required_header_next_to_explicit_one_is_negative(ctx):
     # Dropping the only generated header leaves exactly the explicit headers, which is still a negative case.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "parameters": [
-                        {"name": "X-Tenant", "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": "object", "required": ["kind"]}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {"name": "X-Tenant", "in": "header", "required": True, "schema": {"type": "string"}},
+                {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+            ],
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "object", "required": ["kind"]}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["POST"]
     operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE, headers={"X-Tenant": "t"})
 
@@ -2208,20 +2161,17 @@ def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
 def test_negative_declines_unbuildable_negated_body(ctx):
     # `additionalProperties: false` plus an `allOf` of `if`/`then` negates to a shape the
     # canonical strategy builder cannot draw for; must be declined, not raised as fatal.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "operationId": "createItem",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {"schema": {"$ref": "#/components/schemas/ExportCreateRequestRequest"}}
-                        },
-                        "required": True,
-                    },
-                    "responses": {"201": {"description": "OK"}},
-                }
-            }
+            "operationId": "createItem",
+            "requestBody": {
+                "content": {
+                    "application/json": {"schema": {"$ref": "#/components/schemas/ExportCreateRequestRequest"}}
+                },
+                "required": True,
+            },
+            "responses": {"201": {"description": "OK"}},
         },
         version="3.1.0",
         components={
@@ -2436,7 +2386,6 @@ def test_negative_declines_unbuildable_negated_body(ctx):
             }
         },
     )
-    operation = schema["/items"]["POST"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @seed(1)

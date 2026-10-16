@@ -260,33 +260,29 @@ def test_openapi_3_2_smoke(ctx):
 
 
 def test_openapi_3_2_querystring_parameter_is_collected(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /search",
         {
-            "/search": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "ignored",
-                            "in": "querystring",
-                            "required": True,
-                            "content": {
-                                "application/x-www-form-urlencoded": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"q": {"type": "string"}},
-                                        "required": ["q"],
-                                    }
-                                }
-                            },
+            "parameters": [
+                {
+                    "name": "ignored",
+                    "in": "querystring",
+                    "required": True,
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"q": {"type": "string"}},
+                                "required": ["q"],
+                            }
                         }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+                    },
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.2.0",
     )
-    operation = schema["/search"]["GET"]
     assert len(operation.query.items) == 1
     assert operation.query.items[0].definition["in"] == "querystring"
     assert operation.query.items[0].location == ParameterLocation.QUERY

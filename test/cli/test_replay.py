@@ -468,8 +468,7 @@ def test_replay_applies_per_operation_headers(cli, app_runner, ctx, crash_factor
 
 def test_build_case_drops_stale_framing_headers(ctx, crash_factory):
     # Stale framing headers (Content-Length, Host) are dropped so the re-sent request isn't misframed.
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    operation = schema["/users"]["GET"]
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
     crash = crash_factory.single(
         path="/users",
         status=500,
@@ -486,8 +485,7 @@ def test_build_case_drops_stale_framing_headers(ctx, crash_factory):
 
 def test_build_case_drops_stale_cookie_header(ctx, crash_factory):
     # A recorded Cookie header would override the structured cookies, so it is dropped.
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    operation = schema["/users"]["GET"]
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
     crash = crash_factory.single(
         path="/users",
         status=500,
@@ -1212,8 +1210,7 @@ def test_replay_resends_custom_wire_headers_but_not_generated_ones(
 
 
 def test_build_case_keeps_wire_headers_alongside_header_parameters(ctx, crash_factory):
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    operation = schema["/users"]["GET"]
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
     crash = crash_factory.single(
         path="/users",
         status=500,

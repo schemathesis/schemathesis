@@ -135,7 +135,7 @@ def test_cli_override_wins_over_config_file():
 
 
 def test_first_matching_operation_block_wins(ctx):
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    operation = ctx.openapi.load_operation("GET /users", {"responses": {"200": {"description": "OK"}}})
     config = SchemathesisConfig.from_dict(
         {
             "operations": [
@@ -145,7 +145,7 @@ def test_first_matching_operation_block_wins(ctx):
         }
     )
 
-    assert config.projects.get_default().operations.get_for_operation(schema["/users"]["GET"]).enabled is True
+    assert config.projects.get_default().operations.get_for_operation(operation).enabled is True
 
 
 def test_hypothesis_settings_set_to_default_values_are_explicit():

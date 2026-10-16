@@ -18,16 +18,13 @@ def test_formatted_path(swagger_20):
 
 
 def test_formatted_path_missing_parameter(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users/{name}",
         {
-            "/users/{name}": {
-                "get": {
-                    "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    case = schema["/users/{name}"]["GET"].Case(path_parameters={})
+    case = operation.Case(path_parameters={})
     with pytest.raises(InvalidSchema, match="^Path parameter 'name' is not defined$"):
         assert case.formatted_path

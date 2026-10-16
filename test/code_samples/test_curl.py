@@ -148,17 +148,14 @@ def test_as_curl_command_sanitizes_string_query_params(curl):
 
 
 def test_as_curl_command_sanitizes_raw_query_with_empty_segments(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /q",
         {
-            "/q": {
-                "get": {
-                    "parameters": [{"name": "token", "in": "query", "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "token", "in": "query", "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    case = schema["/q"]["GET"].Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&&flag")})
+    case = operation.Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&&flag")})
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&flag'"
 
 
@@ -171,17 +168,14 @@ def test_as_curl_command_sanitizes_raw_query_with_empty_segments(ctx):
     ids=["object", "array"],
 )
 def test_as_curl_command_sanitizes_json_body(ctx, body, expected):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /sign-in",
         {
-            "/sign-in": {
-                "post": {
-                    "requestBody": {"content": {"application/json": {"schema": {}}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {"content": {"application/json": {"schema": {}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    case = schema["/sign-in"]["POST"].Case(body=body, media_type="application/json")
+    case = operation.Case(body=body, media_type="application/json")
     assert case.as_curl_command() == (
         f"curl -X POST -H 'Content-Type: application/json' -d '{expected}' http://localhost/sign-in"
     )
@@ -189,17 +183,14 @@ def test_as_curl_command_sanitizes_json_body(ctx, body, expected):
 
 
 def test_as_curl_command_keeps_non_sensitive_raw_query_pairs(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /q",
         {
-            "/q": {
-                "get": {
-                    "parameters": [{"name": "token", "in": "query", "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "token", "in": "query", "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    case = schema["/q"]["GET"].Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&page=2")})
+    case = operation.Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&page=2")})
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&page=2'"
 
 
@@ -294,8 +285,8 @@ def test_reproduce_after_same_host_redirect(ctx, app_runner, validate):
 
 
 def test_reproduce_when_validated_response_has_no_request_url(ctx, response_factory):
-    schema = ctx.openapi.load_schema({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/items"]["GET"].Case()
+    operation = ctx.openapi.load_operation("GET /items", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case()
     response = response_factory.requests(status_code=500, content=b"Error", content_type="text/plain", method="GET")
     response.request.url = None
 
@@ -567,15 +558,12 @@ def test_empty_multipart_curl_body_keeps_closing_delimiter(multipart_schema, mon
 
 
 def test_as_curl_command_keeps_encoded_sensitive_raw_query_key(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /q",
         {
-            "/q": {
-                "get": {
-                    "parameters": [{"name": "api key", "in": "query", "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "api key", "in": "query", "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    case = schema["/q"]["GET"].Case(query={RAW_QUERY_STRING_KEY: RawQueryString("api%20key=secret&page=2")})
+    case = operation.Case(query={RAW_QUERY_STRING_KEY: RawQueryString("api%20key=secret&page=2")})
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?api%20key=%5BFiltered%5D&page=2'"

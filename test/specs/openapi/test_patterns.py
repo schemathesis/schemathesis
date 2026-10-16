@@ -1377,22 +1377,19 @@ def test_is_valid_jsonschema_rs_regex(pattern, expected):
 def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
     # Such a pattern constrains nothing during validation, and keeping it would only stop the rest
     # of the schema from being modeled.
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "schema": {"type": "string", "pattern": "[A-Z]{,3}", "maxLength": 5},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "schema": {"type": "string", "pattern": "[A-Z]{,3}", "maxLength": 5},
                 }
-            }
-        }
-    )["/items"]["GET"]
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     parameter = next(iter(operation.query))
 
     assert "pattern" not in parameter.optimized_schema
@@ -1402,18 +1399,15 @@ def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
 @pytest.mark.parametrize("pattern", [r"^(?P<major>\d+)$", r"^(?<major>\d+)$"], ids=["python", "ecma"])
 def test_named_group_pattern_is_kept(ctx, pattern):
     # A group name only one engine reads would leave the pattern refused where the schema is validated.
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["GET"]
+            "parameters": [
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     assert next(iter(operation.query)).optimized_schema["pattern"] == r"^(\d+)$"
     assert examples.generate_one(operation.as_strategy()).query["q"].isdigit()
 
@@ -1445,18 +1439,15 @@ LETTERS = r"^[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+$"
     ],
 )
 def test_pcre_class_syntax_is_translated_or_dropped(ctx, pattern, expected):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["GET"]
+            "parameters": [
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     assert next(iter(operation.query)).optimized_schema.get("pattern") == expected
 
 
@@ -1473,24 +1464,20 @@ def test_quantifier_rewrite_the_validator_cannot_compile_is_not_taken():
 @pytest.mark.parametrize("length_keyword", ["minLength", "maxLength"], ids=["min", "max"])
 def test_huge_length_is_not_folded_into_pattern(ctx, length_keyword):
     length = 9223372036854775807
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "string", "pattern": "^a+$", length_keyword: length},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string", "pattern": "^a+$", length_keyword: length},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["GET"]
 
     assert next(iter(operation.query)).optimized_schema == {
         "type": "string",
@@ -1659,17 +1646,13 @@ def test_unreadable_pattern_rules_nothing_out(pattern):
     ],
 )
 def test_length_bounds_beside_a_pattern(ctx, parameter_schema, expected):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["GET"]
     assert next(iter(operation.query)).optimized_schema == expected
     validator = jsonschema_rs.validator_for(parameter_schema)
 

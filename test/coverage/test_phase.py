@@ -5378,32 +5378,28 @@ def test_missing_required_body_case_sends_no_content_type(ctx):
 
 def test_missing_body_case_clears_the_content_type_negation_it_drops(ctx):
     # The body-less request never sends the mutated `Content-Type`, so its headers carry no negation.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "Content-Type",
-                            "in": "header",
-                            "required": False,
-                            "schema": {"type": "string", "enum": ["application/zip"]},
-                        },
-                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": BODY_WITH_REQUIRED_PROPERTY}},
-                    },
-                    "responses": DEFAULT_RESPONSES,
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": "Content-Type",
+                    "in": "header",
+                    "required": False,
+                    "schema": {"type": "string", "enum": ["application/zip"]},
+                },
+                {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+            ],
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": BODY_WITH_REQUIRED_PROPERTY}},
+            },
+            "responses": DEFAULT_RESPONSES,
+        },
     )
 
     assert [
-        (dict(case.headers), _component_mode(case, ParameterLocation.HEADER))
-        for case in _missing_body_cases(schema["/items"]["POST"])
+        (dict(case.headers), _component_mode(case, ParameterLocation.HEADER)) for case in _missing_body_cases(operation)
     ] == [({"X-Token": ""}, GenerationMode.POSITIVE)]
 
 
@@ -6780,29 +6776,25 @@ def test_negative_coverage_emits_invalid_format_for_uuid_body_property(ctx):
     ids=["plain-ref", "ref-with-sibling"],
 )
 def test_negative_coverage_emits_invalid_format_for_referenced_body_property(ctx, property_schema):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"a": property_schema},
-                                }
-                            }
-                        },
-                    },
-                    "responses": DEFAULT_RESPONSES,
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"a": property_schema},
+                        }
+                    }
+                },
+            },
+            "responses": DEFAULT_RESPONSES,
         },
         version="3.1.0",
         components={"schemas": {"Item": {"properties": {"url": {"format": "uri"}}}}},
     )
-    operation = schema["/items"]["POST"]
 
     assert [
         (case.body, case.meta.phase.data.description)
@@ -7019,26 +7011,22 @@ def test_undeclared_method_probes_dedup_across_operations(ctx):
 )
 def test_wildcard_consumes_picks_concrete_media_type(ctx, consumes):
     # Real clients never send Content-Type: */*; coverage must pick a concrete media type.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /foo",
         {
-            "/foo": {
-                "post": {
-                    "consumes": consumes,
-                    "parameters": [
-                        {
-                            "in": "body",
-                            "name": "body",
-                            "required": True,
-                            "schema": {"type": "object", "properties": {"x": {"type": "string"}}},
-                        }
-                    ],
-                    "responses": {"default": {"description": "OK"}},
+            "consumes": consumes,
+            "parameters": [
+                {
+                    "in": "body",
+                    "name": "body",
+                    "required": True,
+                    "schema": {"type": "object", "properties": {"x": {"type": "string"}}},
                 }
-            }
+            ],
+            "responses": {"default": {"description": "OK"}},
         },
         version="2.0",
     )
-    operation = schema["/foo"]["POST"]
     media_types = {
         case.media_type for case in iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET
     }
@@ -8055,36 +8043,32 @@ def test_multipart_body_with_custom_encoding_yields_positive_case(ctx, is_requir
 
 def test_combination_cases_deduplicate_repeated_requests(ctx):
     # 'X-Token' is the same header as 'x-token', so the all-headers combination repeats the default request.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "x-token",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["secret"]},
-                        },
-                        {
-                            "name": "X-Token",
-                            "in": "header",
-                            "required": False,
-                            "schema": {"type": "string", "enum": ["secret"]},
-                        },
-                        {
-                            "name": "X-Other",
-                            "in": "header",
-                            "required": False,
-                            "schema": {"type": "string", "enum": ["other"]},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": "x-token",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["secret"]},
+                },
+                {
+                    "name": "X-Token",
+                    "in": "header",
+                    "required": False,
+                    "schema": {"type": "string", "enum": ["secret"]},
+                },
+                {
+                    "name": "X-Other",
+                    "in": "header",
+                    "required": False,
+                    "schema": {"type": "string", "enum": ["other"]},
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["GET"]
     stream = [
         (
             case.meta.phase.data.scenario.value,
@@ -8535,17 +8519,14 @@ def test_negative_bodies_violate_one_of_with_ref_sibling_keywords(ctx, version, 
 
 
 def test_negative_bodies_survive_invalid_keyword_behind_ref_in_any_of(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Filters"}}},
-                    },
-                    "responses": DEFAULT_RESPONSES,
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Filters"}}},
+            },
+            "responses": DEFAULT_RESPONSES,
         },
         version="3.1.0",
         components={
@@ -8560,7 +8541,7 @@ def test_negative_bodies_survive_invalid_keyword_behind_ref_in_any_of(ctx):
             }
         },
     )
-    assert coverage_bodies(schema["/test"]["POST"], GenerationMode.NEGATIVE) == [
+    assert coverage_bodies(operation, GenerationMode.NEGATIVE) == [
         {},
         [None, None],
         None,
@@ -9482,25 +9463,22 @@ def test_no_positive_case_when_the_required_body_admits_nothing(ctx):
 
 
 def test_positive_body_for_repeated_consumes_entry_is_not_sent_twice(ctx):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /foo",
         {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "body",
-                            "name": "body",
-                            "required": True,
-                            "schema": {"type": "object", "properties": {"a": {"type": "integer"}}},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "in": "body",
+                    "name": "body",
+                    "required": True,
+                    "schema": {"type": "object", "properties": {"a": {"type": "integer"}}},
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="2.0",
         consumes=["application/json", "application/json"],
-    )["/foo"]["POST"]
+    )
     assert [(case.media_type, case.body) for case in collect_cases(operation, GenerationMode.POSITIVE)] == [
         ("application/json", {}),
         ("application/json", {"a": 0}),

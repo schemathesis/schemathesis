@@ -241,8 +241,8 @@ def test_standalone_validation_passes_case_phase_to_class_check(ctx, response_fa
         def after_response(self, ctx, response, case):
             seen_phases.append(ctx.phase)
 
-    schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/test"]["GET"].Case(
+    operation = ctx.openapi.load_operation("GET /test", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case(
         _meta=CaseMetadata(
             generation=GenerationInfo(time=0.1, mode=GenerationMode.POSITIVE),
             components={},
@@ -271,8 +271,8 @@ def test_class_based_check_fires_exactly_once_in_validate_response(ctx, response
         def after_response(self, ctx, response, case):
             call_count.append(1)
 
-    schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    case = schema["/test"]["GET"].Case()
+    operation = ctx.openapi.load_operation("GET /test", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case()
 
     case.validate_response(response_factory.requests(status_code=200))
 

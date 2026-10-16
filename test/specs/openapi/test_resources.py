@@ -250,18 +250,14 @@ def test_seed_input_values_skips_empty_buckets():
 
 
 def test_record_request_ignores_unusable_slots(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /users/{user_id}",
         {
-            "/users/{user_id}": {
-                "post": {
-                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
-                    "requestBody": {"content": {"application/json": {"schema": {}}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "requestBody": {"content": {"application/json": {"schema": {}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/users/{user_id}"]["POST"]
     user = ResourceDefinition.inferred_from_parameter("User", "id")
     slots = [
         InputSlot(

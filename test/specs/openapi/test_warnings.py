@@ -36,25 +36,19 @@ def test_warnings_other_than_missing_deserializer_have_no_group():
 
 
 def test_detect_missing_deserializers_with_custom_media_type(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/msgpack": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
-                                }
-                            },
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/msgpack": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+                    },
                 }
             }
-        }
+        },
     )
-    operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
 
@@ -65,25 +59,19 @@ def test_detect_missing_deserializers_with_custom_media_type(ctx):
 
 
 def test_detect_missing_deserializers_with_json(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/json": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
-                                }
-                            },
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+                    },
                 }
             }
-        }
+        },
     )
-    operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
 
@@ -91,20 +79,16 @@ def test_detect_missing_deserializers_with_json(ctx):
 
 
 def test_detect_missing_deserializers_no_schema(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "204": {
-                            "description": "No content",
-                        }
-                    }
+            "responses": {
+                "204": {
+                    "description": "No content",
                 }
             }
-        }
+        },
     )
-    operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
 
@@ -112,23 +96,19 @@ def test_detect_missing_deserializers_no_schema(ctx):
 
 
 def test_detect_missing_deserializers_primitive_type(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/msgpack": {"schema": {"type": "string"}},
-                            },
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/msgpack": {"schema": {"type": "string"}},
+                    },
                 }
             }
-        }
+        },
     )
-    operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
 
@@ -136,30 +116,23 @@ def test_detect_missing_deserializers_primitive_type(ctx):
 
 
 def test_detect_missing_deserializers_with_registered_deserializer(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/msgpack": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
-                                }
-                            },
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/msgpack": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+                    },
                 }
             }
-        }
+        },
     )
 
     @schemathesis.deserializer("application/msgpack")
     def msgpack_deserializer(ctx, response):
         return {}
-
-    operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
 
@@ -167,28 +140,24 @@ def test_detect_missing_deserializers_with_registered_deserializer(ctx):
 
 
 def test_detect_missing_deserializers_array_type(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/msgpack": {
-                                    "schema": {
-                                        "type": "array",
-                                        "items": {"type": "object", "properties": {"id": {"type": "integer"}}},
-                                    }
-                                }
-                            },
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        "application/msgpack": {
+                            "schema": {
+                                "type": "array",
+                                "items": {"type": "object", "properties": {"id": {"type": "integer"}}},
+                            }
                         }
-                    }
+                    },
                 }
             }
-        }
+        },
     )
-    operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
 
@@ -197,30 +166,24 @@ def test_detect_missing_deserializers_array_type(ctx):
 
 
 def test_detect_missing_deserializers_with_malformed_media_type(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                # Malformed media type (missing subtype)
-                                "invalid-media-type": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
-                                },
-                                # Valid media type without deserializer
-                                "application/msgpack": {
-                                    "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
-                                },
-                            },
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "Success",
+                    "content": {
+                        # Malformed media type (missing subtype)
+                        "invalid-media-type": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}},
+                        # Valid media type without deserializer
+                        "application/msgpack": {
+                            "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                        },
+                    },
                 }
             }
-        }
+        },
     )
-    operation = schema["/users"]["GET"]
 
     # Should not raise exception and should only warn about the valid media type
     warnings = detect_missing_deserializers(operation)
@@ -258,11 +221,11 @@ def test_detect_missing_deserializers_with_malformed_media_type(ctx):
     ids=["unstructured-sibling", "structured-non-first", "schemaless-sibling"],
 )
 def test_detect_missing_deserializers_judges_each_media_type_separately(ctx, content, expected):
-    schema = ctx.openapi.load_schema(
-        {"/users": {"get": {"responses": {"200": {"description": "Success", "content": content}}}}}
+    operation = ctx.openapi.load_operation(
+        "GET /users", {"responses": {"200": {"description": "Success", "content": content}}}
     )
 
-    assert detect_missing_deserializers(schema["/users"]["GET"]) == [
+    assert detect_missing_deserializers(operation) == [
         MissingDeserializerWarning(operation_label="GET /users", status_code="200", content_type=content_type)
         for content_type in expected
     ]
@@ -400,22 +363,19 @@ def test_unresolvable_reference_behind_a_cycle_is_reported_for_every_response(ct
     ids=["dropped-python-valid", "dropped-lookahead", "kept-but-ungeneratable", "supported"],
 )
 def test_detect_unsupported_regex(ctx, pattern, expected):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "filter",
-                            "required": True,
-                            "schema": {"type": "string", "pattern": pattern},
-                        }
-                    ],
-                    "responses": {"200": {"description": "Success"}},
+            "parameters": [
+                {
+                    "in": "query",
+                    "name": "filter",
+                    "required": True,
+                    "schema": {"type": "string", "pattern": pattern},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "Success"}},
+        },
     )
 
-    assert [warning.message for warning in detect_unsupported_regex(schema["/users"]["GET"])] == expected
+    assert [warning.message for warning in detect_unsupported_regex(operation)] == expected

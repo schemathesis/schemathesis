@@ -42,21 +42,17 @@ def test_binary_format_negative_mutations(ctx, encoding):
     if encoding:
         content["encoding"] = encoding
 
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "content": {"multipart/form-data": content},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "content": {"multipart/form-data": content},
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    operation = schema["/upload"]["POST"]
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(case=strategy)
@@ -101,27 +97,23 @@ def test_binary_format_negative_mutations_with_multiple_content_types(ctx):
 
 def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optional_binary(ctx):
     # `format: binary` is permissive at runtime; mutations producing valid strings aren't actually negative.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PUT /upload",
         {
-            "/upload": {
-                "put": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"captionfile": {"type": "string", "format": "binary"}},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"captionfile": {"type": "string", "format": "binary"}},
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/upload"]["PUT"]
     real_validator = make_validator(operation.body[0].optimized_schema, jsonschema_rs.Draft4Validator)
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
@@ -137,22 +129,18 @@ def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optiona
 def test_custom_media_type_raw_binary_body_in_negative_mode(ctx):
     schemathesis.openapi.media_type("application/x-tar", st.just(b""))
 
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "content": {"application/x-tar": {"schema": {"type": "string", "format": "binary"}}},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {"application/x-tar": {"schema": {"type": "string", "format": "binary"}}},
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.3",
     )
 
-    operation = schema["/upload"]["POST"]
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(case=strategy)

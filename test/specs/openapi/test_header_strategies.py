@@ -119,19 +119,16 @@ def test_negative_mode_range_has_three_tiers():
     ids=["if-match", "if-modified-since"],
 )
 def test_negative_cases_keep_structured_values_for_known_headers(ctx, name, pattern):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {"name": name, "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "X-Count", "in": "header", "required": True, "schema": {"type": "integer"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["GET"]
+            "parameters": [
+                {"name": name, "in": "header", "required": True, "schema": {"type": "string"}},
+                {"name": "X-Count", "in": "header", "required": True, "schema": {"type": "integer"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     values = []
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))

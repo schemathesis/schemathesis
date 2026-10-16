@@ -38,8 +38,8 @@ def serve_tcp(handle: Callable[[socket.socket, socket.socket], None]) -> tuple[i
 
 @pytest.fixture
 def post_case(ctx):
-    schema = ctx.openapi.load_schema({"/items": {"post": {"responses": {"200": {"description": "OK"}}}}})
-    return schema["/items"]["POST"].Case()
+    operation = ctx.openapi.load_operation("POST /items", {"responses": {"200": {"description": "OK"}}})
+    return operation.Case()
 
 
 def test_request_after_crash_on_same_connection(ctx):

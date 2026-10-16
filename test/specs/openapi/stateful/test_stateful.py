@@ -754,17 +754,14 @@ def test_transitions_with_colliding_normalized_names_keep_separate_rules(ctx):
 
 def test_negative_step_with_link_supplied_parameters_falls_back_to_positive(ctx):
     # The link fills the only parameter that could be negated; the step still has to run.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users/{userId}",
         {
-            "/users/{userId}": {
-                "get": {
-                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    strategy = schema["/users/{userId}"]["GET"].as_strategy(
+    strategy = operation.as_strategy(
         generation_mode=GenerationMode.NEGATIVE, phase=TestPhase.STATEFUL, path_parameters={"userId": 42}
     )
     modes = []

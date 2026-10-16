@@ -93,18 +93,15 @@ CONTAINS_TWO = {"contains": {"const": 2}}
 )
 def test_allof_of_contains_consts_placed_positionally(ctx, version, schema, expected):
     # Draft 4 ignores `contains`, so each required value needs its own position to land in generated arrays.
-    loaded = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
-    assert loaded["/items"]["POST"].body[0].optimized_schema == expected
+    assert operation.body[0].optimized_schema == expected
 
 
 @pytest.mark.parametrize(
@@ -459,21 +456,18 @@ def test_does_not_upgrade_legacy_exclusive_bounds_by_default():
 
 
 def test_legacy_exclusive_flag_without_bound_dropped_on_openapi_3_1(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": "number", "exclusiveMinimum": True}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "number", "exclusiveMinimum": True}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-    assert schema["/items"]["POST"].body[0].optimized_schema == {"type": "number"}
+    assert operation.body[0].optimized_schema == {"type": "number"}
 
 
 @pytest.mark.parametrize(
@@ -1045,29 +1039,26 @@ def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path):
 
 
 def test_discriminator_pin_applies_to_boolean_branch_target(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "oneOf": [{"$ref": "#/components/schemas/Any"}],
-                                    "discriminator": {"propertyName": "kind"},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "oneOf": [{"$ref": "#/components/schemas/Any"}],
+                            "discriminator": {"propertyName": "kind"},
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
         components={"schemas": {"Any": True}},
     )
-    assert schema["/items"]["POST"].body[0].optimized_schema == {
+    assert operation.body[0].optimized_schema == {
         "oneOf": [{"allOf": [{"$ref": "#/x-bundled/schema000001"}, {"properties": {"kind": {"enum": ["Any"]}}}]}],
         "discriminator": {"propertyName": "kind"},
         "x-bundled": {"schema000001": True},
@@ -1235,17 +1226,14 @@ def test_malformed_properties_left_alone(schema):
     ],
 )
 def test_malformed_properties_do_not_raise_for_operation(ctx, body_schema):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body_schema}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": body_schema}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    assert schema["/test"]["POST"].get_strategies_from_examples() == []
+    assert operation.get_strategies_from_examples() == []
