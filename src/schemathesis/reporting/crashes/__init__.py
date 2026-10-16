@@ -128,6 +128,8 @@ class CrashStep:
     parent_index: int | None = None
     # The configured identity that sent this step; None when no named identity did, or in older crash files.
     auth_identity: str | None = None
+    # The step's operation label; None in older crash files, which are looked up by path and method.
+    operation: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -152,6 +154,7 @@ class CrashStep:
             "media_type": self.media_type,
             "parent_index": self.parent_index,
             "auth_identity": self.auth_identity,
+            "operation": self.operation,
         }
 
     @classmethod
@@ -177,6 +180,7 @@ class CrashStep:
             media_type=data.get("media_type"),
             parent_index=data.get("parent_index"),
             auth_identity=data.get("auth_identity"),
+            operation=data.get("operation"),
         )
 
 
@@ -398,6 +402,7 @@ def build_crashes_from_recorder(
                 media_type=case.media_type,
                 parent_index=index_by_case_id.get(node.parent_id) if node.parent_id is not None else None,
                 auth_identity=case._auth_identity,
+                operation=case.operation.label,
             )
         )
 

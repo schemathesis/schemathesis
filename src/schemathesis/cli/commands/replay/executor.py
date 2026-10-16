@@ -222,6 +222,10 @@ def _errored_outcome(
 
 
 def _step_operation(schema: BaseSchema, step: CrashStep) -> APIOperation | None:
+    if step.operation is not None:
+        operation = schema.find_operation_by_label(step.operation)
+        if operation is not None:
+            return operation
     try:
         return schema[step.path][step.method]
     except LookupError:
