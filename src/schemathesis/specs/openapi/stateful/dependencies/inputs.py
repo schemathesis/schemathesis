@@ -419,8 +419,6 @@ def _resolve_body_dependencies(
     # Inspect each property that could be a part of some other resource.
     # Flatten composition keywords first so bodies whose top level is allOf/oneOf/anyOf still surface their fields.
     properties, required = _flatten_composition(resolved, bundled)
-    if not properties:
-        return
     path = operation.path
     for property_name, subschema in properties.items():
         # Generation never sends `readOnly` fields, so a link must not either.
@@ -542,7 +540,12 @@ def _extract_nested_body_fk_fields(
     When the FK target resource isn't yet registered, the lookup is appended to
     `deferred` so the caller can replay it once every operation has been scanned.
     """
-    properties, _ = _flatten_composition(schema, scan.bundled)
+    items = schema.get("items")
+    if isinstance(items, dict):
+        # Items of a top-level array body carry FK fields like nested array items: `[{"groupId": ...}]`.
+        properties: dict[str, Any] = {"0": items}
+    else:
+        properties, _ = _flatten_composition(schema, scan.bundled)
     for property_name, subschema in properties.items():
         if not isinstance(subschema, dict):
             continue
