@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.core.result import Ok, Result
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.engine import Status, events
 from schemathesis.transport.prepare import get_default_headers
 
@@ -192,7 +192,7 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
             request.headers.setdefault(header, value)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = session.send(request, timeout=ctx.config.request_timeout or 2)
+            response = session.send(request, timeout=ctx.config.request_timeout or DEFAULT_RESPONSE_TIMEOUT)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
