@@ -631,15 +631,12 @@ def test_optional_query_param_negation(ctx):
         }
     )
 
-    @given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def test(case):
         request = requests.PreparedRequest()
         request.prepare(**case.as_transport_kwargs(base_url="http://127.0.0.1"))
         # Then negative schema should not generate empty queries
         assert urlparse(request.url).query != ""
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -932,13 +929,10 @@ def test_negative_body_respects_allow_extra_parameter_toggle(ctx):
     schema.config.generation.update(allow_extra_parameters=False)
 
     # Roughly one negative body in five carries an extra property; enough draws to surface it reliably.
-    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=50, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=50)
     def test(case):
         if isinstance(case.body, dict):
             assert set(case.body) <= {"name"}, f"undeclared body properties: {sorted(set(case.body) - {'name'})}"
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -999,12 +993,9 @@ def test_non_default_styles(ctx, location, schema, style, explode):
         }
     )
 
-    @given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def test(case):
         assert_requests_call(case)
-
-    test()
 
 
 @pytest.mark.snapshot
@@ -1106,8 +1097,7 @@ def test_negative_format_generates_invalid_values(ctx):
     )
     invalid_uuid_found = False
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def test(case):
         nonlocal invalid_uuid_found
         id_value = case.path_parameters["id"]
@@ -1115,7 +1105,6 @@ def test_negative_format_generates_invalid_values(ctx):
         if not _is_valid_uuid(id_value):
             invalid_uuid_found = True
 
-    test()
     # Then at least some generated values should be invalid UUIDs
     assert invalid_uuid_found, "Negative mode should generate invalid UUID values"
 
@@ -1144,8 +1133,7 @@ def test_negative_custom_format_generates_invalid_values(ctx):
     )
     invalid_uuid4_found = False
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def test(case):
         nonlocal invalid_uuid4_found
         id_value = case.path_parameters["id"]
@@ -1153,7 +1141,6 @@ def test_negative_custom_format_generates_invalid_values(ctx):
         if not is_valid_uuid4(id_value):
             invalid_uuid4_found = True
 
-    test()
     # Then at least some generated values should be invalid UUID4s
     assert invalid_uuid4_found, "Negative mode should generate invalid UUID4 values for custom formats"
 
@@ -1180,13 +1167,10 @@ def test_negative_format_values_violate_the_format(ctx, format, version):
     validator = jsonschema_rs.Draft202012Validator({"type": "string", "format": format}, validate_formats=True)
 
     # Hostnames rarely come out valid by accident, so fewer examples would miss the leak.
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=30, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=30)
     def test(case):
         if isinstance(case.body, str):
             assert not validator.is_valid(case.body), f"Negative body satisfies '{format}': {case.body!r}"
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -1209,16 +1193,13 @@ def test_multiple_mutations_render_one_line_each():
         target_descriptors=compute_mutation_targets(schema),
     )
 
-    @given(data=st.data())
-    @settings(deadline=None, max_examples=50, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(data=st.data(), max_examples=50)
     def test(data):
         draw = data.draw
         _, metadata = ctx.mutate(draw)
         if metadata is not None and metadata.mutations:
             assert metadata.description is not None
             assert metadata.description.count("\n") == max(len(metadata.mutations) - 1, 0)
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -1254,12 +1235,9 @@ def test_ecma_regex_patterns(ctx, pattern):
         },
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def inner(case):
         pass
-
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1348,13 +1326,10 @@ def test_negative_boolean_query_not_mutated_to_object(ctx):
     operation = schema["/users"]["GET"]
 
     # High count: ~1 in 4 boolean negatives is an object; enough draws to surface it reliably.
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(deadline=None, max_examples=50, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=50)
     def test(case):
         value = (case.query or {}).get("active")
         assert not isinstance(value, dict), f"boolean query mutated to coercible object: {value!r}"
-
-    test()
 
 
 def _is_fractional(value):

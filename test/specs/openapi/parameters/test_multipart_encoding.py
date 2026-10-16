@@ -12,6 +12,7 @@ from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import Binary
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
+from test.utils import run_given
 
 
 @pytest.fixture
@@ -76,13 +77,11 @@ def test_multipart_with_custom_encoding(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         # Then the file property should use the XML strategy
         assert case.body["file"] == b"<?xml version='1.0'?><root>test</root>"
         assert isinstance(case.body["name"], str)
-
-    test()
 
 
 def test_multipart_without_custom_encoding_uses_default(ctx):
@@ -101,12 +100,10 @@ def test_multipart_without_custom_encoding_uses_default(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert isinstance(case.body["file"], (bytes | Binary))
         assert isinstance(case.body["name"], str)
-
-    test()
 
 
 def test_multipart_encoding_without_registered_strategy_falls_back(ctx):
@@ -125,12 +122,10 @@ def test_multipart_encoding_without_registered_strategy_falls_back(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         # Should fall back to default strategy
         assert isinstance(case.body["file"], (bytes | Binary))
-
-    test()
 
 
 def test_multipart_multiple_properties_with_different_encodings(ctx):
@@ -159,13 +154,11 @@ def test_multipart_multiple_properties_with_different_encodings(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert case.body["document"] == b"<xml>data</xml>"
         assert case.body["spreadsheet"] == b"col1,col2\nval1,val2"
         assert isinstance(case.body["description"], str)
-
-    test()
 
 
 def test_multipart_encoding_with_multiple_content_types(ctx):
@@ -189,12 +182,10 @@ def test_multipart_encoding_with_multiple_content_types(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         # Should use one of the registered strategies
         assert case.body["image"] in (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff\xe0")
-
-    test()
 
 
 def test_urlencoded_form_with_encoding(ctx):
@@ -217,11 +208,9 @@ def test_urlencoded_form_with_encoding(ctx):
         path="/submit",
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert case.body["data"] == b"<data>test</data>"
-
-    test()
 
 
 def test_multipart_optional_properties(ctx):
@@ -243,13 +232,11 @@ def test_multipart_optional_properties(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert isinstance(case.body["name"], str)
         if "file" in case.body:
             assert case.body["file"] == b"<optional/>"
-
-    test()
 
 
 def test_multipart_wildcard_matching_specific_to_wildcard(ctx):
@@ -275,11 +262,9 @@ def test_multipart_wildcard_matching_specific_to_wildcard(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert case.body["avatar"] == b"\x89PNG\r\n\x1a\n"
-
-    test()
 
 
 def test_multipart_wildcard_matching_wildcard_to_specific(ctx):
@@ -307,11 +292,9 @@ def test_multipart_wildcard_matching_wildcard_to_specific(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert case.body["photo"] in (b"\x89PNG", b"\xff\xd8\xff")
-
-    test()
 
 
 def test_multipart_exact_match_preferred_over_wildcard(ctx):
@@ -334,11 +317,9 @@ def test_multipart_exact_match_preferred_over_wildcard(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert case.body["icon"] == b"EXACT"
-
-    test()
 
 
 def test_multipart_defensive_non_string_content_type(ctx):
@@ -421,14 +402,12 @@ def test_additional_properties_with_encoding(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert case.body["file"] == b"<xml/>"
         for key, value in case.body.items():
             if key != "file":
                 assert isinstance(value, str)
-
-    test()
 
 
 def test_empty_encoding_object(ctx):
@@ -446,11 +425,9 @@ def test_empty_encoding_object(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         assert "file" in case.body
-
-    test()
 
 
 def test_encoding_with_invalid_content_type_format(ctx):
@@ -468,12 +445,10 @@ def test_encoding_with_invalid_content_type_format(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         # Should handle empty string gracefully
         assert "file" in case.body
-
-    test()
 
 
 def test_multipart_comma_separated_without_custom_strategy(ctx):
@@ -494,7 +469,7 @@ def test_multipart_comma_separated_without_custom_strategy(ctx):
 
     content_types_seen = set()
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         if isinstance(case.body, dict):
             files, _ = case.operation.prepare_multipart(case.body, case.multipart_content_types)
@@ -514,7 +489,6 @@ def test_multipart_comma_separated_without_custom_strategy(ctx):
                         )
                         content_types_seen.add(content_type)
 
-    test()
     assert len(content_types_seen) == 2, f"Expected both content types, got: {content_types_seen}"
 
 
@@ -538,13 +512,11 @@ def test_multipart_optional_encoding_not_always_present(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         # Required field must always be present
         assert "required_field" in case.body
         # Optional field may or may not be present - both are valid
-
-    test()
 
 
 def test_multipart_json_encoding_serializes_object_field(ctx):
@@ -567,7 +539,7 @@ def test_multipart_json_encoding_serializes_object_field(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         kwargs = case.as_transport_kwargs(base_url="http://example.com")
         files = kwargs["files"]
@@ -581,8 +553,6 @@ def test_multipart_json_encoding_serializes_object_field(ctx):
                     f"expected JSON-serialized value, got {type(value).__name__}: {value!r}"
                 )
                 assert isinstance(json.loads(value), dict)
-
-    test()
 
 
 def test_multipart_yaml_encoding_serializes_object_field(ctx):
@@ -604,7 +574,7 @@ def test_multipart_yaml_encoding_serializes_object_field(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         kwargs = case.as_transport_kwargs(base_url="http://example.com")
         files = kwargs["files"]
@@ -616,8 +586,6 @@ def test_multipart_yaml_encoding_serializes_object_field(ctx):
                 assert isinstance(value, (str, bytes))
                 parsed = yaml.safe_load(value)
                 assert isinstance(parsed, dict) and "tag" in parsed
-
-    test()
 
 
 def test_multipart_custom_serializer_encoding(ctx, custom_part_serializer):
@@ -639,7 +607,7 @@ def test_multipart_custom_serializer_encoding(ctx, custom_part_serializer):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         kwargs = case.as_transport_kwargs(base_url="http://example.com")
         files = kwargs["files"]
@@ -649,8 +617,6 @@ def test_multipart_custom_serializer_encoding(ctx, custom_part_serializer):
                 _, value, content_type = payload
                 assert content_type == "application/x-part-custom"
                 assert value.startswith(b"CUSTOM:")
-
-    test()
 
 
 def test_multipart_encoding_with_unknown_content_type_fails(ctx):
@@ -672,12 +638,10 @@ def test_multipart_encoding_with_unknown_content_type_fails(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
+    @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         with pytest.raises(SerializationNotPossible, match="application/x-unknown-foo"):
             case.as_transport_kwargs(base_url="http://example.com")
-
-    test()
 
 
 def test_multipart_empty_body_sends_valid_terminator(ctx, case_factory):
@@ -715,9 +679,7 @@ def test_multipart_encoding_with_negative_mode(ctx):
         responses={"default": {}},
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=100)
     def test(case):
         # Should not raise "unhashable type: 'GeneratedValue'"
         pass
-
-    test()

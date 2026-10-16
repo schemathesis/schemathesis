@@ -1,5 +1,4 @@
 import pytest
-from hypothesis import given
 
 from schemathesis.config._auth import AuthConfig
 from schemathesis.core.jsonschema.resolver import make_root_resolver
@@ -80,11 +79,9 @@ def test_name_clash(ctx, kwargs, expected):
         security=SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME["security"],
     )
 
-    @given(case=schema["/test"]["GET"].as_strategy(**kwargs))
+    @run_given(case=schema["/test"]["GET"].as_strategy(**kwargs), max_examples=100)
     def test(case):
         assert case.headers[PARAMETER_NAME] == expected
-
-    test()
 
 
 @pytest.mark.parametrize("with_security_parameters", [True, False])

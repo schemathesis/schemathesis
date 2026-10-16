@@ -68,14 +68,11 @@ def test_cookies(ctx):
 
     strategy = operation.as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         response = case.call(app=app)
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -154,14 +151,11 @@ def test_base_url(ctx):
 
     strategy = operation.as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=1, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+    @run_given(case=strategy, max_examples=1)
     def test(case):
         response = case.call(app=app)
         # Then the base path should be respected and calls should not lead to 404
         assert response.status_code == 200
-
-    test()
 
 
 def test_schema_and_generated_requests_share_one_host():

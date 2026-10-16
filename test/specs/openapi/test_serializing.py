@@ -380,11 +380,9 @@ def test_path_serialization_styles_openapi3(ctx, schema, style, explode, expecte
         },
     )
 
-    @given(case=schema["/teapot/{color}"]["GET"].as_strategy())
+    @run_given(case=schema["/teapot/{color}"]["GET"].as_strategy(), max_examples=100)
     def test(case):
         assert case.path_parameters == expected
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -702,12 +700,9 @@ def test_querystring_binary_serialization_is_sent_as_raw_query(ctx):
         version="3.2.0",
     )
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=1, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert prepared_query_string(case) == "%FF%00A"
-
-    test()
 
 
 DELIMITED_ARRAY_SCHEMA = {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string", "enum": ["a,b"]}}

@@ -6,7 +6,7 @@ import requests
 from _pytest.main import ExitCode
 from fastapi import FastAPI
 from flask import jsonify, redirect
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, settings
 from pydantic import BaseModel, ConfigDict, Field
 from werkzeug.exceptions import InternalServerError
 
@@ -24,6 +24,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.generation.modes import GenerationMode
+from test.utils import run_given
 
 
 def _make_get_users_app() -> FastAPI:
@@ -302,14 +303,11 @@ def test_reproduce_when_validated_response_has_no_request_url(ctx, response_fact
 def test_curl_command_validity(curl, loose_schema):
     # When the input schema is too loose
 
-    @given(case=loose_schema["/test/{key}"]["POST"].as_strategy())
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
+    @run_given(case=loose_schema["/test/{key}"]["POST"].as_strategy(), max_examples=30)
     def test(case):
         command = case.as_curl_command()
         # Then generated command should always be syntactically valid
         curl.assert_valid(command)
-
-    test()
 
 
 @pytest.mark.parametrize(

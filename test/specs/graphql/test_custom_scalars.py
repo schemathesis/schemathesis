@@ -10,6 +10,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.graphql import nodes
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
+from test.utils import run_given
 
 UNSUPPORTED_SCALAR_SDL = """
 scalar FooBar
@@ -39,12 +40,10 @@ type Query {
 """
     schema = ctx.graphql.load_sdl(raw_schema)
 
-    @given(schema["Query"]["getByDate"].as_strategy())
+    @run_given(schema["Query"]["getByDate"].as_strategy(), max_examples=100)
     def test(case):
         # Then scalars should be properly generated
         assert f'getByDate(value: "{expected}")' in case.body
-
-    test()
 
 
 def test_custom_scalar_in_cli(ctx, testdir, cli, snapshot_cli):

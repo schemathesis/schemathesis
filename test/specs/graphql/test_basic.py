@@ -102,13 +102,10 @@ def test_operation_strategy(ctx):
     schema = _books_schema(ctx)
     strategy = schema["Query"]["getBooks"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    @run_given(case=strategy, max_examples=10)
     def test(case):
         response = case.call()
         assert response.status_code < 500
-
-    test()
 
 
 def test_operation_strategy_keeps_explicit_components(ctx):

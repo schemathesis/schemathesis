@@ -50,22 +50,16 @@ def _asserted():
 def test_registered_format_satisfies_its_own_validator(name, validator):
     # A generator whose values its own validator rejects turns every use of that format into a
     # false positive.
-    @given(_resolve(name))
-    @SETTINGS
+    @run_given(_resolve(name), max_examples=50)
     def test(value):
         assert validator.is_valid(value), value
-
-    test()
 
 
 @pytest.mark.parametrize("name", PUBLIC_FORMATS)
 def test_registered_format_generates_strings(name):
-    @given(_resolve(name))
-    @SETTINGS
+    @run_given(_resolve(name), max_examples=50)
     def test(value):
         assert isinstance(value, str), value
-
-    test()
 
 
 @pytest.mark.parametrize(("name", "bounds"), sorted(FORMAT_LENGTHS.items()))
@@ -74,12 +68,9 @@ def test_declared_format_lengths_hold(name, bounds):
     # silently drops cases.
     low, high = bounds
 
-    @given(_resolve(name))
-    @SETTINGS
+    @run_given(_resolve(name), max_examples=50)
     def test(value):
         assert low <= len(value) <= high, value
-
-    test()
 
 
 @given(st.data())
@@ -120,12 +111,9 @@ def test_binary_format_still_draws_arbitrary_bytes():
 
 @pytest.mark.parametrize("name", ["_header_value", "_basic_auth", "_bearer_auth", "_if_match_header"])
 def test_header_formats_are_transmittable(name):
-    @given(FORMATS[name])
-    @SETTINGS
+    @run_given(FORMATS[name], max_examples=50)
     def test(value):
         assert is_valid_header_value(value), value
-
-    test()
 
 
 @given(FORMATS["_header_name"])
@@ -142,12 +130,9 @@ def test_registering_a_format_invalidates_built_strategies():
     register_string_format("test-digits", st.text(alphabet="0123456789", min_size=1))
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @SETTINGS
+    @run_given(built, max_examples=50)
     def test(value):
         assert value.isdigit(), value
-
-    test()
 
 
 def test_length_window_no_format_value_reaches_admits_nothing():
@@ -174,12 +159,9 @@ def test_narrow_length_window_on_many_format_properties():
     validator = jsonschema_rs.Draft202012Validator({"type": "string", "format": "date-time"}, validate_formats=True)
     drawn = []
 
-    @given(built)
-    @SETTINGS
+    @run_given(built, max_examples=50)
     def test(value):
         drawn.append(value)
-
-    test()
 
     assert drawn
     for value in drawn:
@@ -195,13 +177,10 @@ def test_regex_format_respects_generation_alphabet():
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @SETTINGS
+    @run_given(built, max_examples=50)
     def test(value):
         assert "\x00" not in value
         value.encode("ascii")
-
-    test()
 
 
 def test_canonical_strategy_cache_respects_header_exclusions():
@@ -221,12 +200,9 @@ def test_canonical_strategy_cache_respects_header_exclusions():
     _canonical_strategy(schema, first_config, jsonschema_rs.Draft4Validator)
     built = _canonical_strategy(schema, second_config, jsonschema_rs.Draft4Validator)
 
-    @given(built)
-    @SETTINGS
+    @run_given(built, max_examples=50)
     def test(value):
         assert value["X-Foo"] == "B"
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -242,23 +218,17 @@ def test_binary_format_with_string_keywords(keywords):
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @SETTINGS
+    @run_given(built, max_examples=50)
     def test(value):
         assert isinstance(value, Binary), value
-
-    test()
 
 
 @pytest.mark.parametrize("name", ["email", "idn-email", "hostname", "idn-hostname", "uri", "iri", "uri-template"])
 def test_generated_domain_carries_a_dot(name):
     # A dotless domain is well-formed, yet the stricter checkers real services run reject it.
-    @given(_resolve(name))
-    @SETTINGS
+    @run_given(_resolve(name), max_examples=50)
     def test(value):
         assert "." in value.rsplit("@", 1)[-1], value
-
-    test()
 
 
 @pytest.mark.parametrize("name", ["email", "idn-email", "uri", "iri"])
@@ -270,12 +240,9 @@ def test_length_narrowed_domain_carries_a_dot(name):
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @SETTINGS
+    @run_given(built, max_examples=50)
     def test(value):
         assert "." in value.rsplit("@", 1)[-1], value
-
-    test()
 
 
 @pytest.mark.parametrize(

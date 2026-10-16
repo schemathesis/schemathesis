@@ -552,13 +552,11 @@ def test_loose_multipart_definition(ctx):
     )
     # Then non-object data should be excluded during generation
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test(case):
         assert isinstance(case.body, dict)
 
     # And the resulting values should be valid
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -603,16 +601,13 @@ def test_optional_form_parameters(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     strategy = schema["/api/multipart"]["POST"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         assume("maybe" in case.body)
         response = case.call()
         assert response.status_code == 200
         # Then they still should be possible to generate
         assert response.json()["maybe"] == to_wire_string(case.body["maybe"])
-
-    test()
 
 
 def test_ref_field(ctx):
