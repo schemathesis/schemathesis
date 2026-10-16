@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 import pytest
 from flask import jsonify, request
 
@@ -9,17 +11,21 @@ from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 
 
 def assert_links_work(response_factory, location, results, schema):
-    # Verify links are valid and expressions work
-    response = response_factory.requests(headers={"Location": location})
+    response = Response.from_requests(response_factory.requests(headers={"Location": location}), True)
     output = StepOutput(response=response, case=None)
+    location_segments = urlsplit(location).path.removeprefix(schema.base_path.rstrip("/")).split("/")
     for result in results:
         if "operationRef" in result:
             operation = schema.find_operation_by_reference(result["operationRef"])
         else:
             operation = schema.find_operation_by_id(result["operationId"])
-        assert operation is not None
-        for expr in result.get("parameters", {}).values():
-            expressions.evaluate(expr, output)
+        # Each link carries exactly the path parameters the Location fills, with their values.
+        expected = {
+            template[1:-1]: segment
+            for template, segment in zip(operation.path.split("/"), location_segments, strict=False)
+            if template.startswith("{")
+        }
+        assert {name: expressions.evaluate(expr, output) for name, expr in result["parameters"].items()} == expected
 
 
 def build_links(inferencer, location: str) -> list[dict]:
