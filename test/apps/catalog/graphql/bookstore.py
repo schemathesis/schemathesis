@@ -170,7 +170,7 @@ def _make_use_after_create() -> strawberry.Schema:
 
         @strawberry.mutation
         def updateBook(self, id: BookID, title: str) -> Book | None:
-            if id in books and title:
+            if id in books:
                 raise RuntimeError("planted: update-on-existing")
             return books.get(id)
 
@@ -202,7 +202,7 @@ def _make_tombstone() -> strawberry.Schema:
 
         @strawberry.mutation
         def updateBook(self, id: BookID, title: str) -> Book | None:
-            if id in books and title:
+            if id in books:
                 raise RuntimeError("planted: update-on-existing")
             return None
 
