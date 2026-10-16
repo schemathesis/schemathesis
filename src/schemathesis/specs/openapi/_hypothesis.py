@@ -558,23 +558,6 @@ class FormBodyWithContentTypes:
     content_types: dict[str, str]  # property_name -> selected content type
 
 
-def _form_property_value(value: GeneratedValue | dict[str, Any], key: str) -> Any:
-    """Reduce a `{key: value}` overlay result to its single value, keeping any constants provenance."""
-    if isinstance(value, GeneratedValue):
-        inner = value.value[key]
-        if value.constants_draws:
-            return GeneratedValue(
-                inner,
-                value.meta,
-                value.pool_draws,
-                value.semantic_draws,
-                value.dictionary_draws,
-                value.constants_draws,
-            )
-        return inner
-    return value[key]
-
-
 def _body_required_per_feedback(operation: APIOperation, error_feedback: ErrorFeedbackStore | None) -> bool:
     """Return True when the server reported the body itself as missing for this operation."""
     if error_feedback is None:
@@ -656,83 +639,59 @@ def _build_form_strategy_with_encoding(
     if not property_with_content_type_strategies and not property_content_type_selections:
         return None
 
-    # Build strategies for properties
-    property_strategies = {}
-    for property_name, subschema in properties.items():
-        if property_name in property_with_content_type_strategies:
-            # This property has custom content type - will be handled separately
-            continue
-        else:
-            strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
-            strategy = strategy_factory(
-                subschema,
-                operation.label,
-                ParameterLocation.BODY,
-                parameter.media_type,
-                generation_config,
-                operation.schema.adapter.jsonschema_validator_cls,
-            )
-            if constants_value_source is not None and generation_mode.is_positive:
-                strategy = build_constants_overlay_strategy(
-                    st.fixed_dictionaries({property_name: strategy}),
-                    source=constants_value_source,
-                    schema_properties={property_name: subschema},
-                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
-                    location="body",
-                    generation_config=generation_config,
-                ).map(lambda value, key=property_name: _form_property_value(value, key))
-            property_strategies[property_name] = strategy
-
-    # Build fixed dictionary strategy with optional properties
-    required = set(schema.get("required", []))
-    required_strategies = {k: v for k, v in property_strategies.items() if k in required}
-    optional_strategies = {k: _JUST_NOT_SET | v for k, v in property_strategies.items() if k not in required}
+    # Encoded properties take their values from the media type strategy; whether they are present, and every other
+    # property and object-level keyword, still follows the schema.
+    base_schema = {
+        **schema,
+        "properties": {
+            name: {} if name in property_with_content_type_strategies else subschema
+            for name, subschema in properties.items()
+        },
+    }
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    body_strategy = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode](
+        base_schema,
+        operation.label,
+        ParameterLocation.BODY,
+        parameter.media_type,
+        generation_config,
+        validator_cls,
+    )
+    if constants_value_source is not None and generation_mode.is_positive:
+        body_strategy = build_constants_overlay_strategy(
+            body_strategy,
+            source=constants_value_source,
+            schema_properties={
+                name: subschema
+                for name, subschema in properties.items()
+                if name not in property_with_content_type_strategies
+            },
+            validator_cls=validator_cls,
+            location="body",
+            generation_config=generation_config,
+            container_schema=base_schema,
+        )
 
     @st.composite  # type: ignore[untyped-decorator]
-    def build_body(draw: st.DrawFn) -> FormBodyWithContentTypes | GeneratedValue:
-        body: dict[str, Any] = {}
+    def build_body(draw: st.DrawFn) -> object:
+        generated = draw(body_strategy)
+        value = generated.value if isinstance(generated, GeneratedValue) else generated
+        # Negative bodies may not be objects at all, and then there are no parts to encode.
+        if not isinstance(value, dict):
+            return generated
+        body = dict(value)
         selected_content_types: dict[str, str] = {}
-        constants_draws: list[ConstantDraw] = []
-
-        def _take(strategy: st.SearchStrategy) -> Any:
-            result = draw(strategy)
-            if isinstance(result, GeneratedValue):
-                constants_draws.extend(result.constants_draws)
-                return result.value
-            return result
-
-        # Generate required properties
-        for key, strategy in required_strategies.items():
-            body[key] = _take(strategy)
-        # Generate optional properties, filtering out NOT_SET
-        for key, strategy in optional_strategies.items():
-            value = _take(strategy)
-            if value is not NOT_SET:
-                body[key] = value
-
-        # Generate properties with content type strategies (respecting optional)
-        for property_name, ct_strategy in property_with_content_type_strategies.items():
-            if property_name in required:
-                # Required - always generate
-                content_type, data = draw(ct_strategy)
+        for property_name, content_type_strategy in property_with_content_type_strategies.items():
+            if property_name in body:
+                content_type, data = draw(content_type_strategy)
                 body[property_name] = data
                 selected_content_types[property_name] = content_type
-            else:
-                # Optional - may omit
-                should_include = draw(st.booleans())
-                if should_include:
-                    content_type, data = draw(ct_strategy)
-                    body[property_name] = data
-                    selected_content_types[property_name] = content_type
-
-        # For properties with comma-separated content types (but no custom strategy),
-        # randomly select one of the content types
+        # Properties with several content types but no registered strategy get one of those content types
         for property_name, content_type_list in property_content_type_selections.items():
             selected_content_types[property_name] = draw(st.sampled_from(content_type_list))
-
         result = FormBodyWithContentTypes(body=body, content_types=selected_content_types)
-        if constants_draws:
-            return GeneratedValue(result, None, (), (), (), tuple(constants_draws))
+        if isinstance(generated, GeneratedValue):
+            return generated.map_value(lambda _: result)
         return result
 
     return build_body()
