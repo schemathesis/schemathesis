@@ -20,6 +20,7 @@ def _stateful_feedback(engine: EngineContext) -> FeedbackSources:
         extra_data_source=engine.extra_data_source,
         error_feedback=engine.error_feedback,
         constants_value_source=engine.constants_value_source(),
+        answered_credential_removals=engine.credential_removals,
     )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from itertools import islice
 from typing import TYPE_CHECKING, Any, cast
 
 import jsonschema_rs
@@ -57,10 +58,13 @@ from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.resources import ExtraDataSource, PoolDraw, SemanticDraw
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import (
+    CredentialRemoval,
     OpenApiBody,
+    OpenApiParameter,
     OpenApiParameterSet,
     build_constants_overlay_strategy,
 )
+from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
 from schemathesis.specs.openapi.coverage._schema import ANNOTATION_KEYWORDS
 from schemathesis.specs.openapi.diagnostics import build_unsatisfiable_schema_error
 from schemathesis.specs.openapi.formats import (
@@ -178,6 +182,16 @@ def openapi_cases(
         body_is_generated=body is NOT_SET,
     )
 
+    credential_removal = None
+    if generation_mode.is_negative and get_sole_credential(operation) is not None:
+        if (
+            feedback.answered_credential_removals is not None
+            and operation.label in feedback.answered_credential_removals
+        ):
+            credential_removal = CredentialRemoval.ANSWERED
+        else:
+            credential_removal = CredentialRemoval.PENDING
+
     # Drawn in this order: path, headers, cookies, query.
     path_parameters_, headers_, cookies_, query_ = (
         generate_parameter(
@@ -197,6 +211,7 @@ def openapi_cases(
             exclude=feedback.auth_headers
             if location == ParameterLocation.HEADER and generation_mode.is_positive
             else frozenset(),
+            credential_removal=credential_removal if location is ParameterLocation.HEADER else None,
         )
         for location, explicit in (
             (ParameterLocation.PATH, path_parameters),
@@ -796,6 +811,7 @@ def get_parameters_value(
     error_feedback: ErrorFeedbackStore | None = None,
     constants_value_source: ConstantsPool | None = None,
     exclude: frozenset[str] = frozenset(),
+    credential_removal: CredentialRemoval | None = None,
 ) -> GeneratedValue:
     """Get the final value for the specified location.
 
@@ -813,6 +829,7 @@ def get_parameters_value(
             mix_examples=mix_examples,
             error_feedback=error_feedback,
             constants_value_source=constants_value_source,
+            credential_removal=credential_removal,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
@@ -830,6 +847,7 @@ def get_parameters_value(
         error_feedback=error_feedback,
         mix_examples=mix_examples,
         constants_value_source=constants_value_source,
+        credential_removal=credential_removal,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
@@ -948,6 +966,7 @@ def generate_parameter(
     error_feedback: ErrorFeedbackStore | None = None,
     constants_value_source: ConstantsPool | None = None,
     exclude: frozenset[str] = frozenset(),
+    credential_removal: CredentialRemoval | None = None,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -974,6 +993,7 @@ def generate_parameter(
         mix_examples=mix_examples,
         constants_value_source=constants_value_source,
         exclude=exclude,
+        credential_removal=credential_removal,
     )
     value = generated.value
     if value is not None and location == ParameterLocation.PATH:
@@ -1068,6 +1088,27 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
     return any(name in required or not _is_plain_header(header) for name, header in headers.items())
 
 
+def get_sole_credential(operation: APIOperation) -> OpenApiParameter | None:
+    """The required credential header that is the operation's only input and has a value worth negating."""
+    if operation.body:
+        return None
+    parameters = list(islice(operation.iter_parameters(), 2))
+    if len(parameters) != 1:
+        return None
+    parameter = cast(OpenApiParameter, parameters[0])
+    if (
+        parameter.location != ParameterLocation.HEADER
+        or not parameter.is_required
+        or ORIGINAL_SECURITY_TYPE_KEY not in parameter.definition
+    ):
+        return None
+    schema = cast(OpenApiParameterSet, operation.headers).schema["properties"][parameter.name]
+    # Any string satisfies a plain header, so leaving it out is the only negative request it has.
+    if _is_plain_header(schema):
+        return None
+    return parameter
+
+
 _PLAIN_HEADERS = ({"type": "string"}, *({"type": "string", "format": f} for f in PLAIN_HEADER_FORMATS))
 _NULL_SCHEMA = {"type": "null"}
 
@@ -1100,6 +1141,7 @@ def get_parameters_strategy(
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
     constants_value_source: ConstantsPool | None = None,
+    credential_removal: CredentialRemoval | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
@@ -1114,6 +1156,7 @@ def get_parameters_strategy(
             mix_examples=mix_examples,
             error_feedback=error_feedback,
             constants_value_source=constants_value_source,
+            credential_removal=credential_removal,
         )
     # No parameters defined for this location
     return _NONE_STRATEGY

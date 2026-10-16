@@ -1,4 +1,7 @@
+import re
+
 import pytest
+from _pytest.main import ExitCode
 from flask import jsonify, request
 
 AUTH_CONFIGS = {
@@ -679,3 +682,91 @@ def test_alternative_credentials_generated_without_auth(ctx, cli):
     app, api_keys = _api_key_or_bearer_app(ctx)
     cli.run_openapi_app(app, "--phases=coverage,fuzzing", "--mode=positive", "--max-examples=10")
     assert set(api_keys) - {None}
+
+
+def _requests_without_credential(api, path):
+    return [request for request in api.requests if request.path == path and "Authorization" not in request.headers]
+
+
+@pytest.mark.parametrize(("phase", "expected"), [("fuzzing", 2), ("stateful", 18), ("coverage,fuzzing,stateful", 9)])
+def test_request_without_sole_credential_is_not_repeated(ctx, cli, phase, expected):
+    # Leaving out the only credential is one fixed request; with a query parameter it still varies.
+    api = ctx.openapi.apps.basic_linked_to_query()
+
+    result = cli.run(
+        api.schema_url,
+        "--auth=test:test",
+        f"--phases={phase}",
+        "--mode=negative",
+        "--checks=not_a_server_error",
+        "--max-examples=50",
+        "--seed=1",
+    )
+
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert len(_requests_without_credential(api, "/api/basic")) == expected
+    assert len(_requests_without_credential(api, "/api/basic_query")) > expected
+
+
+def test_server_that_stops_rejecting_missing_credential_is_reported(ctx, cli):
+    # The first request without the credential is rejected; every later one is accepted.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/flip": {
+                "get": {
+                    "operationId": "flip",
+                    "security": [{"basicAuth": []}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"secret": {"type": "integer"}}}
+                                }
+                            },
+                            "links": {
+                                "FlipQuery": {"operationId": "flipQuery", "parameters": {"q": "$response.body#/secret"}}
+                            },
+                        },
+                        "401": {"description": "Unauthorized"},
+                    },
+                }
+            },
+            "/api/flip_query": {
+                "get": {
+                    "operationId": "flipQuery",
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+    rejected = []
+
+    @app.route("/api/flip")
+    def flip():
+        if "Authorization" not in request.headers and not rejected:
+            rejected.append(True)
+            return jsonify({}), 401
+        if request.headers.get("Authorization", "Basic dGVzdDp0ZXN0") != "Basic dGVzdDp0ZXN0":
+            return jsonify({}), 401
+        return jsonify({"secret": 42})
+
+    @app.route("/api/flip_query")
+    def flip_query():
+        if re.fullmatch(r"-?[0-9]+", request.args.get("q", "")) is None:
+            return jsonify({}), 400
+        return jsonify({})
+
+    result = cli.run_openapi_app(
+        app,
+        "--auth=test:test",
+        "--phases=coverage,fuzzing",
+        "--mode=negative",
+        "--checks=negative_data_rejection",
+        "--max-examples=50",
+        "--seed=1",
+    )
+
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout

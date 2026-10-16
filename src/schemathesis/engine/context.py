@@ -14,6 +14,7 @@ from schemathesis.core.error_feedback.collector import record_observations
 from schemathesis.core.statistic import StatefulInference
 from schemathesis.engine._lazy import LazyInit
 from schemathesis.engine.control import ExecutionControl
+from schemathesis.engine.credential_removals import CredentialRemovals
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.engine.observations import Observations
@@ -104,6 +105,7 @@ class EngineContext:
         "coverage_unexpected_methods_seen",
         "auth_enforced_operations",
         "auth_header_log",
+        "credential_removals",
         "reauth",
     )
 
@@ -153,6 +155,7 @@ class EngineContext:
         # Operations whose missing and invalid credentials were already rejected in this run.
         self.auth_enforced_operations: set[str] = set()
         self.auth_header_log = AuthHeaderLog()
+        self.credential_removals = CredentialRemovals()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -229,6 +232,7 @@ class EngineContext:
             constants_value_source=self.constants_value_source(),
             auth_header_log=self.auth_header_log,
             auth_headers=self.auth_header_log.get(operation.label),
+            answered_credential_removals=self.credential_removals.for_run(operation.label),
         )
 
     def _extra_data_source_for(self, *, operation: APIOperation, phase: PhaseName) -> ExtraDataSource | None:

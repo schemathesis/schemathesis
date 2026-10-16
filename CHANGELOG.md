@@ -13,6 +13,7 @@
 ### :wrench: Changed
 
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
+- Negative testing stops repeating the request that leaves out an operation's only credential.
 - HTML report lists failures and failed operations most severe first.
 - HTML report shows run details above warnings and the first 10 operations of each warning.
 
