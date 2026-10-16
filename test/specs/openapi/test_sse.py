@@ -6,7 +6,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from flask import Flask, Response, jsonify, stream_with_context
-from hypothesis import HealthCheck, given, settings
 from requests import Request
 from requests.exceptions import ChunkedEncodingError, ContentDecodingError
 
@@ -17,6 +16,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response as TransportResponse
 from schemathesis.openapi.checks import JsonSchemaError
 from schemathesis.specs.openapi.checks import response_schema_conformance
+from test.utils import run_given
 
 SSE_ITEM_SCHEMA = {
     "type": "object",
@@ -1189,13 +1189,10 @@ def test_sse_pytest_plugin(ctx):
     schema = ctx.openapi.load_schema(raw_schema["paths"], version="3.2.0")
     strategy = schema["/sse"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=10, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+    @run_given(case=strategy, max_examples=10)
     def test(case):
         response = case.call(app=app)
         case.validate_response(response)
-
-    test()
 
 
 @pytest.mark.parametrize(

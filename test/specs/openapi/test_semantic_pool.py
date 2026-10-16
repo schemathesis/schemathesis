@@ -5,7 +5,6 @@ import json
 import jsonschema_rs
 import pytest
 from flask import Response, jsonify, request
-from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from schemathesis.config import GenerationConfig
@@ -1222,16 +1221,10 @@ def test_overlay_does_not_mutate_shared_example_dict():
     inner = st.just(shared)
     overlay = build_semantic_overlay(inner, [descriptor], index, jsonschema_rs.Draft202012Validator)
 
-    @given(overlay)
-    @settings(
-        max_examples=30,
-        deadline=None,
-        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-    )
+    @run_given(overlay, max_examples=30)
     def collect(value):
         pass
 
-    collect()
     assert shared == {"email": "ok@example.com"}, f"overlay mutated shared example dict in place; saw {shared}"
 
 
@@ -2103,15 +2096,12 @@ def test_semantic_overlay_drops_overwritten_constant_provenance():
     )
     overlay = build_semantic_overlay(inner, [descriptor], index, jsonschema_rs.Draft202012Validator)
 
-    @given(overlay)
-    @settings(max_examples=60, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    @run_given(overlay, max_examples=60)
     def collect(result):
         if not isinstance(result, GeneratedValue):
             return
         for draw in result.constants_draws:
             assert result.value["code"] == draw.value, "stale constant provenance after semantic overwrite"
-
-    collect()
 
 
 def test_walker_recurses_into_arrays_of_objects():

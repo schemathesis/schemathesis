@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 from flask import Flask, abort, got_request_exception, jsonify
-from hypothesis import HealthCheck, given, settings
 from werkzeug.exceptions import HTTPException
+
+from test.utils import run_given
 
 
 @pytest.mark.hypothesis_nested
@@ -17,13 +18,10 @@ def test_wsgi_reraises_server_exception(ctx):
     operation = ctx.openapi.load_operation("GET /api/crash", {"responses": {"200": {"description": "OK"}}})
     strategy = operation.as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=1, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+    @run_given(case=strategy, max_examples=1)
     def test(case):
         with pytest.raises(ValueError, match="something broke"):
             case.call(app=app)
-
-    test()
 
 
 def test_wsgi_server_exception_keeps_its_own_notes(ctx):

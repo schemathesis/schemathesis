@@ -873,12 +873,9 @@ def test_valid_headers(ctx, swagger_20, definition):
         ),
     )
 
-    @given(case=operation.as_strategy())
-    @settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], deadline=None, max_examples=10)
+    @run_given(case=operation.as_strategy(), max_examples=10)
     def inner(case):
         case.call()
-
-    inner()
 
 
 def make_swagger(*parameters):
@@ -949,13 +946,11 @@ def test_valid_form_data(ctx, raw_schema):
     schema = ctx.openapi.from_full_schema(raw_schema)
     schema.config.update(base_url=f"{api.base_url}/api")
 
-    @given(case=schema["/form"]["POST"].as_strategy())
-    @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=10)
+    @run_given(case=schema["/form"]["POST"].as_strategy(), max_examples=10)
     def inner(case):
         case.call()
 
     # Then these values should be cast to bytes and handled successfully
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -984,14 +979,12 @@ def test_optional_form_data(ctx):
     # It is done mostly due to performance reasons
     schema.config.update(base_url=f"{api.base_url}/api")
 
-    @given(case=schema["/form"]["POST"].as_strategy())
-    @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], max_examples=1)
+    @run_given(case=schema["/form"]["POST"].as_strategy(), max_examples=1)
     def inner(case):
         assume(case.body is NOT_SET)
         case.call()
 
     # Then payload can be absent
-    inner()
 
 
 @pytest.mark.parametrize(
@@ -2460,12 +2453,9 @@ def test_pattern_properties_root_reference_overlap():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=50, deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
+    @run_given(built, max_examples=50)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 def test_canonical_contains_conflicting_formats_never_unsound():
@@ -2783,13 +2773,10 @@ def test_canonical_one_of_admits_only_what_a_single_branch_takes():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=50, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    @run_given(built, max_examples=50)
     def test(value):
         # Values both branches take belong to neither of them alone.
         assert is_valid(value), value
-
-    test()
 
     # Both ends stay reachable; only the overlap between them is gone.
     find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
@@ -2806,12 +2793,9 @@ def test_canonical_one_of_branches_naming_draft_4_definitions():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
     is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
     # Ceiling for a search that stops at the first match.
     find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
@@ -2833,12 +2817,9 @@ def test_canonical_one_of_beside_a_conjunction_drives_the_draw():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
     find(built, lambda value: value["mode"] == "onDemand", settings=settings(max_examples=1000, database=None))
 
@@ -3022,12 +3003,9 @@ def test_canonical_script_property_patterns(schema):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 def test_canonical_unknown_script_property_is_named():
@@ -3697,12 +3675,9 @@ def test_canonical_format_drops_values_over_the_length_bound():
     schema = {"type": "string", "format": "date-time", "maxLength": 25}
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    @run_given(built, max_examples=25)
     def test(value):
         assert len(value) <= 25, value
-
-    test()
 
 
 def test_canonical_format_drops_values_the_pattern_rejects():
@@ -4054,12 +4029,9 @@ def test_metaschema_generation(validator_cls, metaschema):
     built = _canonical_strategy(metaschema, GenerationConfig(), validator_cls)
     is_valid = validator_cls(metaschema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 @pytest.mark.parametrize(("validator_cls", "metaschema"), METASCHEMAS, ids=METASCHEMA_IDS)

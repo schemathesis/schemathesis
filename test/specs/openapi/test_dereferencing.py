@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from flask import Flask, jsonify
-from hypothesis import HealthCheck, given, settings
+from hypothesis import given, settings
 from hypothesis.errors import Unsatisfiable
 from jsonschema_rs import Draft4Validator
 from werkzeug.exceptions import InternalServerError
@@ -152,16 +152,13 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
 
     validator = Draft4Validator({**USER_REFERENCE, "components": raw_schema["components"]})
 
-    @given(case=schema["/users"]["POST"].as_strategy())
-    @settings(max_examples=25, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
+    @run_given(case=schema["/users"]["POST"].as_strategy(), max_examples=25)
     def test(case):
         # Generated payload should be valid for the original schema (with references)
         try:
             validator.validate(case.body)
         except RecursionError:
             pass
-
-    test()
 
 
 @pytest.mark.parametrize(

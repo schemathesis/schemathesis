@@ -394,12 +394,10 @@ def test_valid_headers():
         Draft4Validator,
     )
 
-    @given(strategy)
+    @run_given(strategy, max_examples=100)
     def test(headers):
         # Then headers are always valid
         assert is_valid_header(headers)
-
-    test()
 
 
 @pytest.mark.parametrize("spec_required", [True, False], ids=["spec-required", "spec-optional"])
@@ -456,13 +454,11 @@ def test_configure_headers():
         Draft4Validator,
     )
 
-    @given(strategy)
+    @run_given(strategy, max_examples=100)
     def test(headers):
         # Then headers are always valid
         assert is_valid_header(headers)
         assert set(headers["X-Foo"]) - {"A", "B", "C"} == set()
-
-    test()
 
 
 def test_as_strategy_keeps_passed_headers_unchanged(ctx):
@@ -644,12 +640,10 @@ def test_no_much_filtering_in_headers():
         Draft4Validator,
     )
 
-    @given(strategy)
+    @run_given(strategy, max_examples=100)
     def test(_):
         # Then there should be no failed health checks
         pass
-
-    test()
 
 
 @pytest.fixture
@@ -796,11 +790,9 @@ def test_missing_header_filter(ctx):
         },
     )
 
-    @given(operation.as_strategy())
+    @run_given(operation.as_strategy(), max_examples=100)
     def test(case):
         assert is_valid_header(case.headers)
-
-    test()
 
 
 def test_serializing_shared_header_parameters(ctx):
@@ -818,11 +810,9 @@ def test_serializing_shared_header_parameters(ctx):
         version="2.0",
     )
 
-    @given(schema["/data"]["GET"].as_strategy())
+    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=100)
     def test(case):
         assert is_valid_header(case.headers)
-
-    test()
 
 
 FORM_BODY = {
