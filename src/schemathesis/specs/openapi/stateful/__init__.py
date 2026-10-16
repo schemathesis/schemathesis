@@ -481,12 +481,12 @@ def into_step_input(
 
                     if selected_fields:
                         if isinstance(case.body, dict):
-                            case.body = {**case.body, **selected_fields}
+                            case.body = _merge_link_body(case.body, selected_fields)
                         else:
                             # Can't merge into non-dict, replace entirely
                             case.body = selected_fields
                 elif biased_coin(use_p):
-                    case.body = request_body
+                    case.body = _merge_link_body(case.body, request_body)
                     applied_parameters.append((ParameterLocation.BODY, None))
                 if case._meta is not None:
                     case._meta.constants_draws = prune_overwritten_body_constants(case._meta.constants_draws, case.body)
@@ -495,6 +495,20 @@ def into_step_input(
         return inner(output=_output)
 
     return builder
+
+
+def _merge_link_body(generated: object, linked: object) -> object:
+    """Apply link values onto the generated body, keeping generated fields of nested objects and array items."""
+    if isinstance(generated, dict) and isinstance(linked, dict):
+        merged = dict(generated)
+        for key, value in linked.items():
+            merged[key] = _merge_link_body(generated[key], value) if key in generated else value
+        return merged
+    if isinstance(generated, list) and isinstance(linked, list):
+        # Link items apply to generated items at the same index; unmatched items on either side are kept.
+        merged_items = [_merge_link_body(item, value) for item, value in zip(generated, linked, strict=False)]
+        return merged_items + generated[len(linked) :] + linked[len(generated) :]
+    return linked
 
 
 def _choose_wildcard_matches(value: Any, random: Random) -> Any:
