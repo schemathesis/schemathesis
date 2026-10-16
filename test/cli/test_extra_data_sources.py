@@ -1406,3 +1406,90 @@ def test_extra_data_sources_examples_phase_disabled(cli, snapshot_cli, ctx):
         )
         == snapshot_cli
     )
+
+
+_ITEM_SCHEMA = _object_schema(
+    {"name": {"type": "string", "minLength": 1}, "groupId": {"type": "string"}},
+    required=["name", "groupId"],
+    additionalProperties=False,
+)
+
+
+@pytest.mark.parametrize(
+    ("data_schema", "example", "expected"),
+    [
+        (_ITEM_SCHEMA, {"name": "x", "groupId": "G-EX"}, [{"name": "x", "groupId": "G-REAL"}]),
+        (
+            {"$ref": "#/components/schemas/Item"},
+            {"name": "x", "groupId": "G-EX"},
+            [{"name": "x", "groupId": "G-REAL"}],
+        ),
+        (
+            {"type": "array", "minItems": 1, "items": _ITEM_SCHEMA},
+            [{"name": "x", "groupId": "G-EX"}, {"name": "y", "groupId": "G-EX"}],
+            [[{"name": "x", "groupId": "G-REAL"}, {"name": "y", "groupId": "G-REAL"}]],
+        ),
+        (_ITEM_SCHEMA, None, None),
+        ({"$ref": "#/components/schemas/Item"}, None, None),
+        ({"type": "array", "minItems": 1, "items": _ITEM_SCHEMA}, None, None),
+        ({**_ITEM_SCHEMA, "not": {"properties": {"groupId": {"const": "G-REAL"}}}}, None, []),
+    ],
+    ids=[
+        "inline",
+        "ref",
+        "array",
+        "inline-no-example",
+        "ref-no-example",
+        "array-no-example",
+        "captured-id-not-allowed",
+    ],
+)
+def test_examples_phase_keeps_example_fields_around_nested_captured_id(cli, ctx, data_schema, example, expected):
+    request_body_extra = {} if example is None else {"example": {"data": example}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/groups": {
+                "post": {
+                    "responses": {
+                        "201": _json_response(
+                            _object_schema(
+                                {"data": _object_schema({"id": {"type": "string"}}, required=["id"])},
+                                required=["data"],
+                            ),
+                            description="",
+                        )
+                    }
+                }
+            },
+            "/items": {
+                "post": {
+                    "requestBody": _json_request_body(
+                        _object_schema({"data": data_schema}, required=["data"], additionalProperties=False),
+                        **request_body_extra,
+                    ),
+                    "responses": {"201": {"description": ""}},
+                }
+            },
+        },
+        components={"schemas": {"Item": _ITEM_SCHEMA}},
+    )
+    sent = []
+
+    @app.route("/groups", methods=["POST"])
+    def create_group():
+        return jsonify({"data": {"id": "G-REAL"}}), 201
+
+    @app.route("/items", methods=["POST"])
+    def create_items():
+        sent.append(request.get_json()["data"])
+        return "", 201
+
+    cli.run_openapi_app(app, "--phases=examples", "--mode=positive", config=_examples_fill_missing_config())
+
+    with_captured_id = [data for data in sent if "G-REAL" in str(data)]
+    if expected is not None:
+        assert with_captured_id == expected
+    else:
+        items = [item for data in with_captured_id for item in (data if isinstance(data, list) else [data])]
+        assert items
+        assert all(item["groupId"] == "G-REAL" and item.get("name") for item in items), items

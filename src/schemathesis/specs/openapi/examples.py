@@ -40,7 +40,12 @@ from schemathesis.specs.openapi._hypothesis import (
     openapi_cases,
     snapped_float32_clone,
 )
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import (
+    OpenApiBody,
+    OpenApiParameter,
+    OpenApiParameterSet,
+    _deep_merge_overlay,
+)
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from schemathesis.specs.openapi.formats import format_lengths_for
 
@@ -219,10 +224,7 @@ def get_strategies_from_examples(
         # Round-robin merge: schema as base, pool wins for overlapping keys.
         n = max(len(schema_combos), len(pool_combos))
         pool_augmented = [
-            merge_kwargs(
-                {k: dict(v) if isinstance(v, dict) else v for k, v in schema_combos[i % len(schema_combos)].items()},
-                pool_combos[i % len(pool_combos)],
-            )
+            _with_pool_values(schema_combos[i % len(schema_combos)], pool_combos[i % len(pool_combos)])
             for i in range(n)
         ]
         # Keep original schema combos; append pool-augmented ones that differ.
@@ -234,7 +236,7 @@ def get_strategies_from_examples(
     elif schema_combos:
         all_combos = schema_combos
     elif pool_combos and fill_missing:
-        all_combos = [{k: dict(v) if isinstance(v, dict) else v for k, v in combo.items()} for combo in pool_combos]
+        all_combos = [_with_complete_pool_body(operation, combo) for combo in pool_combos]
     else:
         all_combos = []
 
@@ -248,6 +250,39 @@ def get_strategies_from_examples(
         ).map(serialize_components)
         for combo in all_combos
     ]
+
+
+def _with_pool_values(combo: dict[str, Any], pool_combo: dict[str, Any]) -> dict[str, Any]:
+    """`combo` with captured values on top; a captured field deep in the body keeps the example's other fields."""
+    result = {key: dict(value) if isinstance(value, dict) else value for key, value in combo.items()}
+    pool_body = pool_combo.get("body")
+    if isinstance(pool_body, dict) and isinstance(result.get("body"), dict):
+        body = deepclone(result["body"])
+        _deep_merge_overlay(body, pool_body)
+        pool_combo = {**pool_combo, "body": body}
+    return merge_kwargs(result, pool_combo)
+
+
+def _with_complete_pool_body(operation: OpenApiOperation, combo: dict[str, Any]) -> dict[str, Any]:
+    """`combo` with the body fields its captured values leave out drawn from the schema."""
+    result = {key: dict(value) if isinstance(value, dict) else value for key, value in combo.items()}
+    pool_body = result.get("body")
+    if not isinstance(pool_body, dict):
+        return result
+    body = next(candidate for candidate in operation.body if candidate.media_type == result["media_type"])
+    schema = body.validation_schema
+    validator = _make_example_validator(schema)
+    if _example_is_valid(pool_body, validator):
+        return result
+    drawn = _draw_object(schema, operation) if isinstance(schema, dict) else None
+    if drawn is not None:
+        _deep_merge_overlay(drawn, pool_body)
+        if _example_is_valid(drawn, validator):
+            result["body"] = drawn
+            return result
+    # Generation fills the body when the captured fields cannot make one that conforms.
+    del result["body"], result["media_type"]
+    return result
 
 
 def _with_defaults(
@@ -816,12 +851,17 @@ def _completed_body_example(
     except ValueError:
         # `is_valid` tolerates a value outside the JSON types, but listing its errors raises on one.
         return None
-    config = operation.schema.config.generation_for(operation=operation, phase="examples")
-    generated = _generate_single_example(validation_schema, config, operation.schema.adapter.jsonschema_validator_cls)
-    if not isinstance(generated, dict):
+    generated = _draw_object(validation_schema, operation)
+    if generated is None:
         return None
     merged = _deep_merge(generated, value)
     return merged if _example_is_valid(merged, validator) else None
+
+
+def _draw_object(validation_schema: dict[str, Any], operation: APIOperation) -> dict[str, Any] | None:
+    config = operation.schema.config.generation_for(operation=operation, phase="examples")
+    generated = _generate_single_example(validation_schema, config, operation.schema.adapter.jsonschema_validator_cls)
+    return generated if isinstance(generated, dict) else None
 
 
 def _example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:
