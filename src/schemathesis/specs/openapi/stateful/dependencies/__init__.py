@@ -17,6 +17,7 @@ from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_res
 from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
+    NestedFKCache,
     align_created_identifiers,
     bind_created_item_keys,
     bind_echoed_body_fields,
@@ -73,6 +74,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     canonicalization_cache: CanonicalizationCache = {}
     # Per-operation response resources, materialized once and replayed by input + output extraction
     response_resource_cache: ResponseResourceCache = {}
+    nested_fk_cache: NestedFKCache = {}
 
     # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
@@ -101,6 +103,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     resolver=schema.root_resolver,
                     canonicalization_cache=canonicalization_cache,
                     response_resource_cache=response_resource_cache,
+                    nested_fk_cache=nested_fk_cache,
                     deferred_nested_fks=pending,
                     deferred_named_scalars=pending_named_scalars,
                     deferred_body_fields=pending_body_fields,
@@ -216,8 +219,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Example:
     #   - `DELETE /users/{userId}` initially inferred `User.fields=["userId"]`
     #   - then `POST /users` response revealed `User.fields=["id", "email"]`
-    for resource in updated_resources:
-        update_input_field_bindings(resource, operations)
+    update_input_field_bindings(updated_resources, operations)
 
     # Merge parameter-inferred resources with schema-defined ones
     merge_related_resources(operations, resources)

@@ -642,35 +642,58 @@ def remove_unused_resources(operations: OperationMap, resources: ResourceMap) ->
         del resources[resource_name]
 
 
-def _collect_properties(
-    schema: Mapping[str, Any], resolver: Resolver, seen: frozenset[str] = frozenset()
-) -> dict[str, tuple[Resolver, JsonSchema]]:
+Properties: TypeAlias = dict[str, tuple[Resolver, JsonSchema]]
+# Properties behind a reference, with every reference consulted while collecting them.
+PropertiesCache: TypeAlias = dict[tuple[str, str], tuple[Properties, frozenset[str]]]
+
+
+def _collect_properties(schema: Mapping[str, Any], resolver: Resolver) -> Properties:
+    return _collect_inherited_properties(schema, resolver, frozenset(), {})[0]
+
+
+def _collect_inherited_properties(
+    schema: Mapping[str, Any], resolver: Resolver, seen: frozenset[str], cache: PropertiesCache
+) -> tuple[Properties, frozenset[str]]:
     # Properties inherited through `allOf` belong to the resource as much as its own ones.
-    properties: dict[str, tuple[Resolver, JsonSchema]] = {}
+    properties: Properties = {}
     own = schema.get("properties")
     if isinstance(own, dict):
         properties.update((name, (resolver, subschema)) for name, subschema in own.items())
     branches = schema.get("allOf")
     if not isinstance(branches, list):
-        return properties
+        return properties, frozenset()
+    consulted: set[str] = set()
     for branch in branches:
         if not isinstance(branch, dict):
             continue
-        branch_resolver = resolver
         reference = branch.get("$ref")
-        if reference is not None:
-            if not isinstance(reference, str) or reference in seen:
-                continue
-            try:
-                branch_resolver, branch = maybe_resolve_with_resolver(branch, resolver)
-            except (RefResolutionError, InvalidSchema):
-                continue
-            branch_seen = seen | {reference}
+        if reference is None:
+            branch_properties, branch_consulted = _collect_inherited_properties(branch, resolver, seen, cache)
         else:
-            branch_seen = seen
-        for name, entry in _collect_properties(branch, branch_resolver, branch_seen).items():
+            if not isinstance(reference, str):
+                continue
+            consulted.add(reference)
+            if reference in seen:
+                continue
+            key = (resolver.base_uri, reference)
+            cached = cache.get(key)
+            # Reusable only when no reference it consulted is on the current path, as the cycle guard would differ
+            if cached is not None and seen.isdisjoint(cached[1]):
+                branch_properties, branch_consulted = cached
+            else:
+                try:
+                    branch_resolver, resolved = maybe_resolve_with_resolver(branch, resolver)
+                except (RefResolutionError, InvalidSchema):
+                    continue
+                branch_properties, branch_consulted = _collect_inherited_properties(
+                    resolved, branch_resolver, seen | {reference}, cache
+                )
+                if seen.isdisjoint(branch_consulted):
+                    cache[key] = (branch_properties, branch_consulted)
+        consulted.update(branch_consulted)
+        for name, entry in branch_properties.items():
             properties.setdefault(name, entry)
-    return properties
+    return properties, frozenset(consulted)
 
 
 def _declared_fields(schema: Mapping[str, Any], resolver: Resolver) -> frozenset[str] | None:

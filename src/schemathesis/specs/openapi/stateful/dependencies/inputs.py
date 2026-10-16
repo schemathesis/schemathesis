@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
-from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
@@ -44,6 +44,7 @@ def extract_inputs(
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
+    nested_fk_cache: NestedFKCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
@@ -116,6 +117,7 @@ def extract_inputs(
             operation=operation,
             resources=resources,
             known_dependencies=known_dependencies,
+            nested_fk_cache=nested_fk_cache,
             updated_resource=updated_resource,
             deferred_nested_fks=deferred_nested_fks,
             deferred_named_scalars=deferred_named_scalars,
@@ -375,6 +377,7 @@ def _resolve_body_dependencies(
     operation: APIOperation,
     resources: ResourceMap,
     known_dependencies: set[str],
+    nested_fk_cache: NestedFKCache,
     updated_resource: str | None = None,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
@@ -500,13 +503,34 @@ def _resolve_body_dependencies(
         )
 
     # Recursively find nested FK fields in request body
-    yield from _extract_nested_body_fk_fields(resolved, resources, bundled, deferred=deferred_nested_fks)
+    scan = NestedFKScan(
+        bundled=bundled, name_to_uri=body.name_to_uri, by_reference=nested_fk_cache, by_schema={}, flattened={}
+    )
+    yield from _extract_nested_body_fk_fields(resolved, resources, scan, deferred=deferred_nested_fks)
+
+
+# FK fields behind a bundled reference, by the reference's original URI and the remaining depth.
+NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[str, str, str]]]
+
+
+@dataclass(slots=True)
+class NestedFKScan:
+    """Scan of one request body for nested FK fields."""
+
+    bundled: dict[str, Any]
+    name_to_uri: dict[str, str]
+    # Bodies bundle the same references separately, yet find the same FK fields behind them.
+    by_reference: NestedFKCache
+    # Bodies reuse the same schemas at many places; each is scanned once per remaining depth.
+    by_schema: dict[tuple[int, int], list[tuple[str, str, str]]]
+    # Flattened once whatever the remaining depth.
+    flattened: dict[int, dict[str, Any]]
 
 
 def _extract_nested_body_fk_fields(
     schema: dict[str, Any],
     resources: ResourceMap,
-    bundled: dict[str, Any],
+    scan: NestedFKScan,
     deferred: list[tuple[str, str, str]] | None = None,
 ) -> Iterator[InputSlot]:
     """Recursively extract FK fields from nested request body schemas.
@@ -518,13 +542,11 @@ def _extract_nested_body_fk_fields(
     When the FK target resource isn't yet registered, the lookup is appended to
     `deferred` so the caller can replay it once every operation has been scanned.
     """
-    # Bodies reuse the same schemas at many places; each is scanned once per remaining depth.
-    cache: dict[tuple[int, int], list[tuple[str, str, str]]] = {}
-    properties, _ = _flatten_composition(schema, bundled)
+    properties, _ = _flatten_composition(schema, scan.bundled)
     for property_name, subschema in properties.items():
         if not isinstance(subschema, dict):
             continue
-        for suffix, target_resource_name, target_field in _container_fk_fields(subschema, bundled, 5, cache):
+        for suffix, target_resource_name, target_field in _container_fk_fields(subschema, scan, 5):
             nested_path = property_name + suffix
             resource = resources.get(target_resource_name)
             if resource is not None:
@@ -538,22 +560,25 @@ def _extract_nested_body_fk_fields(
                 deferred.append((target_resource_name, target_field, nested_path))
 
 
-def _container_fk_fields(
-    schema: dict[str, Any],
-    bundled: dict[str, Any],
-    max_depth: int,
-    cache: dict[tuple[int, int], list[tuple[str, str, str]]],
-) -> list[tuple[str, str, str]]:
+def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: int) -> list[tuple[str, str, str]]:
     """FK fields under `schema` as `(path suffix, target resource, target field)`."""
     key = (id(schema), max_depth)
-    cached = cache.get(key)
+    cached = scan.by_schema.get(key)
     if cached is not None:
         return cached
     fields: list[tuple[str, str, str]] = []
-    cache[key] = fields
+    scan.by_schema[key] = fields
     reference = schema.get("$ref")
     if isinstance(reference, str):
-        target = bundled.get(reference.rsplit("/", 1)[-1])
+        bundled_name = reference.rsplit("/", 1)[-1]
+        target = scan.bundled.get(bundled_name)
+        uri = scan.name_to_uri.get(bundled_name)
+        # A bare reference finds the same FK fields in every body that bundles its target.
+        if len(schema) == 1 and uri is not None and isinstance(target, dict):
+            shared = scan.by_reference.setdefault((uri, max_depth), fields)
+            if shared is not fields:
+                scan.by_schema[key] = shared
+                return shared
         if isinstance(target, dict) and target.get("type") == "array":
             # Each followed reference spends depth, so an array whose items point back at it terminates.
             if max_depth <= 1:
@@ -565,12 +590,14 @@ def _container_fk_fields(
         if isinstance(items, dict):
             fields.extend(
                 (f"/0{suffix}", resource, field)
-                for suffix, resource, field in _container_fk_fields(items, bundled, max_depth, cache)
+                for suffix, resource, field in _container_fk_fields(items, scan, max_depth)
             )
         return fields
 
     # Composition branches may carry the actual object shape, so flatten before treating as object.
-    properties, _ = _flatten_composition(schema, bundled)
+    properties = scan.flattened.get(id(schema))
+    if properties is None:
+        properties = scan.flattened[id(schema)] = _flatten_composition(schema, scan.bundled)[0]
     for name, subschema in properties.items():
         if not isinstance(subschema, dict):
             continue
@@ -585,7 +612,7 @@ def _container_fk_fields(
             if isinstance(subschema, dict):
                 fields.extend(
                     (f"/{name}{suffix}", resource, field)
-                    for suffix, resource, field in _container_fk_fields(subschema, bundled, max_depth - 1, cache)
+                    for suffix, resource, field in _container_fk_fields(subschema, scan, max_depth - 1)
                 )
     return fields
 
@@ -665,12 +692,12 @@ def _prefer_string_identifier(
     return field
 
 
-def update_input_field_bindings(resource_name: str, operations: OperationMap) -> None:
+def update_input_field_bindings(resource_names: set[str], operations: OperationMap) -> None:
     """Update input slots field bindings after resource definition was upgraded.
 
     When a resource's fields change (e.g., `User` upgraded from `["userId"]` to `["id", "email"]`),
     existing input slots may reference stale field names. This re-evaluates field matching
-    for all operations using this resource.
+    for all operations using these resources.
 
     Example:
         `DELETE /users/{userId}` created `InputSlot(resource_field="userId")`
@@ -678,17 +705,17 @@ def update_input_field_bindings(resource_name: str, operations: OperationMap) ->
         This updates DELETE's `InputSlot` to use `resource_field="id"`
 
     """
-    # Re-evaluate field matching for all operations referencing this resource
+    # Re-evaluate field matching for all operations referencing these resources
     for operation in operations.values():
         for input_slot in operation.inputs:
-            # Skip inputs not using this resource
-            if input_slot.resource.name != resource_name or isinstance(input_slot.parameter_name, int):
+            # Skip inputs not using these resources
+            if input_slot.resource.name not in resource_names or isinstance(input_slot.parameter_name, int):
                 continue
 
             # Re-match parameter to upgraded resource fields
             new_field = naming.find_matching_field(
                 parameter=input_slot.parameter_name,
-                resource=resource_name,
+                resource=input_slot.resource.name,
                 fields=input_slot.resource.fields,
             )
             if new_field is not None:
