@@ -177,7 +177,7 @@ PROBES = (NullByteInHeader, UnsafePathDecoder)
 
 def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     """Send the probe to the application."""
-    from requests import PreparedRequest, Request, RequestException
+    from requests import PreparedRequest, ReadTimeout, Request, RequestException
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
@@ -198,9 +198,10 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
         # which is not currently implemented
         return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
     except RequestException as exc:
-        # Consider any network errors as a failed probe
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        return ProbeRun(probe, ProbeOutcome.FAILURE, req, None, exc)
+        # A slow server says nothing about the capability; other network errors mean the input was rejected
+        outcome = ProbeOutcome.SKIP if isinstance(exc, ReadTimeout) else ProbeOutcome.FAILURE
+        return ProbeRun(probe, outcome, req, None, exc)
     finally:
         session.close()
     result_type = probe.analyze_response(response)
