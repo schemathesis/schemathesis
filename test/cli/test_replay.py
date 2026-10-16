@@ -723,6 +723,45 @@ def test_replay_graphql_stateful_crash(cli, ctx, tmp_path):
     assert (result.exit_code, "ERROR" in result.output, "1 failed" in result.output) == (1, False, True), result.output
 
 
+def test_graphql_crash_url_template_is_endpoint_url(cli, ctx, tmp_path):
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def boom(self) -> str:
+            raise RuntimeError("planted")
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
+    cli.run(api.schema_url, "--max-examples=1", "--phases=fuzzing")
+    step = json.loads(_list_crash_files(crash_cache_dir(tmp_path))[0].read_text())["sequence"][0]
+
+    assert (step["url"], step["url_template"]) == (api.schema_url, api.schema_url)
+
+
+def test_openapi_crash_url_template_keeps_path_placeholders(cli, app_runner, ctx, tmp_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer", "enum": [7]}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/api/items/<int:item_id>")
+    def item(item_id):
+        return jsonify({}), 500
+
+    base_url = app_runner.openapi_url(app, path="")
+    cli.run(f"{base_url}/openapi.json", "--max-examples=1", "--phases=fuzzing")
+    step = json.loads(_list_crash_files(crash_cache_dir(tmp_path))[0].read_text())["sequence"][0]
+
+    assert (step["url"], step["url_template"]) == (f"{base_url}/api/items/7", f"{base_url}/api/items/{{id}}")
+
+
 def test_replay_reuses_disabled_tls_verification(cli, tmp_path):
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     trustme.CA().issue_cert("127.0.0.1").configure_cert(server_context)
