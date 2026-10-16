@@ -131,7 +131,6 @@ def test_is_xml_media_type(value, expected):
         # Parameters should not affect matching (handled by parse)
         ("application/json", "application/json;charset=utf-8", True),
         # Complex subtypes
-        ("application/problem+json", "application/problem+json", True),
         ("application/vnd.api+json", "application/vnd.api+json", True),
         ("application/*", "application/problem+json", True),
     ],

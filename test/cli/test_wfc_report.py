@@ -524,7 +524,11 @@ OPERATION = "GET /users/{id}"
         (UseAfterFree(operation=OPERATION, message="", free="DELETE /users/1", usage="GET /users/1"), 113),
         (IgnoredAuth(operation="DELETE /users/{id}", message="", scenario=AuthScenario.NO_AUTH), 308),
         (IgnoredAuth(operation="DELETE /users/{id}", message="", scenario=AuthScenario.GENERATED_AUTH), 311),
-        (IgnoredAuth(operation=OPERATION, message="", scenario=AuthScenario.NO_AUTH), 311),
+        pytest.param(
+            IgnoredAuth(operation=OPERATION, message="", scenario=AuthScenario.NO_AUTH),
+            311,
+            id="IgnoredAuth-no-auth-311",
+        ),
         (
             EnsureResourceAvailability(
                 operation=OPERATION, message="", created_with="POST /users", not_available_with="GET /users/1"

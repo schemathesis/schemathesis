@@ -22,7 +22,11 @@ def custom_name(context, path, methods):
     """)
 
 
-@pytest.mark.parametrize("dispatcher_factory", [lambda r: r.getfixturevalue("openapi_30"), lambda _: schemathesis])
+@pytest.mark.parametrize(
+    "dispatcher_factory",
+    [lambda r: r.getfixturevalue("openapi_30"), lambda _: schemathesis],
+    ids=["schema", "global"],
+)
 @pytest.mark.parametrize("register", [register_default, register_named])
 def test_invalid_hook(request, dispatcher_factory, register):
     dispatcher = dispatcher_factory(request)

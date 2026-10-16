@@ -275,7 +275,7 @@ def test_auth(ctx):
         assert request.headers["Authorization"] == "Basic dGVzdDp0ZXN0"
 
 
-@pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
+@pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"], ids=["as-is", "trailing-slash"])
 def test_base_url(ctx, converter):
     api = ctx.openapi.apps.success_and_failure()
     base_url = converter(api.base_url)
