@@ -408,6 +408,11 @@ def cached_draw(session: GenerationSession, strategy: st.SearchStrategy) -> Any:
             outcome = (examples.generate_one(strategy), None)
         except Unsatisfiable as exc:
             outcome = (None, exc)
+        except InvalidArgument as exc:
+            # A size past what Hypothesis draws, e.g. a pattern quantifier asking for 100000 characters, has no value.
+            if "larger than Hypothesis supports" not in str(exc):
+                raise
+            outcome = (None, Unsatisfiable(str(exc)))
         session.draw_outcomes[strategy] = outcome
     value, failure = outcome
     if failure is not None:

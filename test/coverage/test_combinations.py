@@ -3530,6 +3530,29 @@ def test_negative_pattern_with_min_length_past_the_buffer_is_skipped(nctx):
     assert_not_conform(values, schema)
 
 
+QUANTIFIERS_PAST_THE_BUFFER = pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string", "pattern": "^[a-z]{100000,200000}$"},
+        {"type": "string", "pattern": "^(a{40000})?$"},
+        {"type": "object", "patternProperties": {"^a{40000}$": {"type": "integer"}}},
+    ],
+    ids=["quantifier", "optional-group", "pattern-properties"],
+)
+
+
+@QUANTIFIERS_PAST_THE_BUFFER
+def test_positive_pattern_with_quantifier_past_the_buffer(pctx, schema):
+    assert_conform(cover_schema(pctx, schema), schema)
+
+
+@QUANTIFIERS_PAST_THE_BUFFER
+def test_negative_pattern_with_quantifier_past_the_buffer(nctx, schema):
+    values = cover_schema(nctx, schema)
+    assert values
+    assert_not_conform(values, schema)
+
+
 # Past 2**53 the next multiple may have no float spelling; as an integer it is exact.
 def test_positive_number_multiples_past_float_precision_are_exact(pctx):
     schema = {"type": "number", "multipleOf": 3, "minimum": 9996036847180748.0}
