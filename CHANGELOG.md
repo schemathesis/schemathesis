@@ -68,6 +68,7 @@
 - Missed `negative_data_rejection` failures in coverage for scalar parameters next to array or object parameters.
 - Inferred link and undeclared path parameter order varying between runs.
 - Crash or lone surrogates in generated strings when `generation.codec` is `None`.
+- `openapi.from_url` and `graphql.from_url` ignoring TLS, auth and header settings from the config.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 

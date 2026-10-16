@@ -122,6 +122,11 @@ def from_url(
     """
     import requests
 
+    if config is None:
+        config = SchemathesisConfig.discover()
+    if wait_for_schema is None:
+        wait_for_schema = config.wait_for_schema
+    kwargs = {**config.projects.get_default().schema_request_kwargs(), **kwargs}
     kwargs.setdefault("json", {"query": get_introspection_query()})
     response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **kwargs)
     schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))

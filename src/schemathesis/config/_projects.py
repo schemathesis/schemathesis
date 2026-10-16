@@ -429,6 +429,20 @@ class ProjectConfig(DiffBase):
             return self.request_cert
         return None
 
+    def schema_request_kwargs(self) -> dict[str, object]:
+        """Keyword arguments for the HTTP request that fetches the API schema."""
+        kwargs: dict[str, object] = {"verify": self.tls_verify}
+        request_cert = self.request_cert_for()
+        if request_cert:
+            kwargs["cert"] = request_cert
+        auth = self.auth_for()
+        if auth is not None:
+            kwargs["auth"] = auth
+        headers = self.headers_for()
+        if headers:
+            kwargs["headers"] = headers
+        return kwargs
+
     def proxy_for(self, *, operation: APIOperation | None = None) -> str | None:
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)
