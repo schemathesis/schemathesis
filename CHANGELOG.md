@@ -69,6 +69,7 @@
 - Inferred link and undeclared path parameter order varying between runs.
 - Crash or lone surrogates in generated strings when `generation.codec` is `None`.
 - `openapi.from_url` and `graphql.from_url` ignoring TLS, auth and header settings from the config.
+- Format values generated under another operation's `codec`, `allow-x00` or `exclude-header-characters` settings.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 

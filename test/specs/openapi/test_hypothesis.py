@@ -461,6 +461,20 @@ def test_configure_headers():
         assert set(headers["X-Foo"]) - {"A", "B", "C"} == set()
 
 
+def test_format_values_follow_codec_changed_after_generation():
+    schema = {
+        "type": "object",
+        "properties": {"q": {"type": "string", "format": "json-pointer"}},
+        "required": ["q"],
+        "additionalProperties": False,
+    }
+    config = GenerationConfig()
+    generate_many(make_positive_strategy(schema, "GET /x", ParameterLocation.QUERY, None, config, Draft4Validator), 1)
+    config.update(codec="ascii")
+    strategy = make_positive_strategy(schema, "GET /y", ParameterLocation.QUERY, None, config, Draft4Validator)
+    assert [value["q"] for value in generate_many(strategy, 50) if not value["q"].isascii()] == []
+
+
 def test_as_strategy_keeps_passed_headers_unchanged(ctx):
     schema = ctx.openapi.load_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
     schema.config.update(headers={"X-Configured": "global"})
