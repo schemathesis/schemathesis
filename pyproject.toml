@@ -57,6 +57,7 @@ tests = [
   "pydantic>=1.10.2",
   "pytest-asyncio>=1.0,<2.0",
   "pytest-mock>=3.7.0,<4.0",
+  "pytest-timeout>=2.3,<3.0",
   "pytest-trio>=0.8,<1.0",
   "pytest-xdist>=3,<4.0",
   "strawberry-graphql[fastapi]>=0.109.0",
@@ -102,8 +103,8 @@ exclude = [
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
-# Dump every thread's stack for a test running over 5 minutes, so a stalled CI job names the culprit.
-faulthandler_timeout = 300
+# Fail a test running over 5 minutes and dump every thread's stack, so a stalled CI job names the culprit.
+timeout = 300
 xfail_strict = true
 truncation_limit_lines = 0
 truncation_limit_chars = 0
