@@ -39,7 +39,6 @@ from .utils import make_schema, profile_max_examples
 
 pytest_plugins = [
     "pytester",
-    "pytest_mock",
     "test.fixtures.ctx",
     "test.fixtures.crashes",
     "test.fixtures.app_runner",

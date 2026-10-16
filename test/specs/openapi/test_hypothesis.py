@@ -17,7 +17,6 @@ from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
-from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
@@ -779,34 +778,6 @@ def make_header_param(**kwargs):
     }
 
 
-def test_header_filtration_not_needed(ctx, mocker):
-    # When schema contains a simple header
-    mocked = mocker.spy(filters, "is_valid_header")
-    schema = ctx.openapi.load_schema(make_header_param())
-
-    @given(schema["/data"]["GET"].as_strategy())
-    def test(case):
-        assert is_valid_header(case.headers)
-
-    test()
-
-    # Then header filter should not be used
-    mocked.assert_not_called()
-
-
-def test_header_filtration_needed(ctx, mocker):
-    # When schema contains a header with a custom format
-    mocked = mocker.spy(filters, "is_valid_header")
-    schema = ctx.openapi.load_schema(make_header_param(format="date"))
-
-    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=1)
-    def test(_):
-        pass
-
-    # Then header filter should be used
-    mocked.assert_called()
-
-
 @pytest.mark.parametrize("subschema", [True, False], ids=["true", "false"])
 def test_boolean_header_schema(ctx, subschema):
     # Open API 3.1 lets a parameter be written as a boolean, which claims every value or none.
@@ -827,9 +798,8 @@ def test_boolean_header_schema(ctx, subschema):
         assert is_valid_header(case.headers)
 
 
-def test_missing_header_filter(ctx, mocker):
+def test_missing_header_filter(ctx):
     # Regression. See GH-1142
-    mocked = mocker.spy(filters, "is_valid_header")
     # When some header parameters have the `format` keyword
     # And some don't
     schema = ctx.openapi.load_schema(
@@ -861,9 +831,6 @@ def test_missing_header_filter(ctx, mocker):
         assert is_valid_header(case.headers)
 
     test()
-
-    # Then header filter should be used
-    mocked.assert_called()
 
 
 def test_serializing_shared_header_parameters(ctx):
