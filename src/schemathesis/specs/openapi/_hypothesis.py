@@ -634,15 +634,7 @@ def _build_form_strategy_with_encoding(
     property_content_type_selections: dict[str, list[str]] = {}
 
     for property_name in properties:
-        raw_content_type = parameter.get_property_content_type(property_name)
-
-        # contentType can be a string (or comma-separated list) or an array of strings per the spec
-        content_types: list[str] = []
-        if isinstance(raw_content_type, str):
-            content_types = [ct.strip() for ct in raw_content_type.split(",")]
-        elif isinstance(raw_content_type, list):
-            content_types = [ct.strip() for ct in raw_content_type if isinstance(ct, str)]
-
+        content_types = parameter.get_property_content_types(property_name)
         if content_types:
             if generation_mode.is_negative and is_binary_format(properties[property_name]):
                 continue

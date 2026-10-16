@@ -87,7 +87,7 @@ def prepare_multipart_v3(
         if selected_content_types and name in selected_content_types:
             content_type = selected_content_types[name]
         elif body_param:
-            content_type = body_param.get_property_content_type(name)
+            content_type = next(iter(body_param.get_property_content_types(name)), None)
 
         if isinstance(property_schema, dict):
             if isinstance(value, list):
