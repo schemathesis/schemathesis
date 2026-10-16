@@ -12,7 +12,7 @@ from test.apps.catalog.openapi.modifiers.stateful import (
     OmitRequiredField,
     ReturnPlainText,
 )
-from test.utils import flaky, load_yaml_or_fail
+from test.utils import load_yaml_or_fail
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -32,7 +32,7 @@ def test_default(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=3, min_passes=1)
+@pytest.mark.flaky(reruns=2)
 def test_sanitization(ctx, cli, tmp_path):
     api = ctx.openapi.apps.users_crud()
     cassette_path = tmp_path / "output.yaml"
@@ -50,7 +50,7 @@ def test_sanitization(ctx, cli, tmp_path):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_max_failures(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud_with_failure()
     assert (

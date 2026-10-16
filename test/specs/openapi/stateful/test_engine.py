@@ -47,7 +47,6 @@ from test.apps.catalog.openapi.modifiers.stateful import (
     Unsatisfiable,
     UseAfterFree,
 )
-from test.utils import flaky
 
 
 @dataclass
@@ -324,7 +323,7 @@ def test_multiple_conformance_issues(engine_factory):
     }
 
 
-@flaky(max_runs=10, min_passes=1)
+@pytest.mark.flaky(reruns=9)
 def test_find_use_after_free(engine_factory):
     engine = engine_factory(
         UseAfterFree(),
@@ -364,14 +363,14 @@ def _use_after_free_state_machine(ctx):
     return StateMachine
 
 
-@flaky(max_runs=10, min_passes=1)
+@pytest.mark.flaky(reruns=9)
 def test_find_use_after_free_via_state_machine(ctx):
     with pytest.raises(FailureGroup) as exc_info:
         _use_after_free_state_machine(ctx).run(settings=_STATE_MACHINE_SETTINGS)
     assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
 
 
-@flaky(max_runs=10, min_passes=1)
+@pytest.mark.flaky(reruns=9)
 def test_find_use_after_free_via_state_machine_with_overridden_validate_response(ctx):
     class CustomStateMachine(_use_after_free_state_machine(ctx)):
         def validate_response(self, response, case, additional_checks=None, **kwargs):

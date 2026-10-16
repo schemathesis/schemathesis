@@ -4,7 +4,7 @@ import json
 import os
 import struct
 from collections.abc import Callable
-from functools import lru_cache, wraps
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -12,7 +12,6 @@ import pytest
 import requests
 import urllib3
 import yaml
-from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
@@ -162,37 +161,6 @@ def load_json_or_fail(path: str | os.PathLike, *, context: str = "") -> Any:
 
 def _format_context(context: str) -> str:
     return f"\n--- context ---\n{context}\n--- end context ---" if context else ""
-
-
-def flaky(*, max_runs: int, min_passes: int):
-    """A decorator to mark a test as flaky."""
-
-    def decorate(test):
-        @wraps(test)
-        def inner(*args, **kwargs):
-            snapshot_fixture_name = None
-            snapshot_cli = None
-            for name, kwarg in kwargs.items():
-                if isinstance(kwarg, SnapshotAssertion):
-                    snapshot_fixture_name = name
-                    snapshot_cli = kwarg
-                    break
-            runs = passes = 0
-            while passes < min_passes:
-                runs += 1
-                try:
-                    test(*args, **kwargs)
-                except Exception:
-                    if snapshot_fixture_name is not None:
-                        kwargs[snapshot_fixture_name] = snapshot_cli.rebuild()
-                    if runs >= max_runs:
-                        raise
-                else:
-                    passes += 1
-
-        return inner
-
-    return decorate
 
 
 E = TypeVar("E", bound=EngineEvent)

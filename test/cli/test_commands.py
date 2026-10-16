@@ -43,7 +43,7 @@ from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.fragments.schemas import linked_users
 from test.fixtures.app_runner import wait_for_port
-from test.utils import HERE, SIMPLE_PATH, flaky
+from test.utils import HERE, SIMPLE_PATH
 
 
 def test_commands_help(cli, snapshot_cli):
@@ -2710,7 +2710,7 @@ def data_generation_check(ctx, response, case):
         yield module
 
 
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_multiple_generation_modes(ctx, cli, data_generation_check):
     api = ctx.openapi.apps.payload()
     # When multiple data generation methods are supplied in CLI
@@ -3070,7 +3070,7 @@ def test_output_sanitization_via_config(ctx, cli, hypothesis_max_examples, enabl
     assert expected in result.stdout, result.stdout
 
 
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_multiple_failures_in_single_check(ctx, app_runner, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -3098,7 +3098,7 @@ def test_multiple_failures_in_single_check(ctx, app_runner, cli, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={base_url}", "--checks=all", "--mode=positive") == snapshot_cli
 
 
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_binary_payload(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -3132,7 +3132,7 @@ def test_binary_payload(ctx, cli, snapshot_cli):
     )
 
 
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_long_payload(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -3167,7 +3167,7 @@ def test_long_payload(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Snapshot is inaccurate on Windows")
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_multiple_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -3202,7 +3202,7 @@ def test_multiple_errors(ctx, cli, snapshot_cli):
     assert cli.run(str(schema_path), "--url=http://127.0.0.1:1") == snapshot_cli
 
 
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_group_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -3250,7 +3250,7 @@ def test_group_errors(ctx, cli, snapshot_cli):
     )
 
 
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_complex_urlencoded_example(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
