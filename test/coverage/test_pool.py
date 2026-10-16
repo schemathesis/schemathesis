@@ -1076,3 +1076,49 @@ def test_pool_pairs_child_with_its_parent_across_parameter_names(cli, ctx, phase
         assert len(set(pairs)) > 1, pairs
     else:
         assert pairs
+
+
+def test_coverage_pool_overlay_reaches_every_item_of_whole_drawn_arrays(ctx):
+    item = {
+        "type": "object",
+        "properties": {"location_id": {"type": "integer", "minimum": 1}, "name": {"type": "string", "minLength": 1}},
+        "required": ["location_id", "name"],
+        "additionalProperties": False,
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            **_id_producer("/locations", "Location", {"type": "integer"}),
+            **_body_consumer(
+                {
+                    "type": "object",
+                    "properties": {"data": {"type": "array", "minItems": 1, "items": item}},
+                    "required": ["data"],
+                    "additionalProperties": False,
+                }
+            ),
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
+
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+    assert [
+        (case.meta.phase.data.description, [entry["location_id"] for entry in case.body["data"]]) for case in cases
+    ] == [
+        ("Valid object", [7340001]),
+        ("Object with valid 'data' value: Near-boundary items array", [7340001, 7340001]),
+        (
+            "Object with valid 'data' value: Single-item array: Object with valid 'location_id' value: Minimum value",
+            [1],
+        ),
+        (
+            "Object with valid 'data' value: Single-item array: Object with valid 'location_id' value: "
+            "Near-boundary number",
+            [2],
+        ),
+        (
+            "Object with valid 'data' value: Single-item array: Object with valid 'name' value: "
+            "Near-boundary length string",
+            [7340001],
+        ),
+    ]
