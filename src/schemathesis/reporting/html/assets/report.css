@@ -293,8 +293,8 @@ details[open]>summary>.dchev{transform:rotate(45deg) translate(-1px,-1px)}
 
 .repro{position:relative;min-width:0;background:var(--color-surface-1);border-radius:var(--radius-sm)}
 .repro .copy-btn{position:absolute;top:6px;right:6px;background:var(--color-surface-1)}
-.cmd{margin:0;padding:7px 10px;overflow-x:auto;white-space:pre;font:12px/1.6 var(--font-family-monospace);color:var(--color-text-primary);scrollbar-width:thin;border-radius:var(--radius-sm)}
-/* A scroll box's padding only shows at the end of the scroll, so a single command sits beside Copy, not under it. */
+.cmd{margin:0;padding:7px 10px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 var(--font-family-monospace);color:var(--color-text-primary);border-radius:var(--radius-sm)}
+/* Wrapped lines of a single command stay clear of Copy. */
 .repro>.cmd{padding-right:76px}
 .repro>.cmd+.copy-btn{box-shadow:0 0 0 6px var(--color-surface-1)}
 .cmd:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:-2px}

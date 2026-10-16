@@ -15,6 +15,7 @@
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
 - HTML report lists failures and failed operations most severe first.
 - HTML report shows run details above warnings and the first 10 operations of each warning.
+- HTML report wraps long reproduction commands.
 
 ### :racing_car: Performance
 
