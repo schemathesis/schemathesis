@@ -1377,7 +1377,7 @@ def test_is_valid_jsonschema_rs_regex(pattern, expected):
 def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
     # Such a pattern constrains nothing during validation, and keeping it would only stop the rest
     # of the schema from being modeled.
-    schema = ctx.openapi.build_schema(
+    operation = ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {
@@ -1392,8 +1392,7 @@ def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
                 }
             }
         }
-    )
-    operation = schemathesis.openapi.from_dict(schema)["/items"]["GET"]
+    )["/items"]["GET"]
     parameter = next(iter(operation.query))
 
     assert "pattern" not in parameter.optimized_schema
@@ -1403,7 +1402,7 @@ def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
 @pytest.mark.parametrize("pattern", [r"^(?P<major>\d+)$", r"^(?<major>\d+)$"], ids=["python", "ecma"])
 def test_named_group_pattern_is_kept(ctx, pattern):
     # A group name only one engine reads would leave the pattern refused where the schema is validated.
-    schema = ctx.openapi.build_schema(
+    operation = ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {
@@ -1414,8 +1413,7 @@ def test_named_group_pattern_is_kept(ctx, pattern):
                 }
             }
         }
-    )
-    operation = schemathesis.openapi.from_dict(schema)["/items"]["GET"]
+    )["/items"]["GET"]
     assert next(iter(operation.query)).optimized_schema["pattern"] == r"^(\d+)$"
     assert examples.generate_one(operation.as_strategy()).query["q"].isdigit()
 
@@ -1447,7 +1445,7 @@ LETTERS = r"^[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+$"
     ],
 )
 def test_pcre_class_syntax_is_translated_or_dropped(ctx, pattern, expected):
-    schema = ctx.openapi.build_schema(
+    operation = ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {
@@ -1458,8 +1456,7 @@ def test_pcre_class_syntax_is_translated_or_dropped(ctx, pattern, expected):
                 }
             }
         }
-    )
-    operation = schemathesis.openapi.from_dict(schema)["/items"]["GET"]
+    )["/items"]["GET"]
     assert next(iter(operation.query)).optimized_schema.get("pattern") == expected
 
 

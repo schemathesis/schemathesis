@@ -4441,7 +4441,7 @@ def test_body_nothing_can_be_drawn_for(ctx, body_schema):
 
 
 def _query_operation(ctx, parameter_schema, config):
-    raw_schema = ctx.openapi.build_schema(
+    return ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {
@@ -4449,9 +4449,9 @@ def _query_operation(ctx, parameter_schema, config):
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
-    )
-    return schemathesis.openapi.from_dict(raw_schema, config=SchemathesisConfig.from_dict(config))["/items"]["GET"]
+        },
+        config=SchemathesisConfig.from_dict(config),
+    )["/items"]["GET"]
 
 
 @pytest.mark.hypothesis_nested
@@ -4493,7 +4493,10 @@ def test_query_dictionary_binding(ctx, parameter_schema, config, expected):
 @pytest.mark.hypothesis_nested
 def test_body_dictionary_binding_through_recursive_reference(ctx):
     node = {"type": "object", "properties": {"token": {"type": "string"}, "child": {"$ref": "#/components/schemas/A"}}}
-    raw_schema = ctx.openapi.build_schema(
+    config = SchemathesisConfig.from_dict(
+        {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.child.token": {"dictionary": "tokens"}}}
+    )
+    operation = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -4506,11 +4509,8 @@ def test_body_dictionary_binding_through_recursive_reference(ctx):
             }
         },
         components={"schemas": {"A": node}},
-    )
-    config = SchemathesisConfig.from_dict(
-        {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.child.token": {"dictionary": "tokens"}}}
-    )
-    operation = schemathesis.openapi.from_dict(raw_schema, config=config)["/items"]["POST"]
+        config=config,
+    )["/items"]["POST"]
     tokens = []
 
     @given(case=operation.as_strategy())
@@ -4531,7 +4531,10 @@ def test_body_dictionary_binding_on_unknown_item_field_is_ignored(ctx):
         "type": "array",
         "items": {"type": "object", "properties": {"x": {"type": "string"}}, "additionalProperties": False},
     }
-    raw_schema = ctx.openapi.build_schema(
+    config = SchemathesisConfig.from_dict(
+        {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.[*].missing": {"dictionary": "tokens"}}}
+    )
+    operation = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -4539,12 +4542,9 @@ def test_body_dictionary_binding_on_unknown_item_field_is_ignored(ctx):
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
-    )
-    config = SchemathesisConfig.from_dict(
-        {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.[*].missing": {"dictionary": "tokens"}}}
-    )
-    operation = schemathesis.openapi.from_dict(raw_schema, config=config)["/items"]["POST"]
+        },
+        config=config,
+    )["/items"]["POST"]
     validator = jsonschema_rs.validator_for(body_schema)
 
     @given(case=operation.as_strategy())

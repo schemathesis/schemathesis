@@ -9482,7 +9482,7 @@ def test_no_positive_case_when_the_required_body_admits_nothing(ctx):
 
 
 def test_positive_body_for_repeated_consumes_entry_is_not_sent_twice(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    operation = ctx.openapi.load_schema(
         {
             "/foo": {
                 "post": {
@@ -9500,8 +9500,7 @@ def test_positive_body_for_repeated_consumes_entry_is_not_sent_twice(ctx):
         },
         version="2.0",
         consumes=["application/json", "application/json"],
-    )
-    operation = schemathesis.openapi.from_dict(raw_schema)["/foo"]["POST"]
+    )["/foo"]["POST"]
     assert [(case.media_type, case.body) for case in collect_cases(operation, GenerationMode.POSITIVE)] == [
         ("application/json", {}),
         ("application/json", {"a": 0}),
