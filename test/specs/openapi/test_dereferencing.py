@@ -1629,7 +1629,7 @@ def test_external_path_items_reparsed_after_document_eviction(ctx):
             assert isinstance(result, Ok)
             operation = result.ok()
             names = {parameter.name for parameter in operation.path_parameters}
-            if names != get_template_fields(operation.path):
+            if names != set(get_template_fields(operation.path)):
                 corrupted.append((operation.label, sorted(names)))
         # Eviction is size-driven, so drop the cached documents outright to reach the same state
         # without a spec large enough to overflow it.

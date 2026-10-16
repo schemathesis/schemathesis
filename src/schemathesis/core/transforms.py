@@ -14,18 +14,20 @@ deepclone = jsonschema_rs.canonical.schema.clone
 
 
 @lru_cache
-def get_template_fields(template: str) -> frozenset[str]:
-    """Extract named placeholders from a string template.
+def get_template_fields(template: str) -> tuple[str, ...]:
+    """Extract named placeholders from a string template, in the order they appear.
 
-    "/users/{userId}/posts/{postId}" -> {"userId", "postId"}
+    "/users/{userId}/posts/{postId}" -> ("userId", "postId")
     """
     try:
-        parameters = frozenset(name for _, name, _, _ in string.Formatter().parse(template) if name is not None)
+        parameters = tuple(
+            dict.fromkeys(name for _, name, _, _ in string.Formatter().parse(template) if name is not None)
+        )
         # Check for malformed params to avoid injecting them
         template.format(**dict.fromkeys(parameters, ""))
         return parameters
     except (ValueError, IndexError):
-        return frozenset()
+        return ()
 
 
 def to_wire_string(value: object) -> str:

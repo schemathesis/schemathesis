@@ -97,7 +97,7 @@ def _named_after_placeholder(parameters: list[OperationParameter], path: str) ->
         for parameter in parameters
         if parameter.definition.get("in") == "path" and parameter is not target
     }
-    unclaimed = get_template_fields(path) - claimed
+    unclaimed = [name for name in get_template_fields(path) if name not in claimed]
     if len(unclaimed) != 1:
         return parameters
     recovered = OpenApiParameter.from_definition(
@@ -470,10 +470,10 @@ class OperationLoader:
         )
         for parameter in _named_after_placeholder(parameters.items, path):
             operation.add_parameter(parameter)
-        missing_parameter_names = get_template_fields(operation.path) - {
-            parameter.name for parameter in operation.path_parameters
-        }
-        for name in missing_parameter_names:
+        declared_parameter_names = {parameter.name for parameter in operation.path_parameters}
+        for name in get_template_fields(operation.path):
+            if name in declared_parameter_names:
+                continue
             operation.add_parameter(
                 schema.adapter.build_path_parameter({"name": name, INJECTED_PATH_PARAMETER_KEY: True})
             )
