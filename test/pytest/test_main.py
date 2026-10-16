@@ -1,7 +1,10 @@
 import platform
+import ssl
+import time
 
 import pytest
-from flask import request
+import trustme
+from flask import jsonify, request
 
 from schemathesis.generation.modes import GenerationMode
 from test.utils import has_hypothesis_failure_header
@@ -1360,42 +1363,60 @@ def test_api(case):
     result.assert_outcomes(**expected)
 
 
-def test_transport_kwargs_from_config(ctx, testdir):
-    api = ctx.openapi.apps.success()
+def test_transport_kwargs_from_config(ctx, testdir, app_runner, tmp_path):
+    ca = trustme.CA()
+    client_cert = ca.issue_cert("test.org")
+    client_cert_path = tmp_path / "client.pem"
+    client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
+    app, _ = ctx.openapi.make_flask_app({"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    received = []
+
+    # Records what arrived, then outlasts the configured timeout.
+    @app.route("/api/success")
+    def success():
+        received.append(
+            (
+                {name: request.headers.get(name) for name in ("X-Foo", "X-Spam")},
+                ssl.PEM_cert_to_DER_cert(request.environ["SSL_CLIENT_CERT"]),
+            )
+        )
+        time.sleep(1)
+        return jsonify({})
+
+    port = app_runner.run_client_cert_flask_app(app, ca)
     testdir.make_test(
         f"""
+import requests
+
 config = schemathesis.Config.from_dict({{
     "tls-verify": False,
     "headers": {{ "X-Foo": "Bar", "X-Spam": "Unknown" }},
-    "request-timeout": 3,
-    "request-cert": "foo",
+    "request-timeout": 0.3,
+    "request-cert": {str(client_cert_path)!r},
     "phases": {{
         "coverage": {{
             "enabled": False,
         }}
     }}
 }})
-schema = schemathesis.openapi.from_url('{api.schema_url}', config=config)
+schema = schemathesis.openapi.from_url(
+    "https://127.0.0.1:{port}/openapi.json", config=config, verify=False, cert={str(client_cert_path)!r}
+)
 
 def noop(*args, **kwargs):
     pass
 
 @schema.include(name="GET /api/success").parametrize()
-@settings(suppress_health_check=list(HealthCheck))
-def test(case, mocker):
-    spy = mocker.patch("requests.Session.request")
-    spy.return_value.headers = {{}}
-    case.call_and_validate(checks=[noop], headers={{"X-Spam": "Explicit" }})
-    kwargs = spy.call_args[1]
-    assert kwargs["verify"] is False
-    assert kwargs["timeout"] == 3
-    assert kwargs["cert"] == "foo"
-    assert kwargs["headers"]["X-Foo"] == "Bar"
-    assert kwargs["headers"]["X-Spam"] == "Explicit"
+@settings(max_examples=1, suppress_health_check=list(HealthCheck))
+def test(case):
+    with pytest.raises(requests.exceptions.ReadTimeout):
+        case.call_and_validate(checks=[noop], headers={{"X-Spam": "Explicit" }})
 """
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+    expected_cert = ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode())
+    assert received == [({"X-Foo": "Bar", "X-Spam": "Explicit"}, expected_cert)]
 
 
 def test_config_using_headers(testdir):

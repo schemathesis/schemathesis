@@ -137,15 +137,15 @@ def test_explicit_stop(engine_factory, event_cls, stop_event):
     assert collected[-1].status == Status.INTERRUPTED
 
 
-def test_stop_outside_of_state_machine_execution(engine_factory, mocker, stop_event):
-    # When stop signal is received outside of state machine execution
-    engine = engine_factory(
-        IndependentInternalError(),
-    )
-    mocker.patch(
-        "schemathesis.engine.run.stateful._executor.StatefulContext.mark_as_seen_in_run",
-        side_effect=lambda *_, **__: stop_event.set(),
-    )
+@pytest.mark.usefixtures("restore_checks")
+def test_stop_outside_of_state_machine_execution(engine_factory, stop_event):
+    # The stop arrives with a failure, so it is first seen between suites rather than inside a scenario.
+    @schemathesis.check
+    def stop_on_server_error(ctx, response, case):
+        if response.status_code >= 500:
+            stop_event.set()
+
+    engine = engine_factory(IndependentInternalError(), checks=[not_a_server_error, stop_on_server_error])
     result = collect_result(engine)
     assert result.events[-1].status == Status.INTERRUPTED
 

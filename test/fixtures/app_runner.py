@@ -154,6 +154,17 @@ def run_https_flask_app(app: Flask) -> int:
     return server.server_port
 
 
+def run_client_cert_flask_app(app: Flask, ca: trustme.CA) -> int:
+    """Start `app` over HTTPS with a certificate from `ca`, accepting only clients presenting a certificate from it."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ca.issue_cert("127.0.0.1").configure_cert(context)
+    ca.configure_trust(context)
+    context.verify_mode = ssl.CERT_REQUIRED
+    server = make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server.server_port
+
+
 def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
     """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
     port = run_flask_app(app, wait=wait)
@@ -182,6 +193,7 @@ def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wa
 class AppRunner:
     run_flask_app: Callable[..., int]
     run_https_flask_app: Callable[[Flask], int]
+    run_client_cert_flask_app: Callable[[Flask, trustme.CA], int]
     run_asgi_app: Callable[..., int]
     unused_port: Callable[[], int]
     openapi_url: Callable[..., str]
@@ -192,6 +204,7 @@ def app_runner():
     return AppRunner(
         run_flask_app=run_flask_app,
         run_https_flask_app=run_https_flask_app,
+        run_client_cert_flask_app=run_client_cert_flask_app,
         run_asgi_app=run_asgi_app,
         unused_port=unused_port,
         openapi_url=openapi_url,
