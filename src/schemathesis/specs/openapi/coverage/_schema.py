@@ -1204,7 +1204,38 @@ class CoverageContext:
                         stack.enter_context(self.expand(reference, counters=self.generating))
                     return self.generate_from_schema(merged)
             schema = inlined
+        pinned = self._with_spec_values_pinned(schema)
+        if pinned is not schema:
+            try:
+                return self.generate_from(self._strategy_for(pinned))
+            except Unsatisfiable:
+                # Pinned values can clash with keywords about the whole value, like `uniqueItems`.
+                pass
         return self.generate_from(self._strategy_for(schema))
+
+    def _with_spec_values_pinned(self, schema: JsonSchemaObject) -> JsonSchemaObject:
+        """`schema` with each property and `items` schema below it narrowed to its declared example when one fits."""
+        updated = schema
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            pinned = {name: self._pinned_to_spec_value(sub) for name, sub in properties.items()}
+            if any(pinned[name] is not sub for name, sub in properties.items()):
+                updated = {**updated, "properties": pinned}
+        items = schema.get("items")
+        if isinstance(items, dict):
+            pinned_items = self._pinned_to_spec_value(items)
+            if pinned_items is not items:
+                updated = {**updated, "items": pinned_items}
+        return updated
+
+    def _pinned_to_spec_value(self, schema: JsonSchema) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+        value = self._try_spec_value(schema)
+        # Binary values cannot be drawn from, so such a schema keeps generating its own.
+        if value is NOT_SET or contains_binary(value):
+            return self._with_spec_values_pinned(schema)
+        return {"enum": [value]}
 
     def _strategy_for(self, schema: JsonSchema) -> st.SearchStrategy:
         if isinstance(schema, dict) and "examples" in schema:
