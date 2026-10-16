@@ -706,6 +706,17 @@ def test_replay_graphql_crash(cli, ctx, tmp_path):
     assert (result.exit_code, "ERROR" in result.output, "1 failed" in result.output) == (1, False, True), result.output
 
 
+def test_replay_graphql_stateful_crash(cli, ctx, tmp_path):
+    api = ctx.graphql.apps.generic_id_pool()
+    cli.run(api.schema_url, "--max-examples=20", "--phases=stateful", "--mode=positive", "--seed=42")
+    crash = json.loads(_list_crash_files(crash_cache_dir(tmp_path))[0].read_text())
+    assert len(crash["sequence"]) > 1
+
+    result = cli.main("replay", crash["case_id"], "--keep")
+
+    assert (result.exit_code, "ERROR" in result.output, "1 failed" in result.output) == (1, False, True), result.output
+
+
 def test_replay_reuses_disabled_tls_verification(cli, tmp_path):
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     trustme.CA().issue_cert("127.0.0.1").configure_cert(server_context)
