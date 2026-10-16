@@ -329,15 +329,13 @@ def _items(entries: list[Entry]) -> dict[str, dict[str, Any]]:
         item = entry.item
         shared = item.get("parameters")
         if isinstance(shared, list):
-            # A reference carries nothing to name, and all are repointed at the same seed, so keep at most one.
-            references = [parameter for parameter in shared if isinstance(parameter, dict) and "$ref" in parameter]
+            # A reference carries nothing to name.
             item = {
                 **item,
-                "parameters": references[:1]
-                + [
-                    _named(parameter, f"i{position}")
+                "parameters": [
+                    parameter if "$ref" in parameter else _named(parameter, f"i{position}")
                     for position, parameter in enumerate(shared)
-                    if isinstance(parameter, dict) and "$ref" not in parameter
+                    if isinstance(parameter, dict)
                 ],
             }
         names = [
@@ -370,7 +368,9 @@ def _rewritten(document: dict[str, Any], media_types: list[str], pointer: str) -
                 }
             return result
         if isinstance(value, list):
-            return [walk(item) for item in value]
+            # Distinct references become one after repointing, and lists like `parameters` must stay unique.
+            items = [walk(item) for item in value]
+            return [item for index, item in enumerate(items) if item not in items[:index]]
         return value
 
     return _as_object(walk(document))
@@ -497,6 +497,16 @@ def test_walkers_agree_on_valid_documents(version, data):
     total = _assert_walkers_agree(schema)
     # No path item is broken here, so every result names an operation the other walks reach too.
     assert len(list(schema.get_all_operations())) == total
+
+
+@pytest.mark.parametrize("version", sorted(SPECS))
+def test_repointed_references_keep_parameters_unique(version):
+    spec = SPECS[version]
+    item = {"post": {**_OK_RESPONSES, "parameters": [{"$ref": "#/first"}, {"$ref": "#/second"}]}}
+    document = _assemble(
+        _hostile_document(version, {}), [Entry(item, "get", _OK_RESPONSES)], [], ["application/json"], spec=spec
+    )
+    assert document["paths"]["/p0"]["post"]["parameters"] == [{"$ref": spec.seed_pointer}]
 
 
 @pytest.mark.parametrize("hostile", sorted(HOSTILE_PATHS))
