@@ -10,7 +10,7 @@ from fractions import Fraction
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, assume, find, given, settings
+from hypothesis import HealthCheck, Phase, assume, find, given, seed, settings
 from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.errors import InvalidArgument, NoSuchExample, Unsatisfiable
@@ -359,6 +359,40 @@ def test_string_body_respects_alphabet(ctx, codec, allow_x00, body_schema):
             case.body.encode(codec)
 
     test()
+
+
+@pytest.mark.parametrize(
+    "body_schema",
+    [{"type": "string"}, {"type": "string", "pattern": ".+"}],
+    ids=["plain", "pattern"],
+)
+def test_string_body_without_codec_has_no_lone_surrogates(ctx, body_schema):
+    # Lone surrogates cannot be encoded as UTF-8, so checking a drawn value against a pattern crashed.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.generation.codec = None
+    bodies = []
+
+    # Seed 43 reaches a lone surrogate within 10 draws for both schemas.
+    @seed(43)
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        bodies.append(case.body)
+
+    collect()
+    assert [body for body in bodies if any("\ud800" <= char <= "\udfff" for char in body)] == []
 
 
 def test_anyof_disjoint_branches_body(ctx):
