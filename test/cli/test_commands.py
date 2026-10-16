@@ -22,7 +22,6 @@ import yaml
 from _pytest.main import ExitCode
 from flask import Flask, Response, jsonify, redirect, request, url_for
 from hypothesis.internal.observability import with_observability_callback
-from werkzeug.serving import make_server
 
 import schemathesis
 from schemathesis.cli.commands.run.context import ExecutionContext
@@ -216,17 +215,13 @@ def test_force_color_nocolor(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--force-color", "--no-color") == snapshot_cli
 
 
-def test_certificates(cli, tmp_path):
+def test_certificates(cli, app_runner, tmp_path):
     ca = trustme.CA()
     ca_path = tmp_path / "ca.pem"
     ca.cert_pem.write_to_path(str(ca_path))
     client_cert = ca.issue_cert("test.org")
     client_cert_path = tmp_path / "client.pem"
     client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
-    server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ca.issue_cert("127.0.0.1").configure_cert(server_context)
-    ca.configure_trust(server_context)
-    server_context.verify_mode = ssl.CERT_REQUIRED
     app = openapi_basic.success().server
     presented = {}
 
@@ -234,16 +229,12 @@ def test_certificates(cli, tmp_path):
     def record_client_certificate():
         presented.setdefault(request.path, set()).add(ssl.PEM_cert_to_DER_cert(request.environ["SSL_CLIENT_CERT"]))
 
-    server = make_server("127.0.0.1", 0, app, threaded=True, ssl_context=server_context)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    try:
-        cli.run_and_assert(
-            f"https://127.0.0.1:{server.server_port}/openapi.json",
-            f"--request-cert={client_cert_path}",
-            f"--tls-verify={ca_path}",
-        )
-    finally:
-        server.shutdown()
+    port = app_runner.run_client_cert_flask_app(app, ca)
+    cli.run_and_assert(
+        f"https://127.0.0.1:{port}/openapi.json",
+        f"--request-cert={client_cert_path}",
+        f"--tls-verify={ca_path}",
+    )
     expected = {ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode())}
     assert presented["/openapi.json"] == presented["/api/success"] == expected
 
