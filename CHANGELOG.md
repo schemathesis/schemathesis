@@ -34,7 +34,6 @@
 
 - Keep generated fields of nested objects and array items when merging link `requestBody` values. [#5416](https://github.com/schemathesis/schemathesis/issues/5416)
 - Keep example fields next to captured ids in request bodies in the examples phase.
-- Keep example fields next to captured ids in nested request bodies in the examples phase.
 - Report operations answered mostly with `409` as conflicts, not as a schema validation mismatch. [#5429](https://github.com/schemathesis/schemathesis/issues/5429)
 - Stateful scenarios ending early on request bodies with optional `readOnly` fields.
 - Coverage phase crash on `pattern` quantifiers too large to generate (e.g. `[a-z]{100000}`).
