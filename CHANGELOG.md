@@ -66,6 +66,7 @@
 - Valueless sensitive query keys gaining a masked value in reports and cassettes.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.
 - Missed `negative_data_rejection` failures in coverage for scalar parameters next to array or object parameters.
+- Form bodies dropping `additionalProperties` and object keywords for properties with `encoding.contentType`.
 - Inferred link and undeclared path parameter order varying between runs.
 - Crash or lone surrogates in generated strings when `generation.codec` is `None`.
 - `openapi.from_url` and `graphql.from_url` ignoring TLS, auth and header settings from the config.

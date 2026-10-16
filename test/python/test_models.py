@@ -21,6 +21,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
@@ -575,9 +576,9 @@ def test_negative_multipart_keeps_registered_media_type_for_text_property(ctx):
         },
     )
 
-    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=5)
-    def test(case):
-        assert case.body["file"] == b"\x89PNG"
+    bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 30)]
+    # Negative bodies may omit `file` or not be objects at all; where `file` is present, it keeps its media type.
+    assert {body["file"] for body in bodies if isinstance(body, dict) and "file" in body} == {b"\x89PNG"}
 
 
 @pytest.mark.hypothesis_nested

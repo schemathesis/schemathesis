@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import Binary
@@ -383,10 +384,13 @@ def test_nested_object_with_encoding(ctx):
     test()
 
 
-def test_additional_properties_with_encoding(ctx):
-    xml_strategy = st.just(b"<xml/>")
-    schemathesis.openapi.media_type("text/xml", xml_strategy)
-
+@pytest.mark.parametrize(
+    "content_type",
+    ["text/xml", "text/plain, text/csv"],
+    ids=["registered-strategy", "multiple-content-types"],
+)
+def test_additional_properties_with_encoding(ctx, content_type):
+    schemathesis.openapi.media_type("text/xml", st.just(b"<xml/>"))
     operation = make_operation(
         ctx,
         {
@@ -398,16 +402,64 @@ def test_additional_properties_with_encoding(ctx):
                 "required": ["file"],
                 "additionalProperties": {"type": "string"},
             },
+            "encoding": {"file": {"contentType": content_type}},
+        },
+    )
+
+    bodies = [case.body for case in generate_many(operation.as_strategy(), 50)]
+
+    extras = [value for body in bodies for key, value in body.items() if key != "file"]
+    assert extras
+    assert all(isinstance(value, str) for value in extras)
+
+
+def test_object_keywords_with_encoding(ctx):
+    schemathesis.openapi.media_type("text/xml", st.just(b"<xml/>"))
+    operation = make_operation(
+        ctx,
+        {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string", "format": "binary"},
+                    "name": {"type": "string"},
+                },
+                "required": ["file"],
+                "minProperties": 3,
+                "additionalProperties": {"type": "integer"},
+            },
             "encoding": {"file": {"contentType": "text/xml"}},
         },
     )
 
-    @run_given(case=operation.as_strategy(), max_examples=100)
-    def test(case):
-        assert case.body["file"] == b"<xml/>"
-        for key, value in case.body.items():
-            if key != "file":
-                assert isinstance(value, str)
+    bodies = [case.body for case in generate_many(operation.as_strategy(), 50)]
+
+    assert [body for body in bodies if len(body) < 3 or body["file"] != b"<xml/>"] == []
+
+
+def test_negative_body_violations_with_encoding(ctx):
+    schemathesis.openapi.media_type("text/xml", st.just(b"<xml/>"))
+    operation = make_operation(
+        ctx,
+        {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["file", "age"],
+                "additionalProperties": False,
+            },
+            "encoding": {"file": {"contentType": "text/xml"}},
+        },
+    )
+
+    bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 50)]
+
+    # Missing required properties, extra properties and non-object bodies are violations too.
+    assert any(not isinstance(body, dict) or set(body) != {"file", "age"} for body in bodies)
+    assert all(body["file"] == b"<xml/>" for body in bodies if isinstance(body, dict) and "file" in body)
 
 
 def test_empty_encoding_object(ctx):
