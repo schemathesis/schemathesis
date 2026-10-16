@@ -26,7 +26,7 @@ from schemathesis.specs.openapi._hypothesis import openapi_cases
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot, ResourceDefinition
-from test.utils import run_given
+from test.utils import objects_at, run_given
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"
@@ -1652,15 +1652,6 @@ _SHIPPING = {
 _SHIPPING_REF = {"$ref": "#/components/schemas/Shipping"}
 
 
-def _objects_at(value, path):
-    if not path:
-        return [value]
-    head, *rest = path
-    if head == "*":
-        return [found for item in value for found in _objects_at(item, rest)] if isinstance(value, list) else []
-    return _objects_at(value[head], rest) if isinstance(value, dict) and head in value else []
-
-
 def _with_shipping(shipping):
     return {
         "type": "object",
@@ -1761,7 +1752,7 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
     def collect(value):
         if isinstance(value, GeneratedValue):
             value = value.value
-        objects = _objects_at(value, path)
+        objects = objects_at(value, path)
         landed = [isinstance(item, dict) and item.get("location_id") in pooled_ids for item in objects]
         if landed and all(landed):
             pool_hits.append(objects)

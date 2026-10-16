@@ -72,6 +72,16 @@ def run_given(
     return run
 
 
+def objects_at(value: Any, path: Sequence[str]) -> list[Any]:
+    """Values at `path` in `value`, where `*` stands for every array item."""
+    if not path:
+        return [value]
+    head, *rest = path
+    if head == "*":
+        return [found for item in value for found in objects_at(item, rest)] if isinstance(value, list) else []
+    return objects_at(value[head], rest) if isinstance(value, dict) and head in value else []
+
+
 def has_hypothesis_failure_header(text: str, test_name: str = "") -> bool:
     return any(f"{header}: {test_name}" in text for header in HYPOTHESIS_FAILURE_HEADERS)
 

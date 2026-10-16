@@ -7,6 +7,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import PoolDraw
 from test.coverage.helpers import iter_cases, make_request_body
+from test.utils import objects_at
 
 # Consumer responses declare `name` as required; the planted-bug handlers return it as null for known ids.
 PLANTED_BUG_RESPONSES = {
@@ -563,6 +564,175 @@ def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
         {"address_id": {"city": "London"}},
         {"address_id": {}},
     ]
+
+
+_SHIPPING = {
+    "type": "object",
+    "properties": {"location_id": {"type": "integer"}, "note": {"type": "string"}},
+    "required": ["note"],
+}
+_SHIPPING_REF = {"$ref": "#/components/schemas/Shipping"}
+
+
+@pytest.mark.parametrize(
+    ("shipping", "path", "body"),
+    [
+        (_SHIPPING_REF, ("shipping",), {"$ref": "#/components/schemas/Department"}),
+        (_SHIPPING_REF, ("shipping",), None),
+        ({"type": "array", "minItems": 1, "items": _SHIPPING}, ("shipping", "*"), None),
+        ({"type": "array", "minItems": 1, "items": _SHIPPING_REF}, ("shipping", "*"), None),
+        ({"$ref": "#/components/schemas/Shipments"}, ("shipping", "*"), None),
+        (
+            {
+                "type": "object",
+                "required": ["parts"],
+                "properties": {"parts": {"type": "array", "minItems": 1, "items": _SHIPPING_REF}},
+            },
+            ("shipping", "parts", "*"),
+            None,
+        ),
+    ],
+    ids=["ref-body", "ref-object", "array", "array-of-refs", "ref-to-array", "array-in-object"],
+)
+def test_coverage_pool_overlay_reaches_nested_body_fields(ctx, shipping, path, body):
+    department = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "shipping": shipping},
+        "required": ["shipping"],
+    }
+    schema = ctx.openapi.load_schema(
+        {**_id_producer("/locations", "Location", {"type": "integer"}), **_body_consumer(body or department)},
+        components={
+            "schemas": {
+                "Department": department,
+                "Shipping": _SHIPPING,
+                "Shipments": {"type": "array", "minItems": 1, "items": _SHIPPING_REF},
+            }
+        },
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
+
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+    hits = []
+    for case in cases:
+        objects = objects_at(case.body, path)
+        landed = [item.get("location_id") == 7340001 for item in objects]
+        assert all(landed) or not any(landed), f"Pool value reached only some array items: {objects!r}"
+        if objects and all(landed):
+            hits.append(case)
+            assert all("note" in item for item in objects), f"Overlay dropped the generated `note`: {objects!r}"
+            assert [draw.resource_name for draw in case.meta.pool_draws] == ["Location"]
+    assert hits, [case.body for case in cases]
+
+
+def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(ctx):
+    address = {"type": "object", "properties": {"location_id": {"type": "integer"}}}
+    schema = ctx.openapi.load_schema(
+        {
+            **_id_producer("/locations", "Location", {"type": "integer"}),
+            **_id_producer("/addresses", "Address", address),
+            **_body_consumer({"type": "object", "properties": {"address_id": address}}),
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
+    data_source.repository.record_response(
+        operation="POST /addresses", status_code=201, payload={"id": {"location_id": 5550001}}
+    )
+
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+    assert [case.body for case in cases] == [{"address_id": {"location_id": 5550001}}, {}, {"address_id": {}}]
+
+
+@pytest.mark.parametrize(
+    ("version", "body", "expected"),
+    [
+        (
+            "3.1.0",
+            {
+                "type": "object",
+                "properties": {"shipping": {"$ref": "#/components/schemas/Shipping", "type": "object"}},
+            },
+            [{"shipping": {"location_id": 0}}, {}, {"shipping": {}}],
+        ),
+        (
+            "3.0.2",
+            {
+                "type": "object",
+                "properties": {
+                    "shipping": {"type": "object", "properties": {"location_id": {"type": "integer", "example": 42}}}
+                },
+            },
+            [{"shipping": {"location_id": 42}}, {}, {"shipping": {}}],
+        ),
+        (
+            "3.0.2",
+            {
+                "type": "object",
+                "properties": {
+                    "shipping": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "parts": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "items": {"type": "object", "properties": {"location_id": {"type": "integer"}}},
+                                    }
+                                },
+                            }
+                        ]
+                    }
+                },
+            },
+            [
+                {"shipping": {"parts": [{"location_id": 0}]}},
+                {},
+                {"shipping": {}},
+                {"shipping": {"parts": [{}, {}]}},
+                {"shipping": {"parts": [{}]}},
+            ],
+        ),
+    ],
+    ids=["ref-with-clashing-sibling", "nested-declared-example", "field-inside-all-of"],
+)
+def test_coverage_pool_overlay_leaves_fields_it_cannot_fill(ctx, version, body, expected):
+    schema = ctx.openapi.load_schema(
+        {**_id_producer("/locations", "Location", {"type": "integer"}), **_body_consumer(body)},
+        version=version,
+        components={"schemas": {"Shipping": {"type": "object", "properties": {"location_id": {"type": "integer"}}}}},
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
+
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+    assert [case.body for case in cases] == expected
+
+
+def test_coverage_pool_overlay_reaches_top_level_field_of_ref_body(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            **_id_producer("/locations", "Location", {"type": "integer"}),
+            **_body_consumer({"$ref": "#/components/schemas/Department"}),
+        },
+        components={
+            "schemas": {
+                "Department": {
+                    "type": "object",
+                    "properties": {"location_id": {"type": "integer"}, "note": {"$ref": "#/components/schemas/Note"}},
+                    "required": ["location_id"],
+                },
+                "Note": {"type": "string"},
+            }
+        },
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
+
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+    assert [case.body["location_id"] for case in cases] == [7340001, 7340001]
 
 
 def test_coverage_pool_draws_multi_slot_correlated(ctx):
