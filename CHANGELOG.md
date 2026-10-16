@@ -37,6 +37,7 @@
 - Unmasked URL credentials in the terminal's schema location and `Base URL` lines.
 - Stateful scenarios mostly starting from the alphabetically first operation.
 - Crash or wrong URL for server variable names containing dots or brackets.
+- Crash on path keys containing lone surrogates.
 - Internal error instead of a failure for non-object GraphQL responses in negative mode.
 - "Response violates schema" messages embedding the whole response value on one line.
 - False positive `negative_data_rejection` for valid boolean query parameters alongside `text/plain` bodies.

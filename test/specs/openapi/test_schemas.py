@@ -372,6 +372,22 @@ def test_schema_endpoint_under_base_path_is_not_tested(ctx, app_runner, fetch_pa
     assert [result.ok().label for result in schema.get_all_operations()] == ["GET /users"]
 
 
+def test_path_with_lone_surrogate_is_a_schema_error(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/a\ud800b": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (2, 2)
+    results = list(schema.get_all_operations())
+    assert [(result.err().path, result.err().method) for result in results if isinstance(result, Err)] == [
+        ("/a\ud800b", None)
+    ]
+    assert [result.ok().label for result in results if isinstance(result, Ok)] == ["GET /users"]
+
+
 def test_schema_loaded_from_file_keeps_every_operation(ctx, tmp_path):
     location = tmp_path / "openapi.json"
     spec = ctx.openapi.build_schema({str(location): {"get": {"responses": {"200": {"description": "OK"}}}}})
