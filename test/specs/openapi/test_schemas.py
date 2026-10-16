@@ -67,6 +67,10 @@ def test_find_operation_by_path_match(ctx, method, path, expected_path, expected
         ("DELETE", "/users/42"),
         # Wrong path
         ("GET", "/nonexistent"),
+        # Repeated slashes
+        ("GET", "/users//42"),
+        # Missing trailing slash
+        ("GET", "/teams/5"),
     ],
 )
 def test_find_operation_by_path_no_match(ctx, method, path):
@@ -76,6 +80,7 @@ def test_find_operation_by_path_no_match(ctx, method, path):
                 "get": {"operationId": "get_user", "responses": {"200": {"description": "OK"}}},
                 "patch": {"operationId": "update_user", "responses": {"200": {"description": "OK"}}},
             },
+            "/teams/{team_id}/": {"get": {"responses": {"200": {"description": "OK"}}}},
         },
         version="3.0.0",
     )

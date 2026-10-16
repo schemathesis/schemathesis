@@ -715,13 +715,14 @@ class OpenApiSchema(BaseSchema):
         Returns None if no operation matches.
         """
         from werkzeug.exceptions import MethodNotAllowed, NotFound
+        from werkzeug.routing import RequestRedirect
 
         from schemathesis.specs.openapi.stateful.inference import OperationById
 
         # Match path and method using werkzeug router
         try:
             operation_ref, _ = self.analysis.inferencer._adapter.match(path, method=method.upper())
-        except (NotFound, MethodNotAllowed):
+        except (NotFound, MethodNotAllowed, RequestRedirect):
             return None
 
         if isinstance(operation_ref, OperationById):

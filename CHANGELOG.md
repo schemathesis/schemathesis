@@ -56,6 +56,7 @@
 - Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
 - Inferred `Location` links extracting wrong path parameters with base paths, queries or regex characters.
 - Crash on `Location` headers differing from a schema path by a trailing or doubled slash.
+- Crash in `schema.find_operation_by_path` on paths with doubled or missing trailing slashes.
 - `object_level_authorization` sending a single-object `GET` as another user, which may create data.
 - Valueless sensitive query keys gaining a masked value in reports and cassettes.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.
