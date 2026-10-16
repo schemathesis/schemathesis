@@ -30,6 +30,19 @@ from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi import wfc as openapi_wfc
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
 
+STARTED_SERVERS = pytest.StashKey[list[OpenAPIServer]]()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    report = yield
+    servers = item.stash.get(STARTED_SERVERS, None)
+    if report.failed and servers:
+        text = "\n\n".join("\n".join([server.base_url, *map(repr, server.requests)]) for server in servers)
+        report.sections.append(("Captured requests", text))
+    return report
+
+
 if TYPE_CHECKING:
     from schemathesis.config import SchemathesisConfig
     from schemathesis.openapi.loaders import OpenApiSchema
@@ -47,7 +60,10 @@ def _start(parent: Context, app: GraphQLApp) -> GraphQLServer: ...
 def _start(parent: Context, app: OpenAPIApp | GraphQLApp) -> OpenAPIServer | GraphQLServer:
     app_runner = parent.request.getfixturevalue("app_runner")
     runner = app_runner.run_flask_app if app.kind == "flask" else app_runner.run_asgi_app
-    return app.make_server(port=runner(app.server))
+    server = app.make_server(port=runner(app.server))
+    if isinstance(server, OpenAPIServer):
+        parent.request.node.stash.setdefault(STARTED_SERVERS, []).append(server)
+    return server
 
 
 @dataclass(slots=True)

@@ -29,6 +29,11 @@ class CapturedRequest:
     body: bytes
     raw_query: str = ""
 
+    def __repr__(self) -> str:
+        target = f"{self.path}?{self.raw_query}" if self.raw_query else self.path
+        body = f" body={self.body[:200]!r}" if self.body else ""
+        return f"<{self.method} {target}{body}>"
+
     def json(self) -> Any:
         return json.loads(self.body)
 
