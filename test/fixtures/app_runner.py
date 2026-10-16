@@ -16,7 +16,7 @@ import pytest
 import requests
 import trustme
 import uvicorn
-from werkzeug.serving import make_server
+from werkzeug.serving import BaseWSGIServer, make_server
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -24,6 +24,37 @@ if TYPE_CHECKING:
 
 
 COVERAGE_ENV_VARS = ("COVERAGE_PROCESS_START", "COVERAGE_FILE")
+# Every live server keeps a thread, and free-threaded builds hold megabytes per thread, so servers stop with their test.
+_SERVERS: list[BaseWSGIServer | uvicorn.Server] = []
+
+
+def _serve(server: BaseWSGIServer) -> int:
+    _SERVERS.append(server)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server.server_port
+
+
+def _shutdown(server: BaseWSGIServer) -> None:
+    server.shutdown()
+    server.server_close()
+
+
+def _stop(server: BaseWSGIServer | uvicorn.Server) -> None:
+    if isinstance(server, uvicorn.Server):
+        server.should_exit = True
+    else:
+        # `shutdown` waits up to the server's poll interval; doing it in the background keeps teardown instant.
+        threading.Thread(target=_shutdown, args=(server,), daemon=True).start()
+
+
+@pytest.fixture(autouse=True)
+def stop_test_servers():
+    # Servers from wider-scoped fixtures were registered before this point and keep running.
+    started = len(_SERVERS)
+    yield
+    for server in _SERVERS[started:]:
+        _stop(server)
+    del _SERVERS[started:]
 
 
 def unused_port() -> int:
@@ -140,18 +171,14 @@ def run_flask_app(app: Flask, port: int | None = None, timeout: float = 5.0, wai
     if port is not None or not wait:
         return run(app.run, port=port, timeout=timeout, wait=wait)
     # Binding port 0 inside the server leaves no window for another socket to take a pre-picked port.
-    server = make_server("127.0.0.1", 0, app, threaded=True)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server.server_port
+    return _serve(make_server("127.0.0.1", 0, app, threaded=True))
 
 
 def run_https_flask_app(app: Flask) -> int:
     """Start `app` over HTTPS with a certificate from an untrusted CA, so only unverified clients get through."""
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     trustme.CA().issue_cert("127.0.0.1").configure_cert(context)
-    server = make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server.server_port
+    return _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
 
 
 def run_client_cert_flask_app(app: Flask, ca: trustme.CA) -> int:
@@ -160,9 +187,7 @@ def run_client_cert_flask_app(app: Flask, ca: trustme.CA) -> int:
     ca.issue_cert("127.0.0.1").configure_cert(context)
     ca.configure_trust(context)
     context.verify_mode = ssl.CERT_REQUIRED
-    server = make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server.server_port
+    return _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
 
 
 def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
@@ -182,6 +207,7 @@ def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wa
         sockets.append(sock)
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error", lifespan="off")
     server = uvicorn.Server(config)
+    _SERVERS.append(server)
     thread = threading.Thread(target=server.run, kwargs={"sockets": sockets or None}, daemon=True)
     thread.start()
     if wait:

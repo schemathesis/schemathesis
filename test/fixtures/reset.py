@@ -9,10 +9,12 @@ from schemathesis.cli.ext.groups import GROUPS, GroupedOption
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
 from schemathesis.core.jsonschema import _validator_failure_cache, validator_cache
+from schemathesis.core.jsonschema.resolver import _load_remote_uri
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION
 from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
 from schemathesis.specs.openapi import media_types
+from schemathesis.specs.openapi.examples import load_external_example
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
@@ -61,3 +63,6 @@ def reset_hooks():
     validator_cache.clear()
     _validator_failure_cache.clear()
     DEFAULT_GENERATION_SESSION.close()
+    # Test servers stop with their test, so a later test may get the same port and must not see a cached response.
+    _load_remote_uri.cache_clear()
+    load_external_example.cache_clear()
