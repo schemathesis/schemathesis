@@ -1278,6 +1278,30 @@ def test_hypothesis_observability_serialization(ctx):
         test()
 
 
+def test_properties_no_value_satisfies_never_discard_draws():
+    # A discarded draw ends a whole stateful scenario; `readOnly` request body fields arrive here as `false`.
+    schema = {
+        "type": "object",
+        "required": ["name"],
+        "properties": {"name": {"const": "a"}, "id": False, "url": False, "created": False},
+        "additionalProperties": False,
+    }
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    statuses = []
+
+    @given(built)
+    @settings(max_examples=100, database=None, derandomize=True, phases=[Phase.generate], deadline=None)
+    def test(value):
+        pass
+
+    with with_observability_callback(
+        lambda observation: statuses.append(observation.status) if observation.type == "test_case" else None
+    ):
+        test()
+
+    assert set(statuses) == {"passed"}
+
+
 @pytest.mark.parametrize("location", [ParameterLocation.QUERY, ParameterLocation.HEADER])
 def test_apply_exclusions_drops_empty_required_when_all_filtered(location):
     # Empty `required` violates the OpenAPI meta-schema and crashes Hypothesis draws.

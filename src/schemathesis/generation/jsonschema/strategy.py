@@ -976,13 +976,18 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
     value_for = _value_source(view, unnamed, ctx)
     # A key can be required without `properties` saying anything about its value.
     required = {key: entries[key] if key in entries else value_for(key) for key in view.required}
-    optional = {key: entry for key, entry in entries.items() if key not in view.required}
+    # A property no value satisfies can only be absent, so it is never picked.
+    optional = {
+        key: entry
+        for key, entry in entries.items()
+        if key not in view.required and view.properties[key].kind is not canonical.CanonicalKind.FALSE
+    }
     known = set(view.properties) | set(view.required)
     names = None if view.property_names is None else _closed_names(view.property_names)
     if names is not None:
         # A closed name set admits nothing else, so its names are the only optional keys.
         # Sorted: set iteration order is not stable across processes, and draw order decides replays.
-        optional.update({name: value_for(name) for name in sorted(names - set(required) - set(optional))})
+        optional.update({name: value_for(name) for name in sorted(names - set(required) - set(entries))})
         extra = None
     else:
         free_names = _free_names(view, ctx).filter(lambda key: key not in known)
