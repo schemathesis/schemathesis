@@ -166,30 +166,6 @@ def examples() -> dict[str, Any]:
     }
 
 
-def response_headers() -> dict[str, Any]:
-    return {
-        "/headers": {
-            "get": {
-                "produces": ["application/json"],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {"type": "object"},
-                        "headers": {
-                            "X-Total-Count": {"type": "integer"},
-                            "X-Tags": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "collectionFormat": "csv",
-                            },
-                        },
-                    }
-                },
-            }
-        }
-    }
-
-
 def default_response() -> dict[str, Any]:
     return {
         "/errors": {

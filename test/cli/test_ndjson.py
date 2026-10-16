@@ -260,27 +260,25 @@ def test_report_dir(ctx, cli, tmp_path, in_config):
 
 
 def test_binary_body_base64(ctx, cli, ndjson_path):
-    api = ctx.openapi.apps.success()
+    api = ctx.openapi.apps.upload_file()
     cli.run_and_assert(
         api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=1",
         "--seed=1",
         "--mode=positive",
+        "--phases=fuzzing",
     )
     events = load_ndjson(ndjson_path)
-    scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
-    # Binary data should be encoded as {"$base64": "..."} if present
-    for event in scenario_finished:
-        data = get_event_data(event)
-        interactions = data["recorder"].get("interactions", {})
-        for interaction in interactions.values():
-            if interaction.get("response") and interaction["response"].get("body"):
-                body = interaction["response"]["body"]
-                # Body should be a string or a base64 encoded dict
-                assert isinstance(body, (str | dict))
-                if isinstance(body, dict):
-                    assert "$base64" in body
+    bodies = [
+        interaction["request"]["body"]
+        for event in events
+        if get_event_type(event) == "ScenarioFinished"
+        for interaction in get_event_data(event)["recorder"].get("interactions", {}).values()
+        if "body" in interaction["request"]
+    ]
+    assert [list(body) for body in bodies] == [["$base64"]] * len(bodies) != []
+    assert all(b"\x89PNG" in base64.b64decode(body["$base64"]) for body in bodies)
 
 
 def test_enum_serialization_without_sanitization(cli, ctx, ndjson_path):

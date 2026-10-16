@@ -25,7 +25,6 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, ContentTypeServerError, FailureGroup
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
-from schemathesis.core.result import Ok
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
@@ -3275,11 +3274,9 @@ def test_nested_parameters(ctx):
 )
 def test_references(ctx, operation, components):
     schema = ctx.openapi.load_schema({"/test": {"post": operation}}, components=components)
-    for operation in schema.get_all_operations():
-        if isinstance(operation, Ok):
-            iter_cases(operation.ok(), *GenerationMode)
-        else:
-            assert "Unresolvable reference in the schema" in str(operation.err())
+    [loaded] = schema.get_all_operations()
+    # Unresolvable references surface when the operation is tested; generating coverage cases must not crash.
+    iter_cases(loaded.ok(), *GenerationMode)
 
 
 def test_urlencoded_array_body_is_serializable(ctx):

@@ -58,13 +58,6 @@ def examples() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
-def response_headers() -> OpenAPIApp:
-    spec = build_schema(schemas_v2.response_headers(), version="2.0")
-    app = make_flask_app_from_schema(spec)
-    handlers_v2.register_response_headers(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
-
-
 def default_response() -> OpenAPIApp:
     spec = build_schema(schemas_v2.default_response(), version="2.0")
     app = make_flask_app_from_schema(spec)
