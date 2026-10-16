@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.engine import Status, events
+from schemathesis.engine.errors import never_reached_server
 from schemathesis.transport.prepare import get_default_headers
 
 if TYPE_CHECKING:
@@ -199,8 +200,9 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
         return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        # A slow server says nothing about the capability; other network errors mean the input was rejected
-        outcome = ProbeOutcome.SKIP if isinstance(exc, ReadTimeout) else ProbeOutcome.FAILURE
+        # A slow or unreachable server says nothing about the capability; other network errors mean it was rejected
+        inconclusive = isinstance(exc, ReadTimeout) or never_reached_server(exc)
+        outcome = ProbeOutcome.SKIP if inconclusive else ProbeOutcome.FAILURE
         return ProbeRun(probe, outcome, req, None, exc)
     finally:
         session.close()

@@ -57,6 +57,7 @@
 - False positive `positive_data_acceptance` for header values ending with whitespace.
 - Clicks in the HTML report opening an unrelated row in Safari.
 - Double-encoded sensitive query keys in reproduction commands for raw query strings.
+- Generation narrowed for the whole run when capability probes could not connect to the API.
 - False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
 - Redirects followed for operations documenting a `3xx` status, reporting the target's status instead.
 - Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
