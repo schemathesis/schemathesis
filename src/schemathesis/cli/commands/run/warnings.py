@@ -40,11 +40,11 @@ class StatusCodeStatistic:
     def _get_4xx_breakdown(self) -> tuple[int, int, int]:
         """Get breakdown of 4xx responses: (404_count, other_4xx_count, total_4xx_count).
 
-        Auth and rate-limit responses say nothing about the data sent, so they are left out.
+        Auth, conflict and rate-limit responses say nothing about the data sent, so they are left out.
         """
         count_404 = self.counts.get(404, 0)
         count_other_4xx = sum(
-            count for code, count in self.counts.items() if 400 <= code < 500 and code not in {401, 403, 404, 429}
+            count for code, count in self.counts.items() if 400 <= code < 500 and code not in {401, 403, 404, 409, 429}
         )
         total_4xx = count_404 + count_other_4xx
         return count_404, count_other_4xx, total_4xx

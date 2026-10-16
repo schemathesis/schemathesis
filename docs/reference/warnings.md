@@ -95,7 +95,7 @@ to validation errors, indicating schema constraints don't match API validation
 than documented
 ```
 
-**Trigger**: At least 10% of requests returned HTTP 4XX, excluding 401, 403, and 404
+**Trigger**: At least 10% of requests returned HTTP 4XX, excluding 401, 403, 404, 409, and 429
 
 The tested API rejects a lot of data - while technically it is a valid behavior, it means that Schemathesis' tests don't reach deep into the API's business logic and cover mostly the validation layer.
 
