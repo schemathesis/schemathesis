@@ -698,12 +698,18 @@ def test_replay_graphql_crash(cli, ctx, tmp_path):
             raise RuntimeError("planted")
 
     api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
-    cli.run(api.schema_url, "--max-examples=1", "--phases=fuzzing")
+    run = cli.run(api.schema_url, "--max-examples=1", "--phases=fuzzing")
     case_id = json.loads(_list_crash_files(crash_cache_dir(tmp_path))[0].read_text())["case_id"]
 
     result = cli.main("replay", case_id, "--keep")
 
     assert (result.exit_code, "ERROR" in result.output, "1 failed" in result.output) == (1, False, True), result.output
+    # Replay names the case by the same operation label as the run.
+    assert (
+        re.findall(r"^_+ (.+?) _+$", run.stdout, re.MULTILINE),
+        re.findall(r"^_+ (.+?) _+$", result.stdout, re.MULTILINE),
+        re.findall(r"^  x FAILED (.+)$", result.stdout, re.MULTILINE),
+    ) == (["Query.boom"], ["Query.boom"], ["Query.boom"]), result.output
 
 
 def test_replay_graphql_stateful_crash(cli, ctx, tmp_path):
@@ -1923,7 +1929,7 @@ def test_replay_invalid_link_location_is_errored(cli, app_runner, ctx, tmp_path,
     )
     writer.write(
         CrashFile(
-            operation="GET /source -> GET /target",
+            operation="GET /target",
             method="GET",
             path_template="/target",
             fingerprint="badloc",
@@ -2456,7 +2462,7 @@ def test_replay_ignores_link_with_out_of_range_parent_index(cli, app_runner, ctx
     )
     writer.write(
         CrashFile(
-            operation="GET /source -> GET /target",
+            operation="GET /target",
             method="GET",
             path_template="/target",
             fingerprint="stalepar",

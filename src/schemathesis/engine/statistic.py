@@ -13,7 +13,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.engine.recorder import CaseNode, RecordedScenario, ReproductionStep
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
+from schemathesis.generation.meta import coverage_scenario, report_label
 
 if TYPE_CHECKING:
     from schemathesis.baseline import Baseline, Identity
@@ -203,16 +203,12 @@ class Statistic:
 
             if current_case_failures:
                 assert last_failure_info is not None
-                # Compute correct label for UNSPECIFIED_HTTP_METHOD coverage scenario (GH-3322)
-                meta = case.value._meta
-                if (
-                    meta is not None
-                    and isinstance(meta.phase.data, CoveragePhaseData)
-                    and meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
-                ):
-                    label = f"{case.value.method} {case.value.path}"
-                else:
-                    label = failure_label(case.value) if failure_label is not None else recorder.label
+                label = report_label(
+                    operation_label=failure_label(case.value) if failure_label is not None else recorder.label,
+                    method=case.value.method,
+                    path=case.value.path,
+                    scenario=coverage_scenario(case.value),
+                )
                 failures_by_label.setdefault(label, {})[case_id] = GroupedFailures(
                     case_id=case_id,
                     code_sample=last_failure_info.code_sample,

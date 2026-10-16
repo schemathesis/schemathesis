@@ -490,6 +490,14 @@ def coverage_scenario(case: Case) -> CoverageScenario | None:
     return meta.phase.data.scenario
 
 
+def report_label(*, operation_label: str, method: str, path: str, scenario: str | None) -> str:
+    """Name a case the way `st run` and `st replay` report it."""
+    # A probe for a method the schema does not declare borrows an operation; name it by the request sent.
+    if scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+        return f"{method} {path}"
+    return operation_label
+
+
 def content_type_probes_first(cases: Iterable[Case]) -> list[Case]:
     """Order cases so that Content-Type probes run last under LIFO execution.
 
