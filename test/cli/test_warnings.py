@@ -922,6 +922,30 @@ def test_validation_mismatch_ignores_negative_rejections(ctx, cli, snapshot_cli)
     assert cli.run_openapi_app(app, "--phases=coverage", "--max-examples=10") == snapshot_cli
 
 
+@pytest.mark.parametrize(("status", "expected"), [(422, True), (409, False)], ids=["rejected", "conflict"])
+def test_validation_mismatch_ignores_conflicts(ctx, cli, status, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{item_id}": {
+                "delete": {
+                    "parameters": [
+                        {"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer", "minimum": 1}}
+                    ],
+                    "responses": {"204": {"description": "Deleted"}, "409": {"description": "Referenced"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items/<item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        return jsonify({"detail": "Unavailable"}), status
+
+    result = cli.run_openapi_app(app, "--max-examples=10", "-c not_a_server_error")
+
+    assert ("Schema validation mismatch" in result.stdout) is expected
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_ignores_negative_not_found(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
