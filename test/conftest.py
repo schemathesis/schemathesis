@@ -53,7 +53,7 @@ logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
-settings.register_profile("CI", max_examples=2000)
+settings.register_profile("CI", settings.get_profile("ci"), max_examples=2000)
 
 output.SCHEMATHESIS_VERSION = "dev"
 
