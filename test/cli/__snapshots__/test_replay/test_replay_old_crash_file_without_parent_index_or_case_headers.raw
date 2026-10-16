@@ -15,7 +15,7 @@ _____________________________ GET /items/{item_id} _____________________________
 
 1. Test Case ID: <PLACEHOLDER>
 
-- Use after free
+- ST301 Use after free
 
     The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`) for a resource that was previously deleted.
 

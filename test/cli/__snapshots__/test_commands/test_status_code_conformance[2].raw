@@ -31,7 +31,7 @@ Schemathesis dev
 _______________________________ POST /api/teapot _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- ST103 Undocumented HTTP status code
 
     Received: 418
     Documented: 200
@@ -59,7 +59,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ ST103 Undocumented HTTP status code: 1
+
+For more information about this failure, try `st explain ST103`.
 
 Test cases:
   N generated, N found N unique failures

@@ -24,7 +24,7 @@ Schemathesis dev
 _______________________________ GET /items/{id} ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "name" is a required property
 
@@ -67,7 +67,7 @@ Reproduce with:
 _________________________________ POST /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -92,8 +92,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error: 1
-  ❌ Response violates schema: 1
+  ❌ ST101 Server error: 1
+  ❌ ST108 Response violates schema: 1
+
+Some failures have detailed explanations: ST101, ST108.
+For more information about a failure, try `st explain ST101`.
 
 Test cases:
   N generated, N found N unique failures

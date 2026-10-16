@@ -166,7 +166,13 @@ def assert_top_failures_match(html):
     more = count_of(r'<a class="tf-more"[^>]*>\+(\d+) more</a>', html)
     ops = re.search(r'<section class="ops[^"]*"[^>]*>.*?</table></section>', html, flags=re.DOTALL)
     cards = re.findall(r'<article class="case"[^>]*>.*?</article>', ops.group(0) if ops else "", flags=re.DOTALL)
-    kinds = {title for card in cards for title in re.findall(r'<h4 class="finding-title">([^<]+)', card)}
+    # A kind is a failure class; custom checks share ST901, so each custom title is its own kind.
+    findings = [
+        finding
+        for card in cards
+        for finding in re.findall(r'<h4 class="finding-title"><a class="fcode"[^>]*>(ST\d+)</a>([^<]+)', card)
+    ]
+    kinds = {title if code == "ST901" else code for code, title in findings}
     assert shown + more == len(kinds), (shown, more, sorted(kinds))
 
 
@@ -216,6 +222,39 @@ def test_html_report_failed(ctx, cli, report_dir, snapshot_html):
     assert len(re.findall(r'class="tl-mark', html)) == 1
     assert '<div class="tl-head"><h2 class="tl-heading" id="tl-heading">Timeline</h2></div>' in html
     assert "title=" not in re.search(r'<section class="timeline".*?</section>', html).group(0)
+
+
+def test_html_report_shows_failure_codes(ctx, cli, report_dir):
+    api = ctx.openapi.apps.failure()
+    html = run_with_report(cli, report_dir, api.schema_url, exit_code=ExitCode.FAILURES)
+    assert re.findall(r'<a class="tf-name" href="#kind=([^"]+)"[^>]*><span class="fcode">(ST\d+)</span>', html) == [
+        ("server-error", "ST101")
+    ]
+    assert re.findall(r'<option value="\d+" data-slug="([^"]+)" data-code="(ST\d+)">', html) == [
+        ("server-error", "ST101")
+    ]
+    assert re.findall(r'<td class="failures-cell">.*?<span class="fcode">(ST\d+)</span>', html) == ["ST101"]
+    assert re.findall(r'<h4 class="finding-title"><a class="fcode" href="([^"]+)"[^>]*>(ST\d+)</a>', html) == [
+        ("https://schemathesis.readthedocs.io/en/stable/reference/failures/#st101", "ST101")
+    ]
+    assert re.findall(r"<code>st explain (ST\d+)</code>", html) == ["ST101"]
+
+
+def test_html_report_explains_every_code_of_a_case_in_one_line(ctx, cli, app_runner, report_dir):
+    app, _ = ctx.openapi.make_flask_app({"/api/failure": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/failure")
+    def failure():
+        return "", 500
+
+    html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
+    assert re.findall(r'<p class="explain">(.*?)</p>', html) == [
+        "What these mean and how to fix them: <code>st explain ST101</code>, <code>st explain ST103</code>"
+    ]
+    assert re.findall(r'<a class="fcode" [^>]*title="([^"]+)"', html) == [
+        "ST101 in the Schemathesis docs (opens in a new tab)",
+        "ST103 in the Schemathesis docs (opens in a new tab)",
+    ]
 
 
 def test_html_report_schema_not_loaded(ctx, cli, report_dir, snapshot_html):
@@ -514,7 +553,8 @@ def test_html_report_permalinks(ctx, cli, report_dir):
 def top_failures_items(html):
     tf_list = re.search(r'<ul class="tf-list">(.*?)</ul>', html).group(1)
     return re.findall(
-        r'<li>(?:<span class="tf-n">\d+</span><(?:span|a) class="tf-name"[^>]*>([^<]+)</(?:span|a)>|<a[^>]*>([^<]+)</a>)</li>',
+        r'<li>(?:<span class="tf-n">\d+</span><(?:span|a) class="tf-name"[^>]*>(?:<span class="fcode">[^<]+</span>)?'
+        r"([^<]+)</(?:span|a)>|<a[^>]*>([^<]+)</a>)</li>",
         tf_list,
     )
 
@@ -752,7 +792,7 @@ def test_html_report_operations_in_natural_order(ctx, cli, app_runner, report_di
 
 def failed_rows(html):
     return [
-        (anchor, [first, *re.findall(r"<li>([^<]+)</li>", rest)])
+        (anchor, [first, *re.findall(r'<li>(?:<span class="fcode">[^<]+</span>)?([^<]+)</li>', rest)])
         for anchor, first, rest in re.findall(
             r'<tr class="op-row row-failed[^"]*" id="([^"]+)">.*?<span class="failure-title">([^<]+)</span>(.*?)</td>',
             html,

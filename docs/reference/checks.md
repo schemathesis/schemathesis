@@ -32,6 +32,8 @@ See [CLI reference](../reference/cli.md#-c-checks-checks) and [configuration ref
 
 ### `max_response_time`
 
+Failure codes: [ST112](failures.md#st112).
+
 Catches responses that take longer than the configured limit.
 
 ```text
@@ -48,6 +50,8 @@ This check validates response times against your threshold. The actual HTTP requ
 ## Core response validation
 
 ### `not_a_server_error`
+
+Failure codes: [ST101](failures.md#st101), [ST102](failures.md#st102), [ST109](failures.md#st109), [ST201](failures.md#st201), [ST501](failures.md#st501), [ST502](failures.md#st502), [ST503](failures.md#st503), [ST504](failures.md#st504).
 
 Catches server-side errors (5xx status codes) and GraphQL `errors` arrays.
 
@@ -68,6 +72,8 @@ Accepts `expected-statuses` (default `["2xx", "3xx", "4xx"]`) to define which st
 
 ### `status_code_conformance`
 
+Failure codes: [ST103](failures.md#st103).
+
 Verifies the response status code is documented in the schema for the operation (or a `default` response is defined).
 
 ```text
@@ -82,6 +88,8 @@ Wildcards such as `2XX` in the schema are expanded automatically. To silence fai
 ---
 
 ### `content_type_conformance`
+
+Failure codes: [ST104](failures.md#st104), [ST105](failures.md#st105), [ST106](failures.md#st106).
 
 Validates the `Content-Type` header matches the schema. Fails when the header is missing, malformed, or uses an undocumented media type.
 
@@ -109,6 +117,8 @@ Raises `Malformed media type` when parsing fails and `Undocumented Content-Type`
 
 ### `response_headers_conformance`
 
+Failure codes: [ST107](failures.md#st107), [ST108](failures.md#st108).
+
 Ensures response header values match their JSON Schema definitions.
 
 When a required header is missing:
@@ -134,6 +144,8 @@ Header values are coerced into appropriate JSON Schema types before validation, 
 ---
 
 ### `response_schema_conformance`
+
+Failure codes: [ST104](failures.md#st104), [ST108](failures.md#st108), [ST109](failures.md#st109), [ST110](failures.md#st110), [ST111](failures.md#st111).
 
 Validates the response body against its JSON Schema definition. Catches format mismatches, missing required properties, type errors, and more.
 
@@ -173,6 +185,8 @@ For schema examples, polymorphic events, and current limitations, see [Testing S
 
 ### `negative_data_rejection`
 
+Failure codes: [ST201](failures.md#st201).
+
 Verifies the API properly rejects invalid input data. When Schemathesis generates a negative test case (invalid payload, missing required field, etc.), it expects the API to respond with an error status code.
 
 ```text
@@ -192,6 +206,8 @@ The failure message includes the specific invalid component, helping you identif
 
 ### `positive_data_acceptance`
 
+Failure codes: [ST202](failures.md#st202).
+
 Verifies the API accepts valid request data. When Schemathesis generates schema-compliant requests, it expects the API to respond with a success status code.
 
 ```text
@@ -210,6 +226,8 @@ By default, `expected-statuses` includes `3xx/401/403/404/409/429/5xx` to accoun
 
 ### `missing_required_header`
 
+Failure codes: [ST203](failures.md#st203).
+
 Verifies the API rejects requests when required headers are missing.
 
 By default, non-`Authorization` headers are considered correctly rejected with `400`, `401`, `403`, `406`, `415`, or `422`. `Authorization` is stricter and expects `401 Unauthorized`.
@@ -226,6 +244,8 @@ Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 4
 ---
 
 ### `unsupported_method`
+
+Failure codes: [ST204](failures.md#st204).
 
 Verifies the API properly rejects HTTP methods not defined for an endpoint. The API should return `405 Method Not Allowed` with an `Allow` header listing the supported methods (required by [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.5.6)).
 
@@ -245,6 +265,8 @@ Return 405 for methods not listed in the OpenAPI spec
 ---
 
 ### `allow_header_conformance`
+
+Failure codes: [ST205](failures.md#st205).
 
 Verifies the `Allow` header returned for `OPTIONS` requests lists the same methods as the schema. A mismatch means clients are told the resource supports a different set of operations than the one documented; extra methods may expose endpoints that were never meant to be public.
 
@@ -273,6 +295,8 @@ They need a multi-step scenario, so they run under `st run`'s stateful phase and
 
 ### `use_after_free`
 
+Failure codes: [ST301](failures.md#st301).
+
 Detects when deleted resources remain accessible. After a successful `DELETE`, subsequent requests to the same resource should return `404 Not Found`.
 
 ```text
@@ -287,6 +311,8 @@ The failure message lists both the DELETE call and the subsequent operation for 
 ---
 
 ### `ensure_resource_availability`
+
+Failure codes: [ST302](failures.md#st302).
 
 Verifies created resources are immediately accessible. After a successful `POST`, Schemathesis follows links to fetch the resource. The API should return the created resource, not `404 Not Found`.
 
@@ -304,6 +330,8 @@ The API returned `404 Not Found` for a resource that was just created.
 
 ### `ignored_auth`
 
+Failure codes: [ST401](failures.md#st401).
+
 Verifies authentication is properly enforced. When an operation declares authentication, Schemathesis tests whether the API accepts requests without credentials or with invalid credentials.
 
 `401`, `403`, or a redirect to another page, such as a sign-in page, counts as enforcement. Test cases with invalid path parameters are not judged, as they may miss the operation's route entirely.
@@ -320,6 +348,8 @@ Expected 401 or 403, got `200 OK` for `GET /protected-resource`
 The check gives no verdict when an explicitly configured `Authorization` header (e.g. `-H 'Authorization: ...'`) carries credentials the schema's security schemes do not declare: the probes cannot remove them, so a successful response proves nothing. While such a header is configured, an API that ignores the declared scheme entirely is not reported for that operation.
 
 ### `object_level_authorization`
+
+Failure codes: [ST402](failures.md#st402).
 
 Verifies that one user cannot read an object another user owns (OWASP API1, Broken Object Level Authorization). Runs only when [`[auth.wfc]`](configuration.md#authwfc) lists at least two `peers`: users whose objects must stay private to each other; see [Testing Object-Level Authorization](../guides/object-level-authorization.md) for setup. Operations the schema declares public (no requirement under a schema-wide `security`) are skipped; when the schema declares no `security` at all, every operation is checked, since the server may still require credentials.
 

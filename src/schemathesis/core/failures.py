@@ -59,6 +59,13 @@ _SEVERITY_ORDER = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, S
 class Failure(AssertionError):
     """API check failure."""
 
+    # Stable identity for `st explain` and reports; a code is never renumbered or reused.
+    code: ClassVar[str] = "ST901"
+    slug: ClassVar[str] = "custom-check"
+    kind_title: ClassVar[str] = "Custom check failed"
+    wfc: ClassVar[tuple[str, ...]] = ()
+    severity_default: ClassVar[Severity] = Severity.MEDIUM
+
     __slots__ = ("operation", "title", "message", "case_id", "severity")
     # Whether rerunning as the identity that sent the request reproduces the failure.
     reproducible_by_identity: ClassVar[bool] = True
@@ -70,13 +77,13 @@ class Failure(AssertionError):
         title: str,
         message: str,
         case_id: str | None = None,
-        severity: Severity = Severity.MEDIUM,
+        severity: Severity | None = None,
     ) -> None:
         self.operation = operation
         self.title = title
         self.message = message
         self.case_id = case_id
-        self.severity = severity
+        self.severity = severity if severity is not None else self.severity_default
 
     def __repr__(self) -> str:
         return (
@@ -93,6 +100,7 @@ class Failure(AssertionError):
         """Wire representation shared by the NDJSON report and cross-worker transport."""
         return {
             "type": self.__class__.__name__,
+            "code": self.code,
             "operation": self.operation,
             "title": self.title,
             "message": self.message,
@@ -166,6 +174,12 @@ def get_origin(exception: BaseException, seen: tuple[BaseException, ...] = ()) -
 
 
 class CustomFailure(Failure):
+    code = "ST901"
+    slug = "custom-check"
+    kind_title = "Custom check failed"
+    wfc = ()
+    severity_default = Severity.MEDIUM
+
     __slots__ = ("operation", "title", "message", "exception", "case_id", "severity", "origin")
 
     def __init__(
@@ -176,14 +190,14 @@ class CustomFailure(Failure):
         message: str,
         exception: Exception,
         case_id: str | None = None,
-        severity: Severity = Severity.MEDIUM,
+        severity: Severity | None = None,
     ) -> None:
         self.operation = operation
         self.title = title
         self.message = message
         self.exception = exception
         self.case_id = case_id
-        self.severity = severity
+        self.severity = severity if severity is not None else self.severity_default
         self.origin = get_origin(exception)
 
     @property
@@ -194,6 +208,12 @@ class CustomFailure(Failure):
 
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
+
+    code = "ST112"
+    slug = "slow-response"
+    kind_title = "Response time limit exceeded"
+    wfc = ("312",)
+    severity_default = Severity.LOW
 
     __slots__ = ("operation", "elapsed", "deadline", "title", "message", "case_id", "severity")
 
@@ -213,7 +233,7 @@ class ResponseTimeExceeded(Failure):
         self.title = title
         self.message = message
         self.case_id = case_id
-        self.severity = Severity.LOW
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -227,6 +247,12 @@ def is_reproducible_failure(failure: Failure) -> bool:
 
 class ServerError(Failure):
     """Server responded with an error."""
+
+    code = "ST101"
+    slug = "server-error"
+    kind_title = "Server error"
+    wfc = ("100", "121", "205")
+    severity_default = Severity.CRITICAL
 
     __slots__ = ("operation", "status_code", "title", "message", "case_id", "severity")
 
@@ -244,7 +270,7 @@ class ServerError(Failure):
         self.title = title
         self.message = message
         self.case_id = case_id
-        self.severity = Severity.CRITICAL
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -253,6 +279,12 @@ class ServerError(Failure):
 
 class ContentTypeServerError(ServerError):
     """Server failed on a request whose `Content-Type` is malformed or not accepted by the operation."""
+
+    code = "ST102"
+    slug = "server-error-content-type"
+    kind_title = "Server error on unexpected Content-Type"
+    wfc = ("100", "121", "205")
+    severity_default = Severity.CRITICAL
 
     __slots__ = ()
 
@@ -268,6 +300,12 @@ class ContentTypeServerError(ServerError):
 
 class MalformedJson(Failure):
     """Failed to deserialize JSON."""
+
+    code = "ST109"
+    slug = "malformed-json"
+    kind_title = "JSON deserialization error"
+    wfc = ("200",)
+    severity_default = Severity.MEDIUM
 
     __slots__ = (
         "operation",
@@ -304,7 +342,7 @@ class MalformedJson(Failure):
         self.message = message
         self.title = title
         self.case_id = case_id
-        self.severity = Severity.MEDIUM
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -327,6 +365,12 @@ class MalformedJson(Failure):
 class AcceptedNegativeData(Failure):
     """Response with negative data was accepted."""
 
+    code = "ST201"
+    slug = "accepted-invalid-request"
+    kind_title = "API accepted schema-violating request"
+    wfc = ("206", "904")
+    severity_default = Severity.MEDIUM
+
     __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
 
     def __init__(
@@ -345,7 +389,7 @@ class AcceptedNegativeData(Failure):
         self.expected_statuses = expected_statuses
         self.title = title
         self.case_id = case_id
-        self.severity = Severity.MEDIUM
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -418,8 +462,9 @@ def format_failures(
     auth_identity: str | None = None,
     formatter: BlockFormatter | None = None,
     config: OutputConfig,
+    show_codes: bool = False,
 ) -> str:
-    """Format failure information with custom styling."""
+    """Format failure information with custom styling; `show_codes` prefixes each title with its failure code."""
     formatter = formatter or (lambda _, x: x)
 
     if case_id is not None:
@@ -429,7 +474,8 @@ def format_failures(
 
     for title, group in group_failures(failures):
         suffix = f" ({len(group)} violations)" if len(group) > 1 else ""
-        output += formatter(MessageBlock.FAILURE, f"\n- {title}{suffix}")
+        code = f"{group[0].code} " if show_codes else ""
+        output += formatter(MessageBlock.FAILURE, f"\n- {code}{title}{suffix}")
         for failure in group:
             if failure.message:
                 output += "\n\n"

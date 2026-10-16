@@ -23,7 +23,7 @@ Schemathesis dev
 _______________________________ Query.authorName _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- GraphQL schema violation
+- ST502 GraphQL schema violation
 
     Cannot return null for non-nullable field Query.authorName.
 
@@ -50,7 +50,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ GraphQL schema violation: 1
+  ❌ ST502 GraphQL schema violation: 1
+
+For more information about this failure, try `st explain ST502`.
 
 Test cases:
   N generated, N found N unique failures

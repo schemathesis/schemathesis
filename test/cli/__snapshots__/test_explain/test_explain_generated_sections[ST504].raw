@@ -1,0 +1,62 @@
+Exit code: 0
+---
+Stdout:
+ST504  Unexpected GraphQL Response                                        MEDIUM
+checks not_a_server_error
+
+The GraphQL API returned a JSON value other than an object, such as a list, a
+string or null.
+
+Why it matters
+  Every GraphQL client expects an object with `data` or `errors`. A list or a
+  bare string breaks the client's response parser before application code sees
+  the result.
+
+Example
+  query { books { title } }
+
+  200 OK
+  Content-Type: application/json
+
+  ["Dune", "Emma"]
+
+    - ST504 Unexpected GraphQL Response
+
+        GraphQL response is not a JSON object
+
+How Schemathesis found it
+  Schemathesis parses the body as JSON when the status is in `expected-statuses`
+  for `not_a_server_error`: 2xx, 3xx and 4xx by default. It does so for positive
+  and negative test cases. A body that is not JSON reports as ST109. JSON that
+  is not an object reports as this code.
+
+  The message is the same for every case. The response body below it shows the
+  value the server sent.
+
+How to fix
+  The API is wrong: the schema has no say over the response envelope. Return an
+  object such as `{"data": ...}`. Check handlers that write the body themselves,
+  such as error handlers or middleware.
+
+Verify the fix
+  Run `st replay <case id>` with the ID from the `Test Case ID:` line of the
+  failure output. It reruns the stored case and reports whether it still fails;
+  once it passes, replay deletes the stored case. The replay needs the run's
+  credentials: run it with the same config, or pass `--header`, `--auth` or
+  `--auth-wfc`.
+
+Turn it off
+  `--exclude-checks not_a_server_error`
+  or in schemathesis.toml:
+    [checks.not_a_server_error]
+    enabled = false
+  Also disables:
+    ST101  Server error
+    ST102  Server error on unexpected Content-Type
+    ST109  JSON deserialization error (GraphQL only)
+    ST201  API accepted schema-violating request (GraphQL only)
+    ST501  GraphQL server error
+    ST502  GraphQL schema violation
+    ST503  GraphQL client error
+
+Docs  https://schemathesis.readthedocs.io/en/stable/reference/failures/#st504

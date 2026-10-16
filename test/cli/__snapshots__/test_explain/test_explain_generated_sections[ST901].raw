@@ -1,0 +1,65 @@
+Exit code: 0
+---
+Stdout:
+ST901  Custom check failed                                                MEDIUM
+checks user-defined
+
+The API broke a rule that a custom check, registered with `@schemathesis.check`,
+enforces.
+
+Why it matters
+  The check guards a rule the schema cannot express, such as an audit header on
+  every write. When the API breaks it, whatever depends on that rule, such as an
+  audit log, receives wrong or missing data.
+
+Example
+  @schemathesis.check
+  def check_audit_trail(ctx, response, case):
+      if case.method == "POST" and "x-audit-id" not in response.headers:
+          raise AssertionError("Data modification missing audit trail")
+
+    - ST901 Custom check failed: `check_audit_trail`
+
+        Data modification missing audit trail
+
+How Schemathesis found it
+  Schemathesis runs every enabled check against each response. A check that
+  raises `AssertionError` produces a failure titled "Custom check failed". The
+  title carries the check's name in backticks: the function name, or the class
+  name for a class-based check. The message below the title is the assertion
+  message, empty when the assertion has none. Response header names reach the
+  check in lowercase.
+
+  A class-based check that fails in `after_run` shows under "Run checks", with
+  no case ID. An unexpected exception there reads "Check `<name>` raised an
+  unexpected error". A check that raises its own `Failure` subclass shows the
+  title that subclass sets.
+
+  To find the logic, search for `def <name>` or `class <name>` under
+  `@schemathesis.check`. The CLI loads checks from the module or file named in
+  `SCHEMATHESIS_HOOKS` or in the `hooks` key of schemathesis.toml. pytest loads
+  them from `conftest.py`.
+
+How to fix
+  Decide whether the rule holds for the request in the failure.
+
+  - It holds: the API is wrong. Fix the API for that request.
+  - It does not: the check is wrong. Narrow it, for example skip operations or
+    methods it does not cover. Until then, `[checks.<name>]` with `enabled =
+    false` in schemathesis.toml turns it off.
+  - The check raised an unexpected error: fix the bug in the check.
+
+Verify the fix
+  For a function check, run `st replay <case id>` with the same
+  `SCHEMATHESIS_HOOKS` or `hooks` setting as the run. Without it, replay reports
+  "check not available to re-run". Replay cannot rerun class-based checks or
+  `after_run` failures, which have no case ID. For those, rerun `st run` and
+  confirm the failure is gone.
+
+Turn it off
+  `--exclude-checks <name>`, where `<name>` is the custom check named in the failure,
+  or in schemathesis.toml:
+    [checks.<name>]
+    enabled = false
+
+Docs  https://schemathesis.readthedocs.io/en/stable/reference/failures/#st901

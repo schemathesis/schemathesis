@@ -1,0 +1,11 @@
+Exit code: 0
+---
+Stdout:
+`response_schema_conformance` reports these failures:
+  ST104  MED   Missing Content-Type header
+  ST108  HIGH  Response violates schema
+  ST109  MED   JSON deserialization error
+  ST110  MED   Content deserialization error
+  ST111  MED   Discriminator value not in schema mapping
+
+Run `st explain <code>` for details.

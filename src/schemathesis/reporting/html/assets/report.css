@@ -497,3 +497,9 @@ html:not(.js) .js-only{display:none!important}
 @media (hover:none){.permalink{opacity:1}}
 a.permalink-id{text-decoration:none;border-bottom:1px dotted var(--color-border)}
 a.permalink-id:hover{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary)}
+.fcode{font-family:var(--font-family-monospace);font-size:var(--font-size-xs);font-weight:400;padding:1px 6px;margin-right:8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-secondary);text-decoration:none;white-space:nowrap}
+a.fcode:hover{color:var(--color-text-primary);border-color:var(--color-text-secondary)}
+/* Marks the code as a link that leaves the report. */
+a.fcode::after{content:"";display:inline-block;width:7px;height:7px;margin-left:4px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23000' stroke-width='1.4'%3E%3Cpath d='M4 1h5v5M9 1 4.5 5.5M7.5 6.5V9H1V2.5h2.5'/%3E%3C/svg%3E") center/contain no-repeat}
+.explain{margin:var(--space-sm) 0 0;font-size:var(--font-size-sm);color:var(--color-text-muted)}
+.explain code{font-family:var(--font-family-monospace);color:var(--color-text-secondary)}

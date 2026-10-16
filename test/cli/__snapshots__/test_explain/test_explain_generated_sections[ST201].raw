@@ -1,0 +1,92 @@
+Exit code: 0
+---
+Stdout:
+ST201  API accepted schema-violating request                              MEDIUM
+checks negative_data_rejection, not_a_server_error (GraphQL only)   WFC 206, 904
+
+The API accepted a request that breaks the schema, where it should have answered
+with an error status.
+
+Why it matters
+  The schema promises limits the API does not enforce. An attacker sends a value
+  past those limits, such as a page size of a million, and the server loads
+  every row. A write past the limits stores a record that clients built from the
+  schema fail to parse.
+
+Example
+  request:
+    GET /items?limit=1000          (schema: limit is an integer, maximum 100)
+  response:
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    []
+
+How Schemathesis found it
+  Schemathesis generates negative test cases: requests that break a schema
+  constraint, such as a value above `maximum`, a wrong type or a missing
+  required property. They run in `--mode negative` and `--mode all`, the
+  default. The API must answer with a status from `expected-statuses`. The
+  default list includes `5xx`, because `not_a_server_error` reports server
+  errors as ST101.
+
+  In the failure output for OpenAPI, `Invalid component:` names the parameter,
+  its location and the broken constraint. `Expected:` lists the rejection
+  statuses, and the `[200] OK:` line below the message shows what the API
+  returned. For GraphQL, the message describes the invalid input.
+
+  Schemathesis skips values that turn valid on the wire, such as `"5"` for an
+  integer query parameter, and undeclared query, header or cookie parameters.
+  For GraphQL, the API must return an `errors` entry for an invalid query.
+
+How to fix
+  Decide which side is wrong:
+  - The API is wrong: the schema states the rule you mean. Validate the
+    component named in `Invalid component:` and return 400 or 422.
+  - The schema is wrong: the API accepts the value on purpose. Relax the
+    constraint in the schema. Clients and validators generated from it lose that
+    guarantee.
+  - GraphQL: the API returned `data` and no `errors` for the input the message
+    describes. Reject that input with an `errors` entry.
+
+False positives
+  - The API rejects the request with a status outside the list, such as 410 or
+    413. Copy the list under Tuning, add that status and set it in
+    schemathesis.toml.
+
+Verify the fix
+  Run `st replay <case id>` with the ID from the `Test Case ID:` line of the
+  failure output. It reruns the stored case and reports whether it still fails;
+  once it passes, replay deletes the stored case. The replay needs the run's
+  credentials: run it with the same config, or pass `--header`, `--auth` or
+  `--auth-wfc`.
+
+Tuning
+  Set the status codes this check expects, in schemathesis.toml. Your list
+  replaces the default, so copy it and add your status. For one operation only,
+  put the same key, `checks.<check>.expected-statuses`, in an `[[operations]]`
+  entry with `include-name`:
+    [checks.negative_data_rejection]
+    expected-statuses = ["400", "401", "403", "404", "405", "406", "409", "415",
+                         "422", "428", "429", "5xx"]
+
+Turn it off
+  `--exclude-checks negative_data_rejection`
+  or in schemathesis.toml:
+    [checks.negative_data_rejection]
+    enabled = false
+  For GraphQL schemas:
+    `--exclude-checks not_a_server_error`
+    or in schemathesis.toml:
+      [checks.not_a_server_error]
+      enabled = false
+    Also disables:
+      ST101  Server error
+      ST102  Server error on unexpected Content-Type
+      ST109  JSON deserialization error (GraphQL only)
+      ST501  GraphQL server error
+      ST502  GraphQL schema violation
+      ST503  GraphQL client error
+      ST504  Unexpected GraphQL Response
+
+Docs  https://schemathesis.readthedocs.io/en/stable/reference/failures/#st201

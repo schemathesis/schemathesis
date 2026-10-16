@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ POST /test __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API accepted schema-violating request
+- ST201 API accepted schema-violating request
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
@@ -64,7 +64,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ API accepted schema-violating request: 1
+  ❌ ST201 API accepted schema-violating request: 1
+
+For more information about this failure, try `st explain ST201`.
 
 Warnings:
   ⚠️ Unsupported regex: 2 operations had unusable regex patterns

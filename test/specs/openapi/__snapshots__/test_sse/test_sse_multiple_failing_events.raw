@@ -31,7 +31,7 @@ Schemathesis dev
 ___________________________________ GET /sse ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- SSE event payload violates content schema
+- ST108 SSE event payload violates content schema
 
     Event #0: "bad" is not of type "integer"
 
@@ -76,7 +76,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ SSE event payload violates content schema: 1
+  ❌ ST108 SSE event payload violates content schema: 1
+
+For more information about this failure, try `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

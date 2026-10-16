@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ GET /api/basic ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- ST103 Undocumented HTTP status code
 
     Received: 401
     Documented: 200
@@ -60,7 +60,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ ST103 Undocumented HTTP status code: 1
+
+For more information about this failure, try `st explain ST103`.
 
 Warnings:
   ⚠️ Authentication failed: 1 operation returned only 401/403 responses

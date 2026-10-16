@@ -7,6 +7,8 @@
 - Captured resource ids fill fields of array items and `$ref` objects in request bodies. [#5417](https://github.com/schemathesis/schemathesis/issues/5417)
 - Captured resource ids fill fields of top-level array request body items.
 - Captured resource ids fill request body fields declared through nested `allOf`/`oneOf`/`anyOf`.
+- `st explain <code>` describes a failure, how to fix it and how to turn it off.
+- Stable failure codes (`ST101`, ...) in run output, NDJSON, JSON, JUnit and HTML reports.
 - Stateful links inferred from same-origin URLs in response bodies (e.g. DRF hyperlinked fields).
 - Stateful links inferred into fields of top-level array request body items.
 - `#regex:` extractor for `$response.body#/pointer` link expressions.

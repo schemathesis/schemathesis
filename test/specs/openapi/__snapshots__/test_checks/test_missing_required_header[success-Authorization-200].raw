@@ -24,7 +24,7 @@ Schemathesis dev
 _________________________________ GET /success _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Missing header not rejected
+- ST203 Missing header not rejected
 
     Got 200 when missing required 'Authorization' header, expected 401
 
@@ -51,7 +51,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Missing header not rejected: 1
+  ❌ ST203 Missing header not rejected: 1
+
+For more information about this failure, try `st explain ST203`.
 
 Test cases:
   N generated, N found N unique failures

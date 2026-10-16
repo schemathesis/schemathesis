@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ Query.getBook _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- GraphQL server error
+- ST501 GraphQL server error
 
     Book not found
 
@@ -58,7 +58,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ GraphQL server error: 1
+  ❌ ST501 GraphQL server error: 1
+
+For more information about this failure, try `st explain ST501`.
 
 Warnings:
   ⚠️ Low valid-input rate: 1 operation accepted few of the requests sent to it

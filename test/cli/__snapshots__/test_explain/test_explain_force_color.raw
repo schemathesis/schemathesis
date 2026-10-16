@@ -1,0 +1,86 @@
+Exit code: 0
+---
+Stdout:
+[1mST108  Response violates schema[0m                                             [31mHIGH[0m
+[2mchecks response_schema_conformance, response_headers_conformance   WFC 200[0m
+
+A response body or header holds a value that its documented schema rejects.
+
+[1mWhy it matters[0m
+  Generated clients and typed SDKs trust the schema. A [36mnull[0m where the schema
+  promises a string becomes a crash in the consumer's code, far from your API,
+  with no hint of the cause. Every consumer who wrote code against the
+  documented shape carries that bug.
+
+[1mExample[0m
+[2m  schema:[0m
+    openapi: 3.0.3
+    paths:
+      /users/me:
+        get:
+          responses:
+            '200':
+              description: OK
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+[2m  response:[0m
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {"email": null}
+
+[1mHow Schemathesis found it[0m
+  Schemathesis validates the body against the schema for the response status and
+  media type, and each documented header against its schema. The title names the
+  part: [36mResponse violates schema[0m, [36mResponse header does not conform to the[0m
+[36m  schema[0m, or an [36mSSE ...[0m title for Server-Sent Events.
+
+  In the failure output for a body:
+
+  - The first line names the violation, such as [36mnull is not of type "string"[0m.
+  - [36mValidated against the response schema for status code 200.[0m names the
+    response definition. A [36mdefault[0m or range match names that key instead.
+  - [36mSchema at /properties/email:[0m gives the location in the schema and the
+    subschema that failed.
+  - [36mValue:[0m shows what the API returned.
+
+[1mHow to fix[0m
+  Decide which side is wrong.
+
+  - The API is wrong: fix the serializer or the data. A [36mnull[0m points to a field
+    your storage allows to be empty.
+  - The schema is wrong: change it to match, for example [36mnullable: true[0m in
+    OpenAPI 3.0. Widening the schema weakens what clients can rely on.
+
+  Too many [36mformat[0m failures in bodies: set [36mvalidate-formats = false[0m under
+  [36m[checks.response_schema_conformance][0m. Body format violations then go
+  unreported, so turn it back on once you fix the structural failures. The
+  setting leaves header formats checked.
+
+[1mVerify the fix[0m
+  Run [36mst replay <case id>[0m with the ID from the [36mTest Case ID:[0m line of the
+  failure output. It reruns the stored case and reports whether it still fails;
+  once it passes, replay deletes the stored case. The replay needs the run's
+  credentials: run it with the same config, or pass [36m--header[0m, [36m--auth[0m or
+  [36m--auth-wfc[0m.
+
+[1mTurn it off[0m
+  [36m--exclude-checks response_schema_conformance,response_headers_conformance[0m
+  or in schemathesis.toml:
+    [checks.response_schema_conformance]
+    enabled = false
+    [checks.response_headers_conformance]
+    enabled = false
+  Also disables:
+    ST104  Missing Content-Type header
+    ST107  Missing required headers
+    ST109  JSON deserialization error
+    ST110  Content deserialization error
+    ST111  Discriminator value not in schema mapping
+
+[1mDocs[0m  [4mhttps://schemathesis.readthedocs.io/en/stable/reference/failures/#st108[0m

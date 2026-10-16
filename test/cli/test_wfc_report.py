@@ -9,8 +9,15 @@ from flask import jsonify, request
 
 import schemathesis
 from schemathesis.cli.wfc_report import FAULT_CATEGORY_IDS, fault_category
-from schemathesis.core.failures import AcceptedNegativeData, MalformedJson, ResponseTimeExceeded, ServerError
+from schemathesis.core.failures import (
+    AcceptedNegativeData,
+    ContentTypeServerError,
+    MalformedJson,
+    ResponseTimeExceeded,
+    ServerError,
+)
 from schemathesis.engine.events import ScenarioFinished
+from schemathesis.failure_codes import iter_failure_classes
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     AuthScenario,
@@ -475,6 +482,9 @@ OPERATION = "GET /users/{id}"
         (ServerError(operation=OPERATION, status_code=500), 100),
         (ServerError(operation=OPERATION, status_code=503), 121),
         (ServerError(operation=OPERATION, status_code=501), 205),
+        (ContentTypeServerError(operation=OPERATION, status_code=500, message=""), 100),
+        (ContentTypeServerError(operation=OPERATION, status_code=503, message=""), 121),
+        (ContentTypeServerError(operation=OPERATION, status_code=501, message=""), 205),
         (
             MalformedJson(
                 operation=OPERATION, message="", validation_message="", document="", position=0, lineno=1, colno=1
@@ -542,6 +552,7 @@ OPERATION = "GET /users/{id}"
 )
 def test_fault_category(failure, code):
     assert fault_category(failure)[0] == code
+    assert str(code) in type(failure).wfc
 
 
 def test_object_level_authorization_context_names_both_peers():
@@ -562,3 +573,7 @@ def test_fault_category_ids_match_wfc():
     assert {code: id for code, id in FAULT_CATEGORY_IDS.items() if code < 900} == {
         category["code"]: category["id"] for category in WFC_FAULT_CATEGORIES if category["code"] in FAULT_CATEGORY_IDS
     }
+
+
+def test_failure_class_wfc_codes_match_fault_categories():
+    assert {code for cls in iter_failure_classes() for code in cls.wfc} == {str(code) for code in FAULT_CATEGORY_IDS}

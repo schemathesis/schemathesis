@@ -372,6 +372,7 @@ def display_failures_for_single_test(
                 auth_identity=group.auth_identity,
                 formatter=failure_formatter,
                 config=config,
+                show_codes=True,
             )
         )
         click.echo()
@@ -406,12 +407,27 @@ def display_api_operations(operations: OperationsSummary) -> None:
     click.echo()
 
 
+# Custom checks share ST901, so its page has nothing specific to add.
+_CODES_WITHOUT_EXPLANATION = frozenset({"ST901"})
+# Longer lists stop being scannable; rustc caps its list the same way.
+_MAX_LISTED_CODES = 9
+
+
 def display_failures_summary(failures: list[FailureGroup]) -> None:
     click.echo(_style("Failures:", bold=True))
     for group in failures:
-        click.echo(_style(f"  ❌ {group.title}: "), nl=False)
+        click.echo(_style(f"  ❌ {group.code} {group.title}: "), nl=False)
         click.echo(_style(str(group.count), bold=True))
     click.echo()
+    codes = sorted({group.code for group in failures} - _CODES_WITHOUT_EXPLANATION)
+    if len(codes) == 1:
+        click.echo(_style(f"For more information about this failure, try `st explain {codes[0]}`."))
+        click.echo()
+    elif codes:
+        listed = ", ".join(codes[:_MAX_LISTED_CODES]) + (", ..." if len(codes) > _MAX_LISTED_CODES else "")
+        click.echo(_style(f"Some failures have detailed explanations: {listed}."))
+        click.echo(_style(f"For more information about a failure, try `st explain {codes[0]}`."))
+        click.echo()
 
 
 def display_filtered_summary(filtered: int) -> None:

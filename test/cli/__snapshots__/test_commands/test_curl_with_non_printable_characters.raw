@@ -31,7 +31,7 @@ Schemathesis dev
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -64,7 +64,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Server error: 1
+  ❌ ST101 Server error: 1
+
+For more information about this failure, try `st explain ST101`.
 
 Warnings:
   ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data

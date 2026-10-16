@@ -24,7 +24,7 @@ Schemathesis dev
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -49,7 +49,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error: 1
+  ❌ ST101 Server error: 1
+
+For more information about this failure, try `st explain ST101`.
 
 Baseline:
   Known failures: 0

@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ GET /redirect _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- ST103 Undocumented HTTP status code
 
     Received: 303
     Documented: 200
@@ -51,7 +51,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ ST103 Undocumented HTTP status code: 1
+
+For more information about this failure, try `st explain ST103`.
 
 Test cases:
   N generated, N found N unique failures

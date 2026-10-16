@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ GET /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- ST202 API rejected schema-compliant request
 
     Valid data should have been accepted
     Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
@@ -51,7 +51,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ API rejected schema-compliant request: 1
+  ❌ ST202 API rejected schema-compliant request: 1
+
+For more information about this failure, try `st explain ST202`.
 
 Test cases:
   N generated, N found N unique failures

@@ -15,6 +15,7 @@
   const TEXT_ENTRY = 'textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset])';
   const slugToKind = new Map();
   const kindToSlug = new Map();
+  const codeToKind = new Map();
   let f;
   let rows = [];
   let groups = [];
@@ -128,7 +129,8 @@
     clearTimeout(timer);
     reset();
     f.q = (params.get('q') || '').toLowerCase();
-    f.k = slugToKind.get(params.get('kind')) || '';
+    const kind = params.get('kind') || '';
+    f.k = slugToKind.get(kind) || codeToKind.get(kind.toUpperCase()) || '';
     f.m = (params.get('method') || '').toLowerCase().split(',').filter(Boolean);
     paint();
     query.value = f.q;
@@ -145,6 +147,7 @@
     for (const o of all('option[data-slug]', bar)) {
       slugToKind.set(o.dataset.slug, o.value);
       kindToSlug.set(o.value, o.dataset.slug);
+      if (o.dataset.code) codeToKind.set(o.dataset.code, o.value);
     }
     groups = all('.ops-table .group-row').map((header) => {
       const count = header.querySelector('.group-count');

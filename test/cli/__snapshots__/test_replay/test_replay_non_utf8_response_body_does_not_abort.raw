@@ -10,7 +10,7 @@ Replaying 1 case from /tmp/GET_boom_not_a_server_error_testtest.json
 __________________________________ GET /boom ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 

@@ -31,7 +31,7 @@ Schemathesis dev
 ________________________________ GET /api/user _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema (4 violations)
+- ST108 Response violates schema (4 violations)
 
     "" is shorter than 1 character
 
@@ -119,7 +119,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Response violates schema: 4
+  ❌ ST108 Response violates schema: 4
+
+For more information about this failure, try `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

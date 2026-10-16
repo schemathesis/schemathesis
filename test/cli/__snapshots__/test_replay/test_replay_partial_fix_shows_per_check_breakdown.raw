@@ -13,7 +13,7 @@ Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 __________________________________ GET /data ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "value" is a required property
 

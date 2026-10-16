@@ -1,0 +1,58 @@
+Exit code: 0
+---
+Stdout:
+ST112  Response time limit exceeded                                          LOW
+checks max_response_time   WFC 312
+
+The API took longer to respond than the response time limit you set.
+
+Why it matters
+  A slow response holds a client connection and a server worker for its whole
+  duration. Callers with their own timeouts give up and retry, adding load to a
+  server that is already slow.
+
+Example
+  st run openapi.yaml --url http://127.0.0.1:8000 --max-response-time 1.5
+
+  GET /reports?year=2026
+  response: 200 OK after 2.5 s
+
+How Schemathesis found it
+  The check runs once you set a limit in seconds, with `--max-response-time` or
+  `max_response_time` under `[checks]` in schemathesis.toml. Schemathesis times
+  each response from sending the request to receiving its headers, and compares
+  that time with the limit. A slow body download after the headers does not
+  count. The message shows both values in milliseconds: `Actual: 2500.00ms` and
+  `Limit: 1500.00ms`.
+
+  The request timeout, `--request-timeout`, aborts a request that runs too long.
+  This check lets the response finish and then compares its time.
+
+How to fix
+  Decide whether the API or the limit is wrong.
+
+  - The API is slow: profile the request from `Reproduce with:` and fix the slow
+    path, such as a missing index or an unbounded query.
+  - One operation is slow by design, such as a report export: give it its own
+    limit. Add an `[[operations]]` entry with `include-path = "/reports"` and
+    `checks.max_response_time = 5.0`. The other operations keep the tighter
+    limit.
+  - The limit is too tight for the whole API: raise it. A higher limit lets
+    slower regressions through unnoticed.
+
+False positives
+  - The server or the machine running Schemathesis is under load. Response time
+    changes from run to run. Rerun against a quiet environment before you treat
+    one slow response as a bug.
+
+Verify the fix
+  Schemathesis stores no replay case for this failure, because response time
+  changes from run to run. Run the `Reproduce with:` command a few times with
+  `-o /dev/null -s -w '%{time_starttransfer}\n'` added. It prints the seconds
+  until the first response byte, the time the check measures. Compare them with
+  the limit, then rerun `st run` with the same limit.
+
+Turn it off
+  Off unless `--max-response-time` or `checks.max_response_time` is set.
+
+Docs  https://schemathesis.readthedocs.io/en/stable/reference/failures/#st112

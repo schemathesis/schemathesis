@@ -1,0 +1,40 @@
+Exit code: 0
+---
+Stdout:
+Response validation (1xx)
+  ST101  CRIT  Server error                               The API answered a request with a 5xx status, where a success or a client error belongs.
+  ST102  CRIT  Server error on unexpected Content-Type    The API returned a 5xx for a bad `Content-Type` and handled the same request with a declared type.
+  ST103  MED   Undocumented HTTP status code              The API returned a status code that the operation's documented responses don't list.
+  ST104  MED   Missing Content-Type header                The API sent a response without a `Content-Type` header, where the schema documents a media type.
+  ST105  MED   Undocumented Content-Type                  The API sent a `Content-Type` that matches none of the media types the schema documents.
+  ST106  MED   Malformed media type                       The response's `Content-Type`, or a media type in the schema, is not a valid `type/subtype` value.
+  ST107  MED   Missing required headers                   The response lacks a header that the schema marks as required for its status.
+  ST108  HIGH  Response violates schema                   A response body or header holds a value that its documented schema rejects.
+  ST109  MED   JSON deserialization error                 The API sent a body that is not valid JSON, under a JSON `Content-Type` or with none.
+  ST110  MED   Content deserialization error              The API sent a body that the parser for its `Content-Type` can't read.
+  ST111  MED   Discriminator value not in schema mapping  The response's discriminator property holds a value that the schema maps to no known variant.
+  ST112  LOW   Response time limit exceeded               The API took longer to respond than the response time limit you set.
+
+Input handling (2xx)
+  ST201  MED   API accepted schema-violating request      The API accepted a request that breaks the schema, where it should have answered with an error status.
+  ST202  MED   API rejected schema-compliant request      The API rejected a request that the schema describes as valid.
+  ST203  MED   Missing header not rejected                The API did not reject a request that lacks a header the schema marks as required.
+  ST204  MED   Unsupported methods                        The API answered an undeclared method with a status other than 405, or with a 405 that has no...
+  ST205  MED   Invalid Allow header                       The response to `OPTIONS` lists different methods in `Allow` than the schema declares for this path.
+
+Stateful behavior (3xx)
+  ST301  CRIT  Use after free                             The API served a resource that a successful `DELETE` had removed earlier in the same scenario.
+  ST302  MED   Resource is not available after creation   The API returned 404 for a resource that a successful `POST` created earlier in the scenario.
+
+Security (4xx)
+  ST401  CRIT  Authentication not enforced                The API did not reject a request with missing or invalid credentials, though the schema requires...
+  ST402  CRIT  Object-level authorization bypass          The API returned an object that one user owns to another user who should not see it.
+
+GraphQL (5xx)
+  ST501  CRIT  GraphQL server error                       The GraphQL API reported a failed resolver in the `errors` array of its response.
+  ST502  HIGH  GraphQL schema violation                   The GraphQL API returned null for a field that its own schema declares non-nullable.
+  ST503  MED   GraphQL client error                       The GraphQL API rejected a query that its published schema accepts as valid.
+  ST504  MED   Unexpected GraphQL Response                The GraphQL API returned a JSON value other than an object, such as a list, a string or null.
+
+Custom checks (9xx)
+  ST901  MED   Custom check failed                        The API broke a rule that a custom check, registered with `@schemathesis.check`, enforces.

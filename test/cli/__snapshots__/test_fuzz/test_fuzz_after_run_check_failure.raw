@@ -13,7 +13,7 @@ Schemathesis dev
 =================================== FAILURES ===================================
 __________________________________ Run checks __________________________________
 
-- Custom check failed: `NoServerErrors`
+- ST901 Custom check failed: `NoServerErrors`
 
     after_run fired in fuzz
 
@@ -28,7 +28,7 @@ API Operations:
 Stop reason: Completed
 
 Failures:
-  ❌ Custom check failed: `NoServerErrors`: 1
+  ❌ ST901 Custom check failed: `NoServerErrors`: 1
 
 Test cases:
   N generated

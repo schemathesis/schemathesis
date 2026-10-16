@@ -980,6 +980,48 @@ $ st replay [OPTIONS] [PATH]
     $ st replay --auth-wfc ./market-auth.yaml --auth-wfc-user admin
     ```
 
+## `explain`
+
+The `explain` command prints what a failure code means, why it matters, an example, how to fix it, how to verify the fix and how to turn the check off. Every failure in `run`, `fuzz` and `replay` output carries a code; see [Failure codes](failures.md) for all of them.
+
+```console
+$ st explain [OPTIONS] [CODE]
+```
+
+!!! note "Optional Parameter"
+
+    **CODE**: A failure code (`ST108` or `108`), its slug (`response-schema`), a failure class name (`JsonSchemaError`, as in NDJSON `type`) or a check name (`response_schema_conformance`, which lists the codes the check reports). Case does not matter.
+
+    ```console
+    $ st explain ST108
+    $ st explain response-schema
+    $ st explain response_schema_conformance
+    ```
+
+An unknown value exits with code `2` and suggests the closest match.
+
+#### `--list`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    List every failure code with its severity and title, grouped as in the [checks reference](checks.md).
+
+    ```console
+    $ st explain --list
+    ```
+
+#### `--force-color`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    Color the output even when it is not a terminal. Without a terminal, output is 80 columns wide unless `COLUMNS` is set.
+
 ## Exit codes
 
 Schemathesis uses predictable exit codes so automation can interpret results:

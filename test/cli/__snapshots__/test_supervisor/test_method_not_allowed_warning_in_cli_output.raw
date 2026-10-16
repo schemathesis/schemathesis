@@ -31,12 +31,12 @@ Schemathesis dev
 ________________________________ POST /missing _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- ST202 API rejected schema-compliant request
 
     Valid data should have been accepted
     Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
 
-- Undocumented HTTP status code
+- ST103 Undocumented HTTP status code
 
     Received: 405
     Documented: 200
@@ -72,8 +72,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ API rejected schema-compliant request: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ ST202 API rejected schema-compliant request: 1
+  ❌ ST103 Undocumented HTTP status code: 1
+
+Some failures have detailed explanations: ST103, ST202.
+For more information about a failure, try `st explain ST103`.
 
 Warnings:
   ⚠️ Method Not Allowed: 1 operation skipped after consistent 405 responses

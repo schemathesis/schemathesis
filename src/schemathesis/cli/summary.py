@@ -199,6 +199,7 @@ class TestCasesSummary:
 class FailureGroup:
     # `Failure` subclass name; the stable identifier to group and gate on.
     type: str
+    code: str
     title: str
     severity: Severity
     count: int
@@ -407,6 +408,7 @@ def reduce_failures(statistic: Statistic) -> list[FailureGroup]:
                 if group is None:
                     group = FailureGroup(
                         type=failure.__class__.__name__,
+                        code=failure.code,
                         title=failure.title,
                         severity=failure.severity,
                         count=0,

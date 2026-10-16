@@ -31,7 +31,7 @@ Schemathesis dev
 _______________________________ GET /api/success _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `new_check`
+- ST901 Custom check failed: `new_check`
 
     Custom check failed!
 
@@ -58,7 +58,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Custom check failed: `new_check`: 1
+  ❌ ST901 Custom check failed: `new_check`: 1
 
 Test cases:
   N generated, N found N unique failures

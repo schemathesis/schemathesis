@@ -23,9 +23,9 @@ Schemathesis dev
 __________________________________ GET /users __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
-- Undocumented HTTP status code
+- ST103 Undocumented HTTP status code
 
     Received: 500
     Documented: 200
@@ -53,8 +53,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ ST101 Server error: 1
+  ❌ ST103 Undocumented HTTP status code: 1
+
+Some failures have detailed explanations: ST101, ST103.
+For more information about a failure, try `st explain ST101`.
 
 Test cases:
   N generated, N found N unique failures

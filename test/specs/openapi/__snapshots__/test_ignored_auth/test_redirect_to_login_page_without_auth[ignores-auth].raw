@@ -23,7 +23,7 @@ Schemathesis dev
 _____________________________ GET /items/{item_id} _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API accepts invalid authentication
+- ST401 API accepts invalid authentication
 
     Expected 401 or 403, got `200 OK` for `GET /items/{item_id}` (generated auth likely invalid)
 
@@ -50,7 +50,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ API accepts invalid authentication: 1
+  ❌ ST401 API accepts invalid authentication: 1
+
+For more information about this failure, try `st explain ST401`.
 
 Test cases:
   N generated, N found N unique failures

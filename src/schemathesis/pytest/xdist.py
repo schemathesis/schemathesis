@@ -4,7 +4,7 @@ import base64
 import dataclasses
 import hashlib
 import time
-from functools import partial
+from functools import cache, partial
 from pathlib import Path
 from random import Random
 from typing import TYPE_CHECKING
@@ -23,6 +23,7 @@ from schemathesis.config import (
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
+from schemathesis.failure_codes import get_failure_class
 from schemathesis.pytest.reporting import PytestReportOutcome, remember_report_locations
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
@@ -226,7 +227,7 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
             info = check["failure_info"]
             if info is not None:
                 failure_data = info["failure"]
-                failure = Failure(
+                failure = _rebuilt_failure_class(failure_data["code"])(
                     operation=failure_data["operation"],
                     title=failure_data["title"],
                     message=failure_data["message"],
@@ -255,6 +256,21 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
         )
 
     return recorder, data["elapsed_sec"]
+
+
+@cache
+def _rebuilt_failure_class(code: str) -> type[Failure]:
+    """A class with the original failure's name, code and severity; its other fields stay in the worker."""
+    original = get_failure_class(code) or Failure
+    namespace = {
+        "__slots__": (),
+        "code": original.code,
+        "slug": original.slug,
+        "kind_title": original.kind_title,
+        "wfc": original.wfc,
+        "severity_default": original.severity_default,
+    }
+    return type(original.__name__, (Failure,), namespace)
 
 
 def _schema_id(schema: SchemaMetadata) -> str:

@@ -31,7 +31,7 @@ Schemathesis dev
 _____________________________ GET /api/conformance _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "e32ab85ed4634c38a320eb0b22460da9" is not one of "foo"
 
@@ -72,7 +72,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Response violates schema: 1
+  ❌ ST108 Response violates schema: 1
+
+For more information about this failure, try `st explain ST108`.
 
 Test cases:
   9 generated, 1 found 1 unique failure, 7 skipped

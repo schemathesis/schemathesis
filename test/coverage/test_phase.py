@@ -2865,7 +2865,7 @@ def test_content_type_probe_does_not_hide_plain_server_error(ctx, cli):
         app, "--phases=coverage,fuzzing", "--max-examples=1", "--checks=not_a_server_error", "--mode=all"
     )
 
-    findings = dict(re.findall(r"\n- (Server error[^\n]*)\n.*?\n\s+(curl [^\n]+)", result.stdout, re.DOTALL))
+    findings = dict(re.findall(r"\n- ST101 (Server error[^\n]*)\n.*?\n\s+(curl [^\n]+)", result.stdout, re.DOTALL))
     assert list(findings) == ["Server error"], result.stdout
     assert "Content-Type" not in findings["Server error"]
 

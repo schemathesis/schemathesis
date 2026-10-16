@@ -807,7 +807,7 @@ def test_replay_failure_order_matches_run(cli, app_runner, ctx, tmp_path):
         return re.findall(r"^- (\S.*?)(?:  \(\d+ violations\))?$", block, re.MULTILINE)
 
     run_titles = titles(run.output)
-    assert run_titles[0] == "Server error", run.output
+    assert run_titles[0] == "ST101 Server error", run.output
 
     result = cli.main("replay", shared, "--keep")
 

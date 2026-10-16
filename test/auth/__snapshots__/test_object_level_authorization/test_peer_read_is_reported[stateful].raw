@@ -27,7 +27,7 @@ Schemathesis dev
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Object-level authorization bypass
+- ST402 Object-level authorization bypass
 
     `bob` received the `Order` that `alice` owns
 
@@ -57,7 +57,9 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ Object-level authorization bypass: 1
+  ❌ ST402 Object-level authorization bypass: 1
+
+For more information about this failure, try `st explain ST402`.
 
 Test cases:
   N generated, N found N unique failures

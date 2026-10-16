@@ -1,0 +1,40 @@
+Exit code: 0
+---
+Stdout:
+Response validation (1xx)
+  ST101  CRIT  Server error
+  ST102  CRIT  Server error on unexpected Content-Type
+  ST103  MED   Undocumented HTTP status code
+  ST104  MED   Missing Content-Type header
+  ST105  MED   Undocumented Content-Type
+  ST106  MED   Malformed media type
+  ST107  MED   Missing required headers
+  ST108  HIGH  Response violates schema
+  ST109  MED   JSON deserialization error
+  ST110  MED   Content deserialization error
+  ST111  MED   Discriminator value not in schema mapping
+  ST112  LOW   Response time limit exceeded
+
+Input handling (2xx)
+  ST201  MED   API accepted schema-violating request
+  ST202  MED   API rejected schema-compliant request
+  ST203  MED   Missing header not rejected
+  ST204  MED   Unsupported methods
+  ST205  MED   Invalid Allow header
+
+Stateful behavior (3xx)
+  ST301  CRIT  Use after free
+  ST302  MED   Resource is not available after creation
+
+Security (4xx)
+  ST401  CRIT  Authentication not enforced
+  ST402  CRIT  Object-level authorization bypass
+
+GraphQL (5xx)
+  ST501  CRIT  GraphQL server error
+  ST502  HIGH  GraphQL schema violation
+  ST503  MED   GraphQL client error
+  ST504  MED   Unexpected GraphQL Response
+
+Custom checks (9xx)
+  ST901  MED   Custom check failed

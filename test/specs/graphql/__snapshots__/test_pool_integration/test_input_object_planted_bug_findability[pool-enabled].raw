@@ -31,7 +31,7 @@ Schemathesis dev
 ____________________________ Mutation.updateAuthor _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- GraphQL server error
+- ST501 GraphQL server error
 
     planted: input-object-update
 
@@ -58,7 +58,9 @@ Test Phases:
   ✅ Stateful
 
 Failures:
-  ❌ GraphQL server error: 1
+  ❌ ST501 GraphQL server error: 1
+
+For more information about this failure, try `st explain ST501`.
 
 Test cases:
   N generated, N found N unique failures

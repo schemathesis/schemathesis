@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis explain [OPTIONS] [CODE]
+Try 'schemathesis explain --help' for help.
+
+Error: Missing a failure code. Run `st explain --list` to see all codes.

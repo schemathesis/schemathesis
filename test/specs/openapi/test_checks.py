@@ -29,6 +29,8 @@ from schemathesis.generation.meta import (
 from schemathesis.generation.overrides import Override
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
+    ContentDeserializationError,
+    DiscriminatorMismatch,
     JsonSchemaError,
     MissingHeaderNotRejected,
     RejectedPositiveData,
@@ -3047,7 +3049,7 @@ def test_response_schema_conformance_reports_malformed_response_media_type(respo
         case.validate_response(response, checks=[response_schema_conformance])
 
     failures = exc_info.value.exceptions
-    assert len(failures) == 1
+    assert [type(failure) for failure in failures] == [ContentDeserializationError]
     assert failures[0].title == "Content deserialization error"
     assert "Malformed media type: `text`" in failures[0].message
 
@@ -3336,7 +3338,7 @@ def test_response_schema_conformance_discriminator(ctx, response_factory, body, 
     response = Response.from_requests(response, True)
 
     if should_fail:
-        with pytest.raises(Failure) as exc_info:
+        with pytest.raises(DiscriminatorMismatch) as exc_info:
             response_schema_conformance(_CHECK_CTX, response, case)
         assert exc_info.value.title == "Discriminator value not in schema mapping"
     else:
@@ -3471,7 +3473,7 @@ def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_
     assert response_schema_conformance(_CHECK_CTX, Response.from_requests(valid, True), case) is None
 
     invalid = response_factory.requests(content=b'{"petType": "Fish"}')
-    with pytest.raises(Failure) as exc_info:
+    with pytest.raises(DiscriminatorMismatch) as exc_info:
         response_schema_conformance(_CHECK_CTX, Response.from_requests(invalid, True), case)
     assert exc_info.value.title == "Discriminator value not in schema mapping"
 
@@ -3523,7 +3525,7 @@ def test_response_schema_conformance_discriminator_inline_branch(ctx, response_f
     assert response_schema_conformance(_CHECK_CTX, valid, case) is None
 
     invalid = Response.from_requests(response_factory.requests(content=b'{"petType": "fish"}'), True)
-    with pytest.raises(Failure) as exc_info:
+    with pytest.raises(DiscriminatorMismatch) as exc_info:
         response_schema_conformance(_CHECK_CTX, invalid, case)
     assert exc_info.value.title == "Discriminator value not in schema mapping"
 

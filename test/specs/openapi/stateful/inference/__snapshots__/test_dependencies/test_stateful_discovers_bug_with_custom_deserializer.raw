@@ -26,7 +26,7 @@ Schemathesis dev
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     null is not of type "string"
 
@@ -66,7 +66,9 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ Response violates schema: 1
+  ❌ ST108 Response violates schema: 1
+
+For more information about this failure, try `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

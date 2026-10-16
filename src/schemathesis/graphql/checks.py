@@ -11,6 +11,12 @@ if TYPE_CHECKING:
 class UnexpectedGraphQLResponse(Failure):
     """GraphQL response is not a JSON object."""
 
+    code = "ST504"
+    slug = "graphql-unexpected-response"
+    kind_title = "Unexpected GraphQL Response"
+    wfc = ()
+    severity_default = Severity.MEDIUM
+
     __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
 
     def __init__(
@@ -27,7 +33,7 @@ class UnexpectedGraphQLResponse(Failure):
         self.title = title
         self.message = message
         self.case_id = case_id
-        self.severity = Severity.MEDIUM
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -36,6 +42,12 @@ class UnexpectedGraphQLResponse(Failure):
 
 class GraphQLClientError(Failure):
     """GraphQL query has not been executed."""
+
+    code = "ST503"
+    slug = "graphql-client-error"
+    kind_title = "GraphQL client error"
+    wfc = ()
+    severity_default = Severity.MEDIUM
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -54,7 +66,7 @@ class GraphQLClientError(Failure):
         self.message = message
         self.case_id = case_id
         self._unique_key_cache: str | None = None
-        self.severity = Severity.MEDIUM
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -65,6 +77,12 @@ class GraphQLClientError(Failure):
 
 class GraphQLServerError(Failure):
     """GraphQL response indicates at least one server error."""
+
+    code = "ST501"
+    slug = "graphql-server-error"
+    kind_title = "GraphQL server error"
+    wfc = ()
+    severity_default = Severity.CRITICAL
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -83,7 +101,7 @@ class GraphQLServerError(Failure):
         self.message = message
         self.case_id = case_id
         self._unique_key_cache: str | None = None
-        self.severity = Severity.CRITICAL
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:
@@ -94,6 +112,12 @@ class GraphQLServerError(Failure):
 
 class GraphQLSchemaViolation(Failure):
     """GraphQL response contradicts the schema the server publishes."""
+
+    code = "ST502"
+    slug = "graphql-schema-violation"
+    kind_title = "GraphQL schema violation"
+    wfc = ()
+    severity_default = Severity.HIGH
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -112,7 +136,7 @@ class GraphQLSchemaViolation(Failure):
         self.message = message
         self.case_id = case_id
         self._unique_key_cache: str | None = None
-        self.severity = Severity.HIGH
+        self.severity = self.severity_default
 
     @property
     def _unique_key(self) -> str:

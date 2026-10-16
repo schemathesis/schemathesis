@@ -6,6 +6,7 @@ from typing import Any
 
 import click
 
+from schemathesis.cli.commands.explain import explain as explain_command
 from schemathesis.cli.commands.fuzz import fuzz as fuzz_command
 from schemathesis.cli.commands.replay import replay as replay_command
 from schemathesis.cli.commands.run import run as run_command
@@ -143,3 +144,4 @@ fuzz = schemathesis.command(
 )(fuzz_command)
 
 schemathesis.add_command(replay_command)
+schemathesis.add_command(explain_command)

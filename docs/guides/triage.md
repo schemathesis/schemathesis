@@ -106,6 +106,8 @@ Coverage probes are attributed to their documented operation, so in a JUnit repo
 
 These are gaps between what your application does and what its schema says it does — usually a one-line annotation to fix.
 
+Every failure starts with a code, such as `ST103`. Run `st explain ST103` to see what it means, how to fix it and how to turn the check off, or browse all codes in the [Failure codes](../reference/failures.md) reference.
+
 ## Undocumented Status Codes
 
 These dominate most first runs. Look for patterns: if every `GET` returns an undocumented `404`, add it in one pass. For framework-generated schemas that is a response annotation in the source, not an edit to the schema file (for Python stacks, see [Testing Python Web Applications](python-apps.md)). To defer them, `--exclude-checks status_code_conformance`.

@@ -31,7 +31,7 @@ Schemathesis dev
 ___________________________ GET /api/malformed_json ____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- JSON deserialization error
+- ST109 JSON deserialization error
 
     Response must be valid JSON with 'Content-Type: application/json' header:
 
@@ -60,7 +60,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ JSON deserialization error: 1
+  ❌ ST109 JSON deserialization error: 1
+
+For more information about this failure, try `st explain ST109`.
 
 Test cases:
   N generated, N found N unique failures

@@ -52,7 +52,7 @@ def test_negative_data_rejection(ctx, cli):
         "--max-examples=5",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    assert "- API accepted schema-violating request\n" in result.stdout
+    assert "- ST201 API accepted schema-violating request\n" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2352,3 +2352,28 @@ def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
         config={"checks": {"enabled": False}},
     )
     assert time.monotonic() - started >= 1
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_failure_codes_in_run_output(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/crash": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/crash")
+    def crash():
+        return "", 500
+
+    result = cli.run_openapi_app(app, "--max-examples=1", "--phases=fuzzing")
+    lines = result.stdout.splitlines()
+    assert [line for line in lines if line.startswith("- ST")] == [
+        "- ST101 Server error",
+        "- ST103 Undocumented HTTP status code",
+    ]
+    assert [line for line in lines if line.startswith("  ❌ ST")] == [
+        "  ❌ ST101 Server error: 1",
+        "  ❌ ST103 Undocumented HTTP status code: 1",
+    ]
+    assert [line for line in lines if "explanation" in line or "st explain" in line] == [
+        "Some failures have detailed explanations: ST101, ST103.",
+        "For more information about a failure, try `st explain ST101`.",
+    ]
+    assert result == snapshot_cli

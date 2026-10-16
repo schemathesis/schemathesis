@@ -1,0 +1,113 @@
+Exit code: 0
+---
+Stdout:
+ST108  Response violates schema     HIGH
+checks response_schema_conformance, response_headers_conformance   WFC 200
+
+A response body or header holds a value
+that its documented schema rejects.
+
+Why it matters
+  Generated clients and typed SDKs trust
+  the schema. A `null` where the schema
+  promises a string becomes a crash in
+  the consumer's code, far from your
+  API, with no hint of the cause. Every
+  consumer who wrote code against the
+  documented shape carries that bug.
+
+Example
+  schema:
+    openapi: 3.0.3
+    paths:
+      /users/me:
+        get:
+          responses:
+            '200':
+              description: OK
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+  response:
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {"email": null}
+
+How Schemathesis found it
+  Schemathesis validates the body
+  against the schema for the response
+  status and media type, and each
+  documented header against its schema.
+  The title names the part: `Response
+  violates schema`, `Response header
+  does not conform to the schema`, or an
+  `SSE ...` title for Server-Sent
+  Events.
+
+  In the failure output for a body:
+
+  - The first line names the violation,
+    such as `null is not of type
+    "string"`.
+  - `Validated against the response
+    schema for status code 200.` names
+    the response definition. A `default`
+    or range match names that key
+    instead.
+  - `Schema at /properties/email:` gives
+    the location in the schema and the
+    subschema that failed.
+  - `Value:` shows what the API
+    returned.
+
+How to fix
+  Decide which side is wrong.
+
+  - The API is wrong: fix the serializer
+    or the data. A `null` points to a
+    field your storage allows to be
+    empty.
+  - The schema is wrong: change it to
+    match, for example `nullable: true`
+    in OpenAPI 3.0. Widening the schema
+    weakens what clients can rely on.
+
+  Too many `format` failures in bodies:
+  set `validate-formats = false` under
+  `[checks.response_schema_conformance]`.
+  Body format violations then go
+  unreported, so turn it back on once
+  you fix the structural failures. The
+  setting leaves header formats checked.
+
+Verify the fix
+  Run `st replay <case id>` with the ID
+  from the `Test Case ID:` line of the
+  failure output. It reruns the stored
+  case and reports whether it still
+  fails; once it passes, replay deletes
+  the stored case. The replay needs the
+  run's credentials: run it with the
+  same config, or pass `--header`,
+  `--auth` or `--auth-wfc`.
+
+Turn it off
+  `--exclude-checks response_schema_conformance,response_headers_conformance`
+  or in schemathesis.toml:
+    [checks.response_schema_conformance]
+    enabled = false
+    [checks.response_headers_conformance]
+    enabled = false
+  Also disables:
+    ST104  Missing Content-Type header
+    ST107  Missing required headers
+    ST109  JSON deserialization error
+    ST110  Content deserialization error
+    ST111  Discriminator value not in schema mapping
+
+Docs  https://schemathesis.readthedocs.io/en/stable/reference/failures/#st108

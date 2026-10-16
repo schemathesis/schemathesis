@@ -10,6 +10,7 @@ from schemathesis.core.failures import reason_phrase
 from schemathesis.core.output import TRUNCATED, escape_surrogates
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
+from schemathesis.failure_codes import get_failure_class
 from schemathesis.reporting._command import UNKNOWN_ENTRYPOINT
 from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, plural, split_label
 from schemathesis.reporting.html.timeline import (
@@ -430,25 +431,20 @@ def _metric(label: str, value: str, subtitle: str = "", *, extra_class: str = ""
 _TOP_FAILURES_SHOWN = 3
 
 
-def _top_failure_name(title: str, kinds: dict[str, Kind]) -> str:
-    kind = kinds[title]
-    return f'<a class="tf-name" href="#kind={kind.slug}" title="{esc(title)}">{esc(title)}</a>'
+def _top_failure_name(kind: Kind) -> str:
+    return (
+        f'<a class="tf-name" href="#kind={kind.slug}" title="{esc(kind.title)}">'
+        f"{_code_badge(kind.code)}{esc(kind.title)}</a>"
+    )
 
 
 def _second_cell(data: ReportData) -> str:
     if data.top_failures:
+        kinds = sorted(set(_failure_kinds(data).values()), key=lambda kind: kind.value)
         # A "+1 more" line takes the space the hidden item would, so show that item instead.
-        shown = (
-            data.top_failures
-            if len(data.top_failures) <= _TOP_FAILURES_SHOWN + 1
-            else data.top_failures[:_TOP_FAILURES_SHOWN]
-        )
-        kinds = _failure_kinds(data)
-        rows = "".join(
-            f'<li><span class="tf-n">{group.count}</span>{_top_failure_name(group.title, kinds)}</li>'
-            for group in shown
-        )
-        hidden = len(data.top_failures) - len(shown)
+        shown = kinds if len(kinds) <= _TOP_FAILURES_SHOWN + 1 else kinds[:_TOP_FAILURES_SHOWN]
+        rows = "".join(f'<li><span class="tf-n">{kind.failures}</span>{_top_failure_name(kind)}</li>' for kind in shown)
+        hidden = len(kinds) - len(shown)
         if hidden > 0:
             rows += f'<li><a class="tf-more" href="#operations">+{hidden} more</a></li>'
         return (
@@ -705,11 +701,12 @@ def _failures_cell(row: OperationRow) -> str:
     if not row.failures:
         note = f'<span class="op-note">{esc(row.note)}</span>' if row.note else ""
         return f'<td class="failures-cell">{note}</td>'
+    codes = {failure.title: failure.code for case in row.failing_cases for failure in case.failures}
     first, *rest = row.failures
-    title = f'<span class="failure-title">{esc(first)}</span>'
+    title = f'{_code_badge(codes[first])}<span class="failure-title">{esc(first)}</span>'
     if not rest:
         return f'<td class="failures-cell">{title}</td>'
-    items = "".join(f"<li>{esc(name)}</li>" for name in rest)
+    items = "".join(f"<li>{_code_badge(codes[name])}{esc(name)}</li>" for name in rest)
     return (
         '<td class="failures-cell"><details class="fails"><summary>'
         f'{title}<span class="more"><span class="m-closed">+{len(rest)} more</span><span class="m-open">less</span></span>'
@@ -808,9 +805,20 @@ def _failing_case(case: FailingCase, owner: str = "", filters: str = "") -> str:
         count = len(failure.messages)
         violations = f'<span class="violations">{count} violations</span>' if count > 1 else ""
         messages = "".join(f'<pre class="msg">{esc(message)}</pre>' for message in failure.messages if message)
-        parts.append(
-            f'<div class="finding"><h4 class="finding-title">{esc(failure.title)}{violations}</h4>{messages}</div>'
+        url = DOCS_URL.format(anchor=failure.code.lower())
+        badge = (
+            f'<a class="fcode" href="{url}" target="_blank" rel="noopener" '
+            f'title="{esc(failure.code)} in the Schemathesis docs (opens in a new tab)">{esc(failure.code)}</a>'
         )
+        parts.append(
+            f'<div class="finding"><h4 class="finding-title">{badge}{esc(failure.title)}{violations}</h4>'
+            f"{messages}</div>"
+        )
+    codes = dict.fromkeys(failure.code for failure in case.failures if failure.code != CUSTOM_CODE)
+    if codes:
+        lead = "What this means and how to fix it" if len(codes) == 1 else "What these mean and how to fix them"
+        commands = ", ".join(f"<code>st explain {esc(code)}</code>" for code in codes)
+        parts.append(f'<p class="explain">{lead}: {commands}</p>')
     if case.status_code is not None and case.body is not None:
         parts.append(_evidence("Response", _body(case.body), _status(case.status_code)))
     if case.commands:
@@ -928,25 +936,51 @@ class Kind(NamedTuple):
     slug: str
     title: str
     failures: int
+    code: str
+
+
+# Custom checks share one code but not a meaning, so each custom failure title stays its own kind.
+CUSTOM_CODE = "ST901"
+DOCS_URL = "https://schemathesis.readthedocs.io/en/stable/reference/failures/#{anchor}"
 
 
 _METHOD_ORDER = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
 
 
 def _failure_kinds(data: ReportData) -> dict[str, Kind]:
+    """Failure title -> its kind; titles of one failure class share a kind."""
     counts: Counter[str] = Counter()
+    keys: dict[str, str] = {}
+    codes: dict[str, str] = {}
     for group in data.top_failures:
-        counts[group.title] += group.count
-    kinds: dict[str, Kind] = {}
+        key = group.title if group.code == CUSTOM_CODE else group.code
+        keys[group.title] = key
+        codes[key] = group.code
+        counts[key] += group.count
+    by_key: dict[str, Kind] = {}
     taken: set[str] = set()
-    for title, count in counts.items():
-        slug = base = _slug(title) or "kind"
-        suffix = 2
-        while slug in taken:
-            slug, suffix = f"{base}-{suffix}", suffix + 1
+    for key, count in sorted(counts.items(), key=lambda item: -item[1]):
+        cls = get_failure_class(codes[key])
+        if codes[key] == CUSTOM_CODE or cls is None:
+            title = key
+            slug = base = _slug(key) or "kind"
+            suffix = 2
+            while slug in taken:
+                slug, suffix = f"{base}-{suffix}", suffix + 1
+        else:
+            title, slug = cls.kind_title, cls.slug
         taken.add(slug)
-        kinds[title] = Kind(len(kinds), slug, title, count)
-    return kinds
+        by_key[key] = Kind(len(by_key), slug, title, count, codes[key])
+    return {title: by_key[key] for title, key in keys.items()}
+
+
+def _code_attribute(kind: Kind) -> str:
+    # `#kind=<code>` selects a kind only when the code names exactly one.
+    return "" if kind.code == CUSTOM_CODE else f' data-code="{esc(kind.code)}"'
+
+
+def _code_badge(code: str) -> str:
+    return f'<span class="fcode">{esc(code)}</span>'
 
 
 def _case_filters(case: FailingCase, kinds: dict[str, Kind]) -> str:
@@ -962,8 +996,9 @@ def _filter_bar(data: ReportData, kinds: dict[str, Kind]) -> str:
     ]
     if kinds:
         options = "".join(
-            f'<option value="{kind.value}" data-slug="{kind.slug}">{esc(kind.title)} ({kind.failures:,})</option>'
-            for kind in kinds.values()
+            f'<option value="{kind.value}" data-slug="{kind.slug}"{_code_attribute(kind)}>'
+            f"{esc(kind.code)}  {esc(kind.title)} ({kind.failures:,})</option>"
+            for kind in sorted(set(kinds.values()), key=lambda kind: kind.value)
         )
         controls.append(
             '<label><span class="vh">Failure kind</span><select class="fb-select" id="fb-k">'

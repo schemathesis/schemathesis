@@ -23,7 +23,7 @@ Schemathesis dev
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -50,7 +50,9 @@ Test Phases:
   ⏭  Stateful (failure limit reached)
 
 Failures:
-  ❌ Server error: 1
+  ❌ ST101 Server error: 1
+
+For more information about this failure, try `st explain ST101`.
 
 Test cases:
   N generated, N found N unique failures

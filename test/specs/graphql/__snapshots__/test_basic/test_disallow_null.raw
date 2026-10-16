@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ Query.getValue ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- GraphQL client error
+- ST503 GraphQL client error
 
     Cannot query field 'getValue' on type 'Query'.
 
@@ -50,7 +50,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ GraphQL client error: 1
+  ❌ ST503 GraphQL client error: 1
+
+For more information about this failure, try `st explain ST503`.
 
 Test cases:
   N generated, N found N unique failures

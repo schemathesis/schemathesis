@@ -124,6 +124,7 @@ def render_replay(
                         curl=reproduce,
                         formatter=failure_formatter,
                         config=output_config,
+                        show_codes=True,
                     ).rstrip()
                 )
                 click.echo()

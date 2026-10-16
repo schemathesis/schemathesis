@@ -24,7 +24,7 @@ Schemathesis dev
 __________________________________ GET /test ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API accepted schema-violating request
+- ST201 API accepted schema-violating request
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 422, 428, 5xx
@@ -42,7 +42,7 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "message" is a required property
 
@@ -68,7 +68,7 @@ Reproduce with:
             "incorrect": "positive"
         }
 
-- API accepted schema-violating request
+- ST201 API accepted schema-violating request
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 422, 428, 5xx
@@ -97,8 +97,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Response violates schema: 1
-  ❌ API accepted schema-violating request: 2
+  ❌ ST108 Response violates schema: 1
+  ❌ ST201 API accepted schema-violating request: 2
+
+Some failures have detailed explanations: ST108, ST201.
+For more information about a failure, try `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures
