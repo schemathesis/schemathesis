@@ -35,7 +35,7 @@ from schemathesis.specs.openapi.examples import (
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
-from test.utils import EventStream, assert_requests_call, to_float32
+from test.utils import EventStream, assert_requests_call
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -262,10 +262,7 @@ def test_examples_phase_drops_float32_collapsing(ctx, location):
         }
         method = "POST"
     operation = ctx.openapi.load_schema({"/r": endpoint}, version="3.1.0")["/r"][method]
-    values = [example.value for example in (*extract_top_level(operation), *extract_from_schemas(operation))]
-    for value in values:
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            assert to_float32(float(value)) > 0, value
+    assert [example.value for example in (*extract_top_level(operation), *extract_from_schemas(operation))] == []
 
 
 def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx):
@@ -3781,11 +3778,7 @@ def test_top_level_body_example_violating_schema_is_skipped(ctx):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    for example in extract_top_level(operation):
-        if isinstance(example, BodyExample):
-            assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+    assert [example.value for example in extract_top_level(operation) if isinstance(example, BodyExample)] == []
 
 
 def test_schema_level_body_example_violating_schema_is_skipped(ctx):
@@ -3805,10 +3798,7 @@ def test_schema_level_body_example_violating_schema_is_skipped(ctx):
             }
         },
     )
-    validator = jsonschema_rs.validator_for(operation.body[0].optimized_schema)
-    for example in extract_top_level(operation):
-        if isinstance(example, BodyExample):
-            assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+    assert [example.value for example in extract_top_level(operation) if isinstance(example, BodyExample)] == []
 
 
 def test_property_examples_list_filters_invalid_items(ctx):

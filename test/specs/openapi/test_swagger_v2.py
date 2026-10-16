@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from flask import jsonify
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
@@ -93,20 +94,45 @@ def test_examples_phase_uses_x_example(ctx):
     assert {"name": "from-x-example"} in bodies
 
 
-def test_response_header_validation_only_complains_about_headers(ctx):
-    # The conformance check must, when it fails, fail with a header-specific message —
-    # not surface generic body-schema errors against a header schema.
-    api = ctx.openapi.apps.swagger_v2_response_headers()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = EventStream(schema, checks=[response_headers_conformance], max_examples=3).execute()
+def test_response_header_validation_only_complains_about_headers(ctx, app_runner):
+    # A header that breaks its schema must fail with a header message, not body-schema errors against it.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/headers": {
+                "get": {
+                    "produces": ["application/json"],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {"type": "object"},
+                            "headers": {"X-Total-Count": {"type": "integer"}},
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
 
-    assert api.calls_to("/api/headers")
-    for finished in stream.find_all(events.ScenarioFinished):
-        for checks in finished.recorder.checks.values():
-            for check in checks:
-                if check.status == Status.FAILURE:
-                    failure = check.failure_info.failure if check.failure_info else None
-                    assert failure is not None and "header" in str(failure).lower()
+    @app.route("/api/headers")
+    def headers():
+        response = jsonify({})
+        response.headers["X-Total-Count"] = "not-a-number"
+        return response
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = EventStream(schema, checks=[response_headers_conformance], max_examples=1).execute()
+    failures = [
+        str(check.failure_info.failure)
+        for finished in stream.find_all(events.ScenarioFinished)
+        for checks in finished.recorder.checks.values()
+        for check in checks
+        if check.status == Status.FAILURE
+    ]
+    assert failures == [
+        'Response header does not conform to the schema\n\n"not-a-number" is not of type "integer"\n\n'
+        'Schema:\n\n    {\n        "type": "integer"\n    }\n\nValue:\n\n    "not-a-number"'
+    ]
 
 
 def test_default_response_used_when_status_undocumented(ctx):

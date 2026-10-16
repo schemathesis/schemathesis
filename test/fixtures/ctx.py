@@ -432,9 +432,6 @@ class OpenAPIApps:
     def swagger_v2_examples(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.examples())
 
-    def swagger_v2_response_headers(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.response_headers())
-
     def swagger_v2_default_response(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.default_response())
 

@@ -1658,6 +1658,8 @@ def test_generation_config_in_explicit_examples(ctx):
                             "name": "X-VO-Api-Id",
                             "required": True,
                             "type": "string",
+                            # An empty value would satisfy any character set.
+                            "minLength": 1,
                         },
                         {
                             "in": "body",
@@ -1686,10 +1688,7 @@ def test_generation_config_in_explicit_examples(ctx):
         exclude_header_characters="".join({chr(i) for i in range(256)} - {"a"}),
     )
     stream = EventStream(schema, max_examples=10).execute()
-    for case in _scenario_cases(stream):
-        for header in case.value.headers.values():
-            if header:
-                assert set(header) == {"a"}
+    assert [dict(case.value.headers) for case in _scenario_cases(stream)] == [{"X-VO-Api-Id": "a"}]
 
 
 def test_missing_deserializer_warnings_collected(ctx):

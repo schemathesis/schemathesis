@@ -61,15 +61,6 @@ def register_examples(app: Flask) -> None:
         return jsonify({"echo": "hi"})
 
 
-def register_response_headers(app: Flask) -> None:
-    @app.route("/api/headers", methods=["GET"])
-    def headers_endpoint() -> Any:
-        response = jsonify({})
-        response.headers["X-Total-Count"] = "42"
-        response.headers["X-Tags"] = "alpha,beta,gamma"
-        return response
-
-
 def register_default_response(app: Flask) -> None:
     @app.route("/api/errors", methods=["GET"])
     def errors_endpoint() -> Any:
