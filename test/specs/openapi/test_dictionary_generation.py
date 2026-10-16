@@ -17,6 +17,7 @@ from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import SemanticDraw
+from test.utils import run_given
 
 
 def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, *, version: str = "3.0.2", **kwargs):
@@ -52,8 +53,7 @@ def test_probability_one_always_substitutes(ctx):
     operation = schema["/items"]["GET"]
     seen_substituted = []
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=15, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=15, derandomize=True)
     def collect(case):
         q = case.query.get("q")
         if q is None:
@@ -61,7 +61,6 @@ def test_probability_one_always_substitutes(ctx):
         seen_substituted.append(q)
         assert q in {"admin", "root", "' OR 1=1--"}
 
-    collect()
     assert seen_substituted, "no q values generated to verify"
 
 
@@ -78,13 +77,11 @@ def test_dictionary_draw_provenance_attached(ctx):
     operation = schema["/items"]["GET"]
     draws_seen = []
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5, derandomize=True)
     def collect(case):
         if case._meta is not None and case._meta.dictionary_draws:
             draws_seen.extend(case._meta.dictionary_draws)
 
-    collect()
     assert draws_seen and set(draws_seen) == {
         DictionaryDraw(
             dictionary="edge",
@@ -117,14 +114,12 @@ def test_parameter_binding_wins_over_type_wide(ctx):
     operation = schema["/items"]["GET"]
     values = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=15, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=15, derandomize=True)
     def collect(case):
         q = case.query.get("q")
         if q is not None:
             values.add(q)
 
-    collect()
     assert values == {"SPECIFIC"}
 
 
@@ -148,15 +143,13 @@ def test_integer_eligibility_filters_string_values(ctx):
     operation = schema["/items"]["GET"]
     dictionary_values = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=20, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=20, derandomize=True)
     def collect(case):
         if case._meta is None:
             return
         for draw in case._meta.dictionary_draws:
             dictionary_values.add(draw.value)
 
-    collect()
     assert dictionary_values, "no dictionary draws recorded"
     assert dictionary_values == {1, 42}
 
@@ -183,12 +176,9 @@ def test_positive_path_parameter_binding_does_not_break_serialization(ctx):
     )
     operation = schema["/items/{id}"]["GET"]
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         assert case.path_parameters["id"] == "abc123"
-
-    collect()
 
 
 @pytest.mark.hypothesis_nested
@@ -212,8 +202,7 @@ def test_parameter_binding_forces_optional_parameter_present(ctx):
     omissions = 0
     substitutions = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=20, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=20, derandomize=True)
     def collect(case):
         nonlocal omissions, substitutions
         if "q" not in case.query:
@@ -221,7 +210,6 @@ def test_parameter_binding_forces_optional_parameter_present(ctx):
         elif case.query["q"] == "SENTINEL":
             substitutions += 1
 
-    collect()
     assert omissions == 0
     assert substitutions > 0
 
@@ -249,8 +237,7 @@ def test_negative_mode_applies_dictionary_to_unmutated_parameters(ctx):
     operation = schema["/items"]["GET"]
     short_value_in_negative_case = False
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=30, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=30, derandomize=True)
     def collect(case):
         nonlocal short_value_in_negative_case
         if case._meta is None:
@@ -261,7 +248,6 @@ def test_negative_mode_applies_dictionary_to_unmutated_parameters(ctx):
         if case.query.get("r") == "ab":
             short_value_in_negative_case = True
 
-    collect()
     assert short_value_in_negative_case, (
         "expected schema-violating dictionary entry to fire on un-mutated parameter `r` "
         "while `q` carried the negative mutation"
@@ -296,8 +282,7 @@ def test_negative_mode_keeps_case_negative_when_dictionary_overrides_only_mutati
     operation = schema["/items"]["GET"]
     invalid_draw_cases = 0
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=30, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=30, derandomize=True)
     def collect(case):
         nonlocal invalid_draw_cases
         if case._meta is None:
@@ -308,7 +293,6 @@ def test_negative_mode_keeps_case_negative_when_dictionary_overrides_only_mutati
                 f"schema-invalid dictionary draw downgraded case to positive: query={case.query!r}"
             )
 
-    collect()
     assert invalid_draw_cases > 0, "scenario never produced a schema-invalid dictionary draw"
 
 
@@ -332,14 +316,12 @@ def test_positive_mode_filters_out_schema_violating_entries(ctx):
     operation = schema["/items"]["GET"]
     seen: set = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=15, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=15, derandomize=True)
     def collect(case):
         q = case.query.get("q")
         if q is not None:
             seen.add(q)
 
-    collect()
     assert seen == {"valid-string-long-enough"}
 
 
@@ -379,13 +361,11 @@ def test_overlay_does_not_admit_schema_invalid_entries_when_schema_view_is_missi
     )
     leaked: list[DictionaryDraw] = []
 
-    @given(value=overlay)
-    @settings(max_examples=15, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(value=overlay, max_examples=15, derandomize=True)
     def check(value):
         if isinstance(value, GeneratedValue):
             leaked.extend(value.dictionary_draws)
 
-    check()
     assert not leaked, f"schema-invalid entries leaked into POSITIVE mode: {leaked}"
 
 
@@ -430,8 +410,9 @@ def test_unexpected_property_feedback_does_not_leak_invalid_dict_entries_into_po
     )
     leaked: list[DictionaryDraw] = []
 
-    @given(case=operation.as_strategy(feedback=FeedbackSources(error_feedback=store)))
-    @settings(max_examples=20, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(
+        case=operation.as_strategy(feedback=FeedbackSources(error_feedback=store)), max_examples=20, derandomize=True
+    )
     def collect(case):
         if case._meta is None:
             return
@@ -439,7 +420,6 @@ def test_unexpected_property_feedback_does_not_leak_invalid_dict_entries_into_po
             if d.parameter_name == "constraintId" and d.matches_schema:
                 leaked.append(d)
 
-    collect()
     assert not leaked, f"schema-invalid entries leaked into POSITIVE mode: {leaked}"
 
 
@@ -558,12 +538,9 @@ def test_overlay_overrides_prior_semantic_substitution(ctx):
         generation_mode=GenerationMode.POSITIVE,
     )
 
-    @given(value=overlay)
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(value=overlay, max_examples=10, derandomize=True)
     def check(value):
         assert value.value["q"] == "DICT"
-
-    check()
 
 
 def _path_with_body(body_schema: dict, *, required: bool = True) -> dict:
@@ -687,13 +664,11 @@ def test_body_binding_field_behind_ref(ctx, root_is_ref):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         emission_factor = case.body.get("emission_factor") if isinstance(case.body, dict) else None
         seen.add(emission_factor.get("region") if isinstance(emission_factor, dict) else None)
 
-    collect()
     assert seen == {"DE", "GB", "US"}
 
 
@@ -756,8 +731,7 @@ def test_body_binding_array_wildcard(ctx):
     elements_with_widget = 0
     total_elements = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         nonlocal elements_with_widget, total_elements
         for item in case.body.get("items", []):
@@ -765,7 +739,6 @@ def test_body_binding_array_wildcard(ctx):
             if item.get("name") == "widget":
                 elements_with_widget += 1
 
-    collect()
     assert total_elements > 0 and elements_with_widget == total_elements
 
 
@@ -785,8 +758,7 @@ def test_body_binding_top_level_array(ctx):
     elements_seen = 0
     elements_with_alpha = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         nonlocal elements_seen, elements_with_alpha
         for item in case.body or []:
@@ -794,7 +766,6 @@ def test_body_binding_top_level_array(ctx):
             if item == "alpha":
                 elements_with_alpha += 1
 
-    collect()
     assert elements_seen > 0 and elements_with_alpha == elements_seen
 
 
@@ -811,14 +782,12 @@ def test_body_binding_skipped_when_path_does_not_resolve(ctx):
     operation = schema["/items"]["POST"]
     leaks = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         nonlocal leaks
         if "notInSchema" in (case.body or {}):
             leaks += 1
 
-    collect()
     assert leaks == 0
 
 
@@ -851,14 +820,12 @@ def test_body_binding_draws_recorded_on_meta(ctx):
     operation = schema["/items"]["POST"]
     body_draws: list[DictionaryDraw] = []
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5, derandomize=True)
     def collect(case):
         if case._meta is None:
             return
         body_draws.extend(d for d in case._meta.dictionary_draws if d.body_path is not None)
 
-    collect()
     assert body_draws, "expected body_path-bearing draws on case._meta.dictionary_draws"
     assert all(d.body_path == "/ccNumber" and d.value == "1234-5678-9012-3456" for d in body_draws)
 
@@ -883,8 +850,7 @@ def test_body_binding_true_subschema_accepts_entries(ctx):
     operation = schema["/items"]["POST"]
     seen: list[DictionaryDraw] = []
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         if case._meta is None:
             return
@@ -892,7 +858,6 @@ def test_body_binding_true_subschema_accepts_entries(ctx):
             if draw_.body_path == "/token":
                 seen.append(draw_)
 
-    collect()
     assert seen, "no entries substituted into body.token (true subschema misclassified)"
     assert all(d.matches_schema for d in seen), "true subschema must classify entries as matches_schema=True"
 
@@ -912,8 +877,7 @@ def test_body_binding_resolves_through_boolean_items(ctx):
     elements_seen = 0
     elements_with_seed = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         nonlocal elements_seen, elements_with_seed
         for item in case.body or []:
@@ -921,7 +885,6 @@ def test_body_binding_resolves_through_boolean_items(ctx):
             if item == "seed":
                 elements_with_seed += 1
 
-    collect()
     assert elements_seen > 0 and elements_with_seed == elements_seen
 
 
@@ -952,8 +915,7 @@ def test_body_binding_drops_descendant_mutations_under_overwrite(ctx):
     overwrites_seen = 0
     saw_sibling_mutation = False
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=40, derandomize=True)
     def collect(case):
         nonlocal overwrites_seen, saw_sibling_mutation
         if case._meta is None:
@@ -969,7 +931,6 @@ def test_body_binding_drops_descendant_mutations_under_overwrite(ctx):
             if mutation.path and mutation.path[:1] == ("sibling",):
                 saw_sibling_mutation = True
 
-    collect()
     assert overwrites_seen > 0, "scenario never produced a /user overwrite"
     assert saw_sibling_mutation, (
         "no sibling mutation observed in any overwrite case; absence-of-user-mutation could be vacuous"
@@ -990,8 +951,7 @@ def test_body_binding_probability_mixes_substituted_and_native(ctx):
     substituted = 0
     native = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=40, derandomize=True)
     def collect(case):
         nonlocal substituted, native
         token = (case.body or {}).get("token")
@@ -1000,7 +960,6 @@ def test_body_binding_probability_mixes_substituted_and_native(ctx):
         elif token is not None:
             native += 1
 
-    collect()
     assert substituted > 0 and native > 0, f"probability 0.3 did not mix outcomes: subst={substituted}, native={native}"
 
 
@@ -1146,8 +1105,7 @@ def test_body_binding_literal_and_non_body_keys_are_skipped(ctx):
     token_dict_draws = 0
     bodies_seen = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         nonlocal literal_applied_cases, token_dict_draws, bodies_seen
         if isinstance(case.body, dict):
@@ -1158,7 +1116,6 @@ def test_body_binding_literal_and_non_body_keys_are_skipped(ctx):
             return
         token_dict_draws += sum(1 for d in case._meta.dictionary_draws if d.body_path == "/token")
 
-    collect()
     assert bodies_seen > 0
     assert literal_applied_cases == bodies_seen, "literal body override must apply to every case"
     assert token_dict_draws > 0, "dictionary binding on sibling body key did not fire"
@@ -1177,15 +1134,13 @@ def test_body_binding_skipped_when_descending_through_non_object_schema(ctx):
     operation = schema["/items"]["POST"]
     leaks = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5, derandomize=True)
     def collect(case):
         nonlocal leaks
         token = (case.body or {}).get("token")
         if isinstance(token, dict) and "deeper" in token:
             leaks += 1
 
-    collect()
     assert leaks == 0
 
 
@@ -1202,15 +1157,13 @@ def test_body_binding_skipped_when_wildcard_target_lacks_items(ctx):
     operation = schema["/items"]["POST"]
     leaks = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5, derandomize=True)
     def collect(case):
         nonlocal leaks
         for item in (case.body or {}).get("tags", []):
             if item == "SENTINEL_UNIQUE_VALUE_12345":
                 leaks += 1
 
-    collect()
     assert leaks == 0
 
 
@@ -1233,15 +1186,13 @@ def test_body_binding_returns_inner_when_all_entries_filtered(ctx):
     operation = schema["/items"]["POST"]
     body_draws = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         nonlocal body_draws
         if case._meta is None:
             return
         body_draws += sum(1 for d in case._meta.dictionary_draws if d.body_path is not None)
 
-    collect()
     assert body_draws == 0
 
 
@@ -1267,8 +1218,7 @@ def test_body_binding_keeps_mutation_when_path_does_not_match(ctx):
     operation = schema["/items"]["POST"]
     saw_kept_mutation = False
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=40, derandomize=True)
     def collect(case):
         nonlocal saw_kept_mutation
         if case._meta is None:
@@ -1280,7 +1230,6 @@ def test_body_binding_keeps_mutation_when_path_does_not_match(ctx):
             if mutation.path and mutation.path[0] == "tag":
                 saw_kept_mutation = True
 
-    collect()
     assert saw_kept_mutation, "expected mutation on sibling field `tag` to be preserved when /user is overwritten"
 
 
@@ -1300,15 +1249,13 @@ def test_body_binding_skipped_when_descending_past_boolean_leaf(ctx):
     operation = schema["/items"]["POST"]
     leaks = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5, derandomize=True)
     def collect(case):
         nonlocal leaks
         token = (case.body or {}).get("token")
         if isinstance(token, dict) and "field" in token:
             leaks += 1
 
-    collect()
     assert leaks == 0
 
 
@@ -1326,12 +1273,10 @@ def test_body_binding_skipped_for_self_referencing_schema(ctx):
     operation = schema["/items"]["POST"]
     leaks = 0
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5, derandomize=True)
     def collect(case):
         nonlocal leaks
         if isinstance(case.body, dict) and case.body.get("a") == "X":
             leaks += 1
 
-    collect()
     assert leaks == 0

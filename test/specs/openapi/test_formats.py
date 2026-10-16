@@ -12,6 +12,7 @@ from schemathesis.specs.openapi._hypothesis import _build_custom_formats, _canon
 from schemathesis.specs.openapi.coverage._schema import is_valid_header_value
 from schemathesis.specs.openapi.formats import FORMAT_LENGTHS, register_string_format
 from schemathesis.transport.serialization import Binary
+from test.utils import run_given
 
 FORMATS = _build_custom_formats(GenerationConfig(), GenerationMode.POSITIVE)
 # Formats named by JSON Schema; the `_`-prefixed rest are internal and carry their own invariants.
@@ -303,9 +304,6 @@ def test_binary_format_respects_length_keywords(ctx, media_type, keywords, low, 
         }
     )
 
-    @given(schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert low <= len(case.body.data) <= high, case.body
-
-    test()

@@ -1,10 +1,11 @@
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import given
 
 from schemathesis.config._auth import AuthConfig
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.adapter.security import extract_security_definitions_v3
+from test.utils import run_given
 
 
 def test_ref_resolving():
@@ -99,15 +100,12 @@ def test_without_security_parameters(ctx, with_security_parameters):
     )
     schema.config.generation.update(with_security_parameters=with_security_parameters)
 
-    @given(case=schema["/test"]["GET"].as_strategy())
-    @settings(max_examples=20, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/test"]["GET"].as_strategy(), max_examples=20)
     def test(case):
         if with_security_parameters:
             assert "Authorization" in case.headers
         else:
             assert case.headers == {}
-
-    test()
 
 
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"])
@@ -212,12 +210,9 @@ def test_generated_credentials_in_fuzzing(ctx, version, security, expected):
     schema = _schema_with_security(ctx, version, security)
     seen = set()
 
-    @given(case=schema["/test"]["GET"].as_strategy())
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/test"]["GET"].as_strategy(), max_examples=10)
     def test(case):
         seen.update(case.headers)
-
-    test()
 
     assert seen == expected
 
@@ -226,12 +221,9 @@ def test_optional_auth_keeps_configured_credentials(ctx):
     schema = _schema_with_security(ctx, "3.0.2", [{"basicAuth": []}, {"apiKeyAuth": []}, {}])
     schema.config.auth = AuthConfig.from_dict({"openapi": {"basicAuth": {"username": "user", "password": "secret"}}})
 
-    @given(case=schema["/test"]["GET"].as_strategy())
-    @settings(max_examples=5, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/test"]["GET"].as_strategy(), max_examples=5)
     def test(case):
         assert case.headers == {"Authorization": "Basic dXNlcjpzZWNyZXQ="}
-
-    test()
 
 
 SECURITY_REQUIRED_CASES = [

@@ -44,7 +44,7 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.transport.prepare import get_default_headers
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, run_given
 
 
 def _books_schema(ctx):
@@ -629,12 +629,9 @@ def test_type_names(ctx, name):
     schema = ctx.graphql.load_sdl(raw_schema)
     # And requests should be properly generated
 
-    @given(case=schema[name]["v"].as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=schema[name]["v"].as_strategy(), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -811,13 +808,10 @@ def test_negative_mode_fallback_to_positive(ctx):
     schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
-    @given(strategy)
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    @run_given(strategy, max_examples=1)
     def test_(case):
         assert "getBooks" in case.body
         assert case.meta.generation.mode == GenerationMode.POSITIVE
-
-    test_()
 
 
 def _make_graphql_case_with_mode(

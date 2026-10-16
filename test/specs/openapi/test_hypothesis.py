@@ -22,7 +22,7 @@ from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
 from schemathesis.specs.openapi.diagnostics import find_slow_parameter, find_unsatisfiable_parameter
-from test.utils import assert_requests_call, to_float32
+from test.utils import assert_requests_call, run_given, to_float32
 
 
 @pytest.fixture
@@ -63,15 +63,12 @@ def test_explicit_attributes(operation, values, expected):
     # When some Case's attribute is passed explicitly to the case strategy
     strategy = operation.as_strategy(**values)
 
-    @given(strategy)
-    @settings(max_examples=1)
+    @run_given(strategy, max_examples=1)
     def test(case):
         # Then it should appear in the final result
         for attr_name, expected_values in expected.items():
             value = getattr(case, attr_name)
             assert value == expected_values
-
-    test()
 
 
 @pytest.fixture
@@ -119,13 +116,10 @@ def test_missed_ref(ctx, deeply_nested_schema):
     # When not resolved references are present in the schema during constructing a strategy
     schema = ctx.openapi.load_schema(deeply_nested_schema["paths"], components=deeply_nested_schema["components"])
 
-    @given(schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=10)
+    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=10)
     def test(case):
         # Then the reference should be correctly resolved
         assert isinstance(case.query["key"], str)
-
-    test()
 
 
 @pytest.mark.parametrize("location", ["query", "header"])
@@ -151,12 +145,9 @@ def test_required_array_parameter_is_non_empty(ctx, location):
     )
     container = {"query": "query", "header": "headers"}[location]
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=15)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=15)
     def test(case):
         assert getattr(case, container).get("ids"), "Required array parameter generated as empty or absent"
-
-    test()
 
 
 def test_allow_empty_value_false_excludes_empty_string(ctx):
@@ -180,12 +171,9 @@ def test_allow_empty_value_false_excludes_empty_string(ctx):
         }
     )
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=25)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=25)
     def test(case):
         assert case.query["name"] != "", "Empty value generated for `allowEmptyValue: false`"
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -207,12 +195,9 @@ def test_optional_null_query_parameter_is_omitted(ctx, parameter_schema):
         version="3.1.0",
     )
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert case.query.get("limit") != "null"
-
-    test()
 
 
 def test_required_null_query_parameter_is_sent(ctx):
@@ -228,12 +213,9 @@ def test_required_null_query_parameter_is_sent(ctx):
         version="3.1.0",
     )
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=5)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def test(case):
         assert case.query == {"limit": "null"}
-
-    test()
 
 
 def test_optional_false_query_parameter_is_sent(ctx):
@@ -251,13 +233,10 @@ def test_optional_false_query_parameter_is_sent(ctx):
 
     seen = []
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         if case.query not in seen:
             seen.append(case.query)
-
-    test()
 
     assert sorted(seen, key=len) == [{}, {"flag": "false"}]
 
@@ -284,13 +263,10 @@ def test_null_inside_query_array_is_sent(ctx):
 
     seen = []
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         if case.query not in seen:
             seen.append(case.query)
-
-    test()
 
     assert sorted(seen, key=len) == [{}, {"ids": ["null"]}]
 
@@ -308,12 +284,9 @@ def test_null_path_parameter_is_sent(ctx):
         version="3.1.0",
     )
 
-    @given(schema["/data/{key}"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=5)
+    @run_given(schema["/data/{key}"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def test(case):
         assert case.path_parameters == {"key": "null"}
-
-    test()
 
 
 def test_inlined_definitions(deeply_nested_schema):
@@ -324,13 +297,10 @@ def test_inlined_definitions(deeply_nested_schema):
 
     schema = schemathesis.openapi.from_dict(deeply_nested_schema)
 
-    @given(schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         # Then the referenced schema should be properly transformed to the JSON Schema form
         assume(case.query["key"] == "null")
-
-    test()
 
 
 def test_nullable_recursive_reference(ctx):
@@ -380,13 +350,10 @@ def test_contains_no_item_can_match_with_zero_min_contains(ctx):
     schema = _tags_body_schema(ctx, body)
     validator = jsonschema_rs.validator_for(body)
 
-    @given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert validator.is_valid(case.body), case.body
         assert all(isinstance(item, int) for item in case.body), case.body
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -400,12 +367,9 @@ def test_contains_contradicting_items_leaves_only_other_branch(ctx):
     }
     schema = _tags_body_schema(ctx, body)
 
-    @given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert case.body is None, case.body
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -432,12 +396,9 @@ def test_contains_over_recursive_reference_keeps_items_valid(ctx):
     )
     validator = jsonschema_rs.validator_for({**body, "components": components})
 
-    @given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert validator.is_valid(case.body), case.body
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -536,12 +497,9 @@ def test_as_strategy_keeps_passed_headers_unchanged(ctx):
     strategy = schema["/x"]["GET"].as_strategy(headers=headers)
     assert headers == {"X-Caller": "local"}
 
-    @given(strategy)
-    @settings(max_examples=1)
+    @run_given(strategy, max_examples=1)
     def test(case):
         assert case.headers == {"X-Caller": "local", "X-Configured": "global"}
-
-    test()
 
 
 CONSTRAINED_HEADER_SCHEMAS = [
@@ -584,13 +542,10 @@ def test_constrained_headers_are_valid(subschema):
         Draft4Validator,
     )
 
-    @given(strategy)
-    @settings(max_examples=25, deadline=None)
+    @run_given(strategy, max_examples=25)
     def test(headers):
         for value in _strings_in(headers["X-Foo"]):
             assert is_valid_header({"X-Foo": value}), repr(value)
-
-    test()
 
 
 def test_header_length_floor_is_reachable():
@@ -610,13 +565,10 @@ def test_header_length_floor_is_reachable():
         Draft4Validator,
     )
 
-    @given(strategy)
-    @settings(max_examples=25, deadline=None)
+    @run_given(strategy, max_examples=25)
     def test(headers):
         assert len(headers["X-Foo"]) >= 40, headers
         assert is_valid_header(headers), headers
-
-    test()
 
 
 def test_header_values_never_start_with_whitespace():
@@ -673,12 +625,9 @@ def test_cookie_values_use_cookie_octets(ctx, schema):
     )
 
     # Enough draws to reach separators, quotes and whitespace that servers strip or split on.
-    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=30, deadline=None, database=None)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=30)
     def test(case):
         assert set(case.cookies["c"]) <= COOKIE_OCTETS, repr(case.cookies["c"])
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -697,12 +646,9 @@ def test_cookie_values_keep_declared_literals(ctx, schema, expected):
         version="3.1.0",
     )
 
-    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=5, deadline=None, database=None)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def test(case):
         assert case.cookies == {"c": expected}
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -806,13 +752,10 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     original = jsonschema_rs.canonical.json.to_string(deeply_nested_schema)
     schema = schemathesis.openapi.from_dict(deeply_nested_schema)
 
-    @given(schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         # Then the referenced schema should be resolved and the right value generated
         assert check(case.query["key"])
-
-    test()
 
     # And the original schema is not mutated
     assert jsonschema_rs.canonical.json.to_string(deeply_nested_schema) == original
@@ -856,12 +799,9 @@ def test_header_filtration_needed(ctx, mocker):
     mocked = mocker.spy(filters, "is_valid_header")
     schema = ctx.openapi.load_schema(make_header_param(format="date"))
 
-    @given(schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=1)
     def test(_):
         pass
-
-    test()
 
     # Then header filter should be used
     mocked.assert_called()
@@ -882,12 +822,9 @@ def test_boolean_header_schema(ctx, subschema):
         version="3.1.0",
     )
 
-    @given(schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=5)
+    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=5)
     def test(case):
         assert is_valid_header(case.headers)
-
-    test()
 
 
 def test_missing_header_filter(ctx, mocker):
@@ -989,13 +926,10 @@ def test_declared_content_type_header_matches_the_sent_body(ctx, app_runner, con
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
 
-    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         form = case.body if case.media_type in ("application/x-www-form-urlencoded", "multipart/form-data") else {}
         assert case.call().json() == {"mimetype": case.media_type, "form": form}
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -1026,13 +960,11 @@ def test_declared_content_type_header_keeps_values_its_schema_admits(ctx, header
     )
     seen = set()
 
-    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         if case.media_type == "text/plain" or "application/xml" in expected:
             seen.add(case.headers["Content-Type"])
 
-    test()
     assert seen == expected
 
 
@@ -1187,12 +1119,9 @@ def test_custom_format_path_value_with_slash_is_accepted_when_explicit(ctx):
         },
     )
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def inner(case):
         assert case.path_parameters["block"] == "192.168.1.0%2F24"
-
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1282,12 +1211,9 @@ def test_path_example_with_slash_allows_encoded_slash(ctx):
         mix_examples=False,
     )
 
-    @given(value=strategy)
-    @settings(max_examples=10, deadline=None)
+    @run_given(value=strategy, max_examples=10)
     def inner(value):
         assert "%2F" in value["block"]
-
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1462,16 +1388,13 @@ def test_path_string_sanitized_when_decoder_strict(ctx):
     schema.adapt_to_path_decoder_rejection()
     operation = schema["/products/{productName}"]["GET"]
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=30, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=30)
     def inner(case):
         value = case.path_parameters["productName"]
         upper = value.upper()
         assert "%5C" not in upper, value
         assert "%7F" not in upper, value
         assert not any(f"%{i:02X}" in upper for i in range(0x20)), value
-
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1490,12 +1413,9 @@ def test_float_format_snapping_preserves_literal_const(ctx):
         version="3.1.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def inner(case):
         assert case.body == literal, case.body
-
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1517,14 +1437,11 @@ def test_float_format_bound_outside_single_precision_range(ctx, bound):
         version="3.1.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def inner(case):
         value = case.query.get("f")
         if value is not None:
             assert to_float32(float(value)) < 1e39, value
-
-    inner()
 
 
 def test_float_format_snapping_skips_negation():
@@ -1565,8 +1482,7 @@ def test_float_format_openapi_30_boolean_exclusive_bounds(ctx, schema, sign):
     )
     produced = []
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=15, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=15)
     def inner(case):
         value = case.query.get("f")
         if value is None:
@@ -1578,7 +1494,6 @@ def test_float_format_openapi_30_boolean_exclusive_bounds(ctx, schema, sign):
         elif sign < 0:
             assert narrowed < 0, value
 
-    inner()
     assert produced
 
 
@@ -1602,14 +1517,11 @@ def test_float_format_on_integer_type_keeps_bound(ctx):
         version="3.1.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def inner(case):
         value = case.query.get("f")
         if value is not None:
             assert int(value) > 1000, value
-
-    inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1633,14 +1545,11 @@ def test_float_format_collapsing_example_not_mixed_into_strategy(ctx, key):
         version="3.1.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=50, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=50)
     def inner(case):
         value = case.query.get("f")
         if value is not None:
             assert to_float32(float(value)) > 0, value
-
-    inner()
 
 
 @pytest.mark.parametrize("name", ["const", "enum", "default", "example", "examples", "if", "not"])

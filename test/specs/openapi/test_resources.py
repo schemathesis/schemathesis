@@ -27,6 +27,7 @@ from schemathesis.specs.openapi._hypothesis import openapi_cases
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot, ResourceDefinition
+from test.utils import run_given
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"
@@ -1636,14 +1637,11 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
 
     strategy = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
 
-    @given(strategy)
-    @settings(max_examples=200, database=None, deadline=None)
+    @run_given(strategy, max_examples=200)
     def t(value):
         if isinstance(value, dict):
             for required in ("clientId", "clientSecret"):
                 assert required in value, f"required field {required!r} missing from POSITIVE body: {value!r}"
-
-    t()
 
 
 def test_nested_body_pool_overlay_lands_pool_values(ctx):
@@ -1807,8 +1805,7 @@ def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
     # rewrites. With the pre-fix code, captured-variant draws were filtered out here.
     form_pool_hits = 0
 
-    @given(cases_strategy)
-    @settings(max_examples=200, database=None, deadline=None)
+    @run_given(cases_strategy, max_examples=200)
     def collect(case):
         nonlocal form_pool_hits
         if case.media_type != "application/x-www-form-urlencoded":
@@ -1816,7 +1813,6 @@ def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
         if isinstance(case.body, dict) and case.body.get("user_id") in pooled_ids:
             form_pool_hits += 1
 
-    collect()
     assert form_pool_hits > 0, "pool-derived user_id never survived the form-urlencoded prep step"
 
 

@@ -5,6 +5,7 @@ import schemathesis
 from schemathesis.core.transforms import to_wire_string
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import PayloadAlternatives
+from test.utils import run_given
 
 from ..utils import assert_requests_call, integer
 
@@ -644,13 +645,11 @@ def test_ref_field(ctx):
         },
     )
 
-    @given(case=schema["/body"]["POST"].as_strategy())
-    @settings(max_examples=5)
+    @run_given(case=schema["/body"]["POST"].as_strategy(), max_examples=5)
     def test(case):
         assert isinstance(case.body["$ref"], str)
 
     # Then "$ref" field should be generated
-    test()
 
 
 def test_exceptions_on_collect(testdir):

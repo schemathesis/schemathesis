@@ -12,6 +12,7 @@ import pytest
 import requests
 import urllib3
 import yaml
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
@@ -32,6 +33,30 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # assert the header is *present* fail loudly on a future rename, which is what keeps the tests asserting
 # its absence from silently passing against a string Hypothesis no longer emits.
 HYPOTHESIS_FAILURE_HEADERS = ("Failing test case", "Falsifying example")
+
+
+def profile_max_examples() -> int | None:
+    # `max_examples` set via `--hypothesis-profile`, or None under the default profile.
+    value = settings().max_examples
+    return None if value == 100 else value
+
+
+def run_given(*args: Any, max_examples: int, derandomize: bool = False, **kwargs: Any) -> Callable[[Callable], None]:
+    """Run the decorated function as a Hypothesis test right away; `--hypothesis-profile` overrides `max_examples`."""
+    options: dict[str, Any] = {"derandomize": True} if derandomize else {}
+
+    def run(test: Callable) -> None:
+        given(*args, **kwargs)(
+            settings(
+                max_examples=profile_max_examples() or max_examples,
+                deadline=None,
+                database=None,
+                suppress_health_check=list(HealthCheck),
+                **options,
+            )(test)
+        )()
+
+    return run
 
 
 def has_hypothesis_failure_header(text: str, test_name: str = "") -> bool:

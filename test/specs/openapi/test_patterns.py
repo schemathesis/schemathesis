@@ -36,6 +36,7 @@ from schemathesis.engine import from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
+from test.utils import run_given
 
 
 @pytest.mark.parametrize(
@@ -1656,12 +1657,9 @@ def test_length_bounds_beside_a_pattern(ctx, parameter_schema, expected):
     assert next(iter(operation.query)).optimized_schema == expected
     validator = jsonschema_rs.validator_for(parameter_schema)
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10)
     def check(case):
         assert validator.is_valid(case.query["q"]), case.query
-
-    check()
 
 
 @pytest.mark.parametrize(

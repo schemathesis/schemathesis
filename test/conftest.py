@@ -35,7 +35,7 @@ from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
 from schemathesis.python._constants.registry import default_registry
 
-from .utils import make_schema
+from .utils import make_schema, profile_max_examples
 
 pytest_plugins = [
     "pytester",
@@ -78,9 +78,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
 @pytest.fixture(scope="session")
 def hypothesis_max_examples():
-    # Returns max_examples when overridden via `--hypothesis-profile`, else None so each test can pick its own.
-    value = settings().max_examples
-    return None if value == 100 else value
+    return profile_max_examples()
 
 
 @pytest.fixture

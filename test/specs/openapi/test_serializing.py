@@ -34,7 +34,7 @@ from schemathesis.specs.openapi.serialization import (
     simple_object,
 )
 from schemathesis.transport.prepare import get_default_headers
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, run_given
 
 # A branch keeps the parameter's type unknown until the value exists.
 _BRANCHING_SCHEMA = {
@@ -786,14 +786,11 @@ def test_array_parameter_keeps_delimiter_literal(ctx, paths, version, operation_
     # Items are percent-encoded but the separator stays literal, so a server can split the array back.
     schema = ctx.openapi.load_schema(paths, version=version)
 
-    @given(case=schema[operation_path]["GET"].as_strategy())
-    @settings(max_examples=5)
+    @run_given(case=schema[operation_path]["GET"].as_strategy(), max_examples=5)
     def test(case):
         kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
         prepared = requests.Request("GET", kwargs["url"], params=kwargs["params"]).prepare()
         assert prepared.url == expected_url
-
-    test()
 
 
 STYLED_ARRAY_SCHEMA = {"type": "array", "enum": [["a,b", "c"]]}
@@ -1203,15 +1200,12 @@ def test_exploded_object_key_does_not_overwrite_declared_query_parameter(ctx):
         }
     )
 
-    @given(case=schema["/items"]["GET"].as_strategy())
-    @settings(max_examples=5)
+    @run_given(case=schema["/items"]["GET"].as_strategy(), max_examples=5)
     def test(case):
         assert case.as_transport_kwargs(base_url="http://127.0.0.1:1")["params"] == {
             "LaunchTemplateId": "lt-1",
             "Version": "2016-11-15",
         }
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -1314,8 +1308,7 @@ def test_unusual_form_schema(ctx, type_name):
         }
     )
 
-    @given(case=schema["/multipart"]["POST"].as_strategy())
-    @settings(max_examples=5, deadline=None)
+    @run_given(case=schema["/multipart"]["POST"].as_strategy(), max_examples=5)
     def test(case):
         # Then it should lead to a valid network request
         assert_requests_call(case)
@@ -1341,8 +1334,6 @@ def test_unusual_form_schema(ctx, type_name):
         headers = case.as_transport_kwargs(headers={"content-type": "text/plain"})["headers"]
         assert headers["content-type"] == "text/plain"
         assert list(headers) == [*list(get_default_headers()), SCHEMATHESIS_TEST_CASE_HEADER, "content-type"]
-
-    test()
 
 
 NESTED_OBJECT_SCHEMA = {

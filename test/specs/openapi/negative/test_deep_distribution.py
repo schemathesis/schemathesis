@@ -11,6 +11,7 @@ import schemathesis
 from schemathesis.core.jsonschema import _is_valid_uuid
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.generation.meta import FuzzingPhaseData
+from test.utils import run_given
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
@@ -196,11 +197,12 @@ def test_negative_body_stays_invalid(ctx, body_schema):
     )
     validator = jsonschema_rs.Draft4Validator(body_schema)
 
-    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE))
-    @settings(max_examples=10, deadline=None, derandomize=True, suppress_health_check=list(HealthCheck))
+    @run_given(
+        case=schema["/items"]["POST"].as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE),
+        max_examples=10,
+        derandomize=True,
+    )
     def test(case):
         if isinstance(case.body, bytes):
             return
         assert not validator.is_valid(case.body), f"False positive: body {case.body!r}"
-
-    test()

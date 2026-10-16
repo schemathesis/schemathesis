@@ -20,7 +20,7 @@ from schemathesis.hooks import (
 )
 from schemathesis.pytest.plugin import SchemaHandleMark
 from schemathesis.transport.prepare import get_default_headers
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, run_given
 
 
 def integer_id(query):
@@ -141,12 +141,9 @@ def test_global_query_hook(ctx):
     schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         assert case.query["id"].isdigit()
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -188,12 +185,9 @@ def test_schema_query_hook(ctx):
 
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         assert case.query["id"].isdigit()
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -210,13 +204,10 @@ def test_hooks_combination(ctx):
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     # Both filters together admit ~0.15% of the unconstrained strings; a random draw sequence sometimes finds none.
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None, derandomize=True)
+    @run_given(case=strategy, max_examples=3, derandomize=True)
     def test(case):
         assert case.query["id"].isdigit()
         assert int(case.query["id"]) % 2 == 0
-
-    test()
 
 
 def test_map_and_flatmap_hooks_work_in_negative_mode(testdir, simple_openapi):
@@ -417,13 +408,10 @@ def test_multiple_hooks_per_spec(ctx):
 
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         assert case.query["id"].isdigit()
         assert int(case.query["id"]) % 2 == 0
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -442,14 +430,11 @@ def test_flatmap(ctx):
 
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         value = case.query["id"]
         assert value.isdigit()
         assert case.query["square"] == int(value) ** 2
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -473,14 +458,11 @@ def test_case_hooks(ctx):
 
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         value = case.query["id"]
         assert value.isdigit()
         assert case.query["square"] == int(value) ** 2
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -495,12 +477,9 @@ def test_before_process_path_hook(ctx):
 
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3)
     def test(case):
         assert case.query == {"foo": "bar"}
-
-    test()
 
 
 def test_register_wrong_scope(ctx):
@@ -744,12 +723,9 @@ def test_after_call_fires_for_schema_level_hook(ctx):
     def after_call(context, case, response):
         calls.append(case.id)
 
-    @given(case=api_schema["/api/success"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=api_schema["/api/success"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         case.call()
-
-    test()
 
     assert len(calls) == 1
 
@@ -764,20 +740,14 @@ def test_after_validate_fires_for_schema_level_hook(ctx):
     def after_validate(context, case, response, check_results):
         results.extend(check_results)
 
-    @given(case=api_schema["/api/success"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=api_schema["/api/success"]["GET"].as_strategy(), max_examples=1)
     def test_success(case):
         case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
 
-    test_success()
-
-    @given(case=api_schema["/api/failure"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=api_schema["/api/failure"]["GET"].as_strategy(), max_examples=1)
     def test_failure(case):
         with pytest.raises(FailureGroup):
             case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
-
-    test_failure()
 
     assert [(r.name, r.status) for r in results] == [
         ("not_a_server_error", Status.SUCCESS),

@@ -21,7 +21,7 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.stateful import dependencies
-from test.utils import as_param, get_schema_path, integer
+from test.utils import as_param, get_schema_path, integer, run_given
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
 ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo": {"type": "integer"}}}
@@ -45,12 +45,9 @@ def test_request_body_schema_reference_to_plain_name_anchor(ctx):
 
     assert [body.media_type for body in operation.body] == ["application/json"]
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=3)
+    @run_given(case=operation.as_strategy(), max_examples=3)
     def test(case):
         assert isinstance(case.body, str)
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -80,12 +77,9 @@ def test_request_body_reference_into_fragment_of_declared_id(ctx):
         },
     )
 
-    @given(case=schema["/items"]["POST"].as_strategy())
-    @settings(max_examples=3)
+    @run_given(case=schema["/items"]["POST"].as_strategy(), max_examples=3)
     def test(case):
         assert case.body == "alpha"
-
-    test()
 
 
 def build_schema_with_recursion(schema, definition):
@@ -282,12 +276,9 @@ def test_nested_recursive_references(ctx):
         },
     )
 
-    @given(case=schema["/folders"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/folders"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 def test_simple_dereference(testdir):
@@ -1229,12 +1220,9 @@ def test_bundling_cache_with_shared_references(ctx):
 
     operation = next(schema.get_all_operations()).ok()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=3)
+    @run_given(case=operation.as_strategy(), max_examples=3)
     def test(case):
         pass
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -1502,16 +1490,13 @@ def test_prefix_items_with_ref(ctx):
         },
     )
 
-    @given(case=schema["/v1/customers/"]["PATCH"].as_strategy())
-    @settings(max_examples=50)
+    @run_given(case=schema["/v1/customers/"]["PATCH"].as_strategy(), max_examples=50)
     def test(case):
         key = case.body.get("key")
         if key is not None:
             assert isinstance(key, list)
             assert len(key) == 2
             assert isinstance(key[0], str)
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -1579,12 +1564,9 @@ def test_embedded_schema_dialect_declaration(ctx, version, body_schema):
         components={"schemas": {"Scalar": {"type": "string"}}},
     )
 
-    @given(case=schema["/items"]["POST"].as_strategy())
-    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/items"]["POST"].as_strategy(), max_examples=5)
     def test(case):
         assert isinstance(case.body, dict)
-
-    test()
 
 
 def test_external_path_items_reparsed_after_document_eviction(ctx):

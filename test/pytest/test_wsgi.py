@@ -5,6 +5,7 @@ from hypothesis import HealthCheck, given, settings
 import schemathesis
 from schemathesis.core.transforms import to_wire_string
 from schemathesis.specs.openapi.checks import ignored_auth
+from test.utils import run_given
 
 
 @pytest.mark.hypothesis_nested
@@ -65,12 +66,9 @@ def test_login_redirect_counts_as_enforced_auth(ctx):
         def set(self, case, data, context):
             case.cookies = {"session": data}
 
-    @given(case=schema["/me"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=schema["/me"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         assert case.call_and_validate(checks=[ignored_auth]).json() == {"user": "alice"}
-
-    test()
 
 
 @pytest.mark.hypothesis_nested

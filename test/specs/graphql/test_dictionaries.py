@@ -5,7 +5,6 @@ import re
 
 import graphql
 import pytest
-from hypothesis import HealthCheck, given, settings
 
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.generation import GenerationMode
@@ -16,6 +15,7 @@ from schemathesis.generation.meta import TestPhase
 from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
 from schemathesis.specs.graphql.dictionaries import resolve_bindings, substitute_dictionaries
 from schemathesis.specs.graphql.schemas import graphql_cases
+from test.utils import run_given
 
 SDL = """
 interface Media {
@@ -306,12 +306,10 @@ def test_draw_provenance_attached(ctx):
     schema = load(ctx, TITLE_BINDING)
     draws = []
 
-    @given(case=schema["Query"]["bookByTitle"].as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["Query"]["bookByTitle"].as_strategy(), max_examples=5, derandomize=True)
     def run(case):
         draws.extend(case._meta.dictionary_draws)
 
-    run()
     assert draws and set(draws) == {
         DictionaryDraw(
             dictionary="titles",
@@ -333,12 +331,10 @@ def test_no_dictionaries_configured_is_a_no_op(ctx):
     schema = load(ctx, {})
     draws = []
 
-    @given(case=schema["Query"]["bookByTitle"].as_strategy())
-    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["Query"]["bookByTitle"].as_strategy(), max_examples=5, derandomize=True)
     def run(case):
         draws.extend(case._meta.dictionary_draws)
 
-    run()
     assert draws == []
 
 

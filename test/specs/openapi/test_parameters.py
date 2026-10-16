@@ -14,7 +14,7 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
-from test.utils import as_param
+from test.utils import as_param, run_given
 
 
 @pytest.mark.parametrize("schema_name", ["simple_swagger.yaml", "simple_openapi.yaml"])
@@ -81,12 +81,9 @@ def test_cookie_names_are_case_sensitive(ctx):
         }
     )
 
-    @given(case=schema["/x"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/x"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         assert case.cookies == {"sid": "lower", "SID": "upper"}
-
-    test()
 
 
 def test_body(testdir):
@@ -568,8 +565,7 @@ def test_null_body(ctx):
     )
     schema.config.update(base_url=api.base_url)
 
-    @given(case=schema["/api/payload"]["POST"].as_strategy())
-    @settings(max_examples=5, deadline=None)
+    @run_given(case=schema["/api/payload"]["POST"].as_strategy(), max_examples=5)
     def test(case):
         assume(case.body is None)
         # Then it should be possible to send `null`
@@ -577,23 +573,18 @@ def test_null_body(ctx):
         # And the application should return what was sent (`/api/payload` behaves this way)
         assert response.content.strip() == b"null"
 
-    test()
-
 
 def test_read_only(ctx):
     # When API operation has `readOnly` properties
     api = ctx.openapi.apps.read_only()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=schema["/api/read_only"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=schema["/api/read_only"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         # Then `writeOnly` should not affect the response schema
         response = case.call_and_validate()
         assert "write" not in response.json()
         assert "read" in response.json()
-
-    test()
 
 
 def test_write_only(ctx):
@@ -601,8 +592,7 @@ def test_write_only(ctx):
     api = ctx.openapi.apps.write_only()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=schema["/api/write_only"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/api/write_only"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         # Then `writeOnly` should be used only in requests
         assert "write" in case.body
@@ -611,8 +601,6 @@ def test_write_only(ctx):
         response = case.call_and_validate()
         assert "write" not in response.json()
         assert "read" in response.json()
-
-    test()
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
@@ -694,12 +682,9 @@ def test_ascii_codec_for_headers(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.generation.codec = "ascii"
 
-    @given(case=schema["/api/headers"]["GET"].as_strategy())
-    @settings(max_examples=50)
+    @run_given(case=schema["/api/headers"]["GET"].as_strategy(), max_examples=50)
     def test(case):
         assert case.headers["X-Token"].isascii()
-
-    test()
 
 
 def test_exclude_chars_and_no_x00_for_headers(ctx):
@@ -708,13 +693,10 @@ def test_exclude_chars_and_no_x00_for_headers(ctx):
     schema.config.generation.exclude_header_characters = "abc"
     schema.config.generation.allow_x00 = False
 
-    @given(case=schema["/api/headers"]["GET"].as_strategy())
-    @settings(max_examples=50)
+    @run_given(case=schema["/api/headers"]["GET"].as_strategy(), max_examples=50)
     def test(case):
         assert "\x00" not in case.headers["X-Token"]
         assert all(ch not in case.headers["X-Token"] for ch in schema.config.generation.exclude_header_characters)
-
-    test()
 
 
 def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
@@ -748,21 +730,15 @@ def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
     assert operation.headers[0].optimized_schema == {"type": "string"}
     assert operation.query[0].optimized_schema is True
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5)
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test_positive(case):
         assert "h" in case.headers
         assert isinstance(case.headers["h"], str)
         assert "q" in case.query
 
-    test_positive()
-
-    @given(case=operation.as_strategy(GenerationMode.NEGATIVE))
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(GenerationMode.NEGATIVE), max_examples=1)
     def test_negative(case):
         pass
-
-    test_negative()
 
     schema_path = ctx.openapi.write_schema(paths, version="3.1.0")
     api = ctx.openapi.apps.success()
@@ -818,12 +794,9 @@ def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
     # Then the optimized schema should handle boolean true correctly
     assert operation.body[0].optimized_schema is True
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5)
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test_positive(case):
         assert case.body is not NOT_SET
-
-    test_positive()
 
     @given(case=operation.as_strategy(GenerationMode.NEGATIVE))
     @settings(max_examples=1, suppress_health_check=list(HealthCheck))
@@ -944,12 +917,9 @@ def test_non_string_parameter_name(ctx):
         }
     )
 
-    @given(case=schema["/foo"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/foo"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         assert set(case.query) == {"true"}
-
-    test()
 
 
 @pytest.mark.parametrize("location", ["query", "body"])
@@ -970,13 +940,10 @@ def test_non_string_property_name(ctx, location, mode):
         }
     schema = ctx.openapi.load_schema({"/foo": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}})
 
-    @given(case=schema["/foo"]["POST"].as_strategy(generation_mode=mode))
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/foo"]["POST"].as_strategy(generation_mode=mode), max_examples=1)
     def test(case):
         if mode == GenerationMode.POSITIVE:
             assert (case.query if location == "query" else case.body) == {"true": "ALPHA", "200": "BETA"}
-
-    test()
 
 
 def test_yaml_file_with_non_string_property_name():
@@ -1003,12 +970,9 @@ paths:
 """
     )
 
-    @given(case=schema["/foo"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/foo"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=1)
     def test(case):
         assert case.body == {"on": "ALPHA", "200": "BETA"}
-
-    test()
 
 
 def test_non_string_path_parameter_name_recovered_from_template(ctx):
@@ -1026,13 +990,10 @@ def test_non_string_path_parameter_name_recovered_from_template(ctx):
         }
     )
 
-    @given(case=schema["/foo/{on}"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/foo/{on}"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         assert case.path_parameters == {"on": "ALPHA"}
         assert case.formatted_path == "/foo/ALPHA"
-
-    test()
 
 
 def test_non_string_path_parameter_name_kept_when_placeholders_are_ambiguous(ctx):
@@ -1078,12 +1039,9 @@ def test_operation_parameter_overrides_path_item_parameter(ctx, version, path_it
     operation = schema["/foo"]["GET"]
     assert [parameter.definition for parameter in operation.query] == [operation_parameter]
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test(case):
         assert case.query == {"Action": "CancelJob"}
-
-    test()
 
 
 # Overriding replaces the whole declaration, so a path item's required parameter turns optional.

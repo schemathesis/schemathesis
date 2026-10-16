@@ -8,7 +8,7 @@ import flask
 import pytest
 import requests
 from fastapi import FastAPI
-from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import Phase, given, settings
 from hypothesis import strategies as st
 from hypothesis.vendor.pretty import pretty
 
@@ -25,6 +25,7 @@ from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
 from test.apps.catalog.graphql.bookstore import books
+from test.utils import run_given
 
 
 @pytest.fixture
@@ -293,24 +294,20 @@ def test_call_and_validate(ctx, kwargs):
     api = ctx.openapi.apps.success()
     api_schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=api_schema["/api/success"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=api_schema["/api/success"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         case.call_and_validate(**kwargs)
-
-    test()
 
 
 def test_call_and_validate_negative_case_with_body_override(ctx):
     api = ctx.openapi.apps.payload()
     api_schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=api_schema["/api/payload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(
+        case=api_schema["/api/payload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=5
+    )
     def test(case):
         case.call_and_validate(json={"name": "John"})
-
-    test()
 
 
 def test_metadata_has_only_relevant_components(ctx):
@@ -319,17 +316,15 @@ def test_metadata_has_only_relevant_components(ctx):
 
     operation = api_schema["/api/custom_format"]["GET"]
 
-    @given(
+    @run_given(
         case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
-        | operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
+        | operation.as_strategy(generation_mode=GenerationMode.NEGATIVE),
+        max_examples=10,
     )
-    @settings(max_examples=10, deadline=None)
     def test(case):
         # Metadata should only contain components relevant to the API operation
         assert len(case.meta.components) == 1
         assert ParameterLocation.QUERY in case.meta.components
-
-    test()
 
 
 def test_call_and_validate_for_asgi():
@@ -341,13 +336,10 @@ def test_call_and_validate_for_asgi():
 
     api_schema = schemathesis.openapi.from_dict(app.openapi())
 
-    @given(case=api_schema["/users"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=api_schema["/users"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         with pytest.raises(IncorrectUsage, match="If you use the ASGI integration"):
             case.call_and_validate()
-
-    test()
 
 
 def test_asgi_call_with_and_without_explicit_base_url():
@@ -527,13 +519,10 @@ def test_generation_mode_is_available(ctx, mode):
         }
     )
 
-    @given(case=schema["/data"]["POST"].as_strategy(generation_mode=mode))
-    @settings(max_examples=1)
+    @run_given(case=schema["/data"]["POST"].as_strategy(generation_mode=mode), max_examples=1)
     def test(case):
         # Then its generator mode should be available
         assert case.meta.generation.mode == mode
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -560,13 +549,10 @@ def test_disabled_security_parameters_are_not_serialized_into_query(ctx):
     )
     schema.config.generation.update(with_security_parameters=False)
 
-    @given(case=schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=5)
+    @run_given(case=schema["/data"]["GET"].as_strategy(), max_examples=5)
     def test(case):
         assert list(case.query) == ["ids"]
         assert case.query["ids"].count(",") >= 1
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -595,12 +581,9 @@ def test_negative_multipart_keeps_registered_media_type_for_text_property(ctx):
         }
     )
 
-    @given(case=schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=5, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=5)
     def test(case):
         assert case.body["file"] == b"\x89PNG"
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -617,16 +600,13 @@ def test_case_insensitive_headers(ctx):
     )
     # When headers are generated
 
-    @given(case=schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/data"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         assert "X-id" in case.headers
         # Then they are case-insensitive
         case.headers["x-ID"] = "foo"
         assert len(case.headers) == 1
         assert case.headers["X-id"] == "foo"
-
-    test()
 
 
 def test_iter_parameters(ctx):
