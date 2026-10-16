@@ -226,23 +226,20 @@ def test_ref_with_sibling_anyof_against_anyof_target(ctx):
             }
         }
     }
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": body}},
             },
+            "responses": {"200": {"description": "OK"}},
         },
         components=components,
     )
     validator = jsonschema_rs.validator_for({**body, "components": components})
 
-    @given(schema["/data"]["POST"].as_strategy())
+    @given(operation.as_strategy())
     @settings(max_examples=1, deadline=None, database=InMemoryExampleDatabase())
     def test(case):
         validator.validate(case.body)
@@ -252,21 +249,18 @@ def test_ref_with_sibling_anyof_against_anyof_target(ctx):
 
 def test_draft4_typed_integer_enum_stays_in_enum(ctx):
     # OpenAPI 3.0 is Draft 4, where an integer enum canonicalizes to a typed group; body must stay in the enum.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": "integer", "enum": [1, 2]}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "integer", "enum": [1, 2]}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @given(schema["/data"]["POST"].as_strategy())
+    @given(operation.as_strategy())
     @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
     def test(case):
         assert case.body in (1, 2), case.body
@@ -276,21 +270,18 @@ def test_draft4_typed_integer_enum_stays_in_enum(ctx):
 
 def test_empty_enum_body_is_omitted(ctx):
     # An empty enum canonicalizes to `false`; an optional body carrying it generates no value.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": False,
-                        "content": {"application/json": {"schema": {"enum": []}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": False,
+                "content": {"application/json": {"schema": {"enum": []}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @given(schema["/data"]["POST"].as_strategy())
+    @given(operation.as_strategy())
     @settings(max_examples=5, deadline=None, database=InMemoryExampleDatabase())
     def test(case):
         assert case.body is NOT_SET
@@ -300,22 +291,19 @@ def test_empty_enum_body_is_omitted(ctx):
 
 def test_multitype_null_boolean_body(ctx):
     # A 3.1 `type: [null, boolean]` body lifts to a multi-type union; values stay null or boolean.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": ["null", "boolean"]}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": ["null", "boolean"]}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @given(schema["/data"]["POST"].as_strategy())
+    @given(operation.as_strategy())
     @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
     def test(case):
         assert case.body is None or isinstance(case.body, bool), case.body
@@ -395,22 +383,19 @@ def test_string_body_without_codec_has_no_lone_surrogates(ctx, body_schema):
 
 def test_anyof_disjoint_branches_body(ctx):
     # A 3.1 `anyOf` of branches that don't merge into one type lifts to a union; values stay in one branch.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @given(schema["/data"]["POST"].as_strategy())
+    @given(operation.as_strategy())
     @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
     def test(case):
         assert case.body is None or isinstance(case.body, int), case.body
@@ -1197,27 +1182,24 @@ def test_large_minimum_array_size(ctx, cli, snapshot_cli, min_items):
     ids=["implicit", "explicit"],
 )
 def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_values):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /pets",
         {
-            "/pets": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "oneOf": [
-                                        {"$ref": "#/components/schemas/Cat"},
-                                        {"$ref": "#/components/schemas/Dog"},
-                                    ],
-                                    "discriminator": discriminator,
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "oneOf": [
+                                {"$ref": "#/components/schemas/Cat"},
+                                {"$ref": "#/components/schemas/Dog"},
+                            ],
+                            "discriminator": discriminator,
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -1227,7 +1209,7 @@ def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_v
         },
     )
 
-    @given(case=schema["/pets"]["POST"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(max_examples=10, database=None, phases=[Phase.generate])
     def inner(case):
         assert case.body["petType"] in valid_values
@@ -1237,9 +1219,9 @@ def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_v
 
 def test_hypothesis_observability_serialization(ctx):
     # Hypothesis observability serializes all dataclass fields on generated values
-    schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    operation = ctx.openapi.load_operation("GET /test", {"responses": {"200": {"description": "OK"}}})
 
-    @given(case=schema["/test"]["GET"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(max_examples=1, database=None, phases=[Phase.generate])
     def test(case):
         pass
@@ -1291,30 +1273,27 @@ def test_apply_exclusions_reachable_via_auth_supplied_required_header():
 def test_positive_integers_stay_within_format_range(ctx, format, minimum, maximum):
     # `format` alone declares the range; without it generation draws arbitrary-precision ints
     # that a fixed-width-int server rejects, turning a positive case into a false failure.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /x",
         {
-            "/x": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"value": {"type": "integer", "format": format}},
-                                    "required": ["value"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"value": {"type": "integer", "format": format}},
+                            "required": ["value"],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @given(schema["/x"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
     @settings(max_examples=250, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
@@ -1324,21 +1303,18 @@ def test_positive_integers_stay_within_format_range(ctx, format, minimum, maximu
 
 
 def test_integer_multiple_of_body(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": "integer", "multipleOf": 3, "minimum": 1}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "integer", "multipleOf": 3, "minimum": 1}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
+    @run_given(operation.as_strategy(), max_examples=10)
     def test(case):
         assert case.body >= 1 and case.body % 3 == 0, case.body
 
@@ -1357,22 +1333,19 @@ def test_integer_multiple_of_body(ctx):
 )
 def test_format_constrained_string_body(ctx, version, body_schema, extract):
     # Draft 2020-12 reads `format` as an annotation, which must not turn `uuid` into arbitrary text.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body_schema}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": body_schema}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
 
-    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
+    @run_given(operation.as_strategy(), max_examples=10)
     def test(case):
         uuid.UUID(extract(case.body))
 
@@ -3212,27 +3185,24 @@ def test_canonical_integer_grid_without_a_multiple_in_range():
     ids=["number", "number-branch", "number-bound-off-the-float-grid"],
 )
 def test_canonical_number_generation_respects_original_schema(ctx, body_schema):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": body_schema,
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": body_schema,
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
     is_valid = jsonschema_rs.Draft202012Validator(body_schema).is_valid
 
-    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
+    @run_given(operation.as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body)
 
@@ -3240,47 +3210,41 @@ def test_canonical_number_generation_respects_original_schema(ctx, body_schema):
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
 def test_positive_generation_respects_not_with_unicode_property_pattern(ctx, version):
     body_schema = {"type": "string", "not": {"pattern": "[\\p{L}]"}}
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body_schema}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": body_schema}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
     is_valid = jsonschema_rs.validator_for(body_schema).is_valid
 
-    @run_given(schema["/data"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
 
 
 def test_cookie_value_barred_from_every_printable_character_is_empty(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "session",
-                            "in": "cookie",
-                            "required": True,
-                            "schema": {"type": "string", "not": {"pattern": "[ -~]"}},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "session",
+                    "in": "cookie",
+                    "required": True,
+                    "schema": {"type": "string", "not": {"pattern": "[ -~]"}},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert case.cookies == {"session": ""}
 
@@ -3759,20 +3723,17 @@ def test_canonical_object_property_formats(ctx, version):
         "properties": {"id": {"type": "string", "format": "uuid"}, "seen": {"type": "string", "format": "date-time"}},
         "required": ["id", "seen"],
     }
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
     is_valid = jsonschema_rs.Draft202012Validator(body_schema, validate_formats=True).is_valid
 
-    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
+    @run_given(operation.as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
 
@@ -3780,26 +3741,23 @@ def test_canonical_object_property_formats(ctx, version):
 def test_canonical_contains_demand_behind_a_branch_pointer(ctx):
     # A demand one branch reaches through a pointer still has to draw from what the pointer names.
     big = {"type": "integer", "minimum": 5}
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {"type": ["integer", "string"]},
-                                    "contains": {"anyOf": [{"$ref": "#/components/schemas/Big"}, {"type": "string"}]},
-                                    "minItems": 1,
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"type": ["integer", "string"]},
+                            "contains": {"anyOf": [{"$ref": "#/components/schemas/Big"}, {"type": "string"}]},
+                            "minItems": 1,
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
         components={"schemas": {"Big": big}},
@@ -3813,7 +3771,7 @@ def test_canonical_contains_demand_behind_a_branch_pointer(ctx):
         }
     ).is_valid
 
-    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
+    @run_given(operation.as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
 

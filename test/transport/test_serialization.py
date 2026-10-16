@@ -123,21 +123,18 @@ def test_serialize_yaml(open_api_3_schema_with_yaml_payload, transport):
 def test_serialize_any(ctx):
     # See GH-1526
     # When API expects `*/*`
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /any",
         {
-            "/any": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"*/*": {"schema": {"type": "array"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "required": True,
+                "content": {"*/*": {"schema": {"type": "array"}}},
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/any"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         # Then Schemathesis should generate valid data of any supported type
         assert case.as_transport_kwargs()["headers"]["Content-Type"] in REQUESTS_TRANSPORT._serializers
@@ -223,21 +220,18 @@ def test_media_range_matches_only_its_own_main_type(media_range, expected):
 
 @pytest.mark.parametrize("media_type", ["text/html", "text/csv", "text/markdown", "text/powershell"])
 def test_unknown_text_subtype_sent_as_plain_text(ctx, media_type):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {media_type: {"schema": {"type": "string", "enum": ["hello"]}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "required": True,
+                "content": {media_type: {"schema": {"type": "string", "enum": ["hello"]}}},
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/data"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         kwargs = case.as_transport_kwargs()
         assert (kwargs["headers"]["Content-Type"], kwargs["data"]) == (media_type, b"hello")
@@ -275,25 +269,22 @@ def test_multipart_content_type_left_to_requests(ctx):
 
 
 def test_serialization_not_possible_manual(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "integer"},
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "integer"},
+                    }
                 },
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         case.media_type = "application/whatever"
         with pytest.raises(
@@ -1666,19 +1657,16 @@ def test_text_plain_body_spelled_as_json(ctx, app_runner, transport, body, expec
 
 def test_serialize_xml_with_boolean_schema(ctx):
     # Open API 3.1 lets a body be written as `true`, which carries no XML metadata.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/xml": {"schema": True}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/xml": {"schema": True}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @run_given(case=schema["/data"]["POST"].as_strategy(), max_examples=3)
+    @run_given(case=operation.as_strategy(), max_examples=3)
     def test(case):
         assert "data" in REQUESTS_TRANSPORT.serialize_case(case)
 
@@ -1812,22 +1800,19 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
 )
 def test_serialize_xml_unbound_prefix(ctx, schema_object):
     # When the schema contains an unbound prefix
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={"schemas": {"Main": schema_object}},
     )
 
-    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         # Then it should be an error during serialization
         with pytest.raises(SerializationError, match="Unbound prefix: `smp`"):
@@ -1927,42 +1912,36 @@ def test_serialize_xml_hypothesis(ctx, data, schema_object, media_type):
 
 def test_serialize_xml_top_level_string(ctx):
     # A bare string on the wire is not a well-formed XML document, so it cannot be mapped back to the schema.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "content": {"application/xml": {"schema": {"type": "string", "enum": ["hello"]}}},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "content": {"application/xml": {"schema": {"type": "string", "enum": ["hello"]}}},
+                "required": True,
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
             assert transport.serialize_case(case)["data"] == b"<data>hello</data>"
 
 
 def test_xml_with_binary(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "content": {"application/xml": {"schema": {"type": "string", "format": "file"}}},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "content": {"application/xml": {"schema": {"type": "string", "format": "file"}}},
+                "required": True,
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert isinstance(case.as_transport_kwargs()["data"], str)
 
@@ -2218,23 +2197,20 @@ def test_serializer_alias_multiple_targets(ctx):
     schemathesis.serializer.alias(["application/x-custom-yaml", "text/vnd.yaml.custom"], "application/yaml")
 
     try:
-        schema = ctx.openapi.load_schema(
+        operation = ctx.openapi.load_operation(
+            "POST /test",
             {
-                "/test": {
-                    "post": {
-                        "requestBody": {
-                            "content": {
-                                "application/x-custom-yaml": {"schema": {"type": "object"}},
-                            }
-                        },
-                        "responses": {"200": {"description": "OK"}},
+                "requestBody": {
+                    "content": {
+                        "application/x-custom-yaml": {"schema": {"type": "object"}},
                     }
-                }
-            }
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
         )
 
         for media_type in ["application/x-custom-yaml", "text/vnd.yaml.custom"]:
-            case = schema["/test"]["POST"].Case(body={"id": 42}, media_type=media_type)
+            case = operation.Case(body={"id": 42}, media_type=media_type)
             for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
                 data = transport.serialize_case(case)["data"]
                 data_str = data.decode() if isinstance(data, bytes) else data

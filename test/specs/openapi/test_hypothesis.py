@@ -125,52 +125,46 @@ def test_missed_ref(ctx, deeply_nested_schema):
 def test_required_array_parameter_is_non_empty(ctx, location):
     # An empty array for a required parameter serializes to nothing, dropping the parameter
     # from the wire and violating `required: true`.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [
-                        {
-                            "in": location,
-                            "name": "ids",
-                            "required": True,
-                            "schema": {"type": "array", "items": {"type": "integer"}},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "in": location,
+                    "name": "ids",
+                    "required": True,
+                    "schema": {"type": "array", "items": {"type": "integer"}},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
     container = {"query": "query", "header": "headers"}[location]
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=15)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=15)
     def test(case):
         assert getattr(case, container).get("ids"), "Required array parameter generated as empty or absent"
 
 
 def test_allow_empty_value_false_excludes_empty_string(ctx):
     # `allowEmptyValue: false` forbids sending `?name=`, so an empty string is not a positive value.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "name",
-                            "required": True,
-                            "allowEmptyValue": False,
-                            "schema": {"type": "string"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "in": "query",
+                    "name": "name",
+                    "required": True,
+                    "allowEmptyValue": False,
+                    "schema": {"type": "string"},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=25)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=25)
     def test(case):
         assert case.query["name"] != "", "Empty value generated for `allowEmptyValue: false`"
 
@@ -182,57 +176,48 @@ def test_allow_empty_value_false_excludes_empty_string(ctx):
 )
 def test_optional_null_query_parameter_is_omitted(ctx, parameter_schema):
     # No mainstream framework reads `?limit=null` as a JSON null; absence is how a query string says "no value".
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [{"in": "query", "name": "limit", "required": False, "schema": parameter_schema}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"in": "query", "name": "limit", "required": False, "schema": parameter_schema}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert case.query.get("limit") != "null"
 
 
 def test_required_null_query_parameter_is_sent(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [{"in": "query", "name": "limit", "required": True, "schema": {"type": "null"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"in": "query", "name": "limit", "required": True, "schema": {"type": "null"}}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def test(case):
         assert case.query == {"limit": "null"}
 
 
 def test_optional_false_query_parameter_is_sent(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [{"in": "query", "name": "flag", "required": False, "schema": {"enum": [False]}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"in": "query", "name": "flag", "required": False, "schema": {"enum": [False]}}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
     seen = []
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         if case.query not in seen:
             seen.append(case.query)
@@ -241,28 +226,25 @@ def test_optional_false_query_parameter_is_sent(ctx):
 
 
 def test_null_inside_query_array_is_sent(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "ids",
-                            "required": False,
-                            "schema": {"type": "array", "items": {"type": "null"}, "minItems": 1, "maxItems": 1},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "in": "query",
+                    "name": "ids",
+                    "required": False,
+                    "schema": {"type": "array", "items": {"type": "null"}, "minItems": 1, "maxItems": 1},
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
     seen = []
 
-    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         if case.query not in seen:
             seen.append(case.query)
@@ -271,19 +253,16 @@ def test_null_inside_query_array_is_sent(ctx):
 
 
 def test_null_path_parameter_is_sent(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data/{key}",
         {
-            "/data/{key}": {
-                "get": {
-                    "parameters": [{"in": "path", "name": "key", "required": True, "schema": {"type": "null"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"in": "path", "name": "key", "required": True, "schema": {"type": "null"}}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @run_given(schema["/data/{key}"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
     def test(case):
         assert case.path_parameters == {"key": "null"}
 
@@ -381,21 +360,18 @@ def test_contains_over_recursive_reference_keeps_items_valid(ctx):
         "items": {"not": {"type": "null"}},
     }
     components = {"schemas": {"L": {"type": "array", "items": {"$ref": "#/components/schemas/L"}}}}
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /tags",
         {
-            "/tags": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": body}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": body}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
         components=components,
     )
     validator = jsonschema_rs.validator_for({**body, "components": components})
 
-    @run_given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert validator.is_valid(case.body), case.body
 
@@ -781,19 +757,16 @@ def make_header_param(**kwargs):
 @pytest.mark.parametrize("subschema", [True, False], ids=["true", "false"])
 def test_boolean_header_schema(ctx, subschema):
     # Open API 3.1 lets a parameter be written as a boolean, which claims every value or none.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [{"name": "key", "in": "header", "schema": subschema}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"name": "key", "in": "header", "schema": subschema}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    @run_given(schema["/data"]["GET"].as_strategy(), max_examples=5)
+    @run_given(operation.as_strategy(), max_examples=5)
     def test(case):
         assert is_valid_header(case.headers)
 
@@ -802,31 +775,28 @@ def test_missing_header_filter(ctx):
     # Regression. See GH-1142
     # When some header parameters have the `format` keyword
     # And some don't
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "key1",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                        },
-                        {
-                            "name": "key2",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": "key1",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string", "format": "uuid"},
+                },
+                {
+                    "name": "key2",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string"},
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @given(schema["/data"]["GET"].as_strategy())
+    @given(operation.as_strategy())
     def test(case):
         assert is_valid_header(case.headers)
 
@@ -908,26 +878,23 @@ def test_declared_content_type_header_matches_the_sent_body(ctx, app_runner, con
     ids=["media-type-excluded", "one-media-type-admitted"],
 )
 def test_declared_content_type_header_keeps_values_its_schema_admits(ctx, header_schema, expected):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "parameters": [{"in": "header", "name": "Content-Type", "required": True, "schema": header_schema}],
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {"schema": {"type": "object"}},
-                            "text/plain": {"schema": {"type": "string"}},
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"in": "header", "name": "Content-Type", "required": True, "schema": header_schema}],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {"schema": {"type": "object"}},
+                    "text/plain": {"schema": {"type": "string"}},
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
     seen = set()
 
-    @run_given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         if case.media_type == "text/plain" or "application/xml" in expected:
             seen.add(case.headers["Content-Type"])
@@ -938,40 +905,37 @@ def test_declared_content_type_header_keeps_values_its_schema_admits(ctx, header
 def test_filter_urlencoded(ctx):
     # When API schema allows for inputs that can't be serialized to `application/x-www-form-urlencoded`
     # Then such examples should be filtered out during generation
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/x-www-form-urlencoded": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "properties": {
-                                            "value": {
-                                                "enum": ["A"],
-                                            },
-                                            "key": {
-                                                "enum": ["B"],
-                                            },
-                                        },
-                                        "required": ["key", "value"],
-                                        # Additional properties are allowed
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/x-www-form-urlencoded": {
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "properties": {
+                                    "value": {
+                                        "enum": ["A"],
                                     },
-                                    "maxItems": 3,
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+                                    "key": {
+                                        "enum": ["B"],
+                                    },
+                                },
+                                "required": ["key", "value"],
+                                # Additional properties are allowed
+                            },
+                            "maxItems": 3,
+                        }
+                    }
                 },
-            }
-        }
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @given(schema["/test"]["POST"].as_strategy())
+    @given(operation.as_strategy())
     @settings(phases=[Phase.generate], max_examples=15, deadline=None)
     def test(case):
         assert_requests_call(case)

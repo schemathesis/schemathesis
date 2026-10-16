@@ -505,21 +505,18 @@ def test_method_lookup_on_path_without_operations(ctx):
 @pytest.mark.hypothesis_nested
 def test_generation_mode_is_available(ctx, mode):
     # When a new case is generated
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"text/plain": {"schema": {"type": "string"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "required": True,
+                "content": {"text/plain": {"schema": {"type": "string"}}},
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/data"]["POST"].as_strategy(generation_mode=mode), max_examples=1)
+    @run_given(case=operation.as_strategy(generation_mode=mode), max_examples=1)
     def test(case):
         # Then its generator mode should be available
         assert case.meta.generation.mode == mode
@@ -558,49 +555,43 @@ def test_disabled_security_parameters_are_not_serialized_into_query(ctx):
 @pytest.mark.hypothesis_nested
 def test_negative_multipart_keeps_registered_media_type_for_text_property(ctx):
     schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"file": {"type": "string"}, "size": {"type": "integer"}},
-                                    "required": ["file", "size"],
-                                },
-                                "encoding": {"file": {"contentType": "image/png"}},
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"file": {"type": "string"}, "size": {"type": "integer"}},
+                            "required": ["file", "size"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                        "encoding": {"file": {"contentType": "image/png"}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=5)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=5)
     def test(case):
         assert case.body["file"] == b"\x89PNG"
 
 
 @pytest.mark.hypothesis_nested
 def test_case_insensitive_headers(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "parameters": [{"name": "X-id", "in": "header", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                },
-            },
-        }
+            "parameters": [{"name": "X-id", "in": "header", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
     # When headers are generated
 
-    @run_given(case=schema["/data"]["POST"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert "X-id" in case.headers
         # Then they are case-insensitive

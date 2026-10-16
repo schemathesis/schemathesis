@@ -290,20 +290,17 @@ def test_length_narrowed_domain_carries_a_dot(name):
 )
 def test_binary_format_respects_length_keywords(ctx, media_type, keywords, low, high):
     # An empty body for `minLength: 1` reads as a missing body to servers.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {media_type: {"schema": {"type": "string", "format": "binary", **keywords}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {media_type: {"schema": {"type": "string", "format": "binary", **keywords}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert low <= len(case.body.data) <= high, case.body
