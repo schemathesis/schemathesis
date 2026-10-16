@@ -63,14 +63,16 @@ def after_call(context, case, response):
 
 
 @pytest.fixture
-def restore_default_profile():
+def restore_hypothesis_profile():
+    # Hooks in these tests register and load their own profiles; later tests must keep the suite's one.
+    active = settings.get_current_profile_name()
     original = settings.get_profile("default")
     yield
     settings.register_profile("default", original)
-    settings.load_profile("default")
+    settings.load_profile(active)
 
 
-@pytest.mark.usefixtures("restore_default_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_deadline_from_hooks_is_reported(ctx, cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
@@ -90,7 +92,7 @@ def before_call(context, case, kwargs):
     assert "exceeds the deadline of 50.00ms" in result.stdout
 
 
-@pytest.mark.usefixtures("restore_default_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_stateful_run_with_default_profile_settings(ctx, cli):
     api = ctx.openapi.apps.stateful_users()
     module = ctx.write_pymodule(
