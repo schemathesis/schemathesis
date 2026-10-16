@@ -10,7 +10,6 @@ from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
 from schemathesis.core.jsonschema import _validator_failure_cache, validator_cache
 from schemathesis.core.jsonschema.resolver import _load_remote_uri
-from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION
 from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
 from schemathesis.specs.openapi import media_types
@@ -20,6 +19,8 @@ from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
+TRANSPORTS = (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT)
+
 
 @pytest.fixture(autouse=True)
 def reset_hooks():
@@ -27,20 +28,21 @@ def reset_hooks():
     builtin_deserializers = dict(deserialization._DESERIALIZERS)
     builtin_string_formats = set(STRING_FORMATS.keys())
     builtin_groups = set(GROUPS.keys())
+    # Registering a media type overwrites a transport's serializer for it, built-in ones included.
+    builtin_serializers = [(transport, dict(transport._serializers)) for transport in TRANSPORTS]
 
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
     auths.unregister()
-    for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
-        transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
     media_types.unregister_all()
     yield
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
     auths.unregister()
-    for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
-        transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
     media_types.unregister_all()
+    for transport, serializers in builtin_serializers:
+        transport._serializers.clear()
+        transport._serializers.update(serializers)
     # Restore built-in deserializers
     deserialization._DESERIALIZERS.clear()
     deserialization._DESERIALIZERS.update(builtin_deserializers)
