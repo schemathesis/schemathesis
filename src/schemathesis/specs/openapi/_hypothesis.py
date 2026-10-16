@@ -1145,8 +1145,15 @@ def jsonify_query_parameters(value: dict[str, Any], optional: frozenset[str]) ->
     }
 
 
+def _custom_formats_cache_key(
+    generation_config: GenerationConfig, mode: GenerationMode
+) -> tuple[str | None, bool, str | None, GenerationMode]:
+    # Keyed by the settings the strategies depend on, so an updated or different config never reuses another's entry.
+    return (generation_config.exclude_header_characters, generation_config.allow_x00, generation_config.codec, mode)
+
+
 def _build_custom_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:
-    cache_key = (id(generation_config), mode)
+    cache_key = _custom_formats_cache_key(generation_config, mode)
     cached = custom_formats_cache.get(cache_key)
     if cached is not MISSING:
         return cached
@@ -1359,7 +1366,7 @@ def _build_header_formats(generation_config: GenerationConfig, mode: GenerationM
     Leaving the plain header-value generator in would hand every plain string an opaque strategy
     that no length or pattern keyword can steer.
     """
-    cache_key = (id(generation_config), mode, "header")
+    cache_key = (*_custom_formats_cache_key(generation_config, mode), "header")
     cached = custom_formats_cache.get(cache_key)
     if cached is not MISSING:
         return cached
