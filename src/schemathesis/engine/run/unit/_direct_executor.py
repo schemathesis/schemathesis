@@ -29,6 +29,11 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.generation.drivers import CaseGenerator
 
+_NO_CASES_REASONS = {
+    PhaseName.EXAMPLES: "No examples in schema",
+    PhaseName.COVERAGE: "No coverage cases could be generated",
+}
+
 
 def _collect_within_budget(generator: CaseGenerator, ctx: EngineContext) -> list[Case]:
     """Enumerate the generator, stopping once the run has no time left to test what it produces."""
@@ -121,6 +126,7 @@ def run_driver(
 
     status, skip_reason = _settle_status(
         status,
+        phase=phase,
         any_case_ran=any_case_ran,
         any_case_errored=any_case_errored,
         budget_expired=budget_expired,
@@ -145,6 +151,7 @@ def run_driver(
 def _settle_status(
     status: Status,
     *,
+    phase: PhaseName,
     any_case_ran: bool,
     any_case_errored: bool,
     budget_expired: bool,
@@ -155,7 +162,7 @@ def _settle_status(
     if status != Status.SUCCESS:
         return status, None
     if not any_case_ran:
-        return Status.SKIP, "Time limit reached" if budget_expired else "No examples in schema"
+        return Status.SKIP, "Time limit reached" if budget_expired else _NO_CASES_REASONS[phase]
     if any_case_errored:
         return Status.ERROR, None
     if server_went_away and not recorder.has_responses():

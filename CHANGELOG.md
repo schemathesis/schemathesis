@@ -26,6 +26,7 @@
 ### :bug: Fixed
 
 - Coverage phase crash on `pattern` quantifiers too large to generate (e.g. `[a-z]{100000}`).
+- Skip reason "No examples in schema" shown for operations the coverage phase skipped.
 - `st replay` reporting "operation not found in schema" for every GraphQL failure.
 - Unsorted expected statuses in `missing_required_header` failure messages.
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
