@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Annotated
 
 import pytest
@@ -17,14 +18,15 @@ from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.run import PhaseName
 from schemathesis.python.asgi import ASGIClient
+from schemathesis.schemas import BaseSchema
 from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
-from schemathesis.transport.requests import RequestsTransport
 from test.utils import EventStream, run_given
 
 
-def run(schema_url, **config):
-    schema = schemathesis.openapi.from_url(schema_url)
+def run(schema, **config):
+    if not isinstance(schema, BaseSchema):
+        schema = schemathesis.openapi.from_url(schema)
     stream = EventStream(
         schema,
         phases=[PhaseName.FUZZING],
@@ -76,38 +78,54 @@ def test_no_failure(ctx):
     assert event.status == Status.SUCCESS
 
 
-def test_keep_tls_verification(ctx, mocker):
-    # See GH-2613
-    # `verify` and other options should not be ignored in `ignored_auth`
-    api = ctx.openapi.apps.ignored_auth()
-    send = mocker.spy(RequestsTransport, "send")
-    run(
-        api.schema_url,
-        request_timeout=5,
+def _https_api_stalling_without_auth(ctx, app_runner):
+    # Untrusted certificate: only unverified clients connect. Requests without auth stall, so only the
+    # check's unauthenticated retries are slow.
+    app, _ = ctx.openapi.make_flask_app(
+        {"/api/ignored_auth": {"get": {"security": [{"basicAuth": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+    received = []
+
+    @app.route("/api/ignored_auth")
+    def endpoint():
+        received.append("Authorization" in request.headers)
+        if "Authorization" not in request.headers:
+            time.sleep(1)
+        return jsonify({"has_auth": "Authorization" in request.headers})
+
+    port = app_runner.run_https_flask_app(app)
+    return schemathesis.openapi.from_url(f"https://127.0.0.1:{port}/openapi.json", verify=False), received
+
+
+@pytest.mark.parametrize(
+    ("request_timeout", "expected"),
+    [(5, Status.FAILURE), (0.3, Status.ERROR)],
+    ids=["retry-completes", "retry-times-out"],
+)
+def test_keep_tls_verification(ctx, app_runner, request_timeout, expected):
+    # See GH-2613: the check's unauthenticated retries keep `verify` and `timeout`.
+    schema, received = _https_api_stalling_without_auth(ctx, app_runner)
+    event = run(
+        schema,
+        max_examples=1,
+        request_timeout=request_timeout,
         tls_verify=False,
         headers={"Authorization": "Basic dGVzdDp0ZXN0"},
     )
-    for call in send.mock_calls:
-        assert call.kwargs["timeout"] == 5
-        assert not call.kwargs["verify"]
-    send.reset_mock()
+    assert event.status == expected
+    assert False in received
 
-    schema = schemathesis.openapi.from_url(api.schema_url)
 
-    operation = schema["/api/ignored_auth"]["get"]
+def test_keep_tls_verification_in_call_and_validate(ctx, app_runner):
+    schema, received = _https_api_stalling_without_auth(ctx, app_runner)
 
-    @given(operation.as_strategy())
+    @run_given(schema["/api/ignored_auth"]["GET"].as_strategy(), max_examples=1)
     def test(case):
-        try:
-            case.call_and_validate(verify=False, timeout=5)
-        except FailureGroup:
-            pass
+        with pytest.raises(requests.exceptions.ReadTimeout):
+            case.call_and_validate(verify=False, timeout=0.3, headers={"Authorization": "Basic dGVzdDp0ZXN0"})
 
-    test()
-
-    for call in send.mock_calls:
-        assert call.kwargs["timeout"] == 5
-        assert not call.kwargs["verify"]
+    assert received[:2] == [True, False]
 
 
 def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
