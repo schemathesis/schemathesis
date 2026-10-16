@@ -17,7 +17,6 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies import analyze, naming
 from schemathesis.specs.openapi.stateful.dependencies.models import infer_fk_target
-from test.utils import flaky
 
 KNOWN_INCORRECT_FIELD_MAPPINGS = {
     "merge-empty-schema-then-detailed": frozenset(
@@ -6130,7 +6129,7 @@ def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
     order_response_schema = {
         "type": "object",
@@ -6223,7 +6222,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=5, min_passes=1)
+@pytest.mark.flaky(reruns=4)
 def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
     order_response_schema = {
         "type": "object",

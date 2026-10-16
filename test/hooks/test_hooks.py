@@ -20,7 +20,7 @@ from schemathesis.hooks import (
 )
 from schemathesis.pytest.plugin import SchemaHandleMark
 from schemathesis.transport.prepare import get_default_headers
-from test.utils import assert_requests_call, flaky
+from test.utils import assert_requests_call
 
 
 def integer_id(query):
@@ -400,7 +400,7 @@ def test_local_dispatcher(ctx, apply_first):
     assert handle.hooks.get_all_by_name("map_cookies") == []
 
 
-@flaky(max_runs=3, min_passes=1)
+@pytest.mark.flaky(reruns=2)
 @pytest.mark.hypothesis_nested
 def test_multiple_hooks_per_spec(ctx):
     api = ctx.openapi.apps.custom_format()

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from test.utils import flaky
-
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
 
@@ -22,7 +20,7 @@ _POOL_DISABLED_CONFIG = {"phases": {"fuzzing": {"extra-data-sources": {"response
     ids=["use-after-create", "update-on-existing", "no-producer", "pool-disabled-via-config"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=3, min_passes=1)
+@pytest.mark.flaky(reruns=2)
 def test_planted_bug_findability(ctx, cli, snapshot_cli, filter_arg, config):
     # Positive-only: negative queries fail server validation before capture, so they never exercise the pool.
     api = ctx.graphql.apps.use_after_create()
@@ -118,7 +116,7 @@ def test_list_argument_planted_bug_findability(ctx, cli, snapshot_cli, config):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@flaky(max_runs=3, min_passes=1)
+@pytest.mark.flaky(reruns=2)
 def test_non_id_pool_planted_bug_findability(ctx, cli, snapshot_cli):
     # Fuzzing captures Project.fullPath from the projects query and reuses it in moveIssue(projectPath:),
     # reaching a resolver that only errors on a real path.
