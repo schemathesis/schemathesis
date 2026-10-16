@@ -46,6 +46,7 @@ def pytest_runtest_makereport(item, call):
 if TYPE_CHECKING:
     from schemathesis.config import SchemathesisConfig
     from schemathesis.openapi.loaders import OpenApiSchema
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
 
@@ -581,6 +582,20 @@ class OpenApiContext:
     ) -> OpenApiSchema:
         schema = self.build_schema(paths, version=version, **kwargs)
         return schemathesis.openapi.from_dict(schema, config=config)
+
+    def load_operation(
+        self,
+        label: str,
+        definition: dict[str, Any],
+        *,
+        version: str = "3.0.2",
+        config: SchemathesisConfig | None = None,
+        **kwargs: dict[str, Any],
+    ) -> APIOperation:
+        # `label` is "METHOD /path", e.g. "POST /users".
+        method, path = label.split(" ", 1)
+        schema = self.load_schema({path: {method.lower(): definition}}, version=version, config=config, **kwargs)
+        return schema[path][method]
 
     def from_full_schema(self, raw_schema: dict[str, Any]) -> OpenApiSchema:
         version = raw_schema.get("openapi") or raw_schema["swagger"]

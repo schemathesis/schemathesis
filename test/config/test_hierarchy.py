@@ -9,18 +9,15 @@ LABEL = "PUT /users/{user_id}"
 
 @pytest.fixture
 def operation(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PUT /users/{user_id}",
         {
-            "/users/{user_id}": {
-                "put": {
-                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
-                    "requestBody": {"content": {"application/json": {"schema": {}}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+            "requestBody": {"content": {"application/json": {"schema": {}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    return schema["/users/{user_id}"]["PUT"]
+    return operation
 
 
 @pytest.mark.parametrize(

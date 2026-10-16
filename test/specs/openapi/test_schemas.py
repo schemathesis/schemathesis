@@ -180,14 +180,11 @@ def test_external_file_ref_in_body_raises_invalid_schema(ctx):
 def test_non_string_parameter_location(ctx):
     # When a parameter has an invalid non-string `in` value (e.g., empty dict),
     # schema loading should skip the invalid parameter without crashing
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PUT /test",
         {
-            "/test": {
-                "put": {
-                    "parameters": [{"$ref": "#/components/parameters/idOrUUID"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"$ref": "#/components/parameters/idOrUUID"}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
         components={
@@ -196,7 +193,6 @@ def test_non_string_parameter_location(ctx):
             }
         },
     )
-    operation = schema["/test"]["PUT"]
     # Should not raise TypeError: unhashable type: 'dict'
     assert list(operation.iter_parameters()) == []
 
@@ -403,12 +399,10 @@ def test_schema_loaded_from_file_keeps_every_operation(ctx, tmp_path):
 
 def test_percent_encoded_base_path_reserved_char_survives_in_full_path(ctx):
     # Decoding a "%3F" the schema author wrote into a static `basePath` turns it into a query delimiter.
-    schema = ctx.openapi.load_schema(
-        {"/movies.csv&imdb_id={IMDBid}": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    operation = ctx.openapi.load_operation(
+        "GET /movies.csv&imdb_id={IMDBid}",
+        {"responses": {"200": {"description": "OK"}}},
         version="2.0",
         basePath="/api-v2/%3Fsource=http:/example.com/api-v2",
     )
-    assert (
-        schema["/movies.csv&imdb_id={IMDBid}"]["GET"].full_path
-        == "/api-v2/%3Fsource=http:/example.com/api-v2/movies.csv&imdb_id={IMDBid}"
-    )
+    assert operation.full_path == "/api-v2/%3Fsource=http:/example.com/api-v2/movies.csv&imdb_id={IMDBid}"

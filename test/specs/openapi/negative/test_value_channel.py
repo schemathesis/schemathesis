@@ -276,28 +276,25 @@ def test_value_channel_base_body_is_valid():
 
 def test_value_channel_keeps_earlier_bodies_intact(ctx):
     # A value-channel break must not alter enum members shared by later draws or earlier cases.
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["a"],
-                                    "properties": {"a": {"type": "string", "minLength": 2}},
-                                    "enum": [{"a": "xx"}],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["POST"]
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["a"],
+                            "properties": {"a": {"type": "string", "minLength": 2}},
+                            "enum": [{"a": "xx"}],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     drawn = []
 
     # The value channel fires on 15% of draws, so a smaller budget can miss it.

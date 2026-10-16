@@ -55,14 +55,11 @@ def test_as_strategy(swagger_20):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_reference_in_path(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /{key}",
         {
-            "/{key}": {
-                "get": {
-                    "parameters": [{"$ref": "#/components/parameters/PathParameter"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"$ref": "#/components/parameters/PathParameter"}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
         servers=[{"url": "http://localhost/api"}],
@@ -72,5 +69,5 @@ def test_reference_in_path(ctx):
             }
         },
     )
-    strategy = schema["/{key}"]["GET"].as_strategy()
+    strategy = operation.as_strategy()
     assert isinstance(strategy.example().path_parameters["key"], str)

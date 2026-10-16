@@ -845,16 +845,12 @@ def test_response_schema_conformance_custom_deserializer(openapi_30, response_fa
 
 def test_deduplication(ctx, response_factory):
     # See GH-1394
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /data",
         {
-            "/data": {
-                "get": {
-                    "responses": {"200": _oas3_response({"type": "integer"}, description="OK")},
-                },
-            },
-        }
+            "responses": {"200": _oas3_response({"type": "integer"}, description="OK")},
+        },
     )
-    operation = schema["/data"]["GET"]
     case = operation.Case()
     response = Response.from_requests(response_factory.requests(), True)
     recorder = ScenarioRecorder(label="test")

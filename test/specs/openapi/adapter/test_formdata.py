@@ -5,25 +5,21 @@ from schemathesis.specs.openapi.adapter.formdata import prepare_multipart_v3
 
 def test_content_type_for_undefined_single_property(ctx):
     # When encoding specifies contentType for a field NOT in schema properties
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {"type": "object", "properties": {}},
-                                "encoding": {"field": {"contentType": "text/plain"}},
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {"type": "object", "properties": {}},
+                        "encoding": {"field": {"contentType": "text/plain"}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
     )
-    operation = schema["/upload"]["POST"]
     form_data = {"field": "value"}
 
     files, data = prepare_multipart_v3(operation, form_data)
@@ -33,25 +29,21 @@ def test_content_type_for_undefined_single_property(ctx):
 
 def test_content_type_for_undefined_array_property(ctx):
     # When encoding specifies contentType for an array field NOT in schema properties
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {"type": "object", "properties": {}},
-                                "encoding": {"items": {"contentType": "image/jpeg"}},
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {"type": "object", "properties": {}},
+                        "encoding": {"items": {"contentType": "image/jpeg"}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.0.0",
     )
-    operation = schema["/upload"]["POST"]
     form_data = {"items": ["data1", "data2"]}
 
     files, data = prepare_multipart_v3(operation, form_data)
@@ -63,24 +55,19 @@ def test_content_type_for_undefined_array_property(ctx):
 
 
 def make_multipart_operation(ctx, property_schema, *, version):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {"type": "object", "properties": {"file": property_schema}}
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {"schema": {"type": "object", "properties": {"file": property_schema}}}
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
-    return schema["/upload"]["POST"]
+    return operation
 
 
 @pytest.mark.parametrize(

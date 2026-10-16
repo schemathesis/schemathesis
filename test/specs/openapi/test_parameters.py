@@ -408,12 +408,13 @@ def test_bearer_auth_valid_header():
 
 
 def test_positive_bearer_tokens_are_ascii(ctx):
-    schema = ctx.openapi.load_schema(
-        {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    operation = ctx.openapi.load_operation(
+        "GET /x",
+        {"responses": {"200": {"description": "OK"}}},
         components={"securitySchemes": {"bearer_auth": {"type": "http", "scheme": "bearer"}}},
         security=[{"bearer_auth": []}],
     )
-    strategy = schema["/x"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE)
+    strategy = operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
     with pytest.raises(NoSuchExample):
         find(strategy, lambda case: not case.headers["Authorization"].isascii())
 
@@ -521,14 +522,11 @@ def test_(case):
 
 def test_nullable_body_behind_a_reference(ctx):
     # When a body parameter is nullable and is behind a reference
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /payload",
         {
-            "/payload": {
-                "post": {
-                    "parameters": [{"$ref": "#/parameters/Foo"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"$ref": "#/parameters/Foo"}],
+            "responses": {"200": {"description": "OK"}},
         },
         parameters={
             "Foo": {
@@ -541,7 +539,6 @@ def test_nullable_body_behind_a_reference(ctx):
         },
     )
     # Then it should be properly collected
-    operation = schema["/payload"]["POST"]
     # And its definition is not transformed to JSON Schema
     assert operation.body[0].definition == {
         "in": "body",
@@ -778,25 +775,21 @@ def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
 
 def test_parameter_with_boolean_false_schema(ctx):
     # When a parameter has a boolean false schema (accepts nothing - unusual but valid)
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "impossible",
-                            "in": "query",
-                            "schema": False,  # Boolean false - accepts nothing
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "impossible",
+                    "in": "query",
+                    "schema": False,  # Boolean false - accepts nothing
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
     # Then it should load without crashing
-    operation = schema["/test"]["GET"]
     parameter = operation.query[0]
     # The optimized schema should be preserved or handled
     assert parameter.optimized_schema is False
@@ -859,22 +852,19 @@ def test_optimized_schema_untouched_under_draft_2020_12(ctx):
         "items": {"type": "string"},
         "allOf": [{"contains": {"const": "A"}}, {"contains": {"const": "B"}}],
     }
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /payload",
         {
-            "/payload": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": array_schema}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": array_schema}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    assert schema["/payload"]["POST"].body[0].optimized_schema == array_schema
+    assert operation.body[0].optimized_schema == array_schema
 
 
 def test_parameter_type_detection(ctx, cli, snapshot_cli):
@@ -1046,19 +1036,15 @@ def test_non_string_path_parameter_name_recovered_from_template(ctx):
 
 
 def test_non_string_path_parameter_name_kept_when_placeholders_are_ambiguous(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /foo/{on}/{off}",
         {
-            "/foo/{on}/{off}": {
-                "get": {
-                    "parameters": [
-                        {"in": "path", "name": True, "required": True, "schema": {"type": "string", "enum": ["ALPHA"]}}
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {"in": "path", "name": True, "required": True, "schema": {"type": "string", "enum": ["ALPHA"]}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/foo/{on}/{off}"]["GET"]
     assert sorted(parameter.name for parameter in operation.path_parameters) == ["off", "on", "true"]
 
 
@@ -1183,17 +1169,14 @@ def test_body_validate_rejects_violating_value(schema_with_referenced_body, valu
 
 
 def test_query_parameter_validate(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    limit = schema["/items"]["GET"].query[0]
+    limit = operation.query[0]
     assert limit.validate(5) is None
     with pytest.raises(jsonschema_rs.ValidationError):
         limit.validate(0)
@@ -1209,38 +1192,32 @@ def test_query_parameter_allow_empty_value(ctx, parameter_schema, allow_empty_va
     parameter = {"name": "filter", "in": "query", "required": True, "schema": parameter_schema}
     if allow_empty_value is not None:
         parameter["allowEmptyValue"] = allow_empty_value
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [parameter],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [parameter],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    query = schema["/items"]["GET"].query[0]
+    query = operation.query[0]
 
     assert query.is_valid("") is (allow_empty_value is True)
 
 
 def test_query_parameter_allow_empty_value_with_recursive_reference(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "filter",
-                            "in": "query",
-                            "required": True,
-                            "allowEmptyValue": True,
-                            "schema": {"$ref": "#/components/schemas/Node"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "filter",
+                    "in": "query",
+                    "required": True,
+                    "allowEmptyValue": True,
+                    "schema": {"$ref": "#/components/schemas/Node"},
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -1252,7 +1229,7 @@ def test_query_parameter_allow_empty_value_with_recursive_reference(ctx):
             }
         },
     )
-    query = schema["/items"]["GET"].query[0]
+    query = operation.query[0]
 
     assert [query.is_valid(value) for value in ("", {}, {"child": {"child": {}}}, "x")] == [True, True, True, False]
 
@@ -1263,19 +1240,15 @@ def test_swagger_parameter_allow_empty_value(ctx, location, allow_empty_value):
     parameter = {"name": "filter", "in": location, "required": True, "type": "boolean"}
     if allow_empty_value is not None:
         parameter["allowEmptyValue"] = allow_empty_value
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [parameter],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [parameter],
+            "responses": {"200": {"description": "OK"}},
         },
         version="2.0",
         consumes=["application/x-www-form-urlencoded"],
     )
-    operation = schema["/items"]["GET"]
 
     if location == "query":
         is_valid = operation.query[0].is_valid("")
@@ -1286,23 +1259,20 @@ def test_swagger_parameter_allow_empty_value(ctx, location, allow_empty_value):
 
 # An empty array serializes to nothing, so generation raises `minItems`; the contract still admits it.
 def test_validate_ignores_serialization_bounds(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "tags",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "array", "items": {"type": "string"}},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "tags",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "array", "items": {"type": "string"}},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    tags = schema["/items"]["GET"].query[0]
+    tags = operation.query[0]
     assert tags.wire_bounds == {"minItems": 1}
     assert tags.is_valid([])

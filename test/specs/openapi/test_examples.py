@@ -271,17 +271,14 @@ def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx
     # A schema too broken to compile a validator (invalid `pattern`) must keep its examples rather than
     # have float32 narrowing silently drop them.
     inner = {"type": "number", "format": "float", "exclusiveMinimum": 0, "pattern": "(", "examples": [5e-324]}
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /r",
         {
-            "/r": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": inner}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": inner}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
-    )["/r"]["POST"]
+    )
     values = [example.value for example in (*extract_top_level(operation), *extract_from_schemas(operation))]
     assert 5e-324 in values
 
@@ -289,30 +286,27 @@ def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx
 def test_examples_phase_skips_properties_it_cannot_generate(ctx):
     # Barring the whole document has no form to draw from, so that property contributes nothing.
     undrawable = {"not": {"$ref": "#"}}
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /r",
         {
-            "/r": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "a": {"type": "string", "examples": ["given"]},
-                                        "b": undrawable,
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "a": {"type": "string", "examples": ["given"]},
+                                "b": undrawable,
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
-    )["/r"]["POST"]
+    )
     assert [example.value for example in extract_from_schemas(operation)] == [{"a": "given"}]
 
 
@@ -572,21 +566,18 @@ def test_multipart_examples(ctx):
 def test_invalid_x_examples(ctx):
     # See GH-982
     # When an Open API 2.0 schema contains a non-object type in `x-examples`
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {"name": "body", "in": "body", "schema": {"type": "integer"}, "x-examples": {"foo": "value"}}
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
+            "parameters": [
+                {"name": "body", "in": "body", "schema": {"type": "integer"}, "x-examples": {"foo": "value"}}
+            ],
+            "responses": {"default": {"description": "OK"}},
         },
         version="2.0",
     )
     # Then such examples should be skipped as invalid (there should be an object)
-    assert schema["/test"]["POST"].get_strategies_from_examples() == []
+    assert operation.get_strategies_from_examples() == []
 
 
 def test_shared_examples_openapi_2(ctx):
@@ -618,14 +609,11 @@ def test_shared_examples_openapi_2(ctx):
 
 @pytest.mark.parametrize("examples", [{"example1": {"value": "value"}}, ["value"]])
 def test_examples_ref_openapi_2(ctx, examples):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [{"$ref": "#/components/parameters/Referenced"}],
-                    "responses": {"default": {"description": "OK"}},
-                },
-            }
+            "parameters": [{"$ref": "#/components/parameters/Referenced"}],
+            "responses": {"default": {"description": "OK"}},
         },
         components={
             "parameters": {
@@ -640,21 +628,18 @@ def test_examples_ref_openapi_2(ctx, examples):
         },
         version="2.0",
     )
-    strategies = schema["/test"]["POST"].get_strategies_from_examples()
+    strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
 
 
 @pytest.mark.parametrize("body", ["BodyDirect", "BodyRef"])
 def test_examples_ref_openapi_3(ctx, body):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {"$ref": f"#/components/requestBodies/{body}"},
-                    "responses": {"default": {"description": "OK"}},
-                },
-            }
+            "requestBody": {"$ref": f"#/components/requestBodies/{body}"},
+            "responses": {"default": {"description": "OK"}},
         },
         components={
             "requestBodies": {
@@ -670,7 +655,7 @@ def test_examples_ref_openapi_3(ctx, body):
             }
         },
     )
-    strategies = schema["/test"]["POST"].get_strategies_from_examples()
+    strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
 
@@ -690,27 +675,24 @@ def test_boolean_subschema(ctx):
 
 
 def test_examples_ref_missing_components(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "foo-1": {"type": "string", "example": "foo-11"},
-                                    "spam-1": {"$ref": "#/components/schemas/Referenced"},
-                                },
-                                "required": ["foo-1", "spam-1"],
-                            },
-                        }
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                },
-            }
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "foo-1": {"type": "string", "example": "foo-11"},
+                            "spam-1": {"$ref": "#/components/schemas/Referenced"},
+                        },
+                        "required": ["foo-1", "spam-1"],
+                    },
+                }
+            ],
+            "responses": {"default": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -724,65 +706,62 @@ def test_examples_ref_missing_components(ctx):
             }
         },
     )
-    strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
+    strategy = operation.get_strategies_from_examples()[0]
     example = examples.generate_one(strategy)
     assert example.query == {"foo-1": "foo-11", "spam-1[inner]": "example"}
 
 
 @pytest.mark.parametrize("key", ["anyOf", "oneOf"])
 def test_examples_in_any_of_top_level(ctx, key):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "schema": {
-                                key: [
-                                    {
-                                        "example": "foo-1-1",
-                                        "examples": ["foo-1-2"],
-                                        "type": "string",
-                                    },
-                                    {
-                                        "example": "foo-2-1",
-                                        "examples": ["foo-2-2"],
-                                        "type": "string",
-                                    },
-                                    True,
-                                ]
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "schema": {
+                        key: [
+                            {
+                                "example": "foo-1-1",
+                                "examples": ["foo-1-2"],
+                                "type": "string",
                             },
-                        }
-                    ],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    key: [
-                                        {
-                                            "example": "body-1-1",
-                                            "examples": ["body-1-2"],
-                                            "type": "string",
-                                        },
-                                        {
-                                            "example": "body-2-1",
-                                            "examples": ["body-2-2"],
-                                            "type": "string",
-                                        },
-                                        True,
-                                    ]
-                                }
+                            {
+                                "example": "foo-2-1",
+                                "examples": ["foo-2-2"],
+                                "type": "string",
                             },
+                            True,
+                        ]
+                    },
+                }
+            ],
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            key: [
+                                {
+                                    "example": "body-1-1",
+                                    "examples": ["body-1-2"],
+                                    "type": "string",
+                                },
+                                {
+                                    "example": "body-2-1",
+                                    "examples": ["body-2-2"],
+                                    "type": "string",
+                                },
+                                True,
+                            ]
                         }
                     },
-                    "responses": {"default": {"description": "OK"}},
-                },
-            }
-        }
+                }
+            },
+            "responses": {"default": {"description": "OK"}},
+        },
     )
-    extracted = [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])]
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
     # Under `oneOf` every string matches all three branches, so no body example conforms.
     body_examples = (
         []
@@ -804,58 +783,55 @@ def test_examples_in_any_of_top_level(ctx, key):
 
 
 def test_examples_in_all_of_top_level(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "schema": {
-                                "allOf": [
-                                    {
-                                        "example": "foo-1-1",
-                                        "examples": ["foo-1-2"],
-                                        "type": "string",
-                                    },
-                                    {
-                                        "example": "foo-2-1",
-                                        "examples": ["foo-2-2"],
-                                        "type": "string",
-                                    },
-                                    True,
-                                ]
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "schema": {
+                        "allOf": [
+                            {
+                                "example": "foo-1-1",
+                                "examples": ["foo-1-2"],
+                                "type": "string",
                             },
-                        }
-                    ],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "example": "body-1-1",
-                                            "examples": ["body-1-2"],
-                                            "type": "string",
-                                        },
-                                        {
-                                            "example": "body-2-1",
-                                            "examples": ["body-2-2"],
-                                            "type": "string",
-                                        },
-                                        True,
-                                    ]
-                                }
+                            {
+                                "example": "foo-2-1",
+                                "examples": ["foo-2-2"],
+                                "type": "string",
                             },
+                            True,
+                        ]
+                    },
+                }
+            ],
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "example": "body-1-1",
+                                    "examples": ["body-1-2"],
+                                    "type": "string",
+                                },
+                                {
+                                    "example": "body-2-1",
+                                    "examples": ["body-2-2"],
+                                    "type": "string",
+                                },
+                                True,
+                            ]
                         }
                     },
-                    "responses": {"default": {"description": "OK"}},
-                },
-            }
-        }
+                }
+            },
+            "responses": {"default": {"description": "OK"}},
+        },
     )
-    extracted = [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])]
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
         {"container": "query", "name": "q", "value": "foo-1-2"},
@@ -875,23 +851,20 @@ def test_examples_in_all_of_top_level(ctx):
     ids=["map", "list"],
 )
 def test_examples_container_in_parameter_subschema(ctx, container_keyword, container, expected):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "schema": {"allOf": [{"type": "string", container_keyword: container}]},
-                        }
-                    ],
-                    "responses": {"default": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "schema": {"allOf": [{"type": "string", container_keyword: container}]},
                 }
-            }
-        }
+            ],
+            "responses": {"default": {"description": "OK"}},
+        },
     )
-    assert [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])] == [
+    assert [example_to_dict(example) for example in extract_top_level(operation)] == [
         {"container": "query", "name": "q", "value": expected}
     ]
 
@@ -931,80 +904,77 @@ def test_examples_container_in_body_subschema(ctx, version, container, expected)
 
 @pytest.mark.parametrize("key", ["anyOf", "oneOf"])
 def test_examples_in_any_of_in_schemas(ctx, key):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "q-1",
-                            "in": "query",
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "foo-1": {
-                                        key: [
-                                            {
-                                                "example": "foo-1-1-1",
-                                                "examples": ["foo-1-1-2"],
-                                                "type": "string",
-                                            },
-                                            {
-                                                "example": "foo-1-2-1",
-                                                "examples": ["foo-1-2-2"],
-                                                "type": "string",
-                                            },
-                                            True,
-                                        ]
+            "parameters": [
+                {
+                    "name": "q-1",
+                    "in": "query",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "foo-1": {
+                                key: [
+                                    {
+                                        "example": "foo-1-1-1",
+                                        "examples": ["foo-1-1-2"],
+                                        "type": "string",
                                     },
-                                    "bar-1": {
-                                        key: [
-                                            {
-                                                "example": "bar-1-1-1",
-                                                "type": "string",
-                                            },
-                                            {
-                                                "example": "bar-1-2-1",
-                                                "type": "string",
-                                            },
-                                            True,
-                                        ]
+                                    {
+                                        "example": "foo-1-2-1",
+                                        "examples": ["foo-1-2-2"],
+                                        "type": "string",
                                     },
-                                    "spam-1": {"type": "string"},
-                                },
-                                "required": ["foo-1", "bar-1"],
+                                    True,
+                                ]
                             },
-                        }
-                    ],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "key": {
-                                            key: [
-                                                {
-                                                    "enum": ["json-key-1-1", "json-key-1-2"],
-                                                    "example": "json-key-1-1",
-                                                    "examples": ["json-key-1-2"],
-                                                },
-                                                {
-                                                    "enum": ["json-key-2-1", "json-key-2-2"],
-                                                    "example": "json-key-2-1",
-                                                    "examples": ["json-key-2-2"],
-                                                },
-                                            ]
-                                        }
+                            "bar-1": {
+                                key: [
+                                    {
+                                        "example": "bar-1-1-1",
+                                        "type": "string",
                                     },
+                                    {
+                                        "example": "bar-1-2-1",
+                                        "type": "string",
+                                    },
+                                    True,
+                                ]
+                            },
+                            "spam-1": {"type": "string"},
+                        },
+                        "required": ["foo-1", "bar-1"],
+                    },
+                }
+            ],
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    key: [
+                                        {
+                                            "enum": ["json-key-1-1", "json-key-1-2"],
+                                            "example": "json-key-1-1",
+                                            "examples": ["json-key-1-2"],
+                                        },
+                                        {
+                                            "enum": ["json-key-2-1", "json-key-2-2"],
+                                            "example": "json-key-2-1",
+                                            "examples": ["json-key-2-2"],
+                                        },
+                                    ]
                                 }
                             },
                         }
                     },
-                    "responses": {"default": {"description": "OK"}},
-                },
-            }
-        }
+                }
+            },
+            "responses": {"default": {"description": "OK"}},
+        },
     )
     # Every string matches all three `oneOf` branches at once, so no assembled query value conforms.
     query_examples = (
@@ -1017,7 +987,7 @@ def test_examples_in_any_of_in_schemas(ctx, key):
             {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-2-2", "spam-1": ANY}},
         ]
     )
-    assert [example_to_dict(example) for example in extract_from_schemas(schema["/test"]["POST"])] == [
+    assert [example_to_dict(example) for example in extract_from_schemas(operation)] == [
         *query_examples,
         {"media_type": "application/json", "value": {"key": "json-key-1-1"}},
         {"media_type": "application/json", "value": {"key": "json-key-1-2"}},
@@ -1029,25 +999,21 @@ def test_examples_in_any_of_in_schemas(ctx, key):
 def test_partial_examples(ctx):
     # When the API schema contains multiple parameters in the same location
     # And some of them don't have explicit examples and others do
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test/{foo}/{bar}/",
         {
-            "/test/{foo}/{bar}/": {
-                "post": {
-                    "parameters": [
-                        {"name": "foo", "in": "path", "required": True, "schema": {"type": "string", "enum": ["A"]}},
-                        {
-                            "name": "bar",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "example": "bar-example"},
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {"name": "foo", "in": "path", "required": True, "schema": {"type": "string", "enum": ["A"]}},
+                {
+                    "name": "bar",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "example": "bar-example"},
+                },
+            ],
+            "responses": {"default": {"description": "OK"}},
+        },
     )
-    operation = schema["/test/{foo}/{bar}/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then all generated examples should have those missing parts generated according to the API schema
     example = examples.generate_one(strategy)
@@ -1058,37 +1024,33 @@ def test_partial_examples(ctx):
 def test_partial_path_examples_are_escaped(ctx):
     # See GH-3533
     # When only some path parameters come from examples, example values should still be escaped.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PUT /blocks/{network}/{l3vpn}/{block}",
         {
-            "/blocks/{network}/{l3vpn}/{block}": {
-                "put": {
-                    "parameters": [
-                        {
-                            "name": "network",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["default"]},
-                        },
-                        {
-                            "name": "l3vpn",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["0"]},
-                        },
-                        {
-                            "name": "block",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "format": "ipv4-network"},
-                            "example": "192.168.1.0/24",
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": "network",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["default"]},
+                },
+                {
+                    "name": "l3vpn",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["0"]},
+                },
+                {
+                    "name": "block",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "format": "ipv4-network"},
+                    "example": "192.168.1.0/24",
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/blocks/{network}/{l3vpn}/{block}"]["PUT"]
     strategy = operation.get_strategies_from_examples()[0]
 
     example = examples.generate_one(strategy)
@@ -1162,47 +1124,43 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
     ids=["nullable", "type-null"],
 )
 def test_example_query_parameters_use_wire_form(ctx, version, nullable_integer):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "flag",
-                            "in": "query",
-                            "required": False,
-                            "schema": {"type": "boolean"},
-                            "example": True,
-                        },
-                        {
-                            "name": "limit",
-                            "in": "query",
-                            "required": False,
-                            "schema": nullable_integer,
-                            "example": None,
-                        },
-                        {
-                            "name": "offset",
-                            "in": "query",
-                            "required": True,
-                            "schema": nullable_integer,
-                            "example": None,
-                        },
-                        {
-                            "name": "ids",
-                            "in": "query",
-                            "required": False,
-                            "schema": {"type": "array", "items": nullable_integer},
-                            "example": [None, 1],
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [
+                {
+                    "name": "flag",
+                    "in": "query",
+                    "required": False,
+                    "schema": {"type": "boolean"},
+                    "example": True,
+                },
+                {
+                    "name": "limit",
+                    "in": "query",
+                    "required": False,
+                    "schema": nullable_integer,
+                    "example": None,
+                },
+                {
+                    "name": "offset",
+                    "in": "query",
+                    "required": True,
+                    "schema": nullable_integer,
+                    "example": None,
+                },
+                {
+                    "name": "ids",
+                    "in": "query",
+                    "required": False,
+                    "schema": {"type": "array", "items": nullable_integer},
+                    "example": [None, 1],
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
-    operation = schema["/test"]["GET"]
 
     assert examples.generate_one(operation.get_strategies_from_examples()[0]).query == {
         "flag": "true",
@@ -1212,56 +1170,48 @@ def test_example_query_parameters_use_wire_form(ctx, version, nullable_integer):
 
 
 def test_example_path_parameters_use_wire_form(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test/{flag}",
         {
-            "/test/{flag}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "flag",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "boolean"},
-                            "example": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "flag",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "boolean"},
+                    "example": True,
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/test/{flag}"]["GET"]
 
     assert examples.generate_one(operation.get_strategies_from_examples()[0]).path_parameters == {"flag": "true"}
 
 
 def test_example_boolean_header_and_cookie_render_like_the_fuzzing_phase(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "X-Flag",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "boolean"},
-                            "example": True,
-                        },
-                        {
-                            "name": "session",
-                            "in": "cookie",
-                            "required": True,
-                            "schema": {"type": "boolean"},
-                            "example": False,
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": "X-Flag",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "boolean"},
+                    "example": True,
+                },
+                {
+                    "name": "session",
+                    "in": "cookie",
+                    "required": True,
+                    "schema": {"type": "boolean"},
+                    "example": False,
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/test"]["GET"]
     example = examples.generate_one(operation.get_strategies_from_examples()[0])
 
     assert (dict(example.headers), example.cookies) == ({"X-Flag": "true"}, {"session": "false"})
@@ -1269,26 +1219,22 @@ def test_example_boolean_header_and_cookie_render_like_the_fuzzing_phase(ctx):
 
 def test_example_case_with_generated_query_stays_positive(ctx):
     # Rendering an example for the wire must not read back as a schema violation.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "flag",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "boolean"},
-                            "example": True,
-                        },
-                        {"name": "note", "in": "query", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": "flag",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "boolean"},
+                    "example": True,
+                },
+                {"name": "note", "in": "query", "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/test"]["GET"]
 
     assert (
         examples.generate_one(operation.get_strategies_from_examples()[0]).meta.generation.mode
@@ -1303,26 +1249,22 @@ def test_example_case_with_generated_query_stays_positive(ctx):
 )
 def test_example_case_with_generated_header_or_cookie_stays_positive(ctx, location, example_name, generated_name):
     # Headers and cookies are stringified for the wire; that rendering must not read back as a violation.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": example_name,
-                            "in": location,
-                            "required": True,
-                            "schema": {"type": "boolean"},
-                            "example": True,
-                        },
-                        {"name": generated_name, "in": location, "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {
+                    "name": example_name,
+                    "in": location,
+                    "required": True,
+                    "schema": {"type": "boolean"},
+                    "example": True,
+                },
+                {"name": generated_name, "in": location, "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/test"]["GET"]
 
     assert (
         examples.generate_one(operation.get_strategies_from_examples()[0]).meta.generation.mode
@@ -1331,33 +1273,29 @@ def test_example_case_with_generated_header_or_cookie_stays_positive(ctx, locati
 
 
 def test_example_body_keeps_json_types(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "flag": {"type": "boolean"},
-                                        "limit": {"type": ["integer", "null"]},
-                                    },
-                                    "required": ["flag", "limit"],
-                                },
-                                "example": {"flag": True, "limit": None},
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "flag": {"type": "boolean"},
+                                "limit": {"type": ["integer", "null"]},
+                            },
+                            "required": ["flag", "limit"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+                        "example": {"flag": True, "limit": None},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-    operation = schema["/test"]["POST"]
 
     assert examples.generate_one(operation.get_strategies_from_examples()[0]).body == {"flag": True, "limit": None}
 
@@ -1371,24 +1309,20 @@ def test_external_value(ctx, app_runner):
         return Response(b"42", content_type="application/json")
 
     port = app_runner.run_flask_app(answer_app)
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test/",
         {
-            "/test/": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "integer"},
-                                "examples": {"answer": {"externalValue": f"http://127.0.0.1:{port}/answer.json"}},
-                            }
-                        }
-                    },
-                    "responses": {"default": {"description": "OK"}},
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "integer"},
+                        "examples": {"answer": {"externalValue": f"http://127.0.0.1:{port}/answer.json"}},
+                    }
                 }
-            }
-        }
+            },
+            "responses": {"default": {"description": "OK"}},
+        },
     )
-    operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then this example should be used
     example = examples.generate_one(strategy)
@@ -1400,29 +1334,25 @@ def test_external_value(ctx, app_runner):
 
 def test_external_value_network_error(ctx):
     # When the external value is not available
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test/",
         {
-            "/test/": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "integer"},
-                                "examples": {
-                                    "answer": {
-                                        # Not available
-                                        "externalValue": "http://127.0.0.1:1/answer.json"
-                                    }
-                                },
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "integer"},
+                        "examples": {
+                            "answer": {
+                                # Not available
+                                "externalValue": "http://127.0.0.1:1/answer.json"
                             }
-                        }
-                    },
-                    "responses": {"default": {"description": "OK"}},
+                        },
+                    }
                 }
-            }
-        }
+            },
+            "responses": {"default": {"description": "OK"}},
+        },
     )
-    operation = schema["/test/"]["POST"]
     # Then this example should not be used
     assert not operation.get_strategies_from_examples()
 
@@ -2364,50 +2294,44 @@ def test_find_in_responses_only_in_2xx(ctx):
 
 
 def test_response_examples_skip_non_container_examples(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {"type": "object"},
-                                    "examples": "invalid",
-                                    "example": {"id": "123456"},
-                                },
-                                "application/xml": {"schema": {"type": "object"}, "examples": [{"id": "654321"}]},
-                            },
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"},
+                            "examples": "invalid",
+                            "example": {"id": "123456"},
+                        },
+                        "application/xml": {"schema": {"type": "object"}, "examples": [{"id": "654321"}]},
+                    },
                 }
             }
-        }
+        },
     )
-    assert list(schema["/items"]["GET"].responses.iter_examples()) == [
+    assert list(operation.responses.iter_examples()) == [
         ("200/application/json", {"id": "123456"}),
         ("200/application/xml", {"id": "654321"}),
     ]
 
 
 def test_response_examples_with_boolean_schema(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": True, "example": {"id": "123456"}}},
-                        }
-                    }
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": True, "example": {"id": "123456"}}},
                 }
             }
         },
         version="3.1.0",
     )
-    assert list(schema["/items"]["GET"].responses.iter_examples()) == [("200/application/json", {"id": "123456"})]
+    assert list(operation.responses.iter_examples()) == [("200/application/json", {"id": "123456"})]
 
 
 @pytest.mark.parametrize(
@@ -2618,16 +2542,11 @@ def test_path_parameters_example_escaping(ctx, cli, app_runner, snapshot_cli):
 
 
 def test_non_recursive_duplicate_refs_unit(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PUT /test",
         {
-            "/test": {
-                "put": {
-                    "requestBody": {
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Container"}}}
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Container"}}}},
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -2643,8 +2562,6 @@ def test_non_recursive_duplicate_refs_unit(ctx):
             }
         },
     )
-
-    operation = schema["/test"]["PUT"]
 
     extracted = list(extract_from_schemas(operation))
 
@@ -2925,31 +2842,27 @@ def test_anyof_with_required_constraints(ctx):
 def test_non_string_pattern_in_schema(ctx):
     # When a schema contains an invalid non-string `pattern` value (e.g., integer),
     # examples extraction should proceed gracefully without crashing
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PATCH /test",
         {
-            "/test": {
-                "patch": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "key": {
-                                            "type": "string",
-                                            "pattern": 0,  # Invalid: should be string
-                                        }
-                                    },
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "pattern": 0,  # Invalid: should be string
                                 }
-                            }
+                            },
                         }
-                    },
-                    "responses": {"200": {"description": "OK"}},
+                    }
                 }
-            }
-        }
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/test"]["PATCH"]
     # Should not raise TypeError
     assert list(extract_from_schemas(operation)) == []
 
@@ -3096,21 +3009,17 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
     }
     extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
 
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items/{itemId}",
         {
-            "/items/{itemId}": {
-                "get": {
-                    "operationId": "getItem",
-                    "parameters": [
-                        {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}},
-                        {"name": "tenantId", "in": "query", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "operationId": "getItem",
+            "parameters": [
+                {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}},
+                {"name": "tenantId", "in": "query", "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items/{itemId}"]["GET"]
 
     assert _get_pool_combos(operation, extra_data_source) == [
         {"path_parameters": {"itemId": "abc"}, "query": {"tenantId": "x"}},
@@ -3120,32 +3029,28 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
 
 def test_body_example_violating_schema_is_not_used_in_positive_generation(ctx):
     # A schema's own `example` may not match its `schema`; positive generation must filter it out.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "example": {"name": "demo", "timestamp": "not-an-int"},
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "timestamp": {"type": "integer"},
-                                    },
-                                    "required": ["name", "timestamp"],
-                                },
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "example": {"name": "demo", "timestamp": "not-an-int"},
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "timestamp": {"type": "integer"},
+                            },
+                            "required": ["name", "timestamp"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["POST"]
     body = operation.body[0]
     validator = jsonschema_rs.validator_for(body.optimized_schema)
 
@@ -3184,42 +3089,35 @@ def test_get_pool_combos_filters_swagger_2_path_value_violating_schemathesis_min
     }
     extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
 
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items/{name}",
         {
-            "/items/{name}": {
-                "get": {
-                    "operationId": "getItem",
-                    "parameters": [
-                        {"name": "name", "in": "path", "required": True, "type": "string"},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "operationId": "getItem",
+            "parameters": [
+                {"name": "name", "in": "path", "required": True, "type": "string"},
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="2.0",
     )
-    operation = schema["/items/{name}"]["GET"]
 
     assert _get_pool_combos(operation, extra_data_source) == []
 
 
 def _json_body_operation(ctx, body_schema, version="3.0.2", **kwargs):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /test",
         {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": body_schema}},
-                    },
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": body_schema}},
+            },
+            "responses": {"default": {"description": "OK"}},
         },
         version=version,
         **kwargs,
     )
-    return schema["/test"]["POST"]
+    return operation
 
 
 def _extract_json_body_examples(ctx, body_schema, version="3.0.2", **kwargs):
@@ -3312,10 +3210,9 @@ def test_property_without_example_uses_valid_default(ctx, age, expected):
 
 
 def _example_cases(ctx, operation_definition, *, fill_missing, version="3.0.2"):
-    schema = ctx.openapi.load_schema(
-        {"/items": {"post": {**operation_definition, "responses": {"200": {"description": "OK"}}}}}, version=version
+    operation = ctx.openapi.load_operation(
+        "POST /items", {**operation_definition, "responses": {"200": {"description": "OK"}}}, version=version
     )
-    operation = schema["/items"]["POST"]
     return [
         (case.query, case.body)
         for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=fill_missing)
@@ -3759,25 +3656,20 @@ def test_array_item_examples_in_body(ctx, body_schema, version, expected):
 
 
 def test_array_item_example_in_query_parameter(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "schema": {"type": "array", "items": {"type": "integer", "example": 7}},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "schema": {"type": "array", "items": {"type": "integer", "example": 7}},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    assert list(extract_from_schemas(schema["/test"]["GET"])) == [
-        ParameterExample(container="query", name="q", value=[7])
-    ]
+    assert list(extract_from_schemas(operation)) == [ParameterExample(container="query", name="q", value=[7])]
 
 
 def test_array_body_property_with_min_items_generates_correct_length():
@@ -3869,32 +3761,28 @@ def test_top_level_body_example_violating_schema_is_skipped(ctx):
     # When a media-type-level `example` violates the body schema
     # (e.g. a field typed as integer but given a string value),
     # it must not be yielded by extract_top_level.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "title": {"type": "string"},
-                                        "count": {"type": "integer"},
-                                    },
-                                    "required": ["title"],
-                                },
-                                "example": {"title": "My item", "count": "not-an-integer"},
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "count": {"type": "integer"},
+                            },
+                            "required": ["title"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                        "example": {"title": "My item", "count": "not-an-integer"},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["POST"]
     body_schema = operation.body[0].optimized_schema
     validator = jsonschema_rs.validator_for(body_schema)
     for example in extract_top_level(operation):
@@ -3950,35 +3838,31 @@ def test_property_examples_list_filters_invalid_items(ctx):
 def test_top_level_body_examples_container_filters_invalid(ctx):
     # When a media-type-level `examples` object contains values that violate the body schema,
     # only schema-valid values must be yielded by extract_top_level.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /products",
         {
-            "/products": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "title": {"type": "string"},
-                                        "count": {"type": "integer"},
-                                    },
-                                    "required": ["title"],
-                                },
-                                "examples": {
-                                    "bad": {"value": {"title": "My item", "count": "not-an-integer"}},
-                                    "good": {"value": {"title": "My item", "count": 42}},
-                                },
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "count": {"type": "integer"},
+                            },
+                            "required": ["title"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                        "examples": {
+                            "bad": {"value": {"title": "My item", "count": "not-an-integer"}},
+                            "good": {"value": {"title": "My item", "count": 42}},
+                        },
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/products"]["POST"]
     body_schema = operation.body[0].optimized_schema
     validator = jsonschema_rs.validator_for(body_schema)
     body_examples = [e for e in extract_top_level(operation) if isinstance(e, BodyExample)]
@@ -3988,27 +3872,22 @@ def test_top_level_body_examples_container_filters_invalid(ctx):
 
 def test_top_level_parameter_schema_examples_container_filters_invalid(ctx):
     # A parameter schema's `examples` array must not ship values the parameter's own schema rejects.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /search",
         {
-            "/search": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "integer", "examples": ["not-an-int", 42]},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "integer", "examples": ["not-an-int", 42]},
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-    assert list(extract_top_level(schema["/search"]["GET"])) == [
-        ParameterExample(container="query", name="q", value=42)
-    ]
+    assert list(extract_top_level(operation)) == [ParameterExample(container="query", name="q", value=42)]
 
 
 def test_unsatisfiable_property_schema_does_not_crash(ctx):
@@ -4053,36 +3932,32 @@ def test_assembled_body_missing_required_field_is_not_yielded(ctx):
 def test_response_derived_parameter_example_violating_schema_is_skipped(ctx):
     # When a response example contains a field that matches a request parameter name but
     # violates that parameter's schema constraints
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "page_size",
-                            "in": "query",
-                            "schema": {"type": "integer", "maximum": 300},
-                        }
-                    ],
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"page_size": {"type": "integer"}},
-                                    },
-                                    "example": {"page_size": 80839828},
-                                }
+            "parameters": [
+                {
+                    "name": "page_size",
+                    "in": "query",
+                    "schema": {"type": "integer", "maximum": 300},
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"page_size": {"type": "integer"}},
                             },
+                            "example": {"page_size": 80839828},
                         }
                     },
                 }
-            }
-        }
+            },
+        },
     )
-    operation = schema["/items"]["GET"]
     assert list(extract_top_level(operation)) == []
 
 
@@ -4119,27 +3994,23 @@ def test_schema_level_parameter_example_violating_pattern_is_skipped(ctx):
     # When the `example` field lives inside the parameter's `schema` object (not on the parameter
     # definition itself), it is processed via an expanded subschema. The expanded subschema must
     # still be validated against the full parameter schema — otherwise pattern violations slip through.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "orderBy",
-                            "in": "query",
-                            "schema": {
-                                "type": "string",
-                                "pattern": "^-?\\w+(,-?\\w+)*$",
-                                "example": "-companyName,address.houseNumber",
-                            },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "orderBy",
+                    "in": "query",
+                    "schema": {
+                        "type": "string",
+                        "pattern": "^-?\\w+(,-?\\w+)*$",
+                        "example": "-companyName,address.houseNumber",
+                    },
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/items"]["GET"]
     assert list(extract_top_level(operation)) == []
 
 
@@ -4147,34 +4018,30 @@ def test_response_derived_parameter_example_violating_format_is_skipped(ctx):
     # When a response-body example provides a value for a path/query parameter whose schema
     # declares a `format` constraint (e.g. uuid), an example that doesn't satisfy the format
     # must be rejected rather than emitted as a POSITIVE case.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /sensors/{sensorId}",
         {
-            "/sensors/{sensorId}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "sensorId",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                        }
-                    ],
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {"type": "object"},
-                                    "example": {"sensorId": "not-a-uuid-xyzg"},
-                                }
-                            },
+            "parameters": [
+                {
+                    "name": "sensorId",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "format": "uuid"},
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"},
+                            "example": {"sensorId": "not-a-uuid-xyzg"},
                         }
                     },
                 }
-            }
-        }
+            },
+        },
     )
-    operation = schema["/sensors/{sensorId}"]["GET"]
     assert list(extract_top_level(operation)) == []
 
 
@@ -4202,23 +4069,20 @@ def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx)
 
 def test_allof_example_violating_anyof_in_parameter_is_not_yielded(ctx):
     # An allOf property example that mixes values from incompatible anyOf branches should not be yielded.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /search",
         {
-            "/search": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "filters",
-                            "in": "query",
-                            "schema": {
-                                "type": "array",
-                                "items": {"$ref": "#/components/schemas/Filter"},
-                            },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "filters",
+                    "in": "query",
+                    "schema": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Filter"},
+                    },
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -4244,7 +4108,6 @@ def test_allof_example_violating_anyof_in_parameter_is_not_yielded(ctx):
             }
         },
     )
-    operation = schema["/search"]["GET"]
     param_schema = next(p.optimized_schema for p in operation.iter_parameters() if p.name == "filters")
     validator = jsonschema_rs.validator_for(param_schema)
     for example in extract_from_schemas(operation):
@@ -4256,50 +4119,46 @@ def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
     # When array items are assembled from property examples but each item violates the
     # items schema (anyOf where assembled properties match no branch exclusively),
     # no such parameter example should be yielded.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /search",
         {
-            "/search": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "filters",
-                            "in": "query",
-                            "schema": {
-                                "type": "array",
-                                "items": {
+            "parameters": [
+                {
+                    "name": "filters",
+                    "in": "query",
+                    "schema": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "filter": {
                                     "type": "object",
                                     "properties": {
-                                        "filter": {
-                                            "type": "object",
-                                            "properties": {
-                                                "category": {"type": "string", "example": "online"},
-                                                "value": {"type": "integer", "example": 100},
-                                            },
-                                            # Branches are mutually exclusive by additionalProperties type:
-                                            # having both `category` (string) and `value` (integer) violates both.
-                                            "anyOf": [
-                                                {
-                                                    "required": ["category"],
-                                                    "additionalProperties": {"type": "string"},
-                                                },
-                                                {
-                                                    "required": ["value"],
-                                                    "additionalProperties": {"type": "integer"},
-                                                },
-                                            ],
-                                        }
+                                        "category": {"type": "string", "example": "online"},
+                                        "value": {"type": "integer", "example": 100},
                                     },
-                                    "required": ["filter"],
-                                },
+                                    # Branches are mutually exclusive by additionalProperties type:
+                                    # having both `category` (string) and `value` (integer) violates both.
+                                    "anyOf": [
+                                        {
+                                            "required": ["category"],
+                                            "additionalProperties": {"type": "string"},
+                                        },
+                                        {
+                                            "required": ["value"],
+                                            "additionalProperties": {"type": "integer"},
+                                        },
+                                    ],
+                                }
                             },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+                            "required": ["filter"],
+                        },
+                    },
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/search"]["GET"]
     param_schema = next(p.optimized_schema for p in operation.iter_parameters() if p.name == "filters")
     validator = jsonschema_rs.validator_for(param_schema)
     for example in extract_from_schemas(operation):
@@ -4308,65 +4167,58 @@ def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
 
 
 def test_parameter_example_with_wrong_type_is_not_yielded(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /search",
         {
-            "/search": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "version",
-                            "in": "query",
-                            "example": 2,
-                            "schema": {
-                                "type": "string",
-                                "enum": ["2", "3", "4"],
-                                "default": "2",
-                            },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "version",
+                    "in": "query",
+                    "example": 2,
+                    "schema": {
+                        "type": "string",
+                        "enum": ["2", "3", "4"],
+                        "default": "2",
+                    },
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    assert list(extract_top_level(schema["/search"]["GET"])) == []
+    assert list(extract_top_level(operation)) == []
 
 
 def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx):
     # When outer schema properties have examples but an allOf reference has
     # `additionalProperties: false` covering a different property set, assembled
     # bodies with the outer properties are schema-invalid and must not be yielded.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "PATCH /gateways",
         {
-            "/gateways": {
-                "patch": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "allOf": [
+                                {
                                     "type": "object",
-                                    "allOf": [
-                                        {
-                                            "type": "object",
-                                            "properties": {"id": {"type": "string"}},
-                                            "additionalProperties": False,
-                                        }
-                                    ],
-                                    "properties": {
-                                        "etag": {"type": "string", "example": "abc"},
-                                        "location": {"type": "string", "example": "eastus"},
-                                    },
-                                },
-                            }
+                                    "properties": {"id": {"type": "string"}},
+                                    "additionalProperties": False,
+                                }
+                            ],
+                            "properties": {
+                                "etag": {"type": "string", "example": "abc"},
+                                "location": {"type": "string", "example": "eastus"},
+                            },
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    operation = schema["/gateways"]["PATCH"]
     body_schema = operation.body[0].optimized_schema
     validator = jsonschema_rs.validator_for(body_schema)
     for example in extract_from_schemas(operation):
@@ -4376,24 +4228,21 @@ def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx
 
 def test_content_encoded_header_parameter_example_is_valid(ctx):
     # When a header parameter uses `content:` with a nested $ref
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /files",
         {
-            "/files": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "x-metadata",
-                            "in": "header",
-                            "content": {
-                                "application/json": {
-                                    "schema": {"$ref": "#/components/schemas/Metadata"},
-                                }
-                            },
+            "parameters": [
+                {
+                    "name": "x-metadata",
+                    "in": "header",
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/Metadata"},
                         }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+                    },
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -4409,7 +4258,6 @@ def test_content_encoded_header_parameter_example_is_valid(ctx):
             }
         },
     )
-    operation = schema["/files"]["POST"]
     param = next(p for p in operation.iter_parameters() if p.name == "x-metadata")
     validator = jsonschema_rs.validator_for(param.optimized_schema)
     for example in extract_from_schemas(operation):
@@ -4691,27 +4539,24 @@ def test_boolean_property_subschema_alongside_a_cycle(ctx):
 
 def test_both_example_keywords_yield_in_a_stable_order(ctx):
     # The spec-native keyword comes first, and the order holds across processes.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "key",
-                            "in": "query",
-                            "type": "string",
-                            "x-example": "from-x-example",
-                            "example": "from-example",
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "key",
+                    "in": "query",
+                    "type": "string",
+                    "x-example": "from-x-example",
+                    "example": "from-example",
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="2.0",
     )
 
-    assert [example.value for example in extract_top_level(schema["/test"]["GET"])] == [
+    assert [example.value for example in extract_top_level(operation)] == [
         "from-x-example",
         "from-example",
     ]
@@ -5028,30 +4873,26 @@ def test_discriminated_branch_with_empty_mapping_value(ctx):
 
 def test_x_example_in_openapi_3_parameter_schema(ctx):
     # `x-example` works on body properties in every version, so it must work on parameters too.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test/{id}",
         {
-            "/test/{id}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "x-example": "abc"},
-                        },
-                        {"name": "q", "in": "query", "schema": {"type": "string", "x-example": "qq"}},
-                        {
-                            "name": "filter",
-                            "in": "query",
-                            "schema": {"type": "object", "properties": {"name": {"type": "string", "x-example": "nn"}}},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "x-example": "abc"},
+                },
+                {"name": "q", "in": "query", "schema": {"type": "string", "x-example": "qq"}},
+                {
+                    "name": "filter",
+                    "in": "query",
+                    "schema": {"type": "object", "properties": {"name": {"type": "string", "x-example": "nn"}}},
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
     )
-    operation = schema["/test/{id}"]["GET"]
 
     assert [
         (case.path_parameters, case.query)
@@ -5061,30 +4902,26 @@ def test_x_example_in_openapi_3_parameter_schema(ctx):
 
 def test_x_examples_in_openapi_3_parameters(ctx):
     # Real-world 3.0 specs carry `x-examples` on parameters, same as the accepted `x-example`.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test/{id}",
         {
-            "/test/{id}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "x-examples": ["abc"]},
-                        },
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "x-examples": {"first": {"value": "qq"}},
-                            "schema": {"type": "string"},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "x-examples": ["abc"]},
+                },
+                {
+                    "name": "q",
+                    "in": "query",
+                    "x-examples": {"first": {"value": "qq"}},
+                    "schema": {"type": "string"},
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
     )
-    operation = schema["/test/{id}"]["GET"]
 
     assert [
         (case.path_parameters, case.query)
@@ -5112,16 +4949,13 @@ def test_x_examples_in_openapi_3_parameters(ctx):
     ids=["max-items", "max-properties", "valid-array", "valid-object"],
 )
 def test_parameter_examples_assembled_from_nested_ones_respect_the_parameter_schema(ctx, parameter_schema, expected):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /r",
         {
-            "/r": {
-                "get": {
-                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/r"]["GET"]
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     assert [example_to_dict(example) for example in extract_from_schemas(operation)] == expected
 
 
@@ -5135,32 +4969,29 @@ def test_parameter_examples_assembled_from_nested_ones_respect_the_parameter_sch
 )
 def test_media_type_body_examples_container_is_completed(ctx, declaration):
     # A partial body example gets the same filling-in whether it is declared singular or plural.
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name", "kind"],
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "kind": {"type": "string", "enum": ["only"]},
-                                    },
-                                    "additionalProperties": False,
-                                },
-                                **declaration,
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["name", "kind"],
+                            "properties": {
+                                "name": {"type": "string"},
+                                "kind": {"type": "string", "enum": ["only"]},
+                            },
+                            "additionalProperties": False,
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/items"]["POST"]
+                        **declaration,
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     assert [example_to_dict(example) for example in extract_top_level(operation)] == [
         {"media_type": "application/json", "value": {"name": "partial", "kind": "only"}}
     ]

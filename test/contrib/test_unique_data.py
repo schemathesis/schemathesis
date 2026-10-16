@@ -226,31 +226,28 @@ def test_positive_multipart_not_reported_as_negative(ctx, cli, snapshot_cli):
 
 
 def test_hash_keeps_positive_multipart_case(ctx):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {
-                                    "type": "object",
-                                    "additionalProperties": False,
-                                    "properties": {
-                                        "data": {"type": "string", "format": "binary"},
-                                        "price": {"type": "number"},
-                                    },
-                                    "required": ["data", "price"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/upload"]["POST"]
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "data": {"type": "string", "format": "binary"},
+                                "price": {"type": "number"},
+                            },
+                            "required": ["data", "price"],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
 
     @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
     @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)

@@ -274,11 +274,11 @@ def test_constants_overlay_keeps_non_object_body(ctx):
 
 def test_constants_not_substituted_into_security_parameters(ctx):
     # A harvested key makes "generated" auth valid, so `ignored_auth` reports the API accepting it.
-    schema = ctx.openapi.load_schema(
-        {"/data": {"get": {"security": [{"ApiKeyQuery": []}], "responses": {"200": {"description": "OK"}}}}},
+    operation = ctx.openapi.load_operation(
+        "GET /data",
+        {"security": [{"ApiKeyQuery": []}], "responses": {"200": {"description": "OK"}}},
         components={"securitySchemes": {"ApiKeyQuery": {"type": "apiKey", "in": "query", "name": "api_key"}}},
     )
-    operation = schema["/data"]["GET"]
     with pytest.raises(NoSuchExample):
         find(
             operation.as_strategy(
@@ -1152,17 +1152,14 @@ def test_constant_substituted_into_composed_or_nested_body(ctx, body_schema, bod
 
 
 def _nested_body_operation(ctx, body_schema):
-    return ctx.openapi.load_schema(
+    return ctx.openapi.load_operation(
+        "POST /unlock",
         {
-            "/unlock": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
-    )["/unlock"]["POST"]
+    )
 
 
 def _leaf_at(body, depth):

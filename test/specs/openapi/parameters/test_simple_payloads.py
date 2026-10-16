@@ -125,43 +125,37 @@ def test_query_after_querystring_is_rejected(ctx):
 
 
 def test_swagger_parameter_with_non_string_location_is_skipped(ctx):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "parameters": [{"name": "q", "in": 5, "type": "string"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"name": "q", "in": 5, "type": "string"}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="2.0",
-    )["/users"]["GET"]
+    )
 
     assert set(map(str, generated(operation, "query"))) == {"{}"}
 
 
 def test_swagger_array_enum_intersects_item_enum(ctx):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "tags",
-                            "in": "query",
-                            "required": True,
-                            "type": "array",
-                            "maxItems": 1,
-                            "enum": ["a", "b"],
-                            "items": {"type": "string", "enum": ["a", ["x"], {"k": "v"}]},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "tags",
+                    "in": "query",
+                    "required": True,
+                    "type": "array",
+                    "maxItems": 1,
+                    "enum": ["a", "b"],
+                    "items": {"type": "string", "enum": ["a", ["x"], {"k": "v"}]},
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="2.0",
-    )["/users"]["GET"]
+    )
 
     assert {query["tags"] for query in generated(operation, "query")} == {"a"}
 
@@ -199,17 +193,14 @@ def test_required_content_parameter_with_broken_schema_reference(ctx, ref, match
 
 # Examples replace a generated value at random one draw in five; 50 draws make missing it negligible.
 def test_fuzzing_mixes_in_examples_of_boolean_schema_query_parameter(ctx):
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /users",
         {
-            "/users": {
-                "get": {
-                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": True, "example": "picked"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": True, "example": "picked"}],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
-    )["/users"]["GET"]
+    )
     values = []
 
     @given(case=operation.as_strategy())

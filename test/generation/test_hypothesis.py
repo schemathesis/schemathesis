@@ -102,25 +102,22 @@ def test_fuzzing_phase_uses_its_generation_config(ctx):
 
 def test_negative_case_can_negate_the_body_alone(ctx):
     # A server may check the path before the body, so negating every location at once hides body handling.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items/{kind}",
         {
-            "/items/{kind}": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "kind",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["a", "b"]},
-                        }
-                    ],
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "string"}}}},
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "kind",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["a", "b"]},
                 }
-            }
-        }
+            ],
+            "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "string"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    strategy = schema["/items/{kind}"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE)
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     find(
         strategy,
@@ -152,10 +149,10 @@ def test_negative_case_can_negate_the_body_alone(ctx):
 def test_explicit_value_differing_in_case_leaves_location_negatable(ctx, parameters, location, explicit):
     # Only header names are case-insensitive, so `LIMIT` does not cover `limit`.
     header = {"name": "X-Id", "in": "header", "required": True, "schema": {"type": "integer"}}
-    schema = ctx.openapi.load_schema(
-        {"/items": {"get": {"parameters": [*parameters, header], "responses": {"200": {"description": "OK"}}}}}
+    operation = ctx.openapi.load_operation(
+        "GET /items", {"parameters": [*parameters, header], "responses": {"200": {"description": "OK"}}}
     )
-    strategy = schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE, **explicit)
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE, **explicit)
 
     find(
         strategy,
@@ -537,31 +534,26 @@ def test_default_strategies_binary(swagger_20):
 
 
 def test_merge_length_into_pattern(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "string",
-                                    # Unlikely to generate a string of this length from a pattern
-                                    "minLength": 460,
-                                    "maxLength": 465,
-                                    "pattern": "^[a-z]+$",
-                                },
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "string",
+                            # Unlikely to generate a string of this length from a pattern
+                            "minLength": 460,
+                            "maxLength": 465,
+                            "pattern": "^[a-z]+$",
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+                    }
                 },
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-
-    operation = schema["/data"]["POST"]
 
     @given(operation.as_strategy())
     @settings(max_examples=1)
@@ -572,29 +564,24 @@ def test_merge_length_into_pattern(ctx):
 
 
 def test_required_without_properties(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "additionalProperties": False,
-                                    "type": "object",
-                                    "required": ["A"],
-                                },
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "additionalProperties": False,
+                            "type": "object",
+                            "required": ["A"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+                    }
                 },
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-
-    operation = schema["/data"]["POST"]
 
     @given(operation.as_strategy())
     @settings(max_examples=1)
@@ -605,31 +592,26 @@ def test_required_without_properties(ctx):
 
 
 def test_non_schema_property_value(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "maxItems": 0,
-                                    },
-                                },
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "maxItems": 0,
+                            },
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+                    }
                 },
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-
-    operation = schema["/data"]["POST"]
 
     @given(operation.as_strategy())
     @settings(max_examples=1)
@@ -695,30 +677,27 @@ def test_as_strategy_example_resolves_bundled_refs(tmp_path):
 
 def test_malformed_annotation_behind_a_reference_still_generates(ctx):
     # An annotation cannot change which values the schema admits, and canonicalization drops it.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /probe",
         {
-            "/probe": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"field": {"$ref": "#/components/schemas/Annotated"}},
-                                    "required": ["field"],
-                                },
-                            }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"field": {"$ref": "#/components/schemas/Annotated"}},
+                            "required": ["field"],
                         },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={"schemas": {"Annotated": {"type": "string", "description": None}}},
     )
 
-    case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
+    case = examples.generate_one(operation.as_strategy())
 
     assert isinstance(case.body["field"], str)
 
@@ -727,41 +706,38 @@ def test_malformed_annotation_behind_a_reference_still_generates(ctx):
 def test_array_with_allof_of_multiple_contains(ctx, version):
     # Filtering for several `contains` demands exhausts before both consts land, so each is placed:
     # by the `contains` strategy under 3.1, by the converter's positional prefix under Draft 4.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /probe",
         {
-            "/probe": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["type"],
-                                    "properties": {
-                                        "type": {
-                                            "type": "array",
-                                            "minItems": 1,
-                                            "uniqueItems": True,
-                                            "items": {"type": "string"},
-                                            "allOf": [
-                                                {"contains": {"const": "VerifiablePresentation"}},
-                                                {"contains": {"const": "KyaManifest"}},
-                                            ],
-                                        }
-                                    },
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["type"],
+                            "properties": {
+                                "type": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "uniqueItems": True,
+                                    "items": {"type": "string"},
+                                    "allOf": [
+                                        {"contains": {"const": "VerifiablePresentation"}},
+                                        {"contains": {"const": "KyaManifest"}},
+                                    ],
                                 }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
 
-    case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
+    case = examples.generate_one(operation.as_strategy())
 
     assert "VerifiablePresentation" in case.body["type"]
     assert "KyaManifest" in case.body["type"]
@@ -769,39 +745,36 @@ def test_array_with_allof_of_multiple_contains(ctx, version):
 
 def test_string_with_allof_of_formats_and_patterns(ctx):
     # Every generated value has to satisfy both halves of each conjunction at once.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /probe",
         {
-            "/probe": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "host",
-                            "required": True,
-                            "schema": {
-                                "allOf": [
-                                    {"type": "string", "format": "hostname"},
-                                    {"type": "string", "format": "ipv4"},
-                                ]
-                            },
-                        }
-                    ],
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "string", "allOf": [{"pattern": "^[a-z]+$"}, {"pattern": "a"}]}
-                            }
-                        },
+            "parameters": [
+                {
+                    "in": "query",
+                    "name": "host",
+                    "required": True,
+                    "schema": {
+                        "allOf": [
+                            {"type": "string", "format": "hostname"},
+                            {"type": "string", "format": "ipv4"},
+                        ]
                     },
-                    "responses": {"200": {"description": "OK"}},
                 }
-            }
+            ],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "string", "allOf": [{"pattern": "^[a-z]+$"}, {"pattern": "a"}]}
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
 
-    case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
+    case = examples.generate_one(operation.as_strategy())
 
     assert jsonschema_rs.Draft202012Validator({"type": "string", "format": "ipv4"}, validate_formats=True).is_valid(
         case.query["host"]
@@ -811,21 +784,16 @@ def test_string_with_allof_of_formats_and_patterns(ctx):
 
 @pytest.mark.parametrize("media_type", ["text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /data",
         {
-            "/data": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {media_type: {"schema": {"type": "string", "format": "binary"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                },
+            "requestBody": {
+                "required": True,
+                "content": {media_type: {"schema": {"type": "string", "format": "binary"}}},
             },
-        }
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-
-    operation = schema["/data"]["POST"]
 
     @given(operation.as_strategy())
     @settings(max_examples=1)
@@ -1067,26 +1035,23 @@ def test_percent_encoded_base_url_reserved_char_preserved(ctx):
 def test_parameters_jsonified(ctx, expected):
     # See GH-1166
     # When `None` or `True` / `False` are generated in path or query
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /foo/{param_path}",
         {
-            "/foo/{param_path}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": f"param_{location}",
-                            "in": location,
-                            "required": True,
-                            "schema": {"type": "boolean", "nullable": True},
-                        }
-                        for location in ("path", "query")
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": f"param_{location}",
+                    "in": location,
+                    "required": True,
+                    "schema": {"type": "boolean", "nullable": True},
                 }
-            }
-        }
+                for location in ("path", "query")
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    strategy = schema["/foo/{param_path}"]["GET"].as_strategy()
+    strategy = operation.as_strategy()
 
     @given(case=strategy)
     @settings(deadline=None, max_examples=1)
@@ -3066,17 +3031,14 @@ def test_canonical_reference_with_no_finite_value_admits_nothing():
 
 def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
     # `oneOf` routes the body to the other engine, which cannot follow the pointer back to itself.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /orders",
         {
-            "/orders": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
@@ -3104,7 +3066,6 @@ def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
             }
         },
     )
-    operation = schema["/orders"]["POST"]
     is_valid = jsonschema_rs.Draft202012Validator(operation.body[0].validation_schema).is_valid
 
     @given(operation.as_strategy())
@@ -4374,18 +4335,15 @@ def test_whole_float_never_misrepresents_a_large_integer():
 
 
 def _body_operation(ctx, body_schema):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
     )
-    return schema["/items"]["POST"]
+    return operation
 
 
 @pytest.mark.hypothesis_nested
@@ -4441,17 +4399,14 @@ def test_body_nothing_can_be_drawn_for(ctx, body_schema):
 
 
 def _query_operation(ctx, parameter_schema, config):
-    return ctx.openapi.load_schema(
+    return ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
+            "responses": {"200": {"description": "OK"}},
         },
         config=SchemathesisConfig.from_dict(config),
-    )["/items"]["GET"]
+    )
 
 
 @pytest.mark.hypothesis_nested
@@ -4496,21 +4451,18 @@ def test_body_dictionary_binding_through_recursive_reference(ctx):
     config = SchemathesisConfig.from_dict(
         {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.child.token": {"dictionary": "tokens"}}}
     )
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/A"}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/A"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={"schemas": {"A": node}},
         config=config,
-    )["/items"]["POST"]
+    )
     tokens = []
 
     @given(case=operation.as_strategy())
@@ -4534,17 +4486,14 @@ def test_body_dictionary_binding_on_unknown_item_field_is_ignored(ctx):
     config = SchemathesisConfig.from_dict(
         {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.[*].missing": {"dictionary": "tokens"}}}
     )
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+            "responses": {"200": {"description": "OK"}},
         },
         config=config,
-    )["/items"]["POST"]
+    )
     validator = jsonschema_rs.validator_for(body_schema)
 
     @given(case=operation.as_strategy())

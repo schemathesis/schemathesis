@@ -529,11 +529,10 @@ def test_(request, case):
 
 def test_empty_content(ctx):
     # When the "content" value is empty in "requestBody"
-    schema = ctx.openapi.load_schema(
-        {"/body": {"post": {"requestBody": {"content": {}}, "responses": {"200": {"description": "OK"}}}}}
+    operation = ctx.openapi.load_operation(
+        "POST /body", {"requestBody": {"content": {}}, "responses": {"200": {"description": "OK"}}}
     )
     # Then the body processing should be no-op
-    operation = schema["/body"]["POST"]
     assert operation.body == PayloadAlternatives([])
 
 

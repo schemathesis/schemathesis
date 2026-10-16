@@ -15,25 +15,22 @@ def test_cookies(ctx):
     def cookies():
         return jsonify(request.cookies)
 
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /cookies",
         {
-            "/cookies": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "token",
-                            "in": "cookie",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["test"]},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "token",
+                    "in": "cookie",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["test"]},
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    strategy = schema["/cookies"]["GET"].as_strategy()
+    strategy = operation.as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
@@ -97,19 +94,16 @@ def test_form_data(ctx):
 def test_binary_body(ctx, mocker):
     # When an API operation accepts a binary input
     api = ctx.openapi.apps.upload_file()
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /api/upload_file",
         {
-            "/api/upload_file": {
-                "post": {
-                    "requestBody": {
-                        "content": {"application/octet-stream": {"schema": {"format": "binary", "type": "string"}}}
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "content": {"application/octet-stream": {"schema": {"format": "binary", "type": "string"}}}
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    strategy = schema["/api/upload_file"]["POST"].as_strategy()
+    strategy = operation.as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)

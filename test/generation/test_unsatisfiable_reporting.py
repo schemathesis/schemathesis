@@ -46,26 +46,23 @@ def required_chain(depth):
 
 
 def test_message_names_the_keywords_with_their_values(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /test",
         {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "integer", "minimum": 100, "maximum": 10},
-                        }
-                    ],
-                    **RESPONSES,
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "integer", "minimum": 100, "maximum": 10},
                 }
-            }
-        }
+            ],
+            **RESPONSES,
+        },
     )
 
     assert (
-        str(build_unsatisfiable_error(schema["/test"]["GET"], with_tip=False))
+        str(build_unsatisfiable_error(operation, with_tip=False))
         == """Cannot generate test data for query parameter 'id'
 Schema:
 

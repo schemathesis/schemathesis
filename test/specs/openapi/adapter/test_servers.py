@@ -71,25 +71,22 @@ def test_no_per_scope_servers_uses_global(ctx):
 
 
 def test_variable_substitution_from_defaults(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "servers": [
-                        {
-                            "url": "https://{host}.example.com/{version}",
-                            "variables": {
-                                "host": {"default": "api"},
-                                "version": {"default": "v3"},
-                            },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "servers": [
+                {
+                    "url": "https://{host}.example.com/{version}",
+                    "variables": {
+                        "host": {"default": "api"},
+                        "version": {"default": "v3"},
+                    },
                 }
-            }
-        }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
-    assert schema["/items"]["GET"].base_url == "https://api.example.com/v3"
+    assert operation.base_url == "https://api.example.com/v3"
 
 
 @pytest.mark.parametrize(
@@ -263,23 +260,20 @@ def test_unknown_variable_name_silently_ignored(ctx):
 
 def test_config_variable_fills_missing_default(ctx):
     config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "provided"}}})
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "servers": [
-                        {
-                            "url": "https://{host}.example.com",
-                            "variables": {"host": {}},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "servers": [
+                {
+                    "url": "https://{host}.example.com",
+                    "variables": {"host": {}},
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         config=config,
     )
-    assert schema["/items"]["GET"].base_url == "https://provided.example.com"
+    assert operation.base_url == "https://provided.example.com"
 
 
 def test_base_url_override_ignores_variables(ctx):
