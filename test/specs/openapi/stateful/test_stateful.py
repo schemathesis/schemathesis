@@ -430,6 +430,120 @@ def test_inferred_body_link_picks_from_every_listed_resource():
     assert {"first", "second"} <= project_ids
 
 
+_ITEM_BODIES = {
+    "/item": {
+        "type": "object",
+        "required": ["data"],
+        "additionalProperties": False,
+        "properties": {"data": {"$ref": "#/components/schemas/Item"}},
+    },
+    "/items": {
+        "type": "object",
+        "required": ["data"],
+        "additionalProperties": False,
+        "properties": {"data": {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/Item"}}},
+    },
+    "/item-list": {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/Item"}},
+}
+_EXPLICIT_ITEM_LINKS = {
+    "/item": {"data": {"groupId": "$response.body#/data/id"}},
+    "/items": {"data": [{"groupId": "$response.body#/data/id"}]},
+    "/item-list": [{"groupId": "$response.body#/data/id"}],
+}
+
+
+def _linked_items(body):
+    data = body["data"] if isinstance(body, dict) else body
+    return data if isinstance(data, list) else [data]
+
+
+@pytest.mark.parametrize(
+    ("explicit", "targets"),
+    [(False, ("/item", "/items")), (True, ("/item", "/items", "/item-list"))],
+    ids=["inferred", "explicit"],
+)
+def test_link_body_keeps_generated_fields_of_nested_objects_and_array_items(explicit, targets):
+    links = {
+        f"Create{path}": {"operationRef": f"#/paths/~1{path[1:]}/post", "requestBody": _EXPLICIT_ITEM_LINKS[path]}
+        for path in _ITEM_BODIES
+    }
+    group_response = {
+        "description": "Created",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GroupResponse"}}},
+    }
+    if explicit:
+        group_response["links"] = links
+    paths = {"/groups": {"post": {"responses": {"201": group_response}}}}
+    for path, body_schema in _ITEM_BODIES.items():
+        paths[path] = {
+            "post": {
+                "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                "responses": {"201": {"description": "Created"}},
+            }
+        }
+    spec = {
+        "openapi": "3.0.2",
+        "info": {"title": "Groups", "version": "1"},
+        "paths": paths,
+        "components": {
+            "schemas": {
+                "Group": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}},
+                "GroupResponse": {
+                    "type": "object",
+                    "required": ["data"],
+                    "properties": {"data": {"$ref": "#/components/schemas/Group"}},
+                },
+                "Item": {
+                    "type": "object",
+                    "required": ["name", "groupId"],
+                    "additionalProperties": False,
+                    "properties": {"name": {"type": "string", "minLength": 1}, "groupId": {"type": "string"}},
+                },
+            }
+        },
+    }
+    app = FastAPI(openapi_url=None)
+
+    @app.get("/openapi.json")
+    def openapi():
+        return spec
+
+    @app.post("/groups", status_code=201)
+    def create_group():
+        return {"data": {"id": "G-REAL"}}
+
+    @app.post("/item", status_code=201)
+    @app.post("/items", status_code=201)
+    @app.post("/item-list", status_code=201)
+    def create_item():
+        return {}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    linked = {path: [] for path in targets}
+
+    class Workflow(schema.as_state_machine()):
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            items = _linked_items(case.body) if case.operation.path in linked else []
+            if any(item.get("groupId") == "G-REAL" for item in items):
+                linked[case.operation.path].append(case.body)
+
+    Workflow.run(
+        settings=settings(
+            max_examples=10,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+        )
+    )
+    assert all(linked.values()), {path: len(bodies) for path, bodies in linked.items()}
+    incomplete = [
+        body for bodies in linked.values() for body in bodies if not all("name" in item for item in _linked_items(body))
+    ]
+    assert not incomplete, f"Linked bodies lost `name`: {incomplete[:3]!r}"
+
+
 def test_link_sends_parameter_undeclared_on_target():
     spec = {
         "openapi": "3.0.2",
