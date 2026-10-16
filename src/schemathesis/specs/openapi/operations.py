@@ -41,6 +41,16 @@ if TYPE_CHECKING:
 
 SCHEMA_PARSING_ERRORS = (KeyError, RefResolutionError, InvalidSchema)
 
+
+def _is_utf8_encodable(value: str) -> bool:
+    # Lone surrogates have no UTF-8 form, so such a path can not be sent over the wire.
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 _V3_1 = version.parse("3.1")
 
 
@@ -151,6 +161,8 @@ class OperationLoader:
                 continue
             method = None
             try:
+                if not _is_utf8_encodable(path):
+                    raise InvalidSchema("Path is not valid UTF-8", path=path)
                 dispatch_before_process_path(schema, context, path, path_item)
                 if isinstance(path_item, dict) and "$ref" in path_item:
                     path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
@@ -354,7 +366,12 @@ class OperationLoader:
         """Whether this operation served the schema document, and so stays out unless a filter selects it."""
         schema = self.schema
         document_path = schema._schema_document_path
-        if document_path is None or method != "get" or schema.get_full_path(path).rstrip("/") != document_path:
+        if (
+            document_path is None
+            or method != "get"
+            or not _is_utf8_encodable(path)
+            or schema.get_full_path(path).rstrip("/") != document_path
+        ):
             return False
         context = self._filter_context
         operation = context.operation
