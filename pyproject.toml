@@ -134,8 +134,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 parallel = true
-# Branch tracing is fast only from Python 3.14; older interpreters run line-only in CI (see tox.ini).
-branch = "${COVERAGE_BRANCH-true}"
+branch = true
 source_pkgs = ["schemathesis"]
 
 [tool.coverage.paths]

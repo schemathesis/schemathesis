@@ -87,6 +87,7 @@ jobs:
 
       - run: uvx --with="tox" --with="tox-uv" tox -e pytest8
 
+      # The only job running the pytest 8 code paths.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
@@ -134,7 +135,9 @@ jobs:
 
       - run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox
 
+      # 3.12 and 3.13 run without coverage (see tox.ini).
       - name: Upload coverage to Codecov
+        if: ${{ matrix.python != '3.12' && matrix.python != '3.13' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: coverage.xml
