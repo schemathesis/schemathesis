@@ -346,15 +346,26 @@ def _mask_reproduce_commands(data: str) -> str:
     # has a varying number of steps. The `st replay <id>` line is masked separately by `replace_test_case_id`.
     lines = []
     seen = False
+    after_warning = False
     for line in data.splitlines():
         if "curl" in line or line.lstrip().startswith("# as "):
             if not seen:
                 lines.append("    <PLACEHOLDER>")
                 seen = True
+        elif line.endswith(CURL_WARNING_SUFFIXES) or CURL_WARNING_MARKER in line:
+            # Warnings describe the masked command's generated values, so they vary with it.
+            after_warning = True
+        elif after_warning and not line.strip():
+            after_warning = False
         else:
             seen = False
+            after_warning = False
             lines.append(line)
     return "\n".join(lines) + "\n"
+
+
+CURL_WARNING_MARKER = "contains non-printable characters. Actual value:"
+CURL_WARNING_SUFFIXES = ("was truncated for shell display.",)
 
 
 TRANSIENT_LINE_PREFIXES = (

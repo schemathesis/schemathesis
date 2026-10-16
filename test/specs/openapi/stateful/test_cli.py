@@ -138,6 +138,8 @@ def test_stateful_only_with_error(ctx, cli, app_runner, snapshot_cli):
             api.schema_url,
             f"--url=http://127.0.0.1:{app_runner.run_resetting_server()}/api",
             "--phases=stateful",
+            # The reported request body must not depend on the random seed.
+            "--generation-deterministic",
         )
         == snapshot_cli
     )

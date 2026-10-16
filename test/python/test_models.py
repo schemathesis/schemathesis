@@ -576,7 +576,7 @@ def test_negative_multipart_keeps_registered_media_type_for_text_property(ctx):
         },
     )
 
-    bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 30)]
+    bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 200)]
     # Negative bodies may omit `file` or not be objects at all; where `file` is present, it keeps its media type.
     assert {body["file"] for body in bodies if isinstance(body, dict) and "file" in body} == {b"\x89PNG"}
 

@@ -5446,7 +5446,7 @@ def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, c
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
         # Outlasts the request timeout every time, so the operation is flagged unresponsive.
-        time.sleep(0.3)
+        time.sleep(1)
         return jsonify({"id": user_id})
 
     assert (
@@ -5456,7 +5456,8 @@ def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, c
             "--generation-deterministic",
             "--phases=stateful",
             "--checks=not_a_server_error",
-            "--request-timeout=0.05",
+            # Only the hanging operation gets a short timeout, so a slow runner never times out the answering one.
+            config={"operations": [{"include-name": "GET /users/{userId}", "request-timeout": 0.2}]},
         )
         == snapshot_cli
     )

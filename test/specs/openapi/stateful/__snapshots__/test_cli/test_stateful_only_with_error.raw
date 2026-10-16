@@ -57,6 +57,6 @@ Errors:
 Test cases:
   N generated
 
-Seed: 42
+Seed: not used in the deterministic mode
 
 =============================== 1 error in 1.00s ===============================
