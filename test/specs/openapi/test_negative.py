@@ -7,7 +7,7 @@ import pytest
 import requests
 from _pytest.main import ExitCode
 from flask import jsonify
-from hypothesis import HealthCheck, Phase, find, given, seed, settings
+from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 from jsonschema_rs import canonical
@@ -1273,14 +1273,11 @@ def test_path_parameters_never_contain_slash(ctx):
         version="3.0.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(deadline=None, max_examples=250, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=250)
     def test(case):
         for value in case.path_parameters.values():
             assert "/" not in unquote(str(value))
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -1297,14 +1294,11 @@ def test_path_boolean_param_is_not_coerced_to_int_alongside_integer_param(ctx):
         },
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(deadline=None, max_examples=100, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=100)
     def test(case):
         flag = case.path_parameters["flag"]
         assert flag in {"true", "false"}, f"boolean path param became {flag!r}"
-
-    test()
 
 
 def test_negative_boolean_query_not_mutated_to_object(ctx):
@@ -1365,15 +1359,12 @@ def test_negative_integer_produces_fractional_numbers(ctx, location):
     values = []
 
     # High count: a fraction needs a type change to `number` among many other mutation kinds.
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @seed(1)
-    @settings(deadline=None, max_examples=300, database=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=300, seed=1)
     def test(case):
         container = case.body if location == "body" else case.query
         if isinstance(container, dict) and "n" in container:
             values.append(container["n"])
 
-    test()
     assert any(_is_fractional(value) for value in values)
 
 
@@ -1406,15 +1397,11 @@ def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_exampl
         version="3.0.0",
     )
 
-    @seed(8)
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(deadline=None, max_examples=80, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=80, seed=8)
     def test(case):
         for value in case.path_parameters.values():
             assert "/" not in unquote(str(value))
-
-    test()
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2040,17 +2027,14 @@ def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
     body = operation.body[0]
     validator = make_validator(body.unoptimized_schema, schema.adapter.jsonschema_validator_cls)
 
-    @given(body.get_strategy(operation, GenerationConfig(), GenerationMode.NEGATIVE))
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(max_examples=300, deadline=None, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(body.get_strategy(operation, GenerationConfig(), GenerationMode.NEGATIVE), max_examples=300)
     def test(value):
         if isinstance(value, GeneratedValue):
             value = value.value
         if not isinstance(value, dict):
             return
         assert not validator.is_valid(value), f"Negative case conforms to the schema: {value!r}"
-
-    test()
 
 
 def test_negative_declines_unbuildable_negated_body(ctx):
@@ -2282,11 +2266,12 @@ def test_negative_declines_unbuildable_negated_body(ctx):
         },
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @seed(1)
     # The violating draw is rare, so fewer examples would let a regression pass.
-    @settings(max_examples=200, deadline=None, suppress_health_check=list(HealthCheck), phases=[Phase.generate])
+    @run_given(
+        case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE),
+        max_examples=200,
+        phases=[Phase.generate],
+        seed=1,
+    )
     def test(case):
         pass
-
-    test()

@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import os
 import struct
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypeVar
 
+import hypothesis
 import pytest
 import requests
 import urllib3
@@ -41,12 +42,21 @@ def profile_max_examples() -> int | None:
     return None if value == 100 else value
 
 
-def run_given(*args: Any, max_examples: int, derandomize: bool = False, **kwargs: Any) -> Callable[[Callable], None]:
+def run_given(
+    *args: Any,
+    max_examples: int,
+    derandomize: bool = False,
+    phases: Sequence[hypothesis.Phase] | None = None,
+    seed: int | None = None,
+    **kwargs: Any,
+) -> Callable[[Callable], None]:
     """Run the decorated function as a Hypothesis test right away; `--hypothesis-profile` overrides `max_examples`."""
     options: dict[str, Any] = {"derandomize": True} if derandomize else {}
+    if phases is not None:
+        options["phases"] = phases
 
     def run(test: Callable) -> None:
-        given(*args, **kwargs)(
+        wrapped = given(*args, **kwargs)(
             settings(
                 max_examples=profile_max_examples() or max_examples,
                 deadline=None,
@@ -54,7 +64,10 @@ def run_given(*args: Any, max_examples: int, derandomize: bool = False, **kwargs
                 suppress_health_check=list(HealthCheck),
                 **options,
             )(test)
-        )()
+        )
+        if seed is not None:
+            wrapped = hypothesis.seed(seed)(wrapped)
+        wrapped()
 
     return run
 

@@ -623,13 +623,10 @@ def test_graphql_body(ctx):
 
     strategy = schema["Mutation"]["addBook"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(case=strategy, max_examples=3, phases=[Phase.generate])
     def test(case):
         # Not necessarily valid GraphQL, but it is simpler to check the hook this way
         assert case.body == "mutation {\n  addedViaHook\n}"
-
-    test()
 
 
 def test_flatmap_query_hook_applies_to_openapi_and_graphql(ctx):

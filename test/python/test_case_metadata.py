@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import HealthCheck, Phase, find, given, settings
+from hypothesis import Phase, find
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
@@ -351,8 +351,7 @@ def test_before_call_hook_with_negative_cases(ctx):
 
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
-    @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=strategy, max_examples=3, phases=[Phase.generate])
     def test_case(case):
         if case.meta and isinstance(case.body, dict):
             # Initially negative (missing required id)
@@ -366,8 +365,6 @@ def test_before_call_hook_with_negative_cases(ctx):
             # Verify transition happened
             if initial_mode == GenerationMode.NEGATIVE:
                 assert case.meta.components[ParameterLocation.BODY].mode == GenerationMode.POSITIVE
-
-    test_case()
 
 
 @pytest.mark.hypothesis_nested
@@ -400,13 +397,10 @@ def test_map_case_hook_with_metadata(ctx):
 
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
-    @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=strategy, max_examples=3, phases=[Phase.generate])
     def test_case(case):
         # Verify path parameter is valid after hook fix
         assert case.meta.components[ParameterLocation.PATH].mode == GenerationMode.POSITIVE
-
-    test_case()
 
 
 def test_query_parameter_modification_revalidates(ctx):
@@ -694,8 +688,7 @@ type Query {
 
     strategy = operation.as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=5, phases=[Phase.generate], deadline=None)
+    @run_given(case=strategy, max_examples=5, phases=[Phase.generate])
     def test_case(case):
         assert case.meta is not None
         assert case.meta.generation.mode == GenerationMode.POSITIVE
@@ -704,8 +697,6 @@ type Query {
         case.body = '{"query": "invalid syntax {{{"}'
         # GraphQL schemas don't validate, so mode should remain POSITIVE
         assert case.meta.generation.mode == GenerationMode.POSITIVE
-
-    test_case()
 
 
 def test_case_without_metadata_no_crash(ctx):

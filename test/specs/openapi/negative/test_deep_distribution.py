@@ -5,7 +5,7 @@ from collections import Counter
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import Phase
 
 import schemathesis
 from schemathesis.core.jsonschema import _is_valid_uuid
@@ -124,12 +124,10 @@ def test_additional_properties_negation_stays_invalid(ctx):
     )
     validator = jsonschema_rs.Draft4Validator(BODY_WITH_NO_ADDITIONAL_PROPERTIES, validate_formats=True)
 
-    @given(case=operation.as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE))
-    @settings(
+    @run_given(
+        case=operation.as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE),
         max_examples=500,
-        deadline=None,
         derandomize=True,
-        suppress_health_check=list(HealthCheck),
         phases=[Phase.generate],
     )
     def test(case):
@@ -137,8 +135,6 @@ def test_additional_properties_negation_stays_invalid(ctx):
         if not isinstance(body, (dict, list, str, int, float, bool)) and body is not None:
             return
         assert not validator.is_valid(body), f"False positive: body {body!r} is valid against the schema"
-
-    test()
 
 
 @pytest.mark.parametrize(

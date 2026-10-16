@@ -4,7 +4,7 @@ from typing import Annotated
 import pytest
 from fastapi import Cookie, FastAPI, Header, Request
 from fastapi.responses import PlainTextResponse
-from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import Phase
 from pydantic import BaseModel
 
 import schemathesis
@@ -93,16 +93,11 @@ def test_null_byte():
 
     strategy = schema["/data"]["POST"].as_strategy()
 
-    @given(case=strategy)
-    @settings(
-        max_examples=50, suppress_health_check=[HealthCheck.filter_too_much], deadline=None, phases=[Phase.generate]
-    )
+    @run_given(case=strategy, max_examples=50, phases=[Phase.generate])
     def test(case):
         response = case.call()
         assert response.status_code == 200
         assert response.json() == {"success": True}
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -120,16 +115,11 @@ def test_null_byte_in_headers():
 
     strategy = schema["/data"]["POST"].as_strategy()
 
-    @given(case=strategy)
-    @settings(
-        max_examples=50, suppress_health_check=[HealthCheck.filter_too_much], deadline=None, phases=[Phase.generate]
-    )
+    @run_given(case=strategy, max_examples=50, phases=[Phase.generate])
     def test(case):
         response = case.call()
         assert response.status_code == 200
         assert response.json() == {"success": True}
-
-    test()
 
 
 def test_base_url(ctx):
@@ -174,12 +164,9 @@ def test_schema_and_generated_requests_share_one_host():
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-    @given(case=schema["/ping"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, phases=[Phase.generate])
+    @run_given(case=schema["/ping"]["GET"].as_strategy(), max_examples=1, phases=[Phase.generate])
     def test(case):
         assert case.call().status_code == 200
-
-    test()
 
     assert seen == ["testserver", "testserver"]
 
@@ -424,12 +411,9 @@ def test_lifespan_state():
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-    @given(case=schema["/state/{name}"]["GET"].as_strategy())
-    @settings(max_examples=2, deadline=None, phases=[Phase.generate])
+    @run_given(case=schema["/state/{name}"]["GET"].as_strategy(), max_examples=2, phases=[Phase.generate])
     def test(case):
         assert case.call().json() == {"db": "connected"}
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -444,12 +428,9 @@ def test_caller_supplied_session_is_used():
     client = ASGIClient(app)
     client.headers["x-custom"] = "from-session"
 
-    @given(case=schema["/echo"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, phases=[Phase.generate])
+    @run_given(case=schema["/echo"]["GET"].as_strategy(), max_examples=1, phases=[Phase.generate])
     def test(case):
         assert case.call(session=client).json() == {"header": "from-session"}
-
-    test()
 
 
 def test_curl_command_names_the_host_the_request_used():
@@ -462,13 +443,10 @@ def test_curl_command_names_the_host_the_request_used():
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-    @given(case=schema["/ping"]["GET"].as_strategy())
-    @settings(max_examples=1, deadline=None, phases=[Phase.generate])
+    @run_given(case=schema["/ping"]["GET"].as_strategy(), max_examples=1, phases=[Phase.generate])
     def test(case):
         response = case.call()
         assert case.as_curl_command() == f"curl -X GET {response.request.url}"
-
-    test()
 
 
 def test_lifespan_shutdown_leaves_no_unclosed_streams(testdir):

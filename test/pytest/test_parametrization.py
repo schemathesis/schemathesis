@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import HealthCheck, Phase, assume, given, settings
+from hypothesis import Phase, assume
 
 import schemathesis
 from schemathesis.core.transforms import to_wire_string
@@ -581,17 +581,9 @@ def test_multipart_behind_a_reference(ctx):
     )
     # Then it should be correctly resolved
 
-    @given(case=operation.as_strategy())
-    @settings(
-        max_examples=5,
-        deadline=None,
-        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-        phases=[Phase.generate],
-    )
+    @run_given(case=operation.as_strategy(), max_examples=5, phases=[Phase.generate])
     def test(case):
         assert_requests_call(case)
-
-    test()
 
 
 @pytest.mark.hypothesis_nested

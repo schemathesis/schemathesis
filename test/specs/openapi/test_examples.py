@@ -5032,13 +5032,14 @@ def test_examples_with_the_same_name_are_paired_in_fuzzing(ctx):
     schema = ctx.openapi.load_schema(CORRELATED_NAMED_EXAMPLES)
     seen = []
 
-    @given(case=schema["/search"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
     # Every expected variant must appear at least once, which takes many draws.
-    @settings(max_examples=200, deadline=None, phases=[Phase.generate], suppress_health_check=list(HealthCheck))
+    @run_given(
+        case=schema["/search"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE),
+        max_examples=200,
+        phases=[Phase.generate],
+    )
     def test(case):
         seen.append((case.query["region"], case.query["currency"]))
-
-    test()
 
     from_examples = {pair for pair in seen if pair[0] in ("US", "EU") and pair[1] in ("USD", "EUR")}
     assert from_examples

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from schemathesis.config import ConfigError, SchemathesisConfig
@@ -474,9 +473,8 @@ def test_probability_below_one_takes_both_substitute_and_skip_branches(ctx):
     substituted = 0
     skipped = 0
 
-    @given(case=operation.as_strategy())
     # Every expected variant must appear at least once, which takes many draws.
-    @settings(max_examples=60, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=60, derandomize=True)
     def collect(case):
         nonlocal substituted, skipped
         if case._meta is None:
@@ -486,7 +484,6 @@ def test_probability_below_one_takes_both_substitute_and_skip_branches(ctx):
         else:
             skipped += 1
 
-    collect()
     assert substituted > 0 and skipped > 0, f"coin never took both paths: substituted={substituted}, skipped={skipped}"
 
 
@@ -1038,11 +1035,10 @@ def test_body_binding_drops_indexed_mutation_under_wildcard_overwrite(ctx):
     overwrites_seen = 0
     saw_sibling_mutation = False
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     # Generous, because the guard below is a distributional claim rather than a property of any one
     # case: it holds only once enough draws land on the sibling. Every change to the generator re-rolls
     # which examples this seed produces, and at a thin margin that re-roll is a CI failure, not a bug.
-    @settings(max_examples=300, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=300, derandomize=True)
     def collect(case):
         nonlocal overwrites_seen, saw_sibling_mutation
         if case._meta is None:
@@ -1057,7 +1053,6 @@ def test_body_binding_drops_indexed_mutation_under_wildcard_overwrite(ctx):
             if mutation.path[:1] == ("sibling",):
                 saw_sibling_mutation = True
 
-    collect()
     assert overwrites_seen > 0, "scenario never produced a /items/* overwrite"
     assert saw_sibling_mutation, (
         "no sibling mutation observed in any overwrite case; absence-of-items-mutation could be vacuous"

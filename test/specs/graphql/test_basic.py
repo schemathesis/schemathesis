@@ -114,12 +114,9 @@ def test_operation_strategy_keeps_explicit_components(ctx):
         headers={"X-Token": "secret"}, query={"trace": "1"}, cookies={"session": "abc"}
     )
 
-    @given(case=strategy)
-    @settings(max_examples=1, phases=[Phase.generate], deadline=None)
+    @run_given(case=strategy, max_examples=1, phases=[Phase.generate])
     def test(case):
         assert (case.headers, case.query, case.cookies) == ({"X-Token": "secret"}, {"trace": "1"}, {"session": "abc"})
-
-    test()
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
