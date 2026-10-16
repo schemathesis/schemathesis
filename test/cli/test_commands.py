@@ -10,22 +10,18 @@ import subprocess
 import sys
 import threading
 import time
-from http.client import RemoteDisconnected
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from itertools import count
 from urllib.parse import urljoin
 
 import hypothesis
 import pytest
-import requests
 import strawberry
 import trustme
-import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
 from flask import Flask, Response, jsonify, redirect, request, url_for
 from hypothesis.internal.observability import with_observability_callback
-from urllib3.exceptions import ProtocolError
 from werkzeug.serving import make_server
 
 import schemathesis
@@ -637,21 +633,54 @@ def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
     assert result == snapshot_cli
 
 
-def test_read_content_timeout(ctx, cli, mocker, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    original = urllib3.response.HTTPResponse.stream
-    count = 0
+@pytest.fixture
+def raw_http_server(ctx):
+    # Serves the schema, then answers every other request with `reply`, for responses no framework would send.
+    schema = json.dumps(ctx.openapi.build_schema(SUCCESS_PATHS)).encode()
+    listeners = []
 
-    def stream(self, *args, **kwargs):
-        nonlocal count
+    def handle(connection, reply):
+        with connection:
+            request_line = connection.recv(65536).split(b"\r\n", 1)[0]
+            if b" /openapi.json " in request_line:
+                connection.sendall(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                    + str(len(schema)).encode()
+                    + b"\r\nConnection: close\r\n\r\n"
+                    + schema
+                )
+            else:
+                reply(connection)
 
-        count += 1
-        if count > 1:
-            raise urllib3.exceptions.ReadTimeoutError(self._pool, None, "Read timed out.")
-        return original(self, *args, **kwargs)
+    def start(reply):
+        listener = socket.create_server(("127.0.0.1", 0))
+        listeners.append(listener)
 
-    mocker.patch("urllib3.response.HTTPResponse.stream", stream)
-    assert cli.run(api.schema_url) == snapshot_cli
+        def serve():
+            while True:
+                try:
+                    connection, _ = listener.accept()
+                except OSError:
+                    return
+                threading.Thread(target=handle, args=(connection, reply), daemon=True).start()
+
+        threading.Thread(target=serve, daemon=True).start()
+        return f"http://127.0.0.1:{listener.getsockname()[1]}/openapi.json"
+
+    yield start
+    for listener in listeners:
+        listener.close()
+
+
+SUCCESS_PATHS = {"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}}
+
+
+def test_read_content_timeout(cli, raw_http_server, snapshot_cli):
+    def stall_mid_body(connection):
+        connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{")
+        time.sleep(1)
+
+    assert cli.run(raw_http_server(stall_mid_body), "--request-timeout=0.1", "--max-examples=1") == snapshot_cli
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -915,18 +944,13 @@ def broken_check(ctx, response, case):
         )
 
 
-def test_chunked_encoding_error(ctx, mocker, cli, snapshot_cli):
-    api = ctx.openapi.apps.chunked_success()
+def test_chunked_encoding_error(cli, raw_http_server, snapshot_cli):
+    def empty_chunk_length(connection):
+        connection.sendall(
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: application/json\r\n\r\n\r\n"
+        )
 
-    def _update_chunk_length(response):
-        value = b""
-        try:
-            int(value, 16)
-        except ValueError as e:
-            raise urllib3.exceptions.InvalidChunkLength(response, value) from e
-
-    mocker.patch("urllib3.response.HTTPResponse._update_chunk_length", _update_chunk_length)
-    assert cli.run(api.schema_url, "--phases=fuzzing") == snapshot_cli
+    assert cli.run(raw_http_server(empty_chunk_length), "--phases=fuzzing") == snapshot_cli
 
 
 @pytest.mark.skipif(
@@ -949,23 +973,15 @@ def test_remote_disconnected_error(cli, snapshot_cli):
         assert cli.run(f"http://127.0.0.1:{listener.getsockname()[1]}/openapi.json") == snapshot_cli
 
 
-def test_remote_disconnected_error_with_empty_header(ctx, mocker, cli, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    # When a request has an empty header value and the server disconnects
-    # Regression test for IndexError when extracting headers from PreparedRequest with empty values
-    protocol_error = ProtocolError("Connection aborted.", RemoteDisconnected("Remote end closed connection"))
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
+)
+def test_remote_disconnected_error_with_empty_header(cli, raw_http_server, snapshot_cli):
+    # An empty header value on a request the server drops must still render in the error report.
+    def close_without_response(connection):
+        pass
 
-    def raise_connection_error(self, **kwargs):
-        req = requests.Request("GET", "http://127.0.0.1/success", headers={"X-Empty": ""})
-        prepared = req.prepare()
-        conn_error = requests.ConnectionError(protocol_error)
-        conn_error.request = prepared
-        conn_error.__context__ = protocol_error
-        raise conn_error
-
-    mocker.patch("schemathesis.generation.case.Case.call", raise_connection_error)
-    # Then it should not crash with IndexError on empty header value
-    assert cli.run(api.schema_url) == snapshot_cli
+    assert cli.run(raw_http_server(close_without_response), config={"headers": {"X-Empty": ""}}) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
