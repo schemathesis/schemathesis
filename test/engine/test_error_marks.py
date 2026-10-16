@@ -55,7 +55,7 @@ def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
         def set(self, case, data, context):
             pass
 
-    schema_dict = ctx.openapi.build_schema(
+    loaded = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -75,7 +75,6 @@ def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
         },
         components={"securitySchemes": {"bearer": {"type": "http", "scheme": "bearer"}}},
     )
-    loaded = schemathesis.openapi.from_dict(schema_dict)
     try:
         stream = examples_only(loaded)
     finally:
@@ -89,7 +88,7 @@ def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
 
 def test_invalid_headers_example_mark(ctx):
     # Header example containing a newline character is rejected at the wire level.
-    schema = ctx.openapi.build_schema(
+    loaded = ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {
@@ -107,7 +106,6 @@ def test_invalid_headers_example_mark(ctx):
             }
         }
     )
-    loaded = schemathesis.openapi.from_dict(schema)
     stream = examples_only(loaded)
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InvalidHeadersExample) for event in errors), [

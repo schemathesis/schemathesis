@@ -3404,7 +3404,7 @@ def test_response_schema_conformance_reports_boolean_branch_rejection(ctx, respo
 
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
-    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(_DATE_TIME_PATHS), config=config)
+    schema = ctx.openapi.load_schema(_DATE_TIME_PATHS, config=config)
     case = schema["/test"]["GET"].Case()
     response = Response.from_requests(response_factory.requests(content=_STR_DATETIME_RESPONSE), True)
 

@@ -572,10 +572,15 @@ class OpenApiContext:
         return builders.build_schema(paths, version=version, **kwargs)
 
     def load_schema(
-        self, paths: dict[str, Any] | None, *, version: str = "3.0.2", **kwargs: dict[str, Any]
+        self,
+        paths: dict[str, Any] | None,
+        *,
+        version: str = "3.0.2",
+        config: SchemathesisConfig | None = None,
+        **kwargs: dict[str, Any],
     ) -> OpenApiSchema:
         schema = self.build_schema(paths, version=version, **kwargs)
-        return schemathesis.openapi.from_dict(schema)
+        return schemathesis.openapi.from_dict(schema, config=config)
 
     def from_full_schema(self, raw_schema: dict[str, Any]) -> OpenApiSchema:
         version = raw_schema.get("openapi") or raw_schema["swagger"]

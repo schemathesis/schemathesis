@@ -171,7 +171,7 @@ def test_invalid_servers_raises(ctx, operation_definition, match):
 
 def test_config_base_url_short_circuits(ctx):
     config = SchemathesisConfig.from_dict({"base-url": "https://override.example.com/api"})
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/admin": {
                 "servers": [{"url": "https://path.example.com/p"}],
@@ -182,8 +182,8 @@ def test_config_base_url_short_circuits(ctx):
             }
         },
         servers=[{"url": "https://global.example.com/g"}],
+        config=config,
     )
-    schema = schemathesis.openapi.from_dict(schema_dict, config=config)
     assert schema["/admin"]["GET"].base_url == "https://override.example.com/api"
 
 
@@ -262,7 +262,8 @@ def test_unknown_variable_name_silently_ignored(ctx):
 
 
 def test_config_variable_fills_missing_default(ctx):
-    schema_dict = ctx.openapi.build_schema(
+    config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "provided"}}})
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {
@@ -275,10 +276,9 @@ def test_config_variable_fills_missing_default(ctx):
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        config=config,
     )
-    config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "provided"}}})
-    schema = schemathesis.openapi.from_dict(schema_dict, config=config)
     assert schema["/items"]["GET"].base_url == "https://provided.example.com"
 
 

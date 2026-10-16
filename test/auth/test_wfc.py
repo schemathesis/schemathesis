@@ -1109,9 +1109,9 @@ def test_escalating_provider_exposes_its_caching_providers(ctx, tmp_path):
     # Reactive reauth is driven off the caching providers reachable from the schema; an escalating
     # provider must not hide the ones it wraps, or a stale token can never be refreshed.
     auth = _write(tmp_path, EXPIRING_AUTH)
-    raw = ctx.openapi.build_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema = schemathesis.openapi.from_dict(
-        raw, config=schemathesis.Config.from_dict({"auth": {"wfc": {"path": auth}}})
+    schema = ctx.openapi.load_schema(
+        {"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        config=schemathesis.Config.from_dict({"auth": {"wfc": {"path": auth}}}),
     )
 
     assert 401 in schema.reauth_retry_statuses
@@ -1397,9 +1397,11 @@ PEER_AUTH = {
 
 
 def _peer_schema(ctx, tmp_path, *, peers=("alice", "bob"), **wfc):
-    raw = ctx.openapi.build_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
     config = {"path": _write(tmp_path, PEER_AUTH), "peers": list(peers), **wfc}
-    return schemathesis.openapi.from_dict(raw, config=schemathesis.Config.from_dict({"auth": {"wfc": config}}))
+    return ctx.openapi.load_schema(
+        {"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        config=schemathesis.Config.from_dict({"auth": {"wfc": config}}),
+    )
 
 
 def _authenticated_case(schema):
