@@ -129,7 +129,10 @@ def _get_pool_combos(
         )
         if variants:
             required_fields = set(body_schema.get("required", []))
-            complete_variants = [v for v in variants if all(f in v.overlay for f in required_fields)]
+            # Overlays for array items carry single fields, never a complete array body.
+            complete_variants = [
+                v for v in variants if isinstance(v.overlay, dict) and all(f in v.overlay for f in required_fields)
+            ]
             if complete_variants:
                 per_location.append(
                     [{"body": variant.overlay, "media_type": body.media_type} for variant in complete_variants]

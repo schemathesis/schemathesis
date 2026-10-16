@@ -123,7 +123,7 @@ CONSTANTS_OVERLAY_PROBABILITY = 0.15
 _TYPE_DECIDING_KEYWORDS = ("anyOf", "oneOf", "allOf", "not", "$ref")
 
 
-def _variant_key(variant: dict[str, Any]) -> str:
+def _variant_key(variant: dict[str, Any] | list[Any]) -> str:
     """Create a stable string key for a variant dict."""
     return jsonschema_rs.canonical.json.to_string(variant)
 
@@ -898,9 +898,8 @@ def build_hybrid_strategy(
             base_constants_draws = drawn.constants_draws
             base = drawn.value
 
-        # Captured variants are partial dict overrides; meaningful only when the base is a dict.
-        # Schemas without `type: object` can produce scalars/lists — leave those untouched.
-        if not isinstance(base, dict):
+        # Captured variants are partial overrides of an object body or of top-level array items.
+        if not isinstance(base, (dict, list)):
             return base
 
         # Single variant: no selection needed
@@ -913,9 +912,11 @@ def build_hybrid_strategy(
         chosen = captured_variants[idx]
         overlay = chosen.overlay
         pool_draws = chosen.draws
+        if isinstance(overlay, list) != isinstance(base, list) or base == []:
+            return drawn
         # A dictionary binding is explicit intent, so a captured value never replaces its entry.
         bound = {draw_.parameter_name for draw_ in base_dictionary_draws if draw_.body_path is None}
-        if bound & overlay.keys():
+        if isinstance(overlay, dict) and bound & overlay.keys():
             overlay = {key: value for key, value in overlay.items() if key not in bound}
             pool_draws = tuple(pool_draw for pool_draw in pool_draws if pool_draw.parameter_name not in bound)
             if not overlay:
@@ -923,12 +924,12 @@ def build_hybrid_strategy(
 
         if container_validator is not None:
             merged = deepclone(base)
-            _deep_merge_overlay(merged, overlay)
+            _apply_overlay(merged, overlay)
             if not _example_is_valid(merged, container_validator):
                 return drawn
             base = merged
         else:
-            _deep_merge_overlay(base, overlay)
+            _apply_overlay(base, overlay)
         usage_tracker.record_draw(variant_keys[idx])
         return GeneratedValue(
             value=base,
@@ -942,6 +943,13 @@ def build_hybrid_strategy(
     return hybrid()
 
 
+def _apply_overlay(target: dict[str, Any] | list[Any], overlay: dict[str, Any] | list[Any]) -> None:
+    if isinstance(target, dict) and isinstance(overlay, dict):
+        _deep_merge_overlay(target, overlay)
+    elif isinstance(target, list) and isinstance(overlay, list) and _is_item_overlay(overlay):
+        _merge_item_overlay(target, overlay[0])
+
+
 def _deep_merge_overlay(target: dict[str, Any], overlay: dict[str, Any]) -> None:
     """Apply `overlay` onto `target` in place, recursing into nested dicts so leaf overlays don't drop generated siblings."""
     for key, value in overlay.items():
@@ -949,12 +957,16 @@ def _deep_merge_overlay(target: dict[str, Any], overlay: dict[str, Any]) -> None
         if isinstance(value, dict) and isinstance(current, dict):
             _deep_merge_overlay(current, value)
         elif _is_item_overlay(value) and isinstance(current, list) and current:
-            # Fields captured for an array item apply to every generated item, as bulk endpoints check each one.
-            for item in current:
-                if isinstance(item, dict):
-                    _deep_merge_overlay(item, value[0])
+            _merge_item_overlay(current, value[0])
         else:
             target[key] = value
+
+
+def _merge_item_overlay(items: list[Any], overlay: dict[str, Any]) -> None:
+    # Fields captured for an array item apply to every generated item, as bulk endpoints check each one.
+    for item in items:
+        if isinstance(item, dict):
+            _deep_merge_overlay(item, overlay)
 
 
 def _is_item_overlay(value: object) -> bool:

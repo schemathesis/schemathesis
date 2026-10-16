@@ -23,7 +23,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     DependencyGraph,
     InputSlot,
     _build_nested_body,
-    _merge_nested_body,
+    _merge_request_body,
 )
 from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, referenced_values
 
@@ -177,7 +177,7 @@ class CapturedVariant:
     can attribute the case to its semantic predecessor(s).
     """
 
-    overlay: dict[str, Any]
+    overlay: dict[str, Any] | list[Any]
     draws: tuple[PoolDraw, ...]
 
 
@@ -310,23 +310,17 @@ class _VariantSlot:
         return "/".join(map(str, self.path))
 
 
-def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str, Any]) -> dict[str, Any]:
-    variant: dict[str, Any] = {}
+def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str, Any]) -> dict[str, Any] | list[Any]:
+    variant: dict[str, Any] | list[Any] = {}
     for slot in slots:
         if slot.lookup_key in values_by_lookup_key:
-            _merge_nested_body(variant, _build_overlay(slot.lookup_key, values_by_lookup_key[slot.lookup_key]))
+            overlay = _build_nested_body(slot.lookup_key, values_by_lookup_key[slot.lookup_key])
+            variant = _merge_request_body(variant, overlay)
     return variant
 
 
-def _build_overlay(lookup_key: str, value: Any) -> dict[str, Any]:
-    overlay = _build_nested_body(lookup_key, value)
-    # Paths start at a property of the object body, so the overlay is always an object.
-    assert isinstance(overlay, dict)
-    return overlay
-
-
 def _variant_satisfies_paths(
-    variant: dict[str, Any],
+    variant: dict[str, Any] | list[Any],
     slots: list[_VariantSlot],
     validators: dict[str, jsonschema_rs.Validator | None],
 ) -> bool:
@@ -427,7 +421,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
         properties = schema.get("properties")
         if not isinstance(properties, dict):
-            return None
+            # A top-level array body has no properties; its item fields are nested requirements.
+            properties = {}
 
         slots: list[_VariantSlot] = []
         for name, prop_schema in properties.items():
@@ -452,7 +447,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             slot = slots[0]
             variants = [
                 CapturedVariant(
-                    overlay=_build_overlay(slot.lookup_key, value),
+                    overlay=_build_nested_body(slot.lookup_key, value),
                     draws=(
                         _build_pool_draw_from_requirement(
                             location=location,

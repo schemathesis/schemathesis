@@ -1661,26 +1661,49 @@ def _objects_at(value, path):
     return _objects_at(value[head], rest) if isinstance(value, dict) and head in value else []
 
 
+def _with_shipping(shipping):
+    return {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "shipping": shipping},
+        "required": ["shipping"],
+    }
+
+
 @pytest.mark.parametrize(
-    ("shipping", "path"),
+    ("body", "path"),
     [
-        (_SHIPPING, ("shipping",)),
-        (_SHIPPING_REF, ("shipping",)),
-        ({"type": "array", "minItems": 1, "items": _SHIPPING}, ("shipping", "*")),
-        ({"type": "array", "minItems": 1, "items": _SHIPPING_REF}, ("shipping", "*")),
-        ({"$ref": "#/components/schemas/Shipments"}, ("shipping", "*")),
+        (_with_shipping(_SHIPPING), ("shipping",)),
+        (_with_shipping(_SHIPPING_REF), ("shipping",)),
+        (_with_shipping({"type": "array", "minItems": 1, "items": _SHIPPING}), ("shipping", "*")),
+        (_with_shipping({"type": "array", "minItems": 1, "items": _SHIPPING_REF}), ("shipping", "*")),
+        (_with_shipping({"$ref": "#/components/schemas/Shipments"}), ("shipping", "*")),
         (
-            {
-                "type": "object",
-                "required": ["parts"],
-                "properties": {"parts": {"type": "array", "minItems": 1, "items": _SHIPPING_REF}},
-            },
+            _with_shipping(
+                {
+                    "type": "object",
+                    "required": ["parts"],
+                    "properties": {"parts": {"type": "array", "minItems": 1, "items": _SHIPPING_REF}},
+                }
+            ),
             ("shipping", "parts", "*"),
         ),
+        ({"type": "array", "minItems": 1, "items": _SHIPPING}, ("*",)),
+        ({"type": "array", "minItems": 1, "items": _SHIPPING_REF}, ("*",)),
+        ({"$ref": "#/components/schemas/Shipments"}, ("*",)),
     ],
-    ids=["inline-object", "ref-object", "array", "array-of-refs", "ref-to-array", "array-in-object"],
+    ids=[
+        "inline-object",
+        "ref-object",
+        "array",
+        "array-of-refs",
+        "ref-to-array",
+        "array-in-object",
+        "top-level-array",
+        "top-level-array-of-refs",
+        "top-level-ref-to-array",
+    ],
 )
-def test_nested_body_pool_overlay_lands_pool_values(ctx, shipping, path):
+def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
     schema = ctx.openapi.load_schema(
         {
             "/locations": {
@@ -1706,15 +1729,7 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, shipping, path):
                     "operationId": "createDepartment",
                     "requestBody": {
                         "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}, "shipping": shipping},
-                                    "required": ["shipping"],
-                                }
-                            }
-                        },
+                        "content": {"application/json": {"schema": body}},
                     },
                     "responses": {"201": {"description": "OK"}},
                 }
@@ -1753,10 +1768,52 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, shipping, path):
         elif any(landed):
             partial_hits.append(objects)
 
-    assert pool_hits, "Pool's Location.id values never landed under `shipping`"
+    assert pool_hits, "Pool's Location.id values never landed in the body"
     assert not partial_hits, f"Pool value reached only some array items: {partial_hits[:3]!r}"
     dropped = [objects for objects in pool_hits if not all("note" in item for item in objects)]
     assert not dropped, f"Overlay dropped the generated `note` sibling: {dropped[:3]!r}"
+
+
+def test_top_level_array_body_variant_combines_item_fields(ctx):
+    owner = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    schema = ctx.openapi.load_schema(
+        {
+            "/groups": {"post": {"responses": {"201": {"content": {"application/json": {"schema": owner}}}}}},
+            "/owners": {"post": {"responses": {"201": {"content": {"application/json": {"schema": owner}}}}}},
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "groupId": {"type": "string"},
+                                            "ownerId": {"type": "string"},
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /groups", status_code=201, payload={"id": "G-1"})
+    data_source.repository.record_response(operation="POST /owners", status_code=201, payload={"id": "O-1"})
+
+    operation = schema["/items"]["POST"]
+    variants = data_source.get_captured_variants(
+        operation=operation, location=ParameterLocation.BODY, schema=operation.body[0].optimized_schema
+    )
+    assert [variant.overlay for variant in variants] == [[{"groupId": "G-1", "ownerId": "O-1"}]]
 
 
 def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
