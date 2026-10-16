@@ -1493,3 +1493,53 @@ def test_examples_phase_keeps_example_fields_around_nested_captured_id(cli, ctx,
         items = [item for data in with_captured_id for item in (data if isinstance(data, list) else [data])]
         assert items
         assert all(item["groupId"] == "G-REAL" and item.get("name") for item in items), items
+
+
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        (_ITEM_SCHEMA, [{"name": "x", "groupId": "G-REAL"}]),
+        ({"$ref": "#/components/schemas/Item"}, [{"name": "x", "groupId": "G-REAL"}]),
+        ({**_ITEM_SCHEMA, "not": {"properties": {"groupId": {"const": "G-REAL"}}}}, []),
+    ],
+    ids=["inline", "ref", "captured-id-not-allowed"],
+)
+def test_examples_phase_fills_captured_id_into_example_that_supplies_required_fields(cli, ctx, body_schema, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/groups": {
+                "post": {
+                    "responses": {
+                        "201": _json_response(
+                            _object_schema(
+                                {"data": _object_schema({"id": {"type": "string"}}, required=["id"])},
+                                required=["data"],
+                            ),
+                            description="",
+                        )
+                    }
+                }
+            },
+            "/items": {
+                "post": {
+                    "requestBody": _json_request_body(body_schema, example={"name": "x", "groupId": "G-EX"}),
+                    "responses": {"201": {"description": ""}},
+                }
+            },
+        },
+        components={"schemas": {"Item": _ITEM_SCHEMA}},
+    )
+    sent = []
+
+    @app.route("/groups", methods=["POST"])
+    def create_group():
+        return jsonify({"data": {"id": "G-REAL"}}), 201
+
+    @app.route("/items", methods=["POST"])
+    def create_items():
+        sent.append(request.get_json())
+        return "", 201
+
+    cli.run_openapi_app(app, "--phases=examples", "--mode=positive", config=_examples_fill_missing_config())
+
+    assert [body for body in sent if body["groupId"] == "G-REAL"] == expected
