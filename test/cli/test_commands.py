@@ -3529,6 +3529,38 @@ def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, no_null_bytes):
     )
 
 
+def test_slow_probe_response_does_not_adapt_generation(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{name}": {
+                "get": {
+                    "parameters": [
+                        {"name": "name", "in": "path", "required": True, "schema": {"type": "string", "enum": ["\\"]}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    names = []
+
+    @app.before_request
+    def delay_probes():
+        if "X-Schemathesis-Probe" in request.headers:
+            time.sleep(1)
+
+    @app.route("/items/<path:name>")
+    def items(name):
+        names.append(name)
+        return jsonify({})
+
+    lines = cli.run_openapi_app(
+        app, "--phases=fuzzing", "--max-examples=1", "--request-timeout=0.5"
+    ).stdout.splitlines()
+    assert [line.strip() for line in lines if "✘" in line] == []
+    assert set(names) == {"\\"}
+
+
 @pytest.mark.skipif(sys.version_info >= (3, 13), reason="Error message is different")
 def test_malformed_schema(testdir, cli, snapshot_cli, ctx):
     api = ctx.openapi.apps.success()

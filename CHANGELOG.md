@@ -47,6 +47,7 @@
 - Nested objects in inline query parameter schemas serialized as their property names only.
 - Comma-separated multipart `encoding.contentType` sent verbatim as the part Content-Type in coverage. [#5380](https://github.com/schemathesis/schemathesis/issues/5380)
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
+- API capabilities reported as unsupported, and generation narrowed, when a probe request times out.
 - "Cannot generate test data" for path parameters whose `enum` values contain `/`.
 - `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
 - False positive `positive_data_acceptance` for header values ending with whitespace.
