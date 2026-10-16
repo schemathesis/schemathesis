@@ -271,7 +271,7 @@ def test_default_report_is_collected_by_pytest(ctx, cli, tmp_path, pytester):
 
 @pytest.mark.parametrize(
     ("args", "expected"),
-    [((), (False, False, True, True)), (("--output-sanitize=false",), (True, True, False, False))],
+    [((), (False, False, False, True, True)), (("--output-sanitize=false",), (True, True, True, False, False))],
     ids=["sanitized", "not-sanitized"],
 )
 def test_credentials_are_sanitized(ctx, cli, tmp_path, args, expected):
@@ -281,6 +281,8 @@ def test_credentials_are_sanitized(ctx, cli, tmp_path, args, expected):
         f"{api.schema_url}?token=secret-query",
         f"--report-pytest-path={path}",
         "--header=Authorization: Bearer secret-token",
+        # The API under test doubles as a forward proxy for itself.
+        f"--proxy={api.base_url.replace('://', '://user:secret-proxy@')}",
         "--max-examples=1",
         "--phases=fuzzing",
         "--checks=not_a_server_error",
@@ -290,6 +292,7 @@ def test_credentials_are_sanitized(ctx, cli, tmp_path, args, expected):
     assert (
         "secret-token" in content,
         "secret-query" in content,
+        "secret-proxy" in content,
         "'Authorization': '[Filtered]'" in content,
         "# Sensitive values are replaced" in content,
     ) == expected
@@ -422,3 +425,39 @@ def test_disabled_tls_verification_is_replayed(ctx, cli, app_runner, tmp_path, p
 
     pytester.makepyfile(test_regressions=path.read_text(encoding="utf-8"))
     pytester.runpytest("-W", "ignore::urllib3.exceptions.InsecureRequestWarning").assert_outcomes(passed=1)
+
+
+# The proxy case points at the API under test, which doubles as a forward proxy for itself.
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (("--request-timeout=5",), "timeout=5.0,"),
+        (("--proxy=http://{netloc}",), "proxies={{'all': 'http://{netloc}'}},"),
+        (
+            ("--request-cert={cert}", "--request-cert-key={key}"),
+            "cert=({cert!r}, {key!r}),",
+        ),
+    ],
+    ids=["timeout", "proxy", "cert"],
+)
+def test_transport_settings_are_replayed(ctx, cli, tmp_path, pytester, args, expected):
+    api = ctx.openapi.apps.failure()
+    cert, key = tmp_path / "cert.pem", tmp_path / "key.pem"
+    cert.touch()
+    key.touch()
+    values = {"netloc": api.base_url.removeprefix("http://"), "cert": str(cert), "key": str(key)}
+    path = tmp_path / "test_regressions.py"
+    cli.run_and_assert(
+        api.schema_url,
+        f"--report-pytest-path={path}",
+        *(arg.format(**values) for arg in args),
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--checks=not_a_server_error",
+        exit_code=ExitCode.TESTS_FAILED,
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert f"        {expected.format(**values)}\n" in content
+    pytester.makepyfile(test_regressions=content)
+    pytester.runpytest().assert_outcomes(passed=1)

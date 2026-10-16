@@ -28,9 +28,10 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
     from schemathesis.engine.recorder import Interaction
     from schemathesis.engine.statistic import Statistic
+    from schemathesis.schemas import APIOperation
 
 
-def _render_request(interaction: Interaction, config: OutputConfig) -> list[str]:
+def _render_request(interaction: Interaction, operation: APIOperation, config: OutputConfig) -> list[str]:
     request = interaction.request
     headers = {name: ", ".join(values) for name, values in request.headers.items()}
     uri = request.uri
@@ -43,6 +44,18 @@ def _render_request(interaction: Interaction, config: OutputConfig) -> list[str]
         lines.append(f"        data={request.body!r},")
     if interaction.response is not None and interaction.response.verify is not True:
         lines.append(f"        verify={interaction.response.verify!r},")
+    transport = operation.schema.config
+    cert = transport.request_cert_for(operation=operation)
+    if cert is not None:
+        lines.append(f"        cert={cert!r},")
+    proxy = transport.proxy_for(operation=operation)
+    if proxy is not None:
+        if config.sanitization.enabled:
+            proxy = sanitize_url(proxy, config=config.sanitization)
+        lines.append(f"        proxies={{'all': {proxy!r}}},")
+    timeout = transport.request_timeout_for(operation=operation)
+    if timeout is not None:
+        lines.append(f"        timeout={timeout!r},")
     lines.append("    )")
     if interaction.response is None:
         lines.append("    # No response was received")
@@ -94,7 +107,11 @@ def _comment(text: str) -> list[str]:
 
 
 def render(
-    statistic: Statistic, interactions: dict[str, Interaction], config: OutputConfig, location: str | None
+    statistic: Statistic,
+    interactions: dict[str, Interaction],
+    operations: dict[str, APIOperation],
+    config: OutputConfig,
+    location: str | None,
 ) -> str:
     if location and config.sanitization.enabled:
         location = sanitize_url(location, config=config.sanitization)
@@ -110,7 +127,7 @@ def render(
         for index, group in enumerate(statistic.failures[label].values(), 1):
             if group.case_id is None:
                 continue
-            chain = [interactions[step.case_id] for step in group.steps if step.case_id in interactions]
+            chain = [step.case_id for step in group.steps if step.case_id in interactions]
             if not chain:
                 continue
             explanation = format_failures(
@@ -128,9 +145,9 @@ def render(
             lines.extend(_comment(label))
             lines.extend(_comment(explanation))
             lines.append(f"def test_{slug}_{group.case_id}():")
-            for interaction in chain:
-                lines.extend(_render_request(interaction, config))
-            response = chain[-1].response
+            for case_id in chain:
+                lines.extend(_render_request(interactions[case_id], operations[case_id], config))
+            response = interactions[chain[-1]].response
             if response is not None:
                 symptoms: list[str] = []
                 for failure in group.failures:
@@ -146,12 +163,13 @@ def render(
 class PytestReportHandler(EventHandler["BaseExecutionContext"]):
     """Keep the requests of failing scenarios and write them as pytest tests at shutdown."""
 
-    __slots__ = ("output", "location", "interactions")
+    __slots__ = ("output", "location", "interactions", "operations")
 
     def __init__(self, output: Path) -> None:
         self.output = output
         self.location: str | None = None
         self.interactions: dict[str, Interaction] = {}
+        self.operations: dict[str, APIOperation] = {}
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
@@ -166,9 +184,11 @@ class PytestReportHandler(EventHandler["BaseExecutionContext"]):
                         interaction = recorder.interactions.get(step.case_id)
                         if interaction is not None:
                             self.interactions[step.case_id] = interaction
+                            self.operations[step.case_id] = recorder.cases[step.case_id].value.operation
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.output.parent.mkdir(parents=True, exist_ok=True)
         self.output.write_text(
-            render(ctx.statistic, self.interactions, ctx.config.output, self.location), encoding="utf-8"
+            render(ctx.statistic, self.interactions, self.operations, ctx.config.output, self.location),
+            encoding="utf-8",
         )
