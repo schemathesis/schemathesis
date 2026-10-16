@@ -216,8 +216,12 @@ class DependencyGraph:
                         existing = links.get(link_name)
                         if existing is not None:
                             existing.parameters.update(parameters)
-                            if isinstance(existing.request_body, dict) and isinstance(request_body, dict):
-                                _merge_nested_body(existing.request_body, request_body)
+                            target, source = existing.request_body, request_body
+                            if isinstance(target, list) and isinstance(source, list):
+                                # Fields of top-level array items merge like those of nested array items.
+                                target, source = target[0], source[0]
+                            if isinstance(target, dict) and isinstance(source, dict):
+                                _merge_nested_body(target, source)
                             else:
                                 existing.request_body = request_body
                             continue
@@ -629,15 +633,19 @@ def _key_kind(parameter_name: str | int) -> KeyKind | None:
     return key_kind(parameter_name)
 
 
-def _build_nested_body(path: str, value: str) -> dict[str, Any]:
+def _build_nested_body(path: str, value: str) -> dict[str, Any] | list[Any]:
     """Build a nested dict structure from a path like 'shipping/warehouse_id'.
 
     Examples:
         _build_nested_body("customer_id", "$val") -> {"customer_id": "$val"}
         _build_nested_body("shipping/warehouse_id", "$val") -> {"shipping": {"warehouse_id": "$val"}}
         _build_nested_body("items/0/product_id", "$val") -> {"items": [{"product_id": "$val"}]}
+        _build_nested_body("0/product_id", "$val") -> [{"product_id": "$val"}]
 
     """
+    index, _, rest = path.partition("/")
+    if index.isdigit() and rest:
+        return [_build_nested_body(rest, value)]
     if "/" not in path:
         return {path: value}
 

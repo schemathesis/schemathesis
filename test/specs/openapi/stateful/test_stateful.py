@@ -457,12 +457,8 @@ def _linked_items(body):
     return data if isinstance(data, list) else [data]
 
 
-@pytest.mark.parametrize(
-    ("explicit", "targets"),
-    [(False, ("/item", "/items")), (True, ("/item", "/items", "/item-list"))],
-    ids=["inferred", "explicit"],
-)
-def test_link_body_keeps_generated_fields_of_nested_objects_and_array_items(explicit, targets):
+@pytest.mark.parametrize("explicit", [False, True], ids=["inferred", "explicit"])
+def test_link_body_keeps_generated_fields_of_nested_objects_and_array_items(explicit):
     links = {
         f"Create{path}": {"operationRef": f"#/paths/~1{path[1:]}/post", "requestBody": _EXPLICIT_ITEM_LINKS[path]}
         for path in _ITEM_BODIES
@@ -520,7 +516,7 @@ def test_link_body_keeps_generated_fields_of_nested_objects_and_array_items(expl
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
-    linked = {path: [] for path in targets}
+    linked = {path: [] for path in _ITEM_BODIES}
 
     class Workflow(schema.as_state_machine()):
         def validate_response(self, response, case, additional_checks=None, **kwargs):

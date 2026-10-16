@@ -4140,6 +4140,37 @@ def test_nested_fk_inference_array_items_consumer_first(ctx):
     assert (array_slot.resource.name, array_slot.resource_field) == ("Location", "id")
 
 
+def test_top_level_array_body_links_every_fk_field_of_its_items(ctx):
+    item = {
+        "type": "object",
+        "properties": {"product_id": {"type": "string"}, "product_uuid": {"type": "string"}},
+        "required": ["product_id"],
+    }
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
+            **operation_with_body("post", "/orders", "201", {"type": "array", "items": item}),
+        },
+        components={
+            "schemas": {
+                "Product": {"type": "object", "properties": {"id": {"type": "string"}, "uuid": {"type": "string"}}}
+            }
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1products/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                "requestBody": [{"product_id": "$response.body#/*/id", "product_uuid": "$response.body#/*/uuid"}],
+            },
+        ]
+    ]
+
+
 def nested_object(name, schema):
     return {"type": "object", "properties": {name: schema}}
 
