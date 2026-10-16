@@ -79,6 +79,11 @@
 - Form bodies dropping `additionalProperties` and object keywords for properties with `encoding.contentType`.
 - Inferred link and undeclared path parameter order varying between runs.
 - Crash or lone surrogates in generated strings when `generation.codec` is `None`.
+- Inferred links sending `readOnly` request body fields.
+- Inferred links copying a parent resource's key (e.g. `slug`, `seq`) into a new child.
+- Missing inferred links for path parameters named after a resource field (e.g. `{order_seq}`).
+- Missing inferred links for Django-style `_pk` path parameters (e.g. `{order_pk}`).
+- Inferred links reading fields that values of map-shaped responses do not declare.
 - `openapi.from_url` and `graphql.from_url` ignoring TLS, auth and header settings from the config.
 - Format values generated under another operation's `codec`, `allow-x00` or `exclude-header-characters` settings.
 - Generation settings ignored by `APIOperation.as_strategy` after the same operation generated under other settings.

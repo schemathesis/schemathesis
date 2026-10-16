@@ -449,13 +449,6 @@
           "parameter_name": "connectionId",
           "resource": "Message",
           "resource_field": "connectionId"
-        },
-        {
-          "is_suffix_matched": false,
-          "parameter_location": "body",
-          "parameter_name": "id",
-          "resource": "Message",
-          "resource_field": "id"
         }
       ],
       "outputs": [

@@ -155,21 +155,20 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 )
             )
 
-    # Bind path parameters named after a field of the resource owning the path (`/projects/{code}` -> `Project.code`).
-    # Deferred to here so the resource's fields are known regardless of declaration order.
+    # Bind path parameters named after a field of the resource owning the path (`/projects/{code}` -> `Project.code`,
+    # `/rounds/{round_seq}` -> `Round.seq`). Deferred to here so the resource's fields are known regardless of order.
     for label, bindings in deferred_field_named_path_parameters.items():
         for resource_name, parameter_name in bindings:
             owner = resources.get(resource_name)
-            if (
-                owner is None
-                or owner.source < DefinitionSource.SCHEMA_WITH_PROPERTIES
-                or parameter_name not in owner.fields
-            ):
+            if owner is None or owner.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
+                continue
+            field = naming.find_matching_field(parameter=parameter_name, resource=owner.name, fields=owner.fields)
+            if field is None:
                 continue
             operations[label].inputs.append(
                 InputSlot(
                     resource=owner,
-                    resource_field=parameter_name,
+                    resource_field=field,
                     parameter_name=parameter_name,
                     parameter_location=ParameterLocation.PATH,
                 )
