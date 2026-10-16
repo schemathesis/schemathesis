@@ -1650,6 +1650,19 @@ _SHIPPING = {
     "required": ["note"],
 }
 _SHIPPING_REF = {"$ref": "#/components/schemas/Shipping"}
+_COMPOSED_SHIPPING = {
+    "allOf": [
+        {"$ref": "#/components/schemas/Note"},
+        {"type": "object", "properties": {"location_id": {"type": "integer"}}},
+    ]
+}
+_PICKUP = {
+    "type": "object",
+    "properties": {"code": {"type": "integer"}},
+    "required": ["code"],
+    "additionalProperties": False,
+}
+_SHIPPING_OR_PICKUP = {"oneOf": [_SHIPPING_REF, _PICKUP]}
 
 
 def _with_shipping(shipping):
@@ -1681,6 +1694,12 @@ def _with_shipping(shipping):
         ({"type": "array", "minItems": 1, "items": _SHIPPING}, ("*",)),
         ({"type": "array", "minItems": 1, "items": _SHIPPING_REF}, ("*",)),
         ({"$ref": "#/components/schemas/Shipments"}, ("*",)),
+        (_with_shipping(_COMPOSED_SHIPPING), ("shipping",)),
+        (_with_shipping({"$ref": "#/components/schemas/ComposedShipping"}), ("shipping",)),
+        (_with_shipping({"anyOf": [_SHIPPING]}), ("shipping",)),
+        (_with_shipping(_SHIPPING_OR_PICKUP), ("shipping",)),
+        (_with_shipping({"type": "array", "minItems": 1, "items": _COMPOSED_SHIPPING}), ("shipping", "*")),
+        (_with_shipping({"type": "array", "minItems": 1, "items": _SHIPPING_OR_PICKUP}), ("shipping", "*")),
     ],
     ids=[
         "inline-object",
@@ -1692,6 +1711,12 @@ def _with_shipping(shipping):
         "top-level-array",
         "top-level-array-of-refs",
         "top-level-ref-to-array",
+        "all-of",
+        "ref-to-all-of",
+        "any-of",
+        "one-of",
+        "array-of-all-of",
+        "array-of-one-of",
     ],
 )
 def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
@@ -1730,6 +1755,8 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
             "schemas": {
                 "Shipping": _SHIPPING,
                 "Shipments": {"type": "array", "minItems": 1, "items": _SHIPPING_REF},
+                "Note": {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"]},
+                "ComposedShipping": _COMPOSED_SHIPPING,
             }
         },
     )
@@ -1740,12 +1767,12 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
         data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": i})
 
     operation = schema["/departments"]["POST"]
-    strategy = operation.body[0].get_strategy(
-        operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=data_source
-    )
+    body = operation.body[0]
+    strategy = body.get_strategy(operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=data_source)
 
     pool_hits = []
     partial_hits = []
+    invalid = []
 
     # The violating draw is rare, so fewer examples would let a regression pass.
     @run_given(strategy, max_examples=100)
@@ -1758,8 +1785,11 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
             pool_hits.append(objects)
         elif any(landed):
             partial_hits.append(objects)
+        if landed and not body.is_valid(value):
+            invalid.append(value)
 
     assert pool_hits, "Pool's Location.id values never landed in the body"
+    assert not invalid, f"Overlay made POSITIVE bodies invalid: {invalid[:3]!r}"
     assert not partial_hits, f"Pool value reached only some array items: {partial_hits[:3]!r}"
     dropped = [objects for objects in pool_hits if not all("note" in item for item in objects)]
     assert not dropped, f"Overlay dropped the generated `note` sibling: {dropped[:3]!r}"
