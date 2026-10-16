@@ -112,22 +112,19 @@ def test_additional_properties_negation_stays_invalid(ctx):
     # See GH-4332. Negating `additionalProperties` drops the `properties` context it is defined
     # against, so the mutated schema still admits bodies valid against the original.
     # 500 examples because only a small fraction of draws pick this keyword combination.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /reset",
         {
-            "/reset": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": BODY_WITH_NO_ADDITIONAL_PROPERTIES}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": BODY_WITH_NO_ADDITIONAL_PROPERTIES}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
     validator = jsonschema_rs.Draft4Validator(BODY_WITH_NO_ADDITIONAL_PROPERTIES, validate_formats=True)
 
-    @given(case=schema["/reset"]["POST"].as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE))
+    @given(case=operation.as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE))
     @settings(
         max_examples=500,
         deadline=None,
@@ -185,20 +182,17 @@ def test_secondary_planted_bug_detected(cli, ctx, snapshot_cli, factory_name):
     ],
 )
 def test_negative_body_stays_invalid(ctx, body_schema):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+            "responses": {"200": {"description": "OK"}},
+        },
     )
     validator = jsonschema_rs.Draft4Validator(body_schema)
 
     @run_given(
-        case=schema["/items"]["POST"].as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE),
+        case=operation.as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE),
         max_examples=10,
         derandomize=True,
     )

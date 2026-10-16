@@ -540,22 +540,19 @@ def test_empty_content(ctx):
 @pytest.mark.hypothesis_nested
 def test_loose_multipart_definition(ctx):
     # When the schema of "multipart/form-data" content does not define "object" type
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /body",
         {
-            "/body": {
-                "post": {
-                    "requestBody": {
-                        "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}},
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
         },
     )
     # Then non-object data should be excluded during generation
 
-    @given(case=schema["/body"]["POST"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
     def test(case):
         assert isinstance(case.body, dict)
@@ -567,16 +564,13 @@ def test_loose_multipart_definition(ctx):
 @pytest.mark.hypothesis_nested
 def test_multipart_behind_a_reference(ctx):
     # When the schema of "multipart/form-data" is behind a reference
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /body",
         {
-            "/body": {
-                "post": {
-                    "requestBody": {
-                        "$ref": "#/components/requestBodies/MultipartBody",
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "$ref": "#/components/requestBodies/MultipartBody",
+            },
+            "responses": {"200": {"description": "OK"}},
         },
         components={
             "requestBodies": {
@@ -589,7 +583,7 @@ def test_multipart_behind_a_reference(ctx):
     )
     # Then it should be correctly resolved
 
-    @given(case=schema["/body"]["POST"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(
         max_examples=5,
         deadline=None,
@@ -623,29 +617,26 @@ def test_optional_form_parameters(ctx):
 
 def test_ref_field(ctx):
     # When the schema contains "$ref" field, that is not a reference (which is supported by the JSON Schema spec)
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /body",
         {
-            "/body": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {"$ref": {"type": "string"}},
-                                    "required": ["$ref"],
-                                    "type": "object",
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "properties": {"$ref": {"type": "string"}},
+                            "required": ["$ref"],
+                            "type": "object",
+                        }
+                    }
+                },
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
         },
     )
 
-    @run_given(case=schema["/body"]["POST"].as_strategy(), max_examples=5)
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test(case):
         assert isinstance(case.body["$ref"], str)
 

@@ -61,30 +61,27 @@ def test_binary_format_negative_mutations(ctx, encoding):
 
 
 def test_binary_format_negative_mutations_with_multiple_content_types(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
         {
-            "/upload": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["file"],
-                                    "properties": {"file": {"type": "string", "format": "binary"}},
-                                },
-                                "encoding": {"file": {"contentType": "image/jpeg, text/plain"}},
-                            }
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["file"],
+                            "properties": {"file": {"type": "string", "format": "binary"}},
                         },
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                        "encoding": {"file": {"contentType": "image/jpeg, text/plain"}},
+                    }
+                },
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def check(case):
         assert is_structural_mutation(case.body, "file") or is_type_mutation(case.body, "file", bytes)
 

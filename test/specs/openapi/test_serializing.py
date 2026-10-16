@@ -684,30 +684,25 @@ def test_querystring_without_content_sends_no_query(ctx, data):
 
 def test_querystring_binary_serialization_is_sent_as_raw_query(ctx):
     schemathesis.openapi.format("binary", st.just(b"\xff\x00A"))
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /teapot",
         {
-            "/teapot": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "ignored",
-                            "in": "querystring",
-                            "required": True,
-                            "content": {
-                                "application/octet-stream": {
-                                    "schema": {"type": "string", "format": "binary", "minLength": 3}
-                                }
-                            },
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+            "parameters": [
+                {
+                    "name": "ignored",
+                    "in": "querystring",
+                    "required": True,
+                    "content": {
+                        "application/octet-stream": {"schema": {"type": "string", "format": "binary", "minLength": 3}}
+                    },
                 }
-            }
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
         version="3.2.0",
     )
 
-    @given(case=schema["/teapot"]["GET"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(max_examples=1, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test(case):
         assert prepared_query_string(case) == "%FF%00A"
@@ -1168,39 +1163,36 @@ def test_empty_exploded_object_expands_to_nothing(func):
 
 
 def test_exploded_object_key_does_not_overwrite_declared_query_parameter(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "Version",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["2016-11-15"]},
+            "parameters": [
+                {
+                    "name": "Version",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["2016-11-15"]},
+                },
+                {
+                    "name": "LaunchTemplate",
+                    "in": "query",
+                    "required": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "LaunchTemplateId": {"type": "string", "enum": ["lt-1"]},
+                            "Version": {"type": "string", "enum": [""]},
                         },
-                        {
-                            "name": "LaunchTemplate",
-                            "in": "query",
-                            "required": True,
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "LaunchTemplateId": {"type": "string", "enum": ["lt-1"]},
-                                    "Version": {"type": "string", "enum": [""]},
-                                },
-                                "required": ["LaunchTemplateId", "Version"],
-                                "additionalProperties": False,
-                            },
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+                        "required": ["LaunchTemplateId", "Version"],
+                        "additionalProperties": False,
+                    },
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/items"]["GET"].as_strategy(), max_examples=5)
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test(case):
         assert case.as_transport_kwargs(base_url="http://127.0.0.1:1")["params"] == {
             "LaunchTemplateId": "lt-1",
@@ -1294,21 +1286,18 @@ def test_unusual_form_schema(ctx, type_name):
     # See GH-1152
     # When API schema defines multipart media type
     # And its schema is not an object or bytes (string + format=byte)
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "POST /multipart",
         {
-            "/multipart": {
-                "post": {
-                    "requestBody": {
-                        "content": {"multipart/form-data": {"schema": {"type": type_name}}},
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "content": {"multipart/form-data": {"schema": {"type": type_name}}},
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/multipart"]["POST"].as_strategy(), max_examples=5)
+    @run_given(case=operation.as_strategy(), max_examples=5)
     def test(case):
         # Then it should lead to a valid network request
         assert_requests_call(case)

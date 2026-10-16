@@ -67,21 +67,18 @@ def test_(case):
 
 
 def test_cookie_names_are_case_sensitive(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /x",
         {
-            "/x": {
-                "get": {
-                    "parameters": [
-                        {"name": "sid", "in": "cookie", "required": True, "schema": {"enum": ["lower"]}},
-                        {"name": "SID", "in": "cookie", "required": True, "schema": {"enum": ["upper"]}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {"name": "sid", "in": "cookie", "required": True, "schema": {"enum": ["lower"]}},
+                {"name": "SID", "in": "cookie", "required": True, "schema": {"enum": ["upper"]}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/x"]["GET"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert case.cookies == {"sid": "lower", "SID": "upper"}
 
@@ -606,11 +603,11 @@ def test_write_only(ctx):
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, location):
     # When an Open API 3 parameter is missing `schema` & `content`
-    schema = ctx.openapi.load_schema(
-        {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
+    operation = ctx.openapi.load_operation(
+        "GET /foo", {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}
     )
 
-    @given(schema["/foo"]["GET"].as_strategy())
+    @given(operation.as_strategy())
     @settings(max_examples=1)
     def test(case):
         pass
@@ -630,19 +627,16 @@ def test_missing_content_and_schema(ctx, location):
     ids=["openapi-3.0-query", "openapi-3.2-querystring"],
 )
 def test_empty_parameter_content(ctx, version, location):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /x",
         {
-            "/x": {
-                "get": {
-                    "parameters": [{"name": "q", "in": location, "required": True, "content": {}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+            "parameters": [{"name": "q", "in": location, "required": True, "content": {}}],
+            "responses": {"200": {"description": "OK"}},
         },
         version=version,
     )
 
-    @given(case=schema["/x"]["GET"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(max_examples=1)
     def test(case):
         pass
@@ -655,20 +649,15 @@ def test_empty_parameter_content(ctx, version, location):
 
 
 def test_non_object_parameter_media_type(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /x",
         {
-            "/x": {
-                "get": {
-                    "parameters": [
-                        {"name": "a", "in": "query", "required": True, "content": {"application/json": "oops"}}
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "a", "in": "query", "required": True, "content": {"application/json": "oops"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @given(case=schema["/x"]["GET"].as_strategy())
+    @given(case=operation.as_strategy())
     @settings(max_examples=1)
     def test(case):
         pass
@@ -906,18 +895,15 @@ paths:
 def test_non_string_parameter_name(ctx):
     # Specs converted from YAML 1.1 carry `name: on` as the JSON boolean `true`; the name reaches
     # the wire as text either way.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /foo",
         {
-            "/foo": {
-                "get": {
-                    "parameters": [{"in": "query", "name": True, "required": True, "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"in": "query", "name": True, "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/foo"]["GET"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert set(case.query) == {"true"}
 
@@ -977,20 +963,17 @@ paths:
 
 def test_non_string_path_parameter_name_recovered_from_template(ctx):
     # The template is the only place the original name survives, and its schema must still drive the value.
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /foo/{on}",
         {
-            "/foo/{on}": {
-                "get": {
-                    "parameters": [
-                        {"in": "path", "name": True, "required": True, "schema": {"type": "string", "enum": ["ALPHA"]}}
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [
+                {"in": "path", "name": True, "required": True, "schema": {"type": "string", "enum": ["ALPHA"]}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
     )
 
-    @run_given(case=schema["/foo/{on}"]["GET"].as_strategy(), max_examples=1)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert case.path_parameters == {"on": "ALPHA"}
         assert case.formatted_path == "/foo/ALPHA"
