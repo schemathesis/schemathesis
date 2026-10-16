@@ -2765,16 +2765,14 @@ def test_wait_for_schema(cli, app_runner, schema_path, make_app):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-def test_wait_for_schema_not_enough(cli, app_runner, snapshot_cli):
-    app = openapi_basic.success().server
-    original_run = app.run
-
-    def run_with_delay(*args, **kwargs):
-        time.sleep(2)
-        return original_run(*args, **kwargs)
-
-    app.run = run_with_delay
-    assert cli.run(app_runner.openapi_url(app, wait=False), "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
+def test_wait_for_schema_not_enough(cli, snapshot_cli):
+    # A bound socket that never listens refuses every connection for the whole wait window.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+        assert (
+            cli.run(f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
+        )
 
 
 def test_wait_for_schema_retries_503(cli, app_runner, ctx):
