@@ -25,6 +25,7 @@
 
 ### :bug: Fixed
 
+- Coverage phase crash on `pattern` quantifiers too large to generate (e.g. `[a-z]{100000}`).
 - `st replay` reporting "operation not found in schema" for every GraphQL failure.
 - Unsorted expected statuses in `missing_required_header` failure messages.
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
