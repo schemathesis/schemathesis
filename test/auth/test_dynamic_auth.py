@@ -899,23 +899,17 @@ class Static:
     def set(self, case, data, context):
         case.headers["X-API-Key"] = data
 
-SEEN = []
-
 @schema.auth(Static)
 @schema.parametrize()
 @settings(max_examples=5, phases=[Phase.generate])
 def test_api(case):
-    SEEN.append(case.headers.get("X-API-Key"))
-
-def test_seen():
-    assert SEEN
-    assert "secret" not in SEEN
+    assert case.headers.get("X-API-Key") != "secret"
 """,
         schema=raw_schema,
         generation_modes=[GenerationMode.NEGATIVE],
     )
     result = testdir.runpytest()
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=1)
 
 
 def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
