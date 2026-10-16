@@ -16,6 +16,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
@@ -1341,15 +1342,8 @@ def test_positive_bias_keeps_path_integer_within_bounds(ctx, item_schema):
         },
         version="3.1.0",
     )
-    values = []
-
-    @given(case=operation.as_strategy())
     # High count: the flip only overshoots when the exact int32 minimum is drawn, a rare boundary draw.
-    @settings(max_examples=1000, deadline=None, derandomize=True, suppress_health_check=list(HealthCheck))
-    def inner(case):
-        values.append(int(case.path_parameters["item_id"]))
-
-    inner()
+    values = [int(case.path_parameters["item_id"]) for case in generate_many(operation.as_strategy(), 1000)]
     out_of_range = [value for value in values if value > 2147483647 or value < -2147483648]
     assert not out_of_range, f"Out-of-range path integers: {sorted(set(out_of_range))}"
 
@@ -1374,15 +1368,11 @@ def test_positive_bias_keeps_path_integer_schema_valid(ctx, item_schema):
         },
     )
     validator = Draft4Validator(item_schema)
-    values = []
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
     # Enough draws for the probabilistic positive-ID bias to fire on a non-positive value at least once.
-    @settings(max_examples=20, deadline=None, derandomize=True, suppress_health_check=list(HealthCheck))
-    def inner(case):
-        values.append(case.path_parameters["item_id"])
-
-    inner()
+    values = [
+        case.path_parameters["item_id"]
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 20)
+    ]
     assert [value for value in values if not validator.is_valid(value)] == []
 
 

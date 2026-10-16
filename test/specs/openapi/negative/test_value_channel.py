@@ -9,6 +9,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.negative import _strip_binary, negative_schema
@@ -295,13 +296,9 @@ def test_value_channel_keeps_earlier_bodies_intact(ctx):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    drawn = []
-
     # The value channel fires on 15% of draws, so a smaller budget can miss it.
-    @settings(max_examples=100, database=None, deadline=None, suppress_health_check=list(HealthCheck))
-    @given(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    def collect(case):
-        drawn.append((case.body, deepclone(case.body)))
-
-    collect()
+    drawn = [
+        (case.body, deepclone(case.body))
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 100)
+    ]
     assert [snapshot for body, snapshot in drawn if body != snapshot] == []

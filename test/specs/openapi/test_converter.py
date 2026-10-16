@@ -2,11 +2,11 @@ import json
 
 import jsonschema_rs
 import pytest
-from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.core.jsonschema import make_validator, make_validator_for
 from schemathesis.core.transforms import transform
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.openapi import converter
 from schemathesis.specs.openapi.converter import is_read_only, is_write_only, rewrite_properties, to_json_schema
 
@@ -1027,14 +1027,7 @@ def test_discriminator_pin_uses_file_name_for_whole_file_ref(tmp_path):
         )
     )
     schema = schemathesis.openapi.from_path(tmp_path / "openapi.json")
-    kinds = set()
-
-    @given(case=schema["/pets"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None)
-    def test(case):
-        kinds.add(case.body["kind"])
-
-    test()
+    kinds = {case.body["kind"] for case in generate_many(schema["/pets"]["POST"].as_strategy(), 10)}
     assert kinds == {"cat"}
 
 

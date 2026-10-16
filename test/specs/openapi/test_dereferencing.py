@@ -17,6 +17,7 @@ from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.resolver import load_file_uri, make_root_resolver, resolve_reference
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import get_template_fields
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.stateful import dependencies
@@ -221,14 +222,7 @@ def test_recursion_asserting_nothing(ctx):
     raw_schema = ctx.openapi.build_schema({})
     build_schema_with_recursion(raw_schema, USER_REFERENCE)
     schema = schemathesis.openapi.from_dict(raw_schema)
-    drawn = []
-
-    @given(case=schema["/users"]["POST"].as_strategy())
-    @settings(max_examples=1, deadline=None)
-    def test(case):
-        drawn.append(case.body)
-
-    test()
+    drawn = [case.body for case in generate_many(schema["/users"]["POST"].as_strategy(), 1)]
     assert drawn
 
 
@@ -1667,14 +1661,7 @@ def test_top_level_body_ref_siblings(ctx, version, accepts_body_without_extra):
         },
     )
     body = schema["/items"]["POST"].body[0]
-    bodies = []
-
-    @given(case=schema["/items"]["POST"].as_strategy())
-    @settings(max_examples=10, database=None)
-    def test(case):
-        bodies.append(case.body)
-
-    test()
+    bodies = [case.body for case in generate_many(schema["/items"]["POST"].as_strategy(), 10)]
 
     assert body.is_valid({"a": "x"}) is accepts_body_without_extra
     assert [value for value in bodies if not body.is_valid(value)] == []

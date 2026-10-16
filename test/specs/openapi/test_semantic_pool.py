@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from schemathesis.config import GenerationConfig
 from schemathesis.core import transport
 from schemathesis.core.deserialization import register_deserializer
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import MISSING, GeneratedValue, get_at_path
 from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
@@ -918,16 +919,7 @@ def test_overlay_skips_candidate_violating_consumer_constraint():
 
     drawn: list[dict] = []
 
-    @given(overlay)
-    @settings(
-        max_examples=30,
-        deadline=None,
-        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-    )
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 30))
     assert drawn, "no values were drawn"
     assert all(v["recipient_email"] != too_long for v in drawn), (
         f"validity gate should have rejected the too-long substitution; saw {drawn}"
@@ -1152,16 +1144,7 @@ def test_overlay_validates_against_container_when_substitution_violates_parent_c
 
     drawn: list[dict] = []
 
-    @given(overlay)
-    @settings(
-        max_examples=30,
-        deadline=None,
-        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-    )
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 30))
     assert drawn
     for body in drawn:
         assert body.get("email") != blocked, (
@@ -1446,17 +1429,7 @@ def test_parameter_set_strategy_does_not_leak_generated_value_through_filter(ctx
 
     # 30 draws at 0.5 per-leaf substitution probability make it overwhelmingly likely the
     # overlay fires at least once; a single substitution exercises the filter path.
-    @given(strategy)
-    @settings(
-        max_examples=30,
-        derandomize=True,
-        database=None,
-        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-    )
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(strategy, 30))
     assert drawn, "strategy produced no values"
 
 
@@ -1536,12 +1509,7 @@ def test_overlay_records_semantic_draw_when_substitution_fires():
     drawn: list[GeneratedValue] = []
 
     # 50 draws make at least one substitution near-certain at the 0.5 per-leaf probability.
-    @given(overlay)
-    @settings(max_examples=50, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 50))
     substituted = [v for v in drawn if isinstance(v, GeneratedValue) and v.semantic_draws]
     assert substituted, "expected at least one overlay substitution to be recorded"
     for value in substituted:
@@ -1571,12 +1539,7 @@ def test_overlay_emits_no_semantic_draws_when_index_is_empty():
 
     drawn: list[object] = []
 
-    @given(overlay)
-    @settings(max_examples=30, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 30))
     for value in drawn:
         if isinstance(value, GeneratedValue):
             assert value.semantic_draws == ()
@@ -1892,12 +1855,7 @@ def test_overlay_returns_base_unchanged_when_inner_yields_non_dict():
 
     drawn: list[object] = []
 
-    @given(overlay)
-    @settings(max_examples=5, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 5))
     assert drawn and all(value == "plain string" for value in drawn)
 
 
@@ -1930,12 +1888,7 @@ def test_overlay_skips_substitution_when_descriptor_path_is_absent_from_body():
 
     drawn: list[object] = []
 
-    @given(overlay)
-    @settings(max_examples=20, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value.value if isinstance(value, GeneratedValue) else value)
-
-    collect()
+    drawn.extend(value.value if isinstance(value, GeneratedValue) else value for value in generate_many(overlay, 20))
     for body in drawn:
         assert set(body) == {"present_email"}
 
@@ -1964,12 +1917,7 @@ def test_overlay_unwraps_inner_generated_value_and_appends_semantic_draws():
     drawn: list[GeneratedValue] = []
 
     # 50 draws make recording at least one substitution near-certain at 0.5 per-leaf probability.
-    @given(overlay)
-    @settings(max_examples=50, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 50))
     assert drawn and all(isinstance(value, GeneratedValue) for value in drawn)
     assert any(value.semantic_draws for value in drawn)
 
@@ -2085,12 +2033,7 @@ def test_overlay_continues_when_descriptor_schema_breaks_validator_construction(
 
     drawn: list[object] = []
 
-    @given(overlay)
-    @settings(max_examples=30, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 30))
     assert any(isinstance(value, GeneratedValue) and value.value == {"phone": "+12025551234"} for value in drawn), (
         "overlay swallowed validator failure but stopped substituting"
     )
@@ -2125,12 +2068,7 @@ def test_overlay_continues_when_container_validator_construction_fails():
 
     drawn: list[object] = []
 
-    @given(overlay)
-    @settings(max_examples=20, derandomize=True, database=None)
-    def collect(value):
-        drawn.append(value)
-
-    collect()
+    drawn.extend(generate_many(overlay, 20))
     assert any(isinstance(value, GeneratedValue) and value.value == {"email": "x@y.com"} for value in drawn), (
         "container validator failure stopped overlay substitution"
     )
