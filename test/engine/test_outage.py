@@ -1,6 +1,9 @@
 import platform
+import socket
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import pytest
 import requests
@@ -16,11 +19,20 @@ from schemathesis.engine.run import PhaseName
 pytestmark = pytest.mark.skipif(platform.system() == "Windows", reason="Unused ports do not refuse connections")
 
 
+@contextmanager
+def refusing_url() -> Iterator[str]:
+    # A bound socket that never listens refuses every connection, and no other server can take its port meanwhile.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
+
+
 @pytest.fixture
-def operation(ctx, app_runner):
+def operation(ctx):
     schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema.config.update(base_url=f"http://127.0.0.1:{app_runner.unused_port()}")
-    return schema["/users"]["get"]
+    with refusing_url() as url:
+        schema.config.update(base_url=url)
+        yield schema["/users"]["get"]
 
 
 def answer(case, elapsed=0.1):
@@ -123,16 +135,17 @@ def test_workers_refused_after_the_verdict_reuse_it_instead_of_probing_again(ope
     assert monitor.take_report(PhaseName.FUZZING).info.message == expected_message(operation, [first])
 
 
-def test_refusal_from_another_address_is_not_an_outage(operation, app_runner):
+def test_refusal_from_another_address_is_not_an_outage(operation):
     monitor = ServerMonitor()
     case = operation.Case()
     monitor.track(case, lambda: answer(case), transport_kwargs={})
 
-    assert not monitor.is_down(refusal(f"http://127.0.0.1:{app_runner.unused_port()}"))
+    with refusing_url() as other:
+        assert not monitor.is_down(refusal(other))
     assert monitor.take_report(PhaseName.FUZZING) is None
 
 
-def test_requests_to_an_app_are_never_tracked(ctx, app_runner):
+def test_requests_to_an_app_are_never_tracked(ctx):
     # An app is called in-process, so it has no host that could start refusing connections.
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
     operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/users"]["GET"]
@@ -140,7 +153,8 @@ def test_requests_to_an_app_are_never_tracked(ctx, app_runner):
     case = operation.Case()
     monitor.track(case, lambda: answer(case), transport_kwargs={})
 
-    assert not monitor.is_down(refusal(f"http://127.0.0.1:{app_runner.unused_port()}"))
+    with refusing_url() as other:
+        assert not monitor.is_down(refusal(other))
 
 
 def test_refusal_from_a_server_never_reached_is_not_an_outage(operation):

@@ -9,6 +9,7 @@ Schemathesis dev
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
+     Configuration:    /tmp/config.toml
 
  ✅  API capabilities:
 
@@ -26,7 +27,7 @@ Schemathesis dev
 _____________________________ GET /users/{userId} ______________________________
 Network Error
 
-Read timed out after 0.05 seconds
+Read timed out after 0.2 seconds
 
 Reproduce with:
 

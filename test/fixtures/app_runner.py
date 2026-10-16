@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import socket
 import ssl
 import struct
@@ -195,9 +196,27 @@ def run_resetting_server() -> int:
     """Start a server that resets every connection, so requests fail at once without a response on every platform."""
     listener = socket.create_server(("127.0.0.1", 0))
 
+    def read_request(connection: socket.socket) -> None:
+        data = b""
+        while b"\r\n\r\n" not in data:
+            chunk = connection.recv(65536)
+            if not chunk:
+                return
+            data += chunk
+        head, _, body = data.partition(b"\r\n\r\n")
+        length = re.search(rb"(?im)^content-length:\s*(\d+)", head)
+        remaining = int(length.group(1)) - len(body) if length else 0
+        while remaining > 0:
+            chunk = connection.recv(65536)
+            if not chunk:
+                return
+            remaining -= len(chunk)
+
     def serve() -> None:
         while True:
             connection, _ = listener.accept()
+            # Resetting only once the whole request arrived makes the client see the same error every time.
+            read_request(connection)
             # A zero linger timeout makes `close` send RST instead of FIN.
             connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
             connection.close()
