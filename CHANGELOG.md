@@ -40,6 +40,7 @@
 - Internal error instead of a failure for non-object GraphQL responses in negative mode.
 - "Response violates schema" messages embedding the whole response value on one line.
 - False positive `negative_data_rejection` for valid boolean query parameters alongside `text/plain` bodies.
+- Missed `ensure_resource_availability` failures after a `POST` that created the resource at its own URL.
 - Long failure messages in the HTML report not limited in height, unlike response bodies.
 - Nested objects in inline query parameter schemas serialized as their property names only.
 - Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.

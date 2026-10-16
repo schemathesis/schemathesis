@@ -1408,7 +1408,7 @@ def _created_a_resource(*, parent: Case, parent_response: Response, case: Case) 
     """
     if len(parent.path.rstrip("/").split("/")) < len(case.path.rstrip("/").split("/")):
         return True
-    return parent_response.status_code == 201 or "Location" in parent_response.headers
+    return parent_response.status_code == 201 or "location" in parent_response.headers
 
 
 def _stale_cache_hint(response: Response) -> str:
@@ -1534,7 +1534,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
 
     # Look for any successful DELETE operations on this resource across all recorded cases,
     # not just the current root's subtree.
-    if ctx._recorder is not None and resource_was_deleted(ctx._recorder, case):
+    if ctx._recorder is not None and resource_was_deleted(ctx._recorder, case, created_by=parent.id):
         # Resource was properly deleted, 404 is expected
         return None
 
@@ -1797,16 +1797,17 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
     return True
 
 
-def resource_was_deleted(recorder: RecordedScenario, case: Case) -> bool:
+def resource_was_deleted(recorder: RecordedScenario, case: Case, *, created_by: str | None = None) -> bool:
     """Return True if a successful prior request in the scenario removed this case's resource.
 
     A DELETE covers every path below the one it targets. Any other unsafe verb may be a removal
     spelled with the wrong method, so it only counts against the resource's own URI. Used to
-    suppress false positives in checks and in link-calibration observations.
+    suppress false positives in checks and in link-calibration observations. The request that created
+    the resource is not a removal of it.
     """
     case_path = ResourcePath(case.path, case.path_parameters or {})
     for prior_case in recorder.find_all_cases():
-        if prior_case.id == case.id:
+        if prior_case.id in (case.id, created_by):
             continue
         method = prior_case.operation.method.upper()
         if method in SAFE_METHODS:
