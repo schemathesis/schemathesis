@@ -1825,6 +1825,41 @@ def test_urlencoded_form(ctx, cli):
     cli.run_and_assert(api.schema_url, "--mode=positive")
 
 
+def _urlencoded_operation(version, schema):
+    if version == "2.0":
+        return {
+            "consumes": ["application/x-www-form-urlencoded"],
+            "parameters": [{"in": "body", "name": "body", "required": True, "schema": schema}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    return {
+        "requestBody": {"required": True, "content": {"application/x-www-form-urlencoded": {"schema": schema}}},
+        "responses": {"200": {"description": "OK"}},
+    }
+
+
+# `exclusiveMinimum: true` without `minimum` is rejected by the Draft 4 meta-schema.
+@pytest.mark.parametrize(
+    ("version", "keyword"),
+    [("2.0", "exclusiveMinimum"), ("2.0", "exclusiveMaximum"), ("3.0.3", "exclusiveMinimum")],
+    ids=["swagger-exclusive-minimum", "swagger-exclusive-maximum", "openapi-30-exclusive-minimum"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_urlencoded_example_with_dangling_exclusive_bound(ctx, cli, snapshot_cli, version, keyword):
+    schema = {
+        "type": "object",
+        "properties": {"bound": {"type": "integer", keyword: True}, "value": {"type": "integer", "example": 1}},
+    }
+    app, _ = ctx.openapi.make_flask_app({"/form": {"post": _urlencoded_operation(version, schema)}}, version=version)
+
+    @app.route("/form", methods=["POST"])
+    @app.route("/api/form", methods=["POST"])
+    def form():
+        return jsonify({})
+
+    assert cli.run_openapi_app(app, "--phases=examples") == snapshot_cli
+
+
 @pytest.mark.parametrize("workers", [1, 2])
 def test_targeted(ctx, cli, workers):
     api = ctx.openapi.apps.success()
