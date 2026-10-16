@@ -53,6 +53,9 @@ logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
 settings.register_profile("CI", settings.get_profile("ci"), max_examples=2000)
+# Slow CI runners exceed the 200ms default deadline in nested `@given` tests; `--hypothesis-profile` still overrides it.
+settings.register_profile("tests", settings.get_profile(settings.get_current_profile_name()), deadline=None)
+settings.load_profile("tests")
 
 output.SCHEMATHESIS_VERSION = "dev"
 
