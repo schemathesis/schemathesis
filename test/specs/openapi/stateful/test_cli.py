@@ -131,12 +131,12 @@ def test_junit(ctx, tmp_path, cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
-def test_stateful_only_with_error(ctx, cli, snapshot_cli):
+def test_stateful_only_with_error(ctx, cli, app_runner, snapshot_cli):
     api = ctx.openapi.apps.users_crud()
     assert (
         cli.run(
             api.schema_url,
-            "--url=http://127.0.0.1:1/api",
+            f"--url=http://127.0.0.1:{app_runner.run_resetting_server()}/api",
             "--phases=stateful",
         )
         == snapshot_cli

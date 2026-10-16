@@ -24,6 +24,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.generation.modes import GenerationMode
+from test.apps.builders import make_permissive_flask_app
 from test.utils import run_given
 
 
@@ -59,19 +60,19 @@ schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 
 @pytest.fixture
-def loose_schema(ctx):
-    schema = ctx.openapi.load_schema(
-        {
-            "/test/{key}": {
-                "post": {
-                    "parameters": [{"name": "key", "in": "path"}],
-                    "responses": {"default": {"description": "OK"}},
-                }
+def loose_schema(ctx, app_runner):
+    paths = {
+        "/test/{key}": {
+            "post": {
+                "parameters": [{"name": "key", "in": "path"}],
+                "responses": {"default": {"description": "OK"}},
             }
-        },
-        version="2.0",
-    )
-    schema.config.update(base_url="http://127.0.0.1:1")
+        }
+    }
+    schema = ctx.openapi.load_schema(paths, version="2.0")
+    # A live server answers every generated command, so only a malformed one can make curl fail.
+    app = make_permissive_flask_app(ctx.openapi.build_schema(paths, version="2.0"))
+    schema.config.update(base_url=f"http://127.0.0.1:{app_runner.run_flask_app(app)}/api")
     return schema
 
 

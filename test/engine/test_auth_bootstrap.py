@@ -138,9 +138,9 @@ def test_no_flow_is_a_silent_success(ctx):
     assert (payload.status, payload.spec) == (Status.SUCCESS, None)
 
 
-def test_unreachable_sign_up_is_a_register_failure(ctx):
+def test_unreachable_sign_up_is_a_register_failure(ctx, app_runner):
     api = ctx.openapi.apps.sign_up_and_login()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.update(base_url="http://127.0.0.1:1")
+    schema.config.update(base_url=f"http://127.0.0.1:{app_runner.run_resetting_server()}")
     payload = _bootstrap(_run(schema)).payload
     assert (payload.status, payload.failure_stage, payload.status_code) == (Status.ERROR, "register", None)
