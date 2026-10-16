@@ -1,6 +1,7 @@
 import datetime
 import json
 import re
+import string
 import subprocess
 import sys
 import textwrap
@@ -99,6 +100,66 @@ def test_fuzzing_phase_uses_its_generation_config(ctx):
     test()
 
     assert [case.meta.generation.mode for case in generated] == [GenerationMode.NEGATIVE]
+
+
+@pytest.mark.parametrize(
+    ("generation", "mode", "offending"),
+    [
+        (
+            {"codec": "ascii"},
+            GenerationMode.POSITIVE,
+            lambda case: [value for value in (case.query["q"], case.body) if not value.isascii()],
+        ),
+        (
+            {"allow-x00": False},
+            GenerationMode.POSITIVE,
+            lambda case: [value for value in (case.query["q"], case.body) if "\x00" in value],
+        ),
+        (
+            {"exclude-header-characters": string.ascii_letters},
+            GenerationMode.POSITIVE,
+            lambda case: [case.headers["X-Token"]] if set(case.headers["X-Token"]) & set(string.ascii_letters) else [],
+        ),
+        (
+            {"dictionaries": {"string": {"dictionary": "edge", "probability": 1.0}}},
+            GenerationMode.POSITIVE,
+            lambda case: [case.query["q"]] if case.query["q"] != "dictionary-value" else [],
+        ),
+        (
+            {"allow-extra-parameters": False},
+            GenerationMode.NEGATIVE,
+            lambda case: sorted(set(case.query or {}) - {"q"}),
+        ),
+    ],
+    ids=["codec", "allow-x00", "exclude-header-characters", "dictionaries", "allow-extra-parameters"],
+)
+def test_phase_generation_config_applies_after_another_phase_generated(ctx, generation, mode, offending):
+    config = SchemathesisConfig.from_dict(
+        {
+            "dictionaries": {"edge": {"values": ["dictionary-value"]}},
+            "phases": {"stateful": {"generation": generation}},
+        }
+    )
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "parameters": [
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "minLength": 10}},
+                {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string", "minLength": 10}},
+            ],
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "string", "minLength": 10}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        config=config,
+    )
+    generate_many(operation.as_strategy(generation_mode=mode, phase=TestPhase.FUZZING), 30)
+
+    cases = generate_many(operation.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL), 30)
+
+    assert [value for case in cases for value in offending(case)] == []
 
 
 def test_negative_case_can_negate_the_body_alone(ctx):

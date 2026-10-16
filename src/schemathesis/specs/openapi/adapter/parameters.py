@@ -54,6 +54,7 @@ from schemathesis.transport.serialization import Binary, quote_all
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
+    from schemathesis.config._dictionaries import DictionaryBinding
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.specs.openapi.extra_data_source import (
         CapturedVariant,
@@ -100,8 +101,10 @@ CAPTURED_VALUES_PROBABILITY = 0.8
 # Probability of using negative strategy when captured values are available.
 # We want to mostly use captured values to test deeper application logic.
 NEGATIVE_STRATEGY_PROBABILITY = 0.03
-# Error-feedback generation, semantic index identity and constants source identity a built strategy closes over.
-StrategyCacheKey = tuple[int | None, int | None, int | None]
+# Generation settings a built strategy depends on: codec, `\x00`, header characters, extra parameters, dictionaries.
+GenerationCacheKey = tuple[str | None, bool, str | None, bool, frozenset[tuple[str, "DictionaryBinding"]]]
+# Feedback generation, semantic index and constants source identities, and the generation settings a strategy uses.
+StrategyCacheKey = tuple[int | None, int | None, int | None, GenerationCacheKey]
 
 # Probability of biasing path parameter integers toward positive values.
 # Most REST APIs use positive integers for resource IDs, so this improves
@@ -536,18 +539,26 @@ def _semantic_index(extra_data_source: ExtraDataSource | None) -> SemanticValueI
 
 def _strategy_cache_key(
     operation: APIOperation,
+    generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None,
     mix_examples: bool,
     error_feedback: ErrorFeedbackStore | None,
     constants_value_source: ConstantsPool | None,
 ) -> StrategyCacheKey | None:
-    """Identity of every live source a built strategy closes over, or None when it must not be cached."""
+    """Identity of every live source and generation setting a built strategy closes over, or None to skip caching."""
     if not mix_examples or _captured_variants_active(extra_data_source, operation):
         return None
     return (
         error_feedback.generation if error_feedback is not None else None,
         _semantic_cache_key(extra_data_source),
         id(constants_value_source) if constants_value_source is not None else None,
+        (
+            generation_config.codec,
+            generation_config.allow_x00,
+            generation_config.exclude_header_characters,
+            generation_config.allow_extra_parameters,
+            frozenset(generation_config.dictionaries.items()),
+        ),
     )
 
 
@@ -1660,7 +1671,7 @@ class OpenApiBody(OpenApiComponent):
         # would freeze stale variants. The semantic overlay closes over the live index and
         # remains correct under caching, so semantic-only data sources stay cache-eligible.
         overlay_key = _strategy_cache_key(
-            operation, extra_data_source, mix_examples, error_feedback, constants_value_source
+            operation, generation_config, extra_data_source, mix_examples, error_feedback, constants_value_source
         )
         # Only the latest strategy per mode is kept; a new feedback generation replaces it.
         cached = self._strategy_cache.get(generation_mode) if overlay_key is not None else None
@@ -2408,7 +2419,7 @@ class OpenApiParameterSet(ParameterSet):
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         overlay_key = _strategy_cache_key(
-            operation, extra_data_source, mix_examples, error_feedback, constants_value_source
+            operation, generation_config, extra_data_source, mix_examples, error_feedback, constants_value_source
         )
         cache_key = (exclude_key, generation_mode, overlay_key)
         if overlay_key is not None and cache_key in self._strategy_cache:
