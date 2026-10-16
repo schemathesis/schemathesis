@@ -81,9 +81,6 @@ SLOW_DEFAULT = {
     "microsoft.com/graph/1.0.1.json",
 }
 SLOW_COVERAGE = {
-    "amazonaws.com/lex-models/2017-04-19.json",
-    "amazonaws.com/lookoutequipment/2020-12-15.json",
-    "amazonaws.com/worklink/2018-09-25.json",
     "azure.com/network-applicationGateway/2015-06-15.json",
     "azure.com/network-applicationGateway/2016-09-01.json",
     "azure.com/network-applicationGateway/2016-12-01.json",
@@ -92,6 +89,7 @@ SLOW_COVERAGE = {
     "azure.com/network-applicationGateway/2017-08-01.json",
     "azure.com/network-applicationGateway/2017-09-01.json",
     "azure.com/network-applicationGateway/2017-10-01.json",
+    "azure.com/network-applicationGateway/2017-11-01.json",
     "azure.com/network-applicationGateway/2018-01-01.json",
     "azure.com/network-applicationGateway/2018-02-01.json",
     "azure.com/network-applicationGateway/2018-04-01.json",
@@ -106,8 +104,6 @@ SLOW_COVERAGE = {
     "azure.com/network-applicationGateway/2019-06-01.json",
     "azure.com/network-applicationGateway/2019-07-01.json",
     "azure.com/network-applicationGateway/2019-08-01.json",
-    "kubernetes.io/unversioned.json",
-    "kubernetes.io/v1.10.0.json",
 }
 KNOWN_ISSUES = {
     # Regex that includes surrogates which is incompatible with the default alphabet for regex in Hypothesis (UTF-8)
