@@ -1,11 +1,11 @@
 import pytest
-from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.hooks import HookContext, _should_skip_hook
+from test.utils import run_given
 
 
 def register_default(dispatcher):
@@ -69,15 +69,12 @@ def test_simple_filter(ctx, is_include):
         def before_generate_body(context, body):
             return True
 
-    @given(case=schema["/api/payload"]["POST"].as_strategy())
-    @settings(max_examples=10)
+    @run_given(case=schema["/api/payload"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         if is_include:
             assert case.body == 42
         else:
             assert case.body != 42
-
-    test()
 
 
 def test_map_case_filter(ctx, cli, snapshot_cli):
@@ -135,12 +132,9 @@ def test_filter_combo(ctx, hook):
     schema = schemathesis.openapi.from_url(api.schema_url)
     hook(schema)
 
-    @given(case=schema["/api/payload"]["POST"].as_strategy())
-    @settings(max_examples=10)
+    @run_given(case=schema["/api/payload"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         assert case.body == 42
-
-    test()
 
 
 def test_filter_body_works_in_negative_mode(ctx):
@@ -170,12 +164,9 @@ def test_filter_body_works_in_negative_mode(ctx):
     def reject_bytes(context, body):
         return not isinstance(body, bytes)
 
-    @given(case=schema["/test"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=5, suppress_health_check=list(HealthCheck))
+    @run_given(case=schema["/test"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=5)
     def inner(case):
         assert not isinstance(case.body, bytes)
-
-    inner()
 
 
 def _build_operation(ctx, operation_id, path):

@@ -27,7 +27,7 @@ from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
 from schemathesis.transport.serialization import Binary
 from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, run_given
 
 
 def to_csv(data):
@@ -61,15 +61,12 @@ def test_text_csv(ctx):
     # And the user registers a custom serializer for it
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=schema["/api/csv"]["POST"].as_strategy())
-    @settings(max_examples=5, deadline=None)
+    @run_given(case=schema["/api/csv"]["POST"].as_strategy(), max_examples=5)
     def test(case):
         # Then this serializer should be used
         response = case.call_and_validate()
         # And data should be successfully sent to the API as CSV
         assert response.json() == case.body
-
-    test()
 
 
 @pytest.fixture
@@ -115,15 +112,12 @@ def test_serialize_yaml(open_api_3_schema_with_yaml_payload, transport):
     if transport is WSGITransport:
         schema.app = 42
 
-    @given(case=schema["/yaml"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/yaml"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         # Then Schemathesis should generate valid YAML, not JSON with `application/json` media type
         kwargs = case.as_transport_kwargs()
         assert kwargs["headers"]["Content-Type"] == "text/yaml"
         assert kwargs["data"] == "- 42\n"
-
-    test()
 
 
 def test_serialize_any(ctx):
@@ -143,13 +137,10 @@ def test_serialize_any(ctx):
         }
     )
 
-    @given(case=schema["/any"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/any"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         # Then Schemathesis should generate valid data of any supported type
         assert case.as_transport_kwargs()["headers"]["Content-Type"] in REQUESTS_TRANSPORT._serializers
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -246,13 +237,10 @@ def test_unknown_text_subtype_sent_as_plain_text(ctx, media_type):
         }
     )
 
-    @given(case=schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/data"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         kwargs = case.as_transport_kwargs()
         assert (kwargs["headers"]["Content-Type"], kwargs["data"]) == (media_type, b"hello")
-
-    test()
 
 
 def test_unknown_text_subtype_needs_a_plain_text_serializer(ctx):
@@ -305,8 +293,7 @@ def test_serialization_not_possible_manual(ctx):
         }
     )
 
-    @given(case=schema["/test"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         case.media_type = "application/whatever"
         with pytest.raises(
@@ -314,8 +301,6 @@ def test_serialization_not_possible_manual(ctx):
             match=re.escape(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(case.media_type)),
         ):
             case.as_transport_kwargs()
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -1693,12 +1678,9 @@ def test_serialize_xml_with_boolean_schema(ctx):
         version="3.1.0",
     )
 
-    @given(case=schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=3)
+    @run_given(case=schema["/data"]["POST"].as_strategy(), max_examples=3)
     def test(case):
         assert "data" in REQUESTS_TRANSPORT.serialize_case(case)
-
-    test()
 
 
 def test_serialize_xml_for_undeclared_media_type(ctx):
@@ -1845,14 +1827,11 @@ def test_serialize_xml_unbound_prefix(ctx, schema_object):
         components={"schemas": {"Main": schema_object}},
     )
 
-    @given(case=schema["/test"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         # Then it should be an error during serialization
         with pytest.raises(SerializationError, match="Unbound prefix: `smp`"):
             case.as_transport_kwargs()
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -1962,13 +1941,10 @@ def test_serialize_xml_top_level_string(ctx):
         }
     )
 
-    @given(case=schema["/test"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
             assert transport.serialize_case(case)["data"] == b"<data>hello</data>"
-
-    test()
 
 
 def test_xml_with_binary(ctx):
@@ -1986,12 +1962,9 @@ def test_xml_with_binary(ctx):
         }
     )
 
-    @given(case=schema["/test"]["POST"].as_strategy())
-    @settings(max_examples=1)
+    @run_given(case=schema["/test"]["POST"].as_strategy(), max_examples=1)
     def test(case):
         assert isinstance(case.as_transport_kwargs()["data"], str)
-
-    test()
 
 
 def test_duplicate_xml_attributes(ctx):

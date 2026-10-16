@@ -5,7 +5,6 @@ import random
 
 import graphql
 import pytest
-from hypothesis import HealthCheck, given, settings
 
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -14,6 +13,7 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values, substitute_pool_values
+from test.utils import run_given
 
 
 @pytest.fixture
@@ -729,14 +729,11 @@ def test_negative_case_keeps_violation_when_pool_has_values(ctx):
         feedback=FeedbackSources(extra_data_source=_pool_with_captured_book(schema)),
     )
 
-    @given(strategy)
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(strategy, max_examples=10)
     def test(case):
         assert graphql.validate(schema.client_schema, graphql.parse(case.body)), (
             f"Negative case is schema-valid: {case.body}"
         )
-
-    test()
 
 
 @pytest.mark.hypothesis_nested

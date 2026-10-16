@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI, Header, HTTPException
-from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import HealthCheck, Phase, settings
 from hypothesis.control import current_build_context
 from hypothesis.errors import InvalidDefinition
 from hypothesis.internal.conjecture.data import Status
@@ -28,6 +28,7 @@ from schemathesis.specs.openapi.stateful import (
 )
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody
+from test.utils import run_given
 
 
 @pytest.mark.parametrize(
@@ -953,12 +954,10 @@ def test_linked_steps_keep_negative_share_of_scenario_starts(ctx, response_facto
     modes = Counter()
 
     # Enough draws to tell the 10% negative rate, skewed upwards by Hypothesis, from an even split between modes.
-    @given(input=strategy)
-    @settings(max_examples=200, suppress_health_check=list(HealthCheck), database=None)
+    @run_given(input=strategy, max_examples=200)
     def test(input):
         modes[input.case.meta.generation.mode] += 1
 
-    test()
     assert 0 < modes[GenerationMode.NEGATIVE] / modes.total() < 0.45, modes
 
 

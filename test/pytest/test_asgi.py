@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 import schemathesis
 from schemathesis.python.asgi import ASGIClient
+from test.utils import run_given
 
 
 def test_code_sample(testdir):
@@ -230,14 +231,11 @@ def test_events(setup):
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-    @given(case=schema["/health"]["GET"].as_strategy())
-    @settings(max_examples=3, deadline=None)
+    @run_given(case=schema["/health"]["GET"].as_strategy(), max_examples=3)
     def test(case):
         response = case.call()
         assert response.status_code == 200
         assert response.json() == {"status": "OK"}
-
-    test()
 
     assert data["startup"] == 1
 
@@ -308,14 +306,11 @@ def test_head_operation():
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-    @given(case=schema["/ping"]["HEAD"].as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=schema["/ping"]["HEAD"].as_strategy(), max_examples=1)
     def test(case):
         response = case.call()
         assert response.status_code == 200
         assert response.content == b""
-
-    test()
 
 
 def test_application_rejecting_weak_references():

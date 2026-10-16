@@ -37,7 +37,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     remove_required_property,
 )
 from schemathesis.specs.openapi.negative.utils import can_negate
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, run_given
 
 MAX_EXAMPLES = 15
 SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
@@ -543,12 +543,9 @@ def test_openapi_31_legacy_exclusive_bounds_in_negative_generation(ctx):
         version="3.1.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 def test_openapi_31_prefix_items_query_param_negative_generation(ctx):
@@ -583,12 +580,9 @@ def test_openapi_31_prefix_items_query_param_negative_generation(ctx):
 
     operation = schema["/box"]["GET"]
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 def test_openapi_31_prefix_items_body_negative_generation(ctx):
@@ -616,12 +610,9 @@ def test_openapi_31_prefix_items_body_negative_generation(ctx):
         version="3.1.0",
     )
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -726,8 +717,7 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
     )
 
     # Strings that spell an accepted value are a small slice of the negative space.
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=100, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=100, derandomize=True)
     def test(case):
         query = case.query or {}
         mutations = case.meta.phase.data.mutations
@@ -740,8 +730,6 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
         assert not any(validator.is_valid(reading) for reading in _wire_readings(query["value"])), (
             f"Valid as sent: {query['value']!r}, mutations: {mutations!r}"
         )
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -775,15 +763,12 @@ def test_negative_query_does_not_negate_annotation_keywords(ctx):
     )
 
     # Annotation mutations are rare enough that a small sample can miss them.
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=300, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=300, derandomize=True)
     def test(case):
         mutations = case.meta.phase.data.mutations
         assert all(annotation_keywords.isdisjoint(mutation.keywords) for mutation in mutations), mutations
         description = case.meta.phase.data.description or ""
         assert all(f"`{keyword}`" not in description for keyword in annotation_keywords), description
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -809,8 +794,7 @@ def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
     )
     validator = make_validator(property_schema, operation.schema.adapter.jsonschema_validator_cls)
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=50, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=50, derandomize=True)
     def test(case):
         mutations = case.meta.phase.data.mutations
         if (
@@ -820,8 +804,6 @@ def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
         ):
             return
         assert not validator.is_valid(case.body["value"]), f"Valid: {case.body['value']!r}, mutations: {mutations!r}"
-
-    test()
 
 
 @pytest.mark.parametrize("negated", [False, True])
@@ -859,13 +841,10 @@ def test_boolean_not_in_negative_body_schema(ctx, body_schema, negated):
     )
     validator = make_validator(body_schema, operation.schema.adapter.jsonschema_validator_cls)
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=10, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10, derandomize=True)
     def test(case):
         if not isinstance(case.body, bytes):
             assert not validator.is_valid(case.body)
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -1963,13 +1942,11 @@ def test_path_combinator_without_string_branch_is_negated(ctx):
     validator = make_validator(path_schema, operation.schema.adapter.jsonschema_validator_cls)
     values = []
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=10)
     def test(case):
         assert case.meta.components[ParameterLocation.PATH].mode == GenerationMode.NEGATIVE
         values.append(case.path_parameters["itemId"])
 
-    test()
     assert values
     assert not any(validator.is_valid(value) for value in values), values
 

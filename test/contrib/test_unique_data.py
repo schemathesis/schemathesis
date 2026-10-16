@@ -1,9 +1,9 @@
 import platform
 
 import pytest
-from hypothesis import HealthCheck, given, settings
 
 from schemathesis.generation import GenerationMode
+from test.utils import run_given
 
 
 @pytest.fixture(
@@ -249,15 +249,12 @@ def test_hash_keeps_positive_multipart_case(ctx):
         },
     )
 
-    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def check(case):
         body = dict(case.body)
         hash(case)
         assert (case.body, case.meta.generation.mode) == (body, GenerationMode.POSITIVE)
         assert [type(value) for value in case.body.values()] == [type(value) for value in body.values()]
-
-    check()
 
 
 def test_sensitive_parameter_values_are_distinct_inputs(ctx, cli):

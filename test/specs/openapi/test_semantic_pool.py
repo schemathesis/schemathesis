@@ -35,6 +35,7 @@ from schemathesis.specs.openapi.semantic_pool import (
     iter_ingestion_leaves,
     pattern_hash,
 )
+from test.utils import run_given
 
 
 def test_pattern_hash_is_stable_for_equal_inputs():
@@ -1958,13 +1959,11 @@ def test_overlay_records_multiple_substitutions_in_a_single_draw():
 
     # Two independent substitutions at p=0.5 each, so ~25% of draws hit both; 80 examples make
     # missing every multi-substitution draw vanishingly unlikely.
-    @given(overlay)
-    @settings(max_examples=80, derandomize=True, database=None)
+    @run_given(overlay, max_examples=80, derandomize=True)
     def collect(value):
         if isinstance(value, GeneratedValue) and len(value.semantic_draws) == 2:
             multi_subs.append(value)
 
-    collect()
     assert multi_subs, "expected at least one draw with two simultaneous substitutions"
 
 

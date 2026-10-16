@@ -49,7 +49,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     form_data_to_json_schema,
 )
 from schemathesis.transport.serialization import Binary, quote_all
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, run_given
 
 
 def make_operation(schema, **kwargs) -> APIOperation:
@@ -556,12 +556,9 @@ def test_merge_length_into_pattern(ctx):
         },
     )
 
-    @given(operation.as_strategy())
-    @settings(max_examples=1)
+    @run_given(operation.as_strategy(), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 def test_required_without_properties(ctx):
@@ -584,12 +581,9 @@ def test_required_without_properties(ctx):
         },
     )
 
-    @given(operation.as_strategy())
-    @settings(max_examples=1)
+    @run_given(operation.as_strategy(), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 def test_non_schema_property_value(ctx):
@@ -614,12 +608,9 @@ def test_non_schema_property_value(ctx):
         },
     )
 
-    @given(operation.as_strategy())
-    @settings(max_examples=1)
+    @run_given(operation.as_strategy(), max_examples=1)
     def test(case):
         pass
-
-    test()
 
 
 def test_as_strategy_example_resolves_bundled_refs(tmp_path):
@@ -796,13 +787,10 @@ def test_binary_is_serializable(ctx, media_type):
         },
     )
 
-    @given(operation.as_strategy())
-    @settings(max_examples=1)
+    @run_given(operation.as_strategy(), max_examples=1)
     def test(case):
         assert_requests_call(case)
         assert case.as_transport_kwargs()["data"] == case.body.data
-
-    test()
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -1054,14 +1042,11 @@ def test_parameters_jsonified(ctx, expected):
 
     strategy = operation.as_strategy()
 
-    @given(case=strategy)
-    @settings(deadline=None, max_examples=1)
+    @run_given(case=strategy, max_examples=1)
     def test(case):
         # Then they should be converted to their JSON equivalents
         assume(case.path_parameters["param_path"] == expected)
         assume(case.query["param_query"] == expected)
-
-    test()
 
 
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"])
@@ -1319,12 +1304,9 @@ def test_integer_multiple_of_body(ctx):
         }
     )
 
-    @given(schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         assert case.body >= 1 and case.body % 3 == 0, case.body
-
-    test()
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
@@ -1356,12 +1338,9 @@ def test_format_constrained_string_body(ctx, version, body_schema, extract):
         version=version,
     )
 
-    @given(schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         uuid.UUID(extract(case.body))
-
-    test()
 
 
 CANONICAL_NUMBER_SCHEMAS = [
@@ -2421,16 +2400,14 @@ def test_barred_pointer_cycle_never_unsound(schema):
     # means, so it must not be the thing that decides which values are drawn.
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(
+    @run_given(
         make_positive_strategy(
             schema, "test", ParameterLocation.BODY, None, GenerationConfig(), jsonschema_rs.Draft202012Validator
-        )
+        ),
+        max_examples=50,
     )
-    @settings(max_examples=50, deadline=None, suppress_health_check=list(HealthCheck), database=None)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 def test_barred_cycle_admits_nothing():
@@ -2467,12 +2444,9 @@ def test_degenerate_root_cycle(schema):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 def test_pattern_properties_root_reference_overlap():
@@ -2564,13 +2538,10 @@ def test_long_strings_are_padded(schema):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=10, deadline=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert is_valid(value), value
         assert len(set(value)) <= 32, len(set(value))
-
-    test()
 
 
 def test_short_strings_keep_their_variety():
@@ -2632,12 +2603,9 @@ def test_array_size_bounds_over_unfillable_element(array_schema):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=10, deadline=None, database=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -2653,12 +2621,9 @@ def test_uncountable_size_ceiling_leaves_values_unbounded(schema):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=10, deadline=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 @pytest.mark.parametrize("schema", CANONICAL_INTEGER_SCHEMAS, ids=str)
@@ -2666,12 +2631,9 @@ def test_canonical_integer_generation_emits_python_ints(schema):
     # `1.0` satisfies `type: integer` in JSON terms, so the validator alone would accept a float here.
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @settings(max_examples=10, deadline=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert isinstance(value, int), value
-
-    test()
 
 
 def test_canonical_reference_is_not_inlined(ctx):
@@ -2685,12 +2647,9 @@ def test_canonical_reference_is_not_inlined(ctx):
 
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=10, deadline=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 RECURSIVE_SHAPES = [
@@ -2724,12 +2683,9 @@ def test_canonical_recursion_is_drawn_at_any_depth(node):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
     def depth(value):
         if isinstance(value, dict):
@@ -2771,12 +2727,9 @@ def test_canonical_dynamic_recursion_is_drawn_at_any_depth(validator_cls, schema
     built = _canonical_strategy(schema, GenerationConfig(), validator_cls)
     is_valid = validator_cls(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
     def depth(value):
         return 1 + depth(value["child"]) if isinstance(value, dict) and "child" in value else 0
@@ -2807,12 +2760,9 @@ def test_canonical_all_of_with_a_pointer_back_into_the_value():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
     find(built, lambda value: "parent" in value, settings=settings(max_examples=1000, database=None))
 
@@ -2906,12 +2856,9 @@ def test_canonical_array_keeps_the_positions_a_floor_demands():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert len(value) == 2 and is_valid(value), value
-
-    test()
 
 
 META_INVALID_SCHEMAS = [
@@ -2967,12 +2914,9 @@ def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):
 
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert matches(value), value
-
-    test()
 
     # Ceiling for a search that stops at the first match.
     find(built, lambda value: len(value) > 1, settings=settings(max_examples=1000, database=None))
@@ -3055,12 +2999,9 @@ def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
     )
     is_valid = jsonschema_rs.Draft202012Validator(operation.body[0].validation_schema).is_valid
 
-    @given(operation.as_strategy())
-    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    @run_given(operation.as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
-
-    test()
 
 
 SCRIPT_PATTERN_SCHEMAS = [
@@ -3125,12 +3066,10 @@ def test_canonical_content_string_generation(schema, reaches):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft7Validator)
     is_valid = jsonschema_rs.Draft7Validator(schema, validate_formats=True).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
 
-    test()
     for predicate in reaches:
         # Ceiling for a search that stops at the first match.
         find(built, predicate, settings=settings(max_examples=1000, database=None))
@@ -3154,12 +3093,10 @@ def test_canonical_number_excluding_integers_under_draft4():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
     is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
 
-    test()
     # Ceiling for a search that stops at the first match.
     find(built, lambda value: value > 4, settings=settings(max_examples=1000, database=None))
 
@@ -3263,12 +3200,9 @@ def test_canonical_number_generation_respects_original_schema(ctx, body_schema):
     )
     is_valid = jsonschema_rs.Draft202012Validator(body_schema).is_valid
 
-    @given(schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body)
-
-    test()
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
@@ -3290,12 +3224,9 @@ def test_positive_generation_respects_not_with_unicode_property_pattern(ctx, ver
     )
     is_valid = jsonschema_rs.validator_for(body_schema).is_valid
 
-    @given(schema["/data"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
-
-    test()
 
 
 def test_cookie_value_barred_from_every_printable_character_is_empty(ctx):
@@ -3317,12 +3248,9 @@ def test_cookie_value_barred_from_every_printable_character_is_empty(ctx):
         }
     )
 
-    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
     def test(case):
         assert case.cookies == {"session": ""}
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -3363,25 +3291,19 @@ def test_canonical_number_above_the_float_range():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=20, deadline=None, database=None)
+    @run_given(built, max_examples=20)
     def test(value):
         assert isinstance(value, int)
         assert is_valid(value), value
-
-    test()
 
 
 def test_canonical_object_prefers_documented_keys_for_the_floor():
     schema = {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "minProperties": 2}
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @settings(max_examples=50, deadline=None)
+    @run_given(built, max_examples=50)
     def test(value):
         assert {"a", "b"} <= set(value), value
-
-    test()
 
 
 CLOSED_OBJECT_SCHEMAS = [
@@ -3414,13 +3336,10 @@ def test_canonical_closed_object_generation(schema, allowed):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.validator_for(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert set(value) <= allowed, value
         assert is_valid(value), value
-
-    test()
 
 
 def test_canonical_closed_object_reaches_every_admitted_name():
@@ -3466,12 +3385,10 @@ def test_canonical_object_demand_without_a_spellable_complement(schema, validato
     built = _canonical_strategy(schema, GenerationConfig(), validator_cls)
     is_valid = validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
 
-    test()
     # Objects are the only shape the demand governs; the other branches are off-type values.
     find(
         built,
@@ -3487,16 +3404,13 @@ def test_canonical_object_respects_alphabet():
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         for key, item in value.items():
             assert "\x00" not in key
             key.encode("ascii")
             if isinstance(item, str):
                 assert "\x00" not in item
-
-    test()
 
 
 @pytest.mark.parametrize(
@@ -3535,12 +3449,9 @@ def test_canonical_typed_group_keeps_the_type():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
     is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
     # Ceiling for a search that stops at the first match.
     find(built, lambda value: value == 2, settings=settings(max_examples=1000, database=None))
@@ -3700,12 +3611,9 @@ def test_canonical_array_contains_is_satisfied_without_filtering():
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert 7654321 in value, value
-
-    test()
 
 
 def test_canonical_array_min_contains_places_every_demanded_element():
@@ -3715,12 +3623,9 @@ def test_canonical_array_min_contains_places_every_demanded_element():
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert value.count("A") >= 3, value
-
-    test()
 
 
 def test_canonical_array_max_contains_uses_non_matching_filler():
@@ -3737,12 +3642,9 @@ def test_canonical_array_max_contains_uses_non_matching_filler():
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert sum(item >= 10 for item in value) == 2, value
-
-    test()
 
 
 def test_canonical_array_unique_items_separates_booleans_from_numbers():
@@ -3769,24 +3671,18 @@ def test_canonical_array_unique_items_merges_equal_numbers():
         jsonschema_rs.Draft202012Validator,
     )
 
-    @given(built)
-    @settings(max_examples=50, deadline=None)
+    @run_given(built, max_examples=50)
     def test(value):
         rendered = [float(item) for item in value]
         assert len(set(rendered)) == len(rendered), value
-
-    test()
 
 
 def test_canonical_string_format_byte():
     built = _canonical_strategy({"type": "string", "format": "byte"}, GenerationConfig(), jsonschema_rs.Draft4Validator)
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         b64decode(value)
-
-    test()
 
 
 def test_canonical_string_format_binary():
@@ -3794,12 +3690,9 @@ def test_canonical_string_format_binary():
         {"type": "string", "format": "binary"}, GenerationConfig(), jsonschema_rs.Draft4Validator
     )
 
-    @given(built)
-    @settings(max_examples=25, deadline=None)
+    @run_given(built, max_examples=25)
     def test(value):
         assert isinstance(value, Binary), value
-
-    test()
 
 
 def test_canonical_format_drops_values_over_the_length_bound():
@@ -3847,12 +3740,9 @@ def test_canonical_object_property_formats(ctx, version):
     )
     is_valid = jsonschema_rs.Draft202012Validator(body_schema, validate_formats=True).is_valid
 
-    @given(schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
-
-    test()
 
 
 def test_canonical_contains_demand_behind_a_branch_pointer(ctx):
@@ -3891,12 +3781,9 @@ def test_canonical_contains_demand_behind_a_branch_pointer(ctx):
         }
     ).is_valid
 
-    @given(schema["/data"]["POST"].as_strategy())
-    @settings(max_examples=10, deadline=None)
+    @run_given(schema["/data"]["POST"].as_strategy(), max_examples=10)
     def test(case):
         assert is_valid(case.body), case.body
-
-    test()
 
 
 def test_canonical_object_keeps_declared_names_outside_the_alphabet():
@@ -3904,12 +3791,9 @@ def test_canonical_object_keeps_declared_names_outside_the_alphabet():
     schema = {"type": "object", "properties": {"é": {"type": "integer"}}, "required": ["é"]}
     built = _canonical_strategy(schema, GenerationConfig(codec="ascii"), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @settings(max_examples=10, deadline=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert "é" in value, value
-
-    test()
 
 
 def test_canonical_pattern_outside_the_alphabet():
@@ -3918,12 +3802,9 @@ def test_canonical_pattern_outside_the_alphabet():
     built = _canonical_strategy(schema, GenerationConfig(codec="ascii"), jsonschema_rs.Draft202012Validator)
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
-    @given(built)
-    @settings(max_examples=10, deadline=None)
+    @run_given(built, max_examples=10)
     def test(value):
         assert is_valid(value), value
-
-    test()
 
 
 # Bounds where a decimal and its `f64` reading disagree.
@@ -4220,12 +4101,9 @@ def test_array_with_undrawable_items_and_no_floor_is_empty():
 
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    @given(built)
-    @settings(max_examples=5, deadline=None)
+    @run_given(built, max_examples=5)
     def test(value):
         assert value == []
-
-    test()
 
 
 def test_array_with_undrawable_items_and_a_floor_declines():
@@ -4345,12 +4223,9 @@ def test_body_draws_satisfy_schema(ctx, body_schema):
     operation = _body_operation(ctx, body_schema)
     validator = jsonschema_rs.validator_for(body_schema, pattern_options=FANCY_REGEX_OPTIONS)
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10)
     def check(case):
         assert validator.is_valid(case.body), case.body
-
-    check()
 
 
 @pytest.mark.hypothesis_nested
@@ -4421,7 +4296,11 @@ def test_query_dictionary_binding(ctx, parameter_schema, config, expected):
 
 @pytest.mark.hypothesis_nested
 def test_body_dictionary_binding_through_recursive_reference(ctx):
-    node = {"type": "object", "properties": {"token": {"type": "string"}, "child": {"$ref": "#/components/schemas/A"}}}
+    node = {
+        "type": "object",
+        "properties": {"token": {"type": "string"}, "child": {"$ref": "#/components/schemas/A"}},
+        "required": ["token"],
+    }
     config = SchemathesisConfig.from_dict(
         {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.child.token": {"dictionary": "tokens"}}}
     )
@@ -4439,14 +4318,12 @@ def test_body_dictionary_binding_through_recursive_reference(ctx):
     )
     tokens = []
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
     def collect(case):
         child = case.body.get("child") if isinstance(case.body, dict) else None
         if isinstance(child, dict) and "token" in child:
             tokens.append(child["token"])
 
-    collect()
     assert tokens
     assert set(tokens) == {"DICT"}
 
@@ -4470,9 +4347,6 @@ def test_body_dictionary_binding_on_unknown_item_field_is_ignored(ctx):
     )
     validator = jsonschema_rs.validator_for(body_schema)
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(), max_examples=10)
     def check(case):
         assert validator.is_valid(case.body), case.body
-
-    check()

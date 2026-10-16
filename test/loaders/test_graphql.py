@@ -6,11 +6,11 @@ from io import StringIO
 import graphql
 import pytest
 from flask import Flask, Response
-from hypothesis import given, settings
 
 from schemathesis.core.errors import LoaderError
 from schemathesis.graphql import loaders
 from schemathesis.transport.prepare import normalize_base_url
+from test.utils import run_given
 
 RAW_SCHEMA = """
 type Book {
@@ -54,15 +54,12 @@ def test_graphql_url(ctx):
     schema.location = "/graphql/"
     strategy = schema["Query"]["getBooks"].as_strategy()
 
-    @given(case=strategy)
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=strategy, max_examples=1)
     def test(case):
         assert (
             case.as_transport_kwargs(base_url=normalize_base_url(case.operation.base_url))["url"]
             == "http://localhost/graphql/"
         )
-
-    test()
 
 
 def defines_type(parsed, name):

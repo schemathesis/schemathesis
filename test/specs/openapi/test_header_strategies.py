@@ -13,6 +13,7 @@ from schemathesis.specs.openapi.headers import (
     range_slightly_invalid_values,
     range_values,
 )
+from test.utils import run_given
 
 ETAG_RE = re.compile(r'^(\*|(W/)?"[^"]*")(,\s*(\*|(W/)?"[^"]*"))*$')
 HTTP_DATE_RE = re.compile(r"^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$")
@@ -74,16 +75,13 @@ def test_known_header_formats_lookup(name, expected):
 def test_positive_mode_range_always_valid():
     strategies = get_header_format_strategies(GenerationMode.POSITIVE)
 
-    @given(strategies["_range_header"])
-    @settings(max_examples=50)
+    @run_given(strategies["_range_header"], max_examples=50)
     def inner(value):
         assert VALID_RANGE_RE.match(value), f"Positive mode produced invalid Range: {value!r}"
         for spec in value[6:].split(","):
             if re.match(r"^\d+-\d+$", spec):
                 first, last = spec.split("-")
                 assert int(first) <= int(last)
-
-    inner()
 
 
 def test_negative_mode_range_has_three_tiers():

@@ -4,7 +4,6 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from hypothesis import given, settings
 
 import schemathesis.checks
 from schemathesis import Case
@@ -32,6 +31,7 @@ from schemathesis.specs.openapi.checks import (
     status_code_conformance,
     use_after_free,
 )
+from test.utils import run_given
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
@@ -780,15 +780,12 @@ def test_content_type_conformance_undocumented_json_subtype(openapi_30, response
 def test_response_schema_conformance_references_invalid(complex_schema, response_factory):
     schema = schemathesis.openapi.from_path(complex_schema)
 
-    @given(case=schema["/teapot"]["POST"].as_strategy())
-    @settings(max_examples=3, deadline=None)
+    @run_given(case=schema["/teapot"]["POST"].as_strategy(), max_examples=3)
     def test(case):
         response = Response.from_requests(response_factory.requests(content=json.dumps({"foo": 1}).encode()), True)
         with pytest.raises(FailureGroup):
             case.validate_response(response)
         assert not case.operation.is_valid_response(response)
-
-    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -796,15 +793,12 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
 def test_response_schema_conformance_references_valid(complex_schema, value, response_factory):
     schema = schemathesis.openapi.from_path(complex_schema)
 
-    @given(case=schema["/teapot"]["POST"].as_strategy())
-    @settings(max_examples=3, deadline=None)
+    @run_given(case=schema["/teapot"]["POST"].as_strategy(), max_examples=3)
     def test(case):
         response = Response.from_requests(
             response_factory.requests(content=json.dumps({"key": value, "referenced": value}).encode()), True
         )
         case.validate_response(response)
-
-    test()
 
 
 def test_response_schema_conformance_custom_deserializer(openapi_30, response_factory):

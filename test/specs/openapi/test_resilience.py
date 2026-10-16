@@ -1,12 +1,12 @@
 import pytest
 from flask import jsonify
-from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.parameters import SkippedParameter
 from schemathesis.core.result import Err, Ok
 from schemathesis.specs.openapi.adapter.responses import ResolvedSchema
+from test.utils import run_given
 
 
 def _schema(servers):
@@ -427,12 +427,9 @@ def test_request_is_sent_when_optional_parameter_is_dropped(ctx, app_runner):
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     operation = _first_operation(schema).ok()
 
-    @given(case=operation.as_strategy())
-    @settings(max_examples=1, deadline=None)
+    @run_given(case=operation.as_strategy(), max_examples=1)
     def test(case):
         assert case.call().status_code == 200
-
-    test()
 
 
 # `required` and the parameter's name live behind the `$ref`, not on the stub that names it.

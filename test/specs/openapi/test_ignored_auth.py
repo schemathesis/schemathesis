@@ -20,7 +20,7 @@ from schemathesis.python.asgi import ASGIClient
 from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
 from schemathesis.transport.requests import RequestsTransport
-from test.utils import EventStream
+from test.utils import EventStream, run_given
 
 
 def run(schema_url, **config):
@@ -639,13 +639,10 @@ def test_custom_auth():
             case.headers = case.headers or {}
             case.headers["x-api-key"] = data
 
-    @given(case=schema["/"]["GET"].as_strategy())
-    @settings(max_examples=10, deadline=None)
+    @run_given(case=schema["/"]["GET"].as_strategy(), max_examples=10)
     def test(case):
         client = ASGIClient(app)
         case.call_and_validate(session=client)
-
-    test()
 
 
 def make_app(auth_location):

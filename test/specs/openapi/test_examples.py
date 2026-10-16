@@ -40,6 +40,7 @@ from test.utils import EventStream, assert_requests_call, to_float32
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.schemas import OpenApiSchema
+from test.utils import run_given
 
 
 @pytest.fixture(scope="module")
@@ -3054,13 +3055,10 @@ def test_body_example_violating_schema_is_not_used_in_positive_generation(ctx):
     body = operation.body[0]
     validator = jsonschema_rs.validator_for(body.optimized_schema)
 
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-    @settings(deadline=None, max_examples=200, suppress_health_check=list(HealthCheck))
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=200)
     def t(case):
         if isinstance(case.body, dict):
             assert validator.is_valid(case.body), f"strategy yielded body invalid against its schema: {case.body!r}"
-
-    t()
 
 
 def test_get_pool_combos_filters_swagger_2_path_value_violating_schemathesis_min_length(ctx):

@@ -1,10 +1,10 @@
 import pytest
 import requests
-from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from schemathesis.core import NOT_SET
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
+from test.utils import run_given
 
 
 @pytest.mark.parametrize(
@@ -24,12 +24,9 @@ def test_is_valid_query(value, expected):
 def test_is_valid_query_strategy():
     strategy = st.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
 
-    @given(strategy)
-    @settings(max_examples=10)
+    @run_given(strategy, max_examples=10)
     def test(value):
         assert value == {"key": "1"}
-
-    test()
 
 
 @pytest.mark.parametrize(
