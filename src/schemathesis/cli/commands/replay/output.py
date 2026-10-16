@@ -27,6 +27,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import format_failures
 from schemathesis.core.output import truncate_text
 from schemathesis.core.transforms import UNRESOLVABLE
+from schemathesis.generation.meta import report_label
 from schemathesis.reporting.crashes import CrashFile, CrashStep
 
 if TYPE_CHECKING:
@@ -98,11 +99,10 @@ def render_replay(
     if crashes and not trailing_blank:
         console.print()
 
-    # Group failing checks by the request actually sent, not the declared operation.
     failures: dict[str, list[tuple[CrashFile, ReplayOutcome]]] = {}
     for crash, outcome in zip(crashes, outcomes, strict=True):
         if outcome.failures and outcome.transport_response is not None:
-            failures.setdefault(f"{crash.method} {crash.path_template}", []).append((crash, outcome))
+            failures.setdefault(_operation_label(crash), []).append((crash, outcome))
 
     if failures:
         display_section_name("FAILURES")
@@ -158,8 +158,7 @@ def _print_compact_block(console: Console, crash: CrashFile, outcome: ReplayOutc
     """Print the rollup line (plus a breakdown for mixed cases); return True if it ends with a blank line."""
     from rich.text import Text
 
-    terminal_step = crash.sequence[-1]
-    console.print(_header_line(method=terminal_step.method, path=_step_path(terminal_step), outcome=outcome))
+    console.print(_header_line(label=_operation_label(crash), outcome=outcome))
 
     if not outcome.check_outcomes:
         # A case that could not be evaluated carries a single explanation instead of per-check verdicts.
@@ -197,7 +196,16 @@ def _print_check_rows(console: Console, check_outcomes: list[CheckOutcome]) -> N
         console.print(row)
 
 
-def _header_line(*, method: str, path: str, outcome: ReplayOutcome) -> Text:
+def _operation_label(crash: CrashFile) -> str:
+    """The label `st run` reports the case under."""
+    meta = crash.sequence[-1].meta or {}
+    data = (meta.get("phase") or {}).get("data") or {}
+    return report_label(
+        operation_label=crash.operation, method=crash.method, path=crash.path_template, scenario=data.get("scenario")
+    )
+
+
+def _header_line(*, label: str, outcome: ReplayOutcome) -> Text:
     from rich.text import Text
 
     badge = BADGES[outcome.status]
@@ -205,9 +213,13 @@ def _header_line(*, method: str, path: str, outcome: ReplayOutcome) -> Text:
     line.append("  ")
     line.append(f"{badge.glyph} {badge.label}".ljust(BADGE_WIDTH), style=badge.style)
     line.append(" ")
-    line.append(method, style=METHOD_STYLES.get(method, "bold white"))
-    line.append(" ")
-    line.append(path, style="bold bright_white")
+    method, separator, path = label.partition(" ")
+    if separator:
+        line.append(method, style=METHOD_STYLES.get(method, "bold white"))
+        line.append(" ")
+        line.append(path, style="bold bright_white")
+    else:
+        line.append(label, style="bold bright_white")
     return line
 
 
