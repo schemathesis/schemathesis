@@ -11,6 +11,7 @@
 - `#regex:` extractor for `$response.body#/pointer` link expressions.
 - `--report pytest` writes failures as standalone pytest tests. [#2999](https://github.com/schemathesis/schemathesis/issues/2999)
 - Stateful links inferred into fields of top-level array request body items.
+- Captured resource ids fill fields of top-level array request body items.
 
 ### :wrench: Changed
 

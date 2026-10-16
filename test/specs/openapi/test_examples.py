@@ -3028,6 +3028,51 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
     ]
 
 
+def test_get_pool_combos_skips_top_level_array_body(ctx):
+    # A pool value covers one field of each item, so it can't stand in for a whole array body.
+    schema = ctx.openapi.load_schema(
+        {
+            "/groups": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Group"}}},
+                        }
+                    }
+                }
+            },
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}}
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Group": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}},
+                "Item": {
+                    "type": "object",
+                    "required": ["name", "groupId"],
+                    "properties": {"name": {"type": "string"}, "groupId": {"type": "string"}},
+                },
+            }
+        },
+    )
+    extra_data_source = schema.create_extra_data_source()
+    extra_data_source.repository.record_response(operation="POST /groups", status_code=201, payload={"id": "G-1"})
+
+    assert _get_pool_combos(schema["/items"]["POST"], extra_data_source) == []
+
+
 def test_body_example_violating_schema_is_not_used_in_positive_generation(ctx):
     # A schema's own `example` may not match its `schema`; positive generation must filter it out.
     operation = ctx.openapi.load_operation(

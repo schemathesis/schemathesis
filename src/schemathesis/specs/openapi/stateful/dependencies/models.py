@@ -216,14 +216,7 @@ class DependencyGraph:
                         existing = links.get(link_name)
                         if existing is not None:
                             existing.parameters.update(parameters)
-                            target, source = existing.request_body, request_body
-                            if isinstance(target, list) and isinstance(source, list):
-                                # Fields of top-level array items merge like those of nested array items.
-                                target, source = target[0], source[0]
-                            if isinstance(target, dict) and isinstance(source, dict):
-                                _merge_nested_body(target, source)
-                            else:
-                                existing.request_body = request_body
+                            existing.request_body = _merge_request_body(existing.request_body, request_body)
                             continue
                         links[link_name] = LinkDefinition(
                             operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
@@ -672,6 +665,20 @@ def _build_nested_body(path: str, value: str) -> dict[str, Any] | list[Any]:
         current[final_key] = value
 
     return result
+
+
+def _merge_request_body(
+    target: dict[str, Any] | list[Any], source: dict[str, Any] | list[Any]
+) -> dict[str, Any] | list[Any]:
+    """Deep merge `source` into `target` and return the result; `source` wins when the shapes differ."""
+    inner_target, inner_source = target, source
+    if isinstance(target, list) and isinstance(source, list):
+        # Fields of top-level array items merge like those of nested array items.
+        inner_target, inner_source = target[0], source[0]
+    if isinstance(inner_target, dict) and isinstance(inner_source, dict):
+        _merge_nested_body(inner_target, inner_source)
+        return target
+    return source
 
 
 def _merge_nested_body(target: dict[str, Any], source: dict[str, Any]) -> None:
