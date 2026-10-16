@@ -31,9 +31,7 @@ from schemathesis.config._output import MAX_PAYLOAD_SIZE
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.shell import ShellType
 from schemathesis.engine import Status, control, events
-from schemathesis.engine.health import HealthState
 from schemathesis.engine.run import Phase, PhaseName
-from schemathesis.engine.run.unit._pool import DefaultScheduler
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
@@ -1108,21 +1106,11 @@ def test_keyboard_interrupt(ctx, cli, workers, snapshot_cli):
 
 
 @pytest.mark.filterwarnings("ignore:Exception in thread")
-def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
-    # When a Schemathesis run is interrupted by the keyboard or via SIGINT
+def test_keyboard_interrupt_threaded(ctx, cli, snapshot_cli):
+    # The hook runs on the worker threads, so the interrupt starts there rather than in the main thread.
     api = ctx.openapi.apps.success_and_failure()
-    original = DefaultScheduler.next_operation
-    counter = 0
-
-    def mocked(*args, **kwargs):
-        nonlocal counter
-        counter += 1
-        if counter > 1:
-            raise KeyboardInterrupt
-        return original(*args, **kwargs)
-
-    mocker.patch("schemathesis.engine.run.unit._pool.DefaultScheduler.next_operation", wraps=mocked)
-    assert cli.run(api.schema_url, "--workers=2", "--generation-deterministic") == snapshot_cli
+    module = ctx.write_pymodule(INTERRUPT_ON_ADD_EXAMPLES)
+    assert cli.run(api.schema_url, "--workers=2", "--generation-deterministic", hooks=module) == snapshot_cli
 
 
 def test_keyboard_interrupt_during_schema_loading(ctx, cli, tmp_path, snapshot_cli):
@@ -1139,6 +1127,13 @@ INTERRUPT_ON_SCHEMA_LOAD = """
 def before_load_schema(context, raw_schema):
     raise KeyboardInterrupt
 """
+
+INTERRUPT_ON_ADD_EXAMPLES = """
+@schemathesis.hook
+def before_add_examples(context, examples):
+    raise KeyboardInterrupt
+"""
+
 
 INTERRUPT_ON_SECOND_RESPONSE = """
 calls = 0
@@ -5403,7 +5398,7 @@ def before_generate_case(context, strategy):
 
 
 @pytest.mark.snapshot(replace_test_cases=False, replace_generated=True, replace_reproduce_with=True)
-def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, cli, mocker, snapshot_cli):
+def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
 
     @app.route("/users", methods=["POST"])
@@ -5412,18 +5407,18 @@ def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, c
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
+        # Outlasts the request timeout every time, so the operation is flagged unresponsive.
+        time.sleep(0.3)
         return jsonify({"id": user_id})
-
-    # Hanging requests are what flag an operation in a real run; flagging it directly keeps the test fast
-    mocker.patch.object(HealthState, "is_unresponsive", lambda self, label: label == "GET /users/{userId}")
 
     assert (
         cli.run_openapi_app(
             app,
-            "--max-examples=1",
+            "--max-examples=5",
             "--generation-deterministic",
             "--phases=stateful",
             "--checks=not_a_server_error",
+            "--request-timeout=0.05",
         )
         == snapshot_cli
     )
