@@ -53,7 +53,7 @@ def test_coverage_phase_skip_when_filter_drops_all_cases(ctx):
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.COVERAGE)
     assert finished
     assert all(event.status == Status.SKIP for event in finished)
-    assert all(event.skip_reason == "No examples in schema" for event in finished)
+    assert all(event.skip_reason == "No coverage cases could be generated" for event in finished)
 
 
 def test_coverage_phase_failure_status_for_check_failure(ctx):

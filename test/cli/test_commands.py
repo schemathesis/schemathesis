@@ -2677,6 +2677,26 @@ def test_skipped_on_no_explicit_examples(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--phases=examples") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_skipped_on_no_coverage_cases(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"allOf": [{"type": "string"}, {"type": "integer"}]}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert cli.run_openapi_app(app, "--phases=coverage", "--mode=positive") == snapshot_cli
+
+
 @pytest.fixture
 def data_generation_check(ctx):
     with ctx.check(
