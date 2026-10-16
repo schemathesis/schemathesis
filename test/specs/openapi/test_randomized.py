@@ -320,7 +320,7 @@ def _assemble(
     result.update(spec.seed_document())
     for key in spec.media_type_keys:
         result[key] = list(media_types)
-    return _rewritten(result, media_types, spec.seed_pointer)
+    return _rewritten(result, media_types, spec)
 
 
 def _items(entries: list[Entry]) -> dict[str, dict[str, Any]]:
@@ -350,8 +350,9 @@ def _items(entries: list[Entry]) -> dict[str, dict[str, Any]]:
     return items
 
 
-def _rewritten(document: dict[str, Any], media_types: list[str], pointer: str) -> dict[str, Any]:
+def _rewritten(document: dict[str, Any], media_types: list[str], spec: Spec) -> dict[str, Any]:
     """Every reference resolves, and every body is written in a media type that can be encoded."""
+    pointer = spec.seed_pointer
 
     def walk(value: JsonValue) -> JsonValue:
         if isinstance(value, dict):
@@ -366,6 +367,10 @@ def _rewritten(document: dict[str, Any], media_types: list[str], pointer: str) -
                 result["content"] = {
                     media_types[index % len(media_types)]: entry for index, entry in enumerate(entries)
                 }
+            # Swagger 2.0 operations may override the document-level media types with drawn ones.
+            for key in spec.media_type_keys:
+                if isinstance(result.get(key), list) and result[key]:
+                    result[key] = list(media_types)
             return result
         if isinstance(value, list):
             # Distinct references become one after repointing, and lists like `parameters` must stay unique.
@@ -507,6 +512,18 @@ def test_repointed_references_keep_parameters_unique(version):
         _hostile_document(version, {}), [Entry(item, "get", _OK_RESPONSES)], [], ["application/json"], spec=spec
     )
     assert document["paths"]["/p0"]["post"]["parameters"] == [{"$ref": spec.seed_pointer}]
+
+
+def test_operation_media_types_are_encodable():
+    operation = {**_OK_RESPONSES, "consumes": ["1/0"], "produces": ["1/0"]}
+    document = _assemble(
+        _hostile_document("2.0", {}), [Entry({}, "post", operation)], [], ["application/json"], spec=SPECS["2.0"]
+    )
+    assert document["paths"]["/p0"]["post"] == {
+        **_OK_RESPONSES,
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+    }
 
 
 @pytest.mark.parametrize("hostile", sorted(HOSTILE_PATHS))
