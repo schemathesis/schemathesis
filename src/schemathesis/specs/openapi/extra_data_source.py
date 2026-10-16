@@ -9,15 +9,22 @@ import jsonschema_rs
 
 from schemathesis.core import NOT_SET, deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import make_validator, schema_with_bundle
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
+from schemathesis.core.transforms import UNRESOLVABLE, resolve_path
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
+from schemathesis.specs.openapi.error_feedback import _walk_to_property
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex, iter_ingestion_leaves
-from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
+from schemathesis.specs.openapi.stateful.dependencies.models import (
+    DependencyGraph,
+    InputSlot,
+    _build_nested_body,
+    _merge_nested_body,
+)
 from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, referenced_values
 
 if TYPE_CHECKING:
@@ -292,37 +299,22 @@ def _build_property_validator(
 
 @dataclass(slots=True, frozen=True)
 class _VariantSlot:
-    # `path` is where the value lands in the variant; `lookup_key` is the slash-joined
-    # form used as the requirements-dict key and `instance.context` lookup.
-    path: tuple[str, ...]
+    # `path` is where the value lands in the variant, integers marking array items; `lookup_key` is
+    # the slash-joined form used as the requirements-dict key and `instance.context` lookup.
+    path: tuple[str | int, ...]
     leaf_schema: JsonSchema
     requirement: ParameterRequirement
 
     @property
     def lookup_key(self) -> str:
-        return "/".join(self.path)
-
-
-def _assemble_path(path: tuple[str, ...], value: Any) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    cursor = result
-    for key in path[:-1]:
-        nxt: dict[str, Any] = {}
-        cursor[key] = nxt
-        cursor = nxt
-    cursor[path[-1]] = value
-    return result
+        return "/".join(map(str, self.path))
 
 
 def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str, Any]) -> dict[str, Any]:
     variant: dict[str, Any] = {}
     for slot in slots:
-        if slot.lookup_key not in values_by_lookup_key:
-            continue
-        cursor = variant
-        for key in slot.path[:-1]:
-            cursor = cursor.setdefault(key, {})
-        cursor[slot.path[-1]] = values_by_lookup_key[slot.lookup_key]
+        if slot.lookup_key in values_by_lookup_key:
+            _merge_nested_body(variant, _build_nested_body(slot.lookup_key, values_by_lookup_key[slot.lookup_key]))
     return variant
 
 
@@ -335,15 +327,10 @@ def _variant_satisfies_paths(
         validator = validators.get(slot.lookup_key)
         if validator is None:
             continue
-        cursor: Any = variant
-        for key in slot.path:
-            if not isinstance(cursor, dict) or key not in cursor:
-                cursor = None
-                break
-            cursor = cursor[key]
-        if cursor is None:
+        value = resolve_path(variant, slot.path)
+        if value is UNRESOLVABLE or value is None:
             continue
-        if not validator.is_valid(cursor):
+        if not validator.is_valid(value):
             return False
     return True
 
@@ -382,6 +369,12 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self.consumer_labels: frozenset[str] = frozenset(key[0] for key in requirements)
         # Values that have been successfully DELETEd; pool draws skip them.
         self._tombstoned: set[tuple[str, Any]] = set()
+        # Body fields below the top level, e.g. `data/0/groupId`, by operation label.
+        self._nested_body_requirements: dict[str, list[tuple[tuple[str | int, ...], ParameterRequirement]]] = {}
+        for (label, location, name), requirement in requirements.items():
+            if location == ParameterLocation.BODY and "/" in name:
+                path = tuple(int(segment) if segment.isdigit() else segment for segment in name.split("/"))
+                self._nested_body_requirements.setdefault(label, []).append((path, requirement))
 
     # Opaque repr so Hypothesis' argument rendering never walks the live pool that concurrent workers mutate.
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
@@ -420,7 +413,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
         For single requirements, each variant has a single-property overlay.
         For multiple requirements, each variant has a complete value set preserving relationships.
-        For BODY location, walks one level into nested objects so nested foreign-key fields get overlays.
+        For BODY location, also reaches nested foreign-key fields through objects, array items and `$ref`.
         """
         if not isinstance(schema, dict):
             return None
@@ -434,16 +427,15 @@ class OpenApiExtraDataSource(ExtraDataSource):
             requirement = self.requirements.get((operation.label, location, name))
             if requirement is not None:
                 slots.append(_VariantSlot((name,), prop_schema, requirement))
-                continue
-            if location != ParameterLocation.BODY or not isinstance(prop_schema, dict):
-                continue
-            sub_props = prop_schema.get("properties")
-            if not isinstance(sub_props, dict):
-                continue
-            for sub_name, sub_schema in sub_props.items():
-                req = self.requirements.get((operation.label, location, f"{name}/{sub_name}"))
-                if req is not None:
-                    slots.append(_VariantSlot((name, sub_name), sub_schema, req))
+        if location == ParameterLocation.BODY:
+            bound = {slot.path[0] for slot in slots}
+            bundled = schema.get(BUNDLE_STORAGE_KEY)
+            for path, requirement in self._nested_body_requirements.get(operation.label, ()):
+                if path[0] in bound:
+                    continue
+                leaf_schema = _walk_to_property(schema, path, bundled)
+                if leaf_schema is not None:
+                    slots.append(_VariantSlot(path, leaf_schema, requirement))
 
         if not slots:
             return None
@@ -453,7 +445,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             slot = slots[0]
             variants = [
                 CapturedVariant(
-                    overlay=_assemble_path(slot.path, value),
+                    overlay=_build_nested_body(slot.lookup_key, value),
                     draws=(
                         _build_pool_draw_from_requirement(
                             location=location,

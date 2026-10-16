@@ -945,10 +945,21 @@ def build_hybrid_strategy(
 def _deep_merge_overlay(target: dict[str, Any], overlay: dict[str, Any]) -> None:
     """Apply `overlay` onto `target` in place, recursing into nested dicts so leaf overlays don't drop generated siblings."""
     for key, value in overlay.items():
-        if isinstance(value, dict) and isinstance(target.get(key), dict):
-            _deep_merge_overlay(target[key], value)
+        current = target.get(key)
+        if isinstance(value, dict) and isinstance(current, dict):
+            _deep_merge_overlay(current, value)
+        elif _is_item_overlay(value) and isinstance(current, list) and current:
+            # Fields captured for an array item apply to every generated item, as bulk endpoints check each one.
+            for item in current:
+                if isinstance(item, dict):
+                    _deep_merge_overlay(item, value[0])
         else:
             target[key] = value
+
+
+def _is_item_overlay(value: object) -> bool:
+    """Whether `value` holds fields for array items, e.g. `[{"groupId": ...}]` from `data/0/groupId`."""
+    return isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict)
 
 
 def _integer_property_validators(schema: JsonSchemaObject, validator_cls: type) -> dict[str, jsonschema_rs.Validator]:
