@@ -1,3 +1,5 @@
+from unittest.mock import ANY
+
 import pytest
 from flask import Flask, jsonify, redirect, request
 from hypothesis import HealthCheck, given, settings
@@ -89,7 +91,7 @@ def test_form_data(ctx):
 
 
 @pytest.mark.hypothesis_nested
-def test_binary_body(ctx, mocker):
+def test_binary_body(ctx):
     # When an API operation accepts a binary input
     api = ctx.openapi.apps.upload_file()
     operation = ctx.openapi.load_operation(
@@ -108,7 +110,7 @@ def test_binary_body(ctx, mocker):
     def test(case):
         response = case.call(app=api.wsgi_app)
         assert response.status_code == 200
-        assert response.json() == {"size": mocker.ANY}
+        assert response.json() == {"size": ANY}
 
     # Then it should be sent correctly
     test()

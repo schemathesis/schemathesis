@@ -7,10 +7,14 @@ from pathlib import Path
 SRC = str(Path(__file__).parent.parent / "src")
 
 
-def test_dev_version(monkeypatch, mocker):
+def test_dev_version(monkeypatch):
     # When Schemathesis is run in dev environment without installation
     monkeypatch.delitem(sys.modules, "schemathesis.core.version")
-    mocker.patch("importlib.metadata.version", side_effect=metadata.PackageNotFoundError)
+
+    def not_installed(name):
+        raise metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(metadata, "version", not_installed)
     from schemathesis.core.version import SCHEMATHESIS_VERSION
 
     # Then it's version is "dev"
