@@ -17,12 +17,12 @@ import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_path
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -422,75 +422,79 @@ def _with_captured_value_first(
     return updated
 
 
-class _NestedOverlay:
-    """Sentinel distinguishing per-leaf sub-field overlays from raw pool object values."""
-
-    __slots__ = ("fields",)
-
-    def __init__(self, fields: dict[str, Any]) -> None:
-        self.fields = fields
-
-
-def _body_pool_overlays(
-    *,
-    correlated: dict[tuple[ParameterLocation, str], Any],
-    body_schema: Any,
-    validator_cls: type,
+def _with_body_pool_values(
+    schema: dict[str, Any], correlated: dict[tuple[ParameterLocation, str], Any], validator_cls: type
 ) -> dict[str, Any]:
-    """Return pool overlay values for body properties valid against the destination schema."""
-    properties = body_schema.get("properties")
-    if not isinstance(properties, dict):
-        return {}
-    overlays: dict[str, Any] = {}
-    for prop_name, prop_schema in properties.items():
-        if _is_pool_eligible(prop_schema):
-            value = correlated.get((ParameterLocation.BODY, prop_name))
-            if value is not None:
-                try:
-                    if make_validator(schema_with_bundle(prop_schema, body_schema), validator_cls).is_valid(value):
-                        overlays[prop_name] = value
-                        continue
-                except Exception:
-                    pass
-        # Fall through to the nested branch even when the top-level lookup misses:
-        # an object-typed property is pool-eligible but its overlay key lives one level deeper.
-        if isinstance(prop_schema, dict) and isinstance(prop_schema.get("properties"), dict):
-            nested = _nested_body_pool_overlay(
-                correlated=correlated,
-                outer_name=prop_name,
-                inner_schema=prop_schema,
-                body_schema=body_schema,
-                validator_cls=validator_cls,
-            )
-            if nested:
-                overlays[prop_name] = _NestedOverlay(nested)
-    return overlays
+    """Lead body fields the pool can fill with captured values, through objects, array items and `$ref`."""
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
+    # Shallower fields first, so a captured whole object wins over captured fields inside it.
+    fields = sorted(
+        ((name, value) for (location, name), value in correlated.items() if location == ParameterLocation.BODY),
+        key=lambda item: item[0].count("/"),
+    )
+    filled: set[str] = set()
+    updated = schema
+    for name, value in fields:
+        path = tuple(int(segment) if segment.isdigit() else segment for segment in name.split("/"))
+        if path[0] in filled:
+            continue
+        candidate = _with_leaf_example(updated, path, value, bundled, schema, validator_cls)
+        if candidate is not None:
+            updated = candidate
+            if len(path) == 1:
+                filled.add(name)
+    return updated
 
 
-def _nested_body_pool_overlay(
-    *,
-    correlated: dict[tuple[ParameterLocation, str], Any],
-    outer_name: str,
-    inner_schema: dict[str, Any],
+def _with_leaf_example(
+    node: dict[str, Any],
+    path: tuple[str | int, ...],
+    value: object,
+    bundled: object,
     body_schema: dict[str, Any],
     validator_cls: type,
-) -> dict[str, Any]:
-    inner_props = inner_schema.get("properties")
-    assert isinstance(inner_props, dict), "caller must validate inner_schema['properties'] is a dict"
-    inner: dict[str, Any] = {}
-    for sub_name, sub_schema in inner_props.items():
-        if not _is_pool_eligible(sub_schema):
-            continue
-        value = correlated.get((ParameterLocation.BODY, f"{outer_name}/{sub_name}"))
-        if value is None:
-            continue
+) -> dict[str, Any] | None:
+    """Copy of `node` whose schema at `path` lists `value` as its example; None when `path` can't take it."""
+    resolved = _inline_ref(node, bundled)
+    if resolved is None:
+        return None
+    step, *rest = path
+    properties = resolved.get("properties")
+    if isinstance(step, str):
+        child = properties.get(step) if isinstance(properties, dict) else None
+    else:
+        # Every array item shares the `items` schema, so the value reaches each generated item.
+        child = resolved.get("items")
+    if not isinstance(child, dict):
+        return None
+    if rest:
+        replacement = _with_leaf_example(child, tuple(rest), value, bundled, body_schema, validator_cls)
+        if replacement is None:
+            return None
+    else:
+        if not _is_pool_eligible(child):
+            return None
         try:
-            if not make_validator(schema_with_bundle(sub_schema, body_schema), validator_cls).is_valid(value):
-                continue
+            if not make_validator(schema_with_bundle(child, body_schema), validator_cls).is_valid(value):
+                return None
         except Exception:
-            continue
-        inner[sub_name] = value
-    return inner
+            return None
+        replacement = {**child, "examples": [value]}
+    if isinstance(step, str):
+        assert isinstance(properties, dict), "a named step only resolves through `properties`"
+        return {**resolved, "properties": {**properties, step: replacement}}
+    return {**resolved, "items": replacement}
+
+
+def _inline_ref(node: dict[str, Any], bundled: object) -> dict[str, Any] | None:
+    """`node` with its bundled `$ref` target inlined; None when sibling keywords would clash with the target."""
+    target = resolve_bundled_ref(node, bundled)
+    if target is node:
+        return node
+    siblings = {key: item for key, item in node.items() if key != "$ref"}
+    if siblings.keys() & target.keys():
+        return None
+    return {**siblings, **target}
 
 
 def _generate_coverage_values_from_custom_strategy(
@@ -602,14 +606,8 @@ def _case_slot_value(kwargs: dict[str, Any], location: ParameterLocation, parame
     if container is None:
         return _SENTINEL_ABSENT
     if location == ParameterLocation.BODY:
-        if not isinstance(container, dict):
-            return _SENTINEL_ABSENT
-        cursor: Any = container
-        for segment in parameter_name.split("/"):
-            if not isinstance(cursor, dict) or segment not in cursor:
-                return _SENTINEL_ABSENT
-            cursor = cursor[segment]
-        return cursor
+        value = resolve_path(container, parameter_name.split("/"))
+        return _SENTINEL_ABSENT if value is UNRESOLVABLE else value
     if not isinstance(container, dict) or parameter_name not in container:
         return _SENTINEL_ABSENT
     return container[parameter_name]
@@ -924,24 +922,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             if not schema_is_clone:
                 schema = dict(schema)
             schema["examples"] = examples
-        body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema, validator_cls=validator_cls)
-        if body_overlays:
-            schema = dict(schema)
-            schema_properties = dict(schema["properties"])
-            for prop_name, value in body_overlays.items():
-                prop_schema = schema_properties[prop_name]
-                assert isinstance(prop_schema, dict), "_body_pool_overlays only emits dict-schema keys"
-                if isinstance(value, _NestedOverlay):
-                    # Splice per leaf so the coverage generator still fills sibling fields.
-                    sub_props = dict(prop_schema.get("properties") or {})
-                    for sub_name, sub_value in value.fields.items():
-                        sub_schema = sub_props[sub_name]
-                        assert isinstance(sub_schema, dict), "_nested_body_pool_overlay only emits dict-schema keys"
-                        sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}
-                    schema_properties[prop_name] = {**prop_schema, "properties": sub_props}
-                else:
-                    schema_properties[prop_name] = {**prop_schema, "examples": [value]}
-            schema["properties"] = schema_properties
+        schema = _with_body_pool_values(schema, correlated, validator_cls)
         try:
             media_type = media_types.parse(body.media_type)
         except MalformedMediaType as exc:
