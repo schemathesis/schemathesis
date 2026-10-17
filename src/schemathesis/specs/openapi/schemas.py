@@ -419,9 +419,9 @@ class OpenApiSchema(BaseSchema):
         injected = 0
         if observations is not None:
             for operation, entries in observations.location_headers.items():
-                injected += self.analysis.inferencer.inject_links(operation.responses, entries)
+                injected += self.analysis.inferencer.inject_links(operation, entries)
             for operation, body_entries in observations.body_urls.items():
-                injected += self.analysis.inferencer.inject_links(operation.responses, body_entries)
+                injected += self.analysis.inferencer.inject_links(operation, body_entries)
         if self.analysis.should_inject_links():
             injected += self.analysis.inject_links()
         # Injected links land in the schema, where operations may share a response definition, so one

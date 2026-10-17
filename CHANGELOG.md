@@ -46,6 +46,7 @@
 
 #### Inferred stateful links
 
+- Runtime-inferred links lost for response statuses the schema does not document.
 - Missing links for path parameters named after a resource and its field (e.g. `{order_seq}`).
 - Missing links for Django-style `_pk` parameters and body fields (e.g. `{order_pk}`).
 - Missing links from a collection's listing to operations nested under its items.
