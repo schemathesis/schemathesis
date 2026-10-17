@@ -308,6 +308,32 @@ def test_examples_phase_skips_properties_it_cannot_generate(ctx):
     assert [example.value for example in extract_from_schemas(operation)] == [{"a": "given"}]
 
 
+def test_extract_from_schemas_without_examples_skips_shared_references(ctx):
+    # Every level references the next one twice, so walking each path would visit 2**40 schemas.
+    depth = 40
+    schemas = {
+        f"Node{level}": {
+            "type": "object",
+            "properties": {
+                "left": {"$ref": f"#/components/schemas/Node{level + 1}"},
+                "right": {"$ref": f"#/components/schemas/Node{level + 1}"},
+            },
+        }
+        for level in range(depth)
+    }
+    schemas[f"Node{depth}"] = {"type": "string"}
+    operation = ctx.openapi.load_operation(
+        "POST /r",
+        {
+            "parameters": [{"name": "q", "in": "query", "schema": {"$ref": "#/components/schemas/Node0"}}],
+            "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node0"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"schemas": schemas},
+    )
+    assert list(extract_from_schemas(operation)) == []
+
+
 def test_extract_top_level(operation):
     top_level_examples = list(extract_top_level(operation))
     extracted = [example_to_dict(example) for example in top_level_examples]
