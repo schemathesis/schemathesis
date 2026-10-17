@@ -1398,7 +1398,14 @@ class HashSet:
         return _to_hashable_key(value) in self._data
 
     def insert(self, value: Any) -> bool:
+        return self._insert_key(_to_hashable_key(value))
+
+    def insert_unless_in(self, other: HashSet, value: Any) -> bool:
+        """Insert the value unless `other` already holds it; the key is built once for both sets."""
         key = _to_hashable_key(value)
+        return key not in other._data and self._insert_key(key)
+
+    def _insert_key(self, key: tuple) -> bool:
         before = len(self._data)
         self._data.add(key)
         return len(self._data) > before

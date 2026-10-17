@@ -264,7 +264,7 @@ class CaseEmitter:
         key = _dedup_key(kwargs)
         if mode == GenerationMode.POSITIVE:
             return self.seen_positive.insert(key)
-        return key not in self.seen_positive and self.seen_negative.insert(key)
+        return self.seen_negative.insert_unless_in(self.seen_positive, key)
 
     def _meta(
         self,
