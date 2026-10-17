@@ -4223,6 +4223,32 @@ def _violates_hostname(value: object, session: GenerationSession, validator_cls:
     return value == "" or not conforms_to_format(session, value, "hostname", validator_cls)
 
 
+_UUID = "123e4567-e89b-42d3-a456-426614174000"
+_NEAR_UUIDS = (
+    "123e4567e-89b-42d3-a456-426614174000",
+    "g23e4567-e89b-42d3-a456-426614174000",
+    "123e4567e89b-42d3-a456-426614174000",
+    "x123e4567-e89b-42d3-a456-426614174000",
+    "123e4567-e89b-42d3-a456-426614174000x",
+)
+
+
+# Keywords that describe a value without changing what is drawn for it
+_UNDRAWN_KEYWORDS = ANNOTATION_KEYWORDS - _DATA_KEYWORDS
+
+
+@cache
+def _matches_only_uuids(pattern: str) -> bool:
+    """Whether `pattern` is a UUID regex, so no value matching it can break the `uuid` format."""
+    try:
+        matches = make_validator_for({"pattern": pattern}).is_valid
+    except jsonschema_rs.ValidationError:
+        return False
+    return any(matches(value) for value in (_UUID, _UUID.upper())) and not any(
+        matches(value) for near in _NEAR_UUIDS for value in (near, near.upper())
+    )
+
+
 def _negative_format(
     ctx: CoverageContext, schema: JsonSchemaObject, format: str
 ) -> Generator[GeneratedValue, None, None]:
@@ -4238,6 +4264,9 @@ def _negative_format(
     validator_cls = ctx.validator_cls
     if format not in VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset()):
         return
+    pattern = schema.get("pattern")
+    if format == "uuid" and isinstance(pattern, str) and _matches_only_uuids(pattern):
+        raise Unsatisfiable
     # Drawing under the format and filtering for values that violate it can never succeed
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format["type"] = "string"
@@ -4247,7 +4276,8 @@ def _negative_format(
     # Negative-format draws can spend seconds on JS-style `/.../`-wrapped patterns; cache by
     # the structural inputs so the same shape across 100s of operations runs Hypothesis once.
     try:
-        cache_key = ("negative_format", ctx.schema_key(without_format), format, validator_cls)
+        shape = {k: v for k, v in without_format.items() if k not in _UNDRAWN_KEYWORDS and not k.startswith("x-")}
+        cache_key = ("negative_format", ctx.schema_key(shape), format, validator_cls)
     except (TypeError, ValueError):
         cache_key = None
     if cache_key is not None:
