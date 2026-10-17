@@ -10135,3 +10135,90 @@ def test_primary_key_body_field_is_filled_from_its_resource(ctx):
             },
         ]
     ]
+
+
+SEQUENCED_ORDER = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}, "seq": {"type": "integer"}, "total": {"type": "number"}},
+}
+
+
+def sequenced_order_paths(parameter, paginated):
+    items = {"type": "array", "items": component_ref("Order")}
+    listing = {"type": "object", "properties": {"count": {"type": "integer"}, "results": items}} if paginated else items
+    return {
+        **operation("get", "/stores/{store_id}/orders", "200", listing, [path_param("store_id")]),
+        **operation(
+            "get",
+            f"/stores/{{store_id}}/orders/{{{parameter}}}",
+            "200",
+            component_ref("Order"),
+            [path_param("store_id"), path_param(parameter, "integer")],
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    ("paginated", "pointer"), [(False, "/*/seq"), (True, "/results/*/seq")], ids=["plain", "paginated"]
+)
+def test_path_param_named_after_resource_and_its_field_links_list_to_read(ctx, paginated, pointer):
+    _, graph = analyze_dependencies(
+        ctx, sequenced_order_paths("order_seq", paginated), components={"schemas": {"Order": SEQUENCED_ORDER}}
+    )
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1stores~1{store_id}~1orders/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1stores~1{store_id}~1orders~1{order_seq}/get",
+                "parameters": {
+                    "path.order_seq": f"$response.body#{pointer}",
+                    "path.store_id": "$request.path.store_id",
+                },
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_path_param_named_after_resource_and_an_undeclared_field_is_not_linked(ctx):
+    # `Order` has no `ref` field, so nothing in the listing can fill `{order_ref}`.
+    _, graph = analyze_dependencies(
+        ctx, sequenced_order_paths("order_ref", False), components={"schemas": {"Order": SEQUENCED_ORDER}}
+    )
+
+    assert inferred_links(graph) == []
+
+
+PROJECT_MEMBER = {"type": "object", "properties": {"key": {"type": "string"}, "role": {"type": "string"}}}
+
+
+@pytest.mark.parametrize(
+    ("parameter", "linked"),
+    [("member_key", True), ("project_member_key", True), ("project_key", False), ("ber_key", False)],
+    ids=["trailing-word", "full-name", "leading-word", "partial-word"],
+)
+def test_path_param_field_hint_must_name_the_resource_or_its_last_word(ctx, parameter, linked):
+    # `{project_key}` names a project; a member's `key` cannot fill it.
+    paths = {
+        **operation("get", "/project-members", "200", {"type": "array", "items": component_ref("ProjectMember")}),
+        **operation(
+            "get", f"/project-members/{{{parameter}}}", "200", component_ref("ProjectMember"), [path_param(parameter)]
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"ProjectMember": PROJECT_MEMBER}})
+
+    expected = [
+        [
+            "#/paths/~1project-members/get",
+            "200",
+            {
+                "operationRef": f"#/paths/~1project-members~1{{{parameter}}}/get",
+                "parameters": {f"path.{parameter}": "$response.body#/*/key"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (expected if linked else [])

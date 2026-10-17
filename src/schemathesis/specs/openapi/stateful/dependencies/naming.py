@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import re
 from collections.abc import Collection, Mapping
 from functools import lru_cache
 
@@ -573,6 +574,19 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
         if field is not None:
             return field
     return None
+
+
+def parameter_names_resource_field(*, parameter: str, field: str, resource: str) -> bool:
+    """Whether the part of `parameter` before `field` names `resource` or its trailing words."""
+    parameter_normalized = normalize_for_matching(parameter)
+    field_normalized = normalize_for_matching(field)
+    if not parameter_normalized.endswith(field_normalized):
+        return True
+    hint = parameter_normalized[: -len(field_normalized)]
+    if not hint:
+        return True
+    words = [word.lower() for word in re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+", resource)]
+    return any("".join(words[start:]) == hint for start in range(len(words)))
 
 
 def _field_normalized_as(fields: list[str], expected: str) -> str | None:
