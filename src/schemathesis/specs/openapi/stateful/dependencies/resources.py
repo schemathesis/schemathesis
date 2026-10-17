@@ -162,6 +162,8 @@ def iter_resources_from_response(
                 yield primitive_array
                 return None
 
+    current_resolver = response.resolver if response.resolver is not None else resolver
+
     # Handle map-by-id GET responses: `{type: object, additionalProperties: <object>}` with no
     # explicit properties. Keys are the identifiers (Kubernetes pod-statuses, TBA team-statuses).
     if method == "get" and schema_type == "object" and not schema.get("properties"):
@@ -169,10 +171,11 @@ def iter_resources_from_response(
         if isinstance(additional, dict) and (additional.get("type") == "object" or "$ref" in additional):
             map_resource = _resource_from_map_by_id(path=path, resources=resources)
             if map_resource is not None:
+                # The values are what the response declares, not the resource the keys identify.
+                map_resource.response_fields = _declared_fields(additional, current_resolver)
                 yield map_resource
                 return None
 
-    current_resolver = response.resolver if response.resolver is not None else resolver
     parent_ref = schema.get("$ref")
     _, resolved = maybe_resolve_with_resolver(schema, current_resolver, allow_boolean=True)
 
