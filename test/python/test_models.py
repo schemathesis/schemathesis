@@ -850,9 +850,9 @@ def test_call_and_validate_refreshes_expired_graphql_token(ctx):
 
     @run_given(case=schema["Query"]["hello"].as_strategy(), max_examples=1, phases=[Phase.generate])
     def test(case):
+        received.clear()
         case.call_and_validate(app=app, base_url="http://localhost/graphql")
-
-    assert received == [f"Bearer {token}" for token in issued[-2:]]
+        assert received == [f"Bearer {token}" for token in issued[-2:]]
 
 
 @pytest.mark.parametrize(
