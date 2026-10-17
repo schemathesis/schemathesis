@@ -127,6 +127,51 @@ def test_no_dictionary_mismatch_warning_when_most_entries_match(ctx, cli):
     assert "Dictionary mismatch" not in result.stdout
 
 
+def _id_app(ctx, types):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            f"/{resource}/{{id}}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": type_}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+            for resource, type_ in types.items()
+        }
+    )
+
+    @app.route("/<resource>/<id>")
+    def get_resource(resource, id):
+        return jsonify({"id": id})
+
+    return app
+
+
+def run_with_ids(cli, app):
+    return cli.run_openapi_app(
+        app,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--max-examples=5",
+        config={
+            "dictionaries": {"ids": {"values": [1]}},
+            "parameters": {"path.id": {"dictionary": "ids"}},
+        },
+    )
+
+
+def test_no_dictionary_mismatch_warning_when_few_operations_reject_entries(ctx, cli):
+    app = _id_app(ctx, {"items": "integer", "orders": "integer", "carts": "integer", "threads": "string"})
+
+    assert "Dictionary mismatch" not in run_with_ids(cli, app).stdout
+
+
+def test_dictionary_mismatch_warning_counts_operations_that_reject_entries(ctx, cli):
+    app = _id_app(ctx, {"items": "integer", "threads": "string", "notes": "string"})
+
+    assert "on 2 of 3 operations" in run_with_ids(cli, app).stdout
+
+
 SHORT_CODES = {"type": "string", "maxLength": 2}
 
 
