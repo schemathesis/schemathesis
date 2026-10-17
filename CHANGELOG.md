@@ -38,6 +38,7 @@
 - Coverage phase up to ~18x faster on length-bounded strings whose `pattern` has anchors or lookarounds.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
+- Response validation up to ~8x faster with ~6x less memory on APIs reusing response schemas.
 - HTML report up to ~20% smaller on runs with many failures.
 
 ### :bug: Fixed

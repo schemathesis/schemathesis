@@ -221,8 +221,6 @@ class ReportData:
     def untested_operations(self) -> int:
         return max(self.selected_operations - self.tested_operations - self.errored_operations, 0)
 
-    # ponytail: a run that stopped early reports every untested operation as not run, including any
-    # excluded on purpose; phase-level skip reasons cannot tell the two apart.
     @property
     def not_run_operations(self) -> int:
         return self.untested_operations if self.stop_reason is not StopReason.COMPLETED else 0

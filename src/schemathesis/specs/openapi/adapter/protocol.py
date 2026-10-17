@@ -19,13 +19,16 @@ if TYPE_CHECKING:
     from schemathesis.core.parameters import SkippedParameter
     from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
+    from schemathesis.specs.openapi.adapter.responses import ResponseSchemaCache
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "Resolver", str, str], "Bundle"]
 GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], str | None]
 ResolveResponseMediaType = Callable[[Mapping[str, Any], str | None], str | None]
-ExtractSchemaForMediaType = Callable[[Mapping[str, Any], str | None, "Resolver", str, str], Union["Bundle", None]]
+ExtractSchemaForMediaType = Callable[
+    [Mapping[str, Any], str | None, "Resolver", str, str, "ResponseSchemaCache"], Union["Bundle", None]
+]
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
     [Mapping[str, Any], Mapping[str, Any], "Resolver"],

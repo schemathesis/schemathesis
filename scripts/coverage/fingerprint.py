@@ -86,8 +86,6 @@ def main(argv: list[str] | None = None) -> int:
         _write(load_schema_dict(args.spec), args.out, modes)
     else:
         refs = list(iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit or None))
-        # ponytail: a worker killed by a Rust abort / OOM surfaces as BrokenProcessPool and ends the run;
-        # rerun with --only to isolate. Per-schema crash isolation like audit.py's can come later if needed.
         executor = ProcessPoolExecutor(max_workers=args.workers, max_tasks_per_child=_MAX_TASKS_PER_CHILD)
         with executor:
             work = partial(_process_ref, out_dir=args.out, modes=modes)

@@ -1,5 +1,7 @@
 import json
 import re
+import sys
+import threading
 
 import pytest
 import yaml
@@ -12,6 +14,7 @@ from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
 from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import EncodedPath, ParameterLocation
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
@@ -4600,3 +4603,171 @@ def test_positive_data_acceptance_reports_rejection_on_implicit_oauth_flow_opera
     case = operation.Case(_meta=build_metadata())
     with pytest.raises(RejectedPositiveData):
         positive_data_acceptance(check_context(), _opaque_rejection(response_factory), case)
+
+
+ITEM = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+
+
+def response_validator(schema, label, status="200", media_type="application/json", validate_formats=True):
+    response = schema.find_operation_by_label(label).responses.get(status)
+    resolved = response.get_schema(media_type)
+    return response.get_validator(resolved.media_type, resolved.schema, validate_formats=validate_formats)
+
+
+def json_ok(schema):
+    return {"200": {"description": "OK", "content": {"application/json": {"schema": schema}}}}
+
+
+def test_operations_sharing_a_response_schema_share_one_validator(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Item"})}},
+            "/b": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Item"})}},
+        },
+        components={"schemas": {"Item": ITEM}},
+    )
+
+    assert response_validator(schema, "GET /a") is response_validator(schema, "GET /b")
+
+
+def test_shared_response_reference_shares_one_validator(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"get": {"responses": {"200": {"$ref": "#/components/responses/Ok"}}}},
+            "/b": {"get": {"responses": {"200": {"$ref": "#/components/responses/Ok"}}}},
+        },
+        components={
+            "schemas": {"Item": ITEM},
+            "responses": {
+                "Ok": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                }
+            },
+        },
+    )
+
+    assert response_validator(schema, "GET /a") is response_validator(schema, "GET /b")
+
+
+def test_response_validator_survives_operation_rebuilds(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/a": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Item"})}}},
+        components={"schemas": {"Item": ITEM}},
+    )
+
+    first = response_validator(schema, "GET /a")
+    # Each lookup builds a fresh operation; its response validator is not rebuilt with it.
+    assert response_validator(schema, "GET /a") is first
+
+
+def test_different_validate_formats_do_not_share_a_response_validator(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"get": {"responses": json_ok({"type": "string", "format": "date"})}},
+            "/b": {"get": {"responses": json_ok({"type": "string", "format": "date"})}},
+        }
+    )
+
+    strict = response_validator(schema, "GET /a", validate_formats=True)
+    lenient = response_validator(schema, "GET /b", validate_formats=False)
+
+    assert (strict.is_valid("not a date"), lenient.is_valid("not a date")) == (False, True)
+
+
+def test_separately_loaded_schemas_do_not_share_response_validators(ctx):
+    paths = {"/a": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Item"})}}}
+    first = ctx.openapi.load_schema(paths, components={"schemas": {"Item": ITEM}})
+    second = ctx.openapi.load_schema(paths, components={"schemas": {"Item": {"type": "string"}}})
+
+    verdicts = (
+        response_validator(first, "GET /a").is_valid({"id": 1}),
+        response_validator(second, "GET /a").is_valid({"id": 1}),
+    )
+
+    assert verdicts == (True, False)
+
+
+def test_same_response_schema_text_in_two_documents_does_not_share_a_validator(ctx):
+    paths = {
+        "/a": {"get": {"responses": {"200": {"$ref": "./first/responses.json#/Ok"}}}},
+        "/b": {"get": {"responses": {"200": {"$ref": "./second/responses.json#/Ok"}}}},
+    }
+    schema_path = ctx.openapi.write_schema(paths)
+    ok = {"description": "OK", "content": {"application/json": {"schema": {"$ref": "#/Item"}}}}
+    ctx.makefile({"Ok": ok, "Item": ITEM}, filename="responses", parent="first")
+    ctx.makefile({"Ok": ok, "Item": {"type": "string"}}, filename="responses", parent="second")
+    schema = schemathesis.openapi.from_path(str(schema_path))
+
+    verdicts = (
+        response_validator(schema, "GET /a").is_valid({"id": 1}),
+        response_validator(schema, "GET /b").is_valid({"id": 1}),
+    )
+
+    assert verdicts == (True, False)
+
+
+def test_unresolvable_response_reference_is_reported_for_every_response(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Missing"})}},
+            "/b": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Missing"})}},
+        }
+    )
+
+    unresolvable = [
+        schema.find_operation_by_label(label).responses.get("200").get_schema("application/json").unresolvable_reference
+        for label in ("GET /a", "GET /b")
+    ]
+
+    assert unresolvable == ["#/components/schemas/Missing", "#/components/schemas/Missing"]
+
+
+def test_validating_responses_leaves_the_shared_schema_unchanged(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Item"})}},
+            "/b": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Item"})}},
+        },
+        components={"schemas": {"Item": ITEM}},
+    )
+    shared = schema.find_operation_by_label("GET /a").responses.get("200").get_schema("application/json").schema
+    before = deepclone(shared)
+
+    for label in ("GET /a", "GET /b"):
+        case = schema.find_operation_by_label(label).Case()
+        response = response_factory.requests(content=b'{"id": "not an integer"}')
+        with pytest.raises(FailureGroup):
+            case.validate_response(response)
+
+    assert shared == before
+
+
+def test_concurrent_first_use_builds_one_shared_response_validator(ctx):
+    # Switching threads often makes the race between first users likely.
+    previous = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    wide = {"type": "object", "properties": {f"field{i}": {"type": "string"} for i in range(2000)}}
+    labels = [f"GET /op{i}" for i in range(16)]
+    schema = ctx.openapi.load_schema(
+        {f"/op{i}": {"get": {"responses": json_ok({"$ref": "#/components/schemas/Wide"})}} for i in range(16)},
+        components={"schemas": {"Wide": wide}},
+    )
+    operations = [schema.find_operation_by_label(label) for label in labels]
+    barrier = threading.Barrier(len(operations))
+    validators = []
+
+    def validate(operation):
+        barrier.wait()
+        response = operation.responses.get("200")
+        resolved = response.get_schema("application/json")
+        validators.append(response.get_validator(resolved.media_type, resolved.schema))
+
+    threads = [threading.Thread(target=validate, args=(operation,)) for operation in operations]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    sys.setswitchinterval(previous)
+
+    assert len({id(validator) for validator in validators}) == 1
