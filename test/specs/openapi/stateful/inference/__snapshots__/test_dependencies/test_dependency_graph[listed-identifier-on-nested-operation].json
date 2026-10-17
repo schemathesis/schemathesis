@@ -1,0 +1,68 @@
+{
+  "operations": {
+    "GET /warehouses": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/items",
+          "resource": "WarehouseItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /warehouses/{warehouse}/shelves": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "warehouse",
+          "resource": "Warehouse",
+          "resource_field": "warehouse"
+        },
+        {
+          "is_listed_identifier": true,
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "warehouse",
+          "resource": "WarehouseItem",
+          "resource_field": "name"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Shelf",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Shelf": {
+      "fields": [],
+      "types": {}
+    },
+    "Warehouse": {
+      "fields": [
+        "warehouse"
+      ],
+      "types": {}
+    },
+    "WarehouseItem": {
+      "fields": [
+        "name"
+      ],
+      "types": {
+        "name": [
+          "string"
+        ]
+      }
+    }
+  }
+}

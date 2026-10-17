@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1warehouses/get",
+    {
+      "GetWarehouseItem": {
+        "operationRef": "#/paths/~1warehouses~1{warehouse}~1shelves/get",
+        "parameters": {
+          "path.warehouse": "$response.body#/items/*/name"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

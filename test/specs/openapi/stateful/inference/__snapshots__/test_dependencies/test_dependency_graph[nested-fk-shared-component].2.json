@@ -1,0 +1,8 @@
+[
+  [
+    "Warehouse",
+    "POST /warehouses",
+    "201",
+    "/"
+  ]
+]

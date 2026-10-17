@@ -1,0 +1,37 @@
+{
+  "operations": {
+    "GET /cycle-roots": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "CycleRoot",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "CycleRoot": {
+      "fields": [
+        "a",
+        "b",
+        "root"
+      ],
+      "types": {
+        "a": [
+          "string"
+        ],
+        "b": [
+          "string"
+        ],
+        "root": [
+          "string"
+        ]
+      }
+    }
+  }
+}

@@ -468,3 +468,25 @@ def test_transport_settings_are_replayed(ctx, cli, tmp_path, pytester, args, exp
     assert f"        {expected.format(**values)}\n" in content
     pytester.makepyfile(test_regressions=content)
     pytester.runpytest().assert_outcomes(passed=1)
+
+
+def test_network_error_is_not_rendered(ctx, cli, tmp_path):
+    app, _ = ctx.openapi.make_flask_app({"/slow": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/slow")
+    def slow():
+        time.sleep(0.2)
+        return jsonify({})
+
+    path = tmp_path / "test_regressions.py"
+    cli.run_openapi_app(
+        app,
+        f"--report-pytest-path={path}",
+        "--request-timeout=0.01",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--checks=not_a_server_error",
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert "def test_" not in content

@@ -1,0 +1,48 @@
+{
+  "operations": {
+    "POST /orders": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "shipping/warehouse_id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "billing/warehouse_id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    },
+    "POST /warehouses": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Warehouse",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Warehouse": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ]
+      }
+    }
+  }
+}

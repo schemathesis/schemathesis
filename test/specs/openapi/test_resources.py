@@ -27,7 +27,7 @@ from schemathesis.resources.repository import (
     ResourceRepository,
 )
 from schemathesis.specs.openapi._hypothesis import openapi_cases
-from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
+from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot, ResourceDefinition
 from test.utils import objects_at, run_given
@@ -799,6 +799,110 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
     # Each variant carries provenance back to the producing operation.
     assert variants[0].draws[0].source_operation == "POST /items"
     assert variants[0].draws[0].parameter_name == "itemId"
+
+
+def test_top_level_body_requirement_takes_precedence_over_nested_requirement(ctx):
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name="Item",
+                operation="POST /sources",
+                status_code="201",
+                pointer="",
+                cardinality=Cardinality.ONE,
+            )
+        ]
+    )
+    repository.record_response(
+        operation="POST /sources",
+        status_code=201,
+        payload={"groupId": {"ownerId": "top"}, "ownerId": "nested"},
+    )
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "groupId": {
+                                    "type": "object",
+                                    "properties": {"ownerId": {"type": "string"}},
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "responses": {"201": {"description": "OK"}},
+        },
+    )
+    data_source = OpenApiExtraDataSource(
+        repository=repository,
+        requirements={
+            (operation.label, ParameterLocation.BODY, "groupId"): ParameterRequirement("Item", "groupId"),
+            (operation.label, ParameterLocation.BODY, "groupId/ownerId"): ParameterRequirement("Item", "ownerId"),
+        },
+    )
+
+    variants = data_source.get_captured_variants(
+        operation=operation,
+        location=ParameterLocation.BODY,
+        schema=operation.body[0].optimized_schema,
+    )
+
+    assert [variant.overlay for variant in variants] == [{"groupId": {"ownerId": "top"}}]
+
+
+def test_unresolved_nested_body_requirement_is_ignored(ctx):
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name="Item",
+                operation="POST /sources",
+                status_code="201",
+                pointer="",
+                cardinality=Cardinality.ONE,
+            )
+        ]
+    )
+    repository.record_response(operation="POST /sources", status_code=201, payload={"id": "captured"})
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "nested": {
+                                    "type": "object",
+                                    "properties": {"present": {"type": "string"}},
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "responses": {"201": {"description": "OK"}},
+        },
+    )
+    data_source = OpenApiExtraDataSource(
+        repository=repository,
+        requirements={(operation.label, ParameterLocation.BODY, "nested/missing"): ParameterRequirement("Item", "id")},
+    )
+
+    assert (
+        data_source.get_captured_variants(
+            operation=operation,
+            location=ParameterLocation.BODY,
+            schema=operation.body[0].optimized_schema,
+        )
+        is None
+    )
 
 
 def test_data_source_provides_captured_variants(user_schema_builder):

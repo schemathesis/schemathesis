@@ -53,6 +53,7 @@ from schemathesis.specs.openapi.checks import (
     use_after_free,
 )
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
+from schemathesis.specs.openapi.validation import _check_discriminator
 from test.utils import check_context
 
 
@@ -3616,6 +3617,118 @@ def test_response_schema_conformance_discriminator_nested(
         assert exc_info.value.title == "Discriminator value not in schema mapping"
     else:
         assert response_schema_conformance(_CHECK_CTX, response, case) is None
+
+
+def test_response_schema_conformance_discriminator_walk_handles_shared_recursive_data(ctx):
+    # YAML anchors can make a parsed response body share and nest the same object.
+    operation = ctx.openapi.load_operation(
+        "GET /pets",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "first": {"$ref": "#/components/schemas/Node"},
+                                    "second": {"$ref": "#/components/schemas/Node"},
+                                },
+                            }
+                        }
+                    },
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string"},
+                        "child": {"$ref": "#/components/schemas/Node"},
+                        "passthrough": True,
+                    },
+                    "discriminator": {"propertyName": "kind", "mapping": {"node": "#/components/schemas/Node"}},
+                }
+            }
+        },
+    )
+    definition = operation.responses.find_by_status_code(200)
+    assert definition is not None
+    resolved = definition.get_schema("application/json")
+    assert resolved.has_discriminator is True
+    shared = {"kind": "node", "passthrough": 1}
+    shared["child"] = shared
+
+    assert _check_discriminator(operation, {"first": shared, "second": shared}, resolved) is None
+
+
+@pytest.mark.parametrize("array_schema", [{}, {"items": True}, {"items": []}], ids=["absent", "boolean", "list"])
+def test_response_schema_conformance_discriminator_walk_ignores_non_object_items(ctx, array_schema):
+    operation = ctx.openapi.load_operation(
+        "GET /pets",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "values": {"type": "array", **array_schema},
+                                    "pet": {
+                                        "type": "object",
+                                        "discriminator": {
+                                            "propertyName": "kind",
+                                            "mapping": {"cat": "#/components/schemas/Cat"},
+                                        },
+                                    },
+                                },
+                            }
+                        }
+                    },
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Cat": {"type": "object"}}},
+    )
+    definition = operation.responses.find_by_status_code(200)
+    assert definition is not None
+
+    assert (
+        _check_discriminator(
+            operation,
+            {"values": [{}], "pet": {"kind": "cat"}},
+            definition.get_schema("application/json"),
+        )
+        is None
+    )
+
+
+def test_response_schema_conformance_keeps_large_instance_when_truncation_is_disabled(ctx, response_factory):
+    value = "x" * 200
+    operation = ctx.openapi.load_operation(
+        "GET /value",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {"type": "string", "maxLength": 1}}},
+                }
+            }
+        },
+        config=SchemathesisConfig.from_dict({"output": {"truncation": {"enabled": False}}}),
+    )
+    response = Response.from_requests(response_factory.requests(content=json.dumps(value).encode()), True)
+
+    with pytest.raises(JsonSchemaError) as exc_info:
+        response_schema_conformance(_CHECK_CTX, response, operation.Case())
+    assert exc_info.value.validation_message == f'"{value}" is longer than 1 character'
 
 
 def test_response_schema_conformance_discriminator_with_file_branches(tmp_path, response_factory):

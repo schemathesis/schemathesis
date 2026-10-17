@@ -46,7 +46,7 @@ def extract_inputs(
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
     nested_fk_cache: NestedFKCache,
-    deferred_nested_fks: list[tuple[str, str, str]] | None = None,
+    deferred_nested_fks: list[tuple[str, str, str]],
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_field_named_path_parameters: list[tuple[str, str]] | None = None,
@@ -380,7 +380,7 @@ def _resolve_body_dependencies(
     known_dependencies: set[str],
     nested_fk_cache: NestedFKCache,
     updated_resource: str | None = None,
-    deferred_nested_fks: list[tuple[str, str, str]] | None = None,
+    deferred_nested_fks: list[tuple[str, str, str]],
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_writable_body_fields: dict[str, JsonSchema] | None = None,
@@ -530,7 +530,7 @@ def _extract_nested_body_fk_fields(
     schema: dict[str, Any],
     resources: ResourceMap,
     scan: NestedFKScan,
-    deferred: list[tuple[str, str, str]] | None = None,
+    deferred: list[tuple[str, str, str]],
 ) -> Iterator[InputSlot]:
     """Recursively extract FK fields from nested request body schemas.
 
@@ -560,7 +560,7 @@ def _extract_nested_body_fk_fields(
                     parameter_name=nested_path,
                     parameter_location=ParameterLocation.BODY,
                 )
-            elif deferred is not None:
+            else:
                 deferred.append((target_resource_name, target_field, nested_path))
 
 
