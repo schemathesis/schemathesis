@@ -1538,3 +1538,12 @@ def test_sse_stream_limit_with_back_to_back_asgi_events():
     response = case.call(app=_back_to_back_events_app)
 
     assert response.content == _heartbeat_and_event(0) + _heartbeat_and_event(1)
+
+
+@pytest.mark.parametrize("format", ["uuid", "duration"])
+def test_sse_draft4_event_rejects_invalid_supplemental_format(format):
+    item_schema = {"type": "object", "properties": {"data": {"type": "string", "format": format}}, "required": ["data"]}
+    case, response = _call_sse(_sse_schema(item_schema, version="3.0.3", content_key="schema"), "data: nope\n\n")
+
+    with pytest.raises(FailureGroup, match=f'is not a "{format}"'):
+        case.validate_response(response, checks=[response_schema_conformance])

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema_rs
 
 from schemathesis.core import media_types
-from schemathesis.core.jsonschema import schema_with_bundle
+from schemathesis.core.jsonschema import schema_with_bundle, supplemental_formats
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -38,7 +38,9 @@ class SseValidator:
     def __init__(self, schema: dict[str, Any] | bool, validator_cls: type[jsonschema_rs.Validator]) -> None:
         self._deserialize_payload: Callable[[str, str], Any] | None = None
         keywords = _make_keywords(validator_cls, schema, self)
-        self._validator = validator_cls(schema, validate_formats=True, keywords=keywords)
+        self._validator = validator_cls(
+            schema, validate_formats=True, keywords=keywords, formats=supplemental_formats(validator_cls)
+        )
 
     @contextmanager
     def with_deserializer(self, fn: Callable[[str, str], Any]) -> Generator[None, None, None]:
@@ -71,7 +73,12 @@ def _make_keywords(
                 return
             resolved = schema_with_bundle(content_schema, root_schema)
             self._content = (
-                validator_cls(resolved, validate_formats=True, keywords={"contentMediaType": ContentMediaTypeKeyword}),
+                validator_cls(
+                    resolved,
+                    validate_formats=True,
+                    keywords={"contentMediaType": ContentMediaTypeKeyword},
+                    formats=supplemental_formats(validator_cls),
+                ),
                 resolved,
             )
 

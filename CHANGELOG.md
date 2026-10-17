@@ -92,6 +92,7 @@
 
 #### Checks
 
+- Unchecked `uuid` and `duration` formats in OpenAPI 2.0 and 3.0 response schemas.
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
 - "Response violates schema" messages embedding the whole response value on one line.
 - Internal error instead of a failure for non-object GraphQL responses in negative mode.
