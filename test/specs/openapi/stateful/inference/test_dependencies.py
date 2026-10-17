@@ -10222,3 +10222,98 @@ def test_path_param_field_hint_must_name_the_resource_or_its_last_word(ctx, para
         ]
     ]
     assert inferred_links(graph) == (expected if linked else [])
+
+
+ACCOUNT = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+
+
+def account_link(producer, status, target, value):
+    return [
+        producer,
+        status,
+        {
+            "operationRef": target,
+            "parameters": {"path.accountId": value},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+
+
+ACCOUNT_LINKS = [
+    account_link("#/paths/~1accounts/get", "200", "#/paths/~1accounts~1{accountId}/get", "$response.body#/*/id"),
+    account_link("#/paths/~1accounts/get", "200", "#/paths/~1accounts~1{accountId}/put", "$response.body#/*/id"),
+    account_link(
+        "#/paths/~1accounts~1{accountId}/get", "200", "#/paths/~1accounts~1{accountId}/put", "$response.body#/id"
+    ),
+]
+
+
+def account_paths(status):
+    return {
+        **operation("get", "/accounts", "200", {"type": "array", "items": component_ref("Account")}),
+        "/accounts/{accountId}": {
+            "parameters": [path_param("accountId")],
+            "get": response("200", component_ref("Account")),
+            "put": response(status, component_ref("Account")),
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (
+            "200",
+            [
+                *ACCOUNT_LINKS,
+                account_link(
+                    "#/paths/~1accounts~1{accountId}/put",
+                    "200",
+                    "#/paths/~1accounts~1{accountId}/get",
+                    "$response.body#/id",
+                ),
+            ],
+        ),
+        ("204", ACCOUNT_LINKS),
+        ("205", ACCOUNT_LINKS),
+    ],
+)
+def test_responses_whose_status_forbids_a_body_do_not_produce_values(ctx, status, expected):
+    # The update declares a body anyway; a link reading it from a 204 or 205 would always get nothing.
+    _, graph = analyze_dependencies(ctx, account_paths(status), components={"schemas": {"Account": ACCOUNT}})
+
+    assert inferred_links(graph) == expected
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (
+            "200",
+            [
+                [
+                    "#/paths/~1orders~1{orderId}/put",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1customers~1{customerId}/get",
+                        "parameters": {"path.customerId": "$response.body#/customer_id"},
+                        "x-schemathesis": {"is_inferred": True},
+                    },
+                ]
+            ],
+        ),
+        ("204", []),
+        ("205", []),
+    ],
+)
+def test_foreign_keys_in_a_body_the_status_forbids_are_not_followed(ctx, status, expected):
+    order = {"type": "object", "properties": {"id": {"type": "string"}, "customer_id": {"type": "string"}}}
+    customer = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+    paths = {
+        **operation("put", "/orders/{orderId}", status, component_ref("Order"), [path_param("orderId")]),
+        **operation("get", "/customers/{customerId}", "200", component_ref("Customer"), [path_param("customerId")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Order": order, "Customer": customer}})
+
+    assert inferred_links(graph) == expected
