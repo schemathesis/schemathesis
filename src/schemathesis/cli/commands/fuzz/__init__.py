@@ -7,7 +7,6 @@ from typing import IO, Any
 import click
 
 from schemathesis.checks import load_all_checks
-from schemathesis.cli.commands.fuzz import executor
 from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE
 from schemathesis.cli.core import ensure_color, resolve_color
@@ -351,6 +350,8 @@ def fuzz(
     # `[fuzz] max-time` narrows the budget for this command; the root key applies to both commands.
     configured = project.fuzz.max_time if project.fuzz.max_time is not None else project.max_time
     fuzz_config = FuzzConfig(max_time=max_time if max_time is not None else configured)
+
+    from schemathesis.cli.commands.fuzz import executor
 
     executor.execute(
         location=location,
