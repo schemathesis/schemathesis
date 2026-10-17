@@ -21,12 +21,12 @@ from urllib.parse import urlsplit
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, RequestRedirect, Rule
 
-from schemathesis.core.adapter import ResponsesContainer
 from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 if TYPE_CHECKING:
     from schemathesis.engine.observations import BodyUrlEntry, LocationHeaderEntry
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -224,9 +224,7 @@ class LinkInferencer:
         relative_path = path[len(base_path) :]
         return relative_path if relative_path.startswith("/") else "/" + relative_path
 
-    def inject_links(
-        self, responses: ResponsesContainer, entries: list[LocationHeaderEntry] | list[BodyUrlEntry]
-    ) -> int:
+    def inject_links(self, operation: APIOperation, entries: list[LocationHeaderEntry] | list[BodyUrlEntry]) -> int:
         # To avoid unnecessary work, we need to skip entries that we know will produce already inferred links
         seen: set[SeenLinkKey] = set()
         injected = 0
@@ -248,11 +246,14 @@ class LinkInferencer:
                 continue
             seen.add(key)
             # Find the right bucket for the response status or create a new one
-            response = responses.find_by_status_code(entry.status_code)
+            response = operation.responses.find_by_status_code(entry.status_code)
             links: dict[str, dict[str, dict]]
             if response is None:
                 links = {}
-                responses.add(str(entry.status_code), {self._links_keyword: links})
+                definition = {self._links_keyword: links}
+                status_code = str(entry.status_code)
+                operation.definition.raw.setdefault("responses", {})[status_code] = definition
+                operation.responses.add(status_code, definition)
             else:
                 links = response.definition.setdefault(self._links_keyword, {})
 

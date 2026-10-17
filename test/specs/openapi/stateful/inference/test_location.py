@@ -4,7 +4,7 @@ import pytest
 from flask import jsonify, request
 
 from schemathesis.core.transport import Response
-from schemathesis.engine.observations import LocationHeaderEntry
+from schemathesis.engine.observations import LocationHeaderEntry, Observations
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
@@ -891,6 +891,43 @@ def test_location_link_inferred_when_every_response_has_location(cli, snapshot_c
     )
 
 
+@pytest.mark.parametrize("responses", [{"200": {"description": "OK"}}, None], ids=["undocumented", "absent"])
+def test_inferred_link_for_undocumented_response_reaches_state_machine(ctx, responses):
+    source = {"operationId": "createUser"}
+    if responses is not None:
+        source["responses"] = responses
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": source},
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="3.1.0",
+    )
+    operation = schema["/users"]["POST"]
+    observations = Observations()
+    observations.location_headers[operation] = [LocationHeaderEntry(value="/users/123", status_code=201)]
+
+    inference = schema.apply_stateful_inference(observations)
+
+    fresh_operation = schema["/users"]["POST"]
+    fresh_response = fresh_operation.responses.find_by_status_code(201)
+    assert fresh_response is not None
+    assert list(fresh_response.definition["links"]) == ["X-Inferred-Link-0"]
+    state_machine = schema.as_state_machine()
+    assert [
+        (link.status_code, link.target.label)
+        for transition in state_machine._transitions.operations.values()
+        for link in transition.outgoing
+    ] == [("201", "GET /users/{userId}")]
+    assert (inference.inferred, inference.total, inference.selected) == (1, 1, 1)
+
+
 def test_inject_links_location_normalization_returns_none(ctx):
     schema = ctx.openapi.load_schema(
         {
@@ -911,7 +948,7 @@ def test_inject_links_location_normalization_returns_none(ctx):
     # Empty location should be normalized to None
     entries = [LocationHeaderEntry(value="", status_code=201)]
 
-    assert inferencer.inject_links(operation.responses, entries) == 0
+    assert inferencer.inject_links(operation, entries) == 0
     response = operation.responses.find_by_status_code("201")
     assert "links" not in response.definition
 
@@ -936,7 +973,7 @@ def test_inject_links_no_matches(ctx):
     # Location that doesn't match any endpoint
     entries = [LocationHeaderEntry(value="/orders/123", status_code=201)]
 
-    assert inferencer.inject_links(operation.responses, entries) == 0
+    assert inferencer.inject_links(operation, entries) == 0
     response = operation.responses.find_by_status_code("201")
     assert "links" not in response.definition
 
@@ -955,7 +992,7 @@ def test_inject_links_creates_response_definition(ctx):
 
     entries = [LocationHeaderEntry(value="/users/123", status_code=201)]
 
-    assert inferencer.inject_links(operation.responses, entries) == 1
+    assert inferencer.inject_links(operation, entries) == 1
     # Should create the 201 response definition
     assert "201" in operation.responses.status_codes
     response = operation.responses.find_by_status_code("201")
@@ -979,7 +1016,7 @@ def test_inject_links_keeps_links_to_different_operations_under_one_status(ctx):
         LocationHeaderEntry(value="/orders/456", status_code=201),
     ]
 
-    assert inferencer.inject_links(operation.responses, entries) == 2
+    assert inferencer.inject_links(operation, entries) == 2
     links = operation.responses.find_by_status_code("201").definition["links"]
     assert sorted(link["operationId"] for link in links.values()) == ["getOrder", "getUser"]
 
@@ -1001,8 +1038,8 @@ def test_inject_links_skips_links_already_present(ctx):
     ]
 
     assert (
-        inferencer.inject_links(operation.responses, entries),
-        inferencer.inject_links(operation.responses, entries),
+        inferencer.inject_links(operation, entries),
+        inferencer.inject_links(operation, entries),
     ) == (2, 0)
     links = operation.responses.find_by_status_code("201").definition["links"]
     assert sorted(link["operationId"] for link in links.values()) == ["getOrder", "getUser"]
