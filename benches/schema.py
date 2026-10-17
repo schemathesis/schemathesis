@@ -228,7 +228,10 @@ def _write_har(recorders, config, seed):
 
 def _collect_recorders(schema):
     engine = from_schema(schema)
-    return [event.recorder for event in engine.execute() if isinstance(event, events.ScenarioFinished)]
+    recorders = [event.recorder for event in engine.execute() if isinstance(event, events.ScenarioFinished)]
+    # An empty list would benchmark writing nothing.
+    assert recorders
+    return recorders
 
 
 @pytest.mark.parametrize("schema", [VMWARE_SCHEMA], ids=("vmware",))
