@@ -19,6 +19,7 @@
 
 ### :wrench: Changed
 
+- Clearer failure titles, such as `Deleted resource still available` instead of `Use after free`.
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
 - Capability probes wait as long as test requests (10s) when `--request-timeout` is unset.
 - GraphQL failures report under their matching check, such as `negative_data_rejection`, not `not_a_server_error`.

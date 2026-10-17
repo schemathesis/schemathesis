@@ -69,7 +69,7 @@ Accepts `expected-statuses` (default `["2xx", "3xx", "4xx"]`) to define which st
 Verifies the response status code is documented in the schema for the operation (or a `default` response is defined).
 
 ```text
-- Undocumented HTTP status code
+- Undocumented status code
 
 Received: 403
 Documented: 200, 404
@@ -111,7 +111,7 @@ Ensures response header values match their JSON Schema definitions.
 
 When a required header is missing:
 ```text
-- Missing required headers
+- Missing required response headers
 
 The following required headers are missing from the response:
 - `X-RateLimit-Remaining`
@@ -178,7 +178,7 @@ For GraphQL APIs, this check fails on a body that is not JSON, a JSON value that
 Verifies the API properly rejects invalid input data. When Schemathesis generates a negative test case (invalid payload, missing required field, etc.), it expects the API to respond with an error status code.
 
 ```text
-- API accepted schema-violating request
+- Schema-violating request accepted
 
 Invalid data should have been rejected
 Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
@@ -199,7 +199,7 @@ For GraphQL APIs, an invalid query must get an `errors` entry; the status code d
 Verifies the API accepts valid request data. When Schemathesis generates schema-compliant requests, it expects the API to respond with a success status code.
 
 ```text
-- API rejected schema-compliant request
+- Schema-valid request rejected
 
 Valid data should have been accepted
 Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
@@ -221,7 +221,7 @@ Verifies the API rejects requests when required headers are missing.
 By default, non-`Authorization` headers are considered correctly rejected with `400`, `401`, `403`, `406`, `415`, or `422`. `Authorization` is stricter and expects `401 Unauthorized`.
 
 ```text
-- Missing header not rejected
+- Missing required header accepted
 
 Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 415, 422
 ```
@@ -236,7 +236,7 @@ Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 4
 Verifies the API properly rejects HTTP methods not defined for an endpoint. The API should return `405 Method Not Allowed` with an `Allow` header listing the supported methods (required by [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.5.6)).
 
 ```text
-- Unsupported methods
+- Wrong response to undeclared method
 
 Unsupported method PATCH returned 200, expected 405 Method Not Allowed
 
@@ -255,7 +255,7 @@ Return 405 for methods not listed in the OpenAPI spec
 Verifies the `Allow` header returned for `OPTIONS` requests lists the same methods as the schema. A mismatch means clients are told the resource supports a different set of operations than the one documented; extra methods may expose endpoints that were never meant to be public.
 
 ```text
-- Invalid Allow header
+- Allow header mismatch
 
 `Allow` header does not match the schema — missing documented methods: POST
 
@@ -282,7 +282,7 @@ They need a multi-step scenario, so they run under `st run`'s stateful phase and
 Detects when deleted resources remain accessible. After a successful `DELETE`, subsequent requests to the same resource should return `404 Not Found`.
 
 ```text
-- Use after free
+- Deleted resource still available
 
 The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`)
 for a resource that was previously deleted.
@@ -297,7 +297,7 @@ The failure message lists both the DELETE call and the subsequent operation for 
 Verifies created resources are immediately accessible. After a successful `POST`, Schemathesis follows links to fetch the resource. The API should return the created resource, not `404 Not Found`.
 
 ```text
-- Resource is not available after creation
+- Created resource not found
 
 Created with      : `POST /users`
 Not available with: `GET /users/{id}`

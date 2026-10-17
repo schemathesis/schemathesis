@@ -106,7 +106,7 @@ def test_negative_metadata_required_property(ctx, cli, app_runner):
         "--continue-on-failure",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    assert "API accepted schema-violating request" in result.stdout
+    assert "Schema-violating request accepted" in result.stdout
     assert "Invalid component: in body" in result.stdout
 
 
@@ -321,7 +321,7 @@ def before_call(context, case, **kwargs):
         "--continue-on-failure",
         hooks=module,
     )
-    assert "API accepted schema-violating request" not in result.stdout, result.stdout
+    assert "Schema-violating request accepted" not in result.stdout, result.stdout
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
@@ -416,7 +416,7 @@ def before_call(context, case, kwargs):
         "--max-examples=10",
         hooks=module,
     )
-    assert "API accepted schema-violating request" not in result.stdout, result.stdout
+    assert "Schema-violating request accepted" not in result.stdout, result.stdout
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
@@ -487,4 +487,4 @@ def before_call(context, case, kwargs):
         "--max-examples=10",
         hooks=module,
     )
-    assert ("API accepted schema-violating request" in result.stdout) is accepted_invalid, result.stdout
+    assert ("Schema-violating request accepted" in result.stdout) is accepted_invalid, result.stdout

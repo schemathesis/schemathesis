@@ -13,7 +13,7 @@ class UnexpectedGraphQLResponse(Failure):
 
     code = "ST115"
     checks = ("response_schema_conformance",)
-    kind_title = "Unexpected GraphQL Response"
+    kind_title = "Unexpected GraphQL response"
 
     __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
 
@@ -109,7 +109,7 @@ class GraphQLSchemaViolation(Failure):
 
     code = "ST114"
     checks = ("response_schema_conformance",)
-    kind_title = "GraphQL schema violation"
+    kind_title = "Null in non-nullable GraphQL field"
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 

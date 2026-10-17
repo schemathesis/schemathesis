@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST111  Discriminator value not in schema mapping
+ST111  Unknown discriminator value
 checks response_schema_conformance
 
 Discriminator value that matches no schema in the `discriminator` mapping.

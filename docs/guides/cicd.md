@@ -167,7 +167,7 @@ An excerpt from a run that found failures:
     },
     {
       "type": "UndefinedStatusCode",
-      "title": "Undocumented HTTP status code",
+      "title": "Undocumented status code",
       "severity": "medium",
       "count": 3,
       "operations": ["GET /items/{itemId}", "POST /items", "POST /orders"]

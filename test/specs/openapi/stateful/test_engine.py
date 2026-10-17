@@ -333,7 +333,7 @@ def test_find_use_after_free(engine_factory):
     )
     result = collect_result(engine)
     assert len(result.failures) == 1
-    assert result.failures[0].failure_info.failure.title == "Use after free"
+    assert result.failures[0].failure_info.failure.title == "Deleted resource still available"
     assert result.events[-1].status == Status.FAILURE
 
 
@@ -367,7 +367,7 @@ def _use_after_free_state_machine(ctx):
 def test_find_use_after_free_via_state_machine(ctx):
     with pytest.raises(FailureGroup) as exc_info:
         _use_after_free_state_machine(ctx).run(settings=_STATE_MACHINE_SETTINGS)
-    assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
+    assert any("Deleted resource still available" in str(e) for e in exc_info.value.exceptions)
 
 
 @pytest.mark.flaky(reruns=9)
@@ -378,7 +378,7 @@ def test_find_use_after_free_via_state_machine_with_overridden_validate_response
 
     with pytest.raises(FailureGroup) as exc_info:
         CustomStateMachine.run(settings=_STATE_MACHINE_SETTINGS)
-    assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
+    assert any("Deleted resource still available" in str(e) for e in exc_info.value.exceptions)
 
 
 def test_no_false_positive_use_after_free_when_id_reused(engine_factory):
@@ -652,7 +652,7 @@ def test_new_resource_is_not_available(engine_factory):
     result = collect_result(engine)
     # Then it is a failure
     assert result.events[-1].status == Status.FAILURE
-    assert result.failures[0].failure_info.failure.title == "Resource is not available after creation"
+    assert result.failures[0].failure_info.failure.title == "Created resource not found"
 
 
 def test_new_resource_is_not_available_behind_cache(engine_factory):
@@ -1195,8 +1195,8 @@ def test_reproduce_chain_renders_each_step_with_its_own_headers(ctx, app_runner,
     ("status_code", "with_location", "expected"),
     [
         (200, False, []),
-        (200, True, ["Resource is not available after creation"]),
-        (201, False, ["Resource is not available after creation"]),
+        (200, True, ["Created resource not found"]),
+        (201, False, ["Created resource not found"]),
     ],
     ids=["no-creation-evidence", "location-header", "created-status"],
 )

@@ -24,7 +24,7 @@ Schemathesis dev
 _______________________ PUT /{primary}/subs/{secondary} ________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 200
     Documented: 201
@@ -52,7 +52,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 Test cases:
   N generated, N found N unique failures

@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ GET /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error on unexpected Content-Type
+- Server error on undeclared request Content-Type
 
     `Content-Type: multipart/form-data` without a boundary returned 500, expected 400 Bad Request or 415 Unsupported Media Type
 
@@ -52,7 +52,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error on unexpected Content-Type: 1
+  ❌ Server error on undeclared request Content-Type: 1
 
 Test cases:
   N generated, N found N unique failures

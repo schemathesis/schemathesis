@@ -156,7 +156,7 @@ Serializers apply to every transport: network requests, ASGI and WSGI apps.
 
 **`ValueError: dict contains fields not in fieldnames`.** Generated rows contain keys that are not in the header. Pass `extrasaction="ignore"` to `csv.DictWriter`, or add `additionalProperties: false` to the row schema.
 
-**"API accepted schema-violating request" with a value like `False` in a text column.** CSV carries no types, so a negative case that replaces a string with the boolean `false` reaches the API as the valid string `False`. Run CSV endpoints with `--mode positive`, or check which value the API received in the reproduction command before treating it as a bug.
+**"Schema-violating request accepted" with a value like `False` in a text column.** CSV carries no types, so a negative case that replaces a string with the boolean `false` reaches the API as the valid string `False`. Run CSV endpoints with `--mode positive`, or check which value the API received in the reproduction command before treating it as a bug.
 
 **The request body is not CSV.** Check that `SCHEMATHESIS_HOOKS` names the module (without `.py`) and that the media type in the decorator matches the one in the schema.
 

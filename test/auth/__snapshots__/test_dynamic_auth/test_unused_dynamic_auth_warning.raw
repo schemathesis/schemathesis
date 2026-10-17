@@ -24,7 +24,7 @@ Schemathesis dev
 __________________________________ GET /data ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 404
     Documented: 200
@@ -58,7 +58,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 Warnings:
   ⚠️ Unused OpenAPI auth: 1 configured auth scheme not used in the schema

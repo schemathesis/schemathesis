@@ -2322,7 +2322,7 @@ def test_positive_data_acceptance(
     if should_raise:
         with pytest.raises(Failure) as exc_info:
             positive_data_acceptance(ctx, response, case)
-        assert "API rejected schema-compliant request" in exc_info.value.title
+        assert "Schema-valid request rejected" in exc_info.value.title
     else:
         assert positive_data_acceptance(ctx, response, case) is None
 
@@ -3341,7 +3341,7 @@ def test_response_schema_conformance_discriminator(ctx, response_factory, body, 
     if should_fail:
         with pytest.raises(DiscriminatorMismatch) as exc_info:
             response_schema_conformance(_CHECK_CTX, response, case)
-        assert exc_info.value.title == "Discriminator value not in schema mapping"
+        assert exc_info.value.title == "Unknown discriminator value"
     else:
         assert response_schema_conformance(_CHECK_CTX, response, case) is None
 
@@ -3476,7 +3476,7 @@ def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_
     invalid = response_factory.requests(content=b'{"petType": "Fish"}')
     with pytest.raises(DiscriminatorMismatch) as exc_info:
         response_schema_conformance(_CHECK_CTX, Response.from_requests(invalid, True), case)
-    assert exc_info.value.title == "Discriminator value not in schema mapping"
+    assert exc_info.value.title == "Unknown discriminator value"
 
 
 def _single_response_schema(ctx, content):
@@ -3528,7 +3528,7 @@ def test_response_schema_conformance_discriminator_inline_branch(ctx, response_f
     invalid = Response.from_requests(response_factory.requests(content=b'{"petType": "fish"}'), True)
     with pytest.raises(DiscriminatorMismatch) as exc_info:
         response_schema_conformance(_CHECK_CTX, invalid, case)
-    assert exc_info.value.title == "Discriminator value not in schema mapping"
+    assert exc_info.value.title == "Unknown discriminator value"
 
 
 _KIND_BRANCHES = [{"$ref": "#/components/schemas/Cat"}, {"$ref": "#/components/schemas/Dog"}]
@@ -3614,7 +3614,7 @@ def test_response_schema_conformance_discriminator_nested(
     if should_fail:
         with pytest.raises(Failure) as exc_info:
             response_schema_conformance(_CHECK_CTX, response, case)
-        assert exc_info.value.title == "Discriminator value not in schema mapping"
+        assert exc_info.value.title == "Unknown discriminator value"
     else:
         assert response_schema_conformance(_CHECK_CTX, response, case) is None
 

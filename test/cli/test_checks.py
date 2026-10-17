@@ -52,7 +52,7 @@ def test_negative_data_rejection(ctx, cli):
         "--max-examples=5",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    assert "- API accepted schema-violating request\n" in result.stdout
+    assert "- Schema-violating request accepted\n" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -1605,7 +1605,7 @@ def test_negative_data_rejection_fuzzing_phase_metadata(ctx, cli, app_runner):
         "--continue-on-failure",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    assert "API accepted schema-violating request" in result.stdout
+    assert "Schema-violating request accepted" in result.stdout
     assert "Invalid component: in body" in result.stdout
 
 
@@ -1625,7 +1625,7 @@ def test_negative_data_rejection_fuzzing_phase_metadata(ctx, cli, app_runner):
 def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, cli, snapshot_cli, body_schema):
     # When requestBody.required=true but inner schema allows empty object,
     # coverage generates {} which serializes to no body content for form-urlencoded.
-    # This should NOT trigger a false positive "API rejected schema-compliant request".
+    # This should NOT trigger a false positive "Schema-valid request rejected".
     app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/my-method": {

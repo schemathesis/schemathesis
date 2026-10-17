@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ OPTIONS /items ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Invalid Allow header
+- Allow header mismatch
 
     `Allow: GET, HEAD, OPTIONS` does not match the schema. Missing documented methods: POST
 
@@ -52,7 +52,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Invalid Allow header: 1
+  ❌ Allow header mismatch: 1
 
 Test cases:
   N generated, N found N unique failures

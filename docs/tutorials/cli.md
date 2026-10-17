@@ -45,7 +45,7 @@ ________________________________ POST /bookings ________________________________
 
 - Server error
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 500
     Documented: 200, 400, 422
@@ -63,7 +63,7 @@ Reproduce with:
 ...
 Failures:
   ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 ...
 Warnings:

@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST205  Invalid Allow header
+ST205  Allow header mismatch
 checks allow_header_conformance
 
 `Allow` in the `OPTIONS` response lists different methods than the schema

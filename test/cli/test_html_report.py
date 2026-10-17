@@ -525,16 +525,16 @@ def top_failures_items(html):
         (
             False,
             [
-                "Missing required headers",
+                "Missing required response headers",
                 "Server error",
                 "Undocumented Content-Type",
-                "Undocumented HTTP status code",
+                "Undocumented status code",
             ],
         ),
         (
             True,
             [
-                "Missing required headers",
+                "Missing required response headers",
                 "Response violates schema",
                 "Server error",
                 "+2 more",
@@ -789,9 +789,9 @@ def test_html_report_failures_ordered_by_severity(ctx, cli, app_runner, report_d
 
     html = run_with_report(cli, report_dir, app_runner.openapi_url(app), exit_code=ExitCode.FAILURES)
     assert failed_rows(html) == [
-        ("op-get-api-crash", ["Server error", "Undocumented HTTP status code"]),
-        ("op-get-api-array", ["Response violates schema", "Missing required headers"]),
-        ("op-get-api-text", ["Missing required headers", "Undocumented Content-Type"]),
+        ("op-get-api-crash", ["Server error", "Undocumented status code"]),
+        ("op-get-api-array", ["Response violates schema", "Missing required response headers"]),
+        ("op-get-api-text", ["Missing required response headers", "Undocumented Content-Type"]),
     ]
 
 

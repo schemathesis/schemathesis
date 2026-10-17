@@ -408,7 +408,7 @@ def test_replay_unsupported_method_crash(cli, ctx, tmp_path):
     result = cli.main("replay", case_id)
 
     assert result.exit_code == 1, result.output
-    assert "Unsupported methods" in result.output
+    assert "Wrong response to undeclared method" in result.output
     assert "operation not found" not in result.output
     assert "TRACE /api/thing/{id}" in result.output, result.output
     assert "GET /api/thing/{id}" not in result.output, result.output
