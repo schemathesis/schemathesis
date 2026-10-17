@@ -73,6 +73,8 @@ class LinkInferencer:
     """Infer OpenAPI links from observed URLs for stateful testing."""
 
     _adapter: MapAdapter
+    # Rule argument names to OpenAPI path parameter names, per operation
+    _parameter_names: dict[OperationReference, dict[str, str]]
     # All API operations for prefix matching
     _operations: list[OperationReference]
     _base_url: str | None
@@ -84,6 +86,7 @@ class LinkInferencer:
         # NOTE: Use `matchit` for routing in the future
         rules = []
         operations = []
+        parameter_names: dict[OperationReference, dict[str, str]] = {}
         for method, path, definition in schema._operations.iter_operations():
             operation_id = definition.get("operationId")
             operation: OperationById | OperationByRef
@@ -95,12 +98,17 @@ class LinkInferencer:
 
             operations.append(operation)
 
-            # Replace `{parameter}` with `<parameter>` as angle brackets are used for parameters in werkzeug
-            path = re.sub(r"\{([^}]+)\}", r"<\1>", path)
-            rules.append(Rule(path, endpoint=operation, methods=[method.upper()]))
+            # Werkzeug accepts only identifier-like argument names, while OpenAPI allows e.g. `item-id`
+            parts = re.split(r"\{([^}]+)\}", path)
+            parameter_names[operation] = {
+                f"parameter_{index}": part for index, part in enumerate(parts) if index % 2 == 1
+            }
+            rule = "".join(f"<parameter_{index}>" if index % 2 == 1 else part for index, part in enumerate(parts))
+            rules.append(Rule(rule, endpoint=operation, methods=[method.upper()]))
 
         return cls(
             _adapter=Map(rules).bind("", ""),
+            _parameter_names=parameter_names,
             _operations=operations,
             _base_url=schema.config.base_url,
             _base_path=schema.base_path,
@@ -110,9 +118,11 @@ class LinkInferencer:
     def match(self, path: str) -> tuple[OperationReference, Mapping[str, str]] | None:
         """Match path to API operation and extract path parameters."""
         try:
-            return self._adapter.match(path)
+            operation, arguments = self._adapter.match(path)
         except (NotFound, MethodNotAllowed, RequestRedirect):
             return None
+        names = self._parameter_names[operation]
+        return operation, {names[argument]: value for argument, value in arguments.items()}
 
     def _build_links_from_matches(self, matches: MatchList, expression: str) -> list[dict]:
         """Build links from already-found matches."""

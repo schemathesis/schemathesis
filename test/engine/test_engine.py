@@ -2200,6 +2200,53 @@ def test_links_inferred_from_urls_in_response_bodies(ctx, app_runner, body, stat
     )
 
 
+@pytest.mark.parametrize(
+    ("headers", "body"),
+    [
+        ({"Location": f"/teams/{TEAM_ID}"}, {}),
+        ({}, {"url": f"/teams/{TEAM_ID}"}),
+    ],
+    ids=["location-header", "body-url"],
+)
+def test_links_inferred_for_path_parameters_with_non_identifier_names(ctx, app_runner, headers, body):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/teams": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/teams/{team-id}": {
+                "get": {
+                    "parameters": [{"name": "team-id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    fetched = []
+
+    @app.route("/teams", methods=["POST"])
+    def create_team():
+        return flask.jsonify(body), 201, headers
+
+    @app.route("/teams/<int:team_id>")
+    def get_team(team_id):
+        fetched.append(team_id)
+        return flask.jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_examples=5,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+    started = stream.find(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+
+    assert (started.payload.inferred_transitions > 0, TEAM_ID in fetched, stream.find_all(events.FatalError)) == (
+        True,
+        True,
+        [],
+    )
+
+
 def test_max_time_reserves_for_stateful_while_links_may_still_appear(ctx, app_runner):
     # Runtime-inferred links only show up once fuzzing has run, so the share has to be held before that.
     app, _ = ctx.openapi.make_flask_app(
