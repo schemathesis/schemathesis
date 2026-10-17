@@ -12,6 +12,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.transforms import resolve_pointer
 from schemathesis.errors import HookError
+from schemathesis.failure_codes import FAILURE_CLASSES
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 DOCS_DIR = ROOT_DIR / "docs"
@@ -163,7 +164,7 @@ def _resolve(current):
 
 def _search_rest(current, variant, title, segment):
     # Check if current uses additionalProperties (e.g., auth.openapi.<scheme>)
-    if "additionalProperties" in current and "properties" not in current:
+    if "additionalProperties" in current and variant not in current.get("properties", {}):
         data = _resolve(current["additionalProperties"])
     else:
         data = _resolve(current["properties"][variant])
@@ -199,6 +200,8 @@ def test_titles_are_valid():
                         ]
                     else:
                         variants = CHECKS.get_all_names()
+                elif name == "code":
+                    variants = [cls.code for cls in FAILURE_CLASSES]
                 elif name == "scheme":
                     # For auth.openapi.<scheme> - use a sample scheme name
                     variants = ["ApiKeyAuth"]

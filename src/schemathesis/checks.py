@@ -519,6 +519,8 @@ def run_checks(
         except (Failure, AssertionError, FailureGroup) as exc:
             kept = False
             for failure in _failures_from_exception(name, case.operation.label, exc):
+                if not ctx.config.reports(name, failure.code):
+                    continue
                 if not should_keep_failure(failure, case, response):
                     if ctx._recorder is not None:
                         ctx._recorder.record_filtered_failure(case_id=case.id)

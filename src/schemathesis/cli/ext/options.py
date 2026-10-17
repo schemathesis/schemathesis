@@ -65,10 +65,11 @@ class CsvEnumChoice(BaseCsvChoice):
 
 
 class RegistryChoice(BaseCsvChoice):
-    def __init__(self, registry: Registry, with_all: bool = False) -> None:
+    def __init__(self, registry: Registry, with_all: bool = False, with_failure_codes: bool = False) -> None:
         self.registry = registry
         self.case_sensitive = True
         self.with_all = with_all
+        self.with_failure_codes = with_failure_codes
 
     @property
     def choices(self) -> list[str]:
@@ -79,6 +80,12 @@ class RegistryChoice(BaseCsvChoice):
 
     def convert(self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None) -> list[str]:
         selected, invalid_options = self.parse_value(value)
+        if self.with_failure_codes and invalid_options:
+            # Accepted but left out of `--help`, where 26 codes would bury the check names.
+            # Imported on use: loading every failure class at CLI startup slows down unrelated commands.
+            from schemathesis.failure_codes import FAILURE_CLASSES
+
+            invalid_options -= {cls.code for cls in FAILURE_CLASSES}
         if not invalid_options and selected:
             return selected
         self.fail_on_invalid_options(invalid_options, selected)

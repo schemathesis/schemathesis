@@ -20,6 +20,7 @@ class UndefinedStatusCode(Failure):
     """Response has a status code that is not defined in the schema."""
 
     code = "ST103"
+    checks = ("status_code_conformance",)
 
     __slots__ = (
         "operation",
@@ -61,6 +62,7 @@ class MissingHeaders(Failure):
     """Some required headers are missing."""
 
     code = "ST107"
+    checks = ("response_headers_conformance",)
 
     __slots__ = ("operation", "missing_headers", "message", "title", "case_id", "severity")
 
@@ -89,6 +91,7 @@ class JsonSchemaError(Failure):
     """Additional information about JSON Schema validation errors."""
 
     code = "ST108"
+    checks = ("response_schema_conformance", "response_headers_conformance")
 
     __slots__ = (
         "operation",
@@ -218,6 +221,7 @@ class MissingContentType(Failure):
     """Content type header is missing."""
 
     code = "ST104"
+    checks = ("content_type_conformance", "response_schema_conformance")
 
     __slots__ = ("operation", "media_types", "message", "title", "case_id", "severity")
 
@@ -246,6 +250,7 @@ class MalformedMediaType(Failure):
     """Media type name is malformed."""
 
     code = "ST106"
+    checks = ("content_type_conformance",)
 
     __slots__ = ("operation", "actual", "defined", "message", "title", "case_id", "severity")
 
@@ -276,6 +281,7 @@ class ContentDeserializationError(Failure):
     """Response body cannot be deserialized as its documented media type."""
 
     code = "ST110"
+    checks = ("response_schema_conformance",)
 
     __slots__ = ()
 
@@ -292,6 +298,7 @@ class DiscriminatorMismatch(Failure):
     """Response discriminator value matches no schema the discriminator maps to."""
 
     code = "ST111"
+    checks = ("response_schema_conformance",)
 
     __slots__ = ()
 
@@ -310,6 +317,7 @@ class UndefinedContentType(Failure):
     """Response has Content-Type that is not documented in the schema."""
 
     code = "ST105"
+    checks = ("content_type_conformance",)
 
     __slots__ = (
         "operation",
@@ -348,6 +356,7 @@ class UseAfterFree(Failure):
     """Resource was used after a successful DELETE operation on it."""
 
     code = "ST301"
+    checks = ("use_after_free",)
 
     __slots__ = ("operation", "message", "free", "usage", "deleted_case_id", "title", "case_id", "severity")
 
@@ -385,6 +394,7 @@ class EnsureResourceAvailability(Failure):
     """Resource is not available immediately after creation."""
 
     code = "ST302"
+    checks = ("ensure_resource_availability",)
 
     __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "case_id", "severity")
 
@@ -421,6 +431,7 @@ class IgnoredAuth(Failure):
     """The API operation does not check the specified authentication."""
 
     code = "ST401"
+    checks = ("ignored_auth",)
 
     __slots__ = ("operation", "message", "scenario", "title", "case_id", "severity")
 
@@ -450,6 +461,7 @@ class ObjectLevelAuthorizationViolation(Failure):
     """One identity received an object that another identity created."""
 
     code = "ST402"
+    checks = ("object_level_authorization",)
 
     __slots__ = ("operation", "message", "owner", "peer", "owner_case_id", "title", "case_id", "severity")
     # Rerunning as the peer alone does not recreate the owner's object.
@@ -490,6 +502,7 @@ class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""
 
     code = "ST202"
+    checks = ("positive_data_acceptance",)
 
     __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
 
@@ -520,6 +533,7 @@ class MissingHeaderNotRejected(Failure):
     """API did not reject request without required header."""
 
     code = "ST203"
+    checks = ("missing_required_header",)
 
     __slots__ = (
         "operation",
@@ -561,6 +575,7 @@ class UnsupportedMethodResponse(Failure):
     """API response for unsupported HTTP method is incorrect."""
 
     code = "ST204"
+    checks = ("unsupported_method",)
 
     __slots__ = (
         "operation",
@@ -605,6 +620,7 @@ class AllowHeaderMismatch(Failure):
     """`Allow` header does not list the same methods as the schema."""
 
     code = "ST205"
+    checks = ("allow_header_conformance",)
 
     __slots__ = (
         "operation",

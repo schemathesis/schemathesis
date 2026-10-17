@@ -1107,6 +1107,21 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     response_schema_conformance.enabled = false
     ```
 
+#### `checks.<code>.enabled`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Turns off failures with one code, such as `ST103`, while the check that reports them keeps reporting its other codes. `true` runs a disabled check for that code alone, as `--checks ST103` does.
+
+    ```toml
+    [[operations]]
+    include-name = "GET /reports"
+    checks.ST103.enabled = false
+    ```
+
 #### `checks.response_schema_conformance.validate-formats`
 
 !!! note ""

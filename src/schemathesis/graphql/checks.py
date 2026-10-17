@@ -12,6 +12,7 @@ class UnexpectedGraphQLResponse(Failure):
     """GraphQL response is not a JSON object."""
 
     code = "ST115"
+    checks = ("response_schema_conformance",)
 
     __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
 
@@ -40,6 +41,7 @@ class GraphQLClientError(Failure):
     """GraphQL query has not been executed."""
 
     code = "ST206"
+    checks = ("positive_data_acceptance",)
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -71,6 +73,7 @@ class GraphQLServerError(Failure):
     """GraphQL response indicates at least one server error."""
 
     code = "ST113"
+    checks = ("not_a_server_error",)
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -102,6 +105,7 @@ class GraphQLSchemaViolation(Failure):
     """GraphQL response contradicts the schema the server publishes."""
 
     code = "ST114"
+    checks = ("response_schema_conformance",)
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 

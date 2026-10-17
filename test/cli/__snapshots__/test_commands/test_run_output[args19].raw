@@ -38,9 +38,10 @@ Options:
                                  file to exit with a non-zero code on them
 
 API validation options:
-  -c, --checks                  Comma-separated list of checks to run against
-                                API responses [possible values:
-                                not_a_server_error, status_code_conformance,
+  -c, --checks                  Comma-separated list of checks or failure codes
+                                (e.g. ST103) to run against API responses
+                                [possible values: not_a_server_error,
+                                status_code_conformance,
                                 content_type_conformance,
                                 response_headers_conformance,
                                 response_schema_conformance,
@@ -50,8 +51,9 @@ API validation options:
                                 allow_header_conformance, use_after_free,
                                 ensure_resource_availability, ignored_auth,
                                 object_level_authorization, all]
-  --exclude-checks              Comma-separated list of checks to skip during
-                                testing [possible values: not_a_server_error,
+  --exclude-checks              Comma-separated list of checks or failure codes
+                                (e.g. ST103) to skip during testing [possible
+                                values: not_a_server_error,
                                 status_code_conformance,
                                 content_type_conformance,
                                 response_headers_conformance,

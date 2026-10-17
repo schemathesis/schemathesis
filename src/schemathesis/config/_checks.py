@@ -171,6 +171,8 @@ class ChecksConfig(DiffBase):
     _explicit: dict[str, bool]
     # The top-level `enabled` value, applied to custom checks without their own `enabled`.
     _default_enabled: bool | None
+    # Checks selected only through failure codes, with the codes they report.
+    _code_filter: dict[str, set[str]]
 
     def __init__(
         self,
@@ -210,6 +212,7 @@ class ChecksConfig(DiffBase):
         self._custom_kwargs = {}
         self._explicit = {}
         self._default_enabled = None
+        self._code_filter = {}
 
     @property
     def custom_kwargs(self) -> dict[str, dict[str, Any]]:
@@ -270,8 +273,25 @@ class ChecksConfig(DiffBase):
             config._unknown[name] = SimpleCheckConfig(enabled=enabled)
             if kwargs:
                 config._custom_kwargs[name] = kwargs
+            if value.get("enabled") is True:
+                config._select_code(name)
         config._default_enabled = default_enabled
         return config
+
+    def _select_code(self, code: str) -> None:
+        """Turn on the checks behind an explicitly enabled failure code, reporting only that code from them."""
+        from schemathesis.failure_codes import get_failure_class
+
+        cls = get_failure_class(code)
+        if cls is None:
+            return
+        for check in cls.checks:
+            check_config = self.get_by_name(name=check)
+            if not check_config.enabled or check in self._code_filter:
+                check_config.enabled = True
+                if check in self._explicit:
+                    self._explicit[check] = True
+                self._code_filter.setdefault(check, set()).add(cls.code)
 
     @classmethod
     def from_hierarchy(cls, configs: list[ChecksConfig]) -> ChecksConfig:  # type: ignore[override]
@@ -292,6 +312,7 @@ class ChecksConfig(DiffBase):
         merged._default_enabled = next(
             (config._default_enabled for config in configs if config._default_enabled is not None), None
         )
+        merged._code_filter = next((config._code_filter for config in configs if config._code_filter), {})
         # `enabled = True` is the default, so the generic merge cannot tell it from "not configured";
         # without this a lower-priority `false` would win over a check named on the command line.
         known_names = {f.name for f in fields(cls) if not f.name.startswith("_")}
@@ -300,6 +321,14 @@ class ChecksConfig(DiffBase):
                 if name not in merged._explicit:
                     merged._set_enabled(name, known_names=known_names, enabled=enabled)
         return merged
+
+    def reports(self, check: str, code: str) -> bool:
+        """Whether a failure with `code` (e.g. `ST103`) raised by `check` counts."""
+        config = self._unknown.get(code)
+        if config is not None and not config.enabled:
+            return False
+        selected = self._code_filter.get(check)
+        return selected is None or code in selected
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
         try:
@@ -344,6 +373,8 @@ class ChecksConfig(DiffBase):
                 self._set_enabled(name, known_names=known_names, enabled=False)
             elif included_check_names is not None and ("all" in included_check_names or name in included_check_names):
                 self._set_enabled(name, known_names=known_names, enabled=True)
+        for name in included_check_names or []:
+            self._select_code(name)
 
         if max_response_time is not None:
             self._explicit["max_response_time"] = True

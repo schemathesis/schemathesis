@@ -2352,3 +2352,70 @@ def test_phase_without_checks_keeps_running_until_max_time(ctx, cli):
         config={"checks": {"enabled": False}},
     )
     assert time.monotonic() - started >= 1
+
+
+def _crashing_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/crash": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/also-crash": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/crash")
+    def crash():
+        return "", 500
+
+    @app.route("/also-crash")
+    def also_crash():
+        return "", 500
+
+    return app
+
+
+def _reported(stdout):
+    return re.findall(r"^- ([A-Z][^\n]*)$", stdout, re.MULTILINE)
+
+
+def test_exclude_checks_accepts_a_failure_code(ctx, cli):
+    # Every response is an undocumented 500: `Server error` stays, `Undocumented HTTP status code` goes.
+    result = cli.run_openapi_app(_crashing_app(ctx), "--max-examples=1", "--phases=fuzzing", "--exclude-checks=ST103")
+    assert sorted(set(_reported(result.stdout))) == ["Server error"]
+
+
+def test_failure_code_disabled_for_one_operation(ctx, cli):
+    result = cli.run_openapi_app(
+        _crashing_app(ctx),
+        "--max-examples=1",
+        "--phases=fuzzing",
+        config={"operations": [{"include-name": "GET /crash", "checks": {"ST103": {"enabled": False}}}]},
+    )
+    sections = re.split(r"^_+ (GET \S+) _+$", result.stdout, flags=re.MULTILINE)[1:]
+    reported = {label: sorted(set(_reported(body))) for label, body in zip(sections[::2], sections[1::2], strict=True)}
+    assert reported == {
+        "GET /also-crash": ["Server error", "Undocumented HTTP status code"],
+        "GET /crash": ["Server error"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("selected", "expected"),
+    [
+        ("ST103", ["Undocumented HTTP status code"]),
+        ("not_a_server_error,ST103", ["Server error", "Undocumented HTTP status code"]),
+    ],
+    ids=["code", "check-and-code"],
+)
+def test_checks_accepts_a_failure_code(ctx, cli, selected, expected):
+    result = cli.run_openapi_app(_crashing_app(ctx), "--max-examples=1", "--phases=fuzzing", f"--checks={selected}")
+    assert sorted(set(_reported(result.stdout))) == expected
+
+
+def test_failure_code_enabled_in_config(ctx, cli):
+    result = cli.run_openapi_app(
+        _crashing_app(ctx),
+        "--max-examples=1",
+        "--phases=fuzzing",
+        config={"checks": {"enabled": False, "ST103": {"enabled": True}}},
+    )
+    assert sorted(set(_reported(result.stdout))) == ["Undocumented HTTP status code"]

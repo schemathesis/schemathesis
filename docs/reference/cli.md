@@ -164,12 +164,13 @@ $ st run [OPTIONS] SCHEMA
 
     **Type**: `Comma-separated list`  
     **Default**: All checks enabled  
-    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `object_level_authorization`, `all`  
+    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `object_level_authorization`, `all`, or a failure code such as `ST103`  
 
-    Specifies which checks to run against API responses. See the [Checks reference](checks.md) for what each one validates.
+    Specifies which checks to run against API responses. See the [Checks reference](checks.md) for what each one validates. A failure code runs the check that reports it and keeps only failures with that code.
 
     ```console
     $ st run openapi.yaml --checks not_a_server_error,response_schema_conformance
+    $ st run openapi.yaml --checks ST103
     ```
 
 #### `--exclude-checks CHECKS`
@@ -178,12 +179,13 @@ $ st run [OPTIONS] SCHEMA
 
     **Type**: `Comma-separated list`  
     **Default**: `[]`  
-    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `object_level_authorization`, `all`  
+    **Possible values**: `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_headers_conformance`, `response_schema_conformance`, `negative_data_rejection`, `positive_data_acceptance`, `missing_required_header`, `unsupported_method`, `allow_header_conformance`, `use_after_free`, `ensure_resource_availability`, `ignored_auth`, `object_level_authorization`, `all`, or a failure code such as `ST103`  
 
-    Specifies which checks to skip during testing.
+    Specifies which checks to skip during testing. A failure code skips only failures with that code; the check still reports its other codes.
 
     ```console
     $ st run openapi.yaml --checks all --exclude-checks response_schema_conformance
+    $ st run openapi.yaml --exclude-checks ST103
     ```
 
 #### `--max-failures COUNT`

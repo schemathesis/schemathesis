@@ -7,42 +7,42 @@ from schemathesis.core.failures import Failure, ServerError
 from schemathesis.failure_codes import FAILURE_CLASSES, get_failure_class
 
 REGISTRY = [
-    ("ST101", "ServerError"),
-    ("ST102", "ContentTypeServerError"),
-    ("ST103", "UndefinedStatusCode"),
-    ("ST104", "MissingContentType"),
-    ("ST105", "UndefinedContentType"),
-    ("ST106", "MalformedMediaType"),
-    ("ST107", "MissingHeaders"),
-    ("ST108", "JsonSchemaError"),
-    ("ST109", "MalformedJson"),
-    ("ST110", "ContentDeserializationError"),
-    ("ST111", "DiscriminatorMismatch"),
-    ("ST112", "ResponseTimeExceeded"),
-    ("ST113", "GraphQLServerError"),
-    ("ST114", "GraphQLSchemaViolation"),
-    ("ST115", "UnexpectedGraphQLResponse"),
-    ("ST201", "AcceptedNegativeData"),
-    ("ST202", "RejectedPositiveData"),
-    ("ST203", "MissingHeaderNotRejected"),
-    ("ST204", "UnsupportedMethodResponse"),
-    ("ST205", "AllowHeaderMismatch"),
-    ("ST206", "GraphQLClientError"),
-    ("ST301", "UseAfterFree"),
-    ("ST302", "EnsureResourceAvailability"),
-    ("ST401", "IgnoredAuth"),
-    ("ST402", "ObjectLevelAuthorizationViolation"),
-    ("ST901", "CustomFailure"),
+    ("ST101", "ServerError", ("not_a_server_error",)),
+    ("ST102", "ContentTypeServerError", ("not_a_server_error",)),
+    ("ST103", "UndefinedStatusCode", ("status_code_conformance",)),
+    ("ST104", "MissingContentType", ("content_type_conformance", "response_schema_conformance")),
+    ("ST105", "UndefinedContentType", ("content_type_conformance",)),
+    ("ST106", "MalformedMediaType", ("content_type_conformance",)),
+    ("ST107", "MissingHeaders", ("response_headers_conformance",)),
+    ("ST108", "JsonSchemaError", ("response_schema_conformance", "response_headers_conformance")),
+    ("ST109", "MalformedJson", ("response_schema_conformance",)),
+    ("ST110", "ContentDeserializationError", ("response_schema_conformance",)),
+    ("ST111", "DiscriminatorMismatch", ("response_schema_conformance",)),
+    ("ST112", "ResponseTimeExceeded", ("max_response_time",)),
+    ("ST113", "GraphQLServerError", ("not_a_server_error",)),
+    ("ST114", "GraphQLSchemaViolation", ("response_schema_conformance",)),
+    ("ST115", "UnexpectedGraphQLResponse", ("response_schema_conformance",)),
+    ("ST201", "AcceptedNegativeData", ("negative_data_rejection",)),
+    ("ST202", "RejectedPositiveData", ("positive_data_acceptance",)),
+    ("ST203", "MissingHeaderNotRejected", ("missing_required_header",)),
+    ("ST204", "UnsupportedMethodResponse", ("unsupported_method",)),
+    ("ST205", "AllowHeaderMismatch", ("allow_header_conformance",)),
+    ("ST206", "GraphQLClientError", ("positive_data_acceptance",)),
+    ("ST301", "UseAfterFree", ("use_after_free",)),
+    ("ST302", "EnsureResourceAvailability", ("ensure_resource_availability",)),
+    ("ST401", "IgnoredAuth", ("ignored_auth",)),
+    ("ST402", "ObjectLevelAuthorizationViolation", ("object_level_authorization",)),
+    ("ST901", "CustomFailure", ()),
 ]
 
 
 def test_registry_is_stable():
-    assert [(cls.code, cls.__name__) for cls in FAILURE_CLASSES] == REGISTRY
+    assert [(cls.code, cls.__name__, cls.checks) for cls in FAILURE_CLASSES] == REGISTRY
 
 
 @pytest.mark.parametrize("cls", FAILURE_CLASSES, ids=lambda cls: cls.__name__)
 def test_failure_class_defines_its_own_code(cls):
-    assert "code" in vars(cls)
+    assert {"code", "checks"} <= set(vars(cls))
     assert re.fullmatch(r"ST[1-49]\d\d", cls.code)
 
 
