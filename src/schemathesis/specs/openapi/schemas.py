@@ -22,7 +22,7 @@ from schemathesis.config import (
     HttpBearerAuthConfig,
     OperationOrdering,
 )
-from schemathesis.core import NOT_SET, Body, Specification, media_types
+from schemathesis.core import NOT_SET, Body, NotSet, Specification, media_types
 from schemathesis.core.errors import (
     InvalidSchema,
     InvalidStateMachine,
@@ -64,7 +64,7 @@ from ...schemas import APIOperation, APIOperationMap, BaseSchema
 from ._hypothesis import jsonify_python_specific_types, openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
-from .operations import SCHEMA_PARSING_ERRORS, OperationLoader
+from .operations import SCHEMA_PARSING_ERRORS, OperationLoader, RawSchemaVersion
 from .serialization import _build_urlencoded_serializer
 from .stateful import collect_transitions, create_state_machine
 from .utils import PathTemplate, coerce_wire_string, compile_path_template, parameter_types, parse_spec_version
@@ -72,7 +72,7 @@ from .validation import ResponseValidator
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import TypeAlias
+    from typing import Self, TypeAlias
 
     from hypothesis import HealthCheck
     from hypothesis.strategies import SearchStrategy
@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
+    from schemathesis.filters import FilterSet
     from schemathesis.generation.coverage import GenerationSession
     from schemathesis.generation.hypothesis.reporting import SlowParameter, UnsatisfiableParameter
     from schemathesis.generation.stateful import APIStateMachine
@@ -114,6 +115,14 @@ class OpenApiSchema(BaseSchema):
     _spec_version: str = field(init=False)
 
     @override
+    def clone(self, *, test_function: Callable | NotSet = NOT_SET, filter_set: FilterSet | NotSet = NOT_SET) -> Self:
+        cloned = super().clone(test_function=test_function, filter_set=filter_set)
+        # Clones share the raw schema, so a change made through one makes every clone's operations stale.
+        cloned.raw_schema_version = self.raw_schema_version
+        cloned._operations = OperationLoader(cloned)
+        return cloned
+
+    @override
     def __post_init__(self) -> None:
         self._initialize_adapter()
         super().__post_init__()
@@ -121,6 +130,7 @@ class OpenApiSchema(BaseSchema):
         self._bundler = Bundler(ref_siblings=self.adapter.ref_siblings)
         self._bundle_cache: BundleCache = {}
         self.response_schema_cache = ResponseSchemaCache()
+        self.raw_schema_version = RawSchemaVersion()
         self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
         self._operations = OperationLoader(self)
         self._response_validator = ResponseValidator(self)
@@ -429,6 +439,7 @@ class OpenApiSchema(BaseSchema):
         # later reader see them, rather than the counts from before the injection.
         if injected:
             self.__dict__.pop("statistic", None)
+            self._operations.clear_cache()
         transitions = self.statistic.transitions
         return StatefulInference(inferred=injected, total=transitions.total, selected=transitions.selected)
 
@@ -883,6 +894,9 @@ class MethodMap(Mapping):
         operation = self._path_item[method]
         schema = cast(OpenApiSchema, self._parent._schema)
         path = self._path
+        cached = schema._operations.cached(self._scope, path, method)
+        if cached is not None:
+            return cached
         try:
             parameters = schema._iter_parameters(
                 operation, self._path_item.get("parameters", []), resolver=self._resolver
