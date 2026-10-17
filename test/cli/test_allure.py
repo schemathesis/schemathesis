@@ -71,7 +71,7 @@ def test_coverage_unspecified_method_in_allure(ctx, cli, tmp_path):
 
     results = [json.loads(file.read_text()) for file in allure_dir.glob("*-result.json")]
     messages = [step["statusDetails"]["message"] for result in results for step in result.get("steps", [])]
-    assert any("Unsupported methods" in message for message in messages)
+    assert any("Wrong response to undeclared method" in message for message in messages)
 
 
 def test_allure_no_report_without_flag(ctx, cli, tmp_path):

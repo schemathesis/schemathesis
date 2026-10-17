@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST102  Server error on unexpected Content-Type
+ST102  Server error on undeclared request Content-Type
 checks not_a_server_error
 
 5xx for a request sent with an undeclared `Content-Type`, while the same request

@@ -43,12 +43,12 @@ Failures:
   ❌ API accepts requests without authentication: 1
   ❌ Server error: 2
   ❌ Response violates schema: 1
-  ❌ API accepted schema-violating request: 3
+  ❌ Schema-violating request accepted: 3
   ❌ JSON deserialization error: 1
-  ❌ Missing header not rejected: 1
+  ❌ Missing required header accepted: 1
   ❌ Undocumented Content-Type: 4
-  ❌ Undocumented HTTP status code: 1
-  ❌ Unsupported methods: 6
+  ❌ Undocumented status code: 1
+  ❌ Wrong response to undeclared method: 6
 
 Test cases:
   59 generated, 18 found 20 unique failures

@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST302  Resource is not available after creation
+ST302  Created resource not found
 checks ensure_resource_availability
 
 404 for a resource that an earlier successful `POST` created.

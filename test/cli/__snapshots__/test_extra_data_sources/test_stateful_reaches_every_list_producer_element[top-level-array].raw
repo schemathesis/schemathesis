@@ -28,7 +28,7 @@ ________________________________ Stateful tests ________________________________
 
 - Server error
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 500
     Documented: 200, 404
@@ -57,7 +57,7 @@ Test Phases:
 
 Failures:
   ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 Test cases:
   N generated, N found N unique failures

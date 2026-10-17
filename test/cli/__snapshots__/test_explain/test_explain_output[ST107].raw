@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST107  Missing required headers
+ST107  Missing required response headers
 checks response_headers_conformance
 
 Required response header missing for this status.

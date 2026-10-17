@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST203  Missing header not rejected
+ST203  Missing required header accepted
 checks missing_required_header
 
 Request without a required header parameter accepted.

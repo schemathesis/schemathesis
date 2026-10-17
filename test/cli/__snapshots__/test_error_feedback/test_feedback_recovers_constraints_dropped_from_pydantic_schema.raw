@@ -27,7 +27,7 @@ Schemathesis dev
 _________________________________ POST /users __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- Schema-valid request rejected
 
     Valid data should have been accepted
     Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
@@ -46,7 +46,7 @@ Reproduce with:
 
 - Server error
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 500
     Documented: 200, 422
@@ -75,8 +75,8 @@ Test Phases:
 
 Failures:
   ❌ Server error: 1
-  ❌ API rejected schema-compliant request: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Schema-valid request rejected: 1
+  ❌ Undocumented status code: 1
 
 Test cases:
   N generated, N found N unique failures

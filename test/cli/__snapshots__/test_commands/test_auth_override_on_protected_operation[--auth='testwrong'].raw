@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ GET /api/basic ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 401
     Documented: 200
@@ -60,7 +60,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 Warnings:
   ⚠️ Authentication failed: 1 operation returned only 401/403 responses

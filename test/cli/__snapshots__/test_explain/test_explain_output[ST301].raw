@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST301  Use after free
+ST301  Deleted resource still available
 checks use_after_free
 
 Resource still served after a successful `DELETE` removed it.

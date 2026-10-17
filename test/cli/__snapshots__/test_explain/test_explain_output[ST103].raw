@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST103  Undocumented HTTP status code
+ST103  Undocumented status code
 checks status_code_conformance
 
 Status code missing from the operation's documented responses.

@@ -24,7 +24,7 @@ Schemathesis identifies problems in three main categories:
 
 - Response bodies not matching schemas
 - Undocumented status codes
-- Missing required headers
+- Missing required response headers
 - Wrong content types
 
 **Implementation Flaws**

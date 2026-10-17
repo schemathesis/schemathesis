@@ -41,7 +41,7 @@ Need more help?
 ________________________________ POST /api/csv _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API accepted schema-violating request
+- Schema-violating request accepted
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
@@ -70,7 +70,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ API accepted schema-violating request: 1
+  ❌ Schema-violating request accepted: 1
 
 Errors:
   🚫 Serialization not possible: 1
