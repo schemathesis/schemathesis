@@ -758,6 +758,8 @@ def extract_from_schemas(
         resolver = make_root_resolver(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
+            if not _mentions_any_key(schema, (example_keyword, examples_container_keyword)):
+                continue
             walk = ExampleWalk(
                 operation=operation,
                 example_keyword=example_keyword,
@@ -791,6 +793,9 @@ def _extract_body_examples_from_schemas(
         resolver = make_root_resolver(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
+            keys = (example_keyword, examples_container_keyword, *(("default",) if defaults_as_examples else ()))
+            if not _mentions_any_key(schema, keys):
+                continue
             walk = ExampleWalk(
                 operation=operation,
                 example_keyword=example_keyword,
@@ -807,6 +812,26 @@ def _extract_body_examples_from_schemas(
             ):
                 if _example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
+
+
+def _mentions_any_key(schema: dict[str, Any], keys: tuple[str, ...]) -> bool:
+    # The walk follows every path through shared references, which can be exponentially many. Values only come from
+    # these keys, so a schema without them is skipped after one pass that checks each shared subschema once.
+    seen: set[int] = set()
+    stack: list[object] = [schema]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (dict, list)):
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            if isinstance(node, dict):
+                if any(key in node for key in keys):
+                    return True
+                stack.extend(node.values())
+            else:
+                stack.extend(node)
+    return False
 
 
 def _make_example_validator(schema: Any, *, snap_float32: bool = True) -> jsonschema_rs.Validator | None:

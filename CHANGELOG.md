@@ -29,6 +29,7 @@
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
 - Faster coverage phase for large enums, wide objects, nested bodies and many headers.
+- Examples phase up to ~130x faster on schemas with shared references and no examples.
 
 ### :bug: Fixed
 
