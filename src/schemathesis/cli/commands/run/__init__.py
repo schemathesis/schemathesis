@@ -8,7 +8,6 @@ import click
 from click.core import ParameterSource
 
 from schemathesis.checks import load_all_checks
-from schemathesis.cli.commands.run import executor
 from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE
 from schemathesis.cli.core import ensure_color, resolve_color
@@ -395,6 +394,8 @@ def run(
         with_security_parameters=generation_with_security_parameters,
         codec=generation_codec,
     )
+
+    from schemathesis.cli.commands.run import executor
 
     executor.execute(
         location=location,

@@ -30,6 +30,7 @@
 
 - Examples phase up to ~130x faster on schemas with shared references and no examples.
 - Faster coverage phase for large enums, wide objects, nested bodies and many headers.
+- ~20% faster CLI startup.
 - Coverage phase up to ~5x faster on UUID and date fields that also declare a matching `pattern`.
 - Coverage phase up to ~40% faster on schemas with patterns the regex engine rejects.
 - Coverage phase up to ~18% faster on operations with many negative cases.
