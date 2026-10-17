@@ -4360,6 +4360,38 @@ def test_one_of_negative_is_not_valid_for_a_sibling_under_a_newer_draft(ctx_fact
     assert [value for value in values if any(judge.is_valid(value) for judge in judges)] == []
 
 
+def test_body_negative_admitted_as_an_integer_by_a_newer_draft_is_dropped(ctx_factory):
+    schema = {"type": "integer"}
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE], root_schema=schema)
+    generated = GeneratedValue.with_negative(
+        2.0,
+        scenario=CoverageScenario.INCORRECT_TYPE,
+        description="Incorrect type",
+        location="body",
+    )
+
+    assert list(_schema.drop_negatives_any_draft_admits(ctx, schema, iter([generated]))) == []
+
+
+def test_body_binary_negative_reaching_a_validator_is_kept(ctx_factory):
+    schema = {
+        "type": "object",
+        "properties": {"file": {"type": "string", "format": "binary"}},
+        "required": ["file"],
+    }
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE], root_schema=schema)
+    generated = GeneratedValue.with_negative(
+        {"file": b"content"},
+        scenario=CoverageScenario.INCORRECT_TYPE,
+        description="Incorrect type",
+        location="body",
+    )
+
+    assert [value.value for value in _schema.drop_negatives_any_draft_admits(ctx, schema, iter([generated]))] == [
+        {"file": b"content"}
+    ]
+
+
 # A value beyond a negated large ceiling needs more elements than one draw holds.
 def test_positive_array_beyond_a_negated_large_ceiling(pctx):
     schema = {"type": "array", "not": {"maxItems": 8000}}
@@ -4395,6 +4427,21 @@ def test_positive_unique_uuid_array_with_a_large_floor(ctx_factory):
     values = cover_schema(ctx, schema)
     assert values, schema
     assert_conform(values, schema)
+
+
+def test_distinct_array_with_an_uncacheable_annotation(ctx_factory):
+    schema = {
+        "type": "array",
+        "items": {"type": "integer"},
+        "examples": [b"not-json"],
+        "uniqueItems": True,
+        "minItems": 65,
+    }
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+
+    values = ctx._distinct_array(schema, 65)
+
+    assert (len(values), len(set(values))) == (65, 65)
 
 
 @pytest.mark.parametrize("items", UNIQUE_ARRAY_ITEMS, ids=["object", "any"])

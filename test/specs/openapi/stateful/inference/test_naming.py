@@ -356,6 +356,13 @@ def test_find_matching_field_fallbacks(parameter, resource, fields, expected):
     assert naming.find_matching_field(parameter=parameter, resource=resource, fields=fields) == expected
 
 
+def test_parameter_names_resource_field_with_non_suffix_match():
+    field = naming.find_matching_field(parameter="user_id", resource="User", fields=["uuid"])
+
+    assert field == "uuid"
+    assert naming.parameter_names_resource_field(parameter="user_id", field=field, resource="User")
+
+
 @pytest.mark.parametrize(
     ["name", "expected"],
     [

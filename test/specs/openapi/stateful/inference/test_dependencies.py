@@ -3172,6 +3172,118 @@ def snapshot_json(snapshot):
             None,
             id="body-field-name-suffix-on-collection-path",
         ),
+        pytest.param(
+            {
+                **operation(
+                    "get",
+                    "/warehouses",
+                    "200",
+                    {
+                        "type": "object",
+                        "properties": {"items": {"type": "array", "items": component_ref("WarehouseItem")}},
+                    },
+                ),
+                **operation(
+                    "get",
+                    "/warehouses/{warehouse}/shelves",
+                    "200",
+                    {"type": "array", "items": {"type": "object"}},
+                    [path_param("warehouse")],
+                ),
+            },
+            {
+                "schemas": {
+                    "WarehouseItem": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}},
+                        "required": ["name"],
+                    }
+                }
+            },
+            id="listed-identifier-on-nested-operation",
+        ),
+        pytest.param(
+            {
+                **operation("post", "/warehouses", "201", component_ref("Warehouse")),
+                **operation_with_body(
+                    "post",
+                    "/orders",
+                    "201",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "shipping": {**component_ref("Address"), "description": "Shipping address"},
+                            "billing": {**component_ref("Address"), "description": "Billing address"},
+                        },
+                    },
+                ),
+            },
+            {
+                "schemas": {
+                    "Warehouse": {
+                        "type": "object",
+                        "properties": {"id": {"type": "integer"}},
+                        "required": ["id"],
+                    },
+                    "Address": {
+                        "type": "object",
+                        "properties": {"warehouse_id": {"type": "integer"}},
+                    },
+                }
+            },
+            id="nested-fk-shared-component",
+        ),
+        pytest.param(
+            operation("get", "/cycle-roots", "200", component_ref("CycleRoot")),
+            {
+                "schemas": {
+                    "A": {
+                        "type": "object",
+                        "properties": {"a": {"type": "string"}},
+                        "allOf": [component_ref("B")],
+                    },
+                    "B": {
+                        "type": "object",
+                        "properties": {"b": {"type": "string"}},
+                        "allOf": [component_ref("A")],
+                    },
+                    "CycleRoot": {
+                        "type": "object",
+                        "properties": {"root": {"type": "string"}},
+                        "allOf": [component_ref("A"), component_ref("B")],
+                    },
+                }
+            },
+            id="all-of-inheritance-cycle",
+        ),
+        pytest.param(
+            operation("get", "/combined", "200", component_ref("Combined")),
+            {
+                "schemas": {
+                    "Base": {
+                        "type": "object",
+                        "properties": {"base": {"type": "string"}},
+                    },
+                    "Combined": {
+                        "type": "object",
+                        "properties": {"combined": {"type": "string"}},
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "properties": {"left": {"type": "string"}},
+                                "allOf": [component_ref("Base")],
+                            },
+                            {
+                                "type": "object",
+                                "properties": {"right": {"type": "string"}},
+                                "allOf": [component_ref("Base")],
+                            },
+                        ],
+                    },
+                }
+            },
+            id="all-of-shared-base",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

@@ -815,16 +815,12 @@ def _extract_body_examples_from_schemas(
 
 
 def _mentions_any_key(schema: dict[str, Any], keys: tuple[str, ...]) -> bool:
-    # The walk follows every path through shared references, which can be exponentially many. Values only come from
-    # these keys, so a schema without them is skipped after one pass that checks each shared subschema once.
-    seen: set[int] = set()
+    # The walk follows every path through shared references, which can be exponentially many. The bundled
+    # representation stores each shared subschema once, so a schema without these keys is skipped after one pass.
     stack: list[object] = [schema]
     while stack:
         node = stack.pop()
         if isinstance(node, (dict, list)):
-            if id(node) in seen:
-                continue
-            seen.add(id(node))
             if isinstance(node, dict):
                 if any(key in node for key in keys):
                     return True

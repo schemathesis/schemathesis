@@ -1,0 +1,41 @@
+{
+  "operations": {
+    "GET /combined": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Combined",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Combined": {
+      "fields": [
+        "base",
+        "combined",
+        "left",
+        "right"
+      ],
+      "types": {
+        "base": [
+          "string"
+        ],
+        "combined": [
+          "string"
+        ],
+        "left": [
+          "string"
+        ],
+        "right": [
+          "string"
+        ]
+      }
+    }
+  }
+}

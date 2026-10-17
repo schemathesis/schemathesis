@@ -57,10 +57,8 @@ def _render_request(interaction: Interaction, operation: APIOperation, config: O
     if timeout is not None:
         lines.append(f"        timeout={timeout!r},")
     lines.append("    )")
-    if interaction.response is None:
-        lines.append("    # No response was received")
-    else:
-        lines.append(f"    assert response.status_code == {interaction.response.status_code}")
+    assert interaction.response is not None
+    lines.append(f"    assert response.status_code == {interaction.response.status_code}")
     return lines
 
 
@@ -128,8 +126,6 @@ def render(
             if group.case_id is None:
                 continue
             chain = [step.case_id for step in group.steps if step.case_id in interactions]
-            if not chain:
-                continue
             explanation = format_failures(
                 case_id=f"{index}. Test Case ID: {group.case_id}",
                 response=group.response,
@@ -148,13 +144,13 @@ def render(
             for case_id in chain:
                 lines.extend(_render_request(interactions[case_id], operations[case_id], config))
             response = interactions[chain[-1]].response
-            if response is not None:
-                symptoms: list[str] = []
-                for failure in group.failures:
-                    for line in _symptom(failure, response):
-                        if line not in symptoms:
-                            symptoms.append(line)
-                lines.extend(symptoms)
+            assert response is not None
+            symptoms: list[str] = []
+            for failure in group.failures:
+                for line in _symptom(failure, response):
+                    if line not in symptoms:
+                        symptoms.append(line)
+            lines.extend(symptoms)
     if _RAISES_ON_JSON in lines:
         lines.insert(imports, "import pytest")
     return "\n".join(lines) + "\n"
@@ -181,10 +177,8 @@ class PytestReportHandler(EventHandler["BaseExecutionContext"]):
                     if check.failure_info is None:
                         continue
                     for step in check.failure_info.steps:
-                        interaction = recorder.interactions.get(step.case_id)
-                        if interaction is not None:
-                            self.interactions[step.case_id] = interaction
-                            self.operations[step.case_id] = recorder.cases[step.case_id].value.operation
+                        self.interactions[step.case_id] = recorder.interactions[step.case_id]
+                        self.operations[step.case_id] = recorder.cases[step.case_id].value.operation
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.output.parent.mkdir(parents=True, exist_ok=True)

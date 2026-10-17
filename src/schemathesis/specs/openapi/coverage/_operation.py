@@ -474,10 +474,7 @@ def _with_leaf_example(
     else:
         if not _is_pool_eligible(child):
             return None
-        try:
-            if not make_validator(schema_with_bundle(child, body_schema), validator_cls).is_valid(value):
-                return None
-        except Exception:
+        if not make_validator(schema_with_bundle(child, body_schema), validator_cls).is_valid(value):
             return None
         replacement = {**child, "examples": [value]}
     if isinstance(step, str):

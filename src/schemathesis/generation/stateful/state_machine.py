@@ -201,9 +201,8 @@ def _shuffle_root_rules(strategy: RuleStrategy, machine: type[APIStateMachine], 
         machine._shuffled_rules = cached
     _, ordered, sampled = cached
     strategy.rules = ordered
-    # Hypothesis versions differ in which of these strategies they draw rules from.
-    if hasattr(strategy, "rules_strategy"):
-        strategy.rules_strategy = sampled
+    strategy.rules_strategy = sampled
+    # Newer Hypothesis versions also draw rules from this strategy.
     if hasattr(strategy, "_enabled_rules_strategy"):
         strategy._enabled_rules_strategy = sampled.filter(strategy._rule_is_enabled)
 

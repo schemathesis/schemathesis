@@ -1122,3 +1122,33 @@ def test_coverage_pool_overlay_reaches_every_item_of_whole_drawn_arrays(ctx):
             [7340001],
         ),
     ]
+
+
+def test_coverage_pool_falls_back_when_pinning_breaks_unique_items(ctx):
+    item = {
+        "type": "object",
+        "properties": {"location_id": {"type": "integer"}},
+        "required": ["location_id"],
+        "additionalProperties": False,
+    }
+    body = {
+        "type": "object",
+        "properties": {"data": {"type": "array", "minItems": 2, "items": item, "uniqueItems": True}},
+        "required": ["data"],
+        "additionalProperties": False,
+    }
+    schema = ctx.openapi.load_schema(
+        {**_id_producer("/locations", "Location", {"type": "integer"}), **_body_consumer(body)}
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
+
+    cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+
+    assert [(case.meta.phase.data.description, case.body) for case in cases] == [
+        ("Valid object", {"data": [{"location_id": 0}, {"location_id": 1}]}),
+        (
+            "Object with valid 'data' value: Near-boundary items array",
+            {"data": [{"location_id": 0}, {"location_id": 1}, {"location_id": -1}]},
+        ),
+    ]

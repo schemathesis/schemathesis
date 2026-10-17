@@ -1543,3 +1543,48 @@ def test_examples_phase_fills_captured_id_into_example_that_supplies_required_fi
     cli.run_openapi_app(app, "--phases=examples", "--mode=positive", config=_examples_fill_missing_config())
 
     assert [body for body in sent if body["groupId"] == "G-REAL"] == expected
+
+
+def test_examples_phase_discards_completed_pool_body_that_violates_schema(cli, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/groups": {
+                "post": {
+                    "responses": {
+                        "201": _json_response(
+                            _object_schema({"id": {"type": "string"}}, required=["id"]),
+                            description="",
+                        )
+                    }
+                }
+            },
+            "/items": {
+                "post": {
+                    "requestBody": _json_request_body(
+                        {
+                            "type": "object",
+                            "properties": {"groupId": {"type": "string", "enum": ["G-REAL", "G-OTHER"]}},
+                            "required": ["groupId"],
+                            "not": {"properties": {"groupId": {"const": "G-REAL"}}},
+                        }
+                    ),
+                    "responses": {"201": {"description": ""}},
+                }
+            },
+        },
+        version="3.1.0",
+    )
+    sent = []
+
+    @app.route("/groups", methods=["POST"])
+    def create_group():
+        return jsonify({"id": "G-REAL"}), 201
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        sent.append(request.get_json())
+        return "", 201
+
+    cli.run_openapi_app(app, "--phases=examples", "--mode=positive", config=_examples_fill_missing_config())
+
+    assert sent == [{"groupId": "G-OTHER"}]

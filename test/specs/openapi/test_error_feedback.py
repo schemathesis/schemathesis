@@ -979,6 +979,34 @@ def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tup
                 "type": "object",
                 "properties": {
                     "contact": {
+                        "oneOf": [
+                            True,
+                            {"type": "object", "properties": {"email": {"type": "string"}}},
+                        ]
+                    }
+                },
+            },
+            [(("contact", "email"), "email")],
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "oneOf": [
+                            True,
+                            {
+                                "type": "object",
+                                "properties": {"email": {"type": "string", "format": "email"}},
+                            },
+                        ]
+                    }
+                },
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
                         "type": "object",
                         "properties": {"email": {"type": "string"}},
                     }
@@ -1015,6 +1043,7 @@ def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tup
         "bool-schema-passthrough",
         "non-object-root-passthrough",
         "oneof-applies-to-object-branch",
+        "oneof-skips-boolean-branch",
         "nested-path-format-injected",
         "empty-path-observation-skipped",
         "non-string-step-skipped",

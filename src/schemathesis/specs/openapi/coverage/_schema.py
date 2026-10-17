@@ -778,7 +778,7 @@ class CoverageContext:
         # Draws overlap, so twice the batches the floor needs to start with.
         budget = 2 * needed
         elements: dict[object, JsonValue] = {}
-        for _ in range(2):
+        while True:
             batches: list[list[JsonValue]] = examples.generate_many(batch, max_examples=budget)
             elements = {}
             for drawn in batches:
@@ -4266,10 +4266,7 @@ def _pattern_implies_format(pattern: str, format: str) -> bool:
     probes = _FORMAT_PROBES.get(format)
     if probes is None:
         return False
-    try:
-        matches = make_validator_for({"pattern": pattern}).is_valid
-    except jsonschema_rs.ValidationError:
-        return False
+    matches = make_validator_for({"pattern": pattern}).is_valid
     valid, near = probes
     return any(matches(value) or matches(value.upper()) for value in valid) and not any(
         matches(value) or matches(value.upper()) for value in near

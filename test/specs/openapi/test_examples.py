@@ -22,7 +22,7 @@ from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceRepository
-from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
+from schemathesis.specs.openapi.adapter.parameters import _apply_overlay, parameters_to_json_schema
 from schemathesis.specs.openapi.examples import (
     BodyExample,
     ParameterExample,
@@ -332,6 +332,27 @@ def test_extract_from_schemas_without_examples_skips_shared_references(ctx):
         components={"schemas": schemas},
     )
     assert list(extract_from_schemas(operation)) == []
+
+
+def test_non_item_list_overlay_leaves_list_unchanged():
+    target = [{"name": "first"}, {"name": "second"}]
+
+    _apply_overlay(target, [{"captured": "one"}, {"captured": "two"}])
+
+    assert target == [{"name": "first"}, {"name": "second"}]
+
+
+def test_item_overlay_updates_only_object_items():
+    target = [None, {"name": "first"}, "text", {"name": "second"}]
+
+    _apply_overlay(target, [{"captured": "value"}])
+
+    assert target == [
+        None,
+        {"name": "first", "captured": "value"},
+        "text",
+        {"name": "second", "captured": "value"},
+    ]
 
 
 def test_extract_top_level(operation):
