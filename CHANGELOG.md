@@ -30,6 +30,7 @@
 - HTML report up to ~20% smaller on runs with many failures.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
+- Coverage phase up to ~40% faster on schemas with patterns the regex engine rejects.
 - Faster coverage phase for large enums, wide objects, nested bodies and many headers.
 - Examples phase up to ~130x faster on schemas with shared references and no examples.
 - Coverage phase up to ~18% faster on operations with many negative cases.
