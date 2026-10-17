@@ -32,7 +32,7 @@ from schemathesis.core.jsonschema import (
     make_validator_for,
     matches_pattern,
 )
-from schemathesis.core.jsonschema.patterns import normalize_regex, pattern_length_bounds
+from schemathesis.core.jsonschema.patterns import normalize_regex, pattern_length_bounds, update_quantifier
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_surrounding_whitespace
@@ -1657,6 +1657,11 @@ def _pattern_driven(
     """Values drawn from one pattern and filtered by the remaining ones."""
     compiled = _compiled_pattern(pattern)
     assert compiled is not None
+    # A length floor left to the filter rejects the short matches drawn, which are most matches inside an array;
+    # spelled into the pattern, it is drawn to.
+    folded = update_quantifier(compiled.pattern, view.min_length, view.max_length)
+    if folded != compiled.pattern:
+        compiled = re.compile(folded, compiled.flags)
     # Python `re` reads the pattern differently from the validator, so the validator decides what the draw is worth.
     strategy = _from_pattern(compiled, ctx).filter(_facet_check("pattern", pattern))
     if "$" in pattern:

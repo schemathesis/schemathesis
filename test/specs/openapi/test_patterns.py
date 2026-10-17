@@ -306,6 +306,11 @@ from test.utils import run_given
         # A group holding anything but one quantifiable item has no single place for the budget to land.
         ("^(a|bb)$", 2, 2, "^(a|bb)$"),
         ("^([a-z][0-9]*)$", 3, 3, "^([a-z][0-9]*)$"),
+        # Lookarounds right after `^` take no characters, so the budget lands on what follows them.
+        ("^(?!aws:)[a-z]*$", 1, 128, "^(?!aws:)[a-z]{1,128}$"),
+        ("^(?!aws:)(?=x)[a-z]*$", 1, None, "^(?!aws:)(?=x)[a-z]{1,}$"),
+        ("^(?!a)[a-z]+-[0-9]*$", 4, 4, "^(?!a)[a-z]{1}-[0-9]{2}$"),
+        ("^(?!aws:)$", 1, None, "^(?!aws:)$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):

@@ -49,6 +49,7 @@
 - Stateful scenarios ending early on request bodies with optional `readOnly` fields.
 - Coverage phase crash on `pattern` quantifiers too large to generate (e.g. `[a-z]{100000}`).
 - Coverage phase under `--max-time` dropping already generated cases once generation used up the operation's time.
+- Missing large coverage-phase arrays of strings with `minLength` and a `\p{L}` or `(?!...)` `pattern`.
 - Skip reason "No examples in schema" shown for operations the coverage phase skipped.
 - `st replay` reporting "operation not found in schema" for every GraphQL failure.
 - Unsorted expected statuses in `missing_required_header` failure messages.
