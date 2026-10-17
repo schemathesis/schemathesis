@@ -83,6 +83,7 @@
 - Format values generated under another operation's `codec`, `allow-x00` or `exclude-header-characters` settings.
 - Crash or lone surrogates in generated strings when `generation.codec` is `None`.
 - `RecursionError` on objects whose `additionalProperties` references the object itself.
+- `readOnly` request body fields sent when declared via `$ref`, `allOf` or an untyped parent.
 
 #### Checks
 

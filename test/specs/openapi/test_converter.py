@@ -496,7 +496,7 @@ def test_legacy_exclusive_flag_without_bound_dropped_on_openapi_3_1(ctx):
     ],
 )
 def test_rewrite_read_only(schema, expected):
-    rewrite_properties(schema, is_read_only)
+    rewrite_properties(schema, lambda subschema: is_read_only(subschema, None))
     assert schema == expected
 
 
