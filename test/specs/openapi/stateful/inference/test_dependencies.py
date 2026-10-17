@@ -10011,3 +10011,58 @@ def test_path_param_binds_to_identifier_field_of_matching_type(ctx, parameter, p
             },
         ]
     ]
+
+
+STATUS_RANK = {"type": "object", "properties": {"rank": {"type": "integer"}}}
+STATUS_WITH_ID = {"type": "object", "properties": {"id": {"type": "string"}, "rank": {"type": "integer"}}}
+TEAMS_TO_TEAM = [
+    "#/paths/~1teams/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1teams~1{team_id}/get",
+        "parameters": {"path.team_id": "$response.body#/*/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+STATUSES_TO_TEAM = [
+    "#/paths/~1events~1{event_id}~1teams~1statuses/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1teams~1{team_id}/get",
+        "parameters": {"path.team_id": "$response.body#/*/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(STATUS_RANK, [TEAMS_TO_TEAM]), (STATUS_WITH_ID, [TEAMS_TO_TEAM, STATUSES_TO_TEAM])],
+    ids=["without-key", "with-key"],
+)
+@pytest.mark.parametrize(
+    ("wrap", "extra_schemas"),
+    [
+        (lambda status: status, lambda status: {}),
+        (lambda status: component_ref("Status"), lambda status: {"Status": status}),
+    ],
+    ids=["inline", "reference"],
+)
+def test_map_values_supply_only_the_fields_they_declare(ctx, status, expected, wrap, extra_schemas):
+    # Statuses are keyed by team id; a status points at its team only when it declares `id` itself.
+    team = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+    paths = {
+        **operation("get", "/teams", "200", {"type": "array", "items": component_ref("Team")}),
+        **operation(
+            "get",
+            "/events/{event_id}/teams/statuses",
+            "200",
+            {"type": "object", "additionalProperties": wrap(status)},
+            [path_param("event_id")],
+        ),
+        **operation("get", "/teams/{team_id}", "200", component_ref("Team"), [path_param("team_id")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Team": team, **extra_schemas(status)}})
+
+    assert inferred_links(graph) == expected

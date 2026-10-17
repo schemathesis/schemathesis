@@ -34,6 +34,7 @@
 
 ### :bug: Fixed
 
+- Inferred links reading fields that values of map-shaped responses do not declare.
 - Pick the same captured resource ids for nested-resource paths in otherwise identical runs.
 - Stateful phase crashing on path parameter names with characters such as `-`.
 - Respect `--max-examples` and other explicit options when a hook loads a Hypothesis profile.
