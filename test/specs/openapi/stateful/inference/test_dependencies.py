@@ -10066,3 +10066,72 @@ def test_map_values_supply_only_the_fields_they_declare(ctx, status, expected, w
     _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Team": team, **extra_schemas(status)}})
 
     assert inferred_links(graph) == expected
+
+
+ORDER = {"type": "object", "properties": {"id": {"type": "integer"}, "total": {"type": "number"}}}
+CUSTOMER = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+
+
+@pytest.mark.parametrize(
+    ("paginated", "pointer"),
+    [(False, "/*/id"), (True, "/results/*/id")],
+    ids=["plain", "paginated"],
+)
+def test_primary_key_path_param_links_its_own_listing_to_read(ctx, paginated, pointer):
+    # `{order_pk}` names orders, so the customers listing next to it must not fill it.
+    def listing(name):
+        items = {"type": "array", "items": component_ref(name)}
+        return (
+            {"type": "object", "properties": {"count": {"type": "integer"}, "results": items}} if paginated else items
+        )
+
+    paths = {
+        **operation("get", "/stores/{store_id}/orders", "200", listing("Order"), [path_param("store_id")]),
+        **operation("get", "/stores/{store_id}/customers", "200", listing("Customer"), [path_param("store_id")]),
+        **operation(
+            "get",
+            "/stores/{store_id}/orders/{order_pk}",
+            "200",
+            component_ref("Order"),
+            [path_param("store_id"), path_param("order_pk", "integer")],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Order": ORDER, "Customer": CUSTOMER}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1stores~1{store_id}~1orders/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1stores~1{store_id}~1orders~1{order_pk}/get",
+                "parameters": {
+                    "path.order_pk": f"$response.body#{pointer}",
+                    "path.store_id": "$request.path.store_id",
+                },
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_primary_key_body_field_is_filled_from_its_resource(ctx):
+    body = {"type": "object", "properties": {"order_pk": {"type": "integer"}, "note": {"type": "string"}}}
+    paths = {
+        **operation("post", "/orders", "201", ORDER),
+        **operation_with_body("post", "/shipments", "201", body),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Order": ORDER}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1orders/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1shipments/post",
+                "requestBody": {"order_pk": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]

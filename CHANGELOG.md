@@ -34,6 +34,7 @@
 
 ### :bug: Fixed
 
+- Missing inferred links for Django-style `_pk` parameters and body fields (e.g. `{order_pk}`).
 - Inferred links reading fields that values of map-shaped responses do not declare.
 - Pick the same captured resource ids for nested-resource paths in otherwise identical runs.
 - Stateful phase crashing on path parameter names with characters such as `-`.

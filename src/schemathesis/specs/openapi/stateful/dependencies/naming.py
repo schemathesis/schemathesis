@@ -141,6 +141,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
         "_guid",
         "_uuid",
         "_id",
+        "_pk",
         "_slug",
         "_name",
         "_arn",
@@ -698,6 +699,9 @@ def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
 
     if parameter_name.endswith("_id") and len(parameter_name) > 3:
         return parameter_name[:-3], "_id"
+
+    if parameter_name.endswith("_pk") and len(parameter_name) > 3:
+        return parameter_name[:-3], "_pk"
 
     if parameter_name.endswith("_guid") and len(parameter_name) > 5:
         return parameter_name[:-5], "_guid"
