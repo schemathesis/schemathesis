@@ -27,6 +27,7 @@
 ### :racing_car: Performance
 
 - HTML report up to ~20% smaller on runs with many failures.
+- Coverage phase up to ~170x faster on operations with patterns that match no string.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
 - Faster coverage phase for large enums, wide objects, nested bodies and many headers.

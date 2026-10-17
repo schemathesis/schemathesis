@@ -69,6 +69,7 @@ from schemathesis.core.jsonschema.patterns import (
     matches_every_string,
     pattern_length_bounds,
     pattern_length_is_unreachable,
+    pattern_never_matches,
     pattern_requires_char_outside,
     pattern_requires_literal,
     pin_pattern_length,
@@ -1106,6 +1107,10 @@ class CoverageContext:
         if strategy is None:
             raise Unsatisfiable from None
         try:
+            # A pattern with no match at all - often one the length rewrite above produced - would only
+            # be found out after the whole generation budget.
+            if pattern_never_matches(pattern):
+                raise Unsatisfiable
             value = cached_draw(self.session, strategy)
         except Unsatisfiable:
             # Regex matches the format rejects starve the filter even where a conforming one

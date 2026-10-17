@@ -1811,3 +1811,134 @@ def pin_pattern_length(pattern: str, min_length: int | None, max_length: int | N
         return updated
     except (re.error, InternalError):
         return pattern
+
+
+@lru_cache(maxsize=256)
+def pattern_never_matches(pattern: str) -> bool:
+    """Whether no string fully matches the pattern under Python `re` with `re.ASCII`, judged by its shape alone.
+
+    Drawing from such a pattern spends the whole generation budget before giving up. Unknown constructs answer False.
+    """
+    try:
+        parsed = sre_parse.parse(pattern, re.ASCII)
+    except (re.error, RecursionError):
+        return False
+    # Flags change what anchors and classes match; only the default reading is analysed.
+    if parsed.state.flags & ~re.ASCII or _sets_flags(list(parsed)):
+        return False
+    return _nodes_never_match(list(parsed), 0, 0)
+
+
+def _sets_flags(nodes: list[_Node]) -> bool:
+    for op, value in nodes:
+        if op == sre.SUBPATTERN:
+            _, add_flags, del_flags, inner = value
+            if add_flags or del_flags or _sets_flags(list(inner)):
+                return True
+        elif op in REPEATS:
+            if _sets_flags(list(value[2])):
+                return True
+        elif op == sre.BRANCH:
+            if any(_sets_flags(list(alternative)) for alternative in value[1]):
+                return True
+        elif op in (sre.ASSERT, sre.ASSERT_NOT) and _sets_flags(list(value[1])):
+            return True
+    return False
+
+
+def _nodes_never_match(nodes: list[_Node], before: int, after: int) -> bool:
+    """Whether `nodes` match nothing when at least `before` characters precede them and `after` follow."""
+    widths = [_calculate_min_repetition_length([node]) for node in nodes]
+    total = sum(widths)
+    preceding = 0
+    for index, (op, value) in enumerate(nodes):
+        node_before = before + preceding
+        node_after = after + total - preceding - widths[index]
+        preceding += widths[index]
+        if op == sre.AT:
+            if value in (sre.AT_BEGINNING, sre.AT_BEGINNING_STRING) and node_before > 0:
+                return True
+            # `$` also matches before a final newline, so one trailing character can still follow it.
+            if (value == sre.AT_END_STRING and node_after > 0) or (value == sre.AT_END and node_after > 1):
+                return True
+        elif op == sre.SUBPATTERN:
+            if _nodes_never_match(list(value[3]), node_before, node_after):
+                return True
+        elif op in REPEATS:
+            if value[0] >= 1 and _nodes_never_match(list(value[2]), node_before, node_after):
+                return True
+        elif op == sre.BRANCH:
+            if all(_nodes_never_match(list(alternative), node_before, node_after) for alternative in value[1]):
+                return True
+        elif op == sre.ASSERT and value[0] == 1:
+            lookahead = list(value[1])
+            # What follows the lookahead in the pattern is unknown here, so nothing is assumed after it.
+            if _nodes_never_match(lookahead, node_before, 0):
+                return True
+            # The lookahead and the rest of the pattern both start at this position, so they share a first character.
+            required = _first_char(lookahead)
+            following = _first_char(nodes[index + 1 :])
+            if (
+                required is not None
+                and following is not None
+                and following[0] == LITERAL
+                and _admits_char(required, following[1]) is False
+            ):
+                return True
+    return False
+
+
+def _first_char(nodes: list[_Node]) -> _Node | None:
+    """The single-character node every match of `nodes` starts with, or `None` when it is not one node."""
+    for op, value in nodes:
+        if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
+            return (op, value)
+        if op in (sre.AT, sre.ASSERT, sre.ASSERT_NOT):
+            continue
+        if op == sre.SUBPATTERN:
+            inner = list(value[3])
+        elif op in REPEATS and value[0] >= 1:
+            inner = list(value[2])
+        else:
+            return None
+        if _calculate_max_repetition_length(inner) == 0:
+            continue
+        if _calculate_min_repetition_length(inner) == 0:
+            return None
+        return _first_char(inner)
+    return None
+
+
+_CATEGORY_PATTERNS = {
+    sre.CATEGORY_DIGIT: re.compile(r"\d", re.ASCII),
+    sre.CATEGORY_NOT_DIGIT: re.compile(r"\D", re.ASCII),
+    sre.CATEGORY_SPACE: re.compile(r"\s", re.ASCII),
+    sre.CATEGORY_NOT_SPACE: re.compile(r"\S", re.ASCII),
+    sre.CATEGORY_WORD: re.compile(r"\w", re.ASCII),
+    sre.CATEGORY_NOT_WORD: re.compile(r"\W", re.ASCII),
+}
+
+
+def _admits_char(node: _Node, code: int) -> bool | None:
+    """Whether the single-character node matches `code`, or `None` when that is not known."""
+    op, value = node
+    if op == LITERAL:
+        return value == code
+    if op == NOT_LITERAL:
+        return value != code
+    if op == sre.ANY:
+        return code != ord("\n")
+    items = list(value)
+    negated = bool(items) and items[0][0] == sre.NEGATE
+    for item_op, item_value in items[1:] if negated else items:
+        if item_op == LITERAL:
+            hit = item_value == code
+        elif item_op == sre.RANGE:
+            hit = item_value[0] <= code <= item_value[1]
+        elif item_op == sre.CATEGORY and item_value in _CATEGORY_PATTERNS:
+            hit = _CATEGORY_PATTERNS[item_value].fullmatch(chr(code)) is not None
+        else:
+            return None
+        if hit:
+            return not negated
+    return negated

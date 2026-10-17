@@ -27,6 +27,7 @@ from schemathesis.core.jsonschema.patterns import (
     normalize_regex,
     pattern_length_bounds,
     pattern_length_is_unreachable,
+    pattern_never_matches,
     pattern_requires_char_outside,
     pattern_requires_literal,
     pin_pattern_length,
@@ -470,6 +471,46 @@ SECRET_REFERENCE = r"(^arn:aws([a-z]|\-)*:secretsmanager:[a-z0-9-.]+:.*)|(\$(\.[
 )
 def test_pattern_length_is_unreachable(pattern, min_length, max_length, expected):
     assert pattern_length_is_unreachable(pattern, min_length, max_length) is expected
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        (r"(^arn:aws:s3:::)([a-zA-Z0-9_\-]{1}$).{1010}", True),
+        (r"^arn:aws:ec2:placement-group/^.{1,255}$", True),
+        (r"a\Zb", True),
+        (r"(ab|cd)^x", True),
+        (r"(a^|b^)x", True),
+        (r"^arn:(?=[^:]{1,}:fsx:)(():){4}.{5}$", True),
+        (r"(?=a)b", True),
+        (r"(?=\d)x", True),
+        (r"(?=[a-c])d", True),
+        (r"^[a-z]+$", False),
+        (r".*(^arn:aws:s3:::)([a-zA-Z0-9_-]+$).*", False),
+        (r"a$\n", False),
+        (r"(a|^)b", False),
+        (r"(?=[^:]{1,}:fsx:)x", False),
+        (r"(?=\D)x", False),
+        (r"(?=a|b)b", False),
+        (r"(?=a)a", False),
+        (r"(?i)(?=a)A", False),
+        (r"(?m)a^b", False),
+        (r"(?m:a$\n\nb)", False),
+        (r"a*^b", False),
+        (r"(?<=a)^b", False),
+    ],
+)
+def test_pattern_never_matches(pattern, expected):
+    assert pattern_never_matches(pattern) is expected
+
+
+@given(st.data())
+# Most drawn patterns have no match Hypothesis can find and get filtered out, so the count carries the few that do.
+@settings(suppress_health_check=list(HealthCheck), max_examples=200, deadline=None)
+def test_pattern_never_matches_spares_patterns_with_a_match(data):
+    pattern = data.draw(st.text(alphabet="ab^$()|?*+.:\\AZ=!\n", min_size=1).filter(is_valid_regex))
+    data.draw(st.from_regex(re.compile(pattern, re.ASCII), fullmatch=True))
+    assert not pattern_never_matches(pattern)
 
 
 PIN_CASES = [
