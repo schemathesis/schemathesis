@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 import threading
 
 import pytest
@@ -2357,3 +2361,44 @@ def test_pool_draw_names_the_identity_that_produced_the_resource(user_schema_bui
     picked = data_source.pick_correlated_values(operation=schema["/users/{user_id}"]["GET"])
 
     assert [draw.source_identity for draw in picked.draws] == ["alice"]
+
+
+CORRELATED_PICKS_SCRIPT = """
+import json, sys
+import schemathesis
+schema = schemathesis.openapi.from_dict(json.load(sys.stdin))
+data_source = schema.create_extra_data_source()
+post = schema["/accounts/{accountId}/templates/{templateId}"]["POST"]
+get = schema["/accounts/{accountId}/templates/{templateId}"]["GET"]
+for account, template in [("a1", "t1"), ("a1", "t2"), ("a2", "t1")]:
+    case = post.Case(path_parameters={"accountId": account, "templateId": template})
+    data_source.record_request(operation=post, case=case, status_code=201)
+print(json.dumps([list(data_source.pick_correlated_values(operation=get).values.values()) for _ in range(4)]))
+"""
+
+
+def test_correlated_picks_identical_across_hash_seeds(ctx):
+    parameters = [
+        {"name": name, "in": "path", "required": True, "schema": {"type": "string"}}
+        for name in ("accountId", "templateId")
+    ]
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/accounts/{accountId}/templates/{templateId}": {
+                "post": {"parameters": parameters, "responses": {"201": {"description": "Created"}}},
+                "get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}},
+            }
+        }
+    )
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", CORRELATED_PICKS_SCRIPT],
+            input=json.dumps(raw_schema),
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+        ).stdout
+        for seed in range(8)
+    }
+    assert [json.loads(output) for output in outputs] == [[["a1", "t1"], ["a2", "t1"], ["a1", "t1"], ["a1", "t2"]]]

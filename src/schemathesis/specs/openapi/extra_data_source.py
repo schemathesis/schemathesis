@@ -472,7 +472,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
     def _collect_object_variants(self, slots: list[_VariantSlot], location: ParameterLocation) -> list[CapturedVariant]:
         """Collect complete value sets that preserve relationships between properties."""
-        resource_names = {slot.requirement.resource_name for slot in slots}
+        resource_names = dict.fromkeys(slot.requirement.resource_name for slot in slots)
 
         variants: list[CapturedVariant] = []
         seen: set[str] = set()
@@ -629,7 +629,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not slots:
             return PoolPick()
 
-        resource_names = {slot.resource.name for slot in slots}
+        resource_names = dict.fromkeys(slot.resource.name for slot in slots)
         # Each "satisfying" entry records the seed instance and per-slot (instance, value) so
         # provenance stays attached even when context-only fields come from a different parent.
         satisfying: list[
