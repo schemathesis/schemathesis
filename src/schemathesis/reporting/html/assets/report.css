@@ -126,7 +126,7 @@ a:hover{color:#fff}
 .tl-span{position:absolute;top:5px;bottom:5px;min-width:2px;background:var(--color-text-muted);border-radius:2px;outline:1px solid var(--color-background)}
 .tl-mark{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--color-brand-danger)}
 .tl-mark::before{content:"";position:absolute;inset:0 -11px}
-.tl-mark:hover,.tl-mark:focus-visible{width:4px;margin-left:-2px;background:var(--color-text-primary);z-index:2}
+.tl-mark:hover,.tl-mark:focus-visible{width:4px;margin-left:-2px;background:var(--color-text-primary);z-index:6}
 .tl-mark:focus-visible{outline:2px solid var(--color-text-primary);outline-offset:2px}
 .tl-count{position:absolute;top:-3px;left:4px;padding:0 3px;font:600 9px/1.4 var(--font-family-monospace);color:var(--color-background);background:var(--color-brand-danger);border-radius:3px;pointer-events:none}
 .tl-q-short{display:none}
