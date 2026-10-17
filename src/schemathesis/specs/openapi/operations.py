@@ -413,6 +413,7 @@ class OperationLoader:
             resolver=schema.root_resolver if resolver is None else resolver,
             scope=scope,
             adapter=schema.adapter,
+            cache=schema.response_schema_cache,
         )
 
     def _parse_security(self, definition: OperationObject) -> OpenApiSecurityParameters:

@@ -346,7 +346,9 @@ def _unshare_responses(schema: OpenApiSchema) -> None:
     for entry in entries:
         raw_responses = entry.definition.get("responses", {})
         try:
-            responses = OpenApiResponses.from_definition(raw_responses, entry.resolver, entry.scope, schema.adapter)
+            responses = OpenApiResponses.from_definition(
+                raw_responses, entry.resolver, entry.scope, schema.adapter, schema.response_schema_cache
+            )
         except (InvalidSchema, RefResolutionError):
             continue
         # Resolving already rejected anything but an object
