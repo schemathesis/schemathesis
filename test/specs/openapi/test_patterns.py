@@ -6,7 +6,7 @@ from itertools import product
 import jsonschema_rs
 import pytest
 from flask import jsonify
-from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import HealthCheck, assume, example, given, settings
 from hypothesis import strategies as st
 
 try:
@@ -488,6 +488,12 @@ PIN_CASES = [
     (SPLIT_UUID, 47),
 ]
 
+IOTTWINMAKER_ARN = r".*(^arn:((aws)|(aws-cn)|(aws-us-gov)):s3:::)([a-zA-Z0-9_-]+$).*"
+FSX_ARN = (
+    r"^arn:(?=[^:]+:fsx:[^:]+:\d{12}:)((|(?=[a-z0-9-.]{1,63})(?!\d{1,3}(\.\d{1,3}){3})"
+    r"(?![^:]*-{2})(?![^:]*-\.)(?![^:]*\.-)[a-z0-9].*(?<!-)):){4}(?!/).{0,1024}$"
+)
+
 
 @pytest.mark.parametrize(("pattern", "length"), PIN_CASES)
 def test_pin_pattern_length(pattern, length):
@@ -539,6 +545,15 @@ def test_pin_pattern_length_leaves_possessive_repeats_alone():
     # A possessive run keeps what it took, so a count the following part could otherwise share
     # would let strings through that the pattern turns down.
     assert pin_pattern_length("^[a-z]++[a-z]$", 5, 5) == "^[a-z]++[a-z]$"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "length"),
+    [(IOTTWINMAKER_ARN, 1024), (FSX_ARN, 8), (FSX_ARN, 512)],
+    ids=["anchors", "lookarounds-minimum", "lookarounds-maximum"],
+)
+def test_pin_pattern_length_declines_when_zero_width_checks_reject_the_pinned_shape(pattern, length):
+    assert pin_pattern_length(pattern, length, length) == pattern
 
 
 @pytest.mark.parametrize(
@@ -1535,9 +1550,25 @@ BRUTE_FORCE_PATTERNS = [
     r"^(?:(?:ab|abab)+|(?:ba|baba)+)$",
     r"^(?:b|(a)\1)$",
     r"^(?>a+)*$",
+    r"a*(^ab)(b+$)a*",
+    r"^a(?=b)(|b)a+$",
 ]
 BRUTE_FORCE_ALPHABET = "ab"
 BRUTE_FORCE_MAX_LENGTH = 9
+
+SMALL_REGEX_BODIES = st.recursive(
+    st.sampled_from(("a", "b", "[ab]", ".", "(?=a)", "(?=b)", "(?!a)", "^", "$", r"\b")),
+    lambda children: st.one_of(
+        children.map(lambda child: f"(?:{child})"),
+        st.tuples(children, children).map(lambda parts: "".join(parts)),
+        st.tuples(children, children).map(lambda parts: f"(?:{parts[0]}|{parts[1]})"),
+        st.tuples(children, st.sampled_from(("*", "+", "?", "{1,2}"))).map(lambda parts: f"(?:{parts[0]}){parts[1]}"),
+    ),
+    max_leaves=5,
+)
+SMALL_REGEX_PATTERNS = st.tuples(st.sampled_from(("", "^")), SMALL_REGEX_BODIES, st.sampled_from(("", "$", r"\Z"))).map(
+    lambda parts: "".join(parts)
+)
 
 
 def _strings_of_length(length):
@@ -1572,6 +1603,27 @@ def test_pinned_pattern_admits_only_original_matches_of_the_pinned_length(patter
         for text in admitted:
             assert len(text) == length, (pattern, length, text)
             assert original.fullmatch(text), (pattern, length, text)
+
+
+@example(pattern=r"^a(?=b)(|b)a+$", length=2)
+@example(pattern=r"(?:(?=a))+", length=0)
+@example(pattern=r"a(?:^)+", length=1)
+@example(pattern=r"(?:(?!b))+.", length=1)
+@settings(max_examples=50, suppress_health_check=list(HealthCheck), deadline=None)
+@given(pattern=SMALL_REGEX_PATTERNS, length=st.integers(min_value=0, max_value=8))
+def test_pinned_generated_pattern_is_a_non_empty_subset(pattern, length):
+    pinned = pin_pattern_length(pattern, length, length)
+    if pinned == pattern:
+        return
+    admitted = {
+        text
+        for size in range(BRUTE_FORCE_MAX_LENGTH + 1)
+        for text in _strings_of_length(size)
+        if re.fullmatch(pinned, text)
+    }
+    assert admitted, (pattern, length, pinned)
+    assert {len(text) for text in admitted} == {length}
+    assert all(re.fullmatch(pattern, text) for text in admitted)
 
 
 @pytest.mark.parametrize("pattern", BRUTE_FORCE_PATTERNS)

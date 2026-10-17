@@ -31,6 +31,7 @@
 - Coverage phase up to ~5x faster on UUID and date fields that also declare a matching `pattern`.
 - Coverage phase up to ~40% faster on schemas with patterns the regex engine rejects.
 - Coverage phase up to ~18% faster on operations with many negative cases.
+- Coverage phase up to ~18x faster on length-bounded strings whose `pattern` has anchors or lookarounds.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
 - HTML report up to ~20% smaller on runs with many failures.
