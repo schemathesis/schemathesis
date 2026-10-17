@@ -74,7 +74,8 @@ class JunitXmlWriter:
                 )
                 for idx, group in enumerate(failures, 1)
             ]
-            test_case.failures.append(_RecordedOutcome("\n\n".join(messages)))
+            codes = ", ".join(sorted({failure.code for group in failures for failure in group.failures}))
+            test_case.failures.append(_RecordedOutcome("\n\n".join(messages), message=codes))
         elif skip_reason is not None:
             test_case.skipped.append(_RecordedOutcome(skip_reason))
 

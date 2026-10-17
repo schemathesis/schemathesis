@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 class UndefinedStatusCode(Failure):
     """Response has a status code that is not defined in the schema."""
 
+    code = "ST103"
+
     __slots__ = (
         "operation",
         "status_code",
@@ -58,6 +60,8 @@ class UndefinedStatusCode(Failure):
 class MissingHeaders(Failure):
     """Some required headers are missing."""
 
+    code = "ST107"
+
     __slots__ = ("operation", "missing_headers", "message", "title", "case_id", "severity")
 
     def __init__(
@@ -83,6 +87,8 @@ class MissingHeaders(Failure):
 
 class JsonSchemaError(Failure):
     """Additional information about JSON Schema validation errors."""
+
+    code = "ST108"
 
     __slots__ = (
         "operation",
@@ -211,6 +217,8 @@ def _shorten_instance(message: str, instance: JsonValue, config: OutputConfig) -
 class MissingContentType(Failure):
     """Content type header is missing."""
 
+    code = "ST104"
+
     __slots__ = ("operation", "media_types", "message", "title", "case_id", "severity")
 
     def __init__(
@@ -237,6 +245,8 @@ class MissingContentType(Failure):
 class MalformedMediaType(Failure):
     """Media type name is malformed."""
 
+    code = "ST106"
+
     __slots__ = ("operation", "actual", "defined", "message", "title", "case_id", "severity")
 
     def __init__(
@@ -262,8 +272,44 @@ class MalformedMediaType(Failure):
         return self.actual
 
 
+class ContentDeserializationError(Failure):
+    """Response body cannot be deserialized as its documented media type."""
+
+    code = "ST110"
+
+    __slots__ = ()
+
+    def __init__(self, *, operation: str, message: str, case_id: str | None = None) -> None:
+        super().__init__(operation=operation, title="Content deserialization error", message=message, case_id=case_id)
+
+    @property
+    def _unique_key(self) -> str:
+        # One finding per operation, whatever the parse error.
+        return ""
+
+
+class DiscriminatorMismatch(Failure):
+    """Response discriminator value matches no schema the discriminator maps to."""
+
+    code = "ST111"
+
+    __slots__ = ()
+
+    def __init__(self, *, operation: str, message: str, case_id: str | None = None) -> None:
+        super().__init__(
+            operation=operation, title="Discriminator value not in schema mapping", message=message, case_id=case_id
+        )
+
+    @property
+    def _unique_key(self) -> str:
+        # One finding per operation, whatever the value.
+        return ""
+
+
 class UndefinedContentType(Failure):
     """Response has Content-Type that is not documented in the schema."""
+
+    code = "ST105"
 
     __slots__ = (
         "operation",
@@ -301,6 +347,8 @@ class UndefinedContentType(Failure):
 class UseAfterFree(Failure):
     """Resource was used after a successful DELETE operation on it."""
 
+    code = "ST301"
+
     __slots__ = ("operation", "message", "free", "usage", "deleted_case_id", "title", "case_id", "severity")
 
     def __init__(
@@ -336,6 +384,8 @@ class UseAfterFree(Failure):
 class EnsureResourceAvailability(Failure):
     """Resource is not available immediately after creation."""
 
+    code = "ST302"
+
     __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "case_id", "severity")
 
     def __init__(
@@ -370,6 +420,8 @@ class AuthScenario(enum.StrEnum):
 class IgnoredAuth(Failure):
     """The API operation does not check the specified authentication."""
 
+    code = "ST401"
+
     __slots__ = ("operation", "message", "scenario", "title", "case_id", "severity")
 
     def __init__(
@@ -396,6 +448,8 @@ class IgnoredAuth(Failure):
 
 class ObjectLevelAuthorizationViolation(Failure):
     """One identity received an object that another identity created."""
+
+    code = "ST402"
 
     __slots__ = ("operation", "message", "owner", "peer", "owner_case_id", "title", "case_id", "severity")
     # Rerunning as the peer alone does not recreate the owner's object.
@@ -435,6 +489,8 @@ class ObjectLevelAuthorizationViolation(Failure):
 class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""
 
+    code = "ST202"
+
     __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
 
     def __init__(
@@ -462,6 +518,8 @@ class RejectedPositiveData(Failure):
 
 class MissingHeaderNotRejected(Failure):
     """API did not reject request without required header."""
+
+    code = "ST203"
 
     __slots__ = (
         "operation",
@@ -501,6 +559,8 @@ class MissingHeaderNotRejected(Failure):
 
 class UnsupportedMethodResponse(Failure):
     """API response for unsupported HTTP method is incorrect."""
+
+    code = "ST204"
 
     __slots__ = (
         "operation",
@@ -543,6 +603,8 @@ class UnsupportedMethodResponse(Failure):
 
 class AllowHeaderMismatch(Failure):
     """`Allow` header does not list the same methods as the schema."""
+
+    code = "ST205"
 
     __slots__ = (
         "operation",

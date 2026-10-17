@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 class UnexpectedGraphQLResponse(Failure):
     """GraphQL response is not a JSON object."""
 
+    code = "ST115"
+
     __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
 
     def __init__(
@@ -36,6 +38,8 @@ class UnexpectedGraphQLResponse(Failure):
 
 class GraphQLClientError(Failure):
     """GraphQL query has not been executed."""
+
+    code = "ST206"
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -66,6 +70,8 @@ class GraphQLClientError(Failure):
 class GraphQLServerError(Failure):
     """GraphQL response indicates at least one server error."""
 
+    code = "ST113"
+
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
     def __init__(
@@ -94,6 +100,8 @@ class GraphQLServerError(Failure):
 
 class GraphQLSchemaViolation(Failure):
     """GraphQL response contradicts the schema the server publishes."""
+
+    code = "ST114"
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
