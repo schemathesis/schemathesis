@@ -1,8 +1,16 @@
+import re
+import tomllib
+from pathlib import Path
+
 import pytest
 
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.explain.explanations import EXPLANATIONS
+from schemathesis.config import SchemathesisConfig
 from schemathesis.failure_codes import FAILURE_CLASSES
+from scripts.failure_docs import generate_docs_page
+
+DOCS = Path(__file__).parent.parent.parent / "docs"
 
 
 def test_every_code_has_an_explanation():
@@ -41,3 +49,26 @@ def test_explain_accepts_code_aliases(cli, argument):
 )
 def test_explain_output(cli, snapshot_cli, args, columns):
     assert cli.main("explain", *args, env={"COLUMNS": columns} if columns else None) == snapshot_cli
+
+
+def test_docs_page_is_up_to_date():
+    # Regenerate with `python -m scripts.failure_docs > docs/reference/failures.md`.
+    assert (DOCS / "reference" / "failures.md").read_text(encoding="utf-8") == generate_docs_page()
+
+
+def test_docs_page_config_snippets_are_valid():
+    snippets = re.findall(r"```toml\n(.*?)```", generate_docs_page(), re.DOTALL)
+    assert snippets
+    for snippet in snippets:
+        SchemathesisConfig.from_dict(tomllib.loads(snippet))
+
+
+def test_links_to_failure_codes_resolve():
+    anchors = set(re.findall(r"\{#(st\d{3})\}", generate_docs_page()))
+    linked = {
+        anchor
+        for path in DOCS.rglob("*.md")
+        for anchor in re.findall(r"failures\.md#(st\d{3})", path.read_text(encoding="utf-8"))
+    }
+    assert linked
+    assert linked <= anchors

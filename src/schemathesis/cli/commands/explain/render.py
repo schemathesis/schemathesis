@@ -56,21 +56,31 @@ def render_page(code: str, *, width: int, color: bool) -> str:
         lines += ["", *scenario]
     if explanation.notes:
         lines += ["", *_reflow(explanation.notes, prose_width, style=style)]
-    block = _verbatim(explanation.block)
-    if block:
-        lines += ["", CONFIG_FILE_LINE, *block]
-    if explanation.tuning is not None:
-        name, status = explanation.tuning
-        defaults = ChecksConfig().get_by_name(name=name)
-        assert isinstance(defaults, CheckConfig), name
-        statuses = [*defaults.expected_statuses, status]
-        lines += ["", CONFIG_FILE_LINE, "  [[operations]]", f'  include-name = "{_operation_example(code)}"']
-        lines += _toml_list(f"checks.{name}.expected-statuses", statuses, width)
-    lines += ["", *_reflow(_turn_off(code, checks), prose_width, style=style)]
+    snippet = config_snippet(code, width=width - 2)
+    if snippet:
+        lines += ["", *(f"  {line}" for line in snippet)]
+    lines += ["", *_reflow(turn_off_text(code), prose_width, style=style)]
     return "\n".join(lines)
 
 
-def _turn_off(code: str, checks: tuple[str, ...]) -> str:
+def config_snippet(code: str, *, width: int) -> list[str]:
+    """The `schemathesis.toml` lines a page shows, or nothing when the code has none."""
+    explanation = EXPLANATIONS[code]
+    block = textwrap.dedent(explanation.block).strip("\n")
+    if block:
+        return ["# schemathesis.toml", *block.splitlines()]
+    if explanation.tuning is None:
+        return []
+    name, status = explanation.tuning
+    defaults = ChecksConfig().get_by_name(name=name)
+    assert isinstance(defaults, CheckConfig), name
+    statuses = [*defaults.expected_statuses, status]
+    lines = ["# schemathesis.toml", "[[operations]]", f'include-name = "{_operation_example(code)}"']
+    return lines + _toml_list(f"checks.{name}.expected-statuses", statuses, width)
+
+
+def turn_off_text(code: str) -> str:
+    checks = _failure_class(code).checks
     flag = f"`--exclude-checks {','.join(checks) or '<name>'}` turns it off"
     hidden = _hidden_with(code, checks)
     return f"{flag}, along with {', '.join(hidden)}." if hidden else f"{flag}."
@@ -79,9 +89,6 @@ def _turn_off(code: str, checks: tuple[str, ...]) -> str:
 def _reflow(text: str, width: int, *, style: Styler) -> list[str]:
     wrapped = textwrap.wrap(" ".join(text.split()), width=width, break_long_words=False, break_on_hyphens=False)
     return style.prose_lines(wrapped)
-
-
-CONFIG_FILE_LINE = "  # schemathesis.toml"
 
 
 def _verbatim(text: str) -> list[str]:
@@ -100,11 +107,11 @@ def _operation_example(code: str) -> str:
 
 def _toml_list(key: str, values: list[str], width: int) -> list[str]:
     items = ", ".join(f'"{value}"' for value in values)
-    line = f"  {key} = [{items}]"
+    line = f"{key} = [{items}]"
     if len(line) <= width:
         return [line]
-    wrapped = textwrap.wrap(items + ",", width=width - 4, break_on_hyphens=False)
-    return [f"  {key} = [", *(f"    {part}" for part in wrapped), "  ]"]
+    wrapped = textwrap.wrap(items + ",", width=width - 2, break_on_hyphens=False)
+    return [f"{key} = [", *(f"  {part}" for part in wrapped), "]"]
 
 
 def _hidden_with(code: str, checks: tuple[str, ...]) -> list[str]:
