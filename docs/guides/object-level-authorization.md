@@ -44,7 +44,7 @@ Each operation runs as the identity Schemathesis [picks for it](auth.md#web-fuzz
 ## Reading a failure
 
 ```text
-- Object-level authorization bypass
+- ST402 Object-level authorization bypass
 
     `bob` received the `Order` that `alice` owns
 

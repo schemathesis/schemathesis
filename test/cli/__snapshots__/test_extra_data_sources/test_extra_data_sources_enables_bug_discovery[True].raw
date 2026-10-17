@@ -24,7 +24,7 @@ Schemathesis dev
 _______________________________ GET /items/{id} ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "name" is a required property
 
@@ -77,7 +77,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Response violates schema: 1
+  ❌ ST108 Response violates schema: 1
+
+For more information, run `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

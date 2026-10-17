@@ -11,7 +11,7 @@
 - Stateful links inferred into fields of top-level array request body items.
 - `#regex:` extractor for `$response.body#/pointer` link expressions.
 - Error feedback constrains request body fields declared in every `allOf`/`oneOf`/`anyOf` branch.
-- Stable failure codes (`ST101`, ...) in NDJSON, JSON and JUnit reports.
+- Stable failure codes (`ST101`, ...) in run output and NDJSON, JSON and JUnit reports.
 - `st explain <code>` describes a failure, how to fix it and how to turn it off.
 - `--report pytest` writes failures as standalone pytest tests. [#2999](https://github.com/schemathesis/schemathesis/issues/2999)
 - HTML report filters by path, failure kind and method.

@@ -26,7 +26,7 @@ Schemathesis dev
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- GraphQL server error
+- ST113 GraphQL server error
 
     planted: archive-product-by-real-slug
 
@@ -53,7 +53,9 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ GraphQL server error: 1
+  ❌ ST113 GraphQL server error: 1
+
+For more information, run `st explain ST113`.
 
 Test cases:
   N generated, N found N unique failures

@@ -23,7 +23,7 @@ Schemathesis dev
 ______________________________ Mutation.moveIssue ______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- GraphQL server error
+- ST113 GraphQL server error
 
     planted: move-issue-to-real-project
 
@@ -50,7 +50,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ GraphQL server error: 1
+  ❌ ST113 GraphQL server error: 1
+
+For more information, run `st explain ST113`.
 
 Test cases:
   N generated, N found N unique failures

@@ -24,7 +24,7 @@ Schemathesis dev
 __________________________________ GET /data ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 404
     Documented: 200
@@ -58,7 +58,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented status code: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain ST103`.
 
 Warnings:
   ⚠️ Unused OpenAPI auth: 1 configured auth scheme not used in the schema

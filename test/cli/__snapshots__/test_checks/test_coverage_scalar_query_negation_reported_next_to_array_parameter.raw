@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ GET /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Schema-violating request accepted
+- ST201 Schema-violating request accepted
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
@@ -52,7 +52,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Schema-violating request accepted: 1
+  ❌ ST201 Schema-violating request accepted: 1
+
+For more information, run `st explain ST201`.
 
 Test cases:
   N generated, N found N unique failures

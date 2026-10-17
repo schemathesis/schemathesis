@@ -44,7 +44,7 @@ Need more help?
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -79,7 +79,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Server error: 1
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
 
 Errors:
   🚫 Schema Error: 1

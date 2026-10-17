@@ -23,7 +23,7 @@ Schemathesis dev
 _______________________________ Query.authorName _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Null in non-nullable GraphQL field
+- ST114 Null in non-nullable GraphQL field
 
     Cannot return null for non-nullable field Query.authorName.
 
@@ -50,7 +50,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Null in non-nullable GraphQL field: 1
+  ❌ ST114 Null in non-nullable GraphQL field: 1
+
+For more information, run `st explain ST114`.
 
 Test cases:
   N generated, N found N unique failures

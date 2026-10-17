@@ -176,7 +176,7 @@ def test_binary_response(ctx, cli, app_runner, tmp_path):
     assert testcases[0][0].attrib["type"] == "failure"
     assert (
         extract_message(testcases[0][0], base_url.removeprefix("http://"))
-        == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:      curl -X GET http://localhost/api/binary"
+        == "1. Test Case ID: <PLACEHOLDER>  - ST101 Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:      curl -X GET http://localhost/api/binary"
     )
 
 
@@ -203,7 +203,7 @@ def test_bad_charset_response(ctx, cli, app_runner, tmp_path, charset):
     assert testcases[0][0].tag == "failure"
     assert (
         extract_message(testcases[0][0], base_url.removeprefix("http://"))
-        == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      `boom`  Reproduce with:      curl -X GET http://localhost/api/boom"
+        == "1. Test Case ID: <PLACEHOLDER>  - ST101 Server error  [500] Internal Server Error:      `boom`  Reproduce with:      curl -X GET http://localhost/api/boom"
     )
 
 
@@ -225,7 +225,7 @@ def test_control_characters_in_failure_message(ctx, cli, app_runner, tmp_path):
     testcase = ElementTree.parse(xml_path).getroot()[0][0]
     assert (
         extract_message(testcase[0], base_url.removeprefix("http://"))
-        == r"1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      `bad token \x12\x00\ufffe in body`  Reproduce with:      curl -X GET http://localhost/api/boom"
+        == r"1. Test Case ID: <PLACEHOLDER>  - ST101 Server error  [500] Internal Server Error:      `bad token \x12\x00\ufffe in body`  Reproduce with:      curl -X GET http://localhost/api/boom"
     )
 
 
@@ -389,10 +389,10 @@ def test_after_run_failures_in_reports_are_sorted_and_deduplicated(
     )
     testcases_by_name = {testcase.attrib["name"]: testcase for testcase in ElementTree.parse(xml_path).getroot()[0]}
     assert testcases_by_name["Run checks"][0].text == (
-        "\n- dup\n\n    aaa duplicated\n\n- Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
+        "\n- ST901 dup\n\n    aaa duplicated\n\n- ST901 Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
     )
     results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
     [run_checks] = [result for result in results if result["name"] == "Run checks"]
     assert [step["statusDetails"]["message"] for step in run_checks["steps"]] == [
-        "- dup\n\n    aaa duplicated\n\n- Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
+        "- ST901 dup\n\n    aaa duplicated\n\n- ST901 Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
     ]

@@ -27,7 +27,7 @@ Schemathesis dev
 ____________________________ POST /api/v1/airports _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -52,7 +52,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error: 1
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
 
 Test cases:
   N generated, N found N unique failures

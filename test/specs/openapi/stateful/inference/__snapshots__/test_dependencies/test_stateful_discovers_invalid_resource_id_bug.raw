@@ -26,7 +26,7 @@ Schemathesis dev
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "customer_id" is a required property
 
@@ -84,7 +84,9 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ Response violates schema: 1
+  ❌ ST108 Response violates schema: 1
+
+For more information, run `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

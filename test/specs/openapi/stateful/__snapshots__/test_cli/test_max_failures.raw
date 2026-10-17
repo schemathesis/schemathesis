@@ -30,7 +30,7 @@ Schemathesis dev
 _______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -45,7 +45,7 @@ Reproduce with:
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -70,7 +70,9 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ Server error: 2
+  ❌ ST101 Server error: 2
+
+For more information, run `st explain ST101`.
 
 Test cases:
   N generated, N found N unique failures

@@ -248,7 +248,7 @@ def test_reproduce_with_overridden_base_url(ctx, tmp_path, validate):
     with pytest.raises(FailureGroup) as exc_info:
         validate(case, api.base_url)
     assert exc_info.value.message == (
-        "Schemathesis found 1 distinct failure\n\n- Server error\n\n[500] Internal Server Error:\n\n"
+        "Schemathesis found 1 distinct failure\n\n- ST101 Server error\n\n[500] Internal Server Error:\n\n"
         f"    `500: Internal Server Error`\n\nReproduce with:\n\n    curl -X GET {api.base_url}/api/failure\n\n"
     )
 
@@ -281,7 +281,7 @@ def test_reproduce_after_same_host_redirect(ctx, app_runner, validate):
     with pytest.raises(FailureGroup) as exc_info:
         validate(case, base_url)
     assert exc_info.value.message == (
-        "Schemathesis found 1 distinct failure\n\n- Server error\n\n[500] Internal Server Error:\n\n"
+        "Schemathesis found 1 distinct failure\n\n- ST101 Server error\n\n[500] Internal Server Error:\n\n"
         f"    `500: Internal Server Error`\n\nReproduce with:\n\n    curl -X GET {base_url}/items/42\n\n"
     )
 

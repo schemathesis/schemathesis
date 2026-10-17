@@ -31,7 +31,7 @@ Schemathesis dev
 _______________________________ POST /api/events _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -46,7 +46,7 @@ Reproduce with:
 ______________________________ POST /api/messages ______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -61,7 +61,7 @@ Reproduce with:
 _______________________________ POST /api/orders _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -76,7 +76,7 @@ Reproduce with:
 ______________________________ POST /api/webhooks ______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -101,7 +101,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Server error: 4
+  ❌ ST101 Server error: 4
+
+For more information, run `st explain ST101`.
 
 Test cases:
   N generated, N found N unique failures

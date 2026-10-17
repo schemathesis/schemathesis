@@ -27,7 +27,7 @@ The run takes about 20 seconds and reports failures and a summary:
 ______________ POST /internal-server-errors/exceeding-column-size ______________
 1. Test Case ID: aN3Qa9
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -40,15 +40,15 @@ Reproduce with:
     st replay aN3Qa9
 ...
 Failures:
-  ❌ API accepts requests without authentication: 1
-  ❌ Server error: 2
-  ❌ Response violates schema: 1
-  ❌ Schema-violating request accepted: 3
-  ❌ JSON deserialization error: 1
-  ❌ Missing required header accepted: 1
-  ❌ Undocumented Content-Type: 4
-  ❌ Undocumented status code: 1
-  ❌ Wrong response to undeclared method: 6
+  ❌ ST401 API accepts requests without authentication: 1
+  ❌ ST101 Server error: 2
+  ❌ ST108 Response violates schema: 1
+  ❌ ST201 Schema-violating request accepted: 3
+  ❌ ST109 JSON deserialization error: 1
+  ❌ ST203 Missing required header accepted: 1
+  ❌ ST105 Undocumented Content-Type: 4
+  ❌ ST103 Undocumented status code: 1
+  ❌ ST204 Wrong response to undeclared method: 6
 
 Test cases:
   59 generated, 18 found 20 unique failures

@@ -43,7 +43,7 @@ text/event-stream:
 A violation is reported once for the response:
 
 ```
-- SSE stream violates schema
+- ST108 SSE stream violates schema
 
   [...] has more than 100 items
 ```
@@ -66,7 +66,7 @@ Events with no `data` lines are skipped - they produce no validation result. Com
 Schemathesis validates each parsed event against `itemSchema`. When validation fails, the error message identifies which event failed:
 
 ```
-- SSE event violates schema
+- ST108 SSE event violates schema
 
   Event #1: 'type' is a required property
 ```
@@ -122,7 +122,7 @@ itemSchema:
 Schemathesis deserializes the `data` string using the registered deserializer for `application/json` and validates the result against `contentSchema`. A failure is reported as:
 
 ```
-- SSE event payload violates content schema
+- ST108 SSE event payload violates content schema
 
   Event #2: 'id' is a required property
 ```

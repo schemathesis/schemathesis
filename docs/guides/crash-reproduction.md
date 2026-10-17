@@ -39,9 +39,9 @@ Replaying 2 cases from .schemathesis/default/cache/crashes
 _________________________________ POST /orders _________________________________
 1. Test Case ID: D5eIJE
 
-- Server error
+- ST101 Server error
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 500
     Documented: 200, 422
@@ -177,9 +177,9 @@ _____________________________ GET /items/{itemId} ______________________________
 
 1. Test Case ID: dnNCj2
 
-- Server error
+- ST101 Server error
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 503
     Documented: 200, 404, 422

@@ -31,7 +31,7 @@ Schemathesis dev
 ________________________________ GET /api/cp866 ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented Content-Type
+- ST105 Undocumented Content-Type
 
     Received: text/plain;charset=cp866
     Documented: application/json
@@ -59,7 +59,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Undocumented Content-Type: 1
+  ❌ ST105 Undocumented Content-Type: 1
+
+For more information, run `st explain ST105`.
 
 Test cases:
   N generated, N found N unique failures

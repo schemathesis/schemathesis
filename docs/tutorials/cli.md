@@ -43,9 +43,9 @@ The run ends with the failures it found and a summary:
 ________________________________ POST /bookings ________________________________
 1. Test Case ID: Iicuq5
 
-- Server error
+- ST101 Server error
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 500
     Documented: 200, 400, 422
@@ -62,8 +62,8 @@ Reproduce with:
 
 ...
 Failures:
-  ❌ Server error: 1
-  ❌ Undocumented status code: 1
+  ❌ ST101 Server error: 1
+  ❌ ST103 Undocumented status code: 1
 
 ...
 Warnings:

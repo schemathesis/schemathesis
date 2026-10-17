@@ -10,7 +10,7 @@ Replaying 1 case from /tmp/test_replay_keyboard_interrupt0
 ____________________________________ GET /a ____________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 

@@ -94,8 +94,8 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Server error: 1
-  ❌ Undocumented status code: 1
+  ❌ ST101 Server error: 1
+  ❌ ST103 Undocumented status code: 1
 ```
 
 Results vary between runs because generation is random. Compare runs with and without `--generation-maximize` on your own API, using the same `--max-examples`, to see whether targeting helps there.
@@ -146,7 +146,7 @@ def test_api(case):
 
 ```
   | schemathesis.core.failures.FailureGroup: Schemathesis found 2 distinct failures
-  | - Server error
+  | - ST101 Server error
 ...
 FAILED test_api.py::test_api[POST /performance] - ...
 ```

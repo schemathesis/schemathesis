@@ -27,7 +27,7 @@ Schemathesis dev
 ________________________________ POST /profiles ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Schema-valid request rejected
+- ST202 Schema-valid request rejected
 
     Valid data should have been accepted
     Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
@@ -44,7 +44,7 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -69,8 +69,10 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error: 1
-  ❌ Schema-valid request rejected: 1
+  ❌ ST101 Server error: 1
+  ❌ ST202 Schema-valid request rejected: 1
+
+For more information, run `st explain <code>` for ST101, ST202.
 
 Test cases:
   N generated, N found N unique failures

@@ -23,7 +23,7 @@ Schemathesis dev
 ___________________________ GET /networks/{network} ____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 200
     Documented: 202
@@ -51,7 +51,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented status code: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain ST103`.
 
 Test cases:
   N generated, N found N unique failures

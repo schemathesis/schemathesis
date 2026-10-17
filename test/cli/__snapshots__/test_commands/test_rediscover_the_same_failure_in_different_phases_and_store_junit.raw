@@ -38,7 +38,7 @@ Schemathesis dev
 _____________________________ GET /users/{user_id} _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `always_fails`
+- ST901 Custom check failed: `always_fails`
 
     Failed!
 
@@ -65,7 +65,7 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ Custom check failed: `always_fails`: 1
+  ❌ ST901 Custom check failed: `always_fails`: 1
 
 Test cases:
   N generated, N found N unique failures

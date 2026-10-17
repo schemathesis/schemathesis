@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ GET /api/slow _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response time limit exceeded
+- ST112 Response time limit exceeded
 
     Actual: 500.00ms
     Limit: 50.00ms
@@ -49,7 +49,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Response time limit exceeded: 1
+  ❌ ST112 Response time limit exceeded: 1
+
+For more information, run `st explain ST112`.
 
 Test cases:
   N generated, N found N unique failures

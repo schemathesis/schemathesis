@@ -31,7 +31,7 @@ Schemathesis dev
 __________________________________ GET /basic __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 401
     Documented: 200
@@ -59,7 +59,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Undocumented status code: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain ST103`.
 
 Test cases:
   N generated, N found N unique failures

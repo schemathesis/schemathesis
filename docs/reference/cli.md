@@ -982,7 +982,7 @@ $ st replay [OPTIONS] [PATH]
 
 ## `explain`
 
-The `explain` command prints what a failure code means, the checks that report it, common causes and fixes, and how to allow or turn it off. Find the code in the `code` field of NDJSON and JSON reports, or in the `message` attribute of JUnit failures.
+The `explain` command prints what a failure code means, the checks that report it, common causes and fixes, and how to allow or turn it off. Every failure in the output starts with its code, and reports carry it too: the `code` field in NDJSON and JSON, the `message` attribute in JUnit.
 
 ```console
 $ st explain [OPTIONS] [CODE]
