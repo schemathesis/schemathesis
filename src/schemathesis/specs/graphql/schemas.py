@@ -22,6 +22,7 @@ from typing_extensions import override
 from schemathesis import auths
 from schemathesis.core import NOT_SET, Body, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
@@ -471,33 +472,75 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def evaluate_server_error(self, case: Case, response: Response) -> None:
-        from schemathesis.core.failures import AcceptedNegativeData, MalformedJson
-        from schemathesis.graphql.checks import GraphQLClientError
-        from schemathesis.specs.graphql.validation import is_client_error, parse_payload, validate_graphql_response
+        from schemathesis.graphql.checks import GraphQLServerError
 
-        is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
-        try:
-            data = parse_payload(response)
-            if is_negative_mode and isinstance(data, dict):
-                errors = data.get("errors")
-                if errors is None or len(errors) == 0:
-                    description = ""
-                    if case.meta and case.meta.phase.data.description:
-                        description = f"\n{case.meta.phase.data.description}"
-                    raise AcceptedNegativeData(
-                        operation=case.operation.label,
-                        message=f"Invalid data should have been rejected by GraphQL schema validation{description}",
-                        status_code=response.status_code,
-                        expected_statuses=[],
-                    )
-                if is_client_error(data):
-                    return
-            validate_graphql_response(case, data)
-        except GraphQLClientError:
-            if not is_negative_mode:
-                raise
-        except json.JSONDecodeError as exc:
-            raise MalformedJson.from_exception(operation=case.operation.label, exc=exc) from None
+        failure = _response_failure(case, response)
+        if isinstance(failure, GraphQLServerError):
+            raise failure
+
+    @override
+    def evaluate_negative_data(self, case: Case, response: Response) -> None:
+        failure = _response_failure(case, response)
+        if isinstance(failure, AcceptedNegativeData):
+            raise failure
+
+    @override
+    def evaluate_positive_data(self, case: Case, response: Response) -> None:
+        from schemathesis.graphql.checks import GraphQLClientError
+
+        failure = _response_failure(case, response)
+        if isinstance(failure, GraphQLClientError):
+            raise failure
+
+    @override
+    def validate_response(
+        self,
+        operation: APIOperation,
+        response: Response,
+        *,
+        case: Case | None = None,
+    ) -> bool | None:
+        from schemathesis.graphql.checks import GraphQLSchemaViolation, UnexpectedGraphQLResponse
+
+        failure = _response_failure(case if case is not None else operation.Case(), response)
+        if isinstance(failure, (MalformedJson, UnexpectedGraphQLResponse, GraphQLSchemaViolation)):
+            raise failure
+        return None
+
+
+def _response_failure(case: Case, response: Response) -> Failure | None:
+    """The failure a GraphQL response carries; each check raises the kinds it owns."""
+    from schemathesis.graphql.checks import GraphQLClientError
+    from schemathesis.specs.graphql.validation import is_client_error, parse_payload, validate_graphql_response
+
+    # `not_a_server_error` reports a 5xx by its status, so its body is not judged here.
+    if response.status_code >= 500:
+        return None
+    is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
+    try:
+        data = parse_payload(response)
+    except json.JSONDecodeError as exc:
+        return MalformedJson.from_exception(operation=case.operation.label, exc=exc)
+    if is_negative_mode and isinstance(data, dict):
+        if not data.get("errors"):
+            description = ""
+            if case.meta and case.meta.phase.data.description:
+                description = f"\n{case.meta.phase.data.description}"
+            return AcceptedNegativeData(
+                operation=case.operation.label,
+                message=f"Invalid data should have been rejected by GraphQL schema validation{description}",
+                status_code=response.status_code,
+                expected_statuses=[],
+            )
+        if is_client_error(data):
+            return None
+    try:
+        validate_graphql_response(case, data)
+    except GraphQLClientError as exc:
+        return None if is_negative_mode else exc
+    except Failure as exc:
+        return exc
+    return None
 
 
 @dataclass

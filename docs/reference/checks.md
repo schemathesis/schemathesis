@@ -49,7 +49,7 @@ This check validates response times against your threshold. The actual HTTP requ
 
 ### `not_a_server_error`
 
-Catches server-side errors (5xx status codes) and GraphQL `errors` arrays.
+Catches server-side errors: 5xx status codes, and GraphQL `errors` arrays from failed resolvers.
 
 During negative coverage, this is the only response check applied to malformed or undeclared request `Content-Type` probes.
 
@@ -59,8 +59,6 @@ During negative coverage, this is the only response check applied to malformed o
 [500] Internal Server Error:
     `Server got itself in trouble`
 ```
-
-For GraphQL APIs, this check validates both transport-level errors and GraphQL semantics.
 
 Accepts `expected-statuses` (default `["2xx", "3xx", "4xx"]`) to define which status codes are not treated as server errors. To allow a 5xx that only some operations return by design, see [operations that return a documented 5xx](../configuration.md#operations-that-return-a-documented-5xx).
 
@@ -167,6 +165,10 @@ When `itemSchema` properties use `contentMediaType` and `contentSchema`, the emb
 
 For schema examples, polymorphic events, and current limitations, see [Testing Server-Sent Events](../guides/server-sent-events.md).
 
+#### GraphQL
+
+For GraphQL APIs, this check fails on a body that is not JSON, a JSON value that is not an object, and a `null` returned for a non-nullable field.
+
 ---
 
 ## Input handling
@@ -185,6 +187,8 @@ Invalid component: Missing `Accept-Language` at header
 
 The failure message includes the specific invalid component, helping you identify which validation logic is incorrect.
 
+For GraphQL APIs, an invalid query must get an `errors` entry; the status code does not matter.
+
 !!! note "Test mode"
     Requires `--mode negative` or `--mode all` (default)  
 
@@ -202,6 +206,8 @@ Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
 ```
 
 By default, `expected-statuses` includes `3xx/401/403/404/409/429/5xx` to account for redirects (e.g., to a sign-in page or an OAuth provider), authentication requirements, missing resources, conflicts (e.g., duplicate entries), rate limiting, and downstream failures.
+
+For GraphQL APIs, the check fails when the server rejects a valid query with a validation error.
 
 !!! note "Test mode"
     Requires `--mode positive` or `--mode all` (default)

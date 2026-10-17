@@ -84,14 +84,18 @@ def is_unexpected_http_status_case(case: Case) -> bool:
     return coverage_scenario(case) in REQUEST_SHAPE_PROBES
 
 
+def _is_openapi(case: Case) -> bool:
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+    return isinstance(case.operation.schema, OpenApiSchema)
+
+
 def requires_openapi_schema(func: CheckFunction) -> CheckFunction:
     """Skip the check if the operation does not belong to an OpenAPI schema."""
 
     @wraps(func)
     def wrapper(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-        if not isinstance(case.operation.schema, OpenApiSchema):
+        if not _is_openapi(case):
             return True
         return func(ctx, response, case)
 
@@ -288,7 +292,6 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
 
 
 @schemathesis.check
-@requires_openapi_schema
 @skips_on_unexpected_http_status
 def response_schema_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     return case.operation.validate_response(response, case=case)
@@ -850,10 +853,16 @@ def _negative_body_replaced_by_caller(ctx: CheckContext, case: Case) -> bool:
 
 
 @schemathesis.check
-@requires_openapi_schema
+def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    if not _is_openapi(case):
+        case.operation.schema.evaluate_negative_data(case, response)
+        return None
+    return _openapi_negative_data_rejection(ctx, response, case)
+
+
 @skips_on_unexpected_http_status
 @requires_case_meta
-def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+def _openapi_negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     meta = case.meta
     assert meta is not None
 
@@ -1062,10 +1071,16 @@ def _grants_credentials(operation: APIOperation) -> bool:
 
 
 @schemathesis.check
-@requires_openapi_schema
+def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    if not _is_openapi(case):
+        case.operation.schema.evaluate_positive_data(case, response)
+        return None
+    return _openapi_positive_data_acceptance(ctx, response, case)
+
+
 @skips_on_unexpected_http_status
 @requires_case_meta
-def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+def _openapi_positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     meta = case.meta
     assert meta is not None
 

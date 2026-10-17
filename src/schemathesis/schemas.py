@@ -652,6 +652,18 @@ class BaseSchema(Mapping):
         Default no-op; specs whose errors aren't fully captured by HTTP status (e.g. GraphQL 200 + errors body) override.
         """
 
+    def evaluate_negative_data(self, case: Case, response: Response) -> None:
+        """Raise a Failure if the schema's own conventions show that invalid data was accepted.
+
+        Default no-op; OpenAPI judges by status code in `negative_data_rejection` itself.
+        """
+
+    def evaluate_positive_data(self, case: Case, response: Response) -> None:
+        """Raise a Failure if the schema's own conventions show that valid data was rejected.
+
+        Default no-op; OpenAPI judges by status code in `positive_data_acceptance` itself.
+        """
+
     def classify_call_outcome(self, response: Response) -> CallOutcome:
         """Decide what the API did with a request carrying positive test data.
 
