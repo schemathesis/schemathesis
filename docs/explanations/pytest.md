@@ -125,7 +125,7 @@ __________________________ test_api[POST /bookings] ___________________________
   |
   | - Server error
   |
-  | - Undocumented HTTP status code
+  | - Undocumented status code
   |
   |     Received: 500
   |     Documented: 200, 422

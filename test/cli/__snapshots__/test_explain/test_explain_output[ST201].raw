@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST201  API accepted schema-violating request
+ST201  Schema-violating request accepted
 checks negative_data_rejection
 
 Schema-violating request accepted.

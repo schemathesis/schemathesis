@@ -277,7 +277,7 @@ class ContentTypeServerError(ServerError):
 
     code = "ST102"
     checks = ("not_a_server_error",)
-    kind_title = "Server error on unexpected Content-Type"
+    kind_title = "Server error on undeclared request Content-Type"
 
     __slots__ = ()
 
@@ -358,7 +358,7 @@ class AcceptedNegativeData(Failure):
 
     code = "ST201"
     checks = ("negative_data_rejection",)
-    kind_title = "API accepted schema-violating request"
+    kind_title = "Schema-violating request accepted"
 
     __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
 

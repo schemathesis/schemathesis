@@ -27,7 +27,7 @@ Schemathesis dev
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- Schema-valid request rejected
 
     Valid data should have been accepted
     Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
@@ -55,7 +55,7 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ API rejected schema-compliant request: 1
+  ❌ Schema-valid request rejected: 1
 
 Test cases:
   N generated, N found N unique failures

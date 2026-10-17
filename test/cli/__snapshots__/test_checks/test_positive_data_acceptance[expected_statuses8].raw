@@ -32,7 +32,7 @@ Schemathesis dev
 __________________________________ GET /test ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- Schema-valid request rejected
 
     Valid data should have been accepted
     Expected: 200, 201, 400, 401
@@ -60,7 +60,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ API rejected schema-compliant request: 1
+  ❌ Schema-valid request rejected: 1
 
 Test cases:
   N generated, N found N unique failures

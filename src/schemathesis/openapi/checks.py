@@ -21,7 +21,7 @@ class UndefinedStatusCode(Failure):
 
     code = "ST103"
     checks = ("status_code_conformance",)
-    kind_title = "Undocumented HTTP status code"
+    kind_title = "Undocumented status code"
 
     __slots__ = (
         "operation",
@@ -64,7 +64,7 @@ class MissingHeaders(Failure):
 
     code = "ST107"
     checks = ("response_headers_conformance",)
-    kind_title = "Missing required headers"
+    kind_title = "Missing required response headers"
 
     __slots__ = ("operation", "missing_headers", "message", "title", "case_id", "severity")
 
@@ -305,7 +305,7 @@ class DiscriminatorMismatch(Failure):
 
     code = "ST111"
     checks = ("response_schema_conformance",)
-    kind_title = "Discriminator value not in schema mapping"
+    kind_title = "Unknown discriminator value"
 
     __slots__ = ()
 
@@ -363,7 +363,7 @@ class UseAfterFree(Failure):
 
     code = "ST301"
     checks = ("use_after_free",)
-    kind_title = "Use after free"
+    kind_title = "Deleted resource still available"
 
     __slots__ = ("operation", "message", "free", "usage", "deleted_case_id", "title", "case_id", "severity")
 
@@ -402,7 +402,7 @@ class EnsureResourceAvailability(Failure):
 
     code = "ST302"
     checks = ("ensure_resource_availability",)
-    kind_title = "Resource is not available after creation"
+    kind_title = "Created resource not found"
 
     __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "case_id", "severity")
 
@@ -513,7 +513,7 @@ class RejectedPositiveData(Failure):
 
     code = "ST202"
     checks = ("positive_data_acceptance",)
-    kind_title = "API rejected schema-compliant request"
+    kind_title = "Schema-valid request rejected"
 
     __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
 
@@ -545,7 +545,7 @@ class MissingHeaderNotRejected(Failure):
 
     code = "ST203"
     checks = ("missing_required_header",)
-    kind_title = "Missing header not rejected"
+    kind_title = "Missing required header accepted"
 
     __slots__ = (
         "operation",
@@ -588,7 +588,7 @@ class UnsupportedMethodResponse(Failure):
 
     code = "ST204"
     checks = ("unsupported_method",)
-    kind_title = "Unsupported methods"
+    kind_title = "Wrong response to undeclared method"
 
     __slots__ = (
         "operation",
@@ -634,7 +634,7 @@ class AllowHeaderMismatch(Failure):
 
     code = "ST205"
     checks = ("allow_header_conformance",)
-    kind_title = "Invalid Allow header"
+    kind_title = "Allow header mismatch"
 
     __slots__ = (
         "operation",

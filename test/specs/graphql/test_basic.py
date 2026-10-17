@@ -177,7 +177,7 @@ def test_make_case(ctx, kwargs):
     ("kwargs", "expected"),
     [
         ({"content": b"INTERNAL SERVER ERROR", "content_type": "text/plain"}, "JSON deserialization error"),
-        ({"content": b"[]"}, "Unexpected GraphQL Response"),
+        ({"content": b"[]"}, "Unexpected GraphQL response"),
     ],
 )
 def test_response_validation(ctx, response_factory, kwargs, expected):
@@ -435,7 +435,7 @@ GRAPHQL_JAVA_NON_NULL_ERROR = (
 )
 def test_schema_violation(ctx, error_message):
     case = _books_schema(ctx)["Query"]["getBooks"].Case()
-    with pytest.raises(GraphQLSchemaViolation, match="GraphQL schema violation"):
+    with pytest.raises(GraphQLSchemaViolation, match="Null in non-nullable GraphQL field"):
         validate_graphql_response(case, {"data": None, "errors": [{"message": error_message, "path": ["getBooks"]}]})
 
 
@@ -452,7 +452,7 @@ def test_schema_violation_from_classification(ctx):
             }
         ],
     }
-    with pytest.raises(GraphQLSchemaViolation, match="GraphQL schema violation"):
+    with pytest.raises(GraphQLSchemaViolation, match="Null in non-nullable GraphQL field"):
         validate_graphql_response(case, payload)
 
 

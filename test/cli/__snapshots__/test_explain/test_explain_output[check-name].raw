@@ -6,8 +6,8 @@ Stdout:
   ST108  Response violates schema
   ST109  JSON deserialization error
   ST110  Content deserialization error
-  ST111  Discriminator value not in schema mapping
-  ST114  GraphQL schema violation
-  ST115  Unexpected GraphQL Response
+  ST111  Unknown discriminator value
+  ST114  Null in non-nullable GraphQL field
+  ST115  Unexpected GraphQL response
 
 Run `st explain <code>` for details.

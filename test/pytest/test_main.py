@@ -861,7 +861,7 @@ def test(case):
         expected = rf"curl -X GET -H 'Authorization: {auth}' {base_url}/failure"
     assert expected in result.stdout.str()
     assert "Reproduce with" in result.stdout.str()
-    assert "Undocumented HTTP status code" in result.stdout.str()
+    assert "Undocumented status code" in result.stdout.str()
 
 
 def test_content_type_probe_control_request_keeps_call_auth(testdir, ctx, app_runner):

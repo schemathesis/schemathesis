@@ -95,7 +95,7 @@ Test Phases:
 
 Failures:
   ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 ```
 
 Results vary between runs because generation is random. Compare runs with and without `--generation-maximize` on your own API, using the same `--max-examples`, to see whether targeting helps there.

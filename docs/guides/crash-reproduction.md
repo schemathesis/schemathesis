@@ -41,7 +41,7 @@ _________________________________ POST /orders _________________________________
 
 - Server error
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 500
     Documented: 200, 422
@@ -179,7 +179,7 @@ _____________________________ GET /items/{itemId} ______________________________
 
 - Server error
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 503
     Documented: 200, 404, 422

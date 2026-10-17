@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST204  Unsupported methods
+ST204  Wrong response to undeclared method
 checks unsupported_method
 
 Undeclared method answered with a status other than 405, or with 405 and no

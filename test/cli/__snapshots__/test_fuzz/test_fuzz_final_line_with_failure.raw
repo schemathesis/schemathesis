@@ -16,7 +16,7 @@ __________________________________ GET /users __________________________________
 
 - Server error
 
-- Undocumented HTTP status code
+- Undocumented status code
 
     Received: 500
     Documented: 200
@@ -41,7 +41,7 @@ Stop reason: Failure limit reached
 
 Failures:
   ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 Test cases:
   N generated, N found N unique failures

@@ -162,7 +162,7 @@ def test_stateful_retried_and_final_both_fail_checks(ctx, cli):
     result = cli.run_openapi_app(_stateful_429_app(ctx, get_user), *_STATEFUL_ARGS)
     # The retried 429 and the final response fail different checks; both failures are reported together.
     assert result.exit_code == 1, result.stdout
-    assert "Undocumented HTTP status code" in result.stdout
+    assert "Undocumented status code" in result.stdout
     assert "Received: 429" in result.stdout
 
 
@@ -178,5 +178,5 @@ def test_stateful_retried_failure_surfaces_when_final_passes(ctx, cli):
     result = cli.run_openapi_app(_stateful_429_app(ctx, get_user), *_STATEFUL_ARGS)
     # The first 429 fails the check; the retry returns a valid 200, yet the failure is still reported.
     assert result.exit_code == 1, result.stdout
-    assert "Undocumented HTTP status code" in result.stdout
+    assert "Undocumented status code" in result.stdout
     assert "Received: 429" in result.stdout

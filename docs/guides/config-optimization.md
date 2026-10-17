@@ -29,7 +29,7 @@ The run ends with a summary like this (a 10-second budget against a single opera
 ```
 Failures:
   ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 Test cases:
   364 generated, 1 found 2 unique failures

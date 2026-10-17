@@ -635,7 +635,7 @@ TestCase = schema.as_state_machine().TestCase
     )
     result = testdir.runpytest("-n", "1")
     result.assert_outcomes(failed=1)
-    result.stdout.fnmatch_lines(["*Undocumented HTTP status code*"])
+    result.stdout.fnmatch_lines(["*Undocumented status code*"])
 
 
 def test_html_report_failed(testdir, ctx, snapshot_html):
@@ -715,7 +715,7 @@ def test_api(case, user):
 
     assert re.findall(r'class="tf-name"[^>]* title="([^"]+)"', report_dir.join("index.html").read_text("utf-8")) == [
         "Server error",
-        "Undocumented HTTP status code",
+        "Undocumented status code",
     ]
 
 

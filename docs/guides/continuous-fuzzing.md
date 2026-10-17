@@ -24,7 +24,7 @@ The session ends with a summary like this (a 20-second window against the [CLI t
 ```
 Failures:
   ❌ Server error: 1
-  ❌ Undocumented HTTP status code: 1
+  ❌ Undocumented status code: 1
 
 ...
 

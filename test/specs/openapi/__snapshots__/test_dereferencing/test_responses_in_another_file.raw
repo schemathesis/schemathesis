@@ -31,7 +31,7 @@ Schemathesis dev
 ______________________________ PUT /api/v1/items _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Unsupported methods
+- Wrong response to undeclared method
 
     Unsupported method PUT returned 200, expected 405 Method Not Allowed
 
@@ -60,7 +60,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Unsupported methods: 1
+  ❌ Wrong response to undeclared method: 1
 
 Test cases:
   N generated, N found N unique failures

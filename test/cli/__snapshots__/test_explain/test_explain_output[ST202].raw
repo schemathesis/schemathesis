@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-ST202  API rejected schema-compliant request
+ST202  Schema-valid request rejected
 checks positive_data_acceptance
 
 Schema-valid request rejected.

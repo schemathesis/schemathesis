@@ -1145,7 +1145,7 @@ Value:
     )
     assert (
         str(exc.value.exceptions[1])
-        == """Missing required headers
+        == """Missing required response headers
 
 The following required headers are missing from the response:
 - `X-RateLimit-Reset`"""
