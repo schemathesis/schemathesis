@@ -4907,6 +4907,34 @@ def test_query_method_excluded_from_unexpected_when_defined(ctx):
     assert "QUERY" not in {case.method for case in _unspecified_method_cases(operation)}
 
 
+@pytest.mark.parametrize(
+    ("fmt", "pattern", "violates_format"),
+    [
+        ("uuid", "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", False),
+        (
+            "date",
+            "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            False,
+        ),
+        ("date", "^\\d{4}-\\d{2}-\\d{2}$", True),
+    ],
+    ids=["uuid-v7", "date-calendar", "date-digits"],
+)
+def test_negative_format_under_a_pattern_tailored_to_it(ctx, fmt, pattern, violates_format):
+    # A pattern admitting only valid values leaves no room for a value that breaks the format alone.
+    body = {"type": "object", "properties": {"value": {"type": "string", "format": fmt, "pattern": pattern}}}
+    format_validator = jsonschema_rs.validator_for({"format": fmt}, validate_formats=True)
+    values = [
+        case.body["value"]
+        for case in collect_coverage_cases(ctx, body, version="3.1.0")
+        if f"not matching the '{fmt}' format" in case.meta.phase.data.description
+    ]
+    assert bool(values) is violates_format
+    for value in values:
+        assert re.search(pattern, value)
+        assert not format_validator.is_valid(value)
+
+
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
 def test_hostname_format_generation_and_validation_consistent(ctx, version):
     # See GH-3567: generated values should be validated with the same draft semantics.
