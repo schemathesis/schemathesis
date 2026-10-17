@@ -10317,3 +10317,153 @@ def test_foreign_keys_in_a_body_the_status_forbids_are_not_followed(ctx, status,
     _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Order": order, "Customer": customer}})
 
     assert inferred_links(graph) == expected
+
+
+def _listing(name):
+    return {"type": "object", "properties": {"items": {"type": "array", "items": component_ref(name)}}}
+
+
+def _link(target, parameters):
+    return {"operationRef": target, "parameters": parameters, "x-schemathesis": {"is_inferred": True}}
+
+
+def test_parent_key_named_after_collection_takes_listed_identifier(ctx):
+    # `{warehouse}` under `/warehouses` names a listed warehouse, which `GET /warehouses` identifies by `name`.
+    paths = {
+        **operation("get", "/warehouses", "200", _listing("WarehouseItem")),
+        **operation("get", "/warehouses/{name}", "200", component_ref("WarehouseItem"), [path_param("name")]),
+        **operation("get", "/warehouses/{warehouse}/shelves", "200", _listing("ShelfItem"), [path_param("warehouse")]),
+        **operation(
+            "get",
+            "/warehouses/{warehouse}/shelves/{name}",
+            "200",
+            component_ref("ShelfItem"),
+            [path_param("warehouse"), path_param("name")],
+        ),
+    }
+    named = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+    shelf = {**named, "properties": {**named["properties"], "warehouse": {"type": "string"}}}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"WarehouseItem": named, "ShelfItem": shelf}})
+    warehouses = "#/paths/~1warehouses/get"
+    warehouse = "#/paths/~1warehouses~1{name}/get"
+    shelves = "#/paths/~1warehouses~1{warehouse}~1shelves/get"
+    shelf_item = "#/paths/~1warehouses~1{warehouse}~1shelves~1{name}/get"
+    assert inferred_links(graph) == [
+        [warehouses, "200", _link(warehouse, {"path.name": "$response.body#/items/*/name"})],
+        [warehouses, "200", _link(shelves, {"path.warehouse": "$response.body#/items/*/name"})],
+        [warehouses, "200", _link(shelf_item, {"path.warehouse": "$response.body#/items/*/name"})],
+        [warehouse, "200", _link(shelves, {"path.warehouse": "$response.body#/name"})],
+        [warehouse, "200", _link(shelf_item, {"path.warehouse": "$response.body#/name"})],
+        [
+            shelves,
+            "200",
+            _link(
+                shelf_item, {"path.name": "$response.body#/items/*/name", "path.warehouse": "$request.path.warehouse"}
+            ),
+        ],
+    ]
+
+
+def _nested_collection(parameter_type, item):
+    return {
+        **operation("get", "/warehouses", "200", _listing("WarehouseItem")),
+        **operation(
+            "get",
+            "/warehouses/{warehouse}/shelves",
+            "200",
+            {"type": "array", "items": {"type": "object"}},
+            [{"name": "warehouse", "in": "path", "required": True, "schema": {"type": parameter_type}}],
+        ),
+    }, {"schemas": {"WarehouseItem": item}}
+
+
+@pytest.mark.parametrize(
+    ("parameter_type", "item", "expected"),
+    [
+        (
+            "string",
+            {"type": "object", "properties": {"key": {"type": "string"}, "name": {"type": "string"}}},
+            "$response.body#/items/*/key",
+        ),
+        (
+            "integer",
+            {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}},
+            "$response.body#/items/*/id",
+        ),
+        (
+            "string",
+            {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}},
+            "$response.body#/items/*/name",
+        ),
+        # An ARM `id` spells the full resource path; the segment is the `name`
+        (
+            "string",
+            {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string"}},
+            },
+            "$response.body#/items/*/name",
+        ),
+    ],
+    ids=[
+        "key-over-name",
+        "integer-parameter-takes-integer-id",
+        "string-parameter-skips-integer-id",
+        "arm-name-over-full-path-id",
+    ],
+)
+def test_parent_key_named_after_collection_takes_identifier_of_its_type(ctx, parameter_type, item, expected):
+    paths, components = _nested_collection(parameter_type, item)
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1warehouses/get",
+            "200",
+            _link("#/paths/~1warehouses~1{warehouse}~1shelves/get", {"path.warehouse": expected}),
+        ]
+    ]
+
+
+def test_listed_identifier_ignores_same_named_collections_under_other_parents(ctx):
+    # `/apis/{api}/comments` and `/domains/{domain}/comments` list different comments.
+    comment = {"type": "object", "properties": {"id": {"type": "string"}}}
+    listing = {"type": "array", "items": component_ref("ClosableComment")}
+    paths = {
+        **operation("get", "/apis/{api}/comments", "200", listing, [path_param("api")]),
+        **operation("get", "/domains/{domain}/comments", "200", listing, [path_param("domain")]),
+        **operation(
+            "delete", "/apis/{api}/comments/{comment}", "204", None, [path_param("api"), path_param("comment")]
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"ClosableComment": comment}})
+    assert [link for link in inferred_links(graph) if link[0] == "#/paths/~1domains~1{domain}~1comments/get"] == []
+
+
+def test_listed_identifier_does_not_forward_a_parent_key_as_a_child_key(ctx):
+    # `{name}` of a warehouse is not the `{name}` of a shelf below it, wherever it sits in the path.
+    named = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+    paths = {
+        **operation("get", "/warehouses", "200", _listing("WarehouseItem")),
+        **operation("get", "/warehouses/{name}", "200", component_ref("WarehouseItem"), [path_param("name")]),
+        **operation(
+            "get",
+            "/warehouses/{warehouse}/shelves/{name}/bins",
+            "200",
+            {"type": "array", "items": {"type": "object"}},
+            [path_param("warehouse"), path_param("name")],
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"WarehouseItem": named}})
+    bins = "#/paths/~1warehouses~1{warehouse}~1shelves~1{name}~1bins/get"
+    assert [link[2]["parameters"] for link in inferred_links(graph) if link[2]["operationRef"] == bins] == [
+        {"path.warehouse": "$response.body#/items/*/name"},
+        {"path.warehouse": "$response.body#/name"},
+    ]
+
+
+def test_parent_key_named_after_collection_skips_full_path_name(ctx):
+    # Next to `displayName`, an AIP `name` spells the full resource path, not the segment the path takes.
+    item = {"type": "object", "properties": {"name": {"type": "string"}, "displayName": {"type": "string"}}}
+    paths, components = _nested_collection("string", item)
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == []
