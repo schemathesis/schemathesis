@@ -2,6 +2,8 @@
 
 A first run surfaces everything at once: schema gaps, setup you have not supplied yet, and deliberate probes. Most findings are real, but few teams fix all of them on day one. Decide what is in scope, then work through the rest.
 
+Every failure starts with a code, such as `ST103`. Run `st explain ST103` for what it means and how to allow or turn it off, or see all codes in [Failure Codes](../reference/failures.md).
+
 ## Prerequisites
 
 - A first `uvx schemathesis run` against your API, with its failure summary in front of you

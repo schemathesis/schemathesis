@@ -52,6 +52,7 @@ nav:
       - reference/configuration.md
       - Hooks: reference/hooks.md
       - Checks: reference/checks.md
+      - Failure Codes: reference/failures.md
       - reference/warnings.md
 
   - Trophy Case: reference/trophy-case.md
