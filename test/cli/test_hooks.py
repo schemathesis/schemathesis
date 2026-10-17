@@ -1,5 +1,6 @@
 import pytest
 from _pytest.main import ExitCode
+from flask import jsonify
 from hypothesis import settings
 
 
@@ -90,6 +91,43 @@ def before_call(context, case, kwargs):
     )
     result = cli.main("run", api.schema_url, "--phases=fuzzing", "--max-examples=2", hooks=module)
     assert "exceeds the deadline of 50.00ms" in result.stdout
+
+
+@pytest.mark.usefixtures("restore_hypothesis_profile")
+@pytest.mark.parametrize("max_examples", [3, 100])
+def test_max_examples_option_wins_over_profile_from_hooks(ctx, cli, app_runner, max_examples):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({})
+
+    module = ctx.write_pymodule(
+        """
+import hypothesis
+
+hypothesis.settings.register_profile("large", max_examples=150)
+hypothesis.settings.load_profile("large")
+"""
+    )
+    result = cli.main(
+        "run",
+        app_runner.openapi_url(app),
+        "--phases=fuzzing",
+        "--mode=positive",
+        f"--max-examples={max_examples}",
+        hooks=module,
+    )
+    assert f"{max_examples} generated" in result.stdout
 
 
 @pytest.mark.usefixtures("restore_hypothesis_profile")

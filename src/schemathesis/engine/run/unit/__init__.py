@@ -366,6 +366,7 @@ def _run_hypothesis_test(
                 settings=ctx.config.get_hypothesis_settings(
                     operation=operation, phase=phase.value, apply_ci_profile=False
                 ),
+                explicit_setting_names=ctx.config.explicit_hypothesis_settings(operation=operation, phase=phase.value),
                 apply_ci_profile=False,
                 seed=ctx.operation_seed(operation),
                 project=ctx.config,
