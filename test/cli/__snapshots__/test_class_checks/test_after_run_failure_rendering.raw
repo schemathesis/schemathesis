@@ -22,7 +22,7 @@ Schemathesis dev
 =================================== FAILURES ===================================
 __________________________________ Run checks __________________________________
 
-- Custom check failed: `EnsureReachability`
+- ST901 Custom check failed: `EnsureReachability`
 
     never returned 2xx: GET /api/failure
 
@@ -39,7 +39,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Custom check failed: `EnsureReachability`: 1
+  ❌ ST901 Custom check failed: `EnsureReachability`: 1
 
 Test cases:
   N generated, N passed

@@ -75,9 +75,9 @@ ___________________________ test_api[POST /bookings] ___________________________
   ...
   | schemathesis.core.failures.FailureGroup: Schemathesis found 2 distinct failures
   |
-  | - Server error
+  | - ST101 Server error
   |
-  | - Undocumented status code
+  | - ST103 Undocumented status code
   |
   |     Received: 500
   |     Documented: 200, 400, 422

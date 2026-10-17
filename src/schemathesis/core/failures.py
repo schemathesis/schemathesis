@@ -462,7 +462,7 @@ def format_failures(
 
     for title, group in group_failures(failures):
         suffix = f" ({len(group)} violations)" if len(group) > 1 else ""
-        output += formatter(MessageBlock.FAILURE, f"\n- {title}{suffix}")
+        output += formatter(MessageBlock.FAILURE, f"\n- {group[0].code} {title}{suffix}")
         for failure in group:
             if failure.message:
                 output += "\n\n"

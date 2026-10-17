@@ -32,7 +32,7 @@ Schemathesis dev
 __________________________________ GET /test ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Schema-valid request rejected
+- ST202 Schema-valid request rejected
 
     Valid data should have been accepted
     Expected: 200
@@ -60,7 +60,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Schema-valid request rejected: 1
+  ❌ ST202 Schema-valid request rejected: 1
+
+For more information, run `st explain ST202`.
 
 Test cases:
   N generated, N found N unique failures

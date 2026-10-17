@@ -38,7 +38,7 @@ def test_after_run_failure_reported(testdir, restore_checks, test_body):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
     assert result.ret != 0
-    result.stdout.fnmatch_lines(["*- Custom check failed: `AlwaysFail`*", "*    always fails in after_run*"])
+    result.stdout.fnmatch_lines(["*- ST901 Custom check failed: `AlwaysFail`*", "*    always fails in after_run*"])
 
 
 _SCHEMA_PARAMETRIZE_BODY = """
@@ -105,4 +105,4 @@ def test_api(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     assert result.ret == 1
-    result.stdout.fnmatch_lines(["*- Custom check failed: `AlwaysFail`*", "*    always fails in after_run*"])
+    result.stdout.fnmatch_lines(["*- ST901 Custom check failed: `AlwaysFail`*", "*    always fails in after_run*"])

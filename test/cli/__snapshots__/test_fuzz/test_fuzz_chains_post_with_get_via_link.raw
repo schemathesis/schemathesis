@@ -14,7 +14,7 @@ Schemathesis dev
 __________________________ GET /products/{productId} ___________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     null is not of type "string"
 
@@ -49,7 +49,9 @@ API Operations:
 Stop reason: Failure limit reached
 
 Failures:
-  ❌ Response violates schema: 1
+  ❌ ST108 Response violates schema: 1
+
+For more information, run `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

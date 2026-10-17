@@ -23,8 +23,8 @@ The session ends with a summary like this (a 20-second window against the [CLI t
 
 ```
 Failures:
-  ❌ Server error: 1
-  ❌ Undocumented status code: 1
+  ❌ ST101 Server error: 1
+  ❌ ST103 Undocumented status code: 1
 
 ...
 

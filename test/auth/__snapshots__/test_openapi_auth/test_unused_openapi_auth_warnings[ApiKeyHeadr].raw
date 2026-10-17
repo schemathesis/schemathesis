@@ -24,7 +24,7 @@ Schemathesis dev
 _____________________________ GET /api-key-header ______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 401
     Documented: 200
@@ -65,7 +65,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented status code: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain ST103`.
 
 Warnings:
   ⚠️ Authentication failed: 1 operation returned only 401/403 responses

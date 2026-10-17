@@ -23,7 +23,7 @@ Schemathesis dev
 ______________________________ POST /departments _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 422
     Documented: 201
@@ -40,13 +40,13 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- Schema-violating request accepted
+- ST201 Schema-violating request accepted
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
     Invalid component: Missing `X-Required-Header` at header
 
-- Missing required header accepted
+- ST203 Missing required header accepted
 
     Got 201 when missing required 'X-Required-Header' header, expected 400, 401, 403, 406, 415, 422
 
@@ -73,9 +73,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Missing required header accepted: 1
-  ❌ Schema-violating request accepted: 1
-  ❌ Undocumented status code: 1
+  ❌ ST203 Missing required header accepted: 1
+  ❌ ST201 Schema-violating request accepted: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain <code>` for ST103, ST201, ST203.
 
 Test cases:
   N generated, N found N unique failures

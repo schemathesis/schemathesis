@@ -23,7 +23,7 @@ Schemathesis dev
 _________________________________ POST /users __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
 
@@ -56,7 +56,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error: 1
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
 
 Warnings:
   ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data

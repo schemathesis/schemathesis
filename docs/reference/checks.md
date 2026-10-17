@@ -35,7 +35,7 @@ See [CLI reference](../reference/cli.md#-c-checks-checks) and [configuration ref
 Catches responses that take longer than the configured limit.
 
 ```text
-- Response time limit exceeded
+- ST112 Response time limit exceeded
 
 Actual: 2500.00ms
 Limit: 1500.00ms
@@ -54,7 +54,7 @@ Catches server-side errors: 5xx status codes, and GraphQL `errors` arrays from f
 During negative coverage, this is the only response check applied to malformed or undeclared request `Content-Type` probes.
 
 ```text
-- Server error
+- ST101 Server error
 
 [500] Internal Server Error:
     `Server got itself in trouble`
@@ -69,7 +69,7 @@ Accepts `expected-statuses` (default `["2xx", "3xx", "4xx"]`) to define which st
 Verifies the response status code is documented in the schema for the operation (or a `default` response is defined).
 
 ```text
-- Undocumented status code
+- ST103 Undocumented status code
 
 Received: 403
 Documented: 200, 404
@@ -85,7 +85,7 @@ Validates the `Content-Type` header matches the schema. Fails when the header is
 
 When Content-Type header is missing:
 ```text
-- Missing Content-Type header
+- ST104 Missing Content-Type header
 
 The following media types are documented in the schema:
 - application/json
@@ -93,7 +93,7 @@ The following media types are documented in the schema:
 
 When media type is malformed or undocumented:
 ```text
-- Malformed media type
+- ST106 Malformed media type
 
 Media type for Response is incorrect
 
@@ -111,7 +111,7 @@ Ensures response header values match their JSON Schema definitions.
 
 When a required header is missing:
 ```text
-- Missing required response headers
+- ST107 Missing required response headers
 
 The following required headers are missing from the response:
 - `X-RateLimit-Remaining`
@@ -119,7 +119,7 @@ The following required headers are missing from the response:
 
 When a header value violates its schema:
 ```text
-- Response header does not conform to the schema
+- ST108 Response header does not conform to the schema
 
 Header 'X-RateLimit-Limit' does not conform to the schema
 
@@ -136,7 +136,7 @@ Header values are coerced into appropriate JSON Schema types before validation, 
 Validates the response body against its JSON Schema definition. Catches format mismatches, missing required properties, type errors, and more.
 
 ```text
-- Response violates schema
+- ST108 Response violates schema
 
   'message' is a required property
 
@@ -156,7 +156,7 @@ Accepts [`validate-formats`](configuration.md#checksresponse_schema_conformancev
 For `text/event-stream` responses, Schemathesis validates each event individually against the `itemSchema` defined in the OpenAPI 3.2 response. A `schema` next to it is checked once against the whole stream, read as an array of events. Each failure is prefixed with its event index:
 
 ```text
-- SSE event payload violates content schema
+- ST108 SSE event payload violates content schema
 
   Event #1: "not_an_integer" is not of type "integer"
 ```
@@ -178,7 +178,7 @@ For GraphQL APIs, this check fails on a body that is not JSON, a JSON value that
 Verifies the API properly rejects invalid input data. When Schemathesis generates a negative test case (invalid payload, missing required field, etc.), it expects the API to respond with an error status code.
 
 ```text
-- Schema-violating request accepted
+- ST201 Schema-violating request accepted
 
 Invalid data should have been rejected
 Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx
@@ -199,7 +199,7 @@ For GraphQL APIs, an invalid query must get an `errors` entry; the status code d
 Verifies the API accepts valid request data. When Schemathesis generates schema-compliant requests, it expects the API to respond with a success status code.
 
 ```text
-- Schema-valid request rejected
+- ST202 Schema-valid request rejected
 
 Valid data should have been accepted
 Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
@@ -221,7 +221,7 @@ Verifies the API rejects requests when required headers are missing.
 By default, non-`Authorization` headers are considered correctly rejected with `400`, `401`, `403`, `406`, `415`, or `422`. `Authorization` is stricter and expects `401 Unauthorized`.
 
 ```text
-- Missing required header accepted
+- ST203 Missing required header accepted
 
 Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 415, 422
 ```
@@ -236,7 +236,7 @@ Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 4
 Verifies the API properly rejects HTTP methods not defined for an endpoint. The API should return `405 Method Not Allowed` with an `Allow` header listing the supported methods (required by [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.5.6)).
 
 ```text
-- Wrong response to undeclared method
+- ST204 Wrong response to undeclared method
 
 Unsupported method PATCH returned 200, expected 405 Method Not Allowed
 
@@ -255,7 +255,7 @@ Return 405 for methods not listed in the OpenAPI spec
 Verifies the `Allow` header returned for `OPTIONS` requests lists the same methods as the schema. A mismatch means clients are told the resource supports a different set of operations than the one documented; extra methods may expose endpoints that were never meant to be public.
 
 ```text
-- Allow header mismatch
+- ST205 Allow header mismatch
 
 `Allow` header does not match the schema — missing documented methods: POST
 
@@ -282,7 +282,7 @@ They need a multi-step scenario, so they run under `st run`'s stateful phase and
 Detects when deleted resources remain accessible. After a successful `DELETE`, subsequent requests to the same resource should return `404 Not Found`.
 
 ```text
-- Deleted resource still available
+- ST301 Deleted resource still available
 
 The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`)
 for a resource that was previously deleted.
@@ -297,7 +297,7 @@ The failure message lists both the DELETE call and the subsequent operation for 
 Verifies created resources are immediately accessible. After a successful `POST`, Schemathesis follows links to fetch the resource. The API should return the created resource, not `404 Not Found`.
 
 ```text
-- Created resource not found
+- ST302 Created resource not found
 
 Created with      : `POST /users`
 Not available with: `GET /users/{id}`
@@ -315,7 +315,7 @@ Verifies authentication is properly enforced. When an operation declares authent
 `401`, `403`, or a redirect to another page, such as a sign-in page, counts as enforcement. Test cases with invalid path parameters are not judged, as they may miss the operation's route entirely.
 
 ```text
-- API accepts requests without authentication
+- ST401 API accepts requests without authentication
 
 Expected 401 or 403, got `200 OK` for `GET /protected-resource`
 ```
@@ -344,7 +344,7 @@ The check passes when the other peer gets:
 - the full object from a list it can request, which makes the object shared
 
 ```text
-- Object-level authorization bypass
+- ST402 Object-level authorization bypass
 
     `bob` received the `Order` that `alice` owns
 

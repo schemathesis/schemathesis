@@ -23,7 +23,7 @@ Schemathesis dev
 ________________________________ OPTIONS /items ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Allow header mismatch
+- ST205 Allow header mismatch
 
     `Allow: GET, HEAD, OPTIONS` does not match the schema. Missing documented methods: POST
 
@@ -52,7 +52,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Allow header mismatch: 1
+  ❌ ST205 Allow header mismatch: 1
+
+For more information, run `st explain ST205`.
 
 Test cases:
   N generated, N found N unique failures

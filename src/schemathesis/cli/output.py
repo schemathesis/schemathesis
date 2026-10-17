@@ -24,6 +24,7 @@ from schemathesis.cli.summary import (
 )
 from schemathesis.core.errors import LoaderErrorKind
 from schemathesis.core.failures import (
+    CustomFailure,
     MessageBlock,
     format_failures,
     is_reproducible_failure,
@@ -409,9 +410,17 @@ def display_api_operations(operations: OperationsSummary) -> None:
 def display_failures_summary(failures: list[FailureGroup]) -> None:
     click.echo(_style("Failures:", bold=True))
     for group in failures:
-        click.echo(_style(f"  ❌ {group.title}: "), nl=False)
+        click.echo(_style(f"  ❌ {group.code} {group.title}: "), nl=False)
         click.echo(_style(str(group.count), bold=True))
     click.echo()
+    # Custom checks share one code, so its page has nothing specific to add.
+    codes = sorted({group.code for group in failures} - {CustomFailure.code})
+    if len(codes) == 1:
+        click.echo(_style(f"For more information, run `st explain {codes[0]}`."))
+        click.echo()
+    elif codes:
+        click.echo(_style(f"For more information, run `st explain <code>` for {', '.join(codes)}."))
+        click.echo()
 
 
 def display_filtered_summary(filtered: int) -> None:

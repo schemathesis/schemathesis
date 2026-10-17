@@ -31,7 +31,7 @@ Schemathesis dev
 ___________________________________ GET /sse ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- SSE event violates schema
+- ST108 SSE event violates schema
 
     Event #0: {"data":"{\"value\": \"wrong\"}","event":"update"} is not valid under any of the schemas listed in the 'oneOf' keyword
 
@@ -91,7 +91,9 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ SSE event violates schema: 1
+  ❌ ST108 SSE event violates schema: 1
+
+For more information, run `st explain ST108`.
 
 Test cases:
   N generated, N found N unique failures

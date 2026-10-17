@@ -77,7 +77,7 @@ def test_server_error_report(ctx, cli, tmp_path):
 # GET /api/failure
 # 1. Test Case ID: {fault["testCaseId"]}
 #
-# - Server error
+# - ST101 Server error
 #
 # [500] Internal Server Error:
 #

@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ GET /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error on undeclared request Content-Type
+- ST102 Server error on undeclared request Content-Type
 
     `Content-Type: multipart/form-data` without a boundary returned 500, expected 400 Bad Request or 415 Unsupported Media Type
 
@@ -52,7 +52,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Server error on undeclared request Content-Type: 1
+  ❌ ST102 Server error on undeclared request Content-Type: 1
+
+For more information, run `st explain ST102`.
 
 Test cases:
   N generated, N found N unique failures

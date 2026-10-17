@@ -52,7 +52,7 @@ def test_negative_data_rejection(ctx, cli):
         "--max-examples=5",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    assert "- Schema-violating request accepted\n" in result.stdout
+    assert "- ST201 Schema-violating request accepted\n" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

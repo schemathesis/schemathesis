@@ -31,9 +31,9 @@ Schemathesis dev
 ________________________________ GET /api/flaky ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- ST101 Server error
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 500
     Documented: 200
@@ -61,8 +61,10 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Server error: 1
-  ❌ Undocumented status code: 1
+  ❌ ST101 Server error: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain <code>` for ST101, ST103.
 
 Test cases:
   N generated, N found N unique failures

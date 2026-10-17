@@ -35,7 +35,7 @@ import requests
 # GET /api/failure
 # 1. Test Case ID: {case_id}
 #
-# - Server error
+# - ST101 Server error
 #
 # [500] Internal Server Error:
 #

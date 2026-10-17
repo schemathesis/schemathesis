@@ -31,7 +31,7 @@ Schemathesis dev
 _________________________________ GET /broken __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Content deserialization error
+- ST110 Content deserialization error
 
     Failed to deserialize response content:
 
@@ -50,7 +50,7 @@ Reproduce with:
 ________________________________ GET /mismatch _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema
+- ST108 Response violates schema
 
     "notanumber" is not of type "integer"
 
@@ -90,8 +90,10 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Response violates schema: 1
-  ❌ Content deserialization error: 1
+  ❌ ST108 Response violates schema: 1
+  ❌ ST110 Content deserialization error: 1
+
+For more information, run `st explain <code>` for ST108, ST110.
 
 Test cases:
   N generated, N found N unique failures

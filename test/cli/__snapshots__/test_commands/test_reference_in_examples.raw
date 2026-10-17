@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ POST /test __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented status code
+- ST103 Undocumented status code
 
     Received: 404
     Documented:
@@ -60,7 +60,9 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Undocumented status code: 1
+  ❌ ST103 Undocumented status code: 1
+
+For more information, run `st explain ST103`.
 
 Warnings:
   ⚠️ Unresolvable references: 1 operation had parts of the schema skipped
