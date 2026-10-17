@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from decimal import Decimal
 
+    from hypothesis.internal.conjecture.data import ConjectureData
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.core.jsonschema.types import JsonValue
@@ -1128,21 +1129,35 @@ def _with_violations(
     return result
 
 
+class _Collected(st.SearchStrategy):
+    """Free keys and their values, between `low` and `high` of them."""
+
+    # A self-referential schema reaches these entries from inside them. Emptiness is answered with
+    # the rest of the cycle rather than forced while building, which would enter the cycle again.
+
+    def __init__(self, entries: SearchStrategy[tuple[str, JsonValue]], low: int, high: int) -> None:
+        super().__init__()
+        self.entries = entries
+        self.low = low
+        self.collected = st.lists(entries, unique_by=lambda entry: entry[0], min_size=low, max_size=high).map(dict)
+
+    def calc_is_empty(self, recur: Callable[[SearchStrategy], bool]) -> bool:
+        # No key can be spelled; the floor decides whether that is fatal or only means no extras.
+        return bool(self.low) and recur(self.entries)
+
+    def do_draw(self, data: ConjectureData) -> dict[str, JsonValue]:
+        if self.entries.is_empty:
+            return {}
+        return data.draw(self.collected)
+
+
 def _collect(
     entries: SearchStrategy[tuple[str, JsonValue]], low: int, high: int
 ) -> SearchStrategy[dict[str, JsonValue]]:
-    def resolved() -> SearchStrategy[dict[str, JsonValue]]:
-        if _floor(low) is None:
-            # No object can be that wide.
-            return st.nothing()
-        if entries.is_empty:
-            # No key can be spelled; the floor decides whether that is fatal or only means no extras.
-            return st.nothing() if low else st.just({})
-        return st.lists(entries, unique_by=lambda entry: entry[0], min_size=low, max_size=high).map(dict)
-
-    # `is_empty` forces the entries, and a self-referential schema is still being built here, so the
-    # choice waits for the first draw.
-    return st.deferred(resolved)
+    if _floor(low) is None:
+        # No object can be that wide.
+        return st.nothing()
+    return _Collected(entries, low, high)
 
 
 def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[str]:

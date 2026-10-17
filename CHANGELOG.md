@@ -76,6 +76,7 @@
 - Crash on `application/x-www-form-urlencoded` examples whose schema sets `exclusiveMinimum` or `exclusiveMaximum` without a bound.
 - Format values generated under another operation's `codec`, `allow-x00` or `exclude-header-characters` settings.
 - Crash or lone surrogates in generated strings when `generation.codec` is `None`.
+- `RecursionError` on objects whose `additionalProperties` references the object itself.
 
 #### Checks
 
