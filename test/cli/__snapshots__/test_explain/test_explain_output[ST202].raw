@@ -1,0 +1,20 @@
+Exit code: 0
+---
+Stdout:
+ST202  API rejected schema-compliant request
+checks positive_data_acceptance
+
+Schema-valid request rejected.
+
+A `Hint:` line names undeclared properties the body carried. A rejection the
+schema can't express, such as an unknown id or a cross-field rule, can be
+allowed for the operation:
+
+  # schemathesis.toml
+  [[operations]]
+  include-name = "POST /orders"
+  checks.positive_data_acceptance.expected-statuses = [
+    "2xx", "3xx", "401", "403", "404", "409", "429", "5xx", "422",
+  ]
+
+`--exclude-checks positive_data_acceptance` turns it off, along with ST206.

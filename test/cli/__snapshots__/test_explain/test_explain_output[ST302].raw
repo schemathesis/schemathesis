@@ -1,0 +1,16 @@
+Exit code: 0
+---
+Stdout:
+ST302  Resource is not available after creation
+checks ensure_resource_availability
+
+404 for a resource that an earlier successful `POST` created.
+
+  POST  /users        201  {"id": "u_42"}
+  GET   /users/u_42   404
+
+Return the id in the format the path accepts, and read from the primary store
+right after a write. If the link passes the wrong field, such as `id` where the
+path expects a `slug`, declare the right link in the schema.
+
+`--exclude-checks ensure_resource_availability` turns it off.

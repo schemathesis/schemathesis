@@ -1,0 +1,14 @@
+Exit code: 0
+---
+Stdout:
+ST109  JSON deserialization error
+checks response_schema_conformance
+
+Body that is not valid JSON, under a JSON `Content-Type` or with no
+`Content-Type`.
+
+An empty body fails too (`Expecting value: line 1 column 1`): send JSON, or
+remove `content` from that response in the schema.
+
+`--exclude-checks response_schema_conformance` turns it off, along with ST110,
+ST111, ST114, ST115.

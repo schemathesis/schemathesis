@@ -1,0 +1,17 @@
+Exit code: 0
+---
+Stdout:
+ST204  Unsupported methods
+checks unsupported_method
+
+Undeclared method answered with a status other than 405, or with 405 and no
+`Allow` header.
+
+To stop probing methods the API answers differently on purpose, such as `501`
+for `QUERY`, narrow the list of methods Schemathesis sends:
+
+  # schemathesis.toml
+  [phases.coverage]
+  unexpected-methods = ["get", "put", "post", "delete", "options", "patch"]
+
+`--exclude-checks unsupported_method` turns it off.

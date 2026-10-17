@@ -1,0 +1,6 @@
+Exit code: 2
+---
+Stdout:
+error: unknown failure code or name `response-schema`
+tip: a similar value exists: response_schema_conformance
+Run `st explain --list` to see all codes.

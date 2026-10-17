@@ -12,6 +12,8 @@ class UnexpectedGraphQLResponse(Failure):
     """GraphQL response is not a JSON object."""
 
     code = "ST115"
+    checks = ("response_schema_conformance",)
+    kind_title = "Unexpected GraphQL Response"
 
     __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
 
@@ -20,13 +22,13 @@ class UnexpectedGraphQLResponse(Failure):
         *,
         operation: str,
         type_name: str,
-        title: str = "Unexpected GraphQL Response",
+        title: str | None = None,
         message: str,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.type_name = type_name
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.message = message
         self.case_id = case_id
         self.severity = Severity.MEDIUM
@@ -40,6 +42,8 @@ class GraphQLClientError(Failure):
     """GraphQL query has not been executed."""
 
     code = "ST206"
+    checks = ("positive_data_acceptance",)
+    kind_title = "GraphQL client error"
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -49,12 +53,12 @@ class GraphQLClientError(Failure):
         operation: str,
         message: str,
         errors: list[GraphQLFormattedError],
-        title: str = "GraphQL client error",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.message = message
         self.case_id = case_id
         self._unique_key_cache: str | None = None
@@ -71,6 +75,8 @@ class GraphQLServerError(Failure):
     """GraphQL response indicates at least one server error."""
 
     code = "ST113"
+    checks = ("not_a_server_error",)
+    kind_title = "GraphQL server error"
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -80,12 +86,12 @@ class GraphQLServerError(Failure):
         operation: str,
         message: str,
         errors: list[GraphQLFormattedError],
-        title: str = "GraphQL server error",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.message = message
         self.case_id = case_id
         self._unique_key_cache: str | None = None
@@ -102,6 +108,8 @@ class GraphQLSchemaViolation(Failure):
     """GraphQL response contradicts the schema the server publishes."""
 
     code = "ST114"
+    checks = ("response_schema_conformance",)
+    kind_title = "GraphQL schema violation"
 
     __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
@@ -111,12 +119,12 @@ class GraphQLSchemaViolation(Failure):
         operation: str,
         message: str,
         errors: list[GraphQLFormattedError],
-        title: str = "GraphQL schema violation",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.message = message
         self.case_id = case_id
         self._unique_key_cache: str | None = None

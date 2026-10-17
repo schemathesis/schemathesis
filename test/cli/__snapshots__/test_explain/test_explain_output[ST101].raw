@@ -1,0 +1,17 @@
+Exit code: 0
+---
+Stdout:
+ST101  Server error
+checks not_a_server_error
+
+5xx status for a request the API should have handled or rejected with a 4xx.
+
+A 5xx fails even when the schema documents it. A 5xx by design, such as `503`
+when an integration is off, can be allowed for the operation:
+
+  # schemathesis.toml
+  [[operations]]
+  include-name = "POST /orders"
+  checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]
+
+`--exclude-checks not_a_server_error` turns it off, along with ST102, ST113.

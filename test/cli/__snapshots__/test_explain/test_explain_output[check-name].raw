@@ -1,0 +1,13 @@
+Exit code: 0
+---
+Stdout:
+`response_schema_conformance` reports these failures:
+  ST104  Missing Content-Type header
+  ST108  Response violates schema
+  ST109  JSON deserialization error
+  ST110  Content deserialization error
+  ST111  Discriminator value not in schema mapping
+  ST114  GraphQL schema violation
+  ST115  Unexpected GraphQL Response
+
+Run `st explain <code>` for details.

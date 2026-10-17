@@ -1,0 +1,5 @@
+Exit code: 2
+---
+Stdout:
+error: unknown failure code or name `999`
+Run `st explain --list` to see all codes.

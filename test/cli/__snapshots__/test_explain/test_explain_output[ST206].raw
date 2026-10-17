@@ -1,0 +1,18 @@
+Exit code: 0
+---
+Stdout:
+ST206  GraphQL client error
+checks positive_data_acceptance
+
+Valid GraphQL query rejected by the server.
+
+A `schemathesis.graphql.scalar` strategy producing values the server rejects
+shows up here too. A rule GraphQL can't express, such as `from` not exceeding
+`to`, can be skipped for that field:
+
+  # schemathesis.toml
+  [[operations]]
+  include-name = "Query.events"
+  checks.positive_data_acceptance.enabled = false
+
+`--exclude-checks positive_data_acceptance` turns it off, along with ST202.

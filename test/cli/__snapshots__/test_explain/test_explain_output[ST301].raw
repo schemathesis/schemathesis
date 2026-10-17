@@ -1,0 +1,16 @@
+Exit code: 0
+---
+Stdout:
+ST301  Use after free
+checks use_after_free
+
+Resource still served after a successful `DELETE` removed it.
+
+  POST    /items     201  {"id": 7}
+  DELETE  /items/7   204
+  GET     /items/7   200  {"id": 7}
+
+A soft delete that keeps records readable should answer the deleted path with
+`404` or `410`.
+
+`--exclude-checks use_after_free` turns it off.

@@ -1,0 +1,22 @@
+Exit code: 0
+---
+Stdout:
+ST402  Object-level authorization bypass
+checks object_level_authorization
+
+One user's object returned to another user who should not see it.
+
+  POST /orders     as alice   201  {"id": 1, "item": "book"}
+  GET  /orders/1   as alice   200  {"id": 1, "item": "book"}
+  GET  /orders/1   as bob     200  {"id": 1, "item": "book"}
+
+Check that the caller owns the object, and answer `403` or `404` otherwise. An
+object shared by design, such as a team resource, can be skipped for that
+operation:
+
+  # schemathesis.toml
+  [[operations]]
+  include-name = "GET /orders/{id}"
+  checks.object_level_authorization.enabled = false
+
+`--exclude-checks object_level_authorization` turns it off.

@@ -20,6 +20,8 @@ class UndefinedStatusCode(Failure):
     """Response has a status code that is not defined in the schema."""
 
     code = "ST103"
+    checks = ("status_code_conformance",)
+    kind_title = "Undocumented HTTP status code"
 
     __slots__ = (
         "operation",
@@ -40,7 +42,7 @@ class UndefinedStatusCode(Failure):
         defined_status_codes: list[str],
         allowed_status_codes: list[int],
         message: str,
-        title: str = "Undocumented HTTP status code",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -48,7 +50,7 @@ class UndefinedStatusCode(Failure):
         self.defined_status_codes = defined_status_codes
         self.allowed_status_codes = allowed_status_codes
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -61,6 +63,8 @@ class MissingHeaders(Failure):
     """Some required headers are missing."""
 
     code = "ST107"
+    checks = ("response_headers_conformance",)
+    kind_title = "Missing required headers"
 
     __slots__ = ("operation", "missing_headers", "message", "title", "case_id", "severity")
 
@@ -70,13 +74,13 @@ class MissingHeaders(Failure):
         operation: str,
         missing_headers: list[str],
         message: str,
-        title: str = "Missing required headers",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.missing_headers = missing_headers
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -89,6 +93,8 @@ class JsonSchemaError(Failure):
     """Additional information about JSON Schema validation errors."""
 
     code = "ST108"
+    checks = ("response_schema_conformance", "response_headers_conformance")
+    kind_title = "Response violates schema"
 
     __slots__ = (
         "operation",
@@ -113,7 +119,7 @@ class JsonSchemaError(Failure):
         instance_path: list[str | int],
         instance: JsonValue,
         message: str,
-        title: str = "Response violates schema",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -123,7 +129,7 @@ class JsonSchemaError(Failure):
         self.instance_path = instance_path
         self.instance = instance
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.HIGH
 
@@ -135,7 +141,7 @@ class JsonSchemaError(Failure):
     def from_exception(
         cls,
         *,
-        title: str = "Response violates schema",
+        title: str | None = None,
         operation: str,
         exc: jsonschema_rs.ValidationError,
         root_schema: dict[str, Any] | bool,
@@ -218,6 +224,8 @@ class MissingContentType(Failure):
     """Content type header is missing."""
 
     code = "ST104"
+    checks = ("content_type_conformance", "response_schema_conformance")
+    kind_title = "Missing Content-Type header"
 
     __slots__ = ("operation", "media_types", "message", "title", "case_id", "severity")
 
@@ -227,13 +235,13 @@ class MissingContentType(Failure):
         operation: str,
         media_types: list[str],
         message: str,
-        title: str = "Missing Content-Type header",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.media_types = media_types
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -246,6 +254,8 @@ class MalformedMediaType(Failure):
     """Media type name is malformed."""
 
     code = "ST106"
+    checks = ("content_type_conformance",)
+    kind_title = "Malformed media type"
 
     __slots__ = ("operation", "actual", "defined", "message", "title", "case_id", "severity")
 
@@ -256,14 +266,14 @@ class MalformedMediaType(Failure):
         actual: str,
         defined: str,
         message: str,
-        title: str = "Malformed media type",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.actual = actual
         self.defined = defined
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -276,11 +286,13 @@ class ContentDeserializationError(Failure):
     """Response body cannot be deserialized as its documented media type."""
 
     code = "ST110"
+    checks = ("response_schema_conformance",)
+    kind_title = "Content deserialization error"
 
     __slots__ = ()
 
     def __init__(self, *, operation: str, message: str, case_id: str | None = None) -> None:
-        super().__init__(operation=operation, title="Content deserialization error", message=message, case_id=case_id)
+        super().__init__(operation=operation, title=self.kind_title, message=message, case_id=case_id)
 
     @property
     def _unique_key(self) -> str:
@@ -292,13 +304,13 @@ class DiscriminatorMismatch(Failure):
     """Response discriminator value matches no schema the discriminator maps to."""
 
     code = "ST111"
+    checks = ("response_schema_conformance",)
+    kind_title = "Discriminator value not in schema mapping"
 
     __slots__ = ()
 
     def __init__(self, *, operation: str, message: str, case_id: str | None = None) -> None:
-        super().__init__(
-            operation=operation, title="Discriminator value not in schema mapping", message=message, case_id=case_id
-        )
+        super().__init__(operation=operation, title=self.kind_title, message=message, case_id=case_id)
 
     @property
     def _unique_key(self) -> str:
@@ -310,6 +322,8 @@ class UndefinedContentType(Failure):
     """Response has Content-Type that is not documented in the schema."""
 
     code = "ST105"
+    checks = ("content_type_conformance",)
+    kind_title = "Undocumented Content-Type"
 
     __slots__ = (
         "operation",
@@ -328,14 +342,14 @@ class UndefinedContentType(Failure):
         content_type: str,
         defined_content_types: list[str],
         message: str,
-        title: str = "Undocumented Content-Type",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.content_type = content_type
         self.defined_content_types = defined_content_types
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -348,6 +362,8 @@ class UseAfterFree(Failure):
     """Resource was used after a successful DELETE operation on it."""
 
     code = "ST301"
+    checks = ("use_after_free",)
+    kind_title = "Use after free"
 
     __slots__ = ("operation", "message", "free", "usage", "deleted_case_id", "title", "case_id", "severity")
 
@@ -359,7 +375,7 @@ class UseAfterFree(Failure):
         free: str,
         usage: str,
         deleted_case_id: str | None = None,
-        title: str = "Use after free",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -367,7 +383,7 @@ class UseAfterFree(Failure):
         self.free = free
         self.usage = usage
         self.deleted_case_id = deleted_case_id
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.CRITICAL
 
@@ -385,6 +401,8 @@ class EnsureResourceAvailability(Failure):
     """Resource is not available immediately after creation."""
 
     code = "ST302"
+    checks = ("ensure_resource_availability",)
+    kind_title = "Resource is not available after creation"
 
     __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "case_id", "severity")
 
@@ -395,14 +413,14 @@ class EnsureResourceAvailability(Failure):
         message: str,
         created_with: str,
         not_available_with: str,
-        title: str = "Resource is not available after creation",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.created_with = created_with
         self.not_available_with = not_available_with
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -421,6 +439,8 @@ class IgnoredAuth(Failure):
     """The API operation does not check the specified authentication."""
 
     code = "ST401"
+    checks = ("ignored_auth",)
+    kind_title = "Authentication not enforced"
 
     __slots__ = ("operation", "message", "scenario", "title", "case_id", "severity")
 
@@ -450,6 +470,8 @@ class ObjectLevelAuthorizationViolation(Failure):
     """One identity received an object that another identity created."""
 
     code = "ST402"
+    checks = ("object_level_authorization",)
+    kind_title = "Object-level authorization bypass"
 
     __slots__ = ("operation", "message", "owner", "peer", "owner_case_id", "title", "case_id", "severity")
     # Rerunning as the peer alone does not recreate the owner's object.
@@ -463,7 +485,7 @@ class ObjectLevelAuthorizationViolation(Failure):
         owner: str,
         peer: str,
         owner_case_id: str,
-        title: str = "Object-level authorization bypass",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -471,7 +493,7 @@ class ObjectLevelAuthorizationViolation(Failure):
         self.owner = owner
         self.peer = peer
         self.owner_case_id = owner_case_id
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.CRITICAL
 
@@ -490,6 +512,8 @@ class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""
 
     code = "ST202"
+    checks = ("positive_data_acceptance",)
+    kind_title = "API rejected schema-compliant request"
 
     __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
 
@@ -500,14 +524,14 @@ class RejectedPositiveData(Failure):
         message: str,
         status_code: int,
         allowed_statuses: list[str],
-        title: str = "API rejected schema-compliant request",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.status_code = status_code
         self.allowed_statuses = allowed_statuses
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -520,6 +544,8 @@ class MissingHeaderNotRejected(Failure):
     """API did not reject request without required header."""
 
     code = "ST203"
+    checks = ("missing_required_header",)
+    kind_title = "Missing header not rejected"
 
     __slots__ = (
         "operation",
@@ -540,7 +566,7 @@ class MissingHeaderNotRejected(Failure):
         status_code: int,
         expected_statuses: list[int],
         message: str,
-        title: str = "Missing header not rejected",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -548,7 +574,7 @@ class MissingHeaderNotRejected(Failure):
         self.status_code = status_code
         self.expected_statuses = expected_statuses
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -561,6 +587,8 @@ class UnsupportedMethodResponse(Failure):
     """API response for unsupported HTTP method is incorrect."""
 
     code = "ST204"
+    checks = ("unsupported_method",)
+    kind_title = "Unsupported methods"
 
     __slots__ = (
         "operation",
@@ -583,7 +611,7 @@ class UnsupportedMethodResponse(Failure):
         allow_header_present: bool | None = None,
         failure_reason: str,  # "wrong_status" or "missing_allow_header"
         message: str,
-        title: str = "Unsupported methods",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -592,7 +620,7 @@ class UnsupportedMethodResponse(Failure):
         self.allow_header_present = allow_header_present
         self.failure_reason = failure_reason
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -605,6 +633,8 @@ class AllowHeaderMismatch(Failure):
     """`Allow` header does not list the same methods as the schema."""
 
     code = "ST205"
+    checks = ("allow_header_conformance",)
+    kind_title = "Invalid Allow header"
 
     __slots__ = (
         "operation",
@@ -625,7 +655,7 @@ class AllowHeaderMismatch(Failure):
         missing_methods: list[str],
         undocumented_methods: list[str],
         message: str,
-        title: str = "Invalid Allow header",
+        title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -633,7 +663,7 @@ class AllowHeaderMismatch(Failure):
         self.missing_methods = missing_methods
         self.undocumented_methods = undocumented_methods
         self.message = message
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
