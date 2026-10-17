@@ -856,6 +856,27 @@ def test_positive_arrays_honor_contains(ctx, body):
 
 
 @pytest.mark.parametrize(
+    "pattern",
+    [
+        "^(?!aws:)[a-z]*$",
+        "^[\\p{L}_.:]*$",
+        "^(?!aws:)[\\p{L}\\p{Z}\\p{N}_.:\\/=+\\-@%]*$",
+    ],
+    ids=["lookahead", "property-escape", "both"],
+)
+def test_positive_arrays_reach_max_items_for_patterned_strings_with_min_length(ctx, pattern):
+    # Strings the pattern lets be empty must still fill every slot of a 50-item array.
+    body = {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 50,
+        "items": {"type": "string", "pattern": pattern, "minLength": 1, "maxLength": 128},
+    }
+
+    assert {len(case.body) for case in collect_coverage_cases(ctx, body, positive=True)} >= {49, 50}
+
+
+@pytest.mark.parametrize(
     "body",
     [
         {

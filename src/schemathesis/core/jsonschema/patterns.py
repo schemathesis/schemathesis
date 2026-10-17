@@ -878,6 +878,17 @@ _AT_END: _Node = (sre.AT, sre.AT_END)
 def _transform(parsed: list[_Node], min_length: int | None, max_length: int | None) -> list[_Node] | None:
     """Top-level transformer. Dispatches by pattern structure."""
     nodes = list(parsed)
+    lookarounds = 0
+    if nodes and nodes[0] == _AT_BEGINNING:
+        while 1 + lookarounds < len(nodes) and nodes[1 + lookarounds][0] in (sre.ASSERT, sre.ASSERT_NOT):
+            lookarounds += 1
+    if lookarounds:
+        # Lookarounds right after `^` consume nothing, so the length budget goes to what follows them;
+        # they stay in place and keep ruling out what they rule out.
+        transformed = _transform([nodes[0], *nodes[1 + lookarounds :]], min_length, max_length)
+        if transformed is None:
+            return None
+        return [transformed[0], *nodes[1 : 1 + lookarounds], *transformed[1:]]
     match _classify_structure(nodes):
         # For cases without full anchoring: JSON Schema `pattern` is a substring match,
         # so `{1,50}` alone doesn't reject strings longer than 50 chars. Add the missing
