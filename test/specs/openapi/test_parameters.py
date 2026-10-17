@@ -9,7 +9,8 @@ from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 
 import schemathesis
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
@@ -598,6 +599,350 @@ def test_write_only(ctx):
         response = case.call_and_validate()
         assert "write" not in response.json()
         assert "read" in response.json()
+
+
+READ_ONLY_ID = {"type": "integer", "readOnly": True}
+NAME = {"type": "string"}
+
+
+def _json_body(schema):
+    return {"requestBody": {"required": True, "content": {"application/json": {"schema": schema}}}}
+
+
+def _keys(value):
+    if isinstance(value, dict):
+        yield from value
+        for item in value.values():
+            yield from _keys(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _keys(item)
+
+
+@pytest.mark.parametrize(
+    ("version", "definition", "components"),
+    [
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                    "required": ["name"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="ref-to-read-only",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {"id": {"allOf": [{"$ref": "#/components/schemas/Id"}]}, "name": NAME},
+                    "required": ["name"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="all-of-ref",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"allOf": [{"$ref": "#/components/schemas/Id"}], "readOnly": False},
+                        "name": NAME,
+                    },
+                    "required": ["name"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="all-of-ref-with-writable-sibling",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {"type": "object", "properties": {"id": {"allOf": [READ_ONLY_ID]}, "name": NAME}, "required": ["name"]}
+            ),
+            {},
+            id="inline-all-of",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body({"properties": {"id": READ_ONLY_ID, "name": NAME}, "required": ["name"]}),
+            {},
+            id="untyped-parent",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body({"$ref": "#/components/schemas/Resource"}),
+            {"schemas": {"Resource": {"properties": {"id": READ_ONLY_ID, "name": NAME}, "required": ["name"]}}},
+            id="untyped-parent-behind-ref",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Resource"},
+                        {"properties": {"name": NAME}, "required": ["name"]},
+                    ]
+                }
+            ),
+            {"schemas": {"Resource": {"properties": {"id": READ_ONLY_ID}}}},
+            id="all-of-untyped-base",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "allOf": [{"$ref": "#/components/schemas/Resource"}],
+                    "properties": {"name": NAME},
+                    "required": ["id", "name"],
+                }
+            ),
+            {"schemas": {"Resource": {"properties": {"id": READ_ONLY_ID}}}},
+            id="required-in-parent-of-ref-base",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                    "required": ["id", "name"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="required-ref",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                    "required": ["name"],
+                }
+            ),
+            {"schemas": {"Id": {**READ_ONLY_ID, "nullable": True}}},
+            id="nullable-ref-target",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": NAME,
+                        "owner": {"$ref": "#/components/schemas/Id"},
+                        "child": {"$ref": "#/components/schemas/Child"},
+                    },
+                    "required": ["name", "child"],
+                }
+            ),
+            {
+                "schemas": {
+                    "Id": {**READ_ONLY_ID, "nullable": True},
+                    "Child": {
+                        "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                        "required": ["name"],
+                    },
+                }
+            },
+            id="nullable-ref-target-shared",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": NAME,
+                        "child": {
+                            "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                            "required": ["name"],
+                        },
+                    },
+                    "required": ["name", "child"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="nested-object",
+        ),
+        pytest.param(
+            "3.0.2",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": NAME,
+                        "items": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                                "required": ["name"],
+                            },
+                        },
+                    },
+                    "required": ["name", "items"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="array-items",
+        ),
+        pytest.param(
+            "2.0",
+            {
+                "parameters": [
+                    {"in": "body", "name": "body", "required": True, "schema": {"$ref": "#/definitions/Resource"}}
+                ]
+            },
+            None,
+            id="swagger-2.0",
+        ),
+        pytest.param(
+            "3.1.0",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {"id": {"$ref": "#/components/schemas/Id"}, "name": NAME},
+                    "required": ["name"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="openapi-3.1-ref",
+        ),
+        pytest.param(
+            "3.1.0",
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"anyOf": [{"$ref": "#/components/schemas/Id"}, {"type": "null"}]},
+                        "name": NAME,
+                    },
+                    "required": ["name"],
+                }
+            ),
+            {"schemas": {"Id": READ_ONLY_ID}},
+            id="openapi-3.1-nullable-ref",
+        ),
+    ],
+)
+def test_read_only_properties_are_not_generated_in_request_bodies(ctx, version, definition, components):
+    kwargs = {"definitions": {"Resource": {"properties": {"id": READ_ONLY_ID, "name": NAME}, "required": ["name"]}}}
+    if components is not None:
+        kwargs = {"components": components}
+    operation = ctx.openapi.load_operation(
+        "POST /items", {**definition, "responses": {"200": {"description": "OK"}}}, version=version, **kwargs
+    )
+    bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 30)]
+    assert any(isinstance(body, dict) and "name" in body for body in bodies)
+    for body in bodies:
+        assert "id" not in set(_keys(body)), f"Read-only field sent: {body!r}"
+
+
+@pytest.mark.parametrize("required", [True, "id"], ids=["boolean", "string"])
+@pytest.mark.parametrize("behind_ref", [False, True], ids=["inline", "ref"])
+def test_read_only_property_under_malformed_required_is_reported_as_schema_error(ctx, required, behind_ref):
+    resource = {"properties": {"id": READ_ONLY_ID, "name": NAME}, "required": required}
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "parameters": [
+                {
+                    "in": "body",
+                    "name": "body",
+                    "required": True,
+                    "schema": {"$ref": "#/definitions/Resource"} if behind_ref else resource,
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
+        definitions={"Resource": resource},
+    )
+    with pytest.raises(RejectedSchemaDefinition, match="Invalid `required` definition"):
+        generate_many(operation.as_strategy(), 1)
+
+
+@pytest.mark.parametrize(
+    "read_only",
+    ["true", 1],
+    ids=["string", "integer"],
+)
+def test_truthy_read_only_flag_is_honored(ctx, read_only):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        _json_body(
+            {
+                "type": "object",
+                "properties": {"id": {"type": "integer", "readOnly": read_only}, "name": NAME},
+                "required": ["name"],
+            }
+        )
+        | {"responses": {"200": {"description": "OK"}}},
+    )
+    for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 30):
+        assert "id" not in case.body, f"Read-only field sent: {case.body!r}"
+
+
+@pytest.mark.timeout(30)
+def test_read_only_property_in_self_referencing_all_of(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        _json_body(
+            {
+                "allOf": [{"$ref": "#/components/schemas/Node"}],
+                "properties": {"name": NAME, "child": {"allOf": [{"$ref": "#/components/schemas/Node"}]}},
+                "required": ["id", "name"],
+            }
+        )
+        | {"responses": {"200": {"description": "OK"}}},
+        components={
+            "schemas": {"Node": {"allOf": [{"$ref": "#/components/schemas/Node"}], "properties": {"id": READ_ONLY_ID}}}
+        },
+    )
+    # Checked outside generation, which would swallow the timeout.
+    assert not operation.body[0].is_valid({"name": "x", "child": {"id": 1}})
+    bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 30)]
+    assert any(isinstance(body, dict) and "name" in body for body in bodies)
+    for body in bodies:
+        assert "id" not in set(_keys(body)), f"Read-only field sent: {body!r}"
+
+
+def test_read_only_property_is_sent_where_another_media_type_keeps_it_writable(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"id": READ_ONLY_ID, "name": NAME},
+                            "required": ["name"],
+                        }
+                    },
+                    "application/x-www-form-urlencoded": {
+                        "schema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+                    },
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    bodies = {
+        case.media_type: case.body
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 30)
+    }
+    assert "id" not in bodies["application/json"]
+    assert "id" in bodies["application/x-www-form-urlencoded"]
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
