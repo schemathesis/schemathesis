@@ -128,15 +128,13 @@ def create_test(
         # Values are whatever each Hypothesis setting accepts.
         overrides: dict[str, Any] = {}
         if hypothesis.settings.default is not CI:
-            # Merge strategy:
-            # - Use schemathesis' config.settings as base (provides operational defaults)
-            # - Override with user's customizations (values that differ from hypothesis built-in defaults)
-            # This respects both @settings decorators and loaded profiles while allowing
-            # schemathesis to set its operational requirements (deadline, verbosity, etc.)
+            # Values from `@settings` or a loaded profile that differ from Hypothesis defaults override the config,
+            # except that a loaded profile never overrides options set via CLI, config file or `update()`.
             overrides = {
                 item: getattr(user_settings, item)
                 for item in all_settings
                 if getattr(user_settings, item) != getattr(hypothesis_defaults, item)
+                and (user_explicit_settings is not None or item not in config.explicit_setting_names)
             }
         elif config.apply_ci_profile:
             # Hypothesis loads its `ci` profile on its own when it detects a CI environment. Precedence:
