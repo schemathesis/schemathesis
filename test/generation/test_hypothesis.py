@@ -2735,6 +2735,8 @@ RECURSIVE_SHAPES = [
     {"type": "object", "properties": {"other": {"$ref": "#/$defs/other"}}},
     # A pointer at a position `prefixItems` names, where the array may also stop before it.
     {"type": "array", "prefixItems": [{"$ref": "#/$defs/node"}, {"type": "integer"}], "maxItems": 2},
+    # A pointer under `additionalProperties`, where every undeclared key nests another level.
+    {"type": "object", "additionalProperties": {"$ref": "#/$defs/node"}},
 ]
 
 
