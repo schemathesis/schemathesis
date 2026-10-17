@@ -699,6 +699,30 @@ def _collect_inherited_properties(
     return properties, frozenset(consulted)
 
 
+def write_only_fields(response: OpenApiResponse, resolver: Resolver) -> set[str]:
+    """Top-level fields the response declares `writeOnly`, which therefore never appear in it."""
+    schema = response.get_raw_schema()
+    if not isinstance(schema, dict):
+        return set()
+    current_resolver = response.resolver if response.resolver is not None else resolver
+    try:
+        schema_resolver, resolved = maybe_resolve_with_resolver(schema, current_resolver)
+        fields = set()
+        for name, (field_resolver, subschema) in _collect_properties(resolved, schema_resolver).items():
+            if not isinstance(subschema, dict):
+                continue
+            _, field = maybe_resolve_with_resolver(subschema, field_resolver)
+            branches = field.get("allOf")
+            if any(
+                isinstance(node, dict) and node.get("writeOnly") is True
+                for node in (subschema, field, *(branches if isinstance(branches, list) else ()))
+            ):
+                fields.add(name)
+    except (RefResolutionError, InvalidSchema):
+        return set()
+    return fields
+
+
 def _declared_fields(schema: Mapping[str, Any], resolver: Resolver) -> frozenset[str] | None:
     """Fields declared by an object schema, its `allOf` parents, and any of its `oneOf` / `anyOf` alternatives."""
     schema_resolver, resolved = maybe_resolve_with_resolver(schema, resolver)

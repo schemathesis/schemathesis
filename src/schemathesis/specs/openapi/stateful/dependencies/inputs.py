@@ -29,6 +29,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
     ResponseResourceCache,
     cached_resources_from_responses,
+    write_only_fields,
 )
 
 if TYPE_CHECKING:
@@ -1262,6 +1263,72 @@ def bind_id_fields_to_returned_resources(operations: OperationMap) -> None:
             input_slot.resource = candidates[0]
             input_slot.resource_field = "id"
             input_slot.is_suffix_matched = False
+
+
+def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: OperationMap) -> None:
+    """Fill `{warehouseId}` of `/warehouses/{warehouseId}/shipments/{id}` from `Shipment.warehouseId` if unproduced."""
+    produced = _produced_resource_names(operations)
+    for label, operation in operations.items():
+        item_parameter = naming.trailing_path_parameter(operation.path)
+        if item_parameter is None:
+            continue
+        item = next(
+            (
+                input_slot.resource
+                for input_slot in operation.inputs
+                if input_slot.parameter_location == ParameterLocation.PATH
+                and input_slot.parameter_name == item_parameter
+            ),
+            None,
+        )
+        if item is None or item.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
+            continue
+        declared = schema.find_operation_by_label(label)
+        assert declared is not None
+        path_parameters = {
+            parameter.name: parameter
+            for parameter in declared.iter_parameters()
+            if parameter.location == ParameterLocation.PATH
+        }
+        # A `writeOnly` field is never in the item a response returns.
+        unreadable = {
+            field
+            for response in declared.responses.iter_successful_responses()
+            for field in write_only_fields(response, schema.root_resolver)
+        }
+        for input_slot in operation.inputs:
+            parameter_name = input_slot.parameter_name
+            if (
+                input_slot.parameter_location == ParameterLocation.PATH
+                and parameter_name != item_parameter
+                and isinstance(parameter_name, str)
+                and parameter_name in item.fields
+                and input_slot.resource.source == DefinitionSource.PARAMETER_INFERENCE
+                and input_slot.resource.name not in produced
+                and parameter_name in path_parameters
+                and parameter_name not in unreadable
+                # A path segment takes one scalar of the declared type, not a list or a nested object.
+                and _fits_path_parameter(item.types.get(parameter_name, set()), path_parameters[parameter_name])
+            ):
+                input_slot.resource = item
+                input_slot.resource_field = parameter_name
+                input_slot.is_parent_key = True
+
+
+def _fits_path_parameter(field_types: set[str], parameter: OpenApiParameter) -> bool:
+    if not field_types & _SCALAR_TYPES:
+        return False
+    declared_types = parameter_types(parameter)
+    if field_types & set(declared_types):
+        return True
+    # A plain string segment carries a number as is; a `format` or `pattern` (`uuid`) rules numbers out.
+    parameter_schema = _parameter_schema(parameter)
+    return (
+        declared_types == ["string"]
+        and isinstance(parameter_schema, dict)
+        and "format" not in parameter_schema
+        and "pattern" not in parameter_schema
+    )
 
 
 def _module_of(path: str) -> str:

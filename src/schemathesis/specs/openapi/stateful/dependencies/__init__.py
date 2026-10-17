@@ -23,6 +23,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     bind_echoed_body_fields,
     bind_id_fields_to_returned_resources,
     bind_item_parameters_to_collections,
+    bind_parent_keys_to_item_fields,
     disambiguate_module_variants,
     disambiguate_path_suffix_matches,
     extract_inputs,
@@ -257,6 +258,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # `fromAirportId` names what responses return under `fromAirport` (`AirportResponse.id`).
     bind_id_fields_to_returned_resources(operations)
+
+    # An item carries the key of the parent it lives under (`Shipment.warehouseId`) when nothing produces the parent.
+    bind_parent_keys_to_item_fields(schema, operations)
 
     # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
     bind_echoed_body_fields(operations, writable_body_fields)
