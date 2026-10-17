@@ -1,0 +1,12 @@
+Exit code: 0
+---
+Stdout:
+ST105  Undocumented Content-Type
+checks content_type_conformance
+
+`Content-Type` that matches none of the documented media types.
+
+Error handlers often send `application/problem+json`; document it on the error
+responses.
+
+`--exclude-checks content_type_conformance` turns it off, along with ST106.

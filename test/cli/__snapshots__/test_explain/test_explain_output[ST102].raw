@@ -1,0 +1,13 @@
+Exit code: 0
+---
+Stdout:
+ST102  Server error on unexpected Content-Type
+checks not_a_server_error
+
+5xx for a request sent with an undeclared `Content-Type`, while the same request
+with a declared one succeeds.
+
+Schemathesis sends media types the operation doesn't declare, and multipart
+without a boundary. Reject them with `415` or `400` before the body parser runs.
+
+`--exclude-checks not_a_server_error` turns it off, along with ST101, ST113.

@@ -1,0 +1,6 @@
+Exit code: 2
+---
+Stdout:
+error: unknown failure code or name `ST1O8`
+tip: a similar value exists: ST108 (Response violates schema)
+Run `st explain --list` to see all codes.

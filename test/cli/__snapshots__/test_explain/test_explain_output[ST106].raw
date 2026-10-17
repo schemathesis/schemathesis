@@ -1,0 +1,12 @@
+Exit code: 0
+---
+Stdout:
+ST106  Malformed media type
+checks content_type_conformance
+
+`Content-Type` or a schema media type that is not a valid `type/subtype`.
+
+The message says which side is malformed. Usually a missing `/`, as in
+`application-json`.
+
+`--exclude-checks content_type_conformance` turns it off, along with ST105.

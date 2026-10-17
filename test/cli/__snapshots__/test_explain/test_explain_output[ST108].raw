@@ -1,0 +1,17 @@
+Exit code: 0
+---
+Stdout:
+ST108  Response violates schema
+checks response_schema_conformance, response_headers_conformance
+
+Response body or header value that its documented schema rejects.
+
+If `format` alone causes most failures, skip format validation while you fix the
+structural ones:
+
+  # schemathesis.toml
+  [checks.response_schema_conformance]
+  validate-formats = false
+
+`--exclude-checks response_schema_conformance,response_headers_conformance`
+turns it off, along with ST107, ST109, ST110, ST111, ST114, ST115.

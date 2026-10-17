@@ -980,6 +980,47 @@ $ st replay [OPTIONS] [PATH]
     $ st replay --auth-wfc ./market-auth.yaml --auth-wfc-user admin
     ```
 
+## `explain`
+
+The `explain` command prints what a failure code means, the checks that report it, common causes and fixes, and how to allow or turn it off. Find the code in the `code` field of NDJSON and JSON reports, or in the `message` attribute of JUnit failures.
+
+```console
+$ st explain [OPTIONS] [CODE]
+```
+
+!!! note "Required Parameter"
+
+    **CODE** (unless `--list` is given): A failure code (`ST108` or `108`, any case) or a check name (`response_schema_conformance`, which lists the codes the check reports).
+
+    ```console
+    $ st explain ST108
+    $ st explain response_schema_conformance
+    ```
+
+An unknown value exits with code `2` and suggests a close match when one exists.
+
+#### `--list`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    List every failure code with its title and summary, grouped by the code's hundreds digit.
+
+    ```console
+    $ st explain --list
+    ```
+
+#### `--force-color`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    Color the output even when it is not a terminal.
+
 ## Exit codes
 
 Schemathesis uses predictable exit codes so automation can interpret results:

@@ -1,0 +1,21 @@
+Exit code: 0
+---
+Stdout:
+ST203  Missing header not rejected
+checks missing_required_header
+
+Request without a required header parameter accepted.
+
+A missing `Authorization` must get `401`; the list below covers other headers.
+To make a header from `securitySchemes` optional, add `{}` to the operation's
+`security`. Another rejection status, such as `428` for `If-Match`, can be
+allowed for the operation:
+
+  # schemathesis.toml
+  [[operations]]
+  include-name = "POST /orders"
+  checks.missing_required_header.expected-statuses = [
+    "400", "401", "403", "406", "415", "422", "428",
+  ]
+
+`--exclude-checks missing_required_header` turns it off.

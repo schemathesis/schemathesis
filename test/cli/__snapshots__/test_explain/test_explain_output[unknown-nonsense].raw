@@ -1,0 +1,5 @@
+Exit code: 2
+---
+Stdout:
+error: unknown failure code or name `nonsense`
+Run `st explain --list` to see all codes.

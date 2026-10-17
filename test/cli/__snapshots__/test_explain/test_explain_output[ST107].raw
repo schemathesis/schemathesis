@@ -1,0 +1,12 @@
+Exit code: 0
+---
+Stdout:
+ST107  Missing required headers
+checks response_headers_conformance
+
+Required response header missing for this status.
+
+A required header under `default` or a range such as `4XX` applies to error
+responses too.
+
+`--exclude-checks response_headers_conformance` turns it off.

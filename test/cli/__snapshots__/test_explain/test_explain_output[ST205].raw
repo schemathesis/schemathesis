@@ -1,0 +1,13 @@
+Exit code: 0
+---
+Stdout:
+ST205  Invalid Allow header
+checks allow_header_conformance
+
+`Allow` in the `OPTIONS` response lists different methods than the schema
+declares for the path.
+
+CORS middleware or a gateway that sends one `Allow` for every path causes this:
+fix it there, or remove `options` from `phases.coverage.unexpected-methods`.
+
+`--exclude-checks allow_header_conformance` turns it off.

@@ -1,0 +1,18 @@
+Exit code: 0
+---
+Stdout:
+ST112  Response time limit exceeded
+checks max_response_time
+
+Response slower than the configured response time limit.
+
+Measured until the response headers arrive. `--checks all` turns it on with a
+10s limit. Timings vary, so no replay case is stored: rerun `st run`. A
+slow-by-design operation can get its own limit, in seconds:
+
+  # schemathesis.toml
+  [[operations]]
+  include-name = "GET /reports"
+  checks.max_response_time = 30.0
+
+`--exclude-checks max_response_time` turns it off.

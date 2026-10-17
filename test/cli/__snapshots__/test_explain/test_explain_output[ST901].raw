@@ -1,0 +1,11 @@
+Exit code: 0
+---
+Stdout:
+ST901  Custom check failed
+checks user-defined
+
+Response that breaks a rule a custom `@schemathesis.check` enforces.
+
+The failure title names the check.
+
+`--exclude-checks <name>` turns it off.
