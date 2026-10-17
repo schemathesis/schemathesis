@@ -13,6 +13,7 @@ from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
+from schemathesis.specs.openapi.converter import is_read_only
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
@@ -53,7 +54,7 @@ def extract_inputs(
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_field_named_path_parameters: list[tuple[str, str]] | None = None,
-    deferred_writable_body_fields: dict[str, JsonSchema] | None = None,
+    deferred_writable_body_fields: dict[str, JsonSchema],
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
@@ -368,6 +369,25 @@ def _flatten_composition(schema: dict[str, Any], bundled: dict[str, Any]) -> tup
     return properties, required
 
 
+def assigns_identifier(operation: APIOperation, resource_name: str) -> bool:
+    """Whether the request body declares a `readOnly` identifier of `resource_name`, which the server sets."""
+    for body in operation.body:
+        schema = body.raw_schema
+        if not isinstance(schema, dict):
+            continue
+        bundled = schema.get(BUNDLE_STORAGE_KEY, {})
+        properties, _ = _flatten_composition(maybe_resolve_bundled(schema), bundled)
+        for name, subschema in properties.items():
+            lower = name.lower()
+            if (
+                (lower == "id" or lower.endswith(("_id", "-id")) or name.endswith(("Id", "ID")))
+                and naming.from_parameter(name, operation.path, body_field=True) == resource_name
+                and is_read_only(subschema, bundled)
+            ):
+                return True
+    return False
+
+
 _SCALAR_TYPES = frozenset({"string", "integer", "number"})
 
 
@@ -386,7 +406,7 @@ def _resolve_body_dependencies(
     deferred_nested_fks: list[tuple[str, str, str]],
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
-    deferred_writable_body_fields: dict[str, JsonSchema] | None = None,
+    deferred_writable_body_fields: dict[str, JsonSchema],
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
@@ -426,10 +446,9 @@ def _resolve_body_dependencies(
     path = operation.path
     for property_name, subschema in properties.items():
         # Generation never sends `readOnly` fields, so a link must not either.
-        if deferred_writable_body_fields is not None and not (
-            isinstance(subschema, dict) and subschema.get("readOnly")
-        ):
-            deferred_writable_body_fields[property_name] = subschema
+        if is_read_only(subschema, bundled):
+            continue
+        deferred_writable_body_fields[property_name] = subschema
         if deferred_body_fields is not None and property_name in required and _is_scalar(subschema):
             deferred_body_fields.append((property_name, subschema))
         resource_name = naming.from_parameter(property_name, path, body_field=True)
@@ -525,7 +544,7 @@ class NestedFKScan:
     by_reference: NestedFKCache
     # Bodies reuse the same schemas at many places; each is scanned once per remaining depth.
     by_schema: dict[tuple[int, int], list[tuple[str, str, str]]]
-    # Flattened once whatever the remaining depth.
+    # Flattened writable properties, once whatever the remaining depth.
     flattened: dict[int, dict[str, Any]]
 
 
@@ -551,7 +570,7 @@ def _extract_nested_body_fk_fields(
     else:
         properties, _ = _flatten_composition(schema, scan.bundled)
     for property_name, subschema in properties.items():
-        if not isinstance(subschema, dict):
+        if not isinstance(subschema, dict) or is_read_only(subschema, scan.bundled):
             continue
         for suffix, target_resource_name, target_field in _container_fk_fields(subschema, scan, 5):
             nested_path = property_name + suffix
@@ -604,10 +623,12 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
     # Composition branches may carry the actual object shape, so flatten before treating as object.
     properties = scan.flattened.get(id(schema))
     if properties is None:
-        properties = scan.flattened[id(schema)] = _flatten_composition(schema, scan.bundled)[0]
-    for name, subschema in properties.items():
-        if not isinstance(subschema, dict):
-            continue
+        properties = scan.flattened[id(schema)] = {
+            name: subschema
+            for name, subschema in _flatten_composition(schema, scan.bundled)[0].items()
+            if isinstance(subschema, dict) and not is_read_only(subschema, scan.bundled)
+        }
+    for name in properties:
         fk_info = infer_fk_target(name)
         if fk_info is None:
             continue
@@ -732,6 +753,11 @@ def update_input_field_bindings(resource_names: set[str], operations: OperationM
 def merge_related_resources(operations: OperationMap, resources: ResourceMap) -> None:
     """Merge parameter-inferred resources with schema-defined resources from related operations."""
     candidates = find_producer_consumer_candidates(operations)
+    returned_by: dict[tuple[str, str], set[str]] = {}
+    for label, node in operations.items():
+        base_path = _extract_base_path(node.path)
+        for output in node.outputs:
+            returned_by.setdefault((base_path, output.resource.name), set()).add(label)
 
     for producer_name, consumer_name in candidates:
         producer = operations[producer_name]
@@ -739,6 +765,11 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap) ->
 
         # Try to upgrade each input slot
         for input_slot in consumer.inputs:
+            # A fieldless resource its own collection returns is real (a polymorphic listing), not a path-named stub.
+            if input_slot.resource.source == DefinitionSource.SCHEMA_WITHOUT_PROPERTIES and returned_by.get(
+                (_extract_base_path(consumer.path), input_slot.resource.name), set()
+            ) - {consumer_name}:
+                continue
             result = try_merge_input_resource(input_slot, producer.outputs, resources)
 
             if result is not None:
@@ -1375,9 +1406,9 @@ def try_merge_input_resource(
     """Try to upgrade an input's resource to a producer's resource."""
     consumer_resource = input_slot.resource
 
-    # Only upgrade parameter-inferred resources (low confidence) or suffix-matched inputs
+    # Only upgrade resources without declared fields (low confidence) or suffix-matched inputs
     # Suffix-matched inputs may have matched a less specific resource (e.g., "Blog post" instead of "Blog post public")
-    if consumer_resource.source != DefinitionSource.PARAMETER_INFERENCE and not input_slot.is_suffix_matched:
+    if consumer_resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES and not input_slot.is_suffix_matched:
         return None
 
     # Try each producer output

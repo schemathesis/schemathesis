@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.stateful.dependencies import naming
+from schemathesis.specs.openapi.stateful.dependencies.inputs import assigns_identifier
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
     Cardinality,
@@ -169,6 +170,9 @@ def _body_keyed_outputs(
         return
 
     if matching.resource.name in already_extracted:
+        return
+    # The server sets the new item's id, so another body field naming the resource refers to something else.
+    if assigns_identifier(operation, path_resource):
         return
 
     success_status = operation.responses.first_successful_status_code()
