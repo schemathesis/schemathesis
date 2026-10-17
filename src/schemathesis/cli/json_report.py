@@ -86,6 +86,7 @@ def build_document(
         "failures": [
             {
                 "type": group.type,
+                "code": group.code,
                 "title": group.title,
                 "severity": group.severity.value,
                 "count": group.count,

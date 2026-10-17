@@ -100,6 +100,7 @@ def test_report_records_failures(ctx, cli, json_path):
     assert report["failures"] == [
         {
             "type": "ServerError",
+            "code": "ST101",
             "title": "Server error",
             "severity": "critical",
             "count": 1,

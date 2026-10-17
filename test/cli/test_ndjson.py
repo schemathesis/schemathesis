@@ -221,6 +221,7 @@ def test_failure_details(ctx, cli, ndjson_path):
             "title": "Server error",
             "message": "",
             "severity": "critical",
+            "code": "ST101",
         }
     ] * len(failures)
 

@@ -12,7 +12,12 @@ from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.transport import Response
-from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.openapi.checks import (
+    ContentDeserializationError,
+    DiscriminatorMismatch,
+    JsonSchemaError,
+    MissingContentType,
+)
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
 from schemathesis.specs.openapi.discriminator import get_implicit_discriminator_value
 
@@ -130,9 +135,8 @@ class ResponseValidator:
             return None
         except Exception as exc:
             failures.append(
-                Failure(
+                ContentDeserializationError(
                     operation=operation.label,
-                    title="Content deserialization error",
                     message=f"Failed to deserialize response content:\n\n  {exc}",
                 )
             )
@@ -318,9 +322,8 @@ def _discriminator_failure(
         return None
 
     known = ", ".join(f"'{v}'" for v in sorted(known_values))
-    return Failure(
+    return DiscriminatorMismatch(
         operation=operation.label,
-        title="Discriminator value not in schema mapping",
         message=(
             f"Response contains discriminator property '{property_name}' with value {value!r},\n"
             f"which does not match any of the known schema values: {known}"

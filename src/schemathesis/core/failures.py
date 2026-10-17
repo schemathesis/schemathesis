@@ -59,6 +59,11 @@ _SEVERITY_ORDER = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, S
 class Failure(AssertionError):
     """API check failure."""
 
+    # Stable identity in reports; a code is never renumbered or reused.
+    # The hundreds digit says what went wrong, never the protocol: 1 response, 2 request handling, 3 stateful,
+    # 4 auth, 9 custom. A protocol-specific failure gets the next free code in its group.
+    code: ClassVar[str] = "ST901"
+
     __slots__ = ("operation", "title", "message", "case_id", "severity")
     # Whether rerunning as the identity that sent the request reproduces the failure.
     reproducible_by_identity: ClassVar[bool] = True
@@ -93,6 +98,7 @@ class Failure(AssertionError):
         """Wire representation shared by the NDJSON report and cross-worker transport."""
         return {
             "type": self.__class__.__name__,
+            "code": self.code,
             "operation": self.operation,
             "title": self.title,
             "message": self.message,
@@ -166,6 +172,8 @@ def get_origin(exception: BaseException, seen: tuple[BaseException, ...] = ()) -
 
 
 class CustomFailure(Failure):
+    code = "ST901"
+
     __slots__ = ("operation", "title", "message", "exception", "case_id", "severity", "origin")
 
     def __init__(
@@ -194,6 +202,8 @@ class CustomFailure(Failure):
 
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
+
+    code = "ST112"
 
     __slots__ = ("operation", "elapsed", "deadline", "title", "message", "case_id", "severity")
 
@@ -228,6 +238,8 @@ def is_reproducible_failure(failure: Failure) -> bool:
 class ServerError(Failure):
     """Server responded with an error."""
 
+    code = "ST101"
+
     __slots__ = ("operation", "status_code", "title", "message", "case_id", "severity")
 
     def __init__(
@@ -254,6 +266,8 @@ class ServerError(Failure):
 class ContentTypeServerError(ServerError):
     """Server failed on a request whose `Content-Type` is malformed or not accepted by the operation."""
 
+    code = "ST102"
+
     __slots__ = ()
 
     def __init__(self, *, operation: str, status_code: int, message: str, case_id: str | None = None) -> None:
@@ -268,6 +282,8 @@ class ContentTypeServerError(ServerError):
 
 class MalformedJson(Failure):
     """Failed to deserialize JSON."""
+
+    code = "ST109"
 
     __slots__ = (
         "operation",
@@ -326,6 +342,8 @@ class MalformedJson(Failure):
 
 class AcceptedNegativeData(Failure):
     """Response with negative data was accepted."""
+
+    code = "ST201"
 
     __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
 

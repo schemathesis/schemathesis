@@ -69,7 +69,7 @@ def test_junitxml_file(ctx, cli, hypothesis_max_examples, tmp_path, path, in_con
     failure = testcases_by_name["GET /api/failure"]
     assert failure.tag == "testcase"
     assert failure[0].tag == "failure"
-    assert failure[0].attrib["type"] == "failure"
+    assert failure[0].attrib == {"type": "failure", "message": "ST101"}
     message = extract_message(failure[0], server_host)
     assert "Server error" in message
     assert "[500] Internal Server Error" in message

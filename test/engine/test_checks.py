@@ -14,7 +14,9 @@ from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.failure_codes import FAILURE_CLASSES
 from schemathesis.openapi.checks import (
+    DiscriminatorMismatch,
     JsonSchemaError,
     MalformedMediaType,
     MissingHeaders,
@@ -1595,14 +1597,14 @@ def test_malformed_media_type_identity_ignores_message():
     )
 
 
+def test_discriminator_mismatch_identity_ignores_value():
+    assert DiscriminatorMismatch(operation="GET /pets", message="`kind` is 'bird'") == DiscriminatorMismatch(
+        operation="GET /pets", message="`kind` is 'fish'"
+    )
+
+
 def test_no_failure_class_keys_on_its_message():
     # A message-derived key changes whenever wording improves, which a stored key cannot survive.
     schemathesis.checks.load_all_checks()
-    subclasses = []
-    stack = [Failure]
-    while stack:
-        for subclass in stack.pop().__subclasses__():
-            subclasses.append(subclass)
-            stack.append(subclass)
 
-    assert [cls.__name__ for cls in subclasses if cls._unique_key is Failure._unique_key] == []
+    assert [cls.__name__ for cls in FAILURE_CLASSES if cls._unique_key is Failure._unique_key] == []
