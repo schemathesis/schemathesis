@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn, cast
@@ -115,13 +116,27 @@ class _FilterContext:
     operation: APIOperation
 
 
+class RawSchemaVersion:
+    """Bumped whenever the raw schema changes; shared by a schema and its clones, which share the raw schema."""
+
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value = 0
+
+
 class OperationLoader:
     """OpenAPI operation iteration, construction, and the statistic walk over `paths`."""
 
-    __slots__ = ("schema", "_filter_context")
+    __slots__ = ("schema", "_filter_context", "_built", "_built_at", "_lock")
 
     def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
+        # Every lookup returns the same operation, so its hooks run once and its caches outlive phases.
+        self._built: dict[tuple[str, str, str], APIOperation] = {}
+        self._built_at = schema.raw_schema_version.value
+        # Re-entrant: hooks run during a build may look up other operations.
+        self._lock = threading.RLock()
         # Filter hot path mutates the shared operation's identity fields instead of allocating a fresh one per call.
         # `method` is a placeholder that gets overwritten on every `_should_skip` call.
         filter_operation: APIOperation = APIOperation(
@@ -155,6 +170,7 @@ class OperationLoader:
         serves_schema_document = self._serves_schema_document
         iter_parameters = self._iter_parameters
         make_operation = self.make_operation
+        cached = self.cached
         root_resolver = schema.root_resolver
         for path, path_item in paths.items():
             if _is_specification_extension(path):
@@ -181,16 +197,18 @@ class OperationLoader:
                             continue
                         if serves_schema_document(path, method, entry):
                             continue
-                        parameters = iter_parameters(entry, shared_parameters, resolver=path_resolver)
-                        operation = make_operation(
-                            path,
-                            method,
-                            parameters,
-                            entry,
-                            scope,
-                            resolver=path_resolver,
-                            path_item=path_item,
-                        )
+                        operation = cached(scope, path, method)
+                        if operation is None:
+                            parameters = iter_parameters(entry, shared_parameters, resolver=path_resolver)
+                            operation = make_operation(
+                                path,
+                                method,
+                                parameters,
+                                entry,
+                                scope,
+                                resolver=path_resolver,
+                                path_item=path_item,
+                            )
                         yield Ok(operation)
                     except SCHEMA_PARSING_ERRORS as exc:
                         yield self._into_err(exc, path, method)
@@ -438,6 +456,34 @@ class OperationLoader:
         path_item: Mapping[str, Any] | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
+        with self._lock:
+            cached = self.cached(scope, path, method)
+            if cached is None:
+                cached = self._built[(scope, path, method)] = self._build_operation(
+                    path, method, parameters, definition, scope, resolver=resolver, path_item=path_item
+                )
+            return cached
+
+    def cached(self, scope: str, path: str, method: str) -> APIOperation | None:
+        """The operation built earlier, so callers can skip parsing its parameters."""
+        with self._lock:
+            version = self.schema.raw_schema_version.value
+            if self._built_at != version:
+                self._built.clear()
+                self._built_at = version
+            return self._built.get((scope, path, method))
+
+    def _build_operation(
+        self,
+        path: str,
+        method: HttpMethodSchema,
+        parameters: ParsedParameters,
+        definition: OperationObject,
+        scope: str,
+        resolver: Resolver | None = None,
+        path_item: Mapping[str, Any] | None = None,
+    ) -> APIOperation:
+        __tracebackhide__ = True
         schema = self.schema
         if schema.config.base_url is not None:
             base_url = schema.get_base_url()
@@ -496,6 +542,11 @@ class OperationLoader:
                 )
         dispatch_before_init_operation(schema, HookContext(operation=operation), operation)
         return operation
+
+    def clear_cache(self) -> None:
+        """Forget operations built by this schema and its clones after the raw schema changed under them."""
+        with self._lock:
+            self.schema.raw_schema_version.value += 1
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
         __tracebackhide__ = True

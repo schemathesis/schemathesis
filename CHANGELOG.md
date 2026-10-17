@@ -19,6 +19,7 @@
 
 ### :wrench: Changed
 
+- `before_init_operation` hooks run once per operation, not on every lookup.
 - Clearer failure titles, such as `Deleted resource still available` instead of `Use after free`.
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
 - Capability probes wait as long as test requests (10s) when `--request-timeout` is unset.

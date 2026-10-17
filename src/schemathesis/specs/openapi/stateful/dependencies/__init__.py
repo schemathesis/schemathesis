@@ -286,6 +286,8 @@ def inject_links(schema: OpenApiSchema) -> int:
     # Next to them, the next suffix to try per colliding link name, as names taken once stay taken.
     normalized_cache: dict[int, tuple[dict[str, Any], dict[tuple[str, str], list[NormalizedLink]], dict[str, int]]] = {}
     _unshare_responses(schema)
+    # Operations built earlier still point at the response definitions that were just replaced
+    schema._operations.clear_cache()
     for response_links in schema.analysis.dependency_graph.iter_links():
         operation = _find_operation_by_reference(schema, response_links.producer_operation_ref, operation_cache)
         response = operation.responses.get(response_links.status_code)

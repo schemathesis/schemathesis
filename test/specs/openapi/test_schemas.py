@@ -1,5 +1,7 @@
 import datetime
 import json
+import sys
+import threading
 
 import pytest
 from flask import jsonify
@@ -406,3 +408,137 @@ def test_percent_encoded_base_path_reserved_char_survives_in_full_path(ctx):
         basePath="/api-v2/%3Fsource=http:/example.com/api-v2",
     )
     assert operation.full_path == "/api-v2/%3Fsource=http:/example.com/api-v2/movies.csv&imdb_id={IMDBid}"
+
+
+def load_users_schema(ctx):
+    user_response = {"$ref": "#/components/responses/User"}
+    return ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"operationId": "createUser", "responses": {"201": user_response}}},
+            "/admins": {"post": {"operationId": "createAdmin", "responses": {"201": user_response}}},
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": user_response},
+                }
+            },
+        },
+        components={
+            "schemas": {"User": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
+            "responses": {
+                "User": {
+                    "description": "User",
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                }
+            },
+        },
+    )
+
+
+def test_every_lookup_returns_the_same_operation(ctx):
+    schema = load_users_schema(ctx)
+    operation = next(result.ok() for result in schema.get_all_operations() if result.ok().label == "POST /users")
+
+    assert [
+        found is operation
+        for found in (
+            next(result.ok() for result in schema.get_all_operations() if result.ok().label == "POST /users"),
+            schema["/users"]["POST"],
+            schema.find_operation_by_label("POST /users"),
+            schema.find_operation_by_id("createUser"),
+            schema.find_operation_by_reference("#/paths/~1users/post"),
+        )
+    ] == [True] * 5
+
+
+def test_before_init_operation_runs_once_per_operation(ctx):
+    schema = load_users_schema(ctx)
+    initialized = []
+
+    @schema.hook
+    def before_init_operation(context, operation):
+        initialized.append(operation.label)
+
+    list(schema.get_all_operations())
+    list(schema.get_all_operations())
+    schema["/users"]["POST"]
+    schema.find_operation_by_id("getUser")
+
+    assert sorted(initialized) == ["GET /users/{userId}", "POST /admins", "POST /users"]
+
+
+def test_links_injected_after_operations_were_built_are_visible(ctx):
+    def injected_links(prebuild):
+        schema = load_users_schema(ctx)
+        if prebuild:
+            list(schema.get_all_operations())
+        schema.analysis.inject_links()
+        return {
+            label: schema.find_operation_by_label(label).responses.get(status).definition.get("links", {})
+            for label, status in (("POST /users", "201"), ("POST /admins", "201"), ("GET /users/{userId}", "200"))
+        }
+
+    expected = injected_links(prebuild=False)
+
+    assert expected["POST /users"]
+    assert injected_links(prebuild=True) == expected
+
+
+def test_links_injected_through_a_clone_are_visible_in_other_clones(ctx):
+    expected = load_users_schema(ctx)
+    expected.analysis.inject_links()
+    schema = load_users_schema(ctx)
+    first, second = schema.clone(), schema.clone()
+    list(first.get_all_operations())
+
+    second.analysis.inject_links()
+
+    assert first["/users"]["POST"].responses.get("201").definition.get("links") == expected["/users"][
+        "POST"
+    ].responses.get("201").definition.get("links")
+
+
+def test_concurrent_lookups_build_one_operation(ctx):
+    schema = load_users_schema(ctx)
+    initialized = []
+
+    @schema.hook
+    def before_init_operation(context, operation):
+        initialized.append(operation.label)
+
+    barrier = threading.Barrier(16)
+    found = []
+
+    def lookup():
+        barrier.wait()
+        found.append(schema["/users"]["POST"])
+
+    # Switching threads often makes the race between first users likely.
+    previous = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    threads = [threading.Thread(target=lookup) for _ in range(16)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    sys.setswitchinterval(previous)
+
+    assert (len({id(operation) for operation in found}), initialized) == (1, ["POST /users"])
+
+
+def test_cached_lookups_do_not_parse_parameters_again(ctx):
+    schema = load_users_schema(ctx)
+    operation = schema["/users/{userId}"]["GET"]
+    # Only a re-parse would notice this edit, which bypasses cache invalidation.
+    schema.raw_schema["paths"]["/users/{userId}"]["get"]["parameters"] = [{"$ref": "#/components/parameters/Missing"}]
+
+    assert [
+        found is operation
+        for found in (
+            next(result.ok() for result in schema.get_all_operations() if result.ok().label == "GET /users/{userId}"),
+            schema["/users/{userId}"]["GET"],
+            schema.find_operation_by_id("getUser"),
+            schema.find_operation_by_reference("#/paths/~1users~1{userId}/get"),
+        )
+    ] == [True] * 4

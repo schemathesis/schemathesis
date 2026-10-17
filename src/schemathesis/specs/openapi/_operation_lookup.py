@@ -147,6 +147,9 @@ class OperationLookup:
         return entry
 
     def _make_operation(self, entry: OperationLookupEntry) -> APIOperation:
+        cached = self.schema._operations.cached(entry.scope, entry.path, entry.method)
+        if cached is not None:
+            return cached
         parameters = self.schema._iter_parameters(entry.definition, entry.shared_parameters, resolver=entry.resolver)
         return self.schema.make_operation(
             entry.path,
