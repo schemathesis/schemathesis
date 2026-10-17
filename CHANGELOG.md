@@ -22,6 +22,7 @@
 - HTML report lists failures and failed operations most severe first.
 - HTML report shows run details above warnings and the first 10 operations of each warning.
 - HTML report wraps long reproduction commands.
+- HTML report gives operation paths more room than failure names.
 
 ### :racing_car: Performance
 

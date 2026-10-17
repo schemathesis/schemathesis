@@ -152,8 +152,8 @@ a:hover{color:#fff}
 .ops{margin:0 0 var(--space-md);background:var(--color-surface-1);border:1px solid var(--color-border);border-radius:var(--radius-md)}
 .ops-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-family:var(--font-family-monospace);font-size:var(--font-size-sm)}
 .ops-table thead th{padding:10px var(--space-md);text-align:left;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:var(--color-text-secondary);background:var(--color-surface-1);border-bottom:1px solid var(--color-border)}
-.ops-table thead th:first-child{width:46%}
-.ops-table thead th:last-child{width:11%}
+.ops-table thead th:first-child{width:52%}
+.ops-table thead th:last-child{width:9%}
 .ops-table .numeric{position:relative;padding-right:44px;text-align:right;font-variant-numeric:tabular-nums}
 .ops-table tr:last-child>*{border-bottom:0}
 .ops-table>:last-child>tr:last-child>:first-child{border-bottom-left-radius:var(--radius-md)}
