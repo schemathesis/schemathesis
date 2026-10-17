@@ -20,6 +20,7 @@
 
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
 - Capability probes wait as long as test requests (10s) when `--request-timeout` is unset.
+- GraphQL failures report under their matching check, such as `negative_data_rejection`, not `not_a_server_error`.
 - HTML report lists failures and failed operations most severe first.
 - HTML report shows run details above warnings and the first 10 operations of each warning.
 - HTML report gives operation paths more room than failure names.
