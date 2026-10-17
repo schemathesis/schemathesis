@@ -4223,14 +4223,37 @@ def _violates_hostname(value: object, session: GenerationSession, validator_cls:
     return value == "" or not conforms_to_format(session, value, "hostname", validator_cls)
 
 
-_UUID = "123e4567-e89b-42d3-a456-426614174000"
-_NEAR_UUIDS = (
-    "123e4567e-89b-42d3-a456-426614174000",
-    "g23e4567-e89b-42d3-a456-426614174000",
-    "123e4567e89b-42d3-a456-426614174000",
-    "x123e4567-e89b-42d3-a456-426614174000",
-    "123e4567-e89b-42d3-a456-426614174000x",
-)
+# Values valid for the format, and near misses a regex tailored to it rejects
+_FORMAT_PROBES = {
+    "uuid": (
+        (
+            "123e4567-e89b-12d3-a456-426614174000",
+            "123e4567-e89b-42d3-a456-426614174000",
+            "0190a6f4-e89b-72d3-a456-426614174000",
+        ),
+        (
+            "123e4567e-89b-42d3-a456-426614174000",
+            "g23e4567-e89b-42d3-a456-426614174000",
+            "123e4567e89b-42d3-a456-426614174000",
+            "x123e4567-e89b-42d3-a456-426614174000",
+            "123e4567-e89b-42d3-a456-426614174000x",
+        ),
+    ),
+    "date": (
+        ("2024-01-31", "2024-02-29"),
+        (
+            "2024-13-01",
+            "2024-00-10",
+            "2024-01-00",
+            "2024-01-32",
+            "2024-04-31",
+            "2023-02-29",
+            "2024-1-01",
+            "x2024-01-31",
+            "2024-01-31x",
+        ),
+    ),
+}
 
 
 # Keywords that describe a value without changing what is drawn for it
@@ -4238,14 +4261,18 @@ _UNDRAWN_KEYWORDS = ANNOTATION_KEYWORDS - _DATA_KEYWORDS
 
 
 @cache
-def _matches_only_uuids(pattern: str) -> bool:
-    """Whether `pattern` is a UUID regex, so no value matching it can break the `uuid` format."""
+def _pattern_implies_format(pattern: str, format: str) -> bool:
+    """Whether every value matching `pattern` is valid for `format`, so no value can break only the format."""
+    probes = _FORMAT_PROBES.get(format)
+    if probes is None:
+        return False
     try:
         matches = make_validator_for({"pattern": pattern}).is_valid
     except jsonschema_rs.ValidationError:
         return False
-    return any(matches(value) for value in (_UUID, _UUID.upper())) and not any(
-        matches(value) for near in _NEAR_UUIDS for value in (near, near.upper())
+    valid, near = probes
+    return any(matches(value) or matches(value.upper()) for value in valid) and not any(
+        matches(value) or matches(value.upper()) for value in near
     )
 
 
@@ -4265,7 +4292,7 @@ def _negative_format(
     if format not in VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset()):
         return
     pattern = schema.get("pattern")
-    if format == "uuid" and isinstance(pattern, str) and _matches_only_uuids(pattern):
+    if isinstance(pattern, str) and _pattern_implies_format(pattern, format):
         raise Unsatisfiable
     # Drawing under the format and filtering for values that violate it can never succeed
     without_format = {k: v for k, v in schema.items() if k != "format"}
