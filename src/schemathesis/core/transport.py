@@ -6,7 +6,8 @@ import json
 import re
 import string
 import time
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
+from functools import lru_cache
 from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
 
@@ -465,8 +466,14 @@ def expand_status_code(status_code: StatusCodePattern | int) -> list[int]:
     return [int("".join(expanded)) for expanded in product(*chars)]
 
 
-def expand_status_codes(status_codes: list[StatusCodePattern]) -> set[int]:
-    return set(chain.from_iterable(expand_status_code(code) for code in status_codes))
+def expand_status_codes(status_codes: Sequence[StatusCodePattern]) -> frozenset[int]:
+    return _expand_status_codes(tuple(status_codes))
+
+
+# Checks expand the same configured patterns for every response.
+@lru_cache(maxsize=64)
+def _expand_status_codes(status_codes: tuple[StatusCodePattern, ...]) -> frozenset[int]:
+    return frozenset(chain.from_iterable(expand_status_code(code) for code in status_codes))
 
 
 def status_code_matches(pattern: StatusCodePattern, response_code: int) -> bool:

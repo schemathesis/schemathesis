@@ -406,7 +406,7 @@ def check(func: CheckT) -> CheckT:
 
 
 def _check_content_type_probe(
-    ctx: CheckContext, case: Case, scenario: CoverageScenario, status_code: int, expected_statuses: set[int]
+    ctx: CheckContext, case: Case, scenario: CoverageScenario, status_code: int, expected_statuses: frozenset[int]
 ) -> None:
     """Report a server error only when the probe's `Content-Type` causes it."""
     from schemathesis.generation.case import Case

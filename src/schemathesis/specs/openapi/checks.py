@@ -1104,7 +1104,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
         and data.scenario == CoverageScenario.MISSING_PARAMETER
     ):
         if data.parameter.lower() == "authorization":
-            expected_statuses = {401}
+            expected_statuses = frozenset({401})
         else:
             config = ctx.config.missing_required_header
             expected_statuses = expand_status_codes(config.expected_statuses or [])
