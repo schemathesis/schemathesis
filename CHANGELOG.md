@@ -26,6 +26,7 @@
 
 ### :racing_car: Performance
 
+- Coverage phase up to ~5x faster on UUID fields that also declare a UUID `pattern`.
 - HTML report up to ~20% smaller on runs with many failures.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.

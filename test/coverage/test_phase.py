@@ -2135,6 +2135,32 @@ def test_string_with_format(ctx):
     run_positive_test(operation, test)
 
 
+@pytest.mark.parametrize(
+    ("pattern", "violates_format"),
+    [
+        ("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", False),
+        ("^[a-fA-F\\d]{8}(?:-[a-fA-F\\d]{4}){3}-[a-fA-F\\d]{12}$", False),
+        ("^[0-9a-f-]{36}$", True),
+        ("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", True),
+        ("^[0-9a-z]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", True),
+    ],
+    ids=["uuid", "uuid-grouped", "dashes-anywhere", "unanchored", "non-hex"],
+)
+def test_negative_uuid_format_under_pattern(ctx, pattern, violates_format):
+    # Only a pattern admitting non-UUIDs leaves room for a value that breaks the format alone.
+    body = {"type": "object", "properties": {"id": {"type": "string", "format": "uuid", "pattern": pattern}}}
+    uuid_validator = jsonschema_rs.validator_for({"format": "uuid"}, validate_formats=True)
+    values = [
+        case.body["id"]
+        for case in collect_coverage_cases(ctx, body, version="3.1.0")
+        if "not matching the 'uuid' format" in case.meta.phase.data.description
+    ]
+    assert bool(values) is violates_format
+    for value in values:
+        assert re.search(pattern, value)
+        assert not uuid_validator.is_valid(value)
+
+
 def test_query_parameters_with_nested_enum(ctx):
     schema = build_schema(
         ctx,
