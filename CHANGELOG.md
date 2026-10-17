@@ -47,6 +47,7 @@
 - Missing links for parent path parameters the item carries (e.g. `Shipment.warehouseId`).
 - Values read from `204` and `205` responses, which have no body.
 - Links reading fields that values of map-shaped responses do not declare.
+- Links echoing a read value the update's `enum` rejects (e.g. a `deleted` status).
 - `Location` links overwriting each other when several targets share a status code.
 - `Location` links extracting wrong path parameters with base paths, queries or regex characters.
 - Link and undeclared path parameter order varying between runs.

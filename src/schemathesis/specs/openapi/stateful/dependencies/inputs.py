@@ -28,7 +28,10 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
     ResponseResourceCache,
+    allowed_values,
     cached_resources_from_responses,
+    contains_value,
+    declared_field_values,
     write_only_fields,
 )
 
@@ -820,14 +823,17 @@ def rebind_body_fields_to_unique_producers(
                 )
 
 
-def bind_echoed_body_fields(operations: OperationMap, writable_body_fields: dict[str, dict[str, JsonSchema]]) -> None:
+def bind_echoed_body_fields(
+    schema: OpenApiSchema, operations: OperationMap, writable_body_fields: dict[str, dict[str, JsonSchema]]
+) -> None:
     """Bind update body fields to what the item `GET` returns but creation cannot set, e.g. a `version` token."""
     labels = {(node.method.lower(), node.path): label for label, node in operations.items()}
     for label, fields in writable_body_fields.items():
         update = operations[label]
         if update.method.lower() not in ("put", "patch") or naming.trailing_path_parameter(update.path) is None:
             continue
-        reader = operations.get(labels.get(("get", update.path), ""))
+        reader_label = labels.get(("get", update.path), "")
+        reader = operations.get(reader_label)
         if reader is None:
             continue
         # Only creation tells client-set fields apart from server-set ones; client-set fields keep generated values.
@@ -848,6 +854,7 @@ def bind_echoed_body_fields(operations: OperationMap, writable_body_fields: dict
                     or not _is_scalar(field_schema)
                     or field not in output.response_fields
                     or not output.resource.types.get(field, set()) & set(get_type(field_schema))
+                    or not _accepts_read_values(schema, reader_label, output, field, field_schema)
                 ):
                     continue
                 update.inputs.append(
@@ -860,6 +867,22 @@ def bind_echoed_body_fields(operations: OperationMap, writable_body_fields: dict
                     )
                 )
                 bound.add(field)
+
+
+def _accepts_read_values(
+    schema: OpenApiSchema, reader_label: str, output: OutputSlot, field: str, field_schema: dict[str, Any]
+) -> bool:
+    # A read `state` may hold values an update rejects, e.g. `running` when only `success` or `failed` can be set.
+    accepted = allowed_values(field_schema, None)
+    if accepted is None:
+        return True
+    reader = schema.find_operation_by_label(reader_label)
+    assert reader is not None
+    response = reader.responses.get(output.status_code)
+    # The output was extracted from this response.
+    assert response is not None
+    read = declared_field_values(response, output.pointer, field, schema.root_resolver)
+    return read is None or all(contains_value(accepted, value) for value in read)
 
 
 def _has_resource_prefix(field: str, resource_name: str) -> bool:

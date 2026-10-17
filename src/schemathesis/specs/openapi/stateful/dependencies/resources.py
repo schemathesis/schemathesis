@@ -8,7 +8,7 @@ from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
-from schemathesis.core.transforms import encode_pointer
+from schemathesis.core.transforms import decode_pointer, encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -721,6 +721,106 @@ def write_only_fields(response: OpenApiResponse, resolver: Resolver) -> set[str]
     except (RefResolutionError, InvalidSchema):
         return set()
     return fields
+
+
+def declared_field_values(response: OpenApiResponse, pointer: str, field: str, resolver: Resolver) -> list[Any] | None:
+    """Values the response allows for `field` of the object at `pointer`; `None` when it does not list them."""
+    schema = response.get_raw_schema()
+    # Outputs come from the response body, so the schema is an object.
+    assert isinstance(schema, dict)
+    current_resolver = response.resolver if response.resolver is not None else resolver
+    current: Any = schema
+    # References up to the field were resolved when the output was extracted; the field's own are resolved below.
+    for name in [*(decode_pointer(part) for part in pointer.split("/") if part), field]:
+        current_resolver, current = maybe_resolve_with_resolver(current, current_resolver)
+        entry = _collect_properties(current, current_resolver).get(name)
+        # A field declared without a schema (`true`) may hold anything.
+        if entry is None or not isinstance(entry[1], dict):
+            return None
+        current_resolver, current = entry
+    return allowed_values(current, current_resolver)
+
+
+def allowed_values(schema: Mapping[str, Any], resolver: Resolver | None) -> list[Any] | None:
+    """Values `enum` or `const` limit `schema` to that its `type` allows; `None` when it lists none.
+
+    Without a resolver, references are skipped.
+    """
+    values: list[Any] | None = None
+    types: set[str] | None = None
+    nullable = False
+    pending: list[tuple[Resolver | None, Mapping[str, Any]]] = [(resolver, schema)]
+    # `allOf` chains may be recursive.
+    seen: set[int] = set()
+    while pending:
+        current_resolver, node = pending.pop()
+        if "$ref" in node:
+            if current_resolver is None:
+                continue
+            try:
+                current_resolver, node = maybe_resolve_with_resolver(node, current_resolver)
+            except (RefResolutionError, InvalidSchema):
+                continue
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        listed = [node["const"]] if "const" in node else node.get("enum")
+        if isinstance(listed, list):
+            values = listed if values is None else [value for value in values if contains_value(listed, value)]
+        declared = node.get("type")
+        if isinstance(declared, (str, list)):
+            node_types = {declared} if isinstance(declared, str) else set(declared)
+            types = node_types if types is None else _intersect_types(types, node_types)
+        if node.get("nullable") is True or node.get("x-nullable") is True:
+            nullable = True
+        branches = node.get("allOf")
+        if isinstance(branches, list):
+            pending.extend((current_resolver, branch) for branch in branches if isinstance(branch, dict))
+    if values is None:
+        return None
+    # `nullable` adds `null` to the type; `enum` still decides whether `null` is allowed.
+    if nullable and types is not None:
+        types = types | {"null"}
+    # A listed value the declared `type` rules out never appears in a valid instance.
+    if types is not None:
+        values = [
+            value
+            for value in values
+            if _json_type(value) in types or (_json_type(value) == "integer" and "number" in types)
+        ]
+    return values
+
+
+def _intersect_types(left: set[str], right: set[str]) -> set[str]:
+    common = left & right
+    # `integer` is a subset of `number`.
+    if ("integer" in left and "number" in right) or ("number" in left and "integer" in right):
+        common.add("integer")
+    return common
+
+
+_JSON_TYPES = {
+    type(None): "null",
+    bool: "boolean",
+    int: "integer",
+    float: "number",
+    str: "string",
+    list: "array",
+    dict: "object",
+}
+
+
+def _json_type(value: Any) -> str:
+    # JSON Schema counts whole floats (`1.0`) as integers.
+    if isinstance(value, float) and value.is_integer():
+        return "integer"
+    # YAML may also load dates and similar values, which no JSON type matches.
+    return _JSON_TYPES.get(type(value), "object")
+
+
+def contains_value(values: list[Any], value: Any) -> bool:
+    # JSON Schema equality: `1` equals `1.0`, but a boolean is never a number.
+    return any(candidate == value and isinstance(candidate, bool) == isinstance(value, bool) for candidate in values)
 
 
 def _declared_fields(schema: Mapping[str, Any], resolver: Resolver) -> frozenset[str] | None:

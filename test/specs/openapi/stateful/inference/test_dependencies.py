@@ -6792,6 +6792,14 @@ VERSIONED_ITEM = {
 }
 
 
+def versioned_item_reading(version):
+    return {"type": "object", "properties": {**VERSIONED_ITEM["properties"], "version": version}}
+
+
+def enveloped_item_reading(version):
+    return {"type": "object", "properties": {"data": versioned_item_reading(version)}}
+
+
 def versioned_item_paths(*, create=True, read=VERSIONED_ITEM, version=None, label=None):
     update_properties = {"name": {"type": "string"}, "version": {"type": "string"} if version is None else version}
     if label is not None:
@@ -6843,6 +6851,25 @@ READ_TO_UPDATE_ECHOING_VERSION = [
         "x-schemathesis": {"is_inferred": True, "merge_body": True},
     },
 ]
+ENVELOPED_READ_TO_UPDATE = [
+    "#/paths/~1items~1{itemId}/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1items~1{itemId}/put",
+        "parameters": {"path.itemId": "$response.body#/data/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+ENVELOPED_READ_TO_UPDATE_ECHOING_VERSION = [
+    "#/paths/~1items~1{itemId}/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1items~1{itemId}/put",
+        "parameters": {"path.itemId": "$request.path.itemId"},
+        "requestBody": {"version": "$response.body#/data/version"},
+        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+    },
+]
 CREATE_TO_UPDATE = [
     "#/paths/~1items/post",
     "201",
@@ -6869,6 +6896,121 @@ CREATE_TO_READ = [
         ({}, [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ]),
         ({"version": {"type": "string", "readOnly": True}}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
         ({"version": {}}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        (
+            {"version": {"type": "string", "enum": ["queued", "success", "failed"]}},
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success", "failed"]},
+                "read": versioned_item_reading({"type": "string", "enum": ["queued", "success"]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success", "failed"]},
+                "read": versioned_item_reading({"type": "string", "enum": ["queued", "running", "success"]}),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success", "failed"]},
+                "read": versioned_item_reading(component_ref("RunState")),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success", "failed"]},
+                "read": versioned_item_reading({"allOf": [component_ref("RunState")]}),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "allOf": [{"enum": ["queued", "success"]}]},
+                "read": versioned_item_reading({"type": "string", "enum": ["queued", "running"]}),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success"]},
+                "read": versioned_item_reading({"type": "string", "const": "running"}),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success"]},
+                "read": versioned_item_reading(
+                    {"type": "string", "enum": ["queued", "success", None], "nullable": True}
+                ),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success", None], "nullable": True},
+                "read": versioned_item_reading(
+                    {"type": "string", "enum": ["queued", "success", None], "nullable": True}
+                ),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "number", "enum": [1.0, 2.0]},
+                "read": versioned_item_reading({"type": "number", "enum": [1, 2]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success"]},
+                "read": versioned_item_reading({"type": "string", "enum": ["queued", "success", False]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "integer", "enum": [1, 2]},
+                "read": versioned_item_reading({"type": "integer", "enum": [1, True]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success"]},
+                "read": versioned_item_reading(
+                    {"type": "string", "enum": ["queued", "success", None], "x-nullable": True}
+                ),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "success"]},
+                "read": versioned_item_reading({"type": "string", "enum": ["queued", "success"], "nullable": True}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading({"type": "string", "enum": ["queued"], "x-nullable": True}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "integer", "enum": [1, 2], "allOf": [{"type": "number"}]},
+                "read": versioned_item_reading({"type": "integer", "enum": [1]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
         ({"read": None}, [CREATE_TO_UPDATE]),
         ({"read": {"type": "object"}}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
         (
@@ -6899,15 +7041,110 @@ CREATE_TO_READ = [
                 READ_TO_UPDATE,
             ],
         ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": enveloped_item_reading({"type": "string", "enum": ["queued", "running"]}),
+            },
+            [ENVELOPED_READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued", "running"]},
+                "read": enveloped_item_reading({"type": "string", "enum": ["queued"]}),
+            },
+            [ENVELOPED_READ_TO_UPDATE, ENVELOPED_READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {"version": {"type": "string", "enum": ["queued"]}, "read": versioned_item_reading(True)},
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "allOf": [component_ref("RunState")]},
+                "read": versioned_item_reading({"type": "string", "enum": ["running"]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading({"enum": ["queued", "running"]}),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading(
+                    {"type": "string", "enum": ["queued", "running"], "allOf": [{"type": "string"}]}
+                ),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "number", "enum": [1.0]},
+                "read": versioned_item_reading({"type": "number", "enum": [1], "allOf": [{"type": "integer"}]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "integer", "enum": [1]},
+                "read": versioned_item_reading({"type": "integer", "enum": [1, 1.5]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading({"type": "string", "allOf": [component_ref("Missing")]}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading(component_ref("NestedState")),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
     ],
     ids=[
         "echoed",
         "read-only-in-update",
         "untyped-in-update",
+        "enum-in-update-only",
+        "read-enum-accepted-by-update",
+        "read-enum-rejected-by-update",
+        "referenced-read-enum-rejected-by-update",
+        "all-of-referenced-read-enum-rejected-by-update",
+        "read-enum-rejected-by-all-of-update-enum",
+        "read-const-rejected-by-update",
+        "nullable-read-enum-rejected-by-update",
+        "read-null-accepted-by-nullable-update",
+        "integer-read-enum-accepted-by-float-update-enum",
+        "read-enum-value-outside-type-ignored",
+        "read-boolean-outside-integer-type-ignored",
+        "swagger-nullable-read-enum-rejected-by-update",
+        "nullable-read-enum-without-null-accepted-by-update",
+        "swagger-nullable-read-enum-without-null-accepted-by-update",
+        "integer-update-enum-under-number-all-of",
         "no-item-read",
         "item-read-declares-no-fields",
         "nested-list-field-not-echoed",
         "no-create",
+        "read-enum-in-envelope-rejected-by-update",
+        "read-enum-in-envelope-accepted-by-update",
+        "read-field-without-schema-echoed",
+        "update-enum-behind-reference-echoed",
+        "untyped-read-enum-rejected-by-update",
+        "same-type-all-of-read-enum-rejected-by-update",
+        "number-read-enum-under-integer-all-of-accepted",
+        "read-fraction-outside-integer-type-ignored",
+        "unresolvable-read-reference-echoed",
+        "recursive-read-enum-rejected-by-update",
     ],
 )
 def test_update_echoes_values_only_item_read_returns(ctx, kwargs, expected):
@@ -6916,7 +7153,13 @@ def test_update_echoes_values_only_item_read_returns(ctx, kwargs, expected):
         versioned_item_paths(**kwargs),
         components={
             "schemas": {
-                "Tag": {"type": "object", "properties": {"id": {"type": "integer"}, "label": {"type": "string"}}}
+                "Tag": {"type": "object", "properties": {"id": {"type": "integer"}, "label": {"type": "string"}}},
+                "RunState": {"type": "string", "enum": ["queued", "running", "success", "failed"]},
+                "NestedState": {
+                    "type": "string",
+                    "enum": ["queued", "running"],
+                    "allOf": [component_ref("NestedState")],
+                },
             }
         },
     )

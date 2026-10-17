@@ -263,7 +263,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     bind_parent_keys_to_item_fields(schema, operations)
 
     # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
-    bind_echoed_body_fields(operations, writable_body_fields)
+    bind_echoed_body_fields(schema, operations, writable_body_fields)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)
