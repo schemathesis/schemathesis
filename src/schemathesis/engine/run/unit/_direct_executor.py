@@ -40,7 +40,11 @@ def _collect_within_budget(generator: CaseGenerator, ctx: EngineContext) -> list
     cases = []
     for case in generator:
         cases.append(case)
-        if ctx.has_to_stop or ctx.is_operation_slice_expired:
+        if ctx.has_to_stop:
+            break
+        if ctx.is_operation_slice_expired:
+            # Generating used up the share; the cases already paid for still get sent
+            ctx.release_operation_slice()
             break
     return cases
 
