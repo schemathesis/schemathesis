@@ -197,6 +197,9 @@ class DependencyGraph:
                         else:
                             # No resource field means use the whole resource
                             value_expr = f"$response.body#{output_slot.pointer}"
+                        if value_expr.startswith("$response.body") and output_slot.status_code in ("204", "205"):
+                            # These statuses forbid a body, whatever the schema declares.
+                            continue
                         link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
                         # A separate link, so other links keep generating these fields.
                         if input_slot.echoes_response:
@@ -279,6 +282,9 @@ class DependencyGraph:
                     continue
                 # Skip path-keyed and body-keyed outputs (no response body to extract FK fields from)
                 if output_slot.path_parameter is not None or output_slot.body_field is not None:
+                    continue
+                # These statuses forbid a body, whatever the schema declares.
+                if output_slot.status_code in ("204", "205"):
                     continue
 
                 resource = output_slot.resource
