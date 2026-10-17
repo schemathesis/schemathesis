@@ -41,6 +41,7 @@
 
 - Missing links for path parameters named after a resource and its field (e.g. `{order_seq}`).
 - Missing links for Django-style `_pk` parameters and body fields (e.g. `{order_pk}`).
+- Missing links from a collection's listing to operations nested under its items.
 - Values read from `204` and `205` responses, which have no body.
 - Links reading fields that values of map-shaped responses do not declare.
 - `Location` links overwriting each other when several targets share a status code.

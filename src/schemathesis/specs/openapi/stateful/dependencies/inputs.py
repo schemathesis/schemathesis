@@ -79,7 +79,7 @@ def extract_inputs(
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
             parameter_schema=_parameter_schema(param),
-            parameter_types=_parameter_types(param),
+            parameter_types=parameter_types(param),
             parameter_location=param.location,
             operation=operation,
             resources=resources,
@@ -134,7 +134,7 @@ def _parameter_schema(parameter: OpenApiParameter) -> JsonSchema:
         return {}
 
 
-def _parameter_types(parameter: OpenApiParameter) -> list[str]:
+def parameter_types(parameter: OpenApiParameter) -> list[str]:
     try:
         return get_type(parameter.raw_schema)
     except InvalidSchema:
@@ -1015,11 +1015,15 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
             input_slot.resource_field = input_slot.parameter_name
 
 
-def bind_item_parameters_to_collections(operations: OperationMap) -> None:
+def bind_item_parameters_to_collections(
+    operations: OperationMap, path_parameter_types: dict[str, dict[str, list[str]]]
+) -> None:
     """Bind `/things/{id}` path parameters to the resource `GET /things` lists when nothing else can supply the id."""
     listed: dict[str, dict[str, ResourceDefinition]] = {}
     # Collection names each resource is listed under; a shape listed by `/groups` and `/domains` alike is generic.
     listed_under: dict[str, set[str]] = {}
+    # Collection paths each resource is listed under; `/apis/{api}/comments` and `/domains/{domain}/comments` differ
+    listed_at: dict[str, set[str]] = {}
     producers: dict[str, list[tuple[OperationNode, OutputSlot]]] = {}
     # `(resource, field)` pairs that `*_id` fields of produced resources point to
     fed: set[tuple[str, str]] = set()
@@ -1032,7 +1036,9 @@ def bind_item_parameters_to_collections(operations: OperationMap) -> None:
                 collection = operation.path.rstrip("/")
                 listed.setdefault(collection, {})[output.resource.name] = output.resource
                 listed_under.setdefault(output.resource.name, set()).add(collection.rsplit("/", 1)[-1])
+                listed_at.setdefault(output.resource.name, set()).add(re.sub(r"\{[^}]*\}", "{}", collection))
 
+    listed_identifiers: list[tuple[OperationNode, InputSlot]] = []
     for operation in operations.values():
         segments = operation.path.split("/")
         for input_slot in operation.inputs:
@@ -1045,12 +1051,50 @@ def bind_item_parameters_to_collections(operations: OperationMap) -> None:
             index = segments.index(placeholder)
             if index < 2 or segments[index - 1].startswith("{"):
                 continue
+            # `{warehouse}` under `/warehouses` names a listed warehouse, so a slot nothing can fill takes its identifier
+            # `/apis/{api}/{version}` keys one resource by two segments, which no single listed field matches
+            names_collection = (
+                (
+                    input_slot.resource.name not in producers
+                    or input_slot.resource_field not in input_slot.resource.fields
+                )
+                and not (index + 1 < len(segments) and segments[index + 1].startswith("{"))
+                and naming.normalize_for_matching(parameter_name)
+                == naming.normalize_for_matching(naming.to_singular(segments[index - 1]))
+            )
             candidates = [
-                resource
+                (resource, field)
                 for resource in listed.get("/".join(segments[:index]), {}).values()
-                if parameter_name in resource.fields and len(listed_under[resource.name]) == 1
+                if len(listed_under[resource.name]) == 1
+                and (
+                    field := _listed_field(
+                        resource,
+                        parameter_name,
+                        names_collection=names_collection and len(listed_at[resource.name]) == 1,
+                        parameter_types=path_parameter_types.get(
+                            f"{operation.method.upper()} {operation.path}", {}
+                        ).get(parameter_name, []),
+                    )
+                )
+                is not None
             ]
-            if len(candidates) != 1 or candidates[0].name == input_slot.resource.name:
+            if len(candidates) != 1 or candidates[0][0].name == input_slot.resource.name:
+                continue
+            candidate, field = candidates[0]
+            if field != parameter_name:
+                # The current slot stays: foreign keys of other responses may still fill it
+                listed_identifiers.append(
+                    (
+                        operation,
+                        InputSlot(
+                            resource=candidate,
+                            resource_field=field,
+                            parameter_name=parameter_name,
+                            parameter_location=ParameterLocation.PATH,
+                            is_listed_identifier=True,
+                        ),
+                    )
+                )
                 continue
             current = input_slot.resource.name
             if input_slot.resource_field is not None and (current, input_slot.resource_field) in fed:
@@ -1065,9 +1109,8 @@ def bind_item_parameters_to_collections(operations: OperationMap) -> None:
                 for producer, _ in current_producers
             ):
                 continue
-            candidate = candidates[0]
             input_slot.resource = candidate
-            input_slot.resource_field = parameter_name
+            input_slot.resource_field = field
             input_slot.is_suffix_matched = False
             # `POST /things/{id}` still creates what the listing lists
             for producer, output in current_producers:
@@ -1076,6 +1119,36 @@ def bind_item_parameters_to_collections(operations: OperationMap) -> None:
                     for existing in producer.outputs
                 ):
                     producer.outputs.append(replace(output, resource=candidate))
+
+    for operation, slot in listed_identifiers:
+        operation.inputs.append(slot)
+
+
+def _listed_field(
+    resource: ResourceDefinition, parameter_name: str, *, names_collection: bool, parameter_types: list[str]
+) -> str | None:
+    if parameter_name in resource.fields:
+        return parameter_name
+    if names_collection:
+        for identifier in ("id", "slug", "key", "name"):
+            if identifier in resource.fields and _is_segment_identifier(resource, identifier, parameter_types):
+                return identifier
+    return None
+
+
+def _is_segment_identifier(resource: ResourceDefinition, identifier: str, parameter_types: list[str]) -> bool:
+    # The value must fit the parameter, and full resource paths are not segments: an ARM resource's `id` (next to
+    # `name` and `type`) and an AIP resource's `name` (next to `displayName`) spell the whole path
+    accepted = set(parameter_types or ["string"])
+    if "integer" in accepted:
+        accepted.add("number")
+    if not accepted & resource.types.get(identifier, accepted):
+        return False
+    if identifier == "id":
+        return not {"name", "type"} <= set(resource.fields)
+    if identifier == "name":
+        return "displayName" not in resource.fields
+    return True
 
 
 def align_created_identifiers(operations: OperationMap) -> None:

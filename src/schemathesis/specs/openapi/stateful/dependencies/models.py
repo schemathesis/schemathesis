@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import enum
+import re
 from collections import defaultdict
 from collections.abc import Collection, Iterator, Mapping
 from dataclasses import asdict, dataclass
@@ -41,6 +42,8 @@ class DependencyGraph:
                 input["resource"] = input["resource"]["name"]
                 if not input["echoes_response"]:
                     del input["echoes_response"]
+                if not input["is_listed_identifier"]:
+                    del input["is_listed_identifier"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
@@ -232,7 +235,13 @@ class DependencyGraph:
                     # but only postId gets mapped from the response. We need to propagate userId.
                     if links:
                         producer_fields = template_fields[producer_id]
-                        shared_params = [name for name in template_fields[consumer_id] if name in producer_fields]
+                        listed_identifier = any(slot.is_listed_identifier for slot in input_slots)
+                        shared_params = [
+                            name
+                            for name in template_fields[consumer_id]
+                            if name in producer_fields
+                            and not (listed_identifier and _keys_different_items(producer, consumer, name))
+                        ]
 
                         for link_def in links.values():
                             # Find which path parameters are already mapped
@@ -809,6 +818,8 @@ class InputSlot:
     is_suffix_matched: bool = False
     # Whether this input sends back a value a response returned, e.g. a `version` token for an update
     echoes_response: bool = False
+    # Whether a parent key named after its collection takes the identifier the collection lists (`{warehouse}`)
+    is_listed_identifier: bool = False
 
 
 @dataclass(slots=True)
@@ -950,3 +961,17 @@ class DefinitionSource(enum.IntEnum):
 OperationMap: TypeAlias = dict[str, OperationNode]
 ResourceMap: TypeAlias = dict[str, ResourceDefinition]
 CanonicalizationCache: TypeAlias = dict[str, Mapping[str, Any]]
+
+
+def _keys_different_items(producer: OperationNode, consumer: OperationNode, parameter: str) -> bool:
+    """Whether `{parameter}` sits under different parents, so each operation names a different item with it.
+
+    `/warehouses/{name}` and `/warehouses/{warehouse}/shelves/{name}/bins` share `{name}`, but one is a warehouse
+    and the other a shelf.
+    """
+    placeholder = "/{" + parameter + "}"
+    return _shape(producer.path.split(placeholder, 1)[0]) != _shape(consumer.path.split(placeholder, 1)[0])
+
+
+def _shape(path: str) -> str:
+    return re.sub(r"\{[^}]*\}", "{}", path)

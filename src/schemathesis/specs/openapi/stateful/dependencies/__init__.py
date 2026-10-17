@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     disambiguate_path_suffix_matches,
     extract_inputs,
     merge_related_resources,
+    parameter_types,
     rebind_body_fields_to_unique_producers,
     rebind_inherited_suffix_matches,
     rebind_orphan_synthetics,
@@ -87,9 +88,16 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
     candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
 
+    # Declared types of each operation's path parameters, so a bound value can be checked against them
+    path_parameter_types: dict[str, dict[str, list[str]]] = {}
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
+            path_parameter_types[operation.label] = {
+                parameter.name: parameter_types(parameter)
+                for parameter in operation.iter_parameters()
+                if parameter.location == ParameterLocation.PATH
+            }
             pending: list[tuple[str, str, str]] = []
             pending_named_scalars: list[tuple[str, str, JsonSchema]] = []
             pending_body_fields: list[tuple[str, JsonSchema]] = []
@@ -239,7 +247,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     disambiguate_path_suffix_matches(operations, resources)
 
     # Bind `/things/{id}` to what `GET /things` lists when nothing else can supply the id (`partition_id`, `{name}`).
-    bind_item_parameters_to_collections(operations)
+    bind_item_parameters_to_collections(operations, path_parameter_types)
 
     # A bare id `POST /things` returns is what `/things/{id}` takes, whatever each response names its schema.
     align_created_identifiers(operations)
