@@ -1879,6 +1879,25 @@ def test_max_time_coverage_rerun_reaches_what_feedback_unlocked(ctx):
     assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
 
 
+def test_max_time_runs_coverage_cases_generated_before_the_slice_ran_out(ctx):
+    # One slow case uses up the operation's share while the cases before it are already generated.
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    generated = []
+
+    def map_case(context, case):
+        generated.append(case)
+        if len(generated) == 5:
+            time.sleep(1.2)
+        return case
+
+    schema.hook("map_case")(map_case)
+    stream = execute(schema, max_time=2, max_examples=100_000, phases=[PhaseName.COVERAGE, PhaseName.FUZZING])
+    finished = stream.find(events.ScenarioFinished, phase=PhaseName.COVERAGE)
+
+    assert len(finished.recorder.cases) == 5
+
+
 def test_max_time_skips_coverage_rerun_for_feedback_that_cannot_change_generation(ctx):
     # Learning that an operation needs auth teaches generation nothing, so no scoped repeat follows.
     api = ctx.openapi.apps.under_declared_security()

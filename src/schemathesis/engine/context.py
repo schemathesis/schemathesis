@@ -308,6 +308,10 @@ class EngineContext:
             return
         self._thread_local.slice_deadline = budget.take(deadline - self._reserved_time)
 
+    def release_operation_slice(self) -> None:
+        """Let this worker finish the operation it holds without the deadline of its share."""
+        self._thread_local.slice_deadline = None
+
     @property
     def is_operation_slice_expired(self) -> bool:
         deadline = getattr(self._thread_local, "slice_deadline", None)
