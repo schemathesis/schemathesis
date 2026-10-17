@@ -4,101 +4,133 @@
 
 ### :rocket: Added
 
-- Stateful links inferred from same-origin URLs in response bodies (e.g. DRF hyperlinked fields).
 - Captured resource ids fill fields of array items and `$ref` objects in request bodies. [#5417](https://github.com/schemathesis/schemathesis/issues/5417)
+- Captured resource ids fill fields of top-level array request body items.
 - Captured resource ids fill request body fields declared through nested `allOf`/`oneOf`/`anyOf`.
+- Stateful links inferred from same-origin URLs in response bodies (e.g. DRF hyperlinked fields).
+- Stateful links inferred into fields of top-level array request body items.
+- `#regex:` extractor for `$response.body#/pointer` link expressions.
 - Error feedback constrains request body fields declared in every `allOf`/`oneOf`/`anyOf` branch.
+- `--report pytest` writes failures as standalone pytest tests. [#2999](https://github.com/schemathesis/schemathesis/issues/2999)
 - HTML report filters by path, failure kind and method.
 - HTML report permalinks to operations and failing cases that copy the URL on click.
-- `#regex:` extractor for `$response.body#/pointer` link expressions.
-- `--report pytest` writes failures as standalone pytest tests. [#2999](https://github.com/schemathesis/schemathesis/issues/2999)
-- Stateful links inferred into fields of top-level array request body items.
-- Captured resource ids fill fields of top-level array request body items.
 
 ### :wrench: Changed
 
-- Capability probes wait as long as test requests (10s) when `--request-timeout` is unset.
 - Stateful scenarios stop repeating a starting operation whose responses give later steps no data.
+- Capability probes wait as long as test requests (10s) when `--request-timeout` is unset.
 - HTML report lists failures and failed operations most severe first.
 - HTML report shows run details above warnings and the first 10 operations of each warning.
-- HTML report wraps long reproduction commands.
 - HTML report gives operation paths more room than failure names.
+- HTML report wraps long reproduction commands.
 
 ### :racing_car: Performance
 
+- Examples phase up to ~130x faster on schemas with shared references and no examples.
+- Faster coverage phase for large enums, wide objects, nested bodies and many headers.
 - Coverage phase up to ~5x faster on UUID and date fields that also declare a matching `pattern`.
-- HTML report up to ~20% smaller on runs with many failures.
+- Coverage phase up to ~40% faster on schemas with patterns the regex engine rejects.
+- Coverage phase up to ~18% faster on operations with many negative cases.
 - Faster dependency inference on large schemas and shared or recursive references.
 - Unreachable remote references time out once per run.
-- Coverage phase up to ~40% faster on schemas with patterns the regex engine rejects.
-- Faster coverage phase for large enums, wide objects, nested bodies and many headers.
-- Examples phase up to ~130x faster on schemas with shared references and no examples.
-- Coverage phase up to ~18% faster on operations with many negative cases.
+- HTML report up to ~20% smaller on runs with many failures.
 
 ### :bug: Fixed
 
-- Inferred links reading values from `204` and `205` responses, which have no body.
-- Missing inferred links for path parameters named after a resource and its field (e.g. `{order_seq}`).
-- Missing inferred links for Django-style `_pk` parameters and body fields (e.g. `{order_pk}`).
-- Inferred links reading fields that values of map-shaped responses do not declare.
-- Pick the same captured resource ids for nested-resource paths in otherwise identical runs.
-- Stateful phase crashing on path parameter names with characters such as `-`.
-- Respect `--max-examples` and other explicit options when a hook loads a Hypothesis profile.
+#### Inferred stateful links
+
+- Missing links for path parameters named after a resource and its field (e.g. `{order_seq}`).
+- Missing links for Django-style `_pk` parameters and body fields (e.g. `{order_pk}`).
+- Values read from `204` and `205` responses, which have no body.
+- Links reading fields that values of map-shaped responses do not declare.
+- `Location` links overwriting each other when several targets share a status code.
+- `Location` links extracting wrong path parameters with base paths, queries or regex characters.
+- Link and undeclared path parameter order varying between runs.
+
+#### Stateful testing
+
+- Scenarios mostly starting from the alphabetically first operation.
+- Scenarios ending early on request bodies with optional `readOnly` fields.
 - Keep generated fields of nested objects and array items when merging link `requestBody` values. [#5416](https://github.com/schemathesis/schemathesis/issues/5416)
+- GraphQL steps ignoring captured resource ids in about half of requests.
+- Crash on path parameter names with characters such as `-`.
+
+#### Coverage phase
+
+- Missing large arrays of strings with `minLength` and a `\p{L}` or `(?!...)` `pattern`.
+- Generate positive cases for large unique arrays of UUIDs.
+- Already generated cases dropped under `--max-time` once generation used up the operation's time.
+- Comma-separated multipart `encoding.contentType` sent verbatim as the part Content-Type. [#5380](https://github.com/schemathesis/schemathesis/issues/5380)
+- Skip reason "No examples in schema" shown for operations this phase skipped.
+- Slow generation for email patterns combined with length bounds.
+- Crash on `pattern` quantifiers too large to generate (e.g. `[a-z]{100000}`).
+
+#### Data generation
+
+- Pick the same captured resource ids for nested-resource paths in otherwise identical runs.
 - Keep example fields next to captured ids in request bodies in the examples phase.
-- Report operations answered mostly with `409` as conflicts, not as a schema validation mismatch. [#5429](https://github.com/schemathesis/schemathesis/issues/5429)
-- Stateful scenarios ending early on request bodies with optional `readOnly` fields.
-- Coverage phase crash on `pattern` quantifiers too large to generate (e.g. `[a-z]{100000}`).
-- Coverage phase under `--max-time` dropping already generated cases once generation used up the operation's time.
-- Missing large coverage-phase arrays of strings with `minLength` and a `\p{L}` or `(?!...)` `pattern`.
-- Skip reason "No examples in schema" shown for operations the coverage phase skipped.
-- `st replay` reporting "operation not found in schema" for every GraphQL failure.
-- Unsorted expected statuses in `missing_required_header` failure messages.
+- "Cannot generate test data" for path parameters whose `enum` values contain `/`.
+- Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
+- Nested objects in inline query parameter schemas serialized as their property names only.
+- Form bodies dropping `additionalProperties` and object keywords for properties with `encoding.contentType`.
+- Crash on `application/x-www-form-urlencoded` examples whose schema sets `exclusiveMinimum` or `exclusiveMaximum` without a bound.
+- Format values generated under another operation's `codec`, `allow-x00` or `exclude-header-characters` settings.
+- Crash or lone surrogates in generated strings when `generation.codec` is `None`.
+
+#### Checks
+
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
-- Generate positive coverage-phase cases for large unique arrays of UUIDs.
-- Inferred `Location` links overwriting each other when several targets share a status code.
-- Empty `cookies` lists for requests and responses in HAR reports.
-- Empty response `mimeType` and `redirectURL` in HAR reports.
-- Slow coverage generation for email patterns combined with length bounds.
+- "Response violates schema" messages embedding the whole response value on one line.
+- Internal error instead of a failure for non-object GraphQL responses in negative mode.
+- False positive `positive_data_acceptance` for header values ending with whitespace.
+- Missed `ensure_resource_availability` failures after a `POST` that created the resource at its own URL.
+- `object_level_authorization` sending a single-object `GET` as another user, which may create data.
+- Unsorted expected statuses in `missing_required_header` failure messages.
+
+#### `negative_data_rejection`
+
+- False positive for valid boolean query parameters alongside `text/plain` bodies.
+- False positive when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
+- Missed failures in the coverage phase for scalar parameters next to array or object parameters.
+
+#### Capability probes
+
+- API capabilities reported as unsupported, and generation narrowed, when a probe request times out.
+- Generation narrowed for the whole run when probes could not connect to the API.
+
+#### Output and warnings
+
+- Report operations answered mostly with `409` as conflicts, not as a schema validation mismatch. [#5429](https://github.com/schemathesis/schemathesis/issues/5429)
 - Dictionary mismatch warning raised when only a few operations reject the dictionary entries.
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
 - Unmasked URL credentials in the terminal's schema location and `Base URL` lines.
-- Stateful scenarios mostly starting from the alphabetically first operation.
-- Crash or wrong URL for server variable names containing dots or brackets.
-- Crash on path keys containing lone surrogates.
-- Internal error instead of a failure for non-object GraphQL responses in negative mode.
-- "Response violates schema" messages embedding the whole response value on one line.
-- False positive `negative_data_rejection` for valid boolean query parameters alongside `text/plain` bodies.
-- Missed `ensure_resource_availability` failures after a `POST` that created the resource at its own URL.
-- Long failure messages in the HTML report not limited in height, unlike response bodies.
-- Nested objects in inline query parameter schemas serialized as their property names only.
-- Comma-separated multipart `encoding.contentType` sent verbatim as the part Content-Type in coverage. [#5380](https://github.com/schemathesis/schemathesis/issues/5380)
-- Fuzzing repeating one request under `--max-time` when auth overwrites a declared header.
-- API capabilities reported as unsupported, and generation narrowed, when a probe request times out.
-- "Cannot generate test data" for path parameters whose `enum` values contain `/`.
-- `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
-- False positive `positive_data_acceptance` for header values ending with whitespace.
-- Clicks in the HTML report opening an unrelated row in Safari.
 - Double-encoded sensitive query keys in reproduction commands for raw query strings.
-- Generation narrowed for the whole run when capability probes could not connect to the API.
-- False positive `negative_data_rejection` when `call_and_validate` receives its own body via `json=`. [#5344](https://github.com/schemathesis/schemathesis/issues/5344)
-- Redirects followed for operations documenting a `3xx` status, reporting the target's status instead.
-- Keep URL query strings unchanged in reports and cassettes, apart from masked sensitive values.
-- Inferred `Location` links extracting wrong path parameters with base paths, queries or regex characters.
-- Crash on `Location` headers differing from a schema path by a trailing or doubled slash.
-- Crash in `schema.find_operation_by_path` on paths with doubled or missing trailing slashes.
-- `object_level_authorization` sending a single-object `GET` as another user, which may create data.
+
+#### Reports
+
+- Keep URL query strings unchanged in reports and VCR cassettes, apart from masked sensitive values.
 - Valueless sensitive query keys gaining a masked value in reports and cassettes.
 - Invalid VCR cassettes when the command or a request URL contains a single quote.
-- Missed `negative_data_rejection` failures in coverage for scalar parameters next to array or object parameters.
-- Form bodies dropping `additionalProperties` and object keywords for properties with `encoding.contentType`.
-- Inferred link and undeclared path parameter order varying between runs.
-- Crash or lone surrogates in generated strings when `generation.codec` is `None`.
-- `openapi.from_url` and `graphql.from_url` ignoring TLS, auth and header settings from the config.
-- Format values generated under another operation's `codec`, `allow-x00` or `exclude-header-characters` settings.
+- Empty `cookies` lists for requests and responses in HAR reports.
+- Empty response `mimeType` and `redirectURL` in HAR reports.
+- Long failure messages in the HTML report not limited in height, unlike response bodies.
+- Clicks in the HTML report opening an unrelated row in Safari.
+
+#### pytest, Python API and hooks
+
+- Respect `--max-examples` and other explicit options when a hook loads a Hypothesis profile.
 - Generation settings ignored by `APIOperation.as_strategy` after the same operation generated under other settings.
-- Crash on `application/x-www-form-urlencoded` examples whose schema sets `exclusiveMinimum` or `exclusiveMaximum` without a bound.
-- GraphQL stateful steps ignoring captured resource ids in about half of requests.
+- `openapi.from_url` and `graphql.from_url` ignoring TLS, auth and header settings from the config.
+- Crash in `schema.find_operation_by_path` on paths with doubled or missing trailing slashes.
+
+#### Others
+
+- `st fuzz` occasionally dropping results and reporting "Empty test suite" on slow machines.
+- `st replay` reporting "operation not found in schema" for every GraphQL failure.
+- Redirects followed for operations documenting a `3xx` status, reporting the target's status instead.
+- Crash or wrong URL for server variable names containing dots or brackets.
+- Crash on path keys containing lone surrogates.
+- Crash on `Location` headers differing from a schema path by a trailing or doubled slash.
 
 ## [4.31.1](https://github.com/schemathesis/schemathesis/compare/v4.31.0...v4.31.1) - 2026-10-15
 
