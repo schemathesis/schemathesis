@@ -9,7 +9,7 @@ import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType, RefResolutionError, unresolvable_reference
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, supplemental_formats
 from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema
@@ -50,6 +50,17 @@ class CachedValidation:
     has_discriminator: bool = False
     # Shared by every response documenting the same schema; validators are looked up by it.
     bundled: Bundle | None = None
+
+
+def _build_response_validator(
+    schema: JsonSchema, validator_cls: type[jsonschema_rs.Validator], validate_formats: bool
+) -> jsonschema_rs.Validator:
+    return validator_cls(
+        schema,
+        validate_formats=validate_formats,
+        pattern_options=FANCY_REGEX_OPTIONS,
+        formats=supplemental_formats(validator_cls),
+    )
 
 
 class ResponseSchemaCache:
@@ -119,9 +130,7 @@ class ResponseSchemaCache:
             with self._lock:
                 cached = self._validators.get(key)
                 if cached is None:
-                    validator = validator_cls(
-                        bundled.schema, validate_formats=validate_formats, pattern_options=FANCY_REGEX_OPTIONS
-                    )
+                    validator = _build_response_validator(bundled.schema, validator_cls, validate_formats)
                     cached = self._validators[key] = (validator, bundled)
         return cached[0]
 
@@ -239,9 +248,7 @@ class OpenApiResponse:
         return resolved
 
     def _build_validator(self, schema: JsonSchema, validate_formats: bool) -> jsonschema_rs.Validator:
-        return self.adapter.jsonschema_validator_cls(
-            schema, validate_formats=validate_formats, pattern_options=FANCY_REGEX_OPTIONS
-        )
+        return _build_response_validator(schema, self.adapter.jsonschema_validator_cls, validate_formats)
 
     def get_validator(
         self, resolved_media_type: str | None, schema: JsonSchema, *, validate_formats: bool = True

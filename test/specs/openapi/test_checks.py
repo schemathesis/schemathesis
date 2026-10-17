@@ -4771,3 +4771,20 @@ def test_concurrent_first_use_builds_one_shared_response_validator(ctx):
     sys.setswitchinterval(previous)
 
     assert len({id(validator) for validator in validators}) == 1
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+@pytest.mark.parametrize("format", ["uuid", "duration"])
+def test_draft4_response_rejects_invalid_supplemental_format(ctx, response_factory, version, format):
+    schema = {"type": "string", "format": format}
+    if version == "2.0":
+        responses = {"200": {"description": "OK", "schema": schema}}
+    else:
+        responses = json_ok(schema)
+    operation = ctx.openapi.load_operation(
+        "GET /a", {"produces": ["application/json"], "responses": responses}, version=version
+    )
+    response = response_factory.requests(content=b'"nope"')
+
+    with pytest.raises(FailureGroup, match=f'is not a "{format}"'):
+        operation.Case().validate_response(response, checks=[response_schema_conformance])

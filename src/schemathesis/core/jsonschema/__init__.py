@@ -87,6 +87,10 @@ DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {
 }
 
 
+def supplemental_formats(validator_cls: type) -> dict[str, Callable[[Any], bool]] | None:
+    return DRAFT4_SUPPLEMENTAL_FORMATS if validator_cls is jsonschema_rs.Draft4Validator else None
+
+
 # Format names that each `jsonschema_rs` validator class actually validates (after
 # the supplemental `uuid` registration for Draft 4 above). Anything outside the
 # matching set is annotation-only under that draft: negative-format generation
@@ -275,9 +279,12 @@ def _build_validator(
     schema: JsonSchema, validator_cls: type, registry: jsonschema_rs.Registry | None = None
 ) -> jsonschema_rs.Validator:
     # References arrive bundled, so a build never needs the network; a `$schema` URL would otherwise be fetched.
-    kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS, "offline": True}
-    if validator_cls is jsonschema_rs.Draft4Validator:
-        kwargs["formats"] = DRAFT4_SUPPLEMENTAL_FORMATS
+    kwargs: dict[str, Any] = {
+        "validate_formats": True,
+        "pattern_options": FANCY_REGEX_OPTIONS,
+        "offline": True,
+        "formats": supplemental_formats(validator_cls),
+    }
     if registry is not None:
         kwargs["registry"] = registry
     return validator_cls(schema, **kwargs)
@@ -401,6 +408,7 @@ __all__ = [
     "BundleError",
     "CANONICALIZE_DRAFT_BY_VALIDATOR",
     "DRAFT4_SUPPLEMENTAL_FORMATS",
+    "supplemental_formats",
     "DRAFT_03_DIALECT",
     "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
