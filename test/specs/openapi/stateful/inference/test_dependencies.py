@@ -3466,6 +3466,136 @@ def test_path_param_named_after_field_of_unrelated_resource_is_not_bound(ctx):
     assert inferred_links(graph) == []
 
 
+SHIPMENT_FIELDS = {"id": {"type": "string"}, "weight": {"type": "number"}}
+SHIPMENTS_LISTING = {
+    "type": "object",
+    "properties": {"shipments": {"type": "array", "items": component_ref("Shipment")}},
+}
+
+
+def warehouse_shipment_paths(parameter="warehouseId", parameter_schema=None):
+    parameters = [{"name": parameter, "in": "path", "required": True, "schema": parameter_schema or {"type": "string"}}]
+    return {
+        **operation("get", "/shipments", "200", SHIPMENTS_LISTING),
+        **operation("get", f"/warehouses/{{{parameter}}}/shipments", "200", SHIPMENTS_LISTING, parameters),
+        **operation(
+            "get",
+            f"/warehouses/{{{parameter}}}/shipments/{{shipmentId}}",
+            "200",
+            component_ref("Shipment"),
+            [*parameters, path_param("shipmentId")],
+        ),
+    }
+
+
+def listing_to_item(parameter, parent_value):
+    parameters = {"path.shipmentId": "$response.body#/shipments/*/id"}
+    if parent_value is not None:
+        parameters[f"path.{parameter}"] = parent_value
+    return {
+        "operationRef": f"#/paths/~1warehouses~1{{{parameter}}}~1shipments~1{{shipmentId}}/get",
+        "parameters": parameters,
+        "x-schemathesis": {"is_inferred": True},
+    }
+
+
+def warehouse_shipment_links(parameter, parent_value):
+    return [
+        ["#/paths/~1shipments/get", "200", listing_to_item(parameter, parent_value)],
+        [
+            f"#/paths/~1warehouses~1{{{parameter}}}~1shipments/get",
+            "200",
+            listing_to_item(parameter, f"$request.path.{parameter}"),
+        ],
+    ]
+
+
+@pytest.mark.parametrize(
+    "schemas",
+    [
+        {"Shipment": {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": {"type": "string"}}}},
+        {
+            "Shipment": {
+                "allOf": [{"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": {"type": "string"}}}]
+            }
+        },
+        {
+            "Shipment": {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": component_ref("Key")}},
+            "Key": {"type": "string"},
+        },
+        {
+            "Shipment": {"allOf": [component_ref("Stored"), {"type": "object", "properties": SHIPMENT_FIELDS}]},
+            "Stored": {"type": "object", "properties": {"warehouseId": {"type": "string"}}},
+        },
+        {
+            "Shipment": {
+                "type": "object",
+                "properties": {**SHIPMENT_FIELDS, "warehouseId": {"allOf": [component_ref("Key")]}},
+            },
+            "Key": {"type": "string"},
+        },
+    ],
+    ids=["inline", "all-of", "reference", "all-of-reference", "field-all-of-reference"],
+)
+def test_parent_path_param_without_producer_is_filled_from_item_carrying_it(ctx, schemas):
+    _, graph = analyze_dependencies(ctx, warehouse_shipment_paths(), components={"schemas": schemas})
+
+    assert inferred_links(graph) == warehouse_shipment_links("warehouseId", "$response.body#/shipments/*/warehouseId")
+
+
+@pytest.mark.parametrize(
+    ("parameter", "parameter_schema", "field"),
+    [
+        ("warehouseId", None, {"type": "array", "items": {"type": "string"}}),
+        ("warehouse", None, {"type": "object", "properties": {"id": {"type": "string"}}}),
+        ("warehouseId", {"type": "string", "format": "uuid"}, {"type": "integer"}),
+        ("warehouseId", None, {"type": "string", "writeOnly": True}),
+    ],
+    ids=["array", "object", "integer-into-uuid", "write-only"],
+)
+def test_parent_path_param_is_not_filled_from_item_field_of_another_type(ctx, parameter, parameter_schema, field):
+    shipment = {"type": "object", "properties": {**SHIPMENT_FIELDS, parameter: field}}
+    paths = warehouse_shipment_paths(parameter, parameter_schema)
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Shipment": shipment}})
+
+    assert inferred_links(graph) == warehouse_shipment_links(parameter, None)
+
+
+def parent_key_link(target, parameters):
+    return {"operationRef": target, "parameters": parameters, "x-schemathesis": {"is_inferred": True}}
+
+
+def test_parent_path_param_with_producer_is_not_filled_from_item(ctx):
+    shipment = {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": {"type": "string"}}}
+    warehouse = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+    paths = {
+        **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+        **warehouse_shipment_paths(),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Shipment": shipment, "Warehouse": warehouse}})
+
+    item = "#/paths/~1warehouses~1{warehouseId}~1shipments~1{shipmentId}/get"
+    collection = "#/paths/~1warehouses~1{warehouseId}~1shipments/get"
+    from_warehouses = {"path.warehouseId": "$response.body#/*/id"}
+    carried = {"path.warehouseId": "$response.body#/shipments/*/warehouseId"}
+    assert inferred_links(graph) == [
+        ["#/paths/~1warehouses/get", "200", parent_key_link(collection, from_warehouses)],
+        ["#/paths/~1warehouses/get", "200", parent_key_link(item, from_warehouses)],
+        [
+            "#/paths/~1shipments/get",
+            "200",
+            parent_key_link(item, {"path.shipmentId": "$response.body#/shipments/*/id"}),
+        ],
+        [collection, "200", listing_to_item("warehouseId", "$request.path.warehouseId")],
+        ["#/paths/~1shipments/get", "200", parent_key_link(collection, carried)],
+        ["#/paths/~1shipments/get", "200", parent_key_link(item, carried)],
+        [collection, "200", parent_key_link(item, carried)],
+        [item, "200", parent_key_link(collection, {"path.warehouseId": "$response.body#/warehouseId"})],
+    ]
+
+
 BOOKS = {"type": "object", "properties": {"Books": {"type": "array", "items": BOOK}}}
 MESSAGE = {"type": "object", "properties": {"message": {"type": "string"}, "status": {"type": "string"}}}
 

@@ -44,6 +44,8 @@ class DependencyGraph:
                     del input["echoes_response"]
                 if not input["is_listed_identifier"]:
                     del input["is_listed_identifier"]
+                if not input["is_parent_key"]:
+                    del input["is_parent_key"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
@@ -131,6 +133,14 @@ class DependencyGraph:
 
                     for input_slot in input_slots:
                         if confirmed is not None and not _takes_confirmed_value(input_slot, confirmed):
+                            continue
+                        # A parent key is read from an item's own field, and only by producers not under that parent.
+                        if input_slot.is_parent_key and (
+                            input_slot.parameter_name in template_fields[producer_id]
+                            or output_slot.path_parameter is not None
+                            or output_slot.body_field is not None
+                            or output_slot.is_primitive_identifier
+                        ):
                             continue
                         # Scope guard: skip bare {id} links where the producer is from a
                         # different namespace. Triggered only when the resource name matches the
@@ -820,6 +830,8 @@ class InputSlot:
     echoes_response: bool = False
     # Whether a parent key named after its collection takes the identifier the collection lists (`{warehouse}`)
     is_listed_identifier: bool = False
+    # Whether this input takes the key of the parent an item lives under, read from the item (`Shipment.warehouseId`)
+    is_parent_key: bool = False
 
 
 @dataclass(slots=True)

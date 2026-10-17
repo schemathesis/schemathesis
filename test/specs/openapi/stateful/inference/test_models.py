@@ -262,7 +262,10 @@ def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_r
         "GetConfig": {
             "operationRef": get_config,
             "x-schemathesis": {"is_inferred": True},
-            "parameters": {"path.name": "$response.body#/data/*/name"},
+            "parameters": {
+                "path.name": "$response.body#/data/*/name",
+                "path.broker_id": "$response.body#/data/*/broker_id",
+            },
         },
     }
 
