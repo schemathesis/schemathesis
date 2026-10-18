@@ -4,6 +4,7 @@
 
 ### :racing_car: Performance
 
+- ~5% faster stateful testing.
 - ~20% faster stateful testing on APIs with many links.
 - Up to ~100x less time spent on "Response violates schema" failure messages.
 
