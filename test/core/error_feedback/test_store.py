@@ -165,6 +165,26 @@ def test_store_checkpoint_bumps_generation_and_keeps_observations():
     assert store.generation == 1
     assert len(store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)) == 1
 
+    store.record(_obs("name"))
+    store.checkpoint()
+    assert store.generation == 2
+
+
+def test_store_checkpoint_keeps_generation_when_nothing_new_was_learned():
+    store = ErrorFeedbackStore()
+    store.record(_obs("email"))
+    store.checkpoint()
+    store.checkpoint()
+    store.record(_obs("email"))
+    store.checkpoint()
+    assert store.generation == 1
+
+
+def test_store_checkpoint_bumps_generation_when_a_size_bound_gains_an_edge():
+    store = ErrorFeedbackStore()
+    store.record(_make(kind=ObservationKind.SIZE_BOUND, payload=SizeBoundPayload(min=3, max=None)))
+    store.checkpoint()
+    store.record(_make(kind=ObservationKind.SIZE_BOUND, payload=SizeBoundPayload(min=None, max=30)))
     store.checkpoint()
     assert store.generation == 2
 

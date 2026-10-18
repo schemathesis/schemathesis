@@ -193,17 +193,19 @@ class _Bucket:
 class ErrorFeedbackStore:
     """Thread-safe accumulator of parser observations + monotonic generation counter.
 
-    `generation` advances at engine `checkpoint()` calls; strategy caches key on
-    it and rebuild only when it bumps. Within one suite the value is fixed —
+    `generation` advances at engine `checkpoint()` calls that follow new feedback; strategy caches
+    key on it and rebuild only when it bumps. Within one suite the value is fixed —
     safe to consult from inside Hypothesis-driven generation.
     """
 
-    __slots__ = ("_buckets", "_lock", "_generation")
+    __slots__ = ("_buckets", "_lock", "_generation", "_changed")
 
     def __init__(self) -> None:
         self._buckets: dict[_BucketKey, _Bucket] = {}
         self._lock = threading.Lock()
         self._generation = 0
+        # Whether the observations visible to strategies changed since the last checkpoint.
+        self._changed = False
 
     @property
     def generation(self) -> int:
@@ -212,7 +214,9 @@ class ErrorFeedbackStore:
     def checkpoint(self) -> None:
         """Engine-side boundary marker; never call from inside a Hypothesis suite."""
         with self._lock:
-            self._generation += 1
+            if self._changed:
+                self._generation += 1
+                self._changed = False
 
     def observation_counts(self) -> dict[str, int]:
         """How much each operation has taught the parsers, by distinct observation."""
@@ -244,6 +248,7 @@ class ErrorFeedbackStore:
                     count=1,
                 )
                 bucket.inserted += 1
+                self._changed = True
             else:
                 entry.count += 1
                 # Some validators report only the violated side of a size bound;
@@ -262,6 +267,7 @@ class ErrorFeedbackStore:
                     )
                     if merged != entry.canonical.payload:
                         entry.canonical = replace(entry.canonical, payload=merged)
+                        self._changed = True
 
     def observations(
         self,
