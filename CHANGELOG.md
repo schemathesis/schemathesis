@@ -4,6 +4,7 @@
 
 ### :racing_car: Performance
 
+- ~20% faster stateful testing on APIs with many links.
 - Up to ~100x less time spent on "Response violates schema" failure messages.
 
 ## [4.32.0](https://github.com/schemathesis/schemathesis/compare/v4.31.1...v4.32.0) - 2026-10-18
