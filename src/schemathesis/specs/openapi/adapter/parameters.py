@@ -2036,6 +2036,10 @@ def _bundle_parameter(
     name_to_uri = {}
     if schema is not None:
         definition = dict(definition)
+        # A body stands alone, so names local to it let bodies declaring the same schema bundle identically.
+        # Other parameters are merged into one schema per location and need names unique across them.
+        if definition.get("in") == ParameterLocation.BODY:
+            bundler = Bundler(ref_siblings=bundler.ref_siblings)
         try:
             bundled = bundler.bundle(
                 schema,
