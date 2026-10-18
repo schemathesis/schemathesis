@@ -114,6 +114,23 @@ def identical_query_parameters() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def resource_pool(existing_ids: frozenset[int], *, secured: bool = False) -> OpenAPIApp:
+    spec = build_schema(
+        schemas.resource_pool(existing_ids, secured=secured),
+        components={"securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}},
+    )
+    app = make_flask_app_from_schema(spec)
+    handlers.register_resource_pool(app, existing_ids)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def resource_update() -> OpenAPIApp:
+    spec = build_schema(schemas.resource_update())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_resource_update(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def flaky() -> OpenAPIApp:
     spec = build_schema(schemas.flaky())
     app = make_flask_app_from_schema(spec)
