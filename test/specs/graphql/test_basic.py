@@ -1008,12 +1008,12 @@ def test_not_a_server_error_graphql_bad_charset(ctx, charset):
     ids=["data", "errors", "partial-data", "null-data", "empty-errors", "not-a-graphql-response", "non-object"],
 )
 def test_classify_call_outcome(ctx, response_factory, content, expected):
-    schema = _books_schema(ctx)
-    assert schema.classify_call_outcome(response_factory.requests(content=content)) is expected
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
+    assert case.operation.schema.classify_call_outcome(case, response_factory.requests(content=content)) is expected
 
 
 @pytest.mark.parametrize("status_code", [401, 403, 429, 500])
 def test_classify_call_outcome_ignores_uninformative_responses(ctx, response_factory, status_code):
-    schema = _books_schema(ctx)
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
     response = response_factory.requests(status_code=status_code, content=b'{"errors": [{"message": "Nope"}]}')
-    assert schema.classify_call_outcome(response) is CallOutcome.UNINFORMATIVE
+    assert case.operation.schema.classify_call_outcome(case, response) is CallOutcome.UNINFORMATIVE

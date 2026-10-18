@@ -124,6 +124,8 @@
 - Unmasked URL credentials in recorded commands for unknown options passed as `--option=URL`.
 - Unmasked URL credentials in the terminal's schema location and `Base URL` lines.
 - Double-encoded sensitive query keys in reproduction commands for raw query strings.
+- `Missing test data` warning kept for operations that a later phase reached successfully.
+- `Missing test data` warning for operations answering with a documented redirect.
 
 #### Reports
 

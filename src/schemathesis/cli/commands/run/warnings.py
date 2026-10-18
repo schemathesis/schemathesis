@@ -128,7 +128,7 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
         interaction = recorder.interactions.get(case.value.id)
         if interaction is None or interaction.response is None:
             continue
-        outcome = case.value.operation.schema.classify_call_outcome(interaction.response)
+        outcome = case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
         if outcome is CallOutcome.ACCEPTED:
             outcomes.accepted += 1
         elif outcome is CallOutcome.UNREACHABLE:
@@ -260,7 +260,7 @@ def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
         interaction = recorder.interactions.get(case.value.id)
         if interaction is None or interaction.response is None:
             continue
-        if case.value.operation.schema.classify_call_outcome(interaction.response) is CallOutcome.ACCEPTED:
+        if case.value.operation.schema.classify_call_outcome(case.value, interaction.response) is CallOutcome.ACCEPTED:
             return True
     return False
 
@@ -275,17 +275,20 @@ class WarningCollector:
     data: WarningData
     # Operations that got past authentication at some point in the run.
     authenticated: set[str]
+    # Operations that served positive data at some point in the run.
+    served: set[str]
     # Whether a warning configured with `fail-on` was recorded that nothing withdraws later.
     fails: bool
     # Operations whose missing-auth warning is configured with `fail-on`; a later success withdraws them.
     fails_on_auth: set[str]
-    # Operations whose missing-test-data warning is configured with `fail-on`; stateful success withdraws them.
+    # Operations whose missing-test-data warning is configured with `fail-on`; a later success withdraws them.
     fails_on_missing_test_data: set[str]
 
     def __init__(self, config: ProjectConfig) -> None:
         self.config = config
         self.data = WarningData()
         self.authenticated = set()
+        self.served = set()
         self.fails = False
         self.fails_on_auth = set()
         self.fails_on_missing_test_data = set()
@@ -374,6 +377,7 @@ class WarningCollector:
 
         if any_positive_is_accepted(event.recorder):
             self._mark_authenticated(event.recorder.label)
+            self._mark_served(event.recorder.label)
 
         if warnings.should_display(SchemathesisWarning.MISSING_AUTH) and event.recorder.label not in self.authenticated:
             for status_code in auth_error_codes(statistic, event.recorder):
@@ -466,6 +470,8 @@ class WarningCollector:
 
     def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:
         """Record the operation, capturing the link graph the first time one warns."""
+        if label in self.served:
+            return
         if operation is not None:
             if self.data.linked_operations is None:
                 self.data.linked_operations = operation.schema.operations_with_incoming_links()
@@ -483,6 +489,12 @@ class WarningCollector:
             labels.discard(label)
             if not labels:
                 del self.data.missing_auth[status_code]
+
+    def _mark_served(self, label: str) -> None:
+        """Take an operation out of the missing-test-data warning, and keep it out for the rest of the run."""
+        self.served.add(label)
+        self.data.missing_test_data.discard(label)
+        self.fails_on_missing_test_data.discard(label)
 
     def _handle_warning(self, kind: SchemathesisWarning, record_callback: Callable[[], None]) -> None:
         """Handle a warning by checking display/fail config and recording it."""
@@ -583,6 +595,5 @@ class WarningCollector:
                 response = event.recorder.interactions[key].response
                 if response is None:
                     continue
-                if node.value.operation.schema.classify_call_outcome(response) is CallOutcome.ACCEPTED:
-                    self.data.missing_test_data.remove(label)
-                    self.fails_on_missing_test_data.discard(label)
+                if node.value.operation.schema.classify_call_outcome(node.value, response) is CallOutcome.ACCEPTED:
+                    self._mark_served(label)

@@ -447,7 +447,7 @@ class GraphQLSchema(BaseSchema):
         return None
 
     @override
-    def classify_call_outcome(self, response: Response) -> CallOutcome:
+    def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         """Decide what the API did with a positive case, from the body rather than the status code.
 
         A GraphQL server answers the same status whether it served the query or refused it, and an
