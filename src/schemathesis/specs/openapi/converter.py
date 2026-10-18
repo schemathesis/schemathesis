@@ -174,9 +174,13 @@ def _to_json_schema(
                 del subschema["required"]
 
     if is_response_schema:
-        if schema_type == "object":
+        if (
+            schema_type is None
+            or schema_type == "object"
+            or (isinstance(schema_type, list) and "object" in schema_type)
+        ):
             # Write-only properties should not occur in responses
-            rewrite_properties(schema, is_write_only)
+            rewrite_properties(schema, lambda subschema: is_write_only(subschema, bundle))
     else:
         # Read-only properties should not occur in requests
         rewrite_properties(schema, lambda subschema: is_read_only(subschema, bundle))
@@ -693,10 +697,8 @@ def permit_forbidden_properties(schema: object) -> bool:
     return changed
 
 
-def is_write_only(schema: object) -> TypeGuard[dict[str, Any]]:
-    if not isinstance(schema, dict):
-        return False
-    return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
+def is_write_only(schema: object, bundle: Mapping[str, Any] | None = None) -> TypeGuard[dict[str, Any]]:
+    return _has_annotation(schema, bundle, ("writeOnly", "x-writeOnly"))
 
 
 def is_read_only(schema: object, bundle: Mapping[str, Any] | None) -> bool:
@@ -705,6 +707,10 @@ def is_read_only(schema: object, bundle: Mapping[str, Any] | None) -> bool:
     Any applicable declaration counts: on the schema itself, behind a bundled `$ref`, in an `allOf` branch,
     or on the non-null side of a nullable union.
     """
+    return _has_annotation(schema, bundle, ("readOnly",))
+
+
+def _has_annotation(schema: object, bundle: Mapping[str, Any] | None, keywords: tuple[str, ...]) -> bool:
     pending: list[object] = [schema]
     seen: set[int] = set()
     while pending:
@@ -712,7 +718,7 @@ def is_read_only(schema: object, bundle: Mapping[str, Any] | None) -> bool:
         if not isinstance(node, dict) or id(node) in seen:
             continue
         seen.add(id(node))
-        if node.get("readOnly"):
+        if any(node.get(keyword) for keyword in keywords):
             return True
         name = _bundled_name(node.get("$ref"))
         if bundle is not None and name is not None:
