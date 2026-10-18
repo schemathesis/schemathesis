@@ -343,6 +343,10 @@ class APIStateMachine(RuleBasedStateMachine):
         target = _normalize_name(target)
         return super()._new_name(target)
 
+    def bundle(self, name: str) -> CaseInsensitiveDict | tuple[()]:
+        # Availability checks should not populate response storage with empty entries.
+        return self.bundles.get(name, ())
+
     def _get_target_for_result(self, result: StepOutput) -> str | None:
         raise NotImplementedError
 

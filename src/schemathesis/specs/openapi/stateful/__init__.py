@@ -292,7 +292,8 @@ def create_state_machine(
                     rules[name] = transition(
                         name=name,
                         target=catch_all,
-                        precondition=is_transition_allowed(bundle_name, link.source.label, target.label),
+                        source_bundle=bundles[bundle_name],
+                        precondition=is_transition_allowed(link.source.label, target.label),
                         input=bundles[bundle_name].flatmap(
                             into_step_input(
                                 target=target,
@@ -522,9 +523,9 @@ def _choose_wildcard_matches(value: Any, random: Random) -> Any:
     return value
 
 
-def is_transition_allowed(bundle_name: str, source: str, target: str) -> Callable[[OpenAPIStateMachine], bool]:
+def is_transition_allowed(source: str, target: str) -> Callable[[OpenAPIStateMachine], bool]:
     def inner(machine: OpenAPIStateMachine) -> bool:
-        return bool(machine.bundles.get(bundle_name)) and machine.control.allow_transition(source, target)
+        return machine.control.allow_transition(source, target)
 
     return inner
 
@@ -540,6 +541,7 @@ def transition(
     *,
     name: str,
     target: Bundle,
+    source_bundle: Bundle | None = None,
     input: st.SearchStrategy[StepInput],
     precondition: Callable[[OpenAPIStateMachine], bool],
 ) -> Callable[..., StepOutput | None]:
@@ -564,16 +566,15 @@ def transition(
     # Hypothesis' `@rule` / `@precondition` each build their proxy by exec'ing generated source,
     # and every one leaves a module behind for the lifetime of the process. Link-heavy schemas
     # define rules by the thousands, so attach the rule directly instead.
-    setattr(
-        step_function,
-        RULE_MARKER,
-        Rule(
-            targets=(target.name,),
-            function=step_function,
-            arguments={"input": input},
-            preconditions=(precondition,),
-        ),
+    rule = Rule(
+        targets=(target.name,),
+        function=step_function,
+        arguments={"input": input},
+        preconditions=(precondition,),
     )
+    if source_bundle is not None:
+        rule.bundles = (source_bundle,)
+    setattr(step_function, RULE_MARKER, rule)
     return step_function
 
 
