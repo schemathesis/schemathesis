@@ -509,6 +509,35 @@ def test_equivalence(owner, peer, value, schema, expected):
     assert is_equivalent(owner, peer, value, schema) is expected
 
 
+def test_equivalence_with_recursive_all_of(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /nodes",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Node": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Node"},
+                        {
+                            "type": "object",
+                            "properties": {"id": {"type": "string"}, "item": {"type": "string"}},
+                        },
+                    ]
+                }
+            }
+        },
+    )
+    response_schema = operation.responses.get("200").get_schema("application/json").schema
+    assert is_equivalent({"id": "node-1", "item": "book"}, {"id": "node-1", "item": "book"}, "node-1", response_schema)
+
+
 # A key the client picks for what it creates is not a reference, unlike an id that names another object.
 def test_body_values_a_create_references(ctx):
     book = {"type": "object", "properties": {"book_title": {"type": "string"}, "secret": {"type": "string"}}}
