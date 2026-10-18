@@ -49,6 +49,7 @@ from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
+from schemathesis.specs.openapi.adapter.parameters import RequestBodySchemaCache
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.responses import ResponseSchemaCache
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity
@@ -130,6 +131,7 @@ class OpenApiSchema(BaseSchema):
         self._bundler = Bundler(ref_siblings=self.adapter.ref_siblings)
         self._bundle_cache: BundleCache = {}
         self.response_schema_cache = ResponseSchemaCache()
+        self.request_body_schema_cache = RequestBodySchemaCache()
         self.raw_schema_version = RawSchemaVersion()
         self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
         self._operations = OperationLoader(self)

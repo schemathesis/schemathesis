@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -1246,20 +1247,21 @@ class OpenApiComponent(ABC):
         Keeps `prefixItems` intact so `Draft202012Validator` accepts the schema during construction.
         """
         if self._validation_schema is NOT_SET:
-            self._validation_schema = to_json_schema(
-                self.raw_schema,
-                nullable_keyword=self.adapter.nullable_keyword,
-                update_quantifiers=False,
-                upgrade_legacy_exclusive_bounds=(
-                    self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
-                ),
-                convert_prefix_items=False,
-                convert_if_then_else=False,
-                name_to_uri=self.name_to_uri,
-                merge_ref_siblings=self.adapter.ref_siblings,
-            )
+            self._validation_schema = self._build_validation_schema()
         assert not isinstance(self._validation_schema, NotSet)
         return self._validation_schema
+
+    def _build_validation_schema(self) -> JsonSchema:
+        return to_json_schema(
+            self.raw_schema,
+            nullable_keyword=self.adapter.nullable_keyword,
+            update_quantifiers=False,
+            upgrade_legacy_exclusive_bounds=self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator,
+            convert_prefix_items=False,
+            convert_if_then_else=False,
+            name_to_uri=self.name_to_uri,
+            merge_ref_siblings=self.adapter.ref_siblings,
+        )
 
     def _get_validator(self) -> jsonschema_rs.Validator:
         if self._validator is NOT_SET:
@@ -1560,6 +1562,21 @@ class OpenApiParameter(OpenApiComponent):
         return "string" if self.location.is_in_header else None
 
 
+class RequestBodySchemaCache:
+    """Converted request body schemas, shared by every body of a loaded API that declares the same schema."""
+
+    __slots__ = ("_schemas",)
+
+    def __init__(self) -> None:
+        self._schemas: dict[tuple[object, ...], JsonSchema] = {}
+
+    def get_or_build(self, key: tuple[object, ...], build: Callable[[], JsonSchema]) -> JsonSchema:
+        schema = self._schemas.get(key)
+        if schema is None:
+            schema = self._schemas.setdefault(key, build())
+        return schema
+
+
 @dataclass
 class OpenApiBody(OpenApiComponent):
     """OpenAPI request body."""
@@ -1575,6 +1592,7 @@ class OpenApiBody(OpenApiComponent):
         "resource_name",
         "name_to_uri",
         "adapter",
+        "schema_cache",
         "_optimized_schema",
         "_unoptimized_schema",
         "_raw_schema",
@@ -1627,6 +1645,8 @@ class OpenApiBody(OpenApiComponent):
 
     def __post_init__(self) -> None:
         super().__post_init__()
+        # Not part of the body's value: bodies that declare the same schema share converted copies through it.
+        self.schema_cache: RequestBodySchemaCache | None = None
         self._strategy_cache: dict[GenerationMode, tuple[StrategyCacheKey, st.SearchStrategy]] = {}
         self._is_negatable: bool | NotSet = NOT_SET
 
@@ -1653,6 +1673,39 @@ class OpenApiBody(OpenApiComponent):
     def _get_raw_schema(self) -> JsonSchema:
         """Get raw body schema."""
         return self.definition.get("schema", {})
+
+    def _build_schema(self, *, optimize: bool) -> JsonSchema:
+        return self._shared(("generation", optimize), lambda: super(OpenApiBody, self)._build_schema(optimize=optimize))
+
+    def _build_validation_schema(self) -> JsonSchema:
+        return self._shared(("validation",), super()._build_validation_schema)
+
+    def share_converted_schemas(self, cache: RequestBodySchemaCache) -> None:
+        """Share converted schemas with identical bodies, unless they already exist and may have been changed."""
+        if all(
+            value is NOT_SET
+            for value in (
+                self._raw_schema,
+                self._optimized_schema,
+                self._unoptimized_schema,
+                self._validation_schema,
+                self._permissive_schema,
+            )
+        ):
+            self.schema_cache = cache
+
+    def _shared(self, kind: tuple[object, ...], build: Callable[[], JsonSchema]) -> JsonSchema:
+        # Keyed by content when first converted, so a body a hook changed gets its own schema.
+        if self.schema_cache is None:
+            return build()
+        try:
+            text = jsonschema_rs.canonical.json.to_string(self.raw_schema)
+        except ValueError:
+            return build()
+        # Bundled bodies embed every component they reach; a digest keeps the key small.
+        digest = hashlib.sha256(text.encode()).digest()
+        key = (*kind, digest, tuple(sorted(self.name_to_uri.items())), self._get_default_type())
+        return self.schema_cache.get_or_build(key, build)
 
     def _get_default_type(self) -> str | None:
         """Return default type if body is a form type."""
@@ -2157,7 +2210,10 @@ def iter_parameters_v2(
         for media_type in form_media_types:
             # Individual `formData` parameters are joined into a single "composite" one.
             yield OpenApiBody.from_form_parameters(
-                definition=form_data, media_type=media_type, name_to_uri=form_name_to_uri, adapter=adapter
+                definition=form_data,
+                media_type=media_type,
+                name_to_uri=form_name_to_uri,
+                adapter=adapter,
             )
 
 
@@ -2229,7 +2285,9 @@ def iter_parameters_v3(
                         resource_name = resource_name_from_ref(items["$ref"])
                 try:
                     to_bundle = cast(dict[str, Any], schema)
-                    bundled = bundler.bundle(
+                    # Names local to this body, so bodies declaring the same schema bundle identically and share
+                    # their converted schemas.
+                    bundled = Bundler(ref_siblings=bundler.ref_siblings).bundle(
                         to_bundle,
                         body_resolver,
                     )

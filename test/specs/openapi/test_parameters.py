@@ -10,6 +10,7 @@ from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
@@ -1562,3 +1563,114 @@ def test_validate_ignores_serialization_bounds(ctx):
     tags = operation.query[0]
     assert tags.wire_bounds == {"minItems": 1}
     assert tags.is_valid([])
+
+
+ITEM_SCHEMA = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+
+
+def item_body(media_type="application/json"):
+    return {
+        "requestBody": {
+            "required": True,
+            "content": {media_type: {"schema": {"$ref": "#/components/schemas/Item"}}},
+        },
+        "responses": {"200": {"description": "OK"}},
+    }
+
+
+def load_item_schema(ctx, second_media_type="application/json"):
+    return ctx.openapi.load_schema(
+        {"/a": {"post": item_body()}, "/b": {"post": item_body(second_media_type)}},
+        components={"schemas": {"Item": ITEM_SCHEMA}},
+    )
+
+
+def test_operations_with_the_same_request_body_share_its_converted_schemas(ctx):
+    schema = load_item_schema(ctx)
+    first, second = (schema[path]["POST"].body[0] for path in ("/a", "/b"))
+
+    assert (first.optimized_schema is second.optimized_schema, first.validation_schema is second.validation_schema) == (
+        True,
+        True,
+    )
+
+
+def test_request_body_changed_by_a_hook_keeps_its_own_converted_schema(ctx):
+    schema = load_item_schema(ctx)
+
+    @schema.hook
+    def before_init_operation(context, operation):
+        if operation.path == "/a":
+            operation.body[0].definition["schema"] = {"type": "object", "properties": {"id": {"type": "string"}}}
+
+    first, second = (schema[path]["POST"].body[0] for path in ("/a", "/b"))
+
+    assert (first.optimized_schema["properties"]["id"], second.optimized_schema["properties"]["id"]) == (
+        {"type": "string"},
+        {"type": "integer"},
+    )
+
+
+def test_form_and_json_request_bodies_do_not_share_converted_schemas(ctx):
+    schema = load_item_schema(ctx, second_media_type="application/x-www-form-urlencoded")
+    first, second = (schema[path]["POST"].body[0] for path in ("/a", "/b"))
+
+    assert first.optimized_schema is not second.optimized_schema
+
+
+def test_generating_request_bodies_leaves_the_shared_schemas_unchanged(ctx):
+    schema = load_item_schema(ctx)
+    first, second = (schema[path]["POST"] for path in ("/a", "/b"))
+    body = first.body[0]
+    shared = (body.optimized_schema, body.validation_schema)
+    before = deepclone(shared)
+
+    for operation in (first, second):
+        for mode in (GenerationMode.POSITIVE, GenerationMode.NEGATIVE):
+            generate_many(operation.as_strategy(generation_mode=mode), 5)
+
+    assert shared == before
+
+
+# Only recursive references keep named components in a bundle.
+TREE_SCHEMA = {
+    "type": "object",
+    "properties": {"children": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}}},
+}
+
+
+def test_request_bodies_share_converted_schemas_across_other_bundled_parameters(ctx):
+    filter_parameter = {"name": "filter", "in": "query", "schema": {"$ref": "#/components/schemas/Filter"}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"post": item_body()},
+            "/b": {"get": {"parameters": [filter_parameter], "responses": {"200": {"description": "OK"}}}},
+            "/c": {"post": item_body()},
+        },
+        components={
+            "schemas": {
+                "Item": TREE_SCHEMA,
+                "Filter": {"type": "object", "properties": {"next": {"$ref": "#/components/schemas/Filter"}}},
+            }
+        },
+    )
+    operations = [result.ok() for result in schema.get_all_operations()]
+    first, second = (operation.body[0] for operation in operations if operation.method == "post")
+
+    assert first.optimized_schema is second.optimized_schema
+
+
+def test_converted_schema_changed_by_a_hook_stays_with_its_operation(ctx):
+    schema = load_item_schema(ctx)
+
+    @schema.hook
+    def before_init_operation(context, operation):
+        if operation.path == "/a":
+            operation.body[0].optimized_schema["properties"]["id"]["type"] = "string"
+
+    first, second = (schema[path]["POST"].body[0] for path in ("/a", "/b"))
+
+    assert (first.optimized_schema["properties"]["id"], second.optimized_schema["properties"]["id"]) == (
+        {"type": "string"},
+        {"type": "integer"},
+    )
