@@ -147,9 +147,10 @@ def _classify_flaky(*, ctx: StatefulContext, engine: EngineContext, state: Testi
     network_outcome = _network_error_outcome(state)
     if network_outcome is not None:
         return network_outcome
+    retry = bool(ctx.seen_in_suite - ctx.seen_in_run)
     # Mark all failures in this suite as seen to prevent them being re-discovered
     ctx.mark_current_suite_as_seen_in_run()
-    return found, True, []
+    return found, retry, []
 
 
 def _classify_suite_error(
