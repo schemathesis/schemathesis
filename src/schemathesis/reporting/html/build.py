@@ -16,7 +16,12 @@ def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | 
     return FailingCase(
         case_id=group.case_id,
         failures=[
-            FailureEntry(title=title, severity=failures[0].severity, messages=[failure.message for failure in failures])
+            FailureEntry(
+                code=failures[0].code,
+                title=title,
+                severity=failures[0].severity,
+                messages=[failure.message for failure in failures],
+            )
             for title, failures in group_failures(group.failures)
         ],
         status_code=response.status_code if response is not None else None,

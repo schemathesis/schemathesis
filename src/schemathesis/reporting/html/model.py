@@ -63,6 +63,7 @@ class ErrorEntry:
 
 @dataclass(slots=True)
 class FailureEntry:
+    code: str
     title: str
     severity: Severity
     # One per violation; same-title violations on one response share an entry.
