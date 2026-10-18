@@ -95,6 +95,7 @@
 
 #### Checks
 
+- Required `writeOnly` fields behind `$ref` or `allOf` reported missing from responses; present ones accepted.
 - Unchecked `uuid` and `duration` formats in OpenAPI 2.0 and 3.0 response schemas.
 - Unchecked discriminator values in referenced, array item, and nested property response schemas.
 - "Response violates schema" messages embedding the whole response value on one line.

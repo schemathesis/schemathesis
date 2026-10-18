@@ -3221,6 +3221,86 @@ def test_response_schema_conformance_forbidden_property_message(ctx, response_fa
     assert exc_info.value.message.startswith('Property "secret" is not allowed')
 
 
+@pytest.mark.parametrize(
+    ("property_schema", "object_type", "version"),
+    [
+        pytest.param({"$ref": "#/components/schemas/Secret"}, "object", "3.0.2", id="reference"),
+        pytest.param({"allOf": [{"$ref": "#/components/schemas/Secret"}]}, "object", "3.0.2", id="allOf-reference"),
+        pytest.param({"allOf": [{"writeOnly": True}, {"type": "string"}]}, "object", "3.0.2", id="allOf-inline"),
+        pytest.param(
+            {"anyOf": [{"$ref": "#/components/schemas/Secret"}, {"type": "null"}]},
+            "object",
+            "3.1.0",
+            id="anyOf-nullable",
+        ),
+        pytest.param(
+            {"$ref": "#/components/schemas/Secret", "nullable": True},
+            "object",
+            "3.0.2",
+            id="openapi-30-nullable",
+        ),
+        pytest.param({"writeOnly": True}, None, "3.0.2", id="untyped-object"),
+        pytest.param({"writeOnly": True}, ["object", "null"], "3.1.0", id="object-null-union"),
+    ],
+)
+def test_response_schema_conformance_rejects_nested_write_only_property(
+    ctx, response_factory, property_schema, object_type, version
+):
+    response_schema = {"properties": {"secret": property_schema}}
+    if object_type is not None:
+        response_schema["type"] = object_type
+    operation = ctx.openapi.load_operation(
+        "GET /test",
+        {"responses": json_ok(response_schema)},
+        version=version,
+        components={"schemas": {"Secret": {"type": "string", "writeOnly": True}}},
+    )
+    response = response_factory.requests(content=b'{"secret": "s"}')
+
+    with pytest.raises(FailureGroup, match='Property "secret" is not allowed'):
+        operation.Case().validate_response(response, checks=[response_schema_conformance])
+
+
+@pytest.mark.parametrize(
+    ("property_schema", "object_type", "version"),
+    [
+        pytest.param({"$ref": "#/components/schemas/Secret"}, "object", "3.0.2", id="reference"),
+        pytest.param({"allOf": [{"$ref": "#/components/schemas/Secret"}]}, "object", "3.0.2", id="allOf-reference"),
+        pytest.param({"allOf": [{"writeOnly": True}, {"type": "string"}]}, "object", "3.0.2", id="allOf-inline"),
+        pytest.param(
+            {"anyOf": [{"$ref": "#/components/schemas/Secret"}, {"type": "null"}]},
+            "object",
+            "3.1.0",
+            id="anyOf-nullable",
+        ),
+        pytest.param(
+            {"$ref": "#/components/schemas/Secret", "nullable": True},
+            "object",
+            "3.0.2",
+            id="openapi-30-nullable",
+        ),
+        pytest.param({"writeOnly": True}, None, "3.0.2", id="untyped-object"),
+        pytest.param({"writeOnly": True}, ["object", "null"], "3.1.0", id="object-null-union"),
+    ],
+)
+def test_response_schema_conformance_accepts_missing_nested_write_only_property(
+    ctx, response_factory, property_schema, object_type, version
+):
+    # `required` on a writeOnly field applies to requests only.
+    response_schema = {"properties": {"secret": property_schema}, "required": ["secret"]}
+    if object_type is not None:
+        response_schema["type"] = object_type
+    operation = ctx.openapi.load_operation(
+        "GET /test",
+        {"responses": json_ok(response_schema)},
+        version=version,
+        components={"schemas": {"Secret": {"type": "string", "writeOnly": True}}},
+    )
+    response = response_factory.requests(content=b"{}")
+
+    assert operation.Case().validate_response(response, checks=[response_schema_conformance]) is None
+
+
 def test_response_schema_conformance_reports_boolean_branch_rejection(ctx, response_factory):
     operation = ctx.openapi.load_operation(
         "GET /test",
