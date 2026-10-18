@@ -802,14 +802,22 @@ def _reproduce(commands: list[Command], replay: str | None) -> str:
     return _evidence("Reproduce", f'<div class="repro">{content}{_copy_button("reproduction")}</div>{replay_line}')
 
 
+DOCS_URL = "https://schemathesis.readthedocs.io/en/stable/reference/failures/"
+
+
 def _failing_case(case: FailingCase, owner: str = "", filters: str = "") -> str:
     parts = [owner]
     for failure in case.failures:
         count = len(failure.messages)
         violations = f'<span class="violations">{count} violations</span>' if count > 1 else ""
         messages = "".join(f'<pre class="msg">{esc(message)}</pre>' for message in failure.messages if message)
+        code = (
+            f'<a class="fcode" href="{DOCS_URL}#{failure.code.lower()}" target="_blank" rel="noopener">'
+            f"{esc(failure.code)}</a>"
+        )
         parts.append(
-            f'<div class="finding"><h4 class="finding-title">{esc(failure.title)}{violations}</h4>{messages}</div>'
+            f'<div class="finding"><h4 class="finding-title">{esc(failure.title)}{code}{violations}</h4>'
+            f"{messages}</div>"
         )
     if case.status_code is not None and case.body is not None:
         parts.append(_evidence("Response", _body(case.body), _status(case.status_code)))
