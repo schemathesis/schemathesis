@@ -248,7 +248,20 @@ def resolve_ref(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaO
     return maybe_resolve_bundled(cast("JsonSchemaObject", schema_with_bundle(schema, root)))
 
 
-def resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaObject:
+def _resolve_combinator_branch(
+    branch: JsonSchemaObject, root: JsonSchemaObject, seen: frozenset[str]
+) -> tuple[JsonSchemaObject, frozenset[str]] | None:
+    reference = branch.get("$ref")
+    if isinstance(reference, str):
+        if reference in seen:
+            return None
+        seen = seen | {reference}
+    return resolve_ref(branch, root), seen
+
+
+def resolve_combinator(
+    schema: JsonSchemaObject, root: JsonSchemaObject, seen: frozenset[str] = frozenset()
+) -> JsonSchemaObject:
     """Merge ``allOf`` branches; for ``oneOf``/``anyOf``, pick the first branch with declared ``properties``."""
     if "allOf" in schema:
         merged: JsonSchemaObject = {}
@@ -256,7 +269,10 @@ def resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> Json
         for branch in schema["allOf"]:
             if not isinstance(branch, dict):
                 continue
-            resolved_branch = resolve_combinator(resolve_ref(branch, root), root)
+            resolved = _resolve_combinator_branch(branch, root, seen)
+            if resolved is None:
+                continue
+            resolved_branch = resolve_combinator(resolved[0], root, resolved[1])
             for key, value in resolved_branch.items():
                 if key == "properties" and isinstance(value, dict):
                     merged_properties.update(value)
@@ -279,12 +295,14 @@ def resolve_combinator(schema: JsonSchemaObject, root: JsonSchemaObject) -> Json
         for branch in branches:
             if not isinstance(branch, dict):
                 continue
-            resolved = resolve_ref(branch, root)
-            if isinstance(resolved.get("properties"), dict):
-                return resolve_combinator(resolved, root)
+            resolved = _resolve_combinator_branch(branch, root, seen)
+            if resolved is not None and isinstance(resolved[0].get("properties"), dict):
+                return resolve_combinator(resolved[0], root, resolved[1])
         for branch in branches:
             if isinstance(branch, dict):
-                return resolve_combinator(resolve_ref(branch, root), root)
+                resolved = _resolve_combinator_branch(branch, root, seen)
+                if resolved is not None:
+                    return resolve_combinator(resolved[0], root, resolved[1])
     return schema
 
 

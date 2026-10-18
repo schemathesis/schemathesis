@@ -456,6 +456,36 @@ _PRODUCER_SCHEMA = {
     }
 }
 
+_RECURSIVE_NODE = {
+    "allOf": [
+        {"$ref": "#/components/schemas/Node"},
+        {
+            "type": "object",
+            "properties": {"id": {"type": "string"}},
+            "required": ["id"],
+        },
+    ]
+}
+_RECURSIVE_OPERATIONS = {
+    "/nodes": {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+                }
+            }
+        },
+        "post": {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+            },
+            "responses": {"201": {"description": "Created"}},
+        },
+    }
+}
+
 
 def test_extra_data_source_built_when_schema_has_successful_response(ctx):
     schema = ctx.openapi.load_schema(_PRODUCER_SCHEMA)
@@ -494,8 +524,8 @@ def _lookup_by_descriptor(index, descriptor):
     )
 
 
-def _extra_data_source_for(ctx, schema_dict):
-    schema = ctx.openapi.load_schema(schema_dict)
+def _extra_data_source_for(ctx, schema_dict, **kwargs):
+    schema = ctx.openapi.load_schema(schema_dict, **kwargs)
     extra_data_source = schema.analysis.extra_data_source
     assert isinstance(extra_data_source, OpenApiExtraDataSource)
     assert extra_data_source.semantic_index is not None
@@ -515,6 +545,35 @@ def test_record_response_populates_semantic_index(ctx, case_factory, response_fa
     assert extra_data_source.semantic_index.lookup(
         type_token="string", format_token="email", pattern_hash=None, normalized_name="contact"
     ) == (SemanticCandidate("alice@example.com", operation.label),)
+
+
+def test_record_response_handles_recursive_all_of(ctx, case_factory, response_factory):
+    schema, extra_data_source = _extra_data_source_for(
+        ctx, _RECURSIVE_OPERATIONS, components={"schemas": {"Node": _RECURSIVE_NODE}}
+    )
+    operation = schema["/nodes"]["GET"]
+    _ingest_2xx(
+        operation,
+        body={"id": "node-1"},
+        extra_data_source=extra_data_source,
+        case_factory=case_factory,
+        response_factory=response_factory,
+    )
+    assert extra_data_source.semantic_index.lookup(
+        type_token="string", format_token=None, pattern_hash=None, normalized_name="id"
+    ) == (SemanticCandidate("node-1", operation.label),)
+
+
+def test_request_body_strategy_handles_recursive_all_of(ctx):
+    schema, extra_data_source = _extra_data_source_for(
+        ctx, _RECURSIVE_OPERATIONS, components={"schemas": {"Node": _RECURSIVE_NODE}}
+    )
+    operation = schema["/nodes"]["POST"]
+    strategy = operation.body[0].get_strategy(
+        operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=extra_data_source
+    )
+    values = generate_many(strategy, 1)
+    assert values and all(isinstance(value, dict) and isinstance(value.get("id"), str) for value in values)
 
 
 def test_record_response_skips_non_2xx(ctx, case_factory, response_factory):
