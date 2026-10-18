@@ -29,7 +29,7 @@ from schemathesis.filters import FilterUsage
 from schemathesis.hooks import HookContext, dispatch_before_init_operation, dispatch_before_process_path
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, has_optional_auth
 from schemathesis.specs.openapi.adapter.servers import resolve_operation_base_url
 from schemathesis.specs.openapi.utils import parse_spec_version
@@ -541,6 +541,10 @@ class OperationLoader:
                     OpenApiParameter.from_definition(definition=dict(param), name_to_uri={}, adapter=schema.adapter)
                 )
         dispatch_before_init_operation(schema, HookContext(operation=operation), operation)
+        # After the hooks: a body they converted keeps its own copies, so their changes stay with this operation.
+        for body in operation.body:
+            if isinstance(body, OpenApiBody):
+                body.share_converted_schemas(schema.request_body_schema_cache)
         return operation
 
     def clear_cache(self) -> None:
