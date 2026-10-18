@@ -42,6 +42,7 @@
 - Unreachable remote references time out once per run.
 - Response validation up to ~8x faster with ~6x less memory on APIs reusing response schemas.
 - HTML report up to ~20% smaller on runs with many failures.
+- Stateful phase avoids re-running flaky suites that find no new failures.
 
 ### :bug: Fixed
 

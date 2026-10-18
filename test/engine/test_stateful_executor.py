@@ -115,4 +115,4 @@ def test_replay_drawing_differently_is_not_a_suite_error(ctx):
         engine=engine,
         state=TestingState(),
         settings=DEFAULT_STATE_MACHINE_SETTINGS,
-    ) == (Status.SUCCESS, True, [])
+    ) == (Status.SUCCESS, False, [])

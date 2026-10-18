@@ -446,6 +446,77 @@ def test_flaky(engine_factory, kwargs):
     assert failures[0].failure_info.failure.message == "Flaky"
 
 
+def test_flaky_suite_retries_only_after_new_failure(ctx, stop_event):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/branches": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "BlockBranch": {
+                                    "operationId": "createBlock",
+                                    "requestBody": {"targetId": "$response.body#/id"},
+                                }
+                            },
+                        },
+                        "409": {"description": "Conflict"},
+                    },
+                }
+            },
+            "/blocks": {
+                "post": {
+                    "operationId": "createBlock",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["targetId"],
+                                    "properties": {"targetId": {"type": "integer"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}, "422": {"description": "Invalid"}},
+                }
+            },
+        }
+    )
+    created = 0
+
+    @app.route("/branches", methods=["POST"])
+    def create_branch():
+        nonlocal created
+        created += 1
+        if created % 2 == 0:
+            return jsonify({}), 409
+        return jsonify({"id": created}), 201
+
+    @app.route("/blocks", methods=["POST"])
+    def create_block():
+        return jsonify({}), 422
+
+    config = schemathesis.Config.from_dict(
+        {
+            "seed": 6,
+            "checks": {"enabled": False, "positive_data_acceptance": {"enabled": True}},
+            "generation": {"mode": "positive", "max-examples": 25, "database": "none"},
+        }
+    )
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app, config=config)
+    result = collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    assert len([event for event in result.events if isinstance(event, events.SuiteStarted)]) == 2
+
+
 def test_unsatisfiable(engine_factory):
     engine = engine_factory(Unsatisfiable(), max_examples=1)
     result = collect_result(engine)
