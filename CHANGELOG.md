@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.0...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Up to ~100x less time spent on "Response violates schema" failure messages.
+
 ## [4.32.0](https://github.com/schemathesis/schemathesis/compare/v4.31.1...v4.32.0) - 2026-10-18
 
 ### :rocket: Added

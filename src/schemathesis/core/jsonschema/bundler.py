@@ -246,7 +246,7 @@ def _document_display_name(uri: str) -> str:
     return path or uri
 
 
-_UNBUNDLED_COMPONENTS_CACHE: BoundedCache = BoundedCache(maxsize=32)
+_UNBUNDLED_COMPONENTS_CACHE: BoundedCache = BoundedCache(maxsize=256)
 
 
 def _unbundled_schema_name(bundled_name: str, original_uri: str | None) -> str:
