@@ -4160,18 +4160,34 @@ def _negative_multiple_of(
         )
 
 
+def _sent_text_judge(ctx: CoverageContext, schema: JsonSchemaObject) -> Callable[[Any], bool]:
+    """Whether the server reads an array value's single text as valid, e.g. a path array joined with commas."""
+    # A body array stays an array, and a query array travels as repeated parameters the server reads as one list.
+    if ctx.location in (ParameterLocation.BODY, ParameterLocation.QUERY):
+        return lambda value: False
+    judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
+    types = parameter_types(schema)
+
+    def is_valid(instance: Any) -> bool:
+        return _admitted_by_any(judges, instance)
+
+    return lambda value: any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(value))
+
+
 def _negative_unique_items(
     ctx: CoverageContext, schema: JsonSchemaObject, unique_items: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
     if not unique_items:
         return
+    reads_back_valid = _sent_text_judge(ctx, schema)
     unique = jsonify(ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1}))
-    yield NegativeValue(
-        unique + unique,
-        scenario=CoverageScenario.NON_UNIQUE_ITEMS,
-        description="Non-unique items",
-        location=ctx.current_path,
-    )
+    if not reads_back_valid(unique + unique):
+        yield NegativeValue(
+            unique + unique,
+            scenario=CoverageScenario.NON_UNIQUE_ITEMS,
+            description="Non-unique items",
+            location=ctx.current_path,
+        )
     # When the declared type forbids arrays (e.g. Kubernetes paints `uniqueItems: true`
     # onto every scalar query parameter), also emit a 2-element unique-array case so
     # the uniqueItems-valid branch is exercised alongside the duplicate above. Schemas
@@ -4191,7 +4207,7 @@ def _negative_unique_items(
             pair = jsonify(ctx.generate_from_schema(pair_schema))
         except (InvalidArgument, Unsatisfiable):
             return
-        if isinstance(pair, list) and len(pair) == 2 and pair[0] != pair[1]:
+        if isinstance(pair, list) and len(pair) == 2 and pair[0] != pair[1] and not reads_back_valid(pair):
             yield NegativeValue(
                 pair,
                 scenario=CoverageScenario.UNIQUE_ITEMS_ARRAY,
