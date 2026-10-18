@@ -81,6 +81,7 @@ SLOW_DEFAULT = {
     "microsoft.com/graph/1.0.1.json",
 }
 SLOW_COVERAGE = {
+    "amazonaws.com/quicksight/2018-04-01.json",
     "azure.com/network-applicationGateway/2015-06-15.json",
     "azure.com/network-applicationGateway/2016-09-01.json",
     "azure.com/network-applicationGateway/2016-12-01.json",
