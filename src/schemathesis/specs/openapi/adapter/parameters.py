@@ -922,14 +922,12 @@ def build_hybrid_strategy(
             if not overlay:
                 return drawn
 
-        if container_validator is not None:
-            merged = deepclone(base)
-            _apply_overlay(merged, overlay)
-            if not _example_is_valid(merged, container_validator):
-                return drawn
-            base = merged
-        else:
-            _apply_overlay(base, overlay)
+        # The drawn value may be a schema example shared with every later draw.
+        merged = deepclone(base)
+        _apply_overlay(merged, overlay)
+        if container_validator is not None and not _example_is_valid(merged, container_validator):
+            return drawn
+        base = merged
         usage_tracker.record_draw(variant_keys[idx])
         return GeneratedValue(
             value=base,

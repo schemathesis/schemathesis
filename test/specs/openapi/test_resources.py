@@ -2506,3 +2506,59 @@ def test_correlated_picks_identical_across_hash_seeds(ctx):
         for seed in range(8)
     }
     assert [json.loads(output) for output in outputs] == [[["a1", "t1"], ["a2", "t1"], ["a1", "t1"], ["a1", "t2"]]]
+
+
+def test_negative_aware_strategy_keeps_schema_examples_intact(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/projects": {
+                "post": {
+                    "operationId": "createProject",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "CreateTask": {
+                                    "operationId": "createTask",
+                                    "parameters": {"project_id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/tasks": {
+                "post": {
+                    "operationId": "createTask",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"project_id": {"type": "string"}},
+                                    "required": ["project_id"],
+                                },
+                                "example": {"project_id": "declared"},
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /projects", status_code=201, payload={"id": "captured"})
+    operation = schema["/tasks"]["POST"]
+    config = GenerationConfig()
+    body = operation.body[0]
+
+    generate_many(body.get_strategy(operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source), 100)
+
+    positive = generate_many(body.get_strategy(operation, config, GenerationMode.POSITIVE), 100)
+    assert {"project_id": "captured"} not in positive
