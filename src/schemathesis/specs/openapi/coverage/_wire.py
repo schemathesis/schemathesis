@@ -169,6 +169,8 @@ class WireSemantics:
             return []
         if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE):
             return [self.observed(value)]
+        if self.location == ParameterLocation.PATH and isinstance(value, list):
+            return [stringify_value(value, self.location)]
         items = value if self.location == ParameterLocation.QUERY and isinstance(value, list) else [value]
         return [to_wire_string(item) for item in items if not isinstance(item, (dict, list))]
 

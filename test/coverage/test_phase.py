@@ -3919,6 +3919,31 @@ def test_duplicate_items_case_leaves_the_declared_example_alone(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, cases=parameter_cases)
 
 
+@pytest.mark.parametrize(
+    "generation_modes",
+    [[GenerationMode.NEGATIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
+    ids=["negative", "all"],
+)
+def test_unique_items_on_string_path_parameter_yields_no_negatives(ctx, generation_modes):
+    # Arrays travel comma-joined in a path, so any array reads back as a valid string.
+    operation = ctx.openapi.load_operation(
+        "POST /items/{name}",
+        {
+            "parameters": [
+                {"in": "path", "name": "name", "required": True, "type": "string", "uniqueItems": True},
+                {"in": "query", "name": "q", "type": "integer"},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
+    )
+    assert [
+        (case.meta.phase.data.description, case.path_parameters)
+        for case in iter_cases(operation, *generation_modes)
+        if case.meta.components[ParameterLocation.PATH].mode == GenerationMode.NEGATIVE
+    ] == []
+
+
 def test_positive_number_multiple_above_large_minimum(ctx):
     schema = {"type": "number", "multipleOf": 1.1, "minimum": 7e16}
     operation = body_operation(ctx, schema)

@@ -72,6 +72,7 @@
 #### Coverage phase
 
 - Missing large arrays of strings with `minLength` and a `\p{L}` or `(?!...)` `pattern`.
+- Negative cases sending valid path or header strings for string parameters with `uniqueItems`.
 - Generate positive cases for large unique arrays of UUIDs.
 - Already generated cases dropped under `--max-time` once generation used up the operation's time.
 - Comma-separated multipart `encoding.contentType` sent verbatim as the part Content-Type. [#5380](https://github.com/schemathesis/schemathesis/issues/5380)
