@@ -3317,8 +3317,13 @@ def test_response_schema_conformance_reports_boolean_branch_rejection(ctx, respo
     case = operation.Case()
     response = Response.from_requests(response_factory.requests(content=b"{}"), True)
 
-    with pytest.raises(JsonSchemaError):
+    with pytest.raises(JsonSchemaError) as exc:
         response_schema_conformance(_CHECK_CTX, response, case)
+    assert exc.value.message == (
+        "False schema does not allow {}\n\n"
+        "Validated against the response schema for status code 200.\n\n"
+        "Schema at /allOf:\n\n    false\n\nValue:\n\n    {}"
+    )
 
 
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):

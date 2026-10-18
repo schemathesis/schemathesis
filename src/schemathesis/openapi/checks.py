@@ -98,12 +98,17 @@ class JsonSchemaError(Failure):
 
     __slots__ = (
         "operation",
-        "validation_message",
         "schema_path",
-        "schema",
         "instance_path",
         "instance",
-        "message",
+        "_raw_message",
+        "_root_schema",
+        "_config",
+        "_name_to_uri",
+        "_context",
+        "_message",
+        "_validation_message",
+        "_schema",
         "title",
         "case_id",
         "severity",
@@ -113,25 +118,50 @@ class JsonSchemaError(Failure):
         self,
         *,
         operation: str,
-        validation_message: str,
-        schema_path: list[str | int],
-        schema: dict[str, Any] | bool,
-        instance_path: list[str | int],
-        instance: JsonValue,
-        message: str,
+        exc: jsonschema_rs.ValidationError,
+        root_schema: dict[str, Any] | bool,
+        config: OutputConfig | None = None,
+        name_to_uri: dict[str, str] | None = None,
+        context: str | None = None,
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
-        self.validation_message = validation_message
-        self.schema_path = schema_path
-        self.schema = schema
-        self.instance_path = instance_path
-        self.instance = instance
-        self.message = message
+        self.schema_path = exc.schema_path
+        self.instance_path = exc.instance_path
+        self.instance = exc.instance
+        self._raw_message = exc.message
+        self._root_schema = root_schema
+        self._config = config
+        self._name_to_uri = name_to_uri
+        self._context = context
+        # Most failures are duplicates that nobody displays, so the message is rendered on first access.
+        self._message: str | None = None
+        self._validation_message = ""
+        self._schema: dict[str, Any] = {}
         self.title = title if title is not None else self.kind_title
         self.case_id = case_id
         self.severity = Severity.HIGH
+
+    @property
+    def message(self) -> str:
+        if self._message is None:
+            self._message = self._render_message()
+        return self._message
+
+    @message.setter
+    def message(self, value: str) -> None:
+        self._message = value
+
+    @property
+    def validation_message(self) -> str:
+        _ = self.message
+        return self._validation_message
+
+    @property
+    def schema(self) -> dict[str, Any]:
+        _ = self.message
+        return self._schema
 
     @property
     def _unique_key(self) -> str:
@@ -149,30 +179,41 @@ class JsonSchemaError(Failure):
         name_to_uri: dict[str, str] | None = None,
         context: str | None = None,
     ) -> JsonSchemaError:
-        if exc.schema_path:
-            parent_path = exc.schema_path[:-1]
-            schema = resolve_path(root_schema, parent_path)
+        return cls(
+            title=title,
+            operation=operation,
+            exc=exc,
+            root_schema=root_schema,
+            config=config,
+            name_to_uri=name_to_uri,
+            context=context,
+        )
+
+    def _render_message(self) -> str:
+        if self.schema_path:
+            parent_path = self.schema_path[:-1]
+            schema = resolve_path(self._root_schema, parent_path)
             if not isinstance(schema, (dict, bool)):
                 # A boolean branch of `allOf` / `anyOf` has the keyword's list of schemas as its parent.
-                schema = resolve_path(root_schema, exc.schema_path)
+                schema = resolve_path(self._root_schema, self.schema_path)
         else:
-            schema = root_schema
+            schema = self._root_schema
 
         assert isinstance(schema, (dict, bool))
 
         # Read-only and write-only properties are rewritten to a schema nothing satisfies, and the raw
         # validator message spells that rewrite rather than naming what it rejects.
-        if schema == {"not": {}} and exc.schema_path and exc.schema_path[-1] == "not":
-            name = exc.instance_path[-1] if exc.instance_path else None
+        if schema == {"not": {}} and self.schema_path and self.schema_path[-1] == "not":
+            name = self.instance_path[-1] if self.instance_path else None
             validation_message = (
                 f'Property "{name}" is not allowed' if isinstance(name, str) else "Value is not allowed"
             )
         else:
-            validation_message = _shorten_instance(exc.message, exc.instance, config or OutputConfig())
+            validation_message = _shorten_instance(self._raw_message, self.instance, self._config or OutputConfig())
 
         # Reorder schema to prioritize the failing keyword in the output
-        if isinstance(schema, dict) and exc.schema_path:
-            failing_keyword = exc.schema_path[-1]
+        if isinstance(schema, dict) and self.schema_path:
+            failing_keyword = self.schema_path[-1]
             if isinstance(failing_keyword, str) and failing_keyword in schema:
                 schema = {
                     failing_keyword: schema[failing_keyword],
@@ -180,34 +221,28 @@ class JsonSchemaError(Failure):
                 }
 
         # Restore original $ref paths for display if mapping is available
-        if name_to_uri:
-            schema = unbundle(schema, name_to_uri)
+        if self._name_to_uri:
+            schema = unbundle(schema, self._name_to_uri)
 
         schema_str = textwrap.indent(
-            truncate_json(schema, config=config or OutputConfig(), max_lines=20), prefix="    "
+            truncate_json(schema, config=self._config or OutputConfig(), max_lines=20), prefix="    "
         )
         value = textwrap.indent(
-            truncate_json(exc.instance, config=config or OutputConfig(), max_lines=20), prefix="    "
+            truncate_json(self.instance, config=self._config or OutputConfig(), max_lines=20), prefix="    "
         )
-        if len(exc.schema_path) > 1:
+        if len(self.schema_path) > 1:
             schema_title = "Schema at "
-            path = unbundle_path(exc.schema_path[:-1], name_to_uri) if name_to_uri else exc.schema_path[:-1]
+            path = (
+                unbundle_path(self.schema_path[:-1], self._name_to_uri) if self._name_to_uri else self.schema_path[:-1]
+            )
             for segment in path:
                 schema_title += f"/{segment}"
         else:
             schema_title = "Schema"
-        prefix = f"{validation_message}\n\n{context}" if context else validation_message
-        full_message = f"{prefix}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
-        return cls(
-            operation=operation,
-            title=title,
-            message=full_message,
-            validation_message=validation_message,
-            schema_path=exc.schema_path,
-            schema=schema if isinstance(schema, dict) else {},
-            instance_path=exc.instance_path,
-            instance=exc.instance,
-        )
+        prefix = f"{validation_message}\n\n{self._context}" if self._context else validation_message
+        self._validation_message = validation_message
+        self._schema = schema if isinstance(schema, dict) else {}
+        return f"{prefix}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
 
 
 def _shorten_instance(message: str, instance: JsonValue, config: OutputConfig) -> str:
