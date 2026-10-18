@@ -293,6 +293,12 @@ class ReturnPlainText:
         # Every user gets the same ID, so a `GET` linked from `DELETE` finds a re-created user and the reported chain
         # would depend on which path a seed reaches first
         spec["paths"]["/users/{userId}"]["delete"]["responses"]["204"].pop("links")
+        # Only `POST -> GET -> DELETE` extracts data from the plain-text response, so every scenario takes that path.
+        post_links = spec["paths"]["/users"]["post"]["responses"]["201"]["links"]
+        get_link = post_links["GetUser"]
+        post_links.clear()
+        post_links["GetUser"] = get_link
+        spec["paths"]["/orders/{orderId}"]["delete"]["responses"]["200"]["links"].clear()
 
 
 @dataclass(slots=True)

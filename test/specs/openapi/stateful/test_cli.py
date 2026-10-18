@@ -532,8 +532,7 @@ def test_non_json_response(ctx, cli, snapshot_cli, content):
         cli.run(
             api.schema_url,
             "--phases=stateful",
-            # The bug needs a specific call sequence, which takes many scenarios to reach.
-            "-n 80",
+            "-n 10",
             "-c not_a_server_error",
             "--mode=positive",
             config={"phases": {"stateful": {"inference": {"algorithms": []}}}},

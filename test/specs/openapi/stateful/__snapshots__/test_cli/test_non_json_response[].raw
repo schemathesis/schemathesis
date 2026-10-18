@@ -19,7 +19,7 @@ Schemathesis dev
  ✅  Stateful (in 0.00s)
 
      Scenarios:    N
-     API Links:    N covered / 6 selected / 6 total
+     API Links:    N covered / 2 selected / 2 total
 
      ✅ N passed
 
@@ -44,8 +44,8 @@ Register a deserializer with @schemathesis.deserializer() to handle this media t
 
 API Operations:
   Selected: 6/6
-  Tested: 5
-  Skipped: 1
+  Tested: 3
+  Skipped: 3
 
 Test Phases:
   ⏭  Examples (disabled)
