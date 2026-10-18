@@ -1674,3 +1674,33 @@ def test_converted_schema_changed_by_a_hook_stays_with_its_operation(ctx):
         {"type": "string"},
         {"type": "integer"},
     )
+
+
+def test_swagger_body_parameters_share_converted_schemas_across_other_bundled_parameters(ctx):
+    def body_operation():
+        return {
+            "consumes": ["application/json"],
+            "parameters": [{"name": "body", "in": "body", "required": True, "schema": {"$ref": "#/definitions/Item"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+
+    filter_parameter = {"name": "filter", "in": "body", "schema": {"$ref": "#/definitions/Filter"}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/a": {"post": body_operation()},
+            "/b": {"put": {"parameters": [filter_parameter], "responses": {"200": {"description": "OK"}}}},
+            "/c": {"post": body_operation()},
+        },
+        version="2.0",
+        definitions={
+            "Item": {
+                "type": "object",
+                "properties": {"children": {"type": "array", "items": {"$ref": "#/definitions/Item"}}},
+            },
+            "Filter": {"type": "object", "properties": {"next": {"$ref": "#/definitions/Filter"}}},
+        },
+    )
+    operations = [result.ok() for result in schema.get_all_operations()]
+    first, second = (operation.body[0] for operation in operations if operation.method == "post")
+
+    assert first.optimized_schema is second.optimized_schema
