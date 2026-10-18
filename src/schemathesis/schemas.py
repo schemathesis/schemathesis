@@ -664,7 +664,7 @@ class BaseSchema(Mapping):
         Default no-op; OpenAPI judges by status code in `positive_data_acceptance` itself.
         """
 
-    def classify_call_outcome(self, response: Response) -> CallOutcome:
+    def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         """Decide what the API did with a request carrying positive test data.
 
         Status codes carry the answer by default; specs that respond 200 regardless of the outcome
@@ -673,6 +673,11 @@ class BaseSchema(Mapping):
         status_code = response.status_code
         if 200 <= status_code < 300:
             return CallOutcome.ACCEPTED
+        # A documented redirect serves the request; an undocumented one is usually a login page.
+        if 300 <= status_code < 400:
+            documented = case.operation.responses.status_codes
+            if str(status_code) in documented or "3XX" in documented:
+                return CallOutcome.ACCEPTED
         if is_uninformative_status(status_code):
             return CallOutcome.UNINFORMATIVE
         if status_code == 404:

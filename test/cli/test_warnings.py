@@ -470,6 +470,105 @@ def test_withdrawn_missing_test_data_warning_does_not_fail_the_run(ctx, cli, app
     ) == (False, ExitCode.OK, "No issues found")
 
 
+def _run_missing_test_data(cli, app_runner, app, phases, **config):
+    result = cli.run(
+        app_runner.openapi_url(app),
+        "-c not_a_server_error",
+        f"--phases={phases}",
+        "--mode=positive",
+        "--max-examples=10",
+        config={"warnings": {"fail-on": ["missing_test_data"]}, **config},
+    )
+    return (
+        "Missing test data" in result.stdout,
+        result.exit_code,
+        result.stdout.strip().splitlines()[-1].strip("= ").rsplit(" in ", 1)[0],
+    )
+
+
+def test_missing_test_data_warning_withdrawn_by_later_phase(ctx, cli, app_runner):
+    # The schema example names a resource the server lacks; generated values reach existing ones.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "item_id",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "missing",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id == "missing":
+            return jsonify({"message": "Not found"}), 404
+        return jsonify({"id": item_id})
+
+    assert _run_missing_test_data(cli, app_runner, app, "examples,fuzzing") == (False, ExitCode.OK, "No issues found")
+
+
+def test_missing_test_data_warning_withdrawn_by_documented_redirect(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"item_id": "$response.body#/id"}}
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{item_id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "item_id",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "missing",
+                        }
+                    ],
+                    "responses": {"303": {"description": "See Other"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    items = set()
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        item_id = f"item-{len(items) + 1}"
+        items.add(item_id)
+        return jsonify({"id": item_id}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id in items:
+            return Response(status=303, headers={"Location": f"https://example.com/{item_id}"})
+        return jsonify({"message": "Not found"}), 404
+
+    assert _run_missing_test_data(cli, app_runner, app, "examples,stateful", **{"max-redirects": 0}) == (
+        False,
+        ExitCode.OK,
+        "No issues found",
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_advice_from_dependency_graph(ctx, cli, snapshot_cli):
     # No links are declared, so the advice comes from the inferred dependency graph:

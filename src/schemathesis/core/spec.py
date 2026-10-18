@@ -218,7 +218,7 @@ class TransportShape(Protocol):
 
     def evaluate_positive_data(self, case: Case, response: Response) -> None: ...  # pragma: no cover
 
-    def classify_call_outcome(self, response: Response) -> CallOutcome: ...  # pragma: no cover
+    def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome: ...  # pragma: no cover
 
     def prepare_multipart(
         self,
