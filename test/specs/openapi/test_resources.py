@@ -2352,7 +2352,8 @@ def test_correlated_and_per_slot_share_rotation_state(user_schema_builder):
     assert next_pick != drawn_id
 
 
-def test_pool_overlay_respects_max_properties(ctx):
+@pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE], ids=["positive", "negative"])
+def test_pool_overlay_respects_max_properties(ctx, mode):
     # Injecting a captured value adds a key, and the body it lands in may already be at capacity.
     schema = ctx.openapi.load_schema(
         {
@@ -2410,7 +2411,7 @@ def test_pool_overlay_respects_max_properties(ctx):
 
     operation = schema["/posts"]["POST"]
     config = GenerationConfig()
-    strategy = operation.body[0].get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
+    strategy = operation.body[0].get_strategy(operation, config, mode, extra_data_source=data_source)
 
     pool_hits = 0
     oversized = []
@@ -2420,6 +2421,9 @@ def test_pool_overlay_respects_max_properties(ctx):
     def collect(value):
         nonlocal pool_hits
         if isinstance(value, GeneratedValue):
+            # A mutated draw is a negative case, where exceeding `maxProperties` is allowed.
+            if value.meta is not None:
+                return
             value = value.value
         if not isinstance(value, dict):
             return

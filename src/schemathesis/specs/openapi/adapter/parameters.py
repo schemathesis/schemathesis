@@ -1875,7 +1875,14 @@ class OpenApiBody(OpenApiComponent):
             error_feedback=error_feedback,
             constants_value_source=constants_value_source,
         )
-        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
+        schema = _adjusted_schema(self.optimized_schema, operation, ParameterLocation.BODY, error_feedback)
+        positive_strategy = build_hybrid_strategy(
+            positive_strategy,
+            captured_variants,
+            usage_tracker,
+            container_schema=schema if isinstance(schema, dict) else None,
+            validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+        )
         return _mix_negative_into_positive(positive_strategy, negative_strategy)
 
 

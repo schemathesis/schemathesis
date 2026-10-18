@@ -83,7 +83,7 @@
 #### Data generation
 
 - Crash on request or response schemas whose `allOf` references itself.
-- Schema examples altered by captured resource ids, producing non-conforming positive request bodies.
+- Positive request bodies violating the schema after captured resource ids are filled in.
 - Pick the same captured resource ids for nested-resource paths in otherwise identical runs.
 - Keep example fields next to captured ids in request bodies in the examples phase.
 - "Cannot generate test data" for path parameters whose `enum` values contain `/`.
