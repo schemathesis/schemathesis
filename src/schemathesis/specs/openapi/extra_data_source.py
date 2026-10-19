@@ -22,8 +22,8 @@ from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex, iter_in
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     DependencyGraph,
     InputSlot,
-    _build_nested_body,
-    _merge_request_body,
+    build_nested_body,
+    merge_request_body,
 )
 from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, referenced_values
 
@@ -314,8 +314,8 @@ def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str,
     variant: dict[str, Any] | list[Any] = {}
     for slot in slots:
         if slot.lookup_key in values_by_lookup_key:
-            overlay = _build_nested_body(slot.lookup_key, values_by_lookup_key[slot.lookup_key])
-            variant = _merge_request_body(variant, overlay)
+            overlay = build_nested_body(slot.lookup_key, values_by_lookup_key[slot.lookup_key])
+            variant = merge_request_body(variant, overlay)
     return variant
 
 
@@ -447,7 +447,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             slot = slots[0]
             variants = [
                 CapturedVariant(
-                    overlay=_build_nested_body(slot.lookup_key, value),
+                    overlay=build_nested_body(slot.lookup_key, value),
                     draws=(
                         _build_pool_draw_from_requirement(
                             location=location,

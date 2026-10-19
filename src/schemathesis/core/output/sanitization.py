@@ -55,9 +55,9 @@ def sanitize_url(url: str, *, config: SanitizationConfig) -> str:
     )
 
 
-def sanitized(url: str | None, sanitization_config: SanitizationConfig | None) -> str | None:
+def sanitized(url: str | None, sanitization_config: SanitizationConfig) -> str | None:
     # The schema location may be a file path; only URLs can carry credentials.
-    if url is None or sanitization_config is None or not url.startswith(("http://", "https://")):
+    if url is None or not sanitization_config.enabled or not url.startswith(("http://", "https://")):
         return url
     return sanitize_url(url, config=sanitization_config)
 

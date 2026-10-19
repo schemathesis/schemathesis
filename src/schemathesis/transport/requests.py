@@ -8,7 +8,7 @@ import time
 from collections.abc import Iterator, Mapping, MutableMapping
 from http.client import RemoteDisconnected
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode, urljoin, urlparse
 
 import requests
@@ -19,7 +19,7 @@ from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
-from schemathesis.core.jsonschema import maybe_resolve_bundled, schema_with_bundle
+from schemathesis.core.jsonschema import resolve_with_root_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -471,15 +471,11 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
-def _resolve_property(schema: dict[str, Any], root_schema: dict[str, Any]) -> dict[str, Any]:
-    return maybe_resolve_bundled(cast("dict[str, Any]", schema_with_bundle(schema, root_schema)))
-
-
 def _is_structured_schema(schema: dict[str, Any], root_schema: dict[str, Any]) -> bool:
     # An array part takes the default of its items: JSON for nested structures, plain text for primitives and files.
     items = schema.get("items")
     if isinstance(items, dict) and items:
-        return _declares_structure(_resolve_property(items, root_schema))
+        return _declares_structure(resolve_with_root_bundle(items, root_schema))
     return _declares_structure(schema)
 
 
@@ -515,7 +511,7 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
                         continue
                     # Resolve a property-level `$ref` against the body schema's bundle so
                     # a referent like `{type: string}` is left alone and `{type: object}` triggers JSON.
-                    if _is_structured_schema(_resolve_property(prop, schema_node), schema_node):
+                    if _is_structured_schema(resolve_with_root_bundle(prop, schema_node), schema_node):
                         result[name] = "application/json"
         break
     return result
@@ -536,7 +532,7 @@ def _property_schema(ctx: SerializationContext, name: str) -> dict[str, Any]:
     schema_node = body.definition.get("schema")
     properties = schema_node.get("properties", {}) if isinstance(schema_node, dict) else {}
     if isinstance(properties.get(name), dict):
-        return _resolve_property(properties[name], schema_node)
+        return resolve_with_root_bundle(properties[name], schema_node)
     return {}
 
 

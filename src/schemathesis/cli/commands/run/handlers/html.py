@@ -17,9 +17,9 @@ from schemathesis.cli.commands.run.handlers.output import (
     warning_blocks,
 )
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
-from schemathesis.cli.output import LOADER_ERROR_SUGGESTIONS, replay_command
+from schemathesis.cli.output import loader_error_tip, replay_command
 from schemathesis.cli.summary import running_time
-from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.errors import LoaderError
 from schemathesis.core.output import format_response_payload
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.engine import Status, StopReason, events
@@ -172,9 +172,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
     ) -> None:
         if self.started_at is None:
             return
-        if recorder is not None and not any(
-            check.failure_info is not None for checks in recorder.checks.values() for check in checks
-        ):
+        if recorder is not None and not recorder.failing_case_ids():
             return
         for groups in ctx.statistic.failures.values():
             for case_id in groups:
@@ -304,7 +302,6 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         from schemathesis.reporting.html import write_report
 
         sanitization = ctx.config.output.sanitization
-        sanitization_config = sanitization if sanitization.enabled else None
         summary = ctx.summary()
         rows = self._operation_rows(ctx)
         payload = self.finished.payload if self.finished is not None else None
@@ -327,9 +324,9 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         data = ReportData(
             meta=ReportMeta(
                 generated_at=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-                location=sanitized(self.location, sanitization_config),
-                base_url=sanitized(self.base_url, sanitization_config),
-                command=get_command_representation(sanitization_config),
+                location=sanitized(self.location, sanitization),
+                base_url=sanitized(self.base_url, sanitization),
+                command=get_command_representation(sanitization),
                 seed=ctx.config.seed,
             ),
             summary=summary,
@@ -466,12 +463,10 @@ def _by_count(counts: Counter[str]) -> list[tuple[str, int]]:
 
 def _fatal_entry(exception: Exception, *, wait_for_schema: float | int | None) -> ErrorEntry:
     if isinstance(exception, LoaderError):
-        tip = LOADER_ERROR_SUGGESTIONS.get(exception.kind)
-        # The run already waited for the schema, so suggesting a wait would repeat what failed.
-        if exception.kind == LoaderErrorKind.CONNECTION_OTHER and wait_for_schema is not None:
-            tip = None
         return ErrorEntry(
-            title="Failed to load specification", message="\n".join([exception.message, *exception.extras]), tip=tip
+            title="Failed to load specification",
+            message="\n".join([exception.message, *exception.extras]),
+            tip=loader_error_tip(exception, wait_for_schema=wait_for_schema),
         )
     info = EngineErrorInfo(error=exception)
     return ErrorEntry(title=info.title, message=info.message, tip=None)

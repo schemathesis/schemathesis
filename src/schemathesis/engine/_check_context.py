@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from requests.structures import CaseInsensitiveDict
 
@@ -11,19 +11,11 @@ from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
     from schemathesis.checks import ResponseChecks
-    from schemathesis.config import ProjectConfig
     from schemathesis.core.failures import Failure
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import PhaseName
     from schemathesis.schemas import APIOperation
-
-
-class CheckContextSource(Protocol):
-    @property
-    def config(self) -> ProjectConfig: ...
-
-    def get_transport_kwargs(self, operation: APIOperation | None = None) -> dict[str, Any]: ...
 
 
 def run_after_run_checks(ctx: EngineContext) -> list[Failure]:
@@ -65,9 +57,7 @@ class CheckContextData:
         )
 
 
-def collect_check_context_data(
-    *, operation: APIOperation, ctx: CheckContextSource, phase: str | None
-) -> CheckContextData:
+def collect_check_context_data(*, operation: APIOperation, ctx: EngineContext, phase: str | None) -> CheckContextData:
     headers = ctx.config.headers_for(operation=operation)
     return CheckContextData(
         override=overrides.for_operation(ctx.config, operation=operation),
@@ -87,7 +77,7 @@ class CheckContextCache:
 
     _cache: dict[str, CheckContextData] = field(default_factory=dict)
 
-    def get_or_create(self, *, operation: APIOperation, ctx: CheckContextSource, phase: str | None) -> CheckContextData:
+    def get_or_create(self, *, operation: APIOperation, ctx: EngineContext, phase: str | None) -> CheckContextData:
         label = operation.label
         cached = self._cache.get(label)
         if cached is None:

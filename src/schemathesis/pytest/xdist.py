@@ -295,7 +295,7 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
     sanitization = schema.config.output.sanitization
     return {
         "seed": schema.config.seed,
-        "command": get_command_representation(sanitization if sanitization.enabled else None),
+        "command": get_command_representation(sanitization),
         "preserve_bytes": reports.preserve_bytes,
         "sanitization": dataclasses.asdict(sanitization),
         "directory": str(reports.directory),

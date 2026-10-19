@@ -25,12 +25,8 @@ def recorder_failures(statistic: Statistic, recorder: RecordedScenario) -> list[
 
 def scenario_has_failures(recorder: RecordedScenario, label: str) -> bool:
     """Whether any case for a specific operation label within a multi-operation scenario failed a check."""
-    return any(
-        check.failure_info is not None
-        for case_id, node in recorder.cases.items()
-        if node.value.operation.label == label
-        for check in recorder.checks.get(case_id, [])
-    )
+    failing = set(recorder.failing_case_ids())
+    return any(node.value.operation.label == label for case_id, node in recorder.cases.items() if case_id in failing)
 
 
 def scenario_elapsed(recorder: RecordedScenario, label: str) -> float:

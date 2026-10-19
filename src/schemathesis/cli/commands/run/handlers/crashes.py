@@ -92,7 +92,7 @@ def _run(
             if item is None:
                 break
             if not item.success:
-                failing_case_ids = _find_failing_case_ids(item.recorder)
+                failing_case_ids = item.recorder.failing_case_ids()
                 failed |= _operation_labels(item.recorder, failing_case_ids)
                 for failing_case_id in failing_case_ids:
                     for crash in build_crashes_from_recorder(
@@ -108,10 +108,6 @@ def _run(
             writer.remove_by_operation(operation)
     except OSError:
         pass
-
-
-def _find_failing_case_ids(recorder: RecordedScenario) -> list[str]:
-    return [case_id for case_id, checks in recorder.checks.items() if any(c.status == Status.FAILURE for c in checks)]
 
 
 def _operation_labels(recorder: RecordedScenario, case_ids: Iterable[str]) -> set[str]:

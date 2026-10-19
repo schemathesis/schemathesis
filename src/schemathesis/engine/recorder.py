@@ -53,6 +53,8 @@ class RecordedScenario(Protocol):
 
     def find_response(self, *, case_id: str) -> Response | None: ...  # pragma: no cover
 
+    def failing_case_ids(self) -> list[str]: ...  # pragma: no cover
+
     def iter_chain_cases(
         self, *, case_id: str, related_case_ids: tuple[str, ...] = ...
     ) -> Iterator[Case]: ...  # pragma: no cover
@@ -122,6 +124,14 @@ class ScenarioRecorder:
     def record_request(self, *, case_id: str, request: requests.PreparedRequest) -> None:
         """Record a network-level error for a given test case."""
         self.interactions[case_id] = Interaction(request=Request.from_prepared_request(request), response=None)
+
+    def failing_case_ids(self) -> list[str]:
+        """IDs of the cases that failed at least one check."""
+        return [
+            case_id
+            for case_id, checks in self.checks.items()
+            if any(check.status == Status.FAILURE for check in checks)
+        ]
 
     def has_responses(self) -> bool:
         """Whether the server answered anything at all in this scenario."""

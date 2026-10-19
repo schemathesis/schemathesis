@@ -11,7 +11,7 @@ from schemathesis.core.control import SkipTest
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run import TESTING_PHASES, PhaseName
 from schemathesis.engine.run.unit._case import (
     BudgetExpired,
     ServerWentAway,
@@ -36,7 +36,7 @@ def run_test(
     """A single test run with all error handling needed."""
     errors: list[Exception] = []
     skip_reason = None
-    assert phase.value in ("examples", "coverage", "fuzzing", "stateful")
+    assert phase in TESTING_PHASES
     scenario = start_scenario(operation=operation, ctx=ctx, phase=phase, suite_id=suite_id, scenario_id=scenario_id)
     recorder = scenario.recorder
     state = scenario.state

@@ -101,12 +101,11 @@ class HtmlWriter:
         errored = sum(row.status is OperationStatus.ERRORED for row in rows)
         error_titles = Counter(error.title for row in rows for error in row.errors)
         sanitization = self._config.sanitization
-        sanitization_config = sanitization if sanitization.enabled else None
         data = ReportData(
             meta=ReportMeta(
                 generated_at=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-                location=sanitized(self._location, sanitization_config),
-                base_url=sanitized(self._base_url, sanitization_config),
+                location=sanitized(self._location, sanitization),
+                base_url=sanitized(self._base_url, sanitization),
                 command=self._command,
                 seed=self._seed,
             ),

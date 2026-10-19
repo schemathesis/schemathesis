@@ -37,6 +37,14 @@ class PhaseName(enum.StrEnum):
 INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_BOOTSTRAP)
 
 
+# Phases that test each operation on its own.
+UNIT_PHASES = (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
+
+
+# Phases that send test cases; their operations can error out before any test runs.
+TESTING_PHASES = (*UNIT_PHASES, PhaseName.STATEFUL_TESTING)
+
+
 # Phases worth repeating: their yield scales with the time given to them.
 ELASTIC_PHASES = (PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
 
@@ -99,7 +107,7 @@ def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = N
             yield from analysis.execute(ctx, phase)
         elif phase.name == PhaseName.AUTH_BOOTSTRAP:
             yield from auth_bootstrap.execute(ctx, phase)
-        elif phase.name == PhaseName.EXAMPLES or phase.name == PhaseName.COVERAGE or phase.name == PhaseName.FUZZING:
+        elif phase.name in UNIT_PHASES:
             yield from unit.execute(ctx, phase, only=only)
         elif phase.name == PhaseName.STATEFUL_TESTING:
             yield from stateful.execute(ctx, phase)

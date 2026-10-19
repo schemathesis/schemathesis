@@ -14,7 +14,7 @@ from schemathesis.cli.summary import SummaryData, WarningData
 from schemathesis.config import ConfigError, SchemathesisWarning
 from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
-from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
 
 # How telling each outcome is about a phase that ran several times: the summary keeps the highest.
 PHASE_STATUS_PRIORITY = {
@@ -75,7 +75,7 @@ class ExecutionContext(BaseExecutionContext):
             self.statistic.on_scenario_finished(event.recorder)
             collector.on_scenario_finished(self, event)
             if (
-                event.phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
+                event.phase in UNIT_PHASES
                 and event.status == Status.SKIP
                 and event.skip_reason is not None
                 and event.label
@@ -109,8 +109,7 @@ class ExecutionContext(BaseExecutionContext):
 
     def all_skipped_reason(self) -> str:
         unit_phases_off = all(
-            self.phases[name][1] in (PhaseSkipReason.DISABLED, PhaseSkipReason.NOT_SUPPORTED)
-            for name in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
+            self.phases[name][1] in (PhaseSkipReason.DISABLED, PhaseSkipReason.NOT_SUPPORTED) for name in UNIT_PHASES
         )
         if unit_phases_off and self.phases[PhaseName.STATEFUL_TESTING][1] == PhaseSkipReason.NOT_APPLICABLE:
             return "No links for stateful testing"

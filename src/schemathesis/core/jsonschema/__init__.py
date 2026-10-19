@@ -337,6 +337,12 @@ def maybe_resolve_bundled(schema: dict[str, Any]) -> dict[str, Any]:
     return resolve_bundled_ref(schema, schema.get(BUNDLE_STORAGE_KEY))
 
 
+def resolve_with_root_bundle(schema: dict[str, Any], root_schema: dict[str, Any]) -> dict[str, Any]:
+    """Follow a bundled `$ref` (e.g. `#/x-bundled/Foo`) by splicing `root_schema`'s bundle into `schema`."""
+    # `schema_with_bundle` preserves shape: dict in, dict out.
+    return maybe_resolve_bundled(cast("dict[str, Any]", schema_with_bundle(schema, root_schema)))
+
+
 def resolve_bundled_ref(schema: dict[str, Any], bundled: object) -> dict[str, Any]:
     """Follow `$ref` into the `bundled` map; return `schema` as-is when it does not point into it."""
     ref = schema.get("$ref")
@@ -390,6 +396,7 @@ __all__ = [
     "make_validator_for",
     "maybe_resolve_bundled",
     "resolve_bundled_ref",
+    "resolve_with_root_bundle",
     "bundle",
     "schema_with_bundle",
     "REFERENCE_TO_BUNDLE_PREFIX",
