@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import resource
 import sys
+import tempfile
 import time
 import webbrowser
 from collections.abc import Generator
@@ -13,14 +16,23 @@ from pathlib import Path
 from typing import Any
 
 import click
+from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
+from hypothesis.errors import Unsatisfiable
 
 DEFAULT_CLI_PROFILE_FILENAME = "profiles/profile_cli.html"
 
 # Reach the repo-root `tools/` package; scripts/ does not have it on sys.path by default.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from schemathesis.generation import GenerationMode  # noqa: E402
+import schemathesis  # noqa: E402
+import schemathesis.cli  # noqa: E402
+from schemathesis import Case  # noqa: E402
+from schemathesis.core.result import Err  # noqa: E402
+from schemathesis.generation import GenerationMode, hypothesis  # noqa: E402
+from schemathesis.generation.drivers import CoverageGenerator  # noqa: E402
+from schemathesis.generation.feedback import FeedbackSources  # noqa: E402
 from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict, parse_corpus_path  # noqa: E402
+from tools.stub_call import install_stub_call  # noqa: E402
 
 
 @dataclass
@@ -55,8 +67,6 @@ def _load_corpus_dict(schema_path: str) -> dict[str, Any]:
 
 
 def _load_schema(schema_path: str, base_url: str | None) -> Any:
-    import schemathesis
-
     if schema_path.startswith(CORPUS_SCHEME):
         schema_dict = _load_corpus_dict(schema_path)
         kwargs: dict[str, Any] = {}
@@ -76,8 +86,6 @@ _MOCK_BASE_URL = "http://localhost"
 
 def _install_call_mock() -> None:
     """Patch Case.call so the CLI never makes real HTTP requests."""
-    from tools.stub_call import install_stub_call
-
     install_stub_call()
 
 
@@ -86,9 +94,6 @@ def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
 
     Returns (updated_args, tmp_paths).
     """
-    import json
-    import tempfile
-
     updated = []
     tmp_paths = []
     for arg in args:
@@ -115,8 +120,6 @@ def _build_operation_filter(include_name: tuple[str, ...]) -> set[str]:
 
 
 def _iter_operations(schema: Any, operation_filter: set[str]) -> Generator[Any, None, None]:
-    from schemathesis.core.result import Err
-
     for result in schema.get_all_operations():
         if isinstance(result, Err):
             click.echo(f"Skipping invalid operation: {result.err()}", err=True)
@@ -157,8 +160,6 @@ def cli(
 
         python scripts/profile.py cli -- run corpus://openapi-3.1/vercel.com/0.0.1.json --max-examples=5
     """
-    import os
-
     args = list(raw_args)
     if args and args[0] == "--":
         args = args[1:]
@@ -174,9 +175,6 @@ def cli(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     profiler = _get_profiler()
 
-    from schemathesis.cli import schemathesis
-    from schemathesis.generation import hypothesis
-
     hypothesis.setup()
 
     click.echo(f"Profiling: st {' '.join(args)}")
@@ -186,7 +184,7 @@ def cli(
     try:
         with profiler:
             try:
-                schemathesis.main(args=args, standalone_mode=False)
+                schemathesis.cli.schemathesis.main(args=args, standalone_mode=False)
             except SystemExit:
                 pass
             except Exception as exc:  # noqa: BLE001
@@ -251,12 +249,6 @@ def fuzzing(
         python scripts/profile.py generate corpus://openapi-3.0/vercel.com/0.0.1.json
     """
     _get_profiler()
-
-    from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
-    from hypothesis.errors import Unsatisfiable
-
-    from schemathesis import Case
-    from schemathesis.generation import hypothesis
 
     hypothesis.setup()
 
@@ -378,10 +370,6 @@ def coverage(
     """
     _get_profiler()
 
-    from schemathesis.generation import hypothesis
-    from schemathesis.generation.drivers import CoverageGenerator
-    from schemathesis.generation.feedback import FeedbackSources
-
     hypothesis.setup()
 
     click.echo(f"Profiling: {schema_path}")
@@ -467,8 +455,6 @@ def stateful(schema_path: str, base_url: str | None, output_file: str, open_resu
     """
     _install_call_mock()
     profiler = _get_profiler()
-
-    from schemathesis.generation import hypothesis
 
     hypothesis.setup()
 
