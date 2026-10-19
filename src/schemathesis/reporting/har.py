@@ -74,7 +74,7 @@ class HarWriter:
                     mimeType=content_type,
                     text=interaction.response.encoded_body
                     if self._preserve_bytes
-                    else interaction.response.content.decode("utf-8", "replace")
+                    else interaction.response.text_lossy()
                     if interaction.response.content is not None
                     else None,
                     encoding="base64" if interaction.response.content is not None and self._preserve_bytes else None,

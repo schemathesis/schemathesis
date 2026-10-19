@@ -111,7 +111,7 @@ class VcrWriter:
             def write_response_body(response: Response) -> None:
                 if response.content is not None:
                     encoding = response.encoding or "utf8"
-                    string = response.content.decode(encoding, "replace")
+                    string = response.text_lossy()
                     stream.write(f"    body:\n      encoding: '{encoding}'\n      string: ")
                     write_double_quoted(stream, string)
 
