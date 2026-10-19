@@ -18,7 +18,7 @@ from fastapi import FastAPI, Header
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.config import SchemathesisWarning
+from schemathesis.config import SchemathesisConfig, SchemathesisWarning
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import HookExecutionError
 from schemathesis.core.transport import USER_AGENT
@@ -2118,7 +2118,12 @@ def test_max_time_reserves_for_stateful_when_links_are_only_inferred(ctx, app_ru
     assert [event for event in stream.find_all(events.ScenarioFinished) if event.phase == PhaseName.STATEFUL_TESTING]
 
 
-def test_links_inferred_from_location_headers(ctx, app_runner):
+@pytest.mark.parametrize(
+    ("algorithms", "expected"),
+    [(["location-headers", "dependency-analysis"], 1), (["location-headers"], 1), (["dependency-analysis"], 0)],
+    ids=["default", "location-headers", "dependency-analysis"],
+)
+def test_links_inferred_from_location_headers(ctx, app_runner, algorithms, expected):
     # The `Location` header of a created resource is the only hint that these two operations chain.
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -2140,7 +2145,8 @@ def test_links_inferred_from_location_headers(ctx, app_runner):
     def get_user(user_id):
         return flask.jsonify({"id": user_id})
 
-    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    config = SchemathesisConfig.from_dict({"phases": {"stateful": {"inference": {"algorithms": algorithms}}}})
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
     stream = execute(
         schema,
         max_examples=5,
@@ -2149,7 +2155,7 @@ def test_links_inferred_from_location_headers(ctx, app_runner):
     )
     started = stream.find(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
 
-    assert started.payload.inferred_transitions > 0
+    assert started.payload.inferred_transitions == expected
 
 
 TEAM_ID = 982451653

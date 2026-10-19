@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
+- Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
 
 ## [4.32.1](https://github.com/schemathesis/schemathesis/compare/v4.32.0...v4.32.1) - 2026-10-19
 

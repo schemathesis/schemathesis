@@ -833,7 +833,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
 
     Available algorithms:
 
-    - `location-headers` - Analyzes `Location` headers to infer parameter extraction rules between operations.  
+    - `location-headers` - Analyzes URLs in `Location` headers and response bodies to infer parameter extraction rules between operations.  
     - `dependency-analysis` - Analyzes your OpenAPI schema to detect resource dependencies between operations.  
 
     Set to an empty array to disable automatic link inference entirely.

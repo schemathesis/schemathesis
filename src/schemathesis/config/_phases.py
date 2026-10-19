@@ -320,11 +320,6 @@ class InferenceConfig(DiffBase):
             algorithms=data.get("algorithms", list(InferenceAlgorithm)),
         )._mark_source_keys(data)
 
-    @property
-    def is_enabled(self) -> bool:
-        """Inference is enabled if any algorithms are configured."""
-        return bool(self.algorithms)
-
     def is_algorithm_enabled(self, algorithm: InferenceAlgorithm) -> bool:
         return algorithm in self.algorithms
 
