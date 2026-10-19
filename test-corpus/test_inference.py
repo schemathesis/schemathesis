@@ -12,18 +12,13 @@ from schemathesis.specs.openapi.stateful import dependencies
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
-from tools.corpus.io import json_loads, read_corpus_file  # noqa: E402
+from tools.corpus.io import CORPUS_NAMES, json_loads, load_from_corpus, read_corpus_file  # noqa: E402
 from tools.corpus.metrics import (  # noqa: E402
     add_dependency_metrics,
     collect_dependency_metrics,
 )
 
-CORPUS_FILE_NAMES = (
-    "swagger-2.0",
-    "openapi-3.0",
-    "openapi-3.1",
-)
-CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
+CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_NAMES}
 
 
 @pytest.fixture
@@ -108,8 +103,7 @@ KNOWN_INCORRECT_FIELD_MAPPINGS = {}
 )
 def test_dependency_graph(corpus, filename, snapshot_json):
     # Corpus is sampled due to its size
-    raw_content = CORPUS_FILES[corpus].extractfile(filename).read()
-    raw_schema = json_loads(raw_content)
+    raw_schema = load_from_corpus(filename, CORPUS_FILES[corpus])
     schema = schemathesis.openapi.from_dict(raw_schema)
     graph = dependencies.analyze(schema)
     serialized = graph.serialize()

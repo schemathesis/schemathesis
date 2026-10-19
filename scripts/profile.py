@@ -76,21 +76,9 @@ _MOCK_BASE_URL = "http://localhost"
 
 def _install_call_mock() -> None:
     """Patch Case.call so the CLI never makes real HTTP requests."""
-    from unittest.mock import patch
+    from tools.stub_call import install_stub_call
 
-    import requests
-
-    from schemathesis.core.transport import Response
-
-    mock_response = Response(
-        status_code=200,
-        headers={"Content-Type": ["application/json"]},
-        content=b"{}",
-        request=requests.Request(method="GET", url=f"{_MOCK_BASE_URL}/test").prepare(),
-        elapsed=0.1,
-        verify=False,
-    )
-    patch("schemathesis.Case.call", return_value=mock_response).start()
+    install_stub_call()
 
 
 def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:

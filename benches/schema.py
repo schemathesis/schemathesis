@@ -2,17 +2,14 @@ import json
 import pathlib
 import sys
 from io import StringIO
-from unittest.mock import patch
 
 import pytest
-import requests
 from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.transport import Response
 from schemathesis.engine import events, from_schema
 from schemathesis.generation.hypothesis import canonical_form_cache, canonical_strategy_cache, setup
 from schemathesis.generation.jsonschema import strategy
@@ -27,6 +24,7 @@ sys.path.append(str(CURRENT_DIR.parent))
 CATALOG_DIR = CURRENT_DIR / "data"
 
 from tools.corpus.io import load_from_corpus, read_corpus_file  # noqa: E402
+from tools.stub_call import install_stub_call  # noqa: E402
 
 setup()
 CONFIG = SchemathesisConfig()
@@ -63,15 +61,7 @@ BBCI_SCHEMA.config.seed = 42
 BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
 
 
-RESPONSE = Response(
-    status_code=200,
-    headers={},
-    content=b"",
-    request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
-    elapsed=0.1,
-    verify=False,
-)
-patch("schemathesis.Case.call", return_value=RESPONSE).start()
+install_stub_call(headers={}, content=b"")
 
 
 @pytest.mark.benchmark(group="iter-operations")
