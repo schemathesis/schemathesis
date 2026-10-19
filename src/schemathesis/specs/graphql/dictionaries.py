@@ -23,7 +23,13 @@ from schemathesis.config._dictionaries import (
     parse_graphql_path,
 )
 from schemathesis.generation.dictionaries import DictionaryDraw
-from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
+from schemathesis.specs.graphql._helpers import (
+    _root_type_for,
+    _unwrap,
+    replace_field,
+    replace_node,
+    replace_selections,
+)
 from schemathesis.specs.graphql.substitution import _fits_graphql_float, _fits_graphql_int, scalar_value_node
 
 if TYPE_CHECKING:
@@ -114,14 +120,16 @@ def substitute_dictionaries(
     bindings: OperationBindings,
     operation_label: str,
     random: Random,
-) -> list[DictionaryDraw]:
-    """Replace argument literals with configured dictionary entries. Returns the draws applied."""
+) -> tuple[graphql.OperationDefinitionNode, list[DictionaryDraw]]:
+    """Replace argument literals with configured dictionary entries. Returns the draws applied too."""
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
-        return []
+        return operation_node, []
     context = _Context(bindings=bindings, operation_label=operation_label, random=random, draws=[])
-    _walk(operation_node.selection_set, root, context, ())
-    return context.draws
+    selection_set = _walk(operation_node.selection_set, root, context, ())
+    if selection_set is not operation_node.selection_set:
+        operation_node = replace_node(operation_node, selection_set=selection_set)
+    return operation_node, context.draws
 
 
 def _walk(
@@ -129,9 +137,10 @@ def _walk(
     parent_type: graphql.GraphQLObjectType,
     context: _Context,
     path: tuple[str, ...],
-) -> None:
+) -> graphql.SelectionSetNode:
     assert selection_set is not None, "the operation root and object-typed fields always carry a selection set"
-    for selection in selection_set.selections:
+    selections = list(selection_set.selections)
+    for index, selection in enumerate(selection_set.selections):
         # Arguments inside inline fragments (interface/union selections) are not substituted.
         if not isinstance(selection, graphql.FieldNode):
             continue
@@ -141,7 +150,8 @@ def _walk(
             continue
         field_path = (*path, selection.name.value)
         field = (parent_type.name, selection.name.value)
-        for argument in selection.arguments:
+        arguments = list(selection.arguments or ())
+        for position, argument in enumerate(selection.arguments or ()):
             argument_definition = field_def.args.get(argument.name.value)
             assert argument_definition is not None, "a generated argument exists on its field"
             replaced = _substitute_value(
@@ -153,10 +163,13 @@ def _walk(
                 (*field_path, argument.name.value),
             )
             if replaced is not None:
-                argument.value = replaced
+                arguments[position] = replace_node(argument, value=replaced)
+        nested = selection.selection_set
         unwrapped_return = _unwrap(field_def.type)
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            _walk(selection.selection_set, unwrapped_return, context, field_path)
+            nested = _walk(selection.selection_set, unwrapped_return, context, field_path)
+        selections[index] = replace_field(selection, arguments, nested)
+    return replace_selections(selection_set, selections)
 
 
 def _substitute_value(

@@ -19,7 +19,13 @@ import graphql
 
 from schemathesis.core.text import to_pascal_case, to_snake_case
 from schemathesis.python._constants.pool import ConstantDraw, ConstantType, ConstantValue, Origin
-from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
+from schemathesis.specs.graphql._helpers import (
+    _root_type_for,
+    _unwrap,
+    replace_field,
+    replace_node,
+    replace_selections,
+)
 from schemathesis.specs.graphql.handles import HANDLE_SCALARS, Handle, SchemaIndex
 
 if TYPE_CHECKING:
@@ -72,13 +78,13 @@ def substitute_pool_values(
     pool: GraphQLResourcePool,
     random: Random,
     schema_index: SchemaIndex | None = None,
-) -> None:
+) -> graphql.OperationDefinitionNode:
     """Replace matching argument literals with captured pool values."""
 
     def provider(handle: Handle, random: Random) -> str | None:
         return pool.draw(handle=handle, random=random)
 
-    _substitute(operation_node, client_schema, provider, random, schema_index)
+    return _substitute(operation_node, client_schema, provider, random, schema_index)
 
 
 def substitute_bundle_values(
@@ -89,7 +95,7 @@ def substitute_bundle_values(
     random: Random,
     exploration_rate: float = 0.0,
     schema_index: SchemaIndex | None = None,
-) -> None:
+) -> graphql.OperationDefinitionNode:
     """Replace handle-typed argument literals with values from the given handle to value mapping.
 
     `exploration_rate` is the per-argument probability of leaving the
@@ -102,7 +108,7 @@ def substitute_bundle_values(
             return None
         return bundle_values.get(handle)
 
-    _substitute(operation_node, client_schema, provider, random, schema_index)
+    return _substitute(operation_node, client_schema, provider, random, schema_index)
 
 
 def substitute_constants(
@@ -113,17 +119,19 @@ def substitute_constants(
     random: Random,
     probability: float = CONSTANTS_SUBSTITUTION_PROBABILITY,
     skip: frozenset[tuple[str, ...]] = frozenset(),
-) -> list[ConstantDraw]:
+) -> tuple[graphql.OperationDefinitionNode, list[ConstantDraw]]:
     """Replace scalar argument literals with type-compatible constants extracted from the SUT source.
 
     Matches by scalar type rather than id-handle semantics, so it targets free-form scalar
-    arguments the resource pool leaves alone. Returns the substitutions applied, for provenance.
+    arguments the resource pool leaves alone. Returns the substitutions applied too, for provenance.
     """
     root = _root_type_for(client_schema, operation_node.operation)
     assert root is not None, "query and mutation operations always have a root type"
     draws: list[ConstantDraw] = []
-    _walk_constants(operation_node.selection_set, root, pool, random, probability, draws, (), skip)
-    return draws
+    selection_set = _walk_constants(operation_node.selection_set, root, pool, random, probability, draws, (), skip)
+    if selection_set is not operation_node.selection_set:
+        operation_node = replace_node(operation_node, selection_set=selection_set)
+    return operation_node, draws
 
 
 def _walk_constants(
@@ -135,9 +143,10 @@ def _walk_constants(
     draws: list[ConstantDraw],
     path: tuple[str, ...],
     skip: frozenset[tuple[str, ...]],
-) -> None:
+) -> graphql.SelectionSetNode:
     assert selection_set is not None, "the operation root and object-typed fields always carry a selection set"
-    for selection in selection_set.selections:
+    selections = list(selection_set.selections)
+    for index, selection in enumerate(selection_set.selections):
         # Arguments inside inline fragments (interface/union selections) are not substituted.
         if not isinstance(selection, graphql.FieldNode):
             continue
@@ -146,7 +155,8 @@ def _walk_constants(
             # Meta-fields such as `__typename` are valid selections but absent from the type's fields.
             continue
         field_path = (*path, selection.name.value)
-        for argument in selection.arguments:
+        arguments = list(selection.arguments or ())
+        for position, argument in enumerate(selection.arguments or ()):
             argument_definition = field_def.args.get(argument.name.value)
             assert argument_definition is not None, "a generated argument exists on its field"
             new_value = _substitute_constant_value(
@@ -161,12 +171,15 @@ def _walk_constants(
                 skip,
             )
             if new_value is not None:
-                argument.value = new_value
+                arguments[position] = replace_node(argument, value=new_value)
+        nested = selection.selection_set
         unwrapped_return = _unwrap(field_def.type)
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            _walk_constants(
+            nested = _walk_constants(
                 selection.selection_set, unwrapped_return, pool, random, probability, draws, field_path, skip
             )
+        selections[index] = replace_field(selection, arguments, nested)
+    return replace_selections(selection_set, selections)
 
 
 def _substitute_constant_value(
@@ -279,11 +292,14 @@ def _substitute(
     provider: ValueProvider,
     random: Random,
     index: SchemaIndex | None,
-) -> None:
+) -> graphql.OperationDefinitionNode:
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
-        return
-    _walk(operation_node.selection_set, root, provider, random, index)
+        return operation_node
+    selection_set = _walk(operation_node.selection_set, root, provider, random, index)
+    if selection_set is operation_node.selection_set:
+        return operation_node
+    return replace_node(operation_node, selection_set=selection_set)
 
 
 def _walk(
@@ -292,10 +308,11 @@ def _walk(
     provider: ValueProvider,
     random: Random,
     index: SchemaIndex | None,
-) -> None:
+) -> graphql.SelectionSetNode | None:
     if selection_set is None:
-        return
-    for selection in selection_set.selections:
+        return None
+    selections = list(selection_set.selections)
+    for selection_index, selection in enumerate(selection_set.selections):
         if not isinstance(selection, graphql.FieldNode):
             continue
         field_def = parent_type.fields.get(selection.name.value)
@@ -305,7 +322,8 @@ def _walk(
         enclosing_field_type = (
             unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
         )
-        for argument in selection.arguments:
+        arguments = list(selection.arguments or ())
+        for position, argument in enumerate(selection.arguments or ()):
             argument_definition = field_def.args.get(argument.name.value)
             if argument_definition is None:
                 continue
@@ -319,9 +337,12 @@ def _walk(
                 index,
             )
             if new_value is not None:
-                argument.value = new_value
+                arguments[position] = replace_node(argument, value=new_value)
+        nested = selection.selection_set
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            _walk(selection.selection_set, unwrapped_return, provider, random, index)
+            nested = _walk(selection.selection_set, unwrapped_return, provider, random, index)
+        selections[selection_index] = replace_field(selection, arguments, nested)
+    return replace_selections(selection_set, selections)
 
 
 def _substitute_value(
@@ -508,7 +529,7 @@ def _iter_walk(
         enclosing_field_type = (
             unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
         )
-        for argument in selection.arguments:
+        for argument in selection.arguments or ():
             argument_definition = field_def.args.get(argument.name.value)
             if argument_definition is None:
                 continue

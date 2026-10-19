@@ -598,7 +598,7 @@ _GRAPHQL_SCALAR_SCHEMA = graphql.build_schema(
     ],
 )
 def test_graphql_int_scalar_rejects_out_of_range_constants(value, substituted):
-    draws = substitute_constants(
+    _, draws = substitute_constants(
         operation_node=_parse_graphql("{ byNumber(n: 0) }"),
         client_schema=_GRAPHQL_SCALAR_SCHEMA,
         pool=_source("integer", value),
@@ -609,7 +609,7 @@ def test_graphql_int_scalar_rejects_out_of_range_constants(value, substituted):
 
 
 def test_graphql_meta_field_does_not_abort_substitution():
-    draws = substitute_constants(
+    _, draws = substitute_constants(
         operation_node=_parse_graphql('{ lookup(code: "x") __typename }'),
         client_schema=_GRAPHQL_SCALAR_SCHEMA,
         pool=_source("string", "REPLACED"),
@@ -620,7 +620,7 @@ def test_graphql_meta_field_does_not_abort_substitution():
 
 
 def test_graphql_constants_leave_dictionary_filled_arguments_alone():
-    draws = substitute_constants(
+    _, draws = substitute_constants(
         operation_node=_parse_graphql('{ lookup(code: "x") }'),
         client_schema=_GRAPHQL_SCALAR_SCHEMA,
         pool=_source("string", "REPLACED"),
@@ -634,7 +634,7 @@ def test_graphql_constants_leave_dictionary_filled_arguments_alone():
 def test_graphql_float_scalar_rejects_overflowing_integer_constant():
     # `float(10**400)` overflows; such an integer can never be a finite `Float` literal, so it must be
     # filtered out rather than crash the draw with `OverflowError`.
-    draws = substitute_constants(
+    _, draws = substitute_constants(
         operation_node=_parse_graphql("{ byRatio(r: 1.0) }"),
         client_schema=_GRAPHQL_SCALAR_SCHEMA,
         pool=_source("integer", 10**400),

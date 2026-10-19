@@ -25,7 +25,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE
-from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type
+from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type, replace_node, replace_selections
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.inference import (
     CLEANUP_PREFIXES,
@@ -250,12 +250,12 @@ def _bundle_substituter(
     bundle_args: dict[str, Any],
     *,
     exploration_rate: float,
-) -> Callable[[graphql.OperationDefinitionNode, Random], None]:
+) -> Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode]:
     """Build the `mutate_ast` callback that swaps strategy-generated id literals with bundle values."""
     bundle_values = {consumed[argument]: bundle_args[argument] for argument in bundle_args}
 
-    def mutate(operation_node: graphql.OperationDefinitionNode, random: Random) -> None:
-        substitute_bundle_values(
+    def mutate(operation_node: graphql.OperationDefinitionNode, random: Random) -> graphql.OperationDefinitionNode:
+        return substitute_bundle_values(
             operation_node=operation_node,
             client_schema=schema.client_schema,
             bundle_values=bundle_values,
@@ -307,37 +307,51 @@ def _make_producer_rule(
 
 def _inject_field(
     field_name: str, handle_field: str, *, via_edges: bool
-) -> Callable[[graphql.OperationDefinitionNode, Random], None]:
+) -> Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode]:
     """Ensure `handle_field` is selected inside the producing field, so its value can be captured.
 
     For Relay connections the field is nested under `edges { node { ... } }`.
     """
     path = ["edges", "node", handle_field] if via_edges else [handle_field]
 
-    def mutate(operation_node: graphql.OperationDefinitionNode, _random: Random) -> None:
-        for selection in operation_node.selection_set.selections:
+    def mutate(operation_node: graphql.OperationDefinitionNode, _random: Random) -> graphql.OperationDefinitionNode:
+        selections = list(operation_node.selection_set.selections)
+        for index, selection in enumerate(selections):
             if isinstance(selection, graphql.FieldNode) and selection.name.value == field_name:
-                if selection.selection_set is not None:
-                    _ensure_selection_path(selection.selection_set, path)
-                return
+                if selection.selection_set is None:
+                    return operation_node
+                selections[index] = replace_node(
+                    selection, selection_set=_ensure_selection_path(selection.selection_set, path)
+                )
+                return replace_node(
+                    operation_node, selection_set=replace_selections(operation_node.selection_set, selections)
+                )
+        return operation_node
 
     return mutate
 
 
-def _ensure_selection_path(selection_set: graphql.SelectionSetNode, path: list[str]) -> None:
+def _ensure_selection_path(selection_set: graphql.SelectionSetNode, path: list[str]) -> graphql.SelectionSetNode:
     name, rest = path[0], path[1:]
-    field = next(
-        (node for node in selection_set.selections if isinstance(node, graphql.FieldNode) and node.name.value == name),
+    selections = list(selection_set.selections)
+    index = next(
+        (
+            position
+            for position, node in enumerate(selections)
+            if isinstance(node, graphql.FieldNode) and node.name.value == name
+        ),
         None,
     )
-    if field is None:
+    if index is None:
         nested = graphql.SelectionSetNode(selections=()) if rest else None
-        field = graphql.FieldNode(name=graphql.NameNode(value=name), selection_set=nested)
-        selection_set.selections = (*selection_set.selections, field)
+        selections.append(graphql.FieldNode(name=graphql.NameNode(value=name), selection_set=nested))
+        index = len(selections) - 1
+    field = selections[index]
+    assert isinstance(field, graphql.FieldNode)
     if rest:
-        if field.selection_set is None:
-            field.selection_set = graphql.SelectionSetNode(selections=())
-        _ensure_selection_path(field.selection_set, rest)
+        nested = field.selection_set if field.selection_set is not None else graphql.SelectionSetNode(selections=())
+        selections[index] = replace_node(field, selection_set=_ensure_selection_path(nested, rest))
+    return replace_selections(selection_set, selections)
 
 
 def _make_handle_producer_rule(

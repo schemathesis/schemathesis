@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
+
 ## [4.32.1](https://github.com/schemathesis/schemathesis/compare/v4.32.0...v4.32.1) - 2026-10-19
 
 ### :racing_car: Performance

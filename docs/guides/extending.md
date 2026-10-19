@@ -385,16 +385,29 @@ def remove_optional_properties(schema):
 
 ## GraphQL Hooks
 
-GraphQL hooks work with `graphql.DocumentNode` objects instead of JSON data. The `body` parameter contains the GraphQL query structure that you can modify.
+GraphQL hooks work with `graphql.DocumentNode` objects instead of JSON data. AST nodes are immutable in graphql-core 3.3+, so build a modified copy with `graphql.visit` instead of assigning to node attributes.
 
 ### Modifying GraphQL queries
 
 ```python
+import graphql
+
+import schemathesis
+
+
+class RenameField(graphql.Visitor):
+    def leave_field(self, node, *_):
+        if node.name.value == "oldName":
+            return graphql.FieldNode(
+                name=graphql.NameNode(value="newName"),
+                arguments=node.arguments,
+                selection_set=node.selection_set,
+            )
+
+
 @schemathesis.hook
 def map_body(ctx, body):
-    node = body.definitions[0].selection_set.selections[0]
-    node.name.value = "addedViaHook"
-    return body
+    return graphql.visit(body, RenameField())
 ```
 
 ### Adding URL query parameters
@@ -429,19 +442,24 @@ from hypothesis import strategies as st
 import schemathesis
 
 
+class AddDependentField(graphql.Visitor):
+    def leave_operation_definition(self, node, *_):
+        new_field = graphql.FieldNode(name=graphql.NameNode(value="someDependentField"))
+        return graphql.OperationDefinitionNode(
+            operation=node.operation,
+            name=node.name,
+            variable_definitions=node.variable_definitions,
+            directives=node.directives,
+            selection_set=graphql.SelectionSetNode(selections=(*node.selection_set.selections, new_field)),
+        )
+
+
 @schemathesis.hook
 def flatmap_body(ctx, body):
     node = body.definitions[0].selection_set.selections[0]
     if node.name.value == "someField":
-        return st.just(body).map(lambda b: add_field(b, "someDependentField"))
+        return st.just(graphql.visit(body, AddDependentField()))
     return st.just(body)
-
-
-def add_field(body, field_name):
-    new_field = graphql.FieldNode(name=graphql.NameNode(value=field_name))
-    selections = body.definitions[0].selection_set.selections
-    body.definitions[0].selection_set.selections = (*selections, new_field)
-    return body
 ```
 
 For a query `{ someField }`, the request body becomes `{ someField someDependentField }`.
