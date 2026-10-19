@@ -16,6 +16,7 @@ from schemathesis.core.error_feedback.store import (
     SizeBoundPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import as_index_or_key
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -57,7 +58,7 @@ def split_field_path(raw: str) -> ParameterPath:
     segments: list[str | int] = []
     for name, index in _FIELD_PATH_SEGMENT.findall(raw):
         segment = name or index
-        segments.append(int(segment) if segment.isascii() and segment.isdigit() else segment)
+        segments.append(as_index_or_key(segment))
     return tuple(segments)
 
 

@@ -136,6 +136,16 @@ def decode_pointer(value: str) -> str:
     return value.replace("~1", "/").replace("~0", "~")
 
 
+def is_array_index(segment: str) -> bool:
+    """Whether a path segment is an array index; non-ASCII digits such as `²` are object keys."""
+    return segment.isascii() and segment.isdigit()
+
+
+def as_index_or_key(segment: str) -> str | int:
+    """`"0"` -> 0 for array indices, any other segment unchanged."""
+    return int(segment) if is_array_index(segment) else segment
+
+
 def iter_decoded_pointer_segments(pointer: str) -> Iterator[str]:
     return map(decode_pointer, pointer.split("/")[1:])
 

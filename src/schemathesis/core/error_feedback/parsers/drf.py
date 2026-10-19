@@ -20,6 +20,7 @@ from schemathesis.core.error_feedback.store import (
     ParameterPath,
     TypeMismatchPayload,
 )
+from schemathesis.core.transforms import as_index_or_key
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -38,9 +39,7 @@ def _walk(body: object, path: ParameterPath = ()) -> Iterator[WalkPair]:
             if key == "non_field_errors":
                 continue
             # DRF emits index-keyed errors as ASCII-digit strings ("0", "1", ...).
-            # `str.isdigit()` would also accept non-ASCII digits, which we don't want.
-            child_key: str | int = int(key) if key.isascii() and key.isdigit() else key
-            yield from _walk(value, path + (child_key,))
+            yield from _walk(value, path + (as_index_or_key(key),))
         return
     if isinstance(body, list):
         had_string = False

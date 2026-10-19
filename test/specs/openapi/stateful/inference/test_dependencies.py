@@ -10443,6 +10443,39 @@ def test_created_id_links_to_both_item_and_path_named_consumers(ctx):
     }
 
 
+def test_link_body_keeps_object_under_non_ascii_digit_property(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation(
+                "post",
+                "/locations",
+                "201",
+                {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]},
+            ),
+            **operation_with_body(
+                "post",
+                "/foo",
+                "200",
+                {
+                    "type": "object",
+                    "required": ["²"],
+                    "properties": {
+                        "²": {
+                            "type": "object",
+                            "required": ["location_id"],
+                            "properties": {"location_id": {"type": "integer"}},
+                        }
+                    },
+                },
+            ),
+        },
+    )
+    assert [link[2].get("requestBody") for link in inferred_links(graph)] == [
+        {"²": {"location_id": "$response.body#/id"}}
+    ]
+
+
 NUMERIC_ID_AND_STRING_UUID = {"id": {"type": "number"}, "uuid": {"type": "string"}, "slug": {"type": "integer"}}
 
 

@@ -28,7 +28,7 @@ from schemathesis.core.error_feedback.store import (
     TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import decode_pointer
+from schemathesis.core.transforms import as_index_or_key, decode_pointer
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -48,8 +48,7 @@ _FASTIFY_VALIDATION_CODE = "FST_ERR_VALIDATION"
 
 def _to_segment(raw: str) -> str | int:
     """Decode an RFC 6901 segment; ASCII-digit segments become ints (array indices)."""
-    decoded = decode_pointer(raw)
-    return int(decoded) if decoded.isascii() and decoded.isdigit() else decoded
+    return as_index_or_key(decode_pointer(raw))
 
 
 def _split_instance_path(raw: str) -> ParameterPath:

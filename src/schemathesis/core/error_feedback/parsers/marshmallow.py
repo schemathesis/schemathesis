@@ -26,6 +26,7 @@ from schemathesis.core.error_feedback.store import (
     TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import as_index_or_key
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -157,8 +158,7 @@ def _walk(
             if new_location is not None and isinstance(child, dict):
                 yield from _walk(child, path=path, location=new_location, at_root=False)
                 continue
-            child_key: str | int = int(key) if key.isascii() and key.isdigit() else key
-            yield from _walk(child, path=(*path, child_key), location=location, at_root=False)
+            yield from _walk(child, path=(*path, as_index_or_key(key)), location=location, at_root=False)
     elif isinstance(value, list):
         if value and all(isinstance(item, str) for item in value):
             for message in value:

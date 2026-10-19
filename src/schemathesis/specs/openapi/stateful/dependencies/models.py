@@ -12,7 +12,12 @@ from typing import Any, TypeAlias
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.parameters import ParameterLocation, iter_path_parameters
 from schemathesis.core.text import to_pascal_case
-from schemathesis.core.transforms import encode_pointer, get_template_fields, iter_decoded_pointer_segments
+from schemathesis.core.transforms import (
+    encode_pointer,
+    get_template_fields,
+    is_array_index,
+    iter_decoded_pointer_segments,
+)
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies.naming import (
@@ -661,23 +666,23 @@ def _build_nested_body(path: str, value: str) -> dict[str, Any] | list[Any]:
         _build_nested_body("0/product_id", "$val") -> [{"product_id": "$val"}]
 
     """
-    index, _, rest = path.partition("/")
-    if index.isdigit() and rest:
-        return [_build_nested_body(rest, value)]
     if "/" not in path:
         return {path: value}
-
     parts = path.split("/")
+    is_index = list(map(is_array_index, parts))
+    rest = path.partition("/")[2]
+    if is_index[0] and rest:
+        return [_build_nested_body(rest, value)]
+
     result: dict[str, Any] = {}
     current = result
 
     for i, part in enumerate(parts[:-1]):
-        next_part = parts[i + 1]
         # Check if next part is an array index
-        if next_part.isdigit():
+        if is_index[i + 1]:
             current[part] = [{}]
             current = current[part][0]
-        elif part.isdigit():
+        elif is_index[i]:
             # Skip array indices - we're already inside the array
             continue
         else:
@@ -685,9 +690,8 @@ def _build_nested_body(path: str, value: str) -> dict[str, Any] | list[Any]:
             current = current[part]
 
     # Set the final value
-    final_key = parts[-1]
-    if not final_key.isdigit():
-        current[final_key] = value
+    if not is_index[-1]:
+        current[parts[-1]] = value
 
     return result
 
