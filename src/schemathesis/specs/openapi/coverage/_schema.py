@@ -359,7 +359,7 @@ def _unexpected_property_key(schema: dict, existing_keys: set[str]) -> str | Non
     return None
 
 
-@dataclass
+@dataclass(slots=True)
 class GeneratedValue:
     value: Any
     generation_mode: GenerationMode
@@ -367,11 +367,12 @@ class GeneratedValue:
     description: str
     parameter: str | None
     location: str | None
-
-    __slots__ = ("value", "generation_mode", "scenario", "description", "parameter", "location")
+    deduplication_key: tuple | None = None
 
     @classmethod
-    def with_positive(cls, value: Any, *, scenario: CoverageScenario, description: str) -> GeneratedValue:
+    def with_positive(
+        cls, value: Any, *, scenario: CoverageScenario, description: str, deduplication_key: tuple | None = None
+    ) -> GeneratedValue:
         return cls(
             value=value,
             generation_mode=GenerationMode.POSITIVE,
@@ -379,6 +380,7 @@ class GeneratedValue:
             description=description,
             location=None,
             parameter=None,
+            deduplication_key=deduplication_key,
         )
 
     @classmethod
@@ -1397,8 +1399,12 @@ class HashSet:
     def __contains__(self, value: Any) -> bool:
         return _to_hashable_key(value) in self._data
 
-    def insert(self, value: Any) -> bool:
-        return self._insert_key(_to_hashable_key(value))
+    def insert(self, value: Any, *, key: tuple | None = None) -> bool:
+        return self._insert_key(_to_hashable_key(value) if key is None else key)
+
+    def insert_with_key(self, value: Any) -> tuple | None:
+        key = _to_hashable_key(value)
+        return key if self._insert_key(key) else None
 
     def insert_unless_in(self, other: HashSet, value: Any) -> bool:
         """Insert the value unless `other` already holds it; the key is built once for both sets."""
@@ -3633,11 +3639,13 @@ def _positive_array(
         sub_schema = schema["items"]
         for item in cover_schema_iter(ctx, sub_schema):
             candidate = [*prefix_values, item.value]
-            if seen.insert(candidate):
+            deduplication_key = seen.insert_with_key(candidate)
+            if deduplication_key is not None:
                 yield PositiveValue(
                     candidate,
                     scenario=CoverageScenario.VALID_ARRAY,
                     description=f"Single-item array: {item.description}",
+                    deduplication_key=deduplication_key,
                 )
 
 
@@ -3755,7 +3763,7 @@ def _iter_positive_object(
         if name in template:
             seen.insert(template[name])
         for new in cover_schema_iter(ctx, sub_schema):
-            if seen.insert(new.value):
+            if seen.insert(new.value, key=new.deduplication_key):
                 yield PositiveValue(
                     {**template, name: new.value},
                     scenario=CoverageScenario.VALID_OBJECT,
@@ -3772,7 +3780,7 @@ def _iter_positive_object(
         if additional_key is None:
             return
         for new in cover_schema_iter(ctx, additional_properties):
-            if seen.insert(new.value):
+            if seen.insert(new.value, key=new.deduplication_key):
                 yield PositiveValue(
                     {**template, additional_key: new.value},
                     scenario=CoverageScenario.OBJECT_ADDITIONAL_PROPERTY,
@@ -4621,6 +4629,7 @@ def _flip_generation_mode_for_not(
             description=description or value.description,
             location=value.location,
             parameter=value.parameter,
+            deduplication_key=value.deduplication_key,
         )
 
 
