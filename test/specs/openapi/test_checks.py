@@ -3935,9 +3935,10 @@ def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
         ({"Age": "75430"}, "\n\nThe response came from a cache (`Age: 75430`) and may be stale"),
         ({"X-Cache": "MISS, HIT"}, "\n\nThe response came from a cache (`X-Cache: MISS, HIT`) and may be stale"),
         ({"Age": "0", "X-Cache": "MISS"}, ""),
+        ({"Age": "\u00b2"}, ""),
         (None, ""),
     ],
-    ids=["age", "x-cache-hit", "fresh", "no-cache-headers"],
+    ids=["age", "x-cache-hit", "fresh", "non-ascii-digit-age", "no-cache-headers"],
 )
 def test_use_after_free_hints_at_cached_response(ctx, response_factory, headers, hint):
     context, get_case, get_response = _build_user_profile_chain(
