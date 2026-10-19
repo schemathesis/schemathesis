@@ -75,13 +75,13 @@ class Failure(AssertionError):
         self,
         *,
         operation: str | None,
-        title: str,
+        title: str | None = None,
         message: str,
         case_id: str | None = None,
         severity: Severity = Severity.MEDIUM,
     ) -> None:
         self.operation = operation
-        self.title = title
+        self.title = title if title is not None else self.kind_title
         self.message = message
         self.case_id = case_id
         self.severity = severity
@@ -179,7 +179,7 @@ class CustomFailure(Failure):
     checks = ()
     kind_title = "Custom check failed"
 
-    __slots__ = ("operation", "title", "message", "exception", "case_id", "severity", "origin")
+    __slots__ = ("exception", "origin")
 
     def __init__(
         self,
@@ -191,12 +191,8 @@ class CustomFailure(Failure):
         case_id: str | None = None,
         severity: Severity = Severity.MEDIUM,
     ) -> None:
-        self.operation = operation
-        self.title = title
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=severity)
         self.exception = exception
-        self.case_id = case_id
-        self.severity = severity
         self.origin = get_origin(exception)
 
     @property
@@ -212,7 +208,7 @@ class ResponseTimeExceeded(Failure):
     checks = ("max_response_time",)
     kind_title = "Response time limit exceeded"
 
-    __slots__ = ("operation", "elapsed", "deadline", "title", "message", "case_id", "severity")
+    __slots__ = ("elapsed", "deadline")
 
     def __init__(
         self,
@@ -224,13 +220,9 @@ class ResponseTimeExceeded(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.LOW)
         self.elapsed = elapsed
         self.deadline = deadline
-        self.title = title if title is not None else self.kind_title
-        self.message = message
-        self.case_id = case_id
-        self.severity = Severity.LOW
 
     @property
     def _unique_key(self) -> str:
@@ -249,7 +241,7 @@ class ServerError(Failure):
     checks = ("not_a_server_error",)
     kind_title = "Server error"
 
-    __slots__ = ("operation", "status_code", "title", "message", "case_id", "severity")
+    __slots__ = ("status_code",)
 
     def __init__(
         self,
@@ -260,12 +252,8 @@ class ServerError(Failure):
         message: str = "",
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         self.status_code = status_code
-        self.title = title if title is not None else self.kind_title
-        self.message = message
-        self.case_id = case_id
-        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -285,7 +273,6 @@ class ContentTypeServerError(ServerError):
         super().__init__(
             operation=operation,
             status_code=status_code,
-            title=self.kind_title,
             message=message,
             case_id=case_id,
         )
@@ -298,18 +285,7 @@ class MalformedJson(Failure):
     checks = ("response_schema_conformance",)
     kind_title = "JSON deserialization error"
 
-    __slots__ = (
-        "operation",
-        "validation_message",
-        "document",
-        "position",
-        "lineno",
-        "colno",
-        "message",
-        "title",
-        "case_id",
-        "severity",
-    )
+    __slots__ = ("validation_message", "document", "position", "lineno", "colno")
 
     def __init__(
         self,
@@ -324,16 +300,12 @@ class MalformedJson(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.validation_message = validation_message
         self.document = document
         self.position = position
         self.lineno = lineno
         self.colno = colno
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -360,7 +332,7 @@ class AcceptedNegativeData(Failure):
     checks = ("negative_data_rejection",)
     kind_title = "Schema-violating request accepted"
 
-    __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
+    __slots__ = ("status_code", "expected_statuses")
 
     def __init__(
         self,
@@ -372,13 +344,9 @@ class AcceptedNegativeData(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.status_code = status_code
         self.expected_statuses = expected_statuses
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
