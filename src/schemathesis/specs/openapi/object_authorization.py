@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote
 
 from schemathesis.auths import AuthContext
+from schemathesis.core.jsonschema import resolve_with_root_bundle
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import SAFE_METHODS
 from schemathesis.openapi.checks import ObjectLevelAuthorizationViolation
 from schemathesis.specs.openapi._auth_retry import clone_case, remove_auth_from_cookie_header, send_probe
 from schemathesis.specs.openapi.adapter.security import declares_security
 from schemathesis.specs.openapi.extra_data_source import declared_response_schema, referenced_by
-from schemathesis.specs.openapi.semantic_pool import resolve_combinator, resolve_ref
+from schemathesis.specs.openapi.semantic_pool import resolve_combinator
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import Cardinality
 from schemathesis.wfc.escalation import EscalatingAuthProvider, escalating_provider
@@ -232,7 +233,7 @@ def value_paths(body: object, value: object, path: JsonPath = ()) -> set[JsonPat
 def _declared_scalars(
     schema: JsonSchemaObject, body: object, root: JsonSchemaObject, path: JsonPath = ()
 ) -> Iterator[tuple[JsonPath, object]]:
-    schema = resolve_combinator(resolve_ref(schema, root), root)
+    schema = resolve_combinator(resolve_with_root_bundle(schema, root), root)
     properties = schema.get("properties")
     items = schema.get("items")
     if isinstance(body, dict) and isinstance(properties, dict):

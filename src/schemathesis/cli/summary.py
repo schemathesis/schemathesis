@@ -10,16 +10,13 @@ from typing import TYPE_CHECKING
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.failures import RUN_CHECKS_LABEL, Severity
 from schemathesis.engine import Status
-from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run import TESTING_PHASES, PhaseName, PhaseSkipReason
 
 if TYPE_CHECKING:
     from schemathesis.cli.commands.run.warnings import ValidRate
     from schemathesis.core.statistic import ApiStatistic
     from schemathesis.engine import StopReason, events
     from schemathesis.engine.statistic import Statistic
-
-# Phases whose operations can error out before any test runs.
-TESTING_PHASES = (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
 
 
 @dataclass(slots=True)

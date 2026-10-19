@@ -152,10 +152,9 @@ class JsonReportHandler(EventHandler["BaseExecutionContext"]):
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         from schemathesis.reporting._command import get_command_representation
 
-        sanitization = ctx.config.output.sanitization
         document = build_document(
             summary=ctx.summary(),
-            command=get_command_representation(sanitization if sanitization.enabled else None),
+            command=get_command_representation(ctx.config.output.sanitization),
             seed=ctx.config.seed,
             started_at=self.started_at,
             finished=self.finished,

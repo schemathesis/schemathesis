@@ -37,8 +37,7 @@ class BaseOutputHandler(EventHandler[T]):
     loading_manager: LoadingProgressManager | None
 
     def _on_loading_started(self, ctx: T, event: LoadingStarted) -> None:
-        sanitization = ctx.config.output.sanitization
-        location = sanitized(event.location, sanitization if sanitization.enabled else None)
+        location = sanitized(event.location, ctx.config.output.sanitization)
         assert location is not None
         self.loading_manager = LoadingProgressManager(console=self.console, location=location)
         self.loading_manager.start()

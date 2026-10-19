@@ -240,11 +240,11 @@ class AllureWriter:
             self._logger.report_result(result=result)
 
 
-class _AllureCallBuffer:
+class AllureCallBuffer:
     """Captures dynamic allure API calls in xdist workers for cross-process transport.
 
     Implements the same accumulate_* interface as AllureWriter so it can be
-    passed directly to _AllureHookForwarder as a writer substitute.
+    passed directly to AllureHookForwarder as a writer substitute.
     """
 
     __slots__ = ("_calls",)
@@ -272,7 +272,7 @@ class _AllureCallBuffer:
         return self._calls
 
 
-class _AllureHookForwarder:
+class AllureHookForwarder:
     """Per-test-item pluggy hookimpl that routes dynamic allure API calls to AllureWriter instances.
 
     Created fresh per pytest item, registered before the test body runs, unregistered in teardown.
@@ -281,7 +281,7 @@ class _AllureHookForwarder:
 
     __slots__ = ("_label", "_writers")
 
-    def __init__(self, label: str, writers: Sequence[AllureWriter | _AllureCallBuffer]) -> None:
+    def __init__(self, label: str, writers: Sequence[AllureWriter | AllureCallBuffer]) -> None:
         self._label = label
         self._writers = writers
 

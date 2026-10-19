@@ -82,7 +82,9 @@ def get_command_representation(sanitization: SanitizationConfig | None = None) -
     basename = os.path.basename(sys.argv[0])
     executable = basename.removesuffix(".exe")
     raw = sys.argv[1:]
-    args = " ".join(sanitize_args(raw, config=sanitization) if sanitization is not None else raw)
+    args = " ".join(
+        sanitize_args(raw, config=sanitization) if sanitization is not None and sanitization.enabled else raw
+    )
     if executable in ("schemathesis", "st"):
         return f"st {args}"
     if "pytest" in basename or executable == "py.test":

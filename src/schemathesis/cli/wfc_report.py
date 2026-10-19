@@ -268,10 +268,9 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             if endpoint in self.endpoint_ids:
                 status = interaction.response.status_code if interaction.response is not None else None
                 self.covered.setdefault(endpoint, set()).add(status)
-        for case_id, checks in recorder.checks.items():
-            if any(check.failure_info is not None for check in checks):
-                case = recorder.cases[case_id].value
-                self.failing_endpoints[case_id] = (_case_operation_id(case), f"{case.method.upper()} {case.path}")
+        for case_id in recorder.failing_case_ids():
+            case = recorder.cases[case_id].value
+            self.failing_endpoints[case_id] = (_case_operation_id(case), f"{case.method.upper()} {case.path}")
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         if self.finished is not None:

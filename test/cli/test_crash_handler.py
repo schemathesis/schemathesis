@@ -9,7 +9,6 @@ import requests
 from flask import jsonify, request
 
 from schemathesis.cli.commands.run.handlers.crashes import (
-    _find_failing_case_ids,
     _Process,
     _run,
 )
@@ -62,13 +61,13 @@ def _drive(queue: Queue, directory: Path) -> None:
     )
 
 
-def test_find_failing_case_ids_returns_every_failing_case():
+def test_failing_case_ids_returns_every_failing_case():
     recorder = ScenarioRecorder(label="GET /users")
     recorder.record_check_success(name="not_a_server_error", case_id="ok")
     recorder.record_check_failure(name="not_a_server_error", case_id="bad-1", code_sample="", failure=_failure())
     recorder.record_check_failure(name="not_a_server_error", case_id="bad-2", code_sample="", failure=_failure())
 
-    assert sorted(_find_failing_case_ids(recorder)) == ["bad-1", "bad-2"]
+    assert sorted(recorder.failing_case_ids()) == ["bad-1", "bad-2"]
 
 
 def test_passing_scenario_does_not_delete_failing_crash(case_factory, tmp_path):

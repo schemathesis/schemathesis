@@ -22,7 +22,7 @@ from schemathesis.core.jsonschema import (
     BundleError,
     Bundler,
     make_validator,
-    maybe_resolve_bundled,
+    resolve_with_root_bundle,
     schema_with_bundle,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
@@ -435,7 +435,7 @@ def _iter_constant_leaves(
 
     if depth > DEFAULT_MAX_DEPTH:
         return
-    schema = maybe_resolve_bundled(cast(JsonSchemaObject, schema_with_bundle(schema, root_schema)))
+    schema = resolve_with_root_bundle(schema, root_schema)
     if path and _constant_types_for(schema, validator_cls):
         yield path, schema
     properties = schema.get("properties")

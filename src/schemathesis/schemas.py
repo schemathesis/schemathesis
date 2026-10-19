@@ -87,6 +87,24 @@ def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path.replace("%", "%25"), quote(path.lstrip("/"))))
 
 
+def wrap_test_function(func: Callable) -> Callable:
+    """Wrap a test function so it gets its own hook dispatcher, keeping it sync or async like `func`."""
+    if iscoroutinefunction(func):
+
+        @wraps(func)
+        async def test_wrapper(*args: Any, **kwargs: Any) -> Any:
+            return await func(*args, **kwargs)
+
+    else:
+
+        @wraps(func)
+        def test_wrapper(*args: Any, **kwargs: Any) -> Any:
+            return func(*args, **kwargs)
+
+    HookDispatcher.add_dispatcher(test_wrapper)
+    return test_wrapper
+
+
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: JsonSchemaObject
@@ -386,19 +404,7 @@ class BaseSchema(Mapping):
 
                 return wrapped_test
 
-            if iscoroutinefunction(func):
-
-                @wraps(func)
-                async def test_wrapper(*args: Any, **kwargs: Any) -> Any:
-                    return await func(*args, **kwargs)
-
-            else:
-
-                @wraps(func)
-                def test_wrapper(*args: Any, **kwargs: Any) -> Any:
-                    return func(*args, **kwargs)
-
-            HookDispatcher.add_dispatcher(test_wrapper)
+            test_wrapper = wrap_test_function(func)
             cloned = self.clone(test_function=test_wrapper)
             SchemaHandleMark.set(test_wrapper, cloned)
             return test_wrapper

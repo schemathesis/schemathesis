@@ -16,7 +16,7 @@ from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import CallOutcome
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, RecordedScenario
-from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run import UNIT_PHASES, PhaseName
 from schemathesis.generation.meta import REQUEST_SHAPE_PROBES, CoveragePhaseData, CoverageScenario, coverage_scenario
 from schemathesis.generation.modes import GenerationMode
 
@@ -302,7 +302,7 @@ class WarningCollector:
             self.fails = True
 
     def on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
-        if event.phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING):
+        if event.phase in UNIT_PHASES:
             self._check_warnings(ctx, event)
         elif (
             event.phase == PhaseName.STATEFUL_TESTING

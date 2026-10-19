@@ -155,7 +155,7 @@ class StepOutput:
     __slots__ = ("response", "case")
 
 
-def _normalize_name(name: str) -> str:
+def normalize_name(name: str) -> str:
     return re.sub(r"\W|^(?=\d)", "_", name).replace("__", "_")
 
 
@@ -340,7 +340,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return StateMachineTestCase
 
     def _new_name(self, target: str) -> str:
-        target = _normalize_name(target)
+        target = normalize_name(target)
         return super()._new_name(target)
 
     def bundle(self, name: str) -> CaseInsensitiveDict | tuple[()]:

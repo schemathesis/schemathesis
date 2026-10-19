@@ -22,7 +22,7 @@ from schemathesis.cli.summary import (
     OperationsSummary,
     TestCasesSummary,
 )
-from schemathesis.core.errors import LoaderErrorKind
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.failures import (
     CustomFailure,
     MessageBlock,
@@ -49,14 +49,14 @@ IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 if IO_ENCODING != "utf-8":
     HEADER_SEPARATOR = "-"
 
-    def _style(text: str, **kwargs: Any) -> str:
+    def style(text: str, **kwargs: Any) -> str:
         text = text.encode(IO_ENCODING, errors="replace").decode("utf-8")
         return click.style(text, **kwargs)
 
 else:
     HEADER_SEPARATOR = "━"
 
-    def _style(text: str, **kwargs: Any) -> str:
+    def style(text: str, **kwargs: Any) -> str:
         return click.style(text, **kwargs)
 
 
@@ -107,7 +107,7 @@ def print_lines(lines: list[str | Generator[str, None, None]]) -> None:
 
 
 def display_seed(config: ProjectConfig) -> None:
-    click.echo(_style("Seed: ", bold=True), nl=False)
+    click.echo(style("Seed: ", bold=True), nl=False)
     # Deterministic mode can be applied to a subset of tests, but we only care if it is enabled everywhere.
     # If not everywhere, then the seed matters and should be displayed.
     if config.seed is None or config.generation.deterministic:
@@ -175,14 +175,14 @@ def display_final_line(
         color = "green"
 
     banner = format_summary_banner(message, width=get_terminal_width())
-    click.echo(_style(banner, bold=True, fg=color))
+    click.echo(style(banner, bold=True, fg=color))
 
 
 def display_header(version: str) -> None:
     prefix = "v" if version != "dev" else ""
     header = f"Schemathesis {prefix}{version}"
-    click.echo(_style(header, bold=True))
-    click.echo(_style(HEADER_SEPARATOR * len(header), bold=True))
+    click.echo(style(header, bold=True))
+    click.echo(style(HEADER_SEPARATOR * len(header), bold=True))
     click.echo()
 
 
@@ -342,18 +342,18 @@ def display_section_name(title: str, separator: str = "=", **kwargs: object) -> 
     """Print section name centered with separators."""
     message = f" {title} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
-    click.echo(_style(message, **kwargs))
+    click.echo(style(message, **kwargs))
 
 
 def failure_formatter(block: MessageBlock, content: str) -> str:
     if block == MessageBlock.CASE_ID:
-        return _style(content, bold=True)
+        return style(content, bold=True)
     if block == MessageBlock.FAILURE:
-        return _style(content, fg="red", bold=True)
+        return style(content, fg="red", bold=True)
     if block == MessageBlock.STATUS:
-        return _style(content, bold=True)
+        return style(content, bold=True)
     assert block == MessageBlock.CURL
-    return _style(content.replace("Reproduce with", click.style("Reproduce with", bold=True)))
+    return style(content.replace("Reproduce with", click.style("Reproduce with", bold=True)))
 
 
 def replay_command(group: GroupedFailures, *, record_crashes: bool) -> str | None:
@@ -397,64 +397,64 @@ def display_failures(statistic: Statistic, config: OutputConfig, *, record_crash
 
 
 def display_api_operations(operations: OperationsSummary) -> None:
-    click.echo(_style("API Operations:", bold=True))
+    click.echo(style("API Operations:", bold=True))
     click.echo(
-        _style(
+        style(
             f"  Selected: {click.style(str(operations.selected), bold=True)}"
             f"/{click.style(str(operations.total), bold=True)}"
         )
     )
-    click.echo(_style(f"  Tested: {click.style(str(operations.tested), bold=True)}"))
+    click.echo(style(f"  Tested: {click.style(str(operations.tested), bold=True)}"))
     if operations.errored:
-        click.echo(_style(f"  Errored: {click.style(str(operations.errored), bold=True)}"))
+        click.echo(style(f"  Errored: {click.style(str(operations.errored), bold=True)}"))
     if operations.skipped:
-        click.echo(_style(f"  Skipped: {click.style(str(operations.skipped), bold=True)}"))
+        click.echo(style(f"  Skipped: {click.style(str(operations.skipped), bold=True)}"))
         for reason in sorted(set(operations.skip_reasons)):
-            click.echo(_style(f"    - {reason.rstrip('.')}"))
+            click.echo(style(f"    - {reason.rstrip('.')}"))
     click.echo()
 
 
 def display_failures_summary(failures: list[FailureGroup]) -> None:
-    click.echo(_style("Failures:", bold=True))
+    click.echo(style("Failures:", bold=True))
     for group in failures:
-        click.echo(_style(f"  ❌ {group.code} {group.title}: "), nl=False)
-        click.echo(_style(str(group.count), bold=True))
+        click.echo(style(f"  ❌ {group.code} {group.title}: "), nl=False)
+        click.echo(style(str(group.count), bold=True))
     click.echo()
     # Custom checks share one code, so its page has nothing specific to add.
     codes = sorted({group.code for group in failures} - {CustomFailure.code})
     if len(codes) == 1:
-        click.echo(_style(f"For more information, run `st explain {codes[0]}`."))
+        click.echo(style(f"For more information, run `st explain {codes[0]}`."))
         click.echo()
     elif codes:
-        click.echo(_style(f"For more information, run `st explain <code>` for {', '.join(codes)}."))
+        click.echo(style(f"For more information, run `st explain <code>` for {', '.join(codes)}."))
         click.echo()
 
 
 def display_filtered_summary(filtered: int) -> None:
-    click.echo(_style("Filtered: "), nl=False)
-    click.echo(_style(str(filtered), bold=True), nl=False)
-    click.echo(_style(" (dropped by `filter_failure`)"))
+    click.echo(style("Filtered: "), nl=False)
+    click.echo(style(str(filtered), bold=True), nl=False)
+    click.echo(style(" (dropped by `filter_failure`)"))
     click.echo()
 
 
 def display_baseline_summary(baseline: BaselineSummary) -> None:
-    click.echo(_style("Baseline:", bold=True))
-    click.echo(_style("  Known failures: "), nl=False)
-    click.echo(_style(str(baseline.known), bold=True))
+    click.echo(style("Baseline:", bold=True))
+    click.echo(style("  Known failures: "), nl=False)
+    click.echo(style(str(baseline.known), bold=True))
     if baseline.recorded is not None:
-        click.echo(_style("  Recorded: "), nl=False)
-        click.echo(_style(str(baseline.recorded), bold=True))
+        click.echo(style("  Recorded: "), nl=False)
+        click.echo(style(str(baseline.recorded), bold=True))
     if baseline.pruned is not None:
-        click.echo(_style("  Pruned: "), nl=False)
-        click.echo(_style(str(len(baseline.pruned)), bold=True))
+        click.echo(style("  Pruned: "), nl=False)
+        click.echo(style(str(len(baseline.pruned)), bold=True))
     if baseline.unobserved:
-        click.echo(_style("  Unobserved entries: "), nl=False)
-        click.echo(_style(str(baseline.unobserved), bold=True))
+        click.echo(style("  Unobserved entries: "), nl=False)
+        click.echo(style(str(baseline.unobserved), bold=True))
     if baseline.expired_ids:
-        click.echo(_style(f"  Expired entries: {len(baseline.expired_ids)}", fg="yellow"))
-        click.echo(_style(f"    {', '.join(baseline.expired_ids)}", fg="yellow"))
+        click.echo(style(f"  Expired entries: {len(baseline.expired_ids)}", fg="yellow"))
+        click.echo(style(f"    {', '.join(baseline.expired_ids)}", fg="yellow"))
     if baseline.write_error is not None:
-        click.echo(_style(f"  {baseline.write_error}", fg="red"))
+        click.echo(style(f"  {baseline.write_error}", fg="red"))
     click.echo()
 
 
@@ -469,11 +469,11 @@ def _unchecked_parts(test_cases: TestCasesSummary) -> list[str]:
 
 def display_test_cases(test_cases: TestCasesSummary) -> None:
     if test_cases.generated == 0:
-        click.echo(_style("Test cases:", bold=True))
+        click.echo(style("Test cases:", bold=True))
         click.echo("  No test cases were generated\n")
         return
 
-    click.echo(_style("Test cases:", bold=True))
+    click.echo(style("Test cases:", bold=True))
     parts = [f"  {click.style(str(test_cases.generated), bold=True)} generated"]
 
     if test_cases.without_checks + test_cases.errored != test_cases.generated:
@@ -487,14 +487,14 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
             parts.append(f"{click.style(str(test_cases.generated), bold=True)} passed")
     parts.extend(_unchecked_parts(test_cases))
 
-    click.echo(_style(", ".join(parts) + "\n"))
+    click.echo(style(", ".join(parts) + "\n"))
 
 
 def display_errors_summary(errors: list[ErrorGroup]) -> None:
-    click.echo(_style("Errors:", bold=True))
+    click.echo(style("Errors:", bold=True))
     for group in errors:
-        click.echo(_style(f"  🚫 {group.title}: "), nl=False)
-        click.echo(_style(str(group.count), bold=True))
+        click.echo(style(f"  🚫 {group.title}: "), nl=False)
+        click.echo(style(str(group.count), bold=True))
     click.echo()
 
 
@@ -514,6 +514,14 @@ LOADER_ERROR_SUGGESTIONS: dict[LoaderErrorKind, str] = {
     LoaderErrorKind.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can:\n\n  {ISSUE_TRACKER_URL}",
 }
 
+
+def loader_error_tip(exception: LoaderError, *, wait_for_schema: float | int | None) -> str | None:
+    # The run already waited for the schema, so suggesting a wait would repeat what failed.
+    if exception.kind == LoaderErrorKind.CONNECTION_OTHER and wait_for_schema is not None:
+        return None
+    return LOADER_ERROR_SUGGESTIONS.get(exception.kind)
+
+
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 
 
@@ -521,7 +529,7 @@ def _display_extras(extras: list[str]) -> None:
     if extras:
         click.echo()
     for extra in extras:
-        click.echo(_style(f"    {extra}"))
+        click.echo(style(f"    {extra}"))
 
 
 def display_fatal_error(
@@ -537,7 +545,7 @@ def display_fatal_error(
     """
     from rich.text import Text
 
-    from schemathesis.core.errors import HookExecutionError, LoaderError, format_exception, split_traceback
+    from schemathesis.core.errors import HookExecutionError, format_exception, split_traceback
     from schemathesis.engine.errors import EngineErrorInfo
 
     if isinstance(event.exception, LoaderError):
@@ -551,11 +559,10 @@ def display_fatal_error(
                 console.print(Indent(Text(extra), left=5, right=0))
             console.print()
 
-        if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and wait_for_schema is not None):
-            suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
-            if suggestion is not None:
-                suggestion = re.sub(r"`[^`]+`", lambda match: _bold(match.group()), suggestion)
-                click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}\n"))
+        suggestion = loader_error_tip(event.exception, wait_for_schema=wait_for_schema)
+        if suggestion is not None:
+            suggestion = re.sub(r"`[^`]+`", lambda match: _bold(match.group()), suggestion)
+            click.echo(style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}\n"))
 
         raise click.Abort
 
@@ -574,9 +581,9 @@ def display_fatal_error(
     traceback = format_exception(event.exception, with_traceback=True)
     extras = split_traceback(traceback)
     suggestion = f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-    click.echo(_style("Test Execution Error", fg="red", bold=True))
+    click.echo(style("Test Execution Error", fg="red", bold=True))
     click.echo()
     click.echo(DEFAULT_INTERNAL_ERROR_MESSAGE)
     _display_extras(extras)
-    click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}\n"))
+    click.echo(style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}\n"))
     raise click.Abort

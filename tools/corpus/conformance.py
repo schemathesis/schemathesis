@@ -23,7 +23,6 @@ from schemathesis.specs.openapi.utils import coerce_wire_string, parameter_types
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.generation.meta import CaseMetadata
-    from schemathesis.schemas import APIOperation
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,7 +143,7 @@ def _check_container(
     validator_cls: type,
     is_negative: bool,
 ) -> ConformanceViolation | None:
-    parameters = _parameter_set(case.operation, location)
+    parameters = cast("OpenApiParameterSet", case.operation.get_parameter_set(location))
     if not parameters.items:
         return None
     # Only the typed snapshot is comparable; the wire form is strings, spread keys and percent-encoding.
@@ -225,13 +224,3 @@ def _coerce(text: str, types: list[str]) -> object:
     if "number" in types and text.lstrip("-").isdigit():
         return int(text)
     return coerce_wire_string(text, types)
-
-
-def _parameter_set(operation: APIOperation, location: ParameterLocation) -> OpenApiParameterSet:
-    if location == ParameterLocation.QUERY:
-        return cast("OpenApiParameterSet", operation.query)
-    if location == ParameterLocation.PATH:
-        return cast("OpenApiParameterSet", operation.path_parameters)
-    if location == ParameterLocation.HEADER:
-        return cast("OpenApiParameterSet", operation.headers)
-    return cast("OpenApiParameterSet", operation.cookies)

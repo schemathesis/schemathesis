@@ -13,9 +13,9 @@ import re
 import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
-from schemathesis.core.jsonschema import get_type, maybe_resolve_bundled, schema_with_bundle
+from schemathesis.core.jsonschema import get_type, resolve_with_root_bundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.specs.openapi.formats import HEADER_FORMAT
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
@@ -242,12 +242,6 @@ class IngestionLeaf(NamedTuple):
     value: PoolValue
 
 
-def resolve_ref(schema: JsonSchemaObject, root: JsonSchemaObject) -> JsonSchemaObject:
-    """Follow a bundled ``$ref`` (e.g. ``#/x-bundled/Foo``) by splicing ``root``'s bundle into the fragment."""
-    # `schema_with_bundle` preserves shape: dict in, dict out.
-    return maybe_resolve_bundled(cast("JsonSchemaObject", schema_with_bundle(schema, root)))
-
-
 def _resolve_combinator_branch(
     branch: JsonSchemaObject, root: JsonSchemaObject, seen: frozenset[str]
 ) -> tuple[JsonSchemaObject, frozenset[str]] | None:
@@ -256,7 +250,7 @@ def _resolve_combinator_branch(
         if reference in seen:
             return None
         seen = seen | {reference}
-    return resolve_ref(branch, root), seen
+    return resolve_with_root_bundle(branch, root), seen
 
 
 def resolve_combinator(
@@ -383,7 +377,7 @@ def _walk_ingestion(
     if body is None:
         return
     if isinstance(schema, dict):
-        schema = resolve_ref(schema, root)
+        schema = resolve_with_root_bundle(schema, root)
         schema = resolve_combinator(schema, root)
         type_token = _normalize_type(schema)
         if type_token == "object" or (type_token is None and isinstance(body, dict)):
@@ -410,7 +404,7 @@ def _walk_ingestion(
             items = schema.get("items")
             if not isinstance(items, dict) or not isinstance(body, list):
                 return
-            items = resolve_combinator(resolve_ref(items, root), root)
+            items = resolve_combinator(resolve_with_root_bundle(items, root), root)
             if _normalize_type(items) == "object" or "properties" in items:
                 element_name = name
             elif name is not None:
@@ -539,7 +533,7 @@ def _walk_consumer(
     budget.nodes_left -= 1
     if not isinstance(schema, dict):
         return
-    schema = resolve_ref(schema, root)
+    schema = resolve_with_root_bundle(schema, root)
     schema = resolve_combinator(schema, root)
     type_token = _normalize_type(schema)
     properties = schema.get("properties")

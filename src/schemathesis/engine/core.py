@@ -13,7 +13,7 @@ from schemathesis.engine._check_context import run_after_run_checks
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
-from schemathesis.engine.run import ELASTIC_PHASES, Phase, PhaseName, PhaseSkipReason
+from schemathesis.engine.run import ELASTIC_PHASES, TESTING_PHASES, Phase, PhaseName, PhaseSkipReason
 
 if TYPE_CHECKING:
     from schemathesis.core.spec import ApiSchema
@@ -109,10 +109,7 @@ class Engine:
             )
 
         phase = phase_name.value
-        if (
-            phase in ("examples", "coverage", "fuzzing", "stateful")
-            and not self.schema.config.phases.get_by_name(name=phase).enabled
-        ):
+        if phase_name in TESTING_PHASES and not self.schema.config.phases.get_by_name(name=phase).enabled:
             return Phase(
                 name=phase_name,
                 is_enabled=False,

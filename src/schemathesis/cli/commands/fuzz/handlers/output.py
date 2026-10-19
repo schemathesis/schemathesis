@@ -9,10 +9,10 @@ import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
 from schemathesis.cli.commands.run.handlers.output import (
-    _plural,
     display_reports,
     display_warning_blocks,
     get_status_icon,
+    pluralize,
     unmatched_filter_block,
 )
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
@@ -140,16 +140,16 @@ class FuzzProgressManager:
         rate = self.total_scenarios / elapsed if elapsed > 0 else 0.0
         return (
             f"{_INDENT}{hours}:{minutes:02d}:{seconds:02d}"
-            f"{SEPARATOR}{rate:.1f}/s{SEPARATOR}{_plural(self.total_scenarios, 'scenario')}"
+            f"{SEPARATOR}{rate:.1f}/s{SEPARATOR}{pluralize(self.total_scenarios, 'scenario')}"
         )
 
     def _counters_line(self) -> str:
         errors = self.stats[Status.ERROR]
         parts = []
         if self.unique_failures:
-            parts.append(f"❌ {_plural(self.unique_failures, 'unique failure')}")
+            parts.append(f"❌ {pluralize(self.unique_failures, 'unique failure')}")
         if errors:
-            parts.append(f"🚫 {_plural(errors, 'error')}")
+            parts.append(f"🚫 {pluralize(errors, 'error')}")
         text = SEPARATOR.join(parts) if parts else "No issues found yet"
         return f"{_INDENT}{text}"
 
@@ -197,9 +197,9 @@ class FuzzProgressManager:
             if without_checks:
                 parts.append(f"⏭  {self.passed_scenarios} without checks")
             else:
-                parts.append(f"✅ {_plural(self.passed_scenarios, 'scenario')}")
+                parts.append(f"✅ {pluralize(self.passed_scenarios, 'scenario')}")
         if self.unique_failures:
-            parts.append(f"❌ {_plural(self.unique_failures, 'unique failure')}")
+            parts.append(f"❌ {pluralize(self.unique_failures, 'unique failure')}")
         if errors:
             suffix = "s" if errors > 1 else ""
             parts.append(f"🚫 {errors} error{suffix}")

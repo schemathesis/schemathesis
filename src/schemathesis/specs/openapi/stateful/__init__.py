@@ -29,7 +29,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepInput,
     StepOutput,
     Transition,
-    _normalize_name,
+    normalize_name,
 )
 from schemathesis.generation.value import prune_overwritten_body_constants
 from schemathesis.schemas import APIOperation
@@ -288,7 +288,7 @@ def create_state_machine(
             if incoming:
                 for link in incoming:
                     bundle_name = f"{link.source.label} -> {link.status_code}"
-                    name = _unique_rule_name(_normalize_name(link.full_name), rules)
+                    name = _unique_rule_name(normalize_name(link.full_name), rules)
                     rules[name] = transition(
                         name=name,
                         target=catch_all,
@@ -305,7 +305,7 @@ def create_state_machine(
                         ),
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
-                name = _unique_rule_name(_normalize_name(f"RANDOM -> {target.label}"), rules)
+                name = _unique_rule_name(normalize_name(f"RANDOM -> {target.label}"), rules)
                 case_strategy = _step_case_strategy(
                     target,
                     config.modes,

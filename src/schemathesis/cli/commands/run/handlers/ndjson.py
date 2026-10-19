@@ -45,7 +45,7 @@ class NdjsonHandler(EventHandler):
         self.queue.put(
             _Initialize(
                 seed=ctx.config.seed,
-                command=get_command_representation(sanitization if sanitization.enabled else None),
+                command=get_command_representation(sanitization),
             )
         )
 
