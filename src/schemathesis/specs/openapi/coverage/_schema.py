@@ -19,6 +19,7 @@ from math import ceil, floor, inf, isinf, nextafter, ulp
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
+    STANDARD_FORMATS,
     VALIDATED_FORMATS_BY_DRAFT,
     is_unsatisfiable,
     is_valid,
@@ -97,31 +98,6 @@ from schemathesis.specs.openapi.coverage._wire import (
 from schemathesis.specs.openapi.formats import format_length_bounds, format_lengths_for
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.serialization import contains_binary
-
-VALIDATED_FORMATS = frozenset(
-    {
-        "date",
-        "date-time",
-        "duration",
-        "email",
-        "hostname",
-        "idn-email",
-        "idn-hostname",
-        "ipv4",
-        "ipv6",
-        "iri",
-        "iri-reference",
-        "json-pointer",
-        "regex",
-        "relative-json-pointer",
-        "time",
-        "uri",
-        "uri-reference",
-        "uri-template",
-        "uuid",
-    }
-)
-
 
 # A string where these alone surround `format`: nothing else can widen what the generator produces.
 _FORMAT_WITH_LENGTH_KEYS = frozenset({"format", "maxLength", "minLength", "type"})
@@ -1080,7 +1056,7 @@ class CoverageContext:
             # search that broad character classes need. Check one candidate against the original
             # schema; a restrictive pattern still gets its own generator below.
             lengths = format_lengths_for(self.custom_formats).get(fmt or "")
-            if lengths is not None and lengths.within is not None and fmt in VALIDATED_FORMATS:
+            if lengths is not None and lengths.within is not None and fmt in STANDARD_FORMATS:
                 strategy = lengths.within(min_length or 0, max_length if max_length is not None else inf)
                 if strategy is not None:
                     candidate = cached_draw(self.session, strategy)
@@ -1099,7 +1075,7 @@ class CoverageContext:
             pattern = updated
         if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
             return self._long_string_matching(schema, min_length)
-        validated = fmt if fmt in VALIDATED_FORMATS else None
+        validated = fmt if fmt in STANDARD_FORMATS else None
         # Spelling the length into the pattern fixes the shape of every match, so a format the
         # first match fails is one no redraw satisfies; checking once beats searching for it.
         strategy = _pattern_strategy(
@@ -1260,7 +1236,7 @@ class CoverageContext:
         # This avoids producing positive values that the validator for the same schema would reject.
         if (
             isinstance(schema, dict)
-            and (fmt := schema.get("format")) in VALIDATED_FORMATS
+            and (fmt := schema.get("format")) in STANDARD_FORMATS
             and fmt in self.custom_formats
         ):
             validator = _get_format_validator(self.session, fmt, self.validator_cls)
@@ -4323,8 +4299,8 @@ def _negative_format(
     # Only generate negative format cases for formats that have validation semantics.
     # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
     # Formats like "password" have no validation - any string is valid.
-    # We can only generate truly invalid data for formats in VALIDATED_FORMATS (e.g., "email", "uri", "uuid").
-    if format not in VALIDATED_FORMATS:
+    # We can only generate truly invalid data for formats in STANDARD_FORMATS (e.g., "email", "uri", "uuid").
+    if format not in STANDARD_FORMATS:
         return
     # The active draft determines which formats actually validate (Draft 4 treats
     # iri-reference / json-pointer / etc. as annotation-only). Skip when the format

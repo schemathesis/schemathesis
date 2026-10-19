@@ -81,6 +81,31 @@ def supplemental_formats(validator_cls: type) -> dict[str, Callable[[Any], bool]
     return DRAFT4_SUPPLEMENTAL_FORMATS if validator_cls is jsonschema_rs.Draft4Validator else None
 
 
+# Formats with a standard definition; servers validate them that way whatever draft the schema declares.
+STANDARD_FORMATS = frozenset(
+    {
+        "date",
+        "date-time",
+        "duration",
+        "email",
+        "hostname",
+        "idn-email",
+        "idn-hostname",
+        "ipv4",
+        "ipv6",
+        "iri",
+        "iri-reference",
+        "json-pointer",
+        "regex",
+        "relative-json-pointer",
+        "time",
+        "uri",
+        "uri-reference",
+        "uri-template",
+        "uuid",
+    }
+)
+
 # Format names that each `jsonschema_rs` validator class actually validates (after
 # the supplemental `uuid` registration for Draft 4 above). Anything outside the
 # matching set is annotation-only under that draft: negative-format generation
@@ -140,52 +165,8 @@ VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] 
             "uri-template",
         }
     ),
-    jsonschema_rs.Draft201909Validator: frozenset(
-        {
-            "date",
-            "date-time",
-            "duration",
-            "email",
-            "hostname",
-            "idn-email",
-            "idn-hostname",
-            "ipv4",
-            "ipv6",
-            "iri",
-            "iri-reference",
-            "json-pointer",
-            "regex",
-            "relative-json-pointer",
-            "time",
-            "uri",
-            "uri-reference",
-            "uri-template",
-            "uuid",
-        }
-    ),
-    jsonschema_rs.Draft202012Validator: frozenset(
-        {
-            "date",
-            "date-time",
-            "duration",
-            "email",
-            "hostname",
-            "idn-email",
-            "idn-hostname",
-            "ipv4",
-            "ipv6",
-            "iri",
-            "iri-reference",
-            "json-pointer",
-            "regex",
-            "relative-json-pointer",
-            "time",
-            "uri",
-            "uri-reference",
-            "uri-template",
-            "uuid",
-        }
-    ),
+    jsonschema_rs.Draft201909Validator: STANDARD_FORMATS,
+    jsonschema_rs.Draft202012Validator: STANDARD_FORMATS,
 }
 
 
@@ -400,6 +381,7 @@ __all__ = [
     "DRAFT4_SUPPLEMENTAL_FORMATS",
     "supplemental_formats",
     "DRAFT_03_DIALECT",
+    "STANDARD_FORMATS",
     "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
     "is_unsatisfiable",
