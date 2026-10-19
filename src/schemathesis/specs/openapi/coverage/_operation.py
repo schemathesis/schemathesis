@@ -25,7 +25,7 @@ from schemathesis.core.media_types import (
 )
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_path
+from schemathesis.core.transforms import UNRESOLVABLE, as_index_or_key, deepclone, resolve_path
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -485,7 +485,7 @@ def _with_body_pool_values(
     filled: set[str] = set()
     updated = schema
     for name, value in fields:
-        path = tuple(int(segment) if segment.isdigit() else segment for segment in name.split("/"))
+        path = tuple(map(as_index_or_key, name.split("/")))
         if path[0] in filled:
             continue
         candidate = _with_leaf_example(updated, path, value, bundled, schema, validator_cls)

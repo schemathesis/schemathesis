@@ -13,7 +13,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, sch
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transforms import UNRESOLVABLE, resolve_path
+from schemathesis.core.transforms import UNRESOLVABLE, as_index_or_key, resolve_path
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
@@ -374,7 +374,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self._nested_body_requirements: dict[str, list[tuple[tuple[str | int, ...], ParameterRequirement]]] = {}
         for (label, location, name), requirement in requirements.items():
             if location == ParameterLocation.BODY and "/" in name:
-                path = tuple(int(segment) if segment.isdigit() else segment for segment in name.split("/"))
+                path = tuple(map(as_index_or_key, name.split("/")))
                 self._nested_body_requirements.setdefault(label, []).append((path, requirement))
 
     # Opaque repr so Hypothesis' argument rendering never walks the live pool that concurrent workers mutate.
