@@ -26,6 +26,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
+    VALIDATED_FORMATS_BY_DRAFT,
     build_validator_for,
     make_validator,
     make_validator_for,
@@ -1558,6 +1559,16 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
     # A name with no generator behind it is an annotation and leaves the strings unconstrained.
     known = [name for name in view.formats if name in ctx.formats]
     if known:
+        drivers = [pattern for pattern in view.patterns if _compiled_pattern(pattern) is not None]
+        sources = [source for name in known if (source := _format_source(name, view, ctx)) is not None]
+        # A pattern stricter than the format admits few generator values, so it drives when they miss; only a
+        # format the facet check asserts can vouch for what the pattern draws.
+        if drivers and sources and all(name in _CHECKED_FORMATS for name in known):
+            return _format_or_pattern(
+                st.one_of(sources),
+                _string_check(known, view),
+                st.one_of([_pattern_formatted(pattern, known, view, ctx) for pattern in drivers]),
+            )
         # One generator drives, the rest filter; which pair flows depends on the value, so every
         # driver gets a branch and the dead ones reject their draws.
         return st.one_of([_formatted(name, [other for other in known if other != name], view, ctx) for name in known])
@@ -1708,6 +1719,47 @@ def _pattern_joined(
     return _within_length(strategy, view)
 
 
+_CHECKED_FORMATS = VALIDATED_FORMATS_BY_DRAFT[jsonschema_rs.Draft202012Validator]
+# As many tries as a filtered format value gets before its draw is rejected.
+_FORMAT_ATTEMPTS = 3
+
+
+@st.composite  # type: ignore[untyped-decorator]
+def _format_or_pattern(
+    draw: st.DrawFn,
+    formatted: SearchStrategy[JsonValue],
+    admits: Callable[[JsonValue], bool],
+    pattern_driven: SearchStrategy[JsonValue],
+) -> JsonValue:
+    """A format value when one meets every facet within a few tries, a pattern-driven one otherwise."""
+    # A loose pattern admits most format values, a strict one nearly none; falling back rather than
+    # splitting draws between the two keeps the dead side from rejecting its share of them.
+    for _ in range(_FORMAT_ATTEMPTS):
+        value = draw(formatted)
+        if admits(value):
+            return value
+    return draw(pattern_driven)
+
+
+def _string_check(formats: list[str], view: jsonschema_rs.canonical.StringView) -> Callable[[JsonValue], bool]:
+    checks = [_facet_check("format", name) for name in formats]
+    checks.extend(_facet_check("pattern", pattern) for pattern in view.patterns)
+    within = _length_check(view)
+    if within is not None:
+        checks.append(within)
+    return lambda value: all(check(value) for check in checks)
+
+
+def _pattern_formatted(
+    pattern: str, formats: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    """Values drawn from one pattern and filtered by the remaining patterns and every format."""
+    strategy = _pattern_driven(pattern, [other for other in view.patterns if other != pattern], view, ctx)
+    for name in formats:
+        strategy = strategy.filter(_facet_check("format", name))
+    return strategy
+
+
 def _formatted(
     name: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
@@ -1765,18 +1817,25 @@ def _facet_check(keyword: str, value: str) -> Callable[[JsonValue], bool]:
 def _within_length(
     strategy: SearchStrategy[JsonValue], view: jsonschema_rs.canonical.StringView
 ) -> SearchStrategy[JsonValue]:
-    if view.min_length is None and view.max_length is None:
+    check = _length_check(view)
+    if check is None:
         return strategy
+    return strategy.filter(check)
+
+
+def _length_check(view: jsonschema_rs.canonical.StringView) -> Callable[[JsonValue], bool] | None:
+    if view.min_length is None and view.max_length is None:
+        return None
     low = view.min_length or 0
     high = math.inf if view.max_length is None else view.max_length
-    # A binary payload spells its bytes outside the string, so its byte count is the length.
-    return strategy.filter(
-        lambda value: (
-            low <= len(value.data) <= high
-            if isinstance(value, Binary)
-            else contains_binary(value) or low <= len(value) <= high
-        )
-    )
+
+    def check(value: JsonValue) -> bool:
+        # A binary payload spells its bytes outside the string, so its byte count is the length.
+        if isinstance(value, Binary):
+            return low <= len(value.data) <= high
+        return contains_binary(value) or low <= len(cast("str", value)) <= high
+
+    return check
 
 
 def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
