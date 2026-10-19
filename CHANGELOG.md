@@ -5,6 +5,7 @@
 ### :racing_car: Performance
 
 - ~10% faster coverage phase on deeply nested request bodies.
+- ~5% faster stateful phase when operations reuse values captured from earlier responses.
 
 ### :bug: Fixed
 
