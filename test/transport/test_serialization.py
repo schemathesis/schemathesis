@@ -721,7 +721,7 @@ def _multipart_content_type(serialized: dict, name: str) -> str | None:
     return None
 
 
-def _multipart_upload_echo(ctx, properties: dict, media_type: str):
+def _multipart_upload_app(ctx, properties: dict, media_type: str):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/upload": {
@@ -748,6 +748,11 @@ def _multipart_upload_echo(ctx, properties: dict, media_type: str):
             }
         )
 
+    return app
+
+
+def _multipart_upload_echo(ctx, properties: dict, media_type: str):
+    app = _multipart_upload_app(ctx, properties, media_type)
     return schemathesis.openapi.from_wsgi("/openapi.json", app)["/upload"]["POST"]
 
 
@@ -772,6 +777,17 @@ def test_wsgi_multipart_mixed_body_arrives_intact(ctx):
     boundary = received["content_type"].partition("boundary=")[2].strip('"')
     assert received["raw"] == (
         f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--{boundary}--\r\n'
+    )
+
+
+def test_requests_multipart_mixed_body_arrives_intact(ctx, app_runner):
+    app = _multipart_upload_app(ctx, {"note": {"type": "string"}}, "multipart/mixed")
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/upload"]["POST"]
+    received = operation.Case(body={"note": "hello"}, media_type="multipart/mixed").call().json()
+    media_type, _, boundary = received["content_type"].partition("; boundary=")
+    assert (media_type, received["raw"]) == (
+        "multipart/mixed",
+        f'--{boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--{boundary}--\r\n',
     )
 
 

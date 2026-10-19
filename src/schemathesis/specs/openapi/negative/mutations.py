@@ -17,7 +17,7 @@ from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.jsonschema import ALL_KEYWORDS, BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
-from schemathesis.core.media_types import is_xml
+from schemathesis.core.media_types import is_form_urlencoded, is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -667,7 +667,7 @@ def change_type(
     if "type" not in schema:
         # No `type`: schema accepts every type; nothing to change.
         return MutationResult.FAILURE, None
-    if ctx.media_type == "application/x-www-form-urlencoded":
+    if is_form_urlencoded(ctx.media_type):
         # Form data must stay object-shaped.
         return MutationResult.FAILURE, None
     old_types = get_type(schema)

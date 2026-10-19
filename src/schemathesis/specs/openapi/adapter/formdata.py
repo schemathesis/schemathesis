@@ -73,8 +73,7 @@ def prepare_multipart_v3(
     schema: dict[str, Any] = {}
     body_param = None
     for body in operation.body:
-        main, sub = media_types.parse(body.media_type)
-        if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
+        if media_types.is_multipart_form_parts(media_types.parse(body.media_type)):
             schema_node = body.definition.get("schema")
             schema = schema_node if isinstance(schema_node, dict) else {}
             body_param = body

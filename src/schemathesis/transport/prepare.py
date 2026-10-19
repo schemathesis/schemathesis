@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, quote_plus, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, Body
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, Body, media_types
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -251,7 +251,7 @@ def _normalize_multipart_boundary(request: PreparedRequest) -> None:
     """
     content_type = request.headers.get("Content-Type")
     body = request.body
-    if not isinstance(content_type, str) or not content_type.lower().startswith("multipart/"):
+    if not isinstance(content_type, str) or not media_types.is_multipart(content_type):
         return
     if not isinstance(body, bytes):
         return

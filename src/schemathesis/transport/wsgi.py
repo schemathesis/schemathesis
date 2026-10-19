@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 def _is_raw_multipart(media_type: str, payload: object) -> bool:
     """Whether a multipart payload is passed through as-is instead of being encoded into form parts."""
-    return media_types.parse(media_type)[0] == "multipart" and isinstance(payload, (str, bytes))
+    return media_types.is_multipart(media_type) and isinstance(payload, (str, bytes))
 
 
 class WSGITransport(BaseTransport["werkzeug.Client"]):

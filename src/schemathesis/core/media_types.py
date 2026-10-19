@@ -128,6 +128,22 @@ def is_form_urlencoded(value: str | None) -> bool:
         return False
 
 
+def is_multipart(value: str | None) -> bool:
+    """Detect any ``multipart/*`` media type."""
+    if value is None:
+        return False
+    try:
+        return parse(value)[0] == "multipart"
+    except MalformedMediaType:
+        return False
+
+
+def is_multipart_form_parts(media_type: tuple[str, str]) -> bool:
+    """Detect ``multipart/form-data`` or ``multipart/mixed`` from a parsed tuple, wildcards included."""
+    main, sub = media_type
+    return main in ("*", "multipart") and sub in ("*", "form-data", "mixed")
+
+
 def is_json_parts(media_type: tuple[str, str]) -> bool:
     """Detect variations of the ``application/json`` media type from a parsed tuple."""
     if media_type in JSON_MEDIA_TYPES:

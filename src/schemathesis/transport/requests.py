@@ -130,13 +130,13 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         if not isinstance(case.body, NotSet) and media_type is not None:
             media_type, serializer = self._resolve_serializer(media_type)
             # The multipart encoder picks the boundary; a header naming the bare media type leaves the body unparsable.
-            if media_type.startswith("multipart/") and final_headers.get("Content-Type") == case.media_type:
+            if media_types.is_multipart(media_type) and final_headers.get("Content-Type") == case.media_type:
                 del final_headers["Content-Type"]
 
-        # Set content type header if needed
+        # Set content type header if needed. Multipart headers come from the encoder, which picks the boundary.
         if (
             media_type
-            and media_type != "multipart/form-data"
+            and not media_types.is_multipart(media_type)
             and not isinstance(case.body, NotSet)
             and "content-type" not in final_headers
         ):
@@ -498,8 +498,7 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
     selected = ctx.case.multipart_content_types or {}
     result: dict[str, str] = {}
     for body in operation.body:
-        main, sub = media_types.parse(body.media_type)
-        if main not in ("*", "multipart") or sub not in ("*", "form-data", "mixed"):
+        if not media_types.is_multipart_form_parts(media_types.parse(body.media_type)):
             continue
         for name in body.definition.get("encoding", {}):
             # Without a recorded choice, a part is sent with the first listed media type.
@@ -597,15 +596,22 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
         return {"data": value}
     if isinstance(value, dict):
         files, data = prepare_multipart_parts(ctx, value)
+        main, sub = media_types.parse(ctx.case.media_type or "multipart/form-data")
         if not files and not data:
             boundary = choose_boundary()
-            main, sub = media_types.parse(ctx.case.media_type or "multipart/form-data")
             content_type = f"{main}/{sub}; boundary={boundary}"
             return {
                 "files": None,
                 "data": f"--{boundary}--\r\n".encode("latin-1"),
                 "headers": {"Content-Type": content_type},
             }
+        if sub == "mixed":
+            # `requests` labels every encoded body `multipart/form-data`; keep the declared subtype instead.
+            prepared = requests.PreparedRequest()
+            prepared.prepare_headers(None)
+            prepared.prepare_body(data, files)
+            content_type = prepared.headers["Content-Type"].replace("multipart/form-data", "multipart/mixed", 1)
+            return {"data": prepared.body, "headers": {"Content-Type": content_type}}
         return {"files": files, "data": data}
     # Uncommon schema. For example - `{"type": "string"}`
     boundary = choose_boundary()
