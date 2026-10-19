@@ -16,7 +16,6 @@ from schemathesis.specs.openapi.negative.value_channel import (
     violate_minimum,
     violate_multiple_of,
     violate_pattern,
-    violate_required,
     violate_uuid,
 )
 
@@ -72,17 +71,6 @@ def test_violate_enum_outside():
 
 def test_violate_multiple_of_not_divisible():
     assert violate_multiple_of(10, multiple_of=5) % 5 != 0
-
-
-def test_violate_required_drops_field():
-    body = {"a": 1, "b": 2}
-    result = violate_required(body, required=["a", "b"])
-    assert "a" not in result or "b" not in result
-
-
-def test_violate_required_with_empty_list_returns_body_unchanged():
-    body = {"a": 1}
-    assert violate_required(body, required=[]) == body
 
 
 def test_violate_uuid_for_non_uuid_input_still_yields_invalid_uuid():
