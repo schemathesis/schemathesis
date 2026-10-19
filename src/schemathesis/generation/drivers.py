@@ -32,7 +32,6 @@ from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
     HookDispatcher,
-    _should_skip_hook,
     dispatch_before_add_examples,
 )
 
@@ -73,14 +72,10 @@ def _apply_filter_and_map_hooks(
 ) -> Case | None:
     """Run `filter_case` then `map_case` per dispatcher in turn; return `None` when filtered out."""
     for dispatcher in dispatchers:
-        for hook in dispatcher.get_all_by_name("filter_case"):
-            if _should_skip_hook(hook, hook_context):
-                continue
+        for hook in dispatcher.applicable("filter_case", hook_context):
             if not hook(hook_context, case):
                 return None
-        for hook in dispatcher.get_all_by_name("map_case"):
-            if _should_skip_hook(hook, hook_context):
-                continue
+        for hook in dispatcher.applicable("map_case", hook_context):
             case = hook(hook_context, case)
     return case
 

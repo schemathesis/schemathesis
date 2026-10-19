@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from functools import partial
 from typing import TYPE_CHECKING
 
 from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
-from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, _should_skip_hook
+from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -38,33 +37,18 @@ def _apply_dispatcher(
     dispatcher: HookDispatcher,
     operation: APIOperation,
 ) -> SearchStrategy[Case]:
-    context = HookContext(operation=operation)
-    for hook in dispatcher.get_all_by_name("before_generate_case"):
-        if _should_skip_hook(hook, context):
-            continue
-        strategy = hook(context, strategy)
-    for hook in dispatcher.get_all_by_name("filter_case"):
-        if _should_skip_hook(hook, context):
-            continue
-        bound_hook = partial(hook, context)
+    def track_filter(hook: Callable[[Case], bool]) -> Callable[[Case], bool]:
         if operation.filter_case_tracker is None:
             operation.filter_case_tracker = FilterCaseTracker()
         tracker = operation.filter_case_tracker
 
-        def _tracking_filter(case: Case, _hook: Callable = bound_hook, _tracker: FilterCaseTracker = tracker) -> bool:
-            result = _hook(case)
-            _tracker.record(result)
+        def _tracking_filter(case: Case) -> bool:
+            result = hook(case)
+            tracker.record(result)
             return result
 
-        strategy = strategy.filter(_tracking_filter)
-    for hook in dispatcher.get_all_by_name("map_case"):
-        if _should_skip_hook(hook, context):
-            continue
-        hook = partial(hook, context)
-        strategy = strategy.map(hook)
-    for hook in dispatcher.get_all_by_name("flatmap_case"):
-        if _should_skip_hook(hook, context):
-            continue
-        hook = partial(hook, context)
-        strategy = strategy.flatmap(hook)
-    return strategy
+        return _tracking_filter
+
+    return dispatcher.apply_to_container(
+        strategy, "case", HookContext(operation=operation), filter_wrapper=track_filter
+    )

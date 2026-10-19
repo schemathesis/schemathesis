@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 from schemathesis.core.errors import HookExecutionError
 from schemathesis.core.jsonschema.types import JsonSchemaObject
@@ -218,6 +218,12 @@ class HookDispatcher:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
 
+    def applicable(self, name: str, context: HookContext) -> Iterator[Callable]:
+        """Hooks registered for a name whose filters accept the operation in `context`."""
+        for hook in self.get_all_by_name(name):
+            if not _should_skip_hook(hook, context):
+                yield hook
+
     def defines(self, name: str) -> bool:
         """Return True if any hooks are registered under the given name."""
         return bool(self._hooks.get(name))
@@ -228,34 +234,26 @@ class HookDispatcher:
     def apply_to_container(
         self,
         strategy: st.SearchStrategy,
-        container: ContainerName,
+        container: ContainerName | Literal["case"],
         context: HookContext,
         *,
         filter_wrapper: Callable[[Callable], Callable] | None = None,
         map_wrapper: Callable[[Callable], Callable] | None = None,
         flatmap_wrapper: Callable[[Callable], Callable] | None = None,
     ) -> st.SearchStrategy:
-        for hook in self.get_all_by_name(f"before_generate_{container}"):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in self.applicable(f"before_generate_{container}", context):
             strategy = hook(context, strategy)
-        for hook in self.get_all_by_name(f"filter_{container}"):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in self.applicable(f"filter_{container}", context):
             hook = partial(hook, context)
             if filter_wrapper is not None:
                 hook = filter_wrapper(hook)
             strategy = strategy.filter(hook)
-        for hook in self.get_all_by_name(f"map_{container}"):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in self.applicable(f"map_{container}", context):
             hook = partial(hook, context)
             if map_wrapper is not None:
                 hook = map_wrapper(hook)
             strategy = strategy.map(hook)
-        for hook in self.get_all_by_name(f"flatmap_{container}"):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in self.applicable(f"flatmap_{container}", context):
             hook = partial(hook, context)
             if flatmap_wrapper is not None:
                 hook = flatmap_wrapper(hook)
@@ -294,9 +292,7 @@ def _dispatch_to_all(
     *args: Any,
 ) -> None:
     for dispatcher in dispatchers:
-        for hook in dispatcher.get_all_by_name(name):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in dispatcher.applicable(name, context):
             try:
                 hook(context, *args)
             except (Exception, SystemExit) as exc:
@@ -387,9 +383,7 @@ def dispatch_before_call(
 ) -> None:
     name = "before_call"
     for dispatcher in dispatchers:
-        for hook in dispatcher.get_all_by_name(name):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in dispatcher.applicable(name, context):
             try:
                 # Support both `def before_call(ctx, case, kwargs)` and `def before_call(ctx, case, **kwargs)`.
                 if has_var_keyword(hook):
@@ -418,9 +412,7 @@ def should_keep_failure(failure: Failure, case: Case, response: Response) -> boo
         return True
     context = HookContext(operation=case.operation)
     for dispatcher in dispatchers:
-        for hook in dispatcher.get_all_by_name(name):
-            if _should_skip_hook(hook, context):
-                continue
+        for hook in dispatcher.applicable(name, context):
             try:
                 if not hook(context, failure, case, response):
                     return False
