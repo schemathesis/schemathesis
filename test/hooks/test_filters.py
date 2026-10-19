@@ -4,7 +4,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.value import GeneratedValue
-from schemathesis.hooks import HookContext, _should_skip_hook
+from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext
 from test.utils import run_given
 
 
@@ -201,15 +201,9 @@ def test_multiple_apply_to_have_distinct_filters(ctx):
         ctx_b = HookContext(operation=_build_operation(ctx, "operationB", "/b"))
         ctx_other = HookContext(operation=_build_operation(ctx, "operationC", "/c"))
 
-        # hook_a should run for operationA only
-        assert not _should_skip_hook(hook_a, ctx_a)
-        assert _should_skip_hook(hook_a, ctx_b)
-        assert _should_skip_hook(hook_a, ctx_other)
-
-        # hook_b should run for operationB only
-        assert _should_skip_hook(hook_b, ctx_a)
-        assert not _should_skip_hook(hook_b, ctx_b)
-        assert _should_skip_hook(hook_b, ctx_other)
+        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_a)) == [hook_a]
+        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_b)) == [hook_b]
+        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_other)) == []
 
 
 # Mixing apply_to and skip_for across multiple hooks must keep filters independent
@@ -232,12 +226,6 @@ def test_multiple_apply_to_with_skip_for(ctx):
         ctx_exclude = HookContext(operation=_build_operation(ctx, "opExclude", "/exclude"))
         ctx_other = HookContext(operation=_build_operation(ctx, "opOther", "/other"))
 
-        # hook_include: runs only for opInclude
-        assert not _should_skip_hook(hook_include, ctx_include)
-        assert _should_skip_hook(hook_include, ctx_exclude)
-        assert _should_skip_hook(hook_include, ctx_other)
-
-        # hook_exclude: runs for everything EXCEPT opExclude
-        assert not _should_skip_hook(hook_exclude, ctx_include)
-        assert _should_skip_hook(hook_exclude, ctx_exclude)
-        assert not _should_skip_hook(hook_exclude, ctx_other)
+        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_include)) == [hook_include, hook_exclude]
+        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_exclude)) == []
+        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_other)) == [hook_exclude]
