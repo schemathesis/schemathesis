@@ -1568,47 +1568,6 @@ def test_negative_data_rejection_nullable_query_values_sent_as_text(
     )
 
 
-def test_negative_data_rejection_fuzzing_phase_metadata(ctx, cli, app_runner):
-    # Use a simple schema with single property to avoid multiple mutation conflicts
-    app, raw_schema = ctx.openapi.make_flask_app(
-        {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"400": {"description": "Bad Request"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"result": "ok"}), 200
-
-    result = cli.run_and_assert(
-        app_runner.openapi_url(app),
-        "--checks=negative_data_rejection",
-        "--mode=negative",
-        "--phases=fuzzing",
-        "--max-examples=25",
-        "--continue-on-failure",
-        exit_code=ExitCode.TESTS_FAILED,
-    )
-    assert "Schema-violating request accepted" in result.stdout
-    assert "Invalid component: in body" in result.stdout
-
-
 @pytest.mark.parametrize(
     "body_schema",
     [

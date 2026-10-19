@@ -9,8 +9,7 @@ from graphql import GraphQLError
 from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
-from schemathesis.checks import CheckContext, not_a_server_error
-from schemathesis.config import ChecksConfig
+from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup
@@ -45,7 +44,7 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.transport.prepare import get_default_headers
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
-from test.utils import assert_requests_call, run_given
+from test.utils import assert_requests_call, check_context, run_given
 
 
 def _books_schema(ctx):
@@ -184,9 +183,7 @@ def test_response_validation(ctx, response_factory, kwargs, expected):
     schema = _books_schema(ctx)
     response = response_factory.requests(status_code=200, **kwargs)
     case = schema["Query"]["getBooks"].Case(body="Q")
-    check_ctx = CheckContext(
-        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-    )
+    check_ctx = check_context()
     assert not_a_server_error(check_ctx, response, case) is None
     with pytest.raises(Failure, match=expected):
         response_schema_conformance(check_ctx, response, case)
@@ -887,9 +884,7 @@ RESOLVER_ERROR = {"data": None, "errors": [{"message": "Internal error in resolv
 def test_graphql_failure_is_reported_by_its_check(ctx, mode, payload, expected):
     case = _make_graphql_case_with_mode(_books_schema(ctx), mode)
     response = _make_mock_response(payload)
-    check_ctx = CheckContext(
-        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-    )
+    check_ctx = check_context()
     raised = {}
     for check in GRAPHQL_RESPONSE_CHECKS:
         try:
@@ -940,9 +935,7 @@ def test_not_a_server_error_graphql_positive_mode_server_side_extensions_code_ra
             }
         ).encode()
     )
-    check_ctx = CheckContext(
-        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-    )
+    check_ctx = check_context()
 
     with pytest.raises(GraphQLServerError, match="Internal error in resolver"):
         not_a_server_error(check_ctx, response, case)
@@ -952,9 +945,7 @@ def test_negative_data_rejection_graphql_includes_description(ctx):
     schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
-    check_ctx = CheckContext(
-        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-    )
+    check_ctx = check_context()
 
     with pytest.raises(AcceptedNegativeData) as exc_info:
         negative_data_rejection(check_ctx, response, case)
@@ -968,9 +959,7 @@ def test_positive_data_acceptance_graphql_without_meta(ctx):
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    check_ctx = CheckContext(
-        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-    )
+    check_ctx = check_context()
 
     # Without meta, a rejection counts as a rejected positive case.
     with pytest.raises(GraphQLClientError):
@@ -987,9 +976,7 @@ def test_not_a_server_error_graphql_bad_charset(ctx, charset):
     response = _make_mock_response(
         {"data": {"addBook": {"id": "1"}}}, content_type=f"application/json; charset={charset}"
     )
-    check_ctx = CheckContext(
-        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-    )
+    check_ctx = check_context()
 
     assert not_a_server_error(check_ctx, response, case) is None
 

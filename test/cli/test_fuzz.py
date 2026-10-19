@@ -30,7 +30,8 @@ from schemathesis.engine.events import EngineFinished
 from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.statistic import Statistic
-from test.apps.fragments.schemas import linked_users
+from test.apps.fragments.handlers import null_name_lookup
+from test.apps.fragments.schemas import linked_users, null_name_response, null_name_responses
 from test.utils import assert_cli_snapshot
 
 
@@ -696,21 +697,7 @@ def test_fuzz_chains_post_with_get_via_link(cli, app_runner, ctx, snapshot_cli):
                         "schema": {"type": "string"},
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string"}},
-                                }
-                            }
-                        },
-                    },
-                    "404": {"description": "Not found"},
-                },
+                "responses": null_name_responses(),
             }
         },
     }
@@ -726,10 +713,7 @@ def test_fuzz_chains_post_with_get_via_link(cli, app_runner, ctx, snapshot_cli):
 
     @app.route("/products/<product_id>", methods=["GET"])
     def get_product(product_id):
-        if product_id not in products:
-            return "", 404
-        # Planted bug: required `name` is null for products that exist.
-        return jsonify({"name": None}), 200
+        return null_name_lookup(products, product_id)
 
     # The run ends at the first failure; the time limit only stops a regression from hanging the test.
     assert_cli_snapshot(
@@ -799,18 +783,7 @@ def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
                     },
                 },
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string"}},
-                                }
-                            }
-                        },
-                    },
+                    "200": null_name_response(),
                     "400": {"description": "Bad request"},
                 },
             }

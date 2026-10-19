@@ -3,6 +3,9 @@ from __future__ import annotations
 import pytest
 from flask import abort, jsonify, request
 
+from test.apps.fragments.handlers import null_name_lookup
+from test.apps.fragments.schemas import null_name_responses
+
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
@@ -30,21 +33,7 @@ def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
                         "schema": {"type": "string"},
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string"}},
-                                }
-                            }
-                        },
-                    },
-                    "404": {"description": "Not found"},
-                },
+                "responses": null_name_responses(),
             },
         }
     }
@@ -59,10 +48,7 @@ def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
 
     @app.route("/products/<product_name>", methods=["GET"])
     def get_product(product_name):
-        if product_name not in products:
-            return "", 404
-        # Planted bug: required `name` is null for products that exist
-        return jsonify({"name": None}), 200
+        return null_name_lookup(products, product_name)
 
     assert (
         cli.run_openapi_app(
@@ -118,21 +104,7 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
                         "schema": {"type": "string"},
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string"}},
-                                }
-                            }
-                        },
-                    },
-                    "404": {"description": "Not found"},
-                },
+                "responses": null_name_responses(),
             },
         },
     }
@@ -153,10 +125,7 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
 
     @app.route("/products/<product_id>", methods=["GET"])
     def get_product(product_id):
-        if product_id not in products:
-            return "", 404
-        # Planted bug: required `name` is null for products that exist.
-        return jsonify({"name": None}), 200
+        return null_name_lookup(products, product_id)
 
     assert (
         cli.run_openapi_app(
@@ -268,21 +237,7 @@ def test_request_pool_captures_body_fields(cli, snapshot_cli, ctx):
                         "schema": {"type": "string"},
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string"}},
-                                }
-                            }
-                        },
-                    },
-                    "404": {"description": "Not found"},
-                },
+                "responses": null_name_responses(),
             }
         },
     }
@@ -303,10 +258,7 @@ def test_request_pool_captures_body_fields(cli, snapshot_cli, ctx):
 
     @app.route("/sessions/<session_id>", methods=["GET"])
     def get_session(session_id):
-        if session_id not in sessions:
-            return "", 404
-        # Planted bug: required `name` is null for sessions that exist
-        return jsonify({"name": None}), 200
+        return null_name_lookup(sessions, session_id)
 
     assert (
         cli.run_openapi_app(

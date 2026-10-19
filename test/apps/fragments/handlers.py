@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import uuid
+from collections.abc import Container
 from time import sleep
 from typing import Any
 
@@ -16,6 +17,13 @@ from test.apps.fragments.schemas import PAYLOAD_SCHEMA, deep_leaf_bug_components
 _BASIC_AUTH_TOKEN = "Basic dGVzdDp0ZXN0"
 
 _PAYLOAD_VALIDATOR = jsonschema_rs.Draft4Validator({"anyOf": [{"type": "null"}, PAYLOAD_SCHEMA]})
+
+
+def null_name_lookup(registry: Container[object], key: object) -> Any:
+    if key not in registry:
+        return "", 404
+    # Planted bug: required `name` is null for entries that exist
+    return jsonify({"name": None}), 200
 
 
 def register_success(app: Flask) -> None:
@@ -409,3 +417,20 @@ def register_basic_with_query(app: Flask) -> None:
         if request.headers.get("Authorization") == _BASIC_AUTH_TOKEN:
             return jsonify({"ok": True})
         return {"detail": "Unauthorized"}, 401
+
+
+def register_flaky_branch_blocks(app: Flask) -> None:
+    created = 0
+
+    # Every second create conflicts, so Hypothesis cannot replay a stateful suite and ends it as flaky.
+    @app.route("/branches", methods=["POST"])
+    def create_branch() -> Any:
+        nonlocal created
+        created += 1
+        if created % 2 == 0:
+            return jsonify({}), 409
+        return jsonify({"id": created}), 201
+
+    @app.route("/blocks", methods=["POST"])
+    def create_block() -> Any:
+        return jsonify({}), 422

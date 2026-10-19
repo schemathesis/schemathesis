@@ -10,8 +10,6 @@ from flask import jsonify, redirect, request
 from hypothesis import Phase, given, settings
 
 import schemathesis
-from schemathesis.checks import CheckContext
-from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
@@ -21,7 +19,7 @@ from schemathesis.python.asgi import ASGIClient
 from schemathesis.schemas import BaseSchema
 from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
-from test.utils import EventStream, run_given
+from test.utils import EventStream, check_context, run_given
 
 
 def run(schema, **config):
@@ -195,130 +193,82 @@ def test_validate_response_probes_the_server_that_answered(ctx, app_runner, enfo
 
 
 @pytest.mark.parametrize(
-    ("check_context", "request_kwargs", "parameters", "expected"),
+    ("context", "request_kwargs", "parameters", "expected"),
     [
         (
-            CheckContext(
-                override=None,
-                auth=None,
-                headers=None,
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None,
-                auth=None,
-                headers={"Foo": "Bar"},
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(headers={"Foo": "Bar"}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None,
-                auth=None,
-                headers={"A": "V"},
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(headers={"A": "V"}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-            ),
+            check_context(headers={}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-            ),
+            check_context(headers={}),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-            ),
+            check_context(headers={}),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-            ),
+            check_context(headers={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None,
-                auth=None,
-                headers={"Cookie": "A=v;"},
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(headers={"Cookie": "A=v;"}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(
-                override=None,
-                auth=None,
-                headers={"Cookie": "B=v;"},
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(headers={"Cookie": "B=v;"}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-            ),
+            check_context(headers={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,
         ),
         # A generated value containing `; $` makes the outgoing `Cookie` header unparsable by the stdlib parser.
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-            ),
+            check_context(headers={}),
             {"url": "https://example.com", "cookies": {"A": "a; $=b"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
     ],
 )
-def test_contains_auth(check_context, request_kwargs, parameters, expected, response_factory, case_factory):
+def test_contains_auth(context, request_kwargs, parameters, expected, response_factory, case_factory):
     response = response_factory.requests()
     response.request = requests.Request("GET", **request_kwargs).prepare()
     assert (
-        _contains_auth(check_context, case_factory(), Response.from_requests(response, verify=True), parameters)
-        == expected
+        _contains_auth(context, case_factory(), Response.from_requests(response, verify=True), parameters) == expected
     )
 
 

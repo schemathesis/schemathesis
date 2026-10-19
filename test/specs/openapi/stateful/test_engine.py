@@ -9,9 +9,9 @@ from flask import Flask, jsonify, request
 
 import schemathesis
 import schemathesis.openapi
-from schemathesis.checks import CheckContext, not_a_server_error
-from schemathesis.config import ChecksConfig
+from schemathesis.checks import not_a_server_error
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
@@ -47,6 +47,7 @@ from test.apps.catalog.openapi.modifiers.stateful import (
     Unsatisfiable,
     UseAfterFree,
 )
+from test.utils import check_context
 
 
 @dataclass
@@ -447,58 +448,6 @@ def test_flaky(engine_factory, kwargs):
 
 
 def test_flaky_suite_retries_only_after_new_failure(ctx, stop_event):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/branches": {
-                "post": {
-                    "responses": {
-                        "201": {
-                            "description": "Created",
-                            "links": {
-                                "BlockBranch": {
-                                    "operationId": "createBlock",
-                                    "requestBody": {"targetId": "$response.body#/id"},
-                                }
-                            },
-                        },
-                        "409": {"description": "Conflict"},
-                    },
-                }
-            },
-            "/blocks": {
-                "post": {
-                    "operationId": "createBlock",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["targetId"],
-                                    "properties": {"targetId": {"type": "integer"}},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"201": {"description": "Created"}, "422": {"description": "Invalid"}},
-                }
-            },
-        }
-    )
-    created = 0
-
-    @app.route("/branches", methods=["POST"])
-    def create_branch():
-        nonlocal created
-        created += 1
-        if created % 2 == 0:
-            return jsonify({}), 409
-        return jsonify({"id": created}), 201
-
-    @app.route("/blocks", methods=["POST"])
-    def create_block():
-        return jsonify({}), 422
-
     config = schemathesis.Config.from_dict(
         {
             "seed": 6,
@@ -506,7 +455,9 @@ def test_flaky_suite_retries_only_after_new_failure(ctx, stop_event):
             "generation": {"mode": "positive", "max-examples": 25, "database": "none"},
         }
     )
-    schema = schemathesis.openapi.from_wsgi("/openapi.json", app, config=config)
+    schema = schemathesis.openapi.from_wsgi(
+        "/openapi.json", ctx.openapi.apps.flaky_branch_blocks().wsgi_app, config=config
+    )
     result = collect_result(
         stateful.execute(
             engine=EngineContext(schema=schema, stop_event=stop_event),
@@ -611,97 +562,14 @@ def test_external_link(ctx):
             "parameters": {"userId": "$request.path.userId"},
         },
     }
-    delete_links = {
-        "GetUser": {
-            "operationId": "getUser",
-            "parameters": {"userId": "$request.path.userId"},
-        },
-    }
-    schema = ctx.openapi.load_schema(
-        {
-            "/users": {
-                "post": {
-                    "operationId": "createUser",
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Successful response",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                            "links": post_links,
-                        },
-                        "400": {"description": "Bad request"},
-                        "default": {"description": "Default"},
-                    },
-                },
-            },
-            "/users/{userId}": {
-                "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
-                "get": {
-                    "summary": "Get a user",
-                    "operationId": "getUser",
-                    "responses": {
-                        "200": {
-                            "description": "Successful response",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                            "links": get_links,
-                        },
-                        "404": {"description": "User not found"},
-                        "default": {"description": "Default"},
-                    },
-                },
-                "delete": {
-                    "summary": "Delete a user",
-                    "operationId": "deleteUser",
-                    "responses": {
-                        "204": {
-                            "description": "Successful response",
-                            "links": delete_links,
-                        },
-                        "404": {"description": "User not found"},
-                        "default": {"description": "Default"},
-                    },
-                },
-                "patch": {
-                    "summary": "Update a user",
-                    "operationId": "updateUser",
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Successful response",
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        },
-                        "404": {"description": "User not found"},
-                        "default": {"description": "Default"},
-                    },
-                },
-            },
-        },
-        components={
-            "schemas": {
-                "User": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"},
-                        "name": {"type": "string"},
-                        "last_modified": {"type": "string"},
-                    },
-                    "required": ["id", "name", "last_modified"],
-                },
-                "NewUser": {
-                    "type": "object",
-                    "required": ["name"],
-                    "properties": {"name": {"type": "string", "maxLength": 50}},
-                    "additionalProperties": False,
-                },
-            }
-        },
-    )
+    # 75 examples reach the bug only in this scenario space, so drop what the links never use.
+    raw_schema = deepclone(remote_api.spec)
+    del raw_schema["paths"]["/users"]["get"]
+    del raw_schema["paths"]["/orders/{orderId}"]
+    del raw_schema["components"]["schemas"]["UpdateUser"]
+    raw_schema["paths"]["/users"]["post"]["responses"]["201"]["links"] = post_links
+    raw_schema["paths"]["/users/{userId}"]["get"]["responses"]["200"]["links"] = get_links
+    schema = ctx.openapi.from_full_schema(raw_schema)
     root_api = ctx.openapi.apps.stateful_users(IndependentInternalError())
     schema.config.update(base_url=f"{root_api.base_url}/")
     # The bug needs a specific call sequence, which takes many scenarios to reach.
@@ -1165,15 +1033,7 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
     response_404 = make_http_response("GET", "http://localhost/users/1", 404)
     recorder.record_response(case_id=get_b.id, response=response_404)
 
-    check_ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        recorder=recorder,
-        response_checks=None,
-    )
+    check_ctx = check_context(recorder=recorder)
 
     # Should not raise — the DELETE that explains the 404 is in A's subtree.
     assert ensure_resource_availability(check_ctx, response_404, get_b) is None

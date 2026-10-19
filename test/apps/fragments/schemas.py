@@ -7,6 +7,22 @@ def success() -> dict[str, Any]:
     return {"/api/success": {"get": {"responses": {"200": {"description": "Success"}}}}}
 
 
+# Declares `name` as required; planted-bug handlers return it as null.
+def null_name_response() -> dict[str, Any]:
+    return {
+        "description": "OK",
+        "content": {
+            "application/json": {
+                "schema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}
+            }
+        },
+    }
+
+
+def null_name_responses() -> dict[str, Any]:
+    return {"200": null_name_response(), "404": {"description": "Not found"}}
+
+
 def per_path_servers() -> dict[str, Any]:
     return {
         "/api/admin": {
@@ -945,6 +961,45 @@ def linked_users() -> dict[str, Any]:
                 "operationId": "getUser",
                 "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
                 "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+
+
+def flaky_branch_blocks() -> dict[str, Any]:
+    return {
+        "/branches": {
+            "post": {
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "links": {
+                            "BlockBranch": {
+                                "operationId": "createBlock",
+                                "requestBody": {"targetId": "$response.body#/id"},
+                            }
+                        },
+                    },
+                    "409": {"description": "Conflict"},
+                },
+            }
+        },
+        "/blocks": {
+            "post": {
+                "operationId": "createBlock",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["targetId"],
+                                "properties": {"targetId": {"type": "integer"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}, "422": {"description": "Invalid"}},
             }
         },
     }

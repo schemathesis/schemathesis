@@ -12,6 +12,7 @@ from schemathesis.engine.run.unit import _create_scheduler
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.specs.openapi._ordering import compute_operation_layers
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
+from test.apps.fragments.schemas import null_name_responses
 from test.utils import EventStream
 
 
@@ -668,21 +669,7 @@ def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
                     "parameters": [
                         {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
                     ],
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["name"],
-                                        "properties": {"name": {"type": "string"}},
-                                    }
-                                }
-                            },
-                        },
-                        "404": {"description": "Not found"},
-                    },
+                    "responses": null_name_responses(),
                 },
                 "post": {
                     "operationId": "createProduct",
@@ -829,21 +816,7 @@ def test_create_scheduler_filters_to_requested_operations(ctx):
                     "parameters": [
                         {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
                     ],
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["name"],
-                                        "properties": {"name": {"type": "string"}},
-                                    }
-                                }
-                            },
-                        },
-                        "404": {"description": "Not found"},
-                    },
+                    "responses": null_name_responses(),
                 },
                 "post": {
                     "operationId": "createProduct",

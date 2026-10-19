@@ -31,10 +31,11 @@ def test_(request, case):
     result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 2"])
 
 
-def test_pytest_parametrize(testdir):
-    # When `pytest.mark.parametrize` is applied
-    testdir.make_test(
-        """
+@pytest.mark.parametrize(
+    ("source", "node_prefix"),
+    [
+        (
+            """
 @pytest.mark.parametrize("param", ("A", "B"))
 @schema.parametrize()
 def test_(request, param, case):
@@ -42,6 +43,58 @@ def test_(request, param, case):
     assert case.operation.path == "/users"
     assert case.method in ("GET", "POST")
 """,
+            "",
+        ),
+        (
+            """
+from hypothesis import settings, HealthCheck
+
+
+def pytest_generate_tests(metafunc):
+    metafunc.parametrize("inner", ("A", "B"))
+
+@pytest.fixture()
+def param(inner):
+    return inner * 2
+
+@schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_(request, param, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.operation.path == "/users"
+    assert case.method in ("GET", "POST")
+""",
+            "",
+        ),
+        (
+            """
+from hypothesis import settings, HealthCheck
+
+
+class TestAPI:
+
+    def pytest_generate_tests(self, metafunc):
+        metafunc.parametrize("inner", ("A", "B"))
+
+    @pytest.fixture()
+    def param(self, inner):
+        return inner * 2
+
+    @schema.parametrize()
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+    def test_(self, request, param, case):
+        request.config.HYPOTHESIS_CASES += 1
+        assert case.operation.path == "/users"
+        assert case.method in ("GET", "POST")
+""",
+            "TestAPI::",
+        ),
+    ],
+    ids=["mark", "module-generate-tests", "class-generate-tests"],
+)
+def test_pytest_parametrize(testdir, source, node_prefix):
+    testdir.make_test(
+        source,
         paths={
             "/users": {
                 "get": {"responses": {"200": {"description": "OK"}}},
@@ -50,17 +103,16 @@ def test_(request, param, case):
         },
         generation_modes=[GenerationMode.POSITIVE],
     )
-    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be method/path combos x parameters in `parametrize`
-    # I.e. regular pytest parametrization logic should be applied
+    # Regular pytest parametrization applies on top: method/path combos x parameters
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize.py::test_\[GET /users\]\[A\] PASSED",
-            r"test_pytest_parametrize.py::test_\[GET /users\]\[B\] PASSED",
-            r"Hypothesis calls: 8",
+            rf".*::{node_prefix}test_\[{method} /users\]\[{param}\] PASSED"
+            for method in ("GET", "POST")
+            for param in ("A", "B")
         ]
+        + [r"Hypothesis calls: 8"]
     )
 
 

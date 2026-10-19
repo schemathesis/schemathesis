@@ -10,51 +10,6 @@ from schemathesis.generation.modes import GenerationMode
 from test.utils import has_hypothesis_failure_header
 
 
-def test_pytest_parametrize_fixture(testdir):
-    # When `pytest_generate_tests` is used on a module level for fixture parametrization
-    testdir.make_test(
-        """
-from hypothesis import settings, HealthCheck
-
-
-def pytest_generate_tests(metafunc):
-    metafunc.parametrize("inner", ("A", "B"))
-
-@pytest.fixture()
-def param(inner):
-    return inner * 2
-
-@schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
-def test_(request, param, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.path == "/users"
-    assert case.method in ("GET", "POST")
-""",
-        paths={
-            "/users": {
-                "get": {"responses": {"200": {"description": "OK"}}},
-                "post": {"responses": {"200": {"description": "OK"}}},
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # And there are multiple method/path combinations
-    result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be method/path combos x parameters in `pytest_generate_tests`
-    # I.e. regular pytest parametrization logic should be applied
-    result.assert_outcomes(passed=4)
-    result.stdout.re_match_lines(
-        [
-            r"test_pytest_parametrize_fixture.py::test_\[GET /users\]\[A\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[GET /users\]\[B\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[POST /users\]\[A\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[POST /users\]\[B\] PASSED",
-            r"Hypothesis calls: 8",
-        ]
-    )
-
-
 def test_missing_base_url_error_message(testdir):
     testdir.make_test(
         """
@@ -75,53 +30,6 @@ def test_b(case):
     assert "https://api.example.com/v1" in result.stdout.str()
     # But it should NOT include reproduction code since this is a configuration error, not an API failure
     assert "Reproduce with:" not in result.stdout.str()
-
-
-def test_pytest_parametrize_class_fixture(testdir):
-    # When `pytest_generate_tests` is used on a class level for fixture parametrization
-    testdir.make_test(
-        """
-from hypothesis import settings, HealthCheck
-
-
-class TestAPI:
-
-    def pytest_generate_tests(self, metafunc):
-        metafunc.parametrize("inner", ("A", "B"))
-
-    @pytest.fixture()
-    def param(self, inner):
-        return inner * 2
-
-    @schema.parametrize()
-    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
-    def test_(self, request, param, case):
-        request.config.HYPOTHESIS_CASES += 1
-        assert case.operation.path == "/users"
-        assert case.method in ("GET", "POST")
-""",
-        paths={
-            "/users": {
-                "get": {"responses": {"200": {"description": "OK"}}},
-                "post": {"responses": {"200": {"description": "OK"}}},
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # And there are multiple method/path combinations
-    result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be method/path combos x parameters in `pytest_generate_tests`
-    # I.e. regular pytest parametrization logic should be applied
-    result.assert_outcomes(passed=4)
-    result.stdout.re_match_lines(
-        [
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /users\]\[A\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /users\]\[B\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /users\]\[A\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /users\]\[B\] PASSED",
-            r"Hypothesis calls: 8",
-        ]
-    )
 
 
 def test_pytest_collection_regression(testdir):

@@ -1,12 +1,10 @@
 import pytest
-from flask import jsonify
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.parameters import SkippedParameter
 from schemathesis.core.result import Err, Ok
 from schemathesis.specs.openapi.adapter.responses import ResolvedSchema
-from test.utils import run_given
 
 
 def _schema(servers):
@@ -399,37 +397,6 @@ def test_nested_unresolvable_ref_in_optional_parameter_v3(ctx):
     result = _first_operation(schema)
     assert isinstance(result, Ok)
     assert list(result.ok().query) == []
-
-
-def test_request_is_sent_when_optional_parameter_is_dropped(ctx, app_runner):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/things": {
-                "get": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "filter",
-                            "required": False,
-                            "schema": {"$ref": "#/components/schemas/Missing"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/things")
-    def things():
-        return jsonify([])
-
-    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    operation = _first_operation(schema).ok()
-
-    @run_given(case=operation.as_strategy(), max_examples=1)
-    def test(case):
-        assert case.call().status_code == 200
 
 
 # `required` and the parameter's name live behind the `$ref`, not on the stub that names it.
