@@ -8277,6 +8277,24 @@ def test_combination_cases_deduplicate_repeated_requests(ctx):
     ]
 
 
+def test_combination_cases_with_body_deduplicate_repeated_requests(ctx):
+    # The all-optional combination sends the same query and body as the array parameter's own positive case.
+    operation = body_operation(
+        ctx,
+        {"enum": [{"x": 1}]},
+        parameters=[
+            {"in": "query", "name": "a", "required": False, "schema": {"type": "string"}},
+            {"in": "query", "name": "b", "required": False, "schema": {"type": "array", "items": {"type": "string"}}},
+        ],
+    )
+    sent = [
+        (prepared.url, prepared.body)
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        for prepared in [Request(**case.as_transport_kwargs(base_url="http://127.0.0.1")).prepare()]
+    ]
+    assert len(sent) == len(set(sent)), sent
+
+
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 @pytest.mark.parametrize("boolean_schema", [True, False], ids=["true", "false"])
 def test_boolean_parameter_schema(ctx, location, boolean_schema):
