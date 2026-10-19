@@ -537,7 +537,6 @@ def _semantic_index(extra_data_source: ExtraDataSource | None) -> SemanticValueI
 
 
 def _strategy_cache_key(
-    operation: APIOperation,
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None,
     mix_examples: bool,
@@ -545,7 +544,7 @@ def _strategy_cache_key(
     constants_value_source: ConstantsPool | None,
 ) -> StrategyCacheKey | None:
     """Identity of every live source and generation setting a built strategy closes over, or None to skip caching."""
-    if not mix_examples or _captured_variants_active(extra_data_source, operation):
+    if not mix_examples:
         return None
     return (
         error_feedback.generation if error_feedback is not None else None,
@@ -1600,6 +1599,7 @@ class OpenApiBody(OpenApiComponent):
         "_examples",
         "_mutation_targets",
         "_strategy_cache",
+        "_base_strategy_cache",
         "_is_negatable",
     )
 
@@ -1646,6 +1646,8 @@ class OpenApiBody(OpenApiComponent):
         # Not part of the body's value: bodies that declare the same schema share converted copies through it.
         self.schema_cache: RequestBodySchemaCache | None = None
         self._strategy_cache: dict[GenerationMode, tuple[StrategyCacheKey, st.SearchStrategy]] = {}
+        # Strategies beneath the captured-variant overlay, for operations that consume captured values.
+        self._base_strategy_cache: dict[GenerationMode, tuple[StrategyCacheKey, st.SearchStrategy]] = {}
         self._is_negatable: bool | NotSet = NOT_SET
 
     @property
@@ -1739,12 +1741,14 @@ class OpenApiBody(OpenApiComponent):
         constants_value_source: ConstantsPool | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
-        # The captured-variant overlay binds resource values at build time, so caching it
-        # would freeze stale variants. The semantic overlay closes over the live index and
-        # remains correct under caching, so semantic-only data sources stay cache-eligible.
-        overlay_key = _strategy_cache_key(
-            operation, generation_config, extra_data_source, mix_examples, error_feedback, constants_value_source
+        strategy_key = _strategy_cache_key(
+            generation_config, extra_data_source, mix_examples, error_feedback, constants_value_source
         )
+        # The captured-variant overlay binds resource values at build time, so caching it would freeze
+        # stale variants; only the strategy beneath it is cached. The semantic overlay closes over the
+        # live index and remains correct under caching, so semantic-only data sources stay cache-eligible.
+        consumes_captured = _captured_variants_active(extra_data_source, operation)
+        overlay_key = None if consumes_captured else strategy_key
         # Only the latest strategy per mode is kept; a new feedback generation replaces it.
         cached = self._strategy_cache.get(generation_mode) if overlay_key is not None else None
         if cached is not None and cached[0] == overlay_key:
@@ -1769,6 +1773,7 @@ class OpenApiBody(OpenApiComponent):
                 generation_mode,
                 extra_data_source,
                 captured,
+                base_key=strategy_key if consumes_captured else None,
                 mix_examples=mix_examples,
                 error_feedback=error_feedback,
                 constants_value_source=constants_value_source,
@@ -1792,11 +1797,50 @@ class OpenApiBody(OpenApiComponent):
         extra_data_source: ExtraDataSource | None,
         captured: tuple[list[CapturedVariant], VariantUsageTracker] | None,
         *,
+        base_key: StrategyCacheKey | None,
         mix_examples: bool,
         error_feedback: ErrorFeedbackStore | None,
         constants_value_source: ConstantsPool | None,
     ) -> st.SearchStrategy:
-        """Generate body values, then substitute values from other sources into positive ones.
+        """Apply captured values on top of the strategy for every other source, reusing it when `base_key` matches."""
+        cached = self._base_strategy_cache.get(generation_mode) if base_key is not None else None
+        if cached is not None and cached[0] == base_key:
+            strategy = cached[1]
+        else:
+            strategy = self._build_base_strategy(
+                operation,
+                schema,
+                generation_config,
+                generation_mode,
+                extra_data_source,
+                mix_examples=mix_examples,
+                error_feedback=error_feedback,
+                constants_value_source=constants_value_source,
+            )
+            if base_key is not None:
+                self._base_strategy_cache[generation_mode] = (base_key, strategy)
+        if captured is None or strategy is EMPTY_STRATEGY or generation_mode.is_negative:
+            return strategy
+        return build_hybrid_strategy(
+            strategy,
+            *captured,
+            container_schema=schema if isinstance(schema, dict) else None,
+            validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+        )
+
+    def _build_base_strategy(
+        self,
+        operation: OpenApiOperation,
+        schema: JsonSchema,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        extra_data_source: ExtraDataSource | None,
+        *,
+        mix_examples: bool,
+        error_feedback: ErrorFeedbackStore | None,
+        constants_value_source: ConstantsPool | None,
+    ) -> st.SearchStrategy:
+        """Generate body values, then substitute values from sources other than captured ones into positive ones.
 
         The order is load-bearing: examples are mixed before any substitution; constants run before
         semantic and captured values so live, response-derived values win over a random pool literal.
@@ -1839,10 +1883,6 @@ class OpenApiBody(OpenApiComponent):
         if container_schema is not None:
             strategy = _with_semantic_values(
                 strategy, container_schema, _semantic_index(extra_data_source), validator_cls
-            )
-        if captured is not None:
-            strategy = build_hybrid_strategy(
-                strategy, *captured, container_schema=container_schema, validator_cls=validator_cls
             )
         return strategy
 
@@ -2381,6 +2421,7 @@ class OpenApiParameterSet(ParameterSet):
         "_validation_schema",
         "_schema_cache",
         "_strategy_cache",
+        "_base_strategy_cache",
         "_strict_validator",
     )
 
@@ -2397,9 +2438,9 @@ class OpenApiParameterSet(ParameterSet):
         self._schema: dict | NotSet = NOT_SET
         self._validation_schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
-        self._strategy_cache: dict[
-            tuple[frozenset[str], GenerationMode, StrategyCacheKey | None], st.SearchStrategy
-        ] = {}
+        self._strategy_cache: dict[tuple[frozenset[str], GenerationMode, StrategyCacheKey], st.SearchStrategy] = {}
+        # Strategies beneath the captured-variant overlay, for operations that consume captured values.
+        self._base_strategy_cache: dict[tuple[frozenset[str], GenerationMode, StrategyCacheKey], st.SearchStrategy] = {}
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
     def add(self, parameter: OpenApiParameter) -> None:
@@ -2506,11 +2547,13 @@ class OpenApiParameterSet(ParameterSet):
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
-        overlay_key = _strategy_cache_key(
-            operation, generation_config, extra_data_source, mix_examples, error_feedback, constants_value_source
+        strategy_key = _strategy_cache_key(
+            generation_config, extra_data_source, mix_examples, error_feedback, constants_value_source
         )
-        cache_key = (exclude_key, generation_mode, overlay_key)
-        if overlay_key is not None and cache_key in self._strategy_cache:
+        cache_key = (exclude_key, generation_mode, strategy_key) if strategy_key is not None else None
+        # Captured variants are bound at build time, so their consumers cache only the strategy beneath them.
+        consumes_captured = _captured_variants_active(extra_data_source, operation)
+        if cache_key is not None and not consumes_captured and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
 
         schema = _adjusted_schema(self.get_schema_with_exclusions(exclude), operation, self.location, error_feedback)
@@ -2536,11 +2579,12 @@ class OpenApiParameterSet(ParameterSet):
                 exclude_key,
                 extra_data_source,
                 captured,
+                base_key=cache_key if consumes_captured else None,
                 mix_examples=mix_examples,
                 constants_value_source=constants_value_source,
             )
 
-        if overlay_key is not None:
+        if cache_key is not None and not consumes_captured:
             self._strategy_cache[cache_key] = strategy
         return strategy
 
@@ -2554,16 +2598,59 @@ class OpenApiParameterSet(ParameterSet):
         extra_data_source: ExtraDataSource | None,
         captured: tuple[list[CapturedVariant], VariantUsageTracker] | None,
         *,
+        base_key: tuple[frozenset[str], GenerationMode, StrategyCacheKey] | None,
         mix_examples: bool,
         constants_value_source: ConstantsPool | None,
     ) -> st.SearchStrategy:
         from hypothesis import strategies as st
 
-        from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
-
         if generation_mode.is_negative and not schema.get("properties"):
             # Nothing to negate - all properties were excluded
             return st.none()
+        strategy = self._base_strategy_cache.get(base_key) if base_key is not None else None
+        if strategy is None:
+            strategy = self._build_base_strategy(
+                operation,
+                schema,
+                generation_config,
+                generation_mode,
+                exclude_key,
+                extra_data_source,
+                mix_examples=mix_examples,
+                constants_value_source=constants_value_source,
+            )
+            if base_key is not None:
+                self._base_strategy_cache[base_key] = strategy
+        if strategy is EMPTY_STRATEGY:
+            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
+            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+            return strategy
+        if captured is not None:
+            strategy = build_hybrid_strategy(strategy, *captured)
+        return _serialize_for_location(
+            strategy,
+            self.location,
+            generation_mode.is_negative,
+            operation.get_parameter_serializer(self.location),
+            schema,
+            self.items,
+        )
+
+    def _build_base_strategy(
+        self,
+        operation: OpenApiOperation,
+        schema: JsonSchemaObject,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        exclude_key: frozenset[str],
+        extra_data_source: ExtraDataSource | None,
+        *,
+        mix_examples: bool,
+        constants_value_source: ConstantsPool | None,
+    ) -> st.SearchStrategy:
+        """Generate parameter values with every overlay except captured values, before location serialization."""
+        from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
+
         # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
         validation_schema = (
             self._apply_exclusions(parameters_to_validation_schema(self.items, self.location), exclude_key)
@@ -2581,10 +2668,8 @@ class OpenApiParameterSet(ParameterSet):
             validation_schema=validation_schema,
         )
         if strategy is EMPTY_STRATEGY:
-            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
-            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
             return strategy
-        strategy = self._apply_overlays(
+        return self._apply_overlays(
             strategy,
             operation,
             schema,
@@ -2592,17 +2677,8 @@ class OpenApiParameterSet(ParameterSet):
             generation_mode,
             exclude_key,
             extra_data_source,
-            captured,
             mix_examples=mix_examples,
             constants_value_source=constants_value_source,
-        )
-        return _serialize_for_location(
-            strategy,
-            self.location,
-            generation_mode.is_negative,
-            operation.get_parameter_serializer(self.location),
-            schema,
-            self.items,
         )
 
     def _apply_overlays(
@@ -2614,12 +2690,11 @@ class OpenApiParameterSet(ParameterSet):
         generation_mode: GenerationMode,
         exclude_key: frozenset[str],
         extra_data_source: ExtraDataSource | None,
-        captured: tuple[list[CapturedVariant], VariantUsageTracker] | None,
         *,
         mix_examples: bool,
         constants_value_source: ConstantsPool | None,
     ) -> st.SearchStrategy:
-        """Substitute values from other sources into generated ones, before location serialization.
+        """Substitute values from sources other than captured ones into generated ones.
 
         The order is load-bearing: examples are mixed before any substitution so they go through the same
         transformations; path integers are biased before constants so a substituted literal is final;
@@ -2651,12 +2726,9 @@ class OpenApiParameterSet(ParameterSet):
                 validator_cls,
                 name_only=self.location == ParameterLocation.PATH,
             )
-        strategy = _with_dictionary_values(
+        return _with_dictionary_values(
             strategy, operation, self.location, properties, generation_config, generation_mode
         )
-        if captured is not None:
-            strategy = build_hybrid_strategy(strategy, *captured)
-        return strategy
 
     def _build_negative_aware_strategy(
         self,

@@ -8,6 +8,7 @@ import threading
 
 import pytest
 import requests
+from hypothesis import strategies as st
 from hypothesis.vendor.pretty import pretty
 
 from schemathesis.config import GenerationConfig
@@ -1678,6 +1679,79 @@ def test_negative_aware_strategy_with_captured_values(ctx):
     results = generate_many(strategy, 20)
 
     assert all(isinstance(r, GeneratedValue) for r in results)
+
+
+@pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE], ids=["positive", "negative"])
+def test_consumer_strategies_use_values_captured_after_previous_builds(ctx, mode):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "UpdateItem": {
+                                    "operationId": "updateItem",
+                                    "parameters": {"id": "$response.body#/id", "itemId": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "put": {
+                    "operationId": "updateItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"itemId": {"type": "string"}},
+                                    "required": ["itemId"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    operation = schema["/items/{id}"]["PUT"]
+    body = operation.body[0]
+    config = GenerationConfig()
+
+    def draw(strategy: st.SearchStrategy) -> list[object]:
+        return [value.value if isinstance(value, GeneratedValue) else value for value in generate_many(strategy, 30)]
+
+    def draw_values() -> tuple[list[object], list[object]]:
+        path = draw(operation.path_parameters.get_strategy(operation, config, mode, extra_data_source=data_source))
+        bodies = draw(body.get_strategy(operation, config, mode, extra_data_source=data_source))
+        return path, bodies
+
+    # Negative path strings without captured values are unsatisfiable, so only the body is drawn before capturing.
+    draw(body.get_strategy(operation, config, mode, extra_data_source=data_source))
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "first-item"})
+    path, bodies = draw_values()
+    assert {"id": "first-item"} in path
+    assert {"itemId": "first-item"} in bodies
+
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "second-item"})
+    path, bodies = draw_values()
+    assert {"id": "second-item"} in path
+    assert {"itemId": "second-item"} in bodies
 
 
 def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
