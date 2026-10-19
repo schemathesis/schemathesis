@@ -4,7 +4,7 @@ from typing import Annotated
 
 import pytest
 import requests
-from fastapi import FastAPI, HTTPException, Security, status
+from fastapi import FastAPI, Header, HTTPException, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from flask import jsonify, redirect, request
 from hypothesis import Phase, given, settings
@@ -449,6 +449,23 @@ def test_server_error_without_auth_is_reported():
     assert str(exc.value.exceptions[0]) == (
         "Unexpected response to a request without authentication\n\n"
         "Expected 401 or 403, got `500 Internal Server Error` for `GET /`"
+    )
+
+
+# A probe missing another required header gets a validation error instead of an auth verdict.
+def test_invalid_auth_probe_keeps_other_headers():
+    app = FastAPI()
+    api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
+    def root(x_tenant: Annotated[str, Header()], credentials: Annotated[str | None, Security(api_key)]):
+        if credentials != "valid":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return {"tenant": x_tenant}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    schema["/"]["GET"].Case(headers={"x-tenant": "acme"}).call_and_validate(
+        session=ASGIClient(app), headers={"X-API-Key": "valid"}, checks=[ignored_auth]
     )
 
 

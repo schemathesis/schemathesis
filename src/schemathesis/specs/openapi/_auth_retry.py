@@ -46,8 +46,8 @@ def set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:
         return
     attr_name = parameter.location.container_name
     container = getattr(case, attr_name)
-    # Negative-mode cases may replace the container with a non-dict; reset to a fresh dict.
-    if not isinstance(container, dict):
+    # Negative-mode cases may replace the container with a non-mapping; reset to a fresh dict.
+    if not isinstance(container, MutableMapping):
         container = {}
     container[parameter.name] = _invalid_value_for(parameter)
     setattr(case, attr_name, container)
