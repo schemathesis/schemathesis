@@ -6,7 +6,9 @@ from flask import jsonify
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core.file_samples import file_extension
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
+from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import run_given
@@ -50,7 +52,7 @@ def test_pdf_generation(ctx):
 
 
 def test_wildcard_media_type_uses_matching_custom_strategy(ctx):
-    payloads = {"image/png": b"PNG", "image/jpeg": b"JPEG"}
+    payloads = {"model/stl": b"STL", "model/gltf-binary": b"GLTF"}
     for media_type, payload in payloads.items():
         schemathesis.openapi.media_type(media_type, st.just(payload))
 
@@ -59,7 +61,7 @@ def test_wildcard_media_type_uses_matching_custom_strategy(ctx):
         {
             "requestBody": {
                 "required": True,
-                "content": {"image/*": {"schema": {"type": "string", "format": "binary"}}},
+                "content": {"model/*": {"schema": {"type": "string", "format": "binary"}}},
             },
             "responses": {"204": {"description": "OK"}},
         },
@@ -72,6 +74,37 @@ def test_wildcard_media_type_uses_matching_custom_strategy(ctx):
         seen.add(case.media_type)
 
     assert seen == set(payloads)
+
+
+IMAGE_EXTENSIONS = {"image/gif": "gif", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [("image/png", {"image/png"}), ("image/jpeg", {"image/jpeg"}), ("image/*", set(IMAGE_EXTENSIONS))],
+    ids=["png", "jpeg", "wildcard"],
+)
+def test_built_in_image_media_types_send_matching_files(ctx, declared, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /image",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {declared: {"schema": {"type": "string", "format": "binary"}}},
+            },
+            "responses": {"204": {"description": "OK"}},
+        },
+    )
+    seen = set()
+
+    @run_given(case=operation.as_strategy(), max_examples=30)
+    def test(case):
+        for transport in (REQUESTS_TRANSPORT, ASGI_TRANSPORT, WSGI_TRANSPORT):
+            data = transport.serialize_case(case)["data"]
+            assert file_extension(data) == IMAGE_EXTENSIONS[case.media_type], f"{case.media_type}: {data[:8]!r}"
+        seen.add(case.media_type)
+
+    assert seen == expected
 
 
 def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli):

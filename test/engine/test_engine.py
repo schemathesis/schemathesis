@@ -1119,7 +1119,7 @@ def test_non_serializable_example(ctx, phases, expected):
                     ],
                     "requestBody": {
                         "content": {
-                            "image/jpeg": {
+                            "video/mp4": {
                                 "schema": {"format": "base64", "type": "string"},
                             }
                         }

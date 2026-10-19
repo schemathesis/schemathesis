@@ -715,13 +715,13 @@ def _received_part(part):
             {"x": "1"},
             [["f", "application/xml", "<item><x>1</x></item>"]],
         ),
-        ("image/png", FILE_LIST_SCHEMA, 0, [["f", "image/png", "0"]]),
-        ("image/png", FILE_LIST_SCHEMA, 0.5, [["f", "image/png", "0.5"]]),
-        ("image/png", FILE_LIST_SCHEMA, True, [["f", "image/png", "true"]]),
-        ("image/png", FILE_LIST_SCHEMA, None, [["f", "image/png", "null"]]),
-        ("image/png", FILE_LIST_SCHEMA, {}, [["f", "image/png", "{}"]]),
-        ("image/png", {**FILE_LIST_SCHEMA, "type": ["array", "null"]}, 0, [["f", "image/png", "0"]]),
-        ("image/png", {}, 0, [["f", "image/png", "0"]]),
+        ("model/stl", FILE_LIST_SCHEMA, 0, [["f", "model/stl", "0"]]),
+        ("model/stl", FILE_LIST_SCHEMA, 0.5, [["f", "model/stl", "0.5"]]),
+        ("model/stl", FILE_LIST_SCHEMA, True, [["f", "model/stl", "true"]]),
+        ("model/stl", FILE_LIST_SCHEMA, None, [["f", "model/stl", "null"]]),
+        ("model/stl", FILE_LIST_SCHEMA, {}, [["f", "model/stl", "{}"]]),
+        ("model/stl", {**FILE_LIST_SCHEMA, "type": ["array", "null"]}, 0, [["f", "model/stl", "0"]]),
+        ("model/stl", {}, 0, [["f", "model/stl", "0"]]),
         ("application/octet-stream", FILE_LIST_SCHEMA, True, [["f", "application/octet-stream", "true"]]),
     ],
     ids=[
@@ -791,7 +791,7 @@ def test_multipart_array_part_items_need_a_serializer(ctx):
                             "type": "object",
                             "properties": {"f": {"type": "array", "items": {"type": "integer"}}},
                         },
-                        "encoding": {"f": {"contentType": "image/png"}},
+                        "encoding": {"f": {"contentType": "model/stl"}},
                     }
                 },
             },
@@ -799,7 +799,7 @@ def test_multipart_array_part_items_need_a_serializer(ctx):
         },
     )
     case = operation.Case(body={"f": [1]}, media_type="multipart/form-data")
-    with pytest.raises(SerializationNotPossible, match="image/png"):
+    with pytest.raises(SerializationNotPossible, match="model/stl"):
         case.as_transport_kwargs(base_url="http://h")
 
 

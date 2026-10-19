@@ -24,6 +24,7 @@ from schemathesis.core.error_feedback.store import (
 )
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, ContentTypeServerError, FailureGroup
+from schemathesis.core.file_samples import file_extension
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
@@ -3490,8 +3491,13 @@ def test_urlencoded_payloads_are_valid(ctx):
     run_test(operation, test)
 
 
-def test_malformed_content_type(ctx):
-    operation = body_operation(ctx, {"type": "object"}, media_type="invalid")
+@pytest.mark.parametrize(
+    "schema",
+    [{"type": "object"}, {"type": "string", "format": "binary"}],
+    ids=["object", "binary"],
+)
+def test_malformed_content_type(ctx, schema):
+    operation = body_operation(ctx, schema, media_type="invalid")
 
     def test(case):
         if case.meta.phase != TestPhase.COVERAGE:
@@ -8264,6 +8270,27 @@ def test_wildcard_custom_media_type_alternatives_yield_matching_bodies(ctx):
         ("image/png", b"\x89PNG"),
         ("image/jpeg", b"\xff\xd8jpeg"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [
+        ("image/jpeg", [("image/jpeg", "jpg")]),
+        ("image/*", [("image/gif", "gif"), ("image/jpeg", "jpg"), ("image/png", "png"), ("image/webp", "webp")]),
+    ],
+    ids=["jpeg", "wildcard"],
+)
+def test_built_in_image_media_types_yield_matching_files(ctx, declared, expected):
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {declared: {"schema": {"type": "string", "format": "binary"}}},
+        },
+    )["/foo"]["post"]
+    assert [
+        (case.media_type, file_extension(case.body.data)) for case in iter_cases(operation, GenerationMode.POSITIVE)
+    ] == expected
 
 
 def test_custom_media_type_body_emits_no_positive_case_in_negative_mode(ctx):

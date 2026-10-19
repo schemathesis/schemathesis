@@ -17,6 +17,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema, RefResolutionError, unresolvable_reference
+from schemathesis.core.file_samples import iter_media_type_file_samples
 from schemathesis.core.jsonschema import (
     VALIDATED_FORMATS_BY_DRAFT,
     BundleError,
@@ -1703,6 +1704,12 @@ class OpenApiBody(OpenApiComponent):
         # A string may list several media types separated by commas.
         items = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
         return [item.strip() for item in items if isinstance(item, str) and item.strip()]
+
+    def iter_file_samples(self, media_type: str) -> Iterator[tuple[str, bytes]]:
+        """Concrete media types for a raw-file body sent as `media_type`, with a file of each format."""
+        schema = self.optimized_schema
+        if isinstance(schema, dict) and schema.get("format") == "binary":
+            yield from iter_media_type_file_samples(media_type)
 
     def get_property_filename(self, property_name: str) -> str | None:
         """Get filename from encoding.headers.Content-Disposition for a form property."""

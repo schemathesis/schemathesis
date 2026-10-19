@@ -19,6 +19,7 @@ from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
+from schemathesis.core.file_samples import MEDIA_TYPE_FILE_SAMPLES
 from schemathesis.core.jsonschema import get_type, resolve_bundled_root, resolve_with_root_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
@@ -646,6 +647,6 @@ def text_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": to_wire_text(value).encode("utf8")}
 
 
-@REQUESTS_TRANSPORT.serializer("application/octet-stream")
+@REQUESTS_TRANSPORT.serializer("application/octet-stream", *MEDIA_TYPE_FILE_SAMPLES)
 def binary_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": serialize_binary(value)}

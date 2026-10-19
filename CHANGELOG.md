@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - `Case.auth_identity`: name of the WFC auth entry a case was sent with.
+- Built-in PNG, JPEG, GIF and WebP request bodies for `image/*` media types.
 
 ### :wrench: Changed
 
