@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.1...HEAD) - TBD
 
+### :racing_car: Performance
+
+- ~10% faster coverage phase on deeply nested request bodies.
+
 ### :bug: Fixed
 
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.

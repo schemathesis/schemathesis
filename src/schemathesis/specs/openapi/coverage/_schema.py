@@ -1385,6 +1385,26 @@ def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str |
     return type(value), value
 
 
+def _to_hashable_key_with_json_parts(value: dict[str, Any]) -> tuple[tuple, dict[str, int]]:
+    serialized_parts: dict[str, str] = {}
+    try:
+        for name, item in value.items():
+            serialized_parts[name] = jsonschema_rs.canonical.json.to_string(item)
+    except (TypeError, ValueError):
+        return _to_hashable_key(value), {}
+    serialized = (
+        "{"
+        + ",".join(f"{jsonschema_rs.canonical.json.to_string(name)}:{serialized_parts[name]}" for name in sorted(value))
+        + "}"
+    )
+    hashes = {
+        name: hash((type(value[name]), item))
+        for name, item in serialized_parts.items()
+        if type(value[name]) is dict or type(value[name]) is list
+    }
+    return (dict, _digest(serialized)), hashes
+
+
 class HashSet:
     """Helper to track already generated values."""
 
@@ -1406,9 +1426,9 @@ class HashSet:
         key = _to_hashable_key(value)
         return key if self._insert_key(key) else None
 
-    def insert_unless_in(self, other: HashSet, value: Any) -> bool:
+    def insert_unless_in(self, other: HashSet, value: Any, *, key: tuple | None = None) -> bool:
         """Insert the value unless `other` already holds it; the key is built once for both sets."""
-        key = _to_hashable_key(value)
+        key = _to_hashable_key(value) if key is None else key
         return key not in other._data and self._insert_key(key)
 
     def _insert_key(self, key: tuple) -> bool:

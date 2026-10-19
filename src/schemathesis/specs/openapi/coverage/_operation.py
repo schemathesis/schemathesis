@@ -42,6 +42,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
     GeneratedValue,
     HashSet,
+    _to_hashable_key_with_json_parts,
     cover_schema_iter,
     drop_negatives_any_draft_admits,
 )
@@ -248,6 +249,19 @@ class Dedup(Enum):
     WIRE_NEGATIVE_SET = auto()
 
 
+def _dedup_key_and_hashes(
+    kwargs: dict[str, Any],
+) -> tuple[dict[str, Any], tuple, dict[ParameterLocation, int]]:
+    request = _dedup_key(kwargs)
+    key, hashes = _to_hashable_key_with_json_parts(request)
+    initial_hashes = {
+        location: hashes[name]
+        for name, location in CONTAINER_TO_LOCATION.items()
+        if name != "headers" and name in hashes and request.get(name) == kwargs.get(name)
+    }
+    return request, key, initial_hashes
+
+
 @dataclass(slots=True)
 class CaseEmitter:
     """Builds and deduplicates the cases one operation's coverage run emits."""
@@ -259,12 +273,14 @@ class CaseEmitter:
     seen_positive: HashSet
     seen_negative: HashSet
 
-    def is_new_request(self, kwargs: dict[str, Any], mode: GenerationMode) -> bool:
+    def is_new_request(self, kwargs: dict[str, Any], mode: GenerationMode) -> tuple[bool, dict[ParameterLocation, int]]:
         # Repeating a request already sent tests nothing, whichever mode sent it first.
-        key = _dedup_key(kwargs)
+        request, key, initial_hashes = _dedup_key_and_hashes(kwargs)
         if mode == GenerationMode.POSITIVE:
-            return self.seen_positive.insert(key)
-        return self.seen_negative.insert_unless_in(self.seen_positive, key)
+            is_new = self.seen_positive.insert(request, key=key)
+        else:
+            is_new = self.seen_negative.insert_unless_in(self.seen_positive, request, key=key)
+        return is_new, initial_hashes
 
     def _meta(
         self,
@@ -273,6 +289,7 @@ class CaseEmitter:
         components: dict[ParameterLocation, ComponentInfo],
         phase: PhaseInfo,
         raw: dict[str, Any],
+        initial_hashes: dict[ParameterLocation, int],
     ) -> CaseMetadata:
         # Typed parameter containers survive so revalidation judges the schema level, not the wire form.
         raw_containers: dict[ParameterLocation, Any] = {
@@ -283,7 +300,7 @@ class CaseEmitter:
             and location != ParameterLocation.BODY
         }
         # Draws/misses narrowed to the slots this request actually carries, so the pool is not misattributed.
-        return CaseMetadata(
+        meta = CaseMetadata(
             generation=generation,
             components=components,
             phase=phase,
@@ -291,6 +308,10 @@ class CaseEmitter:
             pool_misses=_filter_misses_for_case(raw, self.correlated_misses),
             raw_containers=raw_containers,
         )
+        meta._initial_hashes.update(
+            (location, hash_value) for location, hash_value in initial_hashes.items() if location in components
+        )
+        return meta
 
     def build(
         self,
@@ -306,6 +327,7 @@ class CaseEmitter:
         method: HttpMethod | None = None,
         kwargs: dict[str, Any] | None = None,
         raw: dict[str, Any] | None = None,
+        initial_hashes: dict[ParameterLocation, int] | None = None,
     ) -> Case:
         kwargs = data.kwargs if kwargs is None else kwargs
         raw = data.raw if raw is None else raw
@@ -324,6 +346,7 @@ class CaseEmitter:
                     parameter_location=parameter_location,
                 ),
                 raw=raw,
+                initial_hashes={} if initial_hashes is None else initial_hashes,
             ),
         )
 
@@ -344,10 +367,15 @@ class CaseEmitter:
         dedup: Dedup = Dedup.REQUEST,
     ) -> Case | None:
         checked_kwargs = data.kwargs if kwargs is None else kwargs
-        if dedup is Dedup.REQUEST and not self.is_new_request(checked_kwargs, mode):
-            return None
-        if dedup is Dedup.NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(checked_kwargs)):
-            return None
+        initial_hashes: dict[ParameterLocation, int] = {}
+        if dedup is Dedup.REQUEST:
+            is_new, initial_hashes = self.is_new_request(checked_kwargs, mode)
+            if not is_new:
+                return None
+        if dedup is Dedup.NEGATIVE_SET:
+            request, key, initial_hashes = _dedup_key_and_hashes(checked_kwargs)
+            if not self.seen_negative.insert(request, key=key):
+                return None
         case = self.build(
             data,
             mode=mode,
@@ -360,9 +388,12 @@ class CaseEmitter:
             method=method,
             kwargs=kwargs,
             raw=raw,
+            initial_hashes=initial_hashes,
         )
-        if dedup is Dedup.WIRE_REQUEST and not self.is_new_request(_case_to_kwargs(case), mode):
-            return None
+        if dedup is Dedup.WIRE_REQUEST:
+            is_new, _ = self.is_new_request(_case_to_kwargs(case), mode)
+            if not is_new:
+                return None
         if dedup is Dedup.WIRE_NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(_case_to_kwargs(case))):
             return None
         return case

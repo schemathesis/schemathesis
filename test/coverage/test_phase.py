@@ -5637,6 +5637,37 @@ def test_map_case_hook_applied_in_coverage_phase(ctx):
     )
 
 
+@pytest.mark.parametrize(("mutate", "expected"), [(False, GenerationMode.POSITIVE), (True, GenerationMode.NEGATIVE)])
+def test_map_case_hook_body_mutation_revalidates_coverage_metadata(ctx, mutate, expected):
+    loaded = load_schema(
+        ctx,
+        body={
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "string"}},
+            "additionalProperties": False,
+        },
+    )
+
+    @loaded.hook
+    def map_case(context, case):
+        if mutate and isinstance(case.body, dict):
+            case.body.pop("id", None)
+        return case
+
+    cases = [
+        case
+        for case in generate_hooked_cases(loaded["/foo"]["post"], GenerationMode.POSITIVE)
+        if isinstance(case.body, dict) and case._meta is not None and ParameterLocation.BODY in case._meta.components
+    ]
+
+    assert cases
+    for case in cases:
+        case._check_modifications()
+    assert {case._meta.is_dirty() for case in cases} == {mutate}
+    assert {case.meta.components[ParameterLocation.BODY].mode for case in cases} == {expected}
+
+
 def test_content_json_query_params_single_encoding_in_coverage(ctx):
     # See GH-3701
     operation = body_operation(

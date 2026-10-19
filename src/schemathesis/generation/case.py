@@ -261,7 +261,10 @@ class Case(Generic[OperationT]):
         # Only track components that were actually generated
         for location in self._meta.components:
             value = self.get_container(location)
-            hash_value = self._hash_container(value)
+            if location in self._meta._initial_hashes:
+                hash_value = self._meta._initial_hashes[location]
+            else:
+                hash_value = self._hash_container(value)
             self._meta.update_validated_hash(location, hash_value)
             # Snapshot the wire-form hash so revalidation can tell whether the
             # container is still the unmodified value produced by generation.
