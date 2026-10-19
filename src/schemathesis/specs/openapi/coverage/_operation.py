@@ -410,12 +410,22 @@ class CaseEmitter:
             initial_hashes=initial_hashes,
         )
         if dedup is Dedup.WIRE_REQUEST:
-            is_new, _ = self.is_new_request(_case_to_kwargs(case), mode)
+            is_new, _ = self.is_new_request(_wire_kwargs(case), mode)
             if not is_new:
                 return None
-        if dedup is Dedup.WIRE_NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(_case_to_kwargs(case))):
+        if dedup is Dedup.WIRE_NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(_wire_kwargs(case))):
             return None
         return case
+
+
+def _wire_kwargs(case: Case) -> dict[str, Any]:
+    # Keyed like the template, so a case that sends the same request as a body or parameter case is caught.
+    kwargs = _case_to_kwargs(case)
+    if case.body is not NOT_SET:
+        kwargs["body"] = case.body
+        kwargs["media_type"] = case.media_type
+        _set_multipart_content_types(kwargs, case.multipart_content_types)
+    return kwargs
 
 
 def _replay(
