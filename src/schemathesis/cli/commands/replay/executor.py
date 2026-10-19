@@ -587,7 +587,7 @@ def _build_case(operation: APIOperation, step: CrashStep) -> Case:
     )
     if step.meta is not None:
         case._meta = CaseMetadata.from_dict(step.meta)
-    object.__setattr__(case, "_freeze_metadata", True)
+    case.freeze_metadata()
     return case
 
 
