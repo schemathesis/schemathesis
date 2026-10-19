@@ -14,6 +14,7 @@
 - Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
 - `Failed Health Check` for request bodies with several `$`-anchored `pattern` strings. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
 - `Failed Health Check` for strings whose `pattern` is stricter than their `format`. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
+- Match custom payload strategies to concrete media types selected from wildcard request declarations.
 
 ## [4.32.1](https://github.com/schemathesis/schemathesis/compare/v4.32.0...v4.32.1) - 2026-10-19
 

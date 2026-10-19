@@ -269,10 +269,9 @@ def test_multipart_wildcard_matching_specific_to_wildcard(ctx):
 
 
 def test_multipart_wildcard_matching_wildcard_to_specific(ctx):
-    png_strategy = st.just(b"\x89PNG")
-    jpeg_strategy = st.just(b"\xff\xd8\xff")
-    schemathesis.openapi.media_type("image/png", png_strategy)
-    schemathesis.openapi.media_type("image/jpeg", jpeg_strategy)
+    payloads = {"image/png": b"\x89PNG", "image/jpeg": b"\xff\xd8\xff"}
+    for media_type, payload in payloads.items():
+        schemathesis.openapi.media_type(media_type, st.just(payload))
 
     operation = make_operation(
         ctx,
@@ -293,9 +292,15 @@ def test_multipart_wildcard_matching_wildcard_to_specific(ctx):
         },
     )
 
-    @run_given(case=operation.as_strategy(), max_examples=100)
+    seen = set()
+
+    @run_given(case=operation.as_strategy(), max_examples=10)
     def test(case):
-        assert case.body["photo"] in (b"\x89PNG", b"\xff\xd8\xff")
+        content_type = case.multipart_content_types["photo"]
+        assert case.body["photo"] == payloads[content_type]
+        seen.add(content_type)
+
+    assert seen == set(payloads)
 
 
 def test_multipart_exact_match_preferred_over_wildcard(ctx):

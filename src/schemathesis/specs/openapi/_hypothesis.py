@@ -30,7 +30,11 @@ from schemathesis.core.jsonschema.numeric import (
     resolve_inclusive_bounds,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
-from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
+from schemathesis.core.media_types import (
+    FORM_MEDIA_TYPES,
+    find_media_type_strategy,
+    iter_matching_media_type_strategies,
+)
 from schemathesis.core.mutations import Mutation, MutationMetadata
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
@@ -318,8 +322,10 @@ def _generate_body(
     """Draw a body and the media type it is sent with."""
     candidates, generation_mode = _body_candidates(operation.body.items, generation_mode)
     parameter = draw(st.sampled_from(candidates))
+    media_type = _draw_body_media_type(draw, operation, parameter)
     strategy = _get_body_strategy(
         parameter,
+        media_type,
         operation,
         generation_config,
         draw,
@@ -330,7 +336,6 @@ def _generate_body(
         constants_value_source=constants_value_source,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
-    media_type = _draw_body_media_type(draw, operation, parameter)
     if media_types.is_form_urlencoded(media_type):
         # The hybrid strategy wraps in `GeneratedValue` when it picks a captured pool
         # variant, so both positive and negative paths must unwrap before
@@ -623,10 +628,9 @@ def _build_form_strategy_with_encoding(
                 continue
             strategies_for_types = []
             for ct in content_types:
-                strategy = find_media_type_strategy(ct)
-                if strategy is not None:
+                for media_type, strategy in iter_matching_media_type_strategies(ct):
                     # Pair strategy with its content type so we know which was selected
-                    strategies_for_types.append(st.tuples(st.just(ct), strategy))
+                    strategies_for_types.append(st.tuples(st.just(media_type), strategy))
 
             if strategies_for_types:
                 # Store strategy that returns (content_type, data) tuple
@@ -699,6 +703,7 @@ def _build_form_strategy_with_encoding(
 
 def _get_body_strategy(
     parameter: OpenApiBody,
+    media_type: str,
     operation: APIOperation,
     generation_config: GenerationConfig,
     draw: st.DrawFn,
@@ -721,7 +726,7 @@ def _get_body_strategy(
             return custom_strategy
 
     # Check for custom media type strategy
-    custom_strategy = find_media_type_strategy(parameter.media_type)
+    custom_strategy = find_media_type_strategy(media_type)
     if custom_strategy is not None:
         # Always use custom strategies for raw bodies - they produce transmittable bytes.
         # In negative mode, bypassing them would generate non-bytes values (e.g., integers)

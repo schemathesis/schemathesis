@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
@@ -29,8 +29,18 @@ MEDIA_TYPE_STRATEGIES: dict[str, st.SearchStrategy[bytes]] = {}
 
 def find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | None:
     """Find a registered strategy for a content type, supporting wildcard patterns."""
-    if content_type in MEDIA_TYPE_STRATEGIES:
-        return MEDIA_TYPE_STRATEGIES[content_type]
+    pair = next(iter_matching_media_type_strategies(content_type), None)
+    return pair[1] if pair is not None else None
+
+
+def iter_matching_media_type_strategies(
+    content_type: str,
+) -> Iterator[tuple[str, st.SearchStrategy[bytes]]]:
+    """Yield concrete media types and their registered strategies matching the given media type."""
+    strategy = MEDIA_TYPE_STRATEGIES.get(content_type)
+    if strategy is not None:
+        yield content_type, strategy
+        return
 
     try:
         parsed = parse(content_type)
@@ -43,9 +53,11 @@ def find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | No
         except MalformedMediaType:
             continue
         if matches_either(parsed, target):
-            return strategy
-
-    return None
+            main, sub = parsed
+            target_main, target_sub = target
+            resolved_main = target_main if main == "*" else main
+            resolved_sub = target_sub if sub == "*" else sub
+            yield f"{resolved_main}/{resolved_sub}", strategy
 
 
 def _parseparam(s: str) -> Generator[str]:
