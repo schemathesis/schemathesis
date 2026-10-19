@@ -43,7 +43,6 @@ from .filters import (
     FilterValue,
     MatcherFunc,
     RegexValue,
-    is_deprecated,
 )
 from .hooks import (
     HookDispatcher,
@@ -189,8 +188,7 @@ class BaseSchema(Mapping):
             New schema instance with applied include filters.
 
         """
-        filter_set = self.filter_set.clone()
-        filter_set.include(
+        filter_set = self.filter_set.with_include(
             func,
             name=name,
             name_regex=name_regex,
@@ -241,13 +239,7 @@ class BaseSchema(Mapping):
             New schema instance with applied exclude filters.
 
         """
-        filter_set = self.filter_set.clone()
-        if deprecated:
-            if func is None:
-                func = is_deprecated
-            else:
-                filter_set.exclude(is_deprecated)
-        filter_set.exclude(
+        filter_set = self.filter_set.with_exclude(
             func,
             name=name,
             name_regex=name_regex,
@@ -259,6 +251,7 @@ class BaseSchema(Mapping):
             tag_regex=tag_regex,
             operation_id=operation_id,
             operation_id_regex=operation_id_regex,
+            deprecated=deprecated,
         )
         return self.clone(filter_set=filter_set)
 

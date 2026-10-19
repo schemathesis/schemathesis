@@ -13,7 +13,7 @@ from schemathesis.auths import AuthStorage
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import FailureGroup, as_reported_failure
 from schemathesis.core.result import Err, Ok, Result
-from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
+from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
     GIVEN_REFRESH_ATTR,
@@ -103,8 +103,7 @@ class LazySchema:
         operation_id_regex: RegexValue | None = None,
     ) -> LazySchema:
         """Include only operations that match the given filters."""
-        filter_set = self.filter_set.clone()
-        filter_set.include(
+        filter_set = self.filter_set.with_include(
             func,
             name=name,
             name_regex=name_regex,
@@ -136,13 +135,7 @@ class LazySchema:
         deprecated: bool = False,
     ) -> LazySchema:
         """Exclude operations that match the given filters."""
-        filter_set = self.filter_set.clone()
-        if deprecated:
-            if func is None:
-                func = is_deprecated
-            else:
-                filter_set.exclude(is_deprecated)
-        filter_set.exclude(
+        filter_set = self.filter_set.with_exclude(
             func,
             name=name,
             name_regex=name_regex,
@@ -154,6 +147,7 @@ class LazySchema:
             tag_regex=tag_regex,
             operation_id=operation_id,
             operation_id_regex=operation_id_regex,
+            deprecated=deprecated,
         )
         return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set, auth=self.auth)
 
