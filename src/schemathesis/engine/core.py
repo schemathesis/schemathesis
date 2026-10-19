@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis import auths
-from schemathesis.config import ConfigError, FuzzConfig
+from schemathesis.config import ConfigError, FuzzConfig, InferenceAlgorithm
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError, InvalidSchema
 from schemathesis.engine import Status, StopReason, events, fuzz, run
@@ -36,7 +36,9 @@ class Engine:
             if (
                 phase.name == PhaseName.STATEFUL_TESTING
                 and phase.skip_reason in (None, PhaseSkipReason.NOT_APPLICABLE)
-                and self.schema.config.phases.stateful.inference.is_enabled
+                and self.schema.config.phases.stateful.inference.is_algorithm_enabled(
+                    InferenceAlgorithm.LOCATION_HEADERS
+                )
             ):
                 observations = Observations()
 
