@@ -15,7 +15,7 @@ class UnexpectedGraphQLResponse(Failure):
     checks = ("response_schema_conformance",)
     kind_title = "Unexpected GraphQL response"
 
-    __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
+    __slots__ = ("type_name",)
 
     def __init__(
         self,
@@ -26,12 +26,8 @@ class UnexpectedGraphQLResponse(Failure):
         message: str,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.type_name = type_name
-        self.title = title if title is not None else self.kind_title
-        self.message = message
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -45,7 +41,7 @@ class GraphQLClientError(Failure):
     checks = ("positive_data_acceptance",)
     kind_title = "GraphQL client error"
 
-    __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
+    __slots__ = ("errors", "_unique_key_cache")
 
     def __init__(
         self,
@@ -56,13 +52,9 @@ class GraphQLClientError(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.errors = errors
-        self.title = title if title is not None else self.kind_title
-        self.message = message
-        self.case_id = case_id
         self._unique_key_cache: str | None = None
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -78,7 +70,7 @@ class GraphQLServerError(Failure):
     checks = ("not_a_server_error",)
     kind_title = "GraphQL server error"
 
-    __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
+    __slots__ = ("errors", "_unique_key_cache")
 
     def __init__(
         self,
@@ -89,13 +81,9 @@ class GraphQLServerError(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         self.errors = errors
-        self.title = title if title is not None else self.kind_title
-        self.message = message
-        self.case_id = case_id
         self._unique_key_cache: str | None = None
-        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -111,7 +99,7 @@ class GraphQLSchemaViolation(Failure):
     checks = ("response_schema_conformance",)
     kind_title = "Null in non-nullable GraphQL field"
 
-    __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
+    __slots__ = ("errors", "_unique_key_cache")
 
     def __init__(
         self,
@@ -122,13 +110,9 @@ class GraphQLSchemaViolation(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.HIGH)
         self.errors = errors
-        self.title = title if title is not None else self.kind_title
-        self.message = message
-        self.case_id = case_id
         self._unique_key_cache: str | None = None
-        self.severity = Severity.HIGH
 
     @property
     def _unique_key(self) -> str:

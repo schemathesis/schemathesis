@@ -23,16 +23,7 @@ class UndefinedStatusCode(Failure):
     checks = ("status_code_conformance",)
     kind_title = "Undocumented status code"
 
-    __slots__ = (
-        "operation",
-        "status_code",
-        "defined_status_codes",
-        "allowed_status_codes",
-        "message",
-        "title",
-        "case_id",
-        "severity",
-    )
+    __slots__ = ("status_code", "defined_status_codes", "allowed_status_codes")
 
     def __init__(
         self,
@@ -45,14 +36,10 @@ class UndefinedStatusCode(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.status_code = status_code
         self.defined_status_codes = defined_status_codes
         self.allowed_status_codes = allowed_status_codes
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -66,7 +53,7 @@ class MissingHeaders(Failure):
     checks = ("response_headers_conformance",)
     kind_title = "Missing required response headers"
 
-    __slots__ = ("operation", "missing_headers", "message", "title", "case_id", "severity")
+    __slots__ = ("missing_headers",)
 
     def __init__(
         self,
@@ -77,12 +64,8 @@ class MissingHeaders(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.missing_headers = missing_headers
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -97,7 +80,6 @@ class JsonSchemaError(Failure):
     kind_title = "Response violates schema"
 
     __slots__ = (
-        "operation",
         "schema_path",
         "instance_path",
         "instance",
@@ -109,9 +91,6 @@ class JsonSchemaError(Failure):
         "_message",
         "_validation_message",
         "_schema",
-        "title",
-        "case_id",
-        "severity",
     )
 
     def __init__(
@@ -262,7 +241,7 @@ class MissingContentType(Failure):
     checks = ("content_type_conformance", "response_schema_conformance")
     kind_title = "Missing Content-Type header"
 
-    __slots__ = ("operation", "media_types", "message", "title", "case_id", "severity")
+    __slots__ = ("media_types",)
 
     def __init__(
         self,
@@ -273,12 +252,8 @@ class MissingContentType(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.media_types = media_types
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -292,7 +267,7 @@ class MalformedMediaType(Failure):
     checks = ("content_type_conformance",)
     kind_title = "Malformed media type"
 
-    __slots__ = ("operation", "actual", "defined", "message", "title", "case_id", "severity")
+    __slots__ = ("actual", "defined")
 
     def __init__(
         self,
@@ -304,13 +279,9 @@ class MalformedMediaType(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.actual = actual
         self.defined = defined
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -327,7 +298,7 @@ class ContentDeserializationError(Failure):
     __slots__ = ()
 
     def __init__(self, *, operation: str, message: str, case_id: str | None = None) -> None:
-        super().__init__(operation=operation, title=self.kind_title, message=message, case_id=case_id)
+        super().__init__(operation=operation, message=message, case_id=case_id)
 
     @property
     def _unique_key(self) -> str:
@@ -345,7 +316,7 @@ class DiscriminatorMismatch(Failure):
     __slots__ = ()
 
     def __init__(self, *, operation: str, message: str, case_id: str | None = None) -> None:
-        super().__init__(operation=operation, title=self.kind_title, message=message, case_id=case_id)
+        super().__init__(operation=operation, message=message, case_id=case_id)
 
     @property
     def _unique_key(self) -> str:
@@ -360,15 +331,7 @@ class UndefinedContentType(Failure):
     checks = ("content_type_conformance",)
     kind_title = "Undocumented Content-Type"
 
-    __slots__ = (
-        "operation",
-        "content_type",
-        "defined_content_types",
-        "message",
-        "title",
-        "case_id",
-        "severity",
-    )
+    __slots__ = ("content_type", "defined_content_types")
 
     def __init__(
         self,
@@ -380,13 +343,9 @@ class UndefinedContentType(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.content_type = content_type
         self.defined_content_types = defined_content_types
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -400,7 +359,7 @@ class UseAfterFree(Failure):
     checks = ("use_after_free",)
     kind_title = "Deleted resource still available"
 
-    __slots__ = ("operation", "message", "free", "usage", "deleted_case_id", "title", "case_id", "severity")
+    __slots__ = ("free", "usage", "deleted_case_id")
 
     def __init__(
         self,
@@ -413,14 +372,10 @@ class UseAfterFree(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         self.free = free
         self.usage = usage
         self.deleted_case_id = deleted_case_id
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -439,7 +394,7 @@ class EnsureResourceAvailability(Failure):
     checks = ("ensure_resource_availability",)
     kind_title = "Created resource not found"
 
-    __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "case_id", "severity")
+    __slots__ = ("created_with", "not_available_with")
 
     def __init__(
         self,
@@ -451,13 +406,9 @@ class EnsureResourceAvailability(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.created_with = created_with
         self.not_available_with = not_available_with
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -477,7 +428,7 @@ class IgnoredAuth(Failure):
     checks = ("ignored_auth",)
     kind_title = "Authentication not enforced"
 
-    __slots__ = ("operation", "message", "scenario", "title", "case_id", "severity")
+    __slots__ = ("scenario",)
 
     def __init__(
         self,
@@ -488,13 +439,9 @@ class IgnoredAuth(Failure):
         title: str = "API accepts requests without authentication",
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         # Which credentials the request carried when the API still let it through.
         self.scenario = scenario
-        self.title = title
-        self.case_id = case_id
-        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -508,7 +455,7 @@ class ObjectLevelAuthorizationViolation(Failure):
     checks = ("object_level_authorization",)
     kind_title = "Object-level authorization bypass"
 
-    __slots__ = ("operation", "message", "owner", "peer", "owner_case_id", "title", "case_id", "severity")
+    __slots__ = ("owner", "peer", "owner_case_id")
     # Rerunning as the peer alone does not recreate the owner's object.
     reproducible_by_identity = False
 
@@ -523,14 +470,10 @@ class ObjectLevelAuthorizationViolation(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         self.owner = owner
         self.peer = peer
         self.owner_case_id = owner_case_id
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -550,7 +493,7 @@ class RejectedPositiveData(Failure):
     checks = ("positive_data_acceptance",)
     kind_title = "Schema-valid request rejected"
 
-    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
+    __slots__ = ("status_code", "allowed_statuses")
 
     def __init__(
         self,
@@ -562,13 +505,9 @@ class RejectedPositiveData(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
-        self.message = message
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.status_code = status_code
         self.allowed_statuses = allowed_statuses
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -582,16 +521,7 @@ class MissingHeaderNotRejected(Failure):
     checks = ("missing_required_header",)
     kind_title = "Missing required header accepted"
 
-    __slots__ = (
-        "operation",
-        "header_name",
-        "status_code",
-        "expected_statuses",
-        "message",
-        "title",
-        "case_id",
-        "severity",
-    )
+    __slots__ = ("header_name", "status_code", "expected_statuses")
 
     def __init__(
         self,
@@ -604,14 +534,10 @@ class MissingHeaderNotRejected(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.header_name = header_name
         self.status_code = status_code
         self.expected_statuses = expected_statuses
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -625,17 +551,7 @@ class UnsupportedMethodResponse(Failure):
     checks = ("unsupported_method",)
     kind_title = "Wrong response to undeclared method"
 
-    __slots__ = (
-        "operation",
-        "method",
-        "status_code",
-        "allow_header_present",
-        "failure_reason",
-        "message",
-        "title",
-        "case_id",
-        "severity",
-    )
+    __slots__ = ("method", "status_code", "allow_header_present", "failure_reason")
 
     def __init__(
         self,
@@ -649,15 +565,11 @@ class UnsupportedMethodResponse(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.method = method
         self.status_code = status_code
         self.allow_header_present = allow_header_present
         self.failure_reason = failure_reason
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -671,16 +583,7 @@ class AllowHeaderMismatch(Failure):
     checks = ("allow_header_conformance",)
     kind_title = "Allow header mismatch"
 
-    __slots__ = (
-        "operation",
-        "allow_header",
-        "missing_methods",
-        "undocumented_methods",
-        "message",
-        "title",
-        "case_id",
-        "severity",
-    )
+    __slots__ = ("allow_header", "missing_methods", "undocumented_methods")
 
     def __init__(
         self,
@@ -693,14 +596,10 @@ class AllowHeaderMismatch(Failure):
         title: str | None = None,
         case_id: str | None = None,
     ) -> None:
-        self.operation = operation
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.allow_header = allow_header
         self.missing_methods = missing_methods
         self.undocumented_methods = undocumented_methods
-        self.message = message
-        self.title = title if title is not None else self.kind_title
-        self.case_id = case_id
-        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
