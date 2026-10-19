@@ -12,6 +12,7 @@ from typing import (
     Generic,
     NoReturn,
     TypeVar,
+    cast,
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
@@ -62,6 +63,7 @@ if TYPE_CHECKING:
     from werkzeug.test import TestResponse
 
     from schemathesis.auths import AuthContext, AuthProvider
+    from schemathesis.checks import RunChecks
     from schemathesis.core import Specification
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
@@ -99,6 +101,8 @@ class BaseSchema(Mapping):
     _constants_pool_cache: tuple[object, int, ConstantsPool] | None = field(
         init=False, default=None, repr=False, compare=False
     )
+    # Check instances outside the engine; clones build their own, so `after_run` fires once per test function.
+    _run_checks: RunChecks | None = field(init=False, default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
@@ -450,7 +454,6 @@ class BaseSchema(Mapping):
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         raise NotImplementedError
 
-    @abstractmethod
     def make_case(
         self,
         *,
@@ -466,6 +469,25 @@ class BaseSchema(Mapping):
         multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:
+        from requests.structures import CaseInsensitiveDict
+
+        return Case(
+            operation=operation,
+            method=method or cast("HttpMethod", operation.method.upper()),
+            path=path or operation.path,
+            path_parameters=path_parameters or {},
+            headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
+            cookies=cookies or {},
+            query=query or {},
+            body=body,
+            media_type=self._case_media_type(operation, body, media_type),
+            multipart_content_types=multipart_content_types,
+            meta=meta,
+        )
+
+    @abstractmethod
+    def _case_media_type(self, operation: APIOperation, body: Body, media_type: str | None) -> str | None:
+        """Media type of a new case when the caller gives `media_type`, possibly `None`."""
         raise NotImplementedError
 
     @abstractmethod

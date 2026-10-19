@@ -16,6 +16,7 @@ from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     Indent,
     LoadingProgressManager,
+    SpinnerProgressManager,
     _style,
     display_api_operations,
     display_baseline_summary,
@@ -612,46 +613,11 @@ def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]
 
 
 @dataclass(slots=True)
-class ProbingProgressManager:
-    console: Console
-    started_at: Instant
-    progress: Progress
-    progress_task_id: TaskID | None
-    is_interrupted: bool
-
+class ProbingProgressManager(SpinnerProgressManager):
     def __init__(self, console: Console) -> None:
-        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
         from rich.text import Text
 
-        self.console = console
-        self.started_at = Instant()
-        self.progress = Progress(
-            TextColumn(""),
-            SpinnerColumn("clock"),
-            RenderableColumn(Text("Probing API capabilities", style="bright_white")),
-            transient=True,
-            console=console,
-            # A spinner has nothing to show outside a terminal, and stopping it there prints a blank line.
-            disable=not console.is_interactive,
-        )
-        self.progress_task_id = None
-        self.is_interrupted = False
-
-    def start(self) -> None:
-        """Start probing progress display."""
-        self.progress_task_id = self.progress.add_task("Probing", total=None)
-        self.progress.start()
-
-    def stop(self) -> None:
-        """Stop probing progress display."""
-        assert self.progress_task_id is not None
-        self.progress.stop_task(self.progress_task_id)
-        self.progress.stop()
-
-    def interrupt(self) -> None:
-        """Handle interruption during probing."""
-        self.is_interrupted = True
-        self.stop()
+        SpinnerProgressManager.__init__(self, console, Text("Probing API capabilities", style="bright_white"))
 
     def get_completion_message(self) -> Text:
         """Generate completion message including duration."""

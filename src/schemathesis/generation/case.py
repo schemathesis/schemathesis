@@ -590,8 +590,9 @@ class Case(Generic[OperationT]):
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"
-            verify = getattr(response, "verify", True)
-            curl = self.as_curl_command(headers=dict(response.request.headers), verify=verify, base_url=sent_base_url)
+            curl = self.as_curl_command(
+                headers=dict(response.request.headers), verify=response.verify, base_url=sent_base_url
+            )
             message += format_failures(
                 case_id=None,
                 response=response,

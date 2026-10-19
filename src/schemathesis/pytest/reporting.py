@@ -102,7 +102,7 @@ class PytestReportDispatcher:
             if result.failure is not None:
                 code_sample = case.as_curl_command(
                     headers=dict(response.request.headers),
-                    verify=getattr(response, "verify", True),
+                    verify=response.verify,
                 )
                 recorder.record_check_failure(
                     name=result.name,

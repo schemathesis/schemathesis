@@ -110,26 +110,20 @@ def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
     return updated, tmp_paths
 
 
-def _build_operation_filter(include_name: tuple[str, ...]) -> set[str]:
-    result: set[str] = set()
-    for op in include_name:
-        parts = op.strip().split(None, 1)
-        if len(parts) == 2:
-            result.add(f"{parts[0].upper()} {parts[1]}")
-    return result
-
-
-def _iter_operations(schema: Any, operation_filter: set[str]) -> Generator[Any, None, None]:
+def _iter_operations(schema: Any, include_name: tuple[str, ...]) -> Generator[Any, None, None]:
+    # "post /users" selects `POST /users`; entries without a path are ignored.
+    names = [
+        f"{parts[0].upper()} {parts[1]}"
+        for parts in (name.strip().split(None, 1) for name in include_name)
+        if len(parts) == 2
+    ]
+    if names:
+        schema = schema.include(name=names)
     for result in schema.get_all_operations():
         if isinstance(result, Err):
             click.echo(f"Skipping invalid operation: {result.err()}", err=True)
             continue
-        operation = result.ok()
-        method = operation.method.upper()
-        path = operation.path
-        if operation_filter and f"{method} {path}" not in operation_filter:
-            continue
-        yield operation
+        yield result.ok()
 
 
 def _normalize_path(text: str) -> str:
@@ -258,14 +252,13 @@ def fuzzing(
 
     schema = _load_schema(schema_path, base_url)
     modes = GenerationMode.from_choice(mode)
-    operation_filter = _build_operation_filter(include_name)
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     records: list[ProfileRecord] = []
 
-    for operation in _iter_operations(schema, operation_filter):
+    for operation in _iter_operations(schema, include_name):
         method = operation.method.upper()
         path = operation.path
 
@@ -378,7 +371,6 @@ def coverage(
 
     schema = _load_schema(schema_path, base_url)
     modes = GenerationMode.from_choice(mode)
-    operation_filter = _build_operation_filter(include_name)
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -386,7 +378,7 @@ def coverage(
     records: list[ProfileRecord] = []
     case_counts: dict[Path, int] = {}
 
-    for operation in _iter_operations(schema, operation_filter):
+    for operation in _iter_operations(schema, include_name):
         method = operation.method.upper()
         path = operation.path
         config = operation.schema.config

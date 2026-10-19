@@ -261,9 +261,7 @@ def _without_security_parameters(
     """Drop auth-carrying properties: a harvested credential would make generated auth valid."""
     from schemathesis.specs.openapi._auth_retry import get_security_parameters
 
-    names = {
-        parameter["name"] for parameter in get_security_parameters(operation) if parameter.get("in") == location.value
-    }
+    names = {parameter.name for parameter in get_security_parameters(operation) if parameter.location == location}
     if not names:
         return schema_properties
     return {name: schema for name, schema in schema_properties.items() if name not in names}

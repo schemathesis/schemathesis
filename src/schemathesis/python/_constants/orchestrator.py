@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from schemathesis.python._constants.adapters import FrameworkAdapter, default_adapters, select_adapter
 from schemathesis.python._constants.extract import _THIRD_PARTY_ROOTS, extract_from_module, local_imports_of
 from schemathesis.python._constants.filter import is_kept
-from schemathesis.python._constants.pool import DEFAULT_CAP_PER_TYPE, ConstantsPool, Origin
+from schemathesis.python._constants.pool import ConstantsPool, Origin
 from schemathesis.python._constants.registry import Source, SourceRegistry, default_registry
 from schemathesis.python._constants.walk import _NON_SEQUENCE_BYTES_TYPES, resolve_modules
 
@@ -76,11 +76,10 @@ def extract_all(
     *,
     registry: SourceRegistry,
     adapters: Iterable[FrameworkAdapter],
-    cap_per_type: int = DEFAULT_CAP_PER_TYPE,
     extra_sources: Iterable[Source] = (),
 ) -> ConstantsPool:
     """Run every registered source, walk to modules, extract + filter, build the pool."""
-    pool = ConstantsPool(cap_per_type=cap_per_type)
+    pool = ConstantsPool()
     _extract_all(registry=registry, adapters=list(adapters), pool=pool, extra_sources=extra_sources)
     return pool
 
