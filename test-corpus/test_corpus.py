@@ -2,10 +2,8 @@ import pathlib
 import sys
 from io import StringIO
 from typing import NoReturn
-from unittest.mock import patch
 
 import pytest
-import requests
 
 import schemathesis
 import schemathesis.graphql as _graphql
@@ -29,7 +27,6 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.jsonschema import BundleError
-from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import TestPhase
@@ -39,34 +36,13 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
 from tools.corpus.conformance import check_conformance  # noqa: E402
-from tools.corpus.io import json_loads, read_corpus_file  # noqa: E402
+from tools.corpus.io import CORPUS_NAMES, load_from_corpus, read_corpus_file  # noqa: E402
+from tools.stub_call import install_stub_call  # noqa: E402
 
-CORPUS_FILE_NAMES = (
-    "swagger-2.0",
-    "openapi-3.0",
-    "openapi-3.1",
-)
-CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
+CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_NAMES}
 GRAPHQL_CORPUS = read_corpus_file("graphql")
 
-RESPONSE = Response(
-    status_code=200,
-    headers={"Content-Type": ["application/json"]},
-    content=b"{}",
-    request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
-    elapsed=0.1,
-    verify=False,
-)
-
-
-def _mock_case_call(case, *args, **kwargs):
-    # Real `Case.call()` freezes metadata right before sending the request; mirror that here so
-    # `case.meta` doesn't re-hash containers on every check access for large bodies.
-    object.__setattr__(case, "_freeze_metadata", True)
-    return RESPONSE
-
-
-patch("schemathesis.Case.call", new=_mock_case_call).start()
+install_stub_call()
 
 
 def pytest_generate_tests(metafunc):
@@ -295,8 +271,7 @@ def test_stateful(corpus, filename):
 def _load_schema(corpus, filename):
     if filename in SLOW_DEFAULT:
         pytest.skip("Data generation is extremely slow for this schema")
-    raw_content = CORPUS_FILES[corpus].extractfile(filename).read()
-    raw_schema = json_loads(raw_content)
+    raw_schema = load_from_corpus(filename, CORPUS_FILES[corpus])
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
         schema.config.update(base_url="http://127.0.0.1:8080/")
@@ -432,8 +407,7 @@ GRAPHQL_FILENAMES = [member.name for member in GRAPHQL_CORPUS.getmembers()]
 
 @pytest.mark.parametrize("filename", GRAPHQL_FILENAMES)
 def test_graphql(filename, tmp_path):
-    raw_content = GRAPHQL_CORPUS.extractfile(filename).read()
-    raw_schema = json_loads(raw_content)
+    raw_schema = load_from_corpus(filename, GRAPHQL_CORPUS)
     schema = _graphql.from_dict(raw_schema)
     schema.config.update(base_url="http://127.0.0.1:8080/graphql")
     schema.config.generation.update(database=None, max_examples=1)

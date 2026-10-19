@@ -2,29 +2,20 @@ import json
 import pathlib
 import sys
 from typing import Any
-from unittest.mock import patch
 
 import pytest
-import requests
 import yaml
 
 import schemathesis
 from schemathesis.config import HealthCheck
-from schemathesis.core.transport import Response
 from schemathesis.engine import from_schema
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent.parent))
 
-RESPONSE = Response(
-    status_code=200,
-    headers={"Content-Type": ["application/json"]},
-    content=b"{}",
-    request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
-    elapsed=0.1,
-    verify=False,
-)
-patch("schemathesis.Case.call", return_value=RESPONSE).start()
+from tools.stub_call import install_stub_call  # noqa: E402
+
+install_stub_call()
 
 
 def _load(name: str) -> dict[str, Any]:
