@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from base64 import b64decode
+from collections.abc import Iterator
+
+from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.media_types import parse
 
 # Smallest well-formed files of common upload formats, keyed by extension.
 FILE_SAMPLES: dict[str, bytes] = {
@@ -25,6 +29,27 @@ FILE_SAMPLES: dict[str, bytes] = {
         "AGEudHh0UEsFBgAAAAABAAEAMwAAACQAAAAAAA=="
     ),
 }
+
+# Media types a server checks against the file signature, so a body sent as one must be a file of that format.
+MEDIA_TYPE_FILE_SAMPLES: dict[str, bytes] = {
+    "image/gif": FILE_SAMPLES["gif"],
+    "image/jpeg": FILE_SAMPLES["jpg"],
+    "image/png": FILE_SAMPLES["png"],
+    "image/webp": FILE_SAMPLES["webp"],
+}
+
+
+def iter_media_type_file_samples(media_type: str) -> Iterator[tuple[str, bytes]]:
+    """Concrete media types `media_type` names, with a file of each format; `*/*` names no format."""
+    try:
+        main, sub = parse(media_type)
+    except MalformedMediaType:
+        return
+    for candidate, sample in MEDIA_TYPE_FILE_SAMPLES.items():
+        candidate_main, candidate_sub = candidate.split("/")
+        if main == candidate_main and sub in ("*", candidate_sub):
+            yield candidate, sample
+
 
 _SIGNATURES = (
     (b"\x89PNG\r\n\x1a\n", "png"),

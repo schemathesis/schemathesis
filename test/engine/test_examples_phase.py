@@ -338,7 +338,7 @@ def test_examples_phase_serialization_not_possible_wraps_message(ctx):
                     ],
                     "requestBody": {
                         "content": {
-                            "image/jpeg": {
+                            "video/mp4": {
                                 "schema": {"format": "base64", "type": "string"},
                             }
                         }
