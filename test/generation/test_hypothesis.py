@@ -695,6 +695,63 @@ def test_end_anchored_patterns_do_not_exhaust_generation(ctx):
     test()
 
 
+@pytest.mark.parametrize(
+    "version",
+    ["4", "7"],
+    ids=["v4", "v7"],
+)
+def test_pattern_stricter_than_format_does_not_exhaust_generation(ctx, version):
+    identifier = {
+        "type": "string",
+        "format": "uuid",
+        "pattern": f"^([0-9a-fA-F]{{8}}-[0-9a-fA-F]{{4}}-{version}[0-9a-fA-F]{{3}}-[89abAB][0-9a-fA-F]{{3}}-[0-9a-fA-F]{{12}})$",
+    }
+    reference = {"$ref": "#/components/schemas/Id"}
+    operation = ctx.openapi.load_operation(
+        "POST /d",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["a", "b", "items", "ids"],
+                            "additionalProperties": False,
+                            "properties": {
+                                "a": reference,
+                                "b": reference,
+                                "items": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "type": "object",
+                                        "required": ["c", "d"],
+                                        "additionalProperties": False,
+                                        "properties": {"c": reference, "d": reference},
+                                    },
+                                },
+                                "ids": {"type": "array", "minItems": 1, "items": reference},
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"schemas": {"Id": identifier}},
+    )
+
+    # The format generator draws few values this pattern admits, so the pattern has to drive generation too.
+    @seed(0)
+    @settings(max_examples=15, deadline=None, database=None, phases=[Phase.generate])
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    def test(case):
+        pass
+
+    test()
+
+
 def test_required_without_properties(ctx):
     operation = ctx.openapi.load_operation(
         "POST /data",
