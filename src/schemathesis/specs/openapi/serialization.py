@@ -6,6 +6,7 @@ from functools import partial
 from typing import Any
 from urllib.parse import quote
 
+from schemathesis.core import media_types
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundled, schema_with_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
 from schemathesis.core.transforms import to_wire_string
@@ -165,7 +166,7 @@ def _serialize_querystring_openapi3(
     if media_type is None:
         return
 
-    if media_type == "application/x-www-form-urlencoded":
+    if media_types.is_form_urlencoded(media_type):
         yield _serialize_querystring_urlencoded(name, media_type_object)
     else:
         yield _serialize_querystring_other_media_type(name, media_type)
