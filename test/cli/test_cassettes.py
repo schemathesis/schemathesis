@@ -342,6 +342,33 @@ def test_har_response_mime_type_and_redirect_url(ctx, cli, cassette_path):
 
 
 @pytest.mark.parametrize(
+    ("charset", "body", "text"),
+    [("latin-1", '"\xe9"'.encode("latin-1"), '"\xe9"'), ("bogus-xyz", b'"\xc3\xa9"', '"\xe9"')],
+    ids=["latin-1", "unknown-charset"],
+)
+def test_response_body_charset_in_reports(ctx, cli, cassette_path, charset, body, text):
+    app, _ = ctx.openapi.make_flask_app({"/api/text": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/text")
+    def text_body():
+        return flask.Response(body, content_type=f"application/json; charset={charset}")
+
+    har_path = cassette_path.with_suffix(".har")
+    cli.run_openapi_app(
+        app,
+        f"--report-har-path={har_path}",
+        f"--report-vcr-path={cassette_path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--mode=positive",
+    )
+    assert [entry["response"]["content"]["text"] for entry in load_json_or_fail(har_path)["log"]["entries"]] == [text]
+    assert [interaction["response"]["body"] for interaction in load_cassette(cassette_path)["http_interactions"]] == [
+        {"encoding": charset, "string": text}
+    ]
+
+
+@pytest.mark.parametrize(
     ("value", "expected"),
     [
         (

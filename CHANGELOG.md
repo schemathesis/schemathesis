@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
 - Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
 
