@@ -49,6 +49,31 @@ def test_pdf_generation(ctx):
             assert transport.serialize_case(case)["data"] == SAMPLE_PDF
 
 
+def test_wildcard_media_type_uses_matching_custom_strategy(ctx):
+    payloads = {"image/png": b"PNG", "image/jpeg": b"JPEG"}
+    for media_type, payload in payloads.items():
+        schemathesis.openapi.media_type(media_type, st.just(payload))
+
+    operation = ctx.openapi.load_operation(
+        "POST /image",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"image/*": {"schema": {"type": "string", "format": "binary"}}},
+            },
+            "responses": {"204": {"description": "OK"}},
+        },
+    )
+    seen = set()
+
+    @run_given(case=operation.as_strategy(), max_examples=10)
+    def test(case):
+        assert case.body == payloads[case.media_type]
+        seen.add(case.media_type)
+
+    assert seen == set(payloads)
+
+
 def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {

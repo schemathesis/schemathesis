@@ -8132,6 +8132,22 @@ def test_each_custom_media_type_alternative_yields_its_own_body(ctx):
     ]
 
 
+def test_wildcard_custom_media_type_alternatives_yield_matching_bodies(ctx):
+    schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
+    schemathesis.openapi.media_type("image/jpeg", st.just(b"\xff\xd8jpeg"))
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {"image/*": {"schema": {"type": "string", "format": "binary"}}},
+        },
+    )["/foo"]["post"]
+    assert [(case.media_type, case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
+        ("image/png", b"\x89PNG"),
+        ("image/jpeg", b"\xff\xd8jpeg"),
+    ]
+
+
 def test_custom_media_type_body_emits_no_positive_case_in_negative_mode(ctx):
     schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
     operation = load_schema(
@@ -8167,6 +8183,27 @@ def test_multipart_body_with_custom_encoding_yields_positive_case(ctx, is_requir
         for case in iter_cases(operation, GenerationMode.POSITIVE)
         if case.body is not NOT_SET
     ] == [(GenerationMode.POSITIVE, {"file": b"\x89PNG"})]
+
+
+def test_multipart_wildcard_custom_encoding_records_matching_part_content_type(ctx):
+    schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "multipart/form-data": {
+                    "schema": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}},
+                    "encoding": {"file": {"contentType": "image/*"}},
+                }
+            },
+        },
+    )["/foo"]["post"]
+    assert [
+        (case.body, case.multipart_content_types)
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if case.body is not NOT_SET
+    ] == [({"file": b"\x89PNG"}, {"file": "image/png"})]
 
 
 def test_combination_cases_deduplicate_repeated_requests(ctx):
