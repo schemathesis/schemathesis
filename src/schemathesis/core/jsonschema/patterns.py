@@ -505,6 +505,34 @@ _SubpatternValue: TypeAlias = tuple[int | None, int, int, list[_Node]]
 _BranchValue: TypeAlias = tuple[None, list[list[_Node]]]
 
 
+def compile_ecma_pattern(pattern: str) -> re.Pattern[str] | None:
+    """The pattern under the validator's reading of it, or `None` when Python `re` rejects it."""
+    # `re.ASCII`: the validator's engine expands `\d`, `\w` and `\b` over ASCII, Python over the whole
+    # of Unicode, so the default reading draws values the schema rejects. `\s` follows neither reading.
+    try:
+        return re.compile(anchor_end_of_string(pattern), re.ASCII)
+    except (re.error, ValueError):
+        return None
+
+
+@lru_cache(maxsize=256)
+def anchor_end_of_string(pattern: str) -> str:
+    r"""`pattern` with its closing `$` spelled `\Z`, the end of the string the validator means."""
+    # Python's `$` also matches before a final newline, which only a closing `$` lets a drawn value carry.
+    try:
+        parsed = sre_parse.parse(pattern)
+    except (re.error, InternalError):
+        return pattern
+    if (
+        parsed
+        and parsed[-1] == (sre.AT, sre.AT_END)
+        and not parsed.state.flags & re.MULTILINE
+        and pattern.endswith("$")
+    ):
+        return pattern[:-1] + r"\Z"
+    return pattern
+
+
 @lru_cache(maxsize=256)
 def _parse_regex(pattern: str) -> list[_Node] | None:
     """Parse `pattern` to an sre AST node list (None if invalid); the cached result must not be mutated."""

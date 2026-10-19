@@ -20,7 +20,6 @@ from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
-    compile_ecma_pattern,
     is_unsatisfiable,
     is_valid,
     make_validator,
@@ -66,6 +65,7 @@ from schemathesis.core import (
 from schemathesis.core.cache import MISSING
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.patterns import (
+    compile_ecma_pattern,
     matches_every_string,
     pattern_length_bounds,
     pattern_length_is_unreachable,

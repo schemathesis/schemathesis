@@ -27,12 +27,17 @@ from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
     build_validator_for,
-    compile_ecma_pattern,
     make_validator,
     make_validator_for,
     matches_pattern,
 )
-from schemathesis.core.jsonschema.patterns import normalize_regex, pattern_length_bounds, update_quantifier
+from schemathesis.core.jsonschema.patterns import (
+    anchor_end_of_string,
+    compile_ecma_pattern,
+    normalize_regex,
+    pattern_length_bounds,
+    update_quantifier,
+)
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_surrounding_whitespace
@@ -71,7 +76,7 @@ def _compiled_pattern(pattern: str) -> re.Pattern[str] | None:
         return None
     # No `re.ASCII`: the translation spells properties out as ranges, and the flag would refuse every
     # non-ASCII one of them. The translation only comes back once it has compiled, so this cannot fail.
-    return re.compile(translated)
+    return re.compile(anchor_end_of_string(translated))
 
 
 def _countable(bound: int | None) -> int | None:
@@ -1676,13 +1681,10 @@ def _pattern_driven(
     # spelled into the pattern, it is drawn to.
     folded = update_quantifier(compiled.pattern, view.min_length, view.max_length)
     if folded != compiled.pattern:
-        compiled = re.compile(folded, compiled.flags)
+        compiled = _compiled_pattern(folded)
+        assert compiled is not None
     # Python `re` reads the pattern differently from the validator, so the validator decides what the draw is worth.
     strategy = _from_pattern(compiled, ctx).filter(_facet_check("pattern", pattern))
-    if "$" in pattern:
-        # Python also matches `$` before a trailing newline, where the validator means end of string;
-        # telling literal `$`s apart costs more than dropping the newline-terminated values.
-        strategy = strategy.filter(lambda value: not value.endswith("\n"))
     for other in others:
         strategy = strategy.filter(_facet_check("pattern", other))
     # Length is normally folded into the pattern upstream; this filter is the soundness net.

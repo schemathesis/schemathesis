@@ -21,6 +21,7 @@ from schemathesis.core.jsonschema.patterns import (
     _PARTIAL_SCRIPT_CLASSES,
     _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
+    compile_ecma_pattern,
     is_valid_jsonschema_rs_regex,
     is_valid_python_regex,
     matches_every_string,
@@ -696,6 +697,33 @@ def test_translation_agrees_with_the_validator(pattern, matching, rejected):
         assert validator.is_valid(value), value
     for value in rejected:
         assert not compiled.fullmatch(value), value
+        assert not validator.is_valid(value), value
+
+
+_END_ANCHOR_AGREEMENT = [
+    (r"^a$", ("a",), ("a\n",)),
+    (r"(?m)^a$", ("a", "a\nb"), ("ab",)),
+    (r"\\$", ("\\",), ("\\\n",)),
+    (r"\$", ("$",), ("a",)),
+    (r"[$]", ("$",), ("a",)),
+    (r"[^$]", ("a",), ("$",)),
+    (r"^[^]$]+$", ("ab",), ("a$", "a]")),
+    (r"^[]$]+$", ("]$",), ("a", "]\n")),
+]
+
+
+@pytest.mark.parametrize(
+    ("pattern", "matching", "rejected"), _END_ANCHOR_AGREEMENT, ids=[item[0] for item in _END_ANCHOR_AGREEMENT]
+)
+def test_end_anchor_agrees_with_the_validator(pattern, matching, rejected):
+    compiled = compile_ecma_pattern(pattern)
+    assert compiled is not None
+    validator = jsonschema_rs.validator_for({"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS)
+    for value in matching:
+        assert compiled.search(value), value
+        assert validator.is_valid(value), value
+    for value in rejected:
+        assert not compiled.search(value), value
         assert not validator.is_valid(value), value
 
 

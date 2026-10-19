@@ -11,7 +11,7 @@ from fractions import Fraction
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, assume, find, given, settings
+from hypothesis import HealthCheck, Phase, assume, find, given, seed, settings
 from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.errors import InvalidArgument, NoSuchExample, Unsatisfiable
@@ -636,6 +636,63 @@ def test_merge_length_into_pattern(ctx):
     @run_given(operation.as_strategy(), max_examples=1)
     def test(case):
         pass
+
+
+def test_end_anchor_after_pattern_normalization():
+    compiled = strategy._compiled_pattern(r"^\p{Greek}+$")
+    assert compiled is not None
+    assert compiled.search("α")
+    assert not compiled.search("α\n")
+
+
+def test_end_anchored_patterns_do_not_exhaust_generation(ctx):
+    identifier = {
+        "type": "string",
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+        "maxLength": 36,
+    }
+    operation = ctx.openapi.load_operation(
+        "POST /d",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Bulk"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={
+            "schemas": {
+                "Id": identifier,
+                "Item": {
+                    "type": "object",
+                    "required": ["a", "b", "c", "d"],
+                    "additionalProperties": False,
+                    "properties": {name: {"$ref": "#/components/schemas/Id"} for name in "abcd"},
+                },
+                "Bulk": {
+                    "type": "object",
+                    "required": ["data"],
+                    "additionalProperties": False,
+                    "properties": {
+                        "data": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {"$ref": "#/components/schemas/Item"},
+                        }
+                    },
+                },
+            }
+        },
+    )
+
+    # Four end-anchored fields per item: any draw wasted on a trailing newline exhausts the filter budget.
+    @seed(14)
+    @settings(max_examples=15, deadline=None, database=None, phases=[Phase.generate])
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    def test(case):
+        pass
+
+    test()
 
 
 def test_required_without_properties(ctx):
