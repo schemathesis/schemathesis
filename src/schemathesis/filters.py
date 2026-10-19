@@ -278,6 +278,76 @@ class FilterSet:
             operation_id_regex=operation_id_regex,
         )
 
+    def with_include(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: RegexValue | None = None,
+        method: FilterValue | None = None,
+        method_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: RegexValue | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+    ) -> Self:
+        """A copy of this filter set with a new INCLUDE filter."""
+        filter_set = self.clone()
+        filter_set.include(
+            func,
+            name=name,
+            name_regex=name_regex,
+            method=method,
+            method_regex=method_regex,
+            path=path,
+            path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
+        )
+        return filter_set
+
+    def with_exclude(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: RegexValue | None = None,
+        method: FilterValue | None = None,
+        method_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: RegexValue | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+        deprecated: bool = False,
+    ) -> Self:
+        """A copy of this filter set with a new EXCLUDE filter, optionally excluding deprecated operations too."""
+        filter_set = self.clone()
+        if deprecated:
+            if func is None:
+                func = is_deprecated
+            else:
+                filter_set.exclude(is_deprecated)
+        filter_set.exclude(
+            func,
+            name=name,
+            name_regex=name_regex,
+            method=method,
+            method_regex=method_regex,
+            path=path,
+            path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
+        )
+        return filter_set
+
     def _add_filter(
         self,
         include: bool,
