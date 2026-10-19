@@ -277,8 +277,26 @@ def _operation(ctx, parameter):
             9223372036854776001,
             9223372036854776001,
         ),
+        (
+            {"in": "query", "schema": {"anyOf": [{"type": "number"}, {"type": "string"}]}},
+            GenerationMode.POSITIVE,
+            "²",
+            "²",
+        ),
+        (
+            {"in": "query", "schema": {"anyOf": [{"type": "number"}, {"type": "string"}]}},
+            GenerationMode.POSITIVE,
+            "--5",
+            "--5",
+        ),
     ],
-    ids=["declared-encoded-path-value", "json-encoded-parameter", "integer-beyond-float-precision"],
+    ids=[
+        "declared-encoded-path-value",
+        "json-encoded-parameter",
+        "integer-beyond-float-precision",
+        "non-ascii-digit",
+        "double-minus",
+    ],
 )
 def test_wire_reading_keeps_validity(ctx, case_factory, parameter, mode, generated, sent):
     operation = _operation(ctx, parameter)

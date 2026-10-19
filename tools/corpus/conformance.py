@@ -222,7 +222,7 @@ def _read_text(text: str, parameter: OpenApiParameter) -> object:
 
 def _coerce(text: str, types: list[str]) -> object:
     # An integer parser keeps every digit a float would round away.
-    if "number" in types and text.lstrip("-").isdigit():
+    if "number" in types and text.isascii() and text.removeprefix("-").isdigit():
         return int(text)
     return coerce_wire_string(text, types)
 
