@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.responses import ResponseSchemaCache
+    from schemathesis.specs.openapi.adapter.security import SecurityParameter
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
@@ -32,7 +33,7 @@ ExtractSchemaForMediaType = Callable[
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
     [Mapping[str, Any], Mapping[str, Any], "Resolver"],
-    Iterator[Mapping[str, Any]],
+    Iterator["SecurityParameter"],
 ]
 PrepareMultipart = Callable[
     ["APIOperation", dict[str, Any], dict[str, str] | None],

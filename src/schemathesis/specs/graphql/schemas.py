@@ -16,7 +16,6 @@ from unittest import SkipTest
 from urllib.parse import urlsplit, urlunsplit
 
 from hypothesis import strategies as st
-from requests.structures import CaseInsensitiveDict
 from typing_extensions import override
 
 from schemathesis import auths
@@ -69,7 +68,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.spec import ApiSchema, Scheduler
-    from schemathesis.core.transport import HttpMethod, Response
+    from schemathesis.core.transport import Response
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.run import Phase
@@ -406,34 +405,8 @@ class GraphQLSchema(BaseSchema):
         return []
 
     @override
-    def make_case(
-        self,
-        *,
-        operation: APIOperation,
-        method: HttpMethod | None = None,
-        path: str | None = None,
-        path_parameters: dict[str, Any] | None = None,
-        headers: dict[str, Any] | CaseInsensitiveDict | None = None,
-        cookies: dict[str, Any] | None = None,
-        query: dict[str, Any] | None = None,
-        body: Body = NOT_SET,
-        media_type: str | None = None,
-        multipart_content_types: dict[str, str] | None = None,
-        meta: CaseMetadata | None = None,
-    ) -> Case:
-        return Case(
-            operation=operation,
-            method=method or cast("HttpMethod", operation.method.upper()),
-            path=path or operation.path,
-            path_parameters=path_parameters or {},
-            headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
-            cookies=cookies or {},
-            query=query or {},
-            body=body,
-            media_type=media_type or "application/json",
-            multipart_content_types=multipart_content_types,
-            meta=meta,
-        )
+    def _case_media_type(self, operation: APIOperation, body: Body, media_type: str | None) -> str | None:
+        return media_type or "application/json"
 
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:

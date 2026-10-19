@@ -76,6 +76,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
+    from schemathesis.specs.openapi.adapter.security import SecurityParameter
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -1143,12 +1144,6 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
 AUTH_REJECTION_STATUSES = frozenset({401, 403})
 
 
-def _requires_authentication(operation: APIOperation) -> bool:
-    from schemathesis.specs.openapi.adapter.security import get_effective_security_scheme_names
-
-    return bool(get_effective_security_scheme_names(operation, operation.schema.raw_schema))
-
-
 def _targets_generated_resource(ctx: CheckContext, operation: APIOperation) -> bool:
     """Whether the resource this request targets was drawn rather than supplied by the user."""
     if "{" not in operation.path:
@@ -1176,9 +1171,11 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
             # method dispatch. 405 is only guaranteed when the target resource exists.
             if response.status_code == 404 and _targets_generated_resource(ctx, case.operation):
                 return None
+            from schemathesis.specs.openapi.adapter.security import declares_security
+
             # Most frameworks authenticate before method dispatch, so a protected operation rejects an
             # undeclared method with 401/403 without ever reaching routing.
-            if response.status_code in AUTH_REJECTION_STATUSES and _requires_authentication(case.operation):
+            if response.status_code in AUTH_REJECTION_STATUSES and declares_security(case.operation):
                 return None
             # Rate limiters usually run as middleware ahead of routing and throttle every method alike.
             if response.status_code == 429:
@@ -1649,9 +1646,9 @@ def object_level_authorization(ctx: CheckContext, response: Response, case: Case
 
 
 def _has_undeclared_explicit_authorization(
-    ctx: CheckContext, response: Response, security_parameters: list[Mapping[str, Any]]
+    ctx: CheckContext, response: Response, security_parameters: list[SecurityParameter]
 ) -> bool:
-    if any(p["in"] == "header" and p["name"].lower() == "authorization" for p in security_parameters):
+    if any(p.location == ParameterLocation.HEADER and p.name.lower() == "authorization" for p in security_parameters):
         return False
     sources = [
         ctx._headers,
@@ -1700,7 +1697,7 @@ def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> 
 
 
 def _contains_auth(
-    ctx: CheckContext, case: Case, response: Response, security_parameters: list[Mapping[str, Any]]
+    ctx: CheckContext, case: Case, response: Response, security_parameters: list[SecurityParameter]
 ) -> AuthKind | None:
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
@@ -1721,18 +1718,18 @@ def _contains_auth(
             # Generated values may render a header the stdlib parser rejects; fall back to the cookie jar.
             header_cookies = SimpleCookie()
 
-    def has_header(p: Mapping[str, Any]) -> bool:
-        return p["in"] == "header" and p["name"] in request.headers
+    def has_header(p: SecurityParameter) -> bool:
+        return p.location == ParameterLocation.HEADER and p.name in request.headers
 
-    def has_query(p: Mapping[str, Any]) -> bool:
-        return p["in"] == "query" and p["name"] in query
+    def has_query(p: SecurityParameter) -> bool:
+        return p.location == ParameterLocation.QUERY and p.name in query
 
-    def has_cookie(p: Mapping[str, Any]) -> bool:
+    def has_cookie(p: SecurityParameter) -> bool:
         cookies = cast(RequestsCookieJar, request._cookies)  # type: ignore[attr-defined]
-        return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
+        return p.location == ParameterLocation.COOKIE and (p.name in cookies or p.name in header_cookies)
 
     for parameter in security_parameters:
-        name = parameter["name"]
+        name = parameter.name
         if has_header(parameter):
             if (
                 # Explicit CLI headers

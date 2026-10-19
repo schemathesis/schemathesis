@@ -10,7 +10,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import SAFE_METHODS
 from schemathesis.openapi.checks import ObjectLevelAuthorizationViolation
 from schemathesis.specs.openapi._auth_retry import clone_case, remove_auth_from_cookie_header, send_probe
-from schemathesis.specs.openapi.adapter.security import get_effective_security_scheme_names
+from schemathesis.specs.openapi.adapter.security import declares_security
 from schemathesis.specs.openapi.extra_data_source import declared_response_schema, referenced_by
 from schemathesis.specs.openapi.semantic_pool import resolve_combinator, resolve_ref
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -159,7 +159,7 @@ def _linked_values(read: _OwnerRead) -> Iterator[tuple[str, object, Case | None]
 
 def _declared_public(operation: APIOperation) -> bool:
     """Whether the schema says anyone may call `operation`."""
-    if get_effective_security_scheme_names(operation, operation.schema.raw_schema):
+    if declares_security(operation):
         return False
     # Without schema-wide `security` the server may still require credentials; the anonymous replay decides.
     return "security" in operation.schema.raw_schema

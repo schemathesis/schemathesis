@@ -325,13 +325,13 @@ _RUN_CHECKS_LOCK = threading.Lock()
 def run_checks_for(schema: BaseSchema) -> RunChecks:
     # Per-schema cache (non-engine paths) so `after_response`/`after_run` share one instance.
     # Lazy + atomic: built on first access, once, even under concurrency.
-    cached = schema.__dict__.get("_run_checks")
+    cached = schema._run_checks
     if cached is None:
         with _RUN_CHECKS_LOCK:
-            cached = schema.__dict__.get("_run_checks")
+            cached = schema._run_checks
             if cached is None:
                 cached = RunChecks.from_registry(config=schema.config.checks_config_for())
-                schema.__dict__["_run_checks"] = cached
+                schema._run_checks = cached
     return cached
 
 

@@ -529,16 +529,12 @@ class OperationLoader:
         # credential can only ever be rejected, so such requests are sent without one.
         if config.with_security_parameters and not has_optional_auth(schema.raw_schema, definition):
             for param in operation.security.iter_parameters():
-                param_name = param.get("name")
-                param_location = param.get("in")
-                if (
-                    param_name is not None
-                    and param_location is not None
-                    and operation.get_parameter(name=param_name, location=param_location) is not None
-                ):
+                if operation.get_parameter(name=param.name, location=param.location) is not None:
                     continue
                 operation.add_parameter(
-                    OpenApiParameter.from_definition(definition=dict(param), name_to_uri={}, adapter=schema.adapter)
+                    OpenApiParameter.from_definition(
+                        definition=dict(param.definition), name_to_uri={}, adapter=schema.adapter
+                    )
                 )
         dispatch_before_init_operation(schema, HookContext(operation=operation), operation)
         # After the hooks: a body they converted keeps its own copies, so their changes stay with this operation.

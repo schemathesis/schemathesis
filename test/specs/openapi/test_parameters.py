@@ -296,7 +296,7 @@ def _assert_parameter(schema, schema_spec, location, expected=None):
                 }
             ]
         )
-    parameters = [param for param in operation.security.iter_parameters() if param["in"] == location]
+    parameters = [param.definition for param in operation.security.iter_parameters() if param.location == location]
     # Then it should be presented as a "string" parameter
     assert parameters == expected
 

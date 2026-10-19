@@ -7,7 +7,7 @@ from typing import Any, Literal, NotRequired, TypeAlias
 
 from typing_extensions import TypedDict
 
-from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef, _SecurityTypeKey
+from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef
 
 
 class BodyParameter(TypedDict):
@@ -125,14 +125,3 @@ class Operation(TypedDict):
     description: NotRequired[str]
     externalDocs: NotRequired[dict[str, Any]]
     schemes: NotRequired[list[str]]
-
-
-# Security parameter types
-class SecurityParameter(NonBodyParameter, _SecurityTypeKey):
-    """Swagger 2.0 synthetic security parameter.
-
-    Created from security definitions (apiKey or basic auth).
-    Follows the same structure as NonBodyParameter since v2 has inline types.
-    """
-
-    pass

@@ -38,7 +38,6 @@ from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import (
     HTTP_METHODS_SCHEMA,
-    HttpMethod,
     HttpMethodSchema,
     Response,
     restful_method_priority,
@@ -46,7 +45,7 @@ from schemathesis.core.transport import (
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.meta import CaseMetadata, ComponentInfo
+from schemathesis.generation.meta import ComponentInfo
 from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.parameters import RequestBodySchemaCache
@@ -773,9 +772,9 @@ class OpenApiSchema(BaseSchema):
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
-            security_parameters = [param for param in operation.security.iter_parameters() if param["in"] == location]
-            if security_parameters:
-                definitions.extend(security_parameters)
+            definitions.extend(
+                param.definition for param in operation.security.iter_parameters() if param.location == location
+            )
         if definitions:
             return self._get_parameter_serializer(definitions)
         return None
@@ -810,36 +809,10 @@ class OpenApiSchema(BaseSchema):
         return body
 
     @override
-    def make_case(
-        self,
-        *,
-        operation: APIOperation,
-        method: HttpMethod | None = None,
-        path: str | None = None,
-        path_parameters: dict[str, Any] | None = None,
-        headers: dict[str, Any] | CaseInsensitiveDict | None = None,
-        cookies: dict[str, Any] | None = None,
-        query: dict[str, Any] | None = None,
-        body: Body = NOT_SET,
-        media_type: str | None = None,
-        multipart_content_types: dict[str, str] | None = None,
-        meta: CaseMetadata | None = None,
-    ) -> Case:
+    def _case_media_type(self, operation: APIOperation, body: Body, media_type: str | None) -> str | None:
         if body is not NOT_SET and media_type is None:
-            media_type = operation._get_default_media_type()
-        return Case(
-            operation=operation,
-            method=method or cast("HttpMethod", operation.method.upper()),
-            path=path or operation.path,
-            path_parameters=path_parameters or {},
-            headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
-            cookies=cookies or {},
-            query=query or {},
-            body=body,
-            media_type=media_type,
-            multipart_content_types=multipart_content_types,
-            meta=meta,
-        )
+            return operation._get_default_media_type()
+        return media_type
 
     @override
     def validate_response(

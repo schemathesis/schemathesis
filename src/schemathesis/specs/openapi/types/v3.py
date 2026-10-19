@@ -7,7 +7,7 @@ from typing import Any, Literal, NotRequired, TypeAlias
 
 from typing_extensions import TypedDict
 
-from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef, _SecurityTypeKey
+from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef
 
 
 class Example(TypedDict):
@@ -133,14 +133,3 @@ class Operation(TypedDict):
     externalDocs: NotRequired[dict[str, Any]]
     servers: NotRequired[list[dict[str, Any]]]
     callbacks: NotRequired[dict[str, Any]]
-
-
-# Security parameter types
-class SecurityParameter(ParameterWithSchema, _SecurityTypeKey):
-    """OpenAPI 3.x synthetic security parameter.
-
-    Created from security schemes (apiKey or http auth).
-    Follows the same structure as ParameterWithSchema since v3 uses nested schema.
-    """
-
-    pass

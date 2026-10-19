@@ -150,8 +150,8 @@ def test_invalid_security_requirement_types_are_ignored(ctx):
     params = list(operation.security.iter_parameters())
     # Only the valid ApiKeyAuth requirement should be processed
     assert len(params) == 1
-    assert params[0]["name"] == "X-API-Key"
-    assert params[0]["in"] == "header"
+    assert params[0].name == "X-API-Key"
+    assert params[0].location == "header"
 
 
 SECURITY_DEFINITIONS = {
@@ -239,4 +239,6 @@ SECURITY_REQUIRED_CASES = [
 )
 def test_only_schemes_demanded_by_every_alternative_are_required(ctx, version, security, expected):
     operation = _schema_with_security(ctx, version, security)["/test"]["GET"]
-    assert {parameter["name"]: parameter["required"] for parameter in operation.security.iter_parameters()} == expected
+    assert {
+        parameter.name: parameter.definition["required"] for parameter in operation.security.iter_parameters()
+    } == expected

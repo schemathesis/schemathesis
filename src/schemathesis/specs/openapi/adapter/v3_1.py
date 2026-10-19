@@ -2,11 +2,11 @@ from functools import partial
 
 from jsonschema_rs import Draft202012Validator
 
+from schemathesis.specs.openapi import serialization
 from schemathesis.specs.openapi.adapter import (
     base_paths,
     content_types,
     formdata,
-    parameter_serializers,
     parameters,
     responses,
     security,
@@ -65,7 +65,7 @@ get_default_media_types: GetDefaultMediaTypes = content_types.default_media_type
 get_base_path: GetBasePath = base_paths.base_path_v3
 get_base_url: GetBaseUrl = base_paths.base_url_v3
 validate_schema: ValidateSchema = validators.validate_v3
-get_parameter_serializer: GetParameterSerializer = parameter_serializers.serializer_v3
+get_parameter_serializer: GetParameterSerializer = serialization.serialize_openapi3_parameters
 extract_security_definitions: ExtractSecurityDefinitions = security.extract_security_definitions_v3
 
 jsonschema_validator_cls = Draft202012Validator

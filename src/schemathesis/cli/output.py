@@ -236,32 +236,24 @@ def make_console(**kwargs: Any) -> Console:
 
 
 @dataclass(slots=True)
-class LoadingProgressManager:
-    """Manage the loading spinner and completion/error messages for schema loading."""
+class SpinnerProgressManager:
+    """A transient spinner next to a message while one step runs, e.g. schema loading."""
 
     console: Console
-    location: str
     started_at: Instant
     progress: Progress
     progress_task_id: TaskID | None
     is_interrupted: bool
 
-    def __init__(self, console: Console, location: str) -> None:
+    def __init__(self, console: Console, message: Text) -> None:
         from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
-        from rich.style import Style
-        from rich.text import Text
 
         self.console = console
-        self.location = location
         self.started_at = Instant()
-        progress_message = Text.assemble(
-            ("Loading specification from ", Style(color="white")),
-            (location, Style(color="cyan")),
-        )
         self.progress = Progress(
             TextColumn(""),
             SpinnerColumn("clock"),
-            RenderableColumn(progress_message),
+            RenderableColumn(message),
             console=console,
             transient=True,
             # A spinner has nothing to show outside a terminal, and stopping it there prints a blank line.
@@ -271,20 +263,35 @@ class LoadingProgressManager:
         self.is_interrupted = False
 
     def start(self) -> None:
-        """Start loading progress display."""
-        self.progress_task_id = self.progress.add_task("Loading", total=None)
+        self.progress_task_id = self.progress.add_task("", total=None)
         self.progress.start()
 
     def stop(self) -> None:
-        """Stop loading progress display."""
         assert self.progress_task_id is not None
         self.progress.stop_task(self.progress_task_id)
         self.progress.stop()
 
     def interrupt(self) -> None:
-        """Handle interruption during loading."""
         self.is_interrupted = True
         self.stop()
+
+
+@dataclass(slots=True)
+class LoadingProgressManager(SpinnerProgressManager):
+    """Manage the loading spinner and completion/error messages for schema loading."""
+
+    location: str
+
+    def __init__(self, console: Console, location: str) -> None:
+        from rich.style import Style
+        from rich.text import Text
+
+        SpinnerProgressManager.__init__(
+            self,
+            console,
+            Text.assemble(("Loading specification from ", Style(color="white")), (location, Style(color="cyan"))),
+        )
+        self.location = location
 
     def get_completion_message(self) -> Text:
         """Generate completion message including duration."""
