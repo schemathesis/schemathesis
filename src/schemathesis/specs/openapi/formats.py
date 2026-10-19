@@ -539,10 +539,16 @@ FORMAT_NARROWERS: dict[str, Callable[[int, float], st.SearchStrategy[str] | None
 def format_lengths_for(formats: dict[str, st.SearchStrategy]) -> dict[str, FormatLengths]:
     """What is known about the lengths in `formats`, skipping every name with a caller-supplied generator."""
     defaults = get_default_format_strategies()
+    return _format_lengths(frozenset(name for name in FORMAT_LENGTHS if formats.get(name) is defaults.get(name)))
+
+
+@lru_cache
+def _format_lengths(names: frozenset[str]) -> dict[str, FormatLengths]:
+    # Shared between callers, which only read it.
     return {
         name: FormatLengths(shortest, longest, FORMAT_NARROWERS.get(name))
         for name, (shortest, longest) in FORMAT_LENGTHS.items()
-        if formats.get(name) is defaults.get(name)
+        if name in names
     }
 
 

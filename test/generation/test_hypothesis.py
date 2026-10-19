@@ -3072,10 +3072,31 @@ def test_canonical_meta_invalid_schema_is_reported(schema, keyword):
     [datetime.date(2020, 1, 1), datetime.time(1, 2, 3), datetime.datetime(2020, 1, 1, 2, 3, 4)],
     ids=["date", "time", "datetime"],
 )
-def test_canonical_schema_with_a_non_json_value_is_reported(value):
+@pytest.mark.parametrize("count", [{"type": "number"}, {"type": "number", "format": "float"}], ids=["plain", "float"])
+def test_schema_with_a_non_json_value_is_reported(ctx, value, count):
     # Python dicts can hold values the Rust engine cannot serialize into a JSON document.
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "count": count,
+                                "when": {"type": "string", "default": value},
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
     with pytest.raises(InvalidSchema, match="Unsupported type"):
-        _canonical_strategy({"type": "string", "default": value}, GenerationConfig(), jsonschema_rs.Draft7Validator)
+        generate_many(operation.as_strategy(), 1)
 
 
 # Real-world spellings the validator's engine turns down: a character class with `\w` as a range
