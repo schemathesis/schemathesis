@@ -1426,7 +1426,7 @@ def _created_a_resource(*, parent: Case, parent_response: Response, case: Case) 
 def _stale_cache_hint(response: Response) -> str:
     # A shared cache can keep serving the pre-write state, so the failure may belong to the intermediary, not the API.
     age = response.headers.get("age", [""])[0]
-    if age.isdigit() and int(age) > 0:
+    if age.isascii() and age.isdigit() and int(age) > 0:
         return f"\n\nThe response came from a cache (`Age: {age}`) and may be stale"
     x_cache = response.headers.get("x-cache", [""])[0]
     if "HIT" in x_cache.upper():
