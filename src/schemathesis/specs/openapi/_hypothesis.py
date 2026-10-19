@@ -1252,11 +1252,12 @@ def _drop_empty_float_branch(schema: dict[str, Any]) -> None:
 
 
 def _schema_has_float_format(node: object) -> bool:
-    if isinstance(node, dict):
-        return node.get("format") == "float" or any(_schema_has_float_format(value) for value in node.values())
-    if isinstance(node, list):
-        return any(_schema_has_float_format(item) for item in node)
-    return False
+    # Escaping keeps the marker from matching inside a string value, so this finds the same dicts as a walk.
+    try:
+        return '"format":"float"' in jsonschema_rs.canonical.json.to_string(node)
+    except (TypeError, ValueError):
+        # Generation reports such a schema as invalid, so there is nothing to snap.
+        return False
 
 
 def snapped_float32_clone(schema: JsonSchema) -> JsonSchema:
