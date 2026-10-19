@@ -21,7 +21,7 @@ def install_stub_call(*, headers: dict[str, list[str]] | None = None, content: b
 
     def call(case: Case, *args: object, **kwargs: object) -> Response:
         # The real call freezes metadata before sending, so `case.meta` does not re-hash containers on every access.
-        object.__setattr__(case, "_freeze_metadata", True)
+        case.freeze_metadata()
         return response
 
     patch("schemathesis.Case.call", new=call).start()

@@ -321,10 +321,8 @@ def _audit_body(kwargs: dict[str, Any]) -> tuple[bytes | None, str | None]:
 
 
 def _case_to_interaction(case: Case) -> tracecov.HttpInteraction:
-    # Skip the modification-detection hash on `case.meta` access: the audit never mutates
-    # cases or revalidates them, so the cost (canonical-JSON encoding bodies the size of an
-    # Azure ApplicationGateway) is pure waste.
-    object.__setattr__(case, "_freeze_metadata", True)
+    # The audit never mutates cases, so re-hashing containers on every `case.meta` access is pure waste.
+    case.freeze_metadata()
     base_url = normalize_base_url(case.operation.base_url)
     kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url, headers=None)
     body, fallback = _audit_body(kwargs)

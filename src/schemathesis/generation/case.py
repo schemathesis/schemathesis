@@ -360,6 +360,9 @@ class Case(Generic[OperationT]):
                 self._revalidate_metadata()
         return self._meta
 
+    def freeze_metadata(self) -> None:
+        object.__setattr__(self, "_freeze_metadata", True)
+
     @property
     def formatted_path(self) -> str:
         """Path template with variables substituted (e.g., /users/{user_id} -> /users/123)."""
@@ -433,7 +436,7 @@ class Case(Generic[OperationT]):
             self._revalidate_metadata()
 
         # Freeze metadata to prevent revalidation after request preparation transforms the body
-        object.__setattr__(self, "_freeze_metadata", True)
+        self.freeze_metadata()
         object.__setattr__(self, "_base_url", base_url)
 
         if self.operation.app is not None:
