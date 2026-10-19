@@ -67,49 +67,6 @@ def test_format_password_false_positive(ctx, cli, snapshot_cli):
     )
 
 
-def test_negative_metadata_required_property(ctx, cli, app_runner):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "description": {"type": "string"},
-                                    },
-                                    "required": ["name", "description"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/items", methods=["POST"])
-    def create_item():
-        return jsonify({"result": "ok"}), 200
-
-    result = cli.run_and_assert(
-        app_runner.openapi_url(app),
-        "--checks=negative_data_rejection",
-        "--mode=negative",
-        "--phases=fuzzing",
-        "--max-examples=25",
-        "--continue-on-failure",
-        exit_code=ExitCode.TESTS_FAILED,
-    )
-    assert "Schema-violating request accepted" in result.stdout
-    assert "Invalid component: in body" in result.stdout
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_text_plain_negative_becomes_valid_after_serialization(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(

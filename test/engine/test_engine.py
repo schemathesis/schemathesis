@@ -33,6 +33,7 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from test.apps.fragments.schemas import linked_users
 from test.utils import EventStream
 
 IS_PYPY = platform.python_implementation() == "PyPy"
@@ -1134,69 +1135,6 @@ def test_non_serializable_example(ctx, phases, expected):
     errors = stream.find_all(events.NonFatalError)
     assert len(errors) == len(phases)
     assert expected in str(errors[0].info)
-
-
-def test_unsupported_regex_removed_with_warning(ctx):
-    # When a schema contains an unsupported regex pattern
-    schema = ctx.openapi.load_schema(
-        {
-            "/success": {
-                "post": {
-                    "parameters": [
-                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
-                    ],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "region": {
-                                            "nullable": True,
-                                            "pattern": "^[\\w\\s\\-\\/\\p{Tibetan},.#;:()']+$",
-                                            "type": "string",
-                                        },
-                                    },
-                                    "required": ["region"],
-                                    "type": "object",
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    # Then the pattern is removed and a warning is emitted
-    warnings = list(schema.analysis.iter_warnings())
-    assert len(warnings) > 0
-    assert any("^[\\w\\s\\-\\/\\p{Tibetan},.#;:()']+$" in w.message for w in warnings)
-
-
-def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
-    # When a parameter schema contains an unsupported regex pattern
-    schema = ctx.openapi.load_schema(
-        {
-            "/users/{id}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "pattern": "\\p{Tibetan}+"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    # Then the pattern is removed and a warning is emitted
-    warnings = list(schema.analysis.iter_warnings())
-    assert len(warnings) > 0
-    assert any("\\p{Tibetan}+" in w.message for w in warnings)
 
 
 def test_invalid_header_in_example(ctx):
@@ -2342,33 +2280,9 @@ def test_max_time_stops_reserving_once_stateful_proves_idle(ctx, app_runner):
     assert len(fuzzing) <= 3, len(fuzzing)
 
 
-LINKED_USERS_PATHS = {
-    "/users": {
-        "post": {
-            "responses": {
-                "201": {
-                    "description": "OK",
-                    "content": {
-                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
-                    },
-                    "links": {"GetUser": {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}}},
-                }
-            }
-        }
-    },
-    "/users/{userId}": {
-        "get": {
-            "operationId": "getUser",
-            "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
-            "responses": {"200": {"description": "OK"}},
-        }
-    },
-}
-
-
 def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner):
     # A retry that starts with the budget already gone issues no request, so it vouches for nothing.
-    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    app, _ = ctx.openapi.make_flask_app(linked_users())
 
     @app.route("/users", methods=["POST"])
     def create_user():

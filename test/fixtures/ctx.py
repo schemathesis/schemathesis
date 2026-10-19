@@ -239,6 +239,9 @@ class OpenAPIApps:
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
 
+    def flaky_branch_blocks(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_stateful.flaky_branch_blocks())
+
     def users_crud(self) -> OpenAPIServer:
         return _start(self.parent, openapi_users.crud())
 
