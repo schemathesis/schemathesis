@@ -87,14 +87,6 @@ def violate_multiple_of(original: float | int, multiple_of: float | int) -> floa
     return original + 1
 
 
-def violate_required(body: dict[str, JsonValue], required: list[str]) -> dict[str, JsonValue]:
-    if not required:
-        return body
-    out = dict(body)
-    out.pop(required[0], None)
-    return out
-
-
 def collect_value_targets(
     body: JsonValue,
     schema: JsonSchemaObject,

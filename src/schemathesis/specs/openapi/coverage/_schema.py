@@ -1736,9 +1736,7 @@ def _has_array_sibling(sub_schemas: list) -> bool:
     return False
 
 
-def _generate_oversized_string(
-    ctx: CoverageContext, original_schema: JsonSchemaObject, new_schema: dict[str, Any], target_length: int
-) -> str | None:
+def _generate_oversized_string(ctx: CoverageContext, new_schema: dict[str, Any], target_length: int) -> str | None:
     pattern = new_schema.get("pattern")
     if not isinstance(pattern, str):
         try:
@@ -2288,7 +2286,7 @@ def _negative_max_length(
             new_schema.pop("enum", None)
             new_schema.pop("const", None)
             new_schema["type"] = "string"
-            new_value = _generate_oversized_string(ctx, schema, new_schema, target_length)
+            new_value = _generate_oversized_string(ctx, new_schema, target_length)
         if new_value is not None and seen.insert(new_value):
             yield NegativeValue(
                 new_value,
