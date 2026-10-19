@@ -1101,7 +1101,7 @@ def _violation_entry(
         return st.tuples(key, _rejected_by(admitted, violation.additional))
     if view.additional_properties is not None:
         complement = complement.intersect(view.additional_properties)
-    return st.tuples(key, from_schema(complement, ctx))
+    return st.tuples(key, st.deferred(lambda: from_schema(complement, ctx)))
 
 
 def _rejected_by(

@@ -2765,6 +2765,22 @@ def test_canonical_recursion_is_drawn_at_any_depth(node):
     find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
 
 
+def test_canonical_negated_recursive_additional_properties():
+    schema = {
+        "type": "object",
+        "properties": {"value": {"not": {"$ref": "#/x-bundled/node"}}},
+        "required": ["value"],
+        "x-bundled": {"node": {"type": "object", "additionalProperties": {"$ref": "#/x-bundled/node"}}},
+    }
+
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
+    is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
+
+    @run_given(built, max_examples=10)
+    def test(value):
+        assert is_valid(value), value
+
+
 DYNAMIC_RECURSIVE_SHAPES = [
     (
         jsonschema_rs.Draft202012Validator,
