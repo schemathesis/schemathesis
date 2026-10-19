@@ -1,5 +1,6 @@
 from unittest.mock import ANY
 
+import graphql
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
@@ -615,11 +616,7 @@ def test_graphql_body(ctx):
 
     @schema.hook
     def map_body(context, body):
-        node = body.definitions[0].selection_set.selections[0]
-        node.name.value = "addedViaHook"
-        node.arguments = ()
-        node.selection_set = ()
-        return body
+        return graphql.parse("mutation { addedViaHook }")
 
     strategy = schema["Mutation"]["addBook"].as_strategy()
 

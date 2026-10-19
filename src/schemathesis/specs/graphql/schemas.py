@@ -52,6 +52,7 @@ from schemathesis.schemas import (
 )
 from schemathesis.transport.prepare import prepare_path
 
+from ._helpers import replace_node
 from .dictionaries import resolve_bindings, substitute_dictionaries
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
@@ -597,7 +598,7 @@ def graphql_cases(
     phase: TestPhase = TestPhase.FUZZING,
     # GraphQL draws from the resource pool and extracted constants; it has no use for error feedback.
     feedback: FeedbackSources = NO_FEEDBACK,
-    mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], None] | None = None,
+    mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode] | None = None,
 ) -> Any:
     import graphql
     from hypothesis.errors import InvalidArgument
@@ -654,12 +655,13 @@ def graphql_cases(
     constants_draws: tuple[ConstantDraw, ...] = ()
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
     if operation_node is not None:
+        original_operation_node = operation_node
         # A captured identifier would overwrite the argument the negative strategy deliberately
         # corrupted, turning the query valid and making the server's acceptance look like a bug.
         if isinstance(feedback.extra_data_source, GraphQLResourcePool) and effective_mode.is_positive:
             random_source = draw(st.randoms())
             if random_source.random() < SUBSTITUTION_PROBABILITY:
-                substitute_pool_values(
+                operation_node = substitute_pool_values(
                     operation_node=operation_node,
                     client_schema=operation.schema.client_schema,
                     pool=feedback.extra_data_source,
@@ -671,32 +673,38 @@ def graphql_cases(
         if effective_mode.is_positive:
             dictionary_bindings = resolve_bindings(operation, generation)
             if not dictionary_bindings.is_empty:
-                dictionary_draws = tuple(
-                    substitute_dictionaries(
-                        operation_node=operation_node,
-                        client_schema=operation.schema.client_schema,
-                        bindings=dictionary_bindings,
-                        operation_label=operation.label,
-                        random=draw(st.randoms()),
-                    )
-                )
-        if feedback.constants_value_source is not None and effective_mode.is_positive:
-            constants_draws = tuple(
-                substitute_constants(
+                operation_node, applied_dictionary_draws = substitute_dictionaries(
                     operation_node=operation_node,
                     client_schema=operation.schema.client_schema,
-                    pool=feedback.constants_value_source,
+                    bindings=dictionary_bindings,
+                    operation_label=operation.label,
                     random=draw(st.randoms()),
-                    skip=frozenset(
-                        tuple(draw_.body_path.lstrip("/").split("/"))
-                        for draw_ in dictionary_draws
-                        if draw_.body_path is not None
-                    ),
                 )
+                dictionary_draws = tuple(applied_dictionary_draws)
+        if feedback.constants_value_source is not None and effective_mode.is_positive:
+            operation_node, applied_constants_draws = substitute_constants(
+                operation_node=operation_node,
+                client_schema=operation.schema.client_schema,
+                pool=feedback.constants_value_source,
+                random=draw(st.randoms()),
+                skip=frozenset(
+                    tuple(draw_.body_path.lstrip("/").split("/"))
+                    for draw_ in dictionary_draws
+                    if draw_.body_path is not None
+                ),
             )
+            constants_draws = tuple(applied_constants_draws)
         if mutate_ast is not None:
             # Hypothesis-driven randoms favor tiny values and would skip captured ids far above the exploration rate.
-            mutate_ast(operation_node, draw(st.randoms(use_true_random=True)))
+            operation_node = mutate_ast(operation_node, draw(st.randoms(use_true_random=True)))
+        if operation_node is not original_operation_node:
+            ast_node = replace_node(
+                ast_node,
+                definitions=tuple(
+                    operation_node if definition is original_operation_node else definition
+                    for definition in ast_node.definitions
+                ),
+            )
     body = graphql.print_ast(ast_node)
 
     path_parameters_ = _generate_parameter(

@@ -278,13 +278,14 @@ def test_unsupported_scalar_kinds_keep_generated_values(ctx, expected):
 def substitute(schema, query, *, root="Query", field="bookByTitle"):
     operation = schema[root][field]
     generation = schema.config.generation_for(operation=operation, phase="fuzzing")
-    return substitute_dictionaries(
+    _, draws = substitute_dictionaries(
         operation_node=graphql.parse(query).definitions[0],
         client_schema=schema.client_schema,
         bindings=resolve_bindings(operation, generation),
         operation_label=operation.label,
         random=random.Random(0),
     )
+    return draws
 
 
 @pytest.mark.parametrize(

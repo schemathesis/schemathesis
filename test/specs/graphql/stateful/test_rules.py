@@ -17,26 +17,26 @@ def _operation(query: str) -> graphql.OperationDefinitionNode:
 
 def test_inject_field_adds_missing_field():
     operation = _operation("query { projects { id } }")
-    _inject_field("projects", "fullPath", via_edges=False)(operation, random.Random(0))
+    operation = _inject_field("projects", "fullPath", via_edges=False)(operation, random.Random(0))
     assert "fullPath" in graphql.print_ast(operation)
 
 
 def test_inject_field_idempotent_when_present():
     operation = _operation("query { projects { fullPath } }")
-    _inject_field("projects", "fullPath", via_edges=False)(operation, random.Random(0))
+    operation = _inject_field("projects", "fullPath", via_edges=False)(operation, random.Random(0))
     assert graphql.print_ast(operation).count("fullPath") == 1
 
 
 def test_inject_field_through_relay_connection():
     operation = _operation("query { products { totalCount } }")
-    _inject_field("products", "slug", via_edges=True)(operation, random.Random(0))
+    operation = _inject_field("products", "slug", via_edges=True)(operation, random.Random(0))
     printed = graphql.print_ast(operation)
     assert "edges" in printed and "node" in printed and "slug" in printed
 
 
 def test_inject_field_reuses_existing_edges_node():
     operation = _operation("query { products { edges { node { id } } } }")
-    _inject_field("products", "slug", via_edges=True)(operation, random.Random(0))
+    operation = _inject_field("products", "slug", via_edges=True)(operation, random.Random(0))
     printed = graphql.print_ast(operation)
     assert printed.count("edges") == 1 and printed.count("node") == 1 and "slug" in printed
 
