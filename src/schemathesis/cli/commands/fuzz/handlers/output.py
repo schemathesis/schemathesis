@@ -9,7 +9,6 @@ import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
 from schemathesis.cli.commands.run.handlers.output import (
-    display_reports,
     display_warning_blocks,
     get_status_icon,
     pluralize,
@@ -26,6 +25,7 @@ from schemathesis.cli.output import (
     display_filtered_summary,
     display_final_line,
     display_header,
+    display_reports,
     display_section_name,
     display_seed,
     display_test_cases,

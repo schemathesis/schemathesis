@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from rich.segment import Segment
     from rich.text import Text
 
+    from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.config import OutputConfig, ProjectConfig
     from schemathesis.core.failures import MessageBlock
     from schemathesis.engine import events
@@ -530,6 +531,15 @@ def _display_extras(extras: list[str]) -> None:
         click.echo()
     for extra in extras:
         click.echo(style(f"    {extra}"))
+
+
+def display_reports(ctx: BaseExecutionContext) -> None:
+    reports = ctx.all_reports()
+    if reports:
+        click.echo(style("Reports:", bold=True))
+        for name, path in reports:
+            click.echo(style(f"  - {name}: {path}"))
+        click.echo()
 
 
 def display_fatal_error(

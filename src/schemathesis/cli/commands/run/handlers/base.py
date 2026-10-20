@@ -9,7 +9,7 @@ from queue import Queue
 from typing import IO, TYPE_CHECKING, Any, Generic, TypeVar
 
 from schemathesis.cli.events import LoadingStarted
-from schemathesis.cli.output import LoadingProgressManager, display_fatal_error
+from schemathesis.cli.output import LoadingProgressManager, display_fatal_error, display_reports
 from schemathesis.core.output.sanitization import sanitized
 
 if TYPE_CHECKING:
@@ -46,8 +46,12 @@ class BaseOutputHandler(EventHandler[T]):
         self.loading_manager.start()
 
     def _on_fatal_error(self, ctx: T, event: events.FatalError) -> None:
-        self.shutdown(ctx)
-        display_fatal_error(self.console, self.loading_manager, event, wait_for_schema=ctx.config.wait_for_schema)
+        try:
+            self.shutdown(ctx)
+            display_fatal_error(self.console, self.loading_manager, event, wait_for_schema=ctx.config.wait_for_schema)
+        finally:
+            # Reports are written even when the run stops before testing
+            display_reports(ctx)
 
 
 TextOutput = IO[str] | StringIO | Path

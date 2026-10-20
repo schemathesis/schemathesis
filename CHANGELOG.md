@@ -29,6 +29,7 @@
 - Sign-up and login requests counted as tests in WFC, JUnit, Allure and HTML reports.
 - `ValueError` crash in `use_after_free` and `ensure_resource_availability` for non-ASCII digit `Age` headers.
 - Match custom payload strategies to concrete media types selected from wildcard request declarations.
+- List written reports when `st fuzz` stops on a fatal error like an unreachable schema.
 - Crash and wrong link bodies for request body properties named with non-ASCII digits like `²`.
 - Keep `st fuzz` running past `Inconsistent data generation` errors caused by changing server state.
 
