@@ -12,7 +12,7 @@ from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
 from schemathesis.engine import StopReason, events
-from schemathesis.engine._rate_limit_retry import send_tracked
+from schemathesis.engine._rate_limit_retry import send_tracked, validate_with_rate_limited
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.errors import (
     TestingState,
@@ -216,7 +216,7 @@ def _do_call_and_validate(
     pending_events: list[events.EngineEvent],
 ) -> None:
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
-    response = _call_with_reauth(
+    rate_limited, response = _call_with_reauth(
         case=case, ctx=ctx, recorder=recorder, transport_kwargs=transport_kwargs, pending_events=pending_events
     )
     recorder.record_response(case_id=case.id, response=response)
@@ -224,13 +224,18 @@ def _do_call_and_validate(
         case=case, ctx=ctx, recorder=recorder, response=response, transport_kwargs=transport_kwargs
     )
     metrics.maximize(generation.maximize, case=case, response=response)
-    validate_response(
-        case=case,
-        ctx=check_ctx,
-        response=response,
-        continue_on_failure=continue_on_failure,
-        recorder=recorder,
-        baseline=ctx.config.load_baseline(),
+    validate_with_rate_limited(
+        rate_limited,
+        response,
+        lambda answer: validate_response(
+            case=case,
+            ctx=check_ctx,
+            response=answer,
+            continue_on_failure=continue_on_failure,
+            recorder=recorder,
+            baseline=ctx.config.load_baseline(),
+        ),
+        lambda answer: recorder.record_response(case_id=case.id, response=answer),
     )
     response.clear_cache()
 
@@ -242,23 +247,28 @@ def _call_with_reauth(
     recorder: ScenarioRecorder,
     transport_kwargs: dict[str, Any],
     pending_events: list[events.EngineEvent],
-) -> Response:
-    """Call the server, retrying on rate limits and replaying once with fresh credentials when auth expired."""
+) -> tuple[list[Response], Response]:
+    """Call the server, retrying on rate limits and replaying once with fresh credentials when auth expired.
+
+    Returns (rate_limited_responses, final_response).
+    """
+    rate_limited: list[Response] = []
 
     def _perform_call() -> Response:
         try:
-            _, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
+            retried, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
         except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
             if isinstance(error.request, requests.Request):
                 recorder.record_request(case_id=case.id, request=error.request.prepare())
             elif isinstance(error.request, requests.PreparedRequest):
                 recorder.record_request(case_id=case.id, request=error.request)
             raise
+        rate_limited.extend(retried)
         return response
 
     response = _perform_call()
     # Replay through `_perform_call` so it keeps rate-limit and network-error handling.
-    return reauth_and_replay(case, response, ctx.reauth, _perform_call)
+    return rate_limited, reauth_and_replay(case, response, ctx.reauth, _perform_call)
 
 
 def _record_response_signals(

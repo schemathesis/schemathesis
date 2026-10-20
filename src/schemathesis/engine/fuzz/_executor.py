@@ -24,7 +24,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
-from schemathesis.engine._rate_limit_retry import send_tracked
+from schemathesis.engine._rate_limit_retry import send_tracked, validate_with_rate_limited
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.errors import is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     import hypothesis
     from hypothesis.strategies import DrawFn
 
-    from schemathesis.checks import ResponseChecks
+    from schemathesis.checks import CheckContext, ResponseChecks
     from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
@@ -373,24 +373,27 @@ def _send_step(
     operation: APIOperation,
     event_queue: queue.Queue[events.EngineEvent],
     seen_error_labels: set[str],
-) -> Response | None:
-    """Send the step's request, waiting out rate limits; `None` when a transport error skips the step."""
+) -> tuple[list[Response], Response] | None:
+    """Send the step's request, waiting out rate limits; `None` when a transport error skips the step.
+
+    Returns (rate_limited_responses, final_response).
+    """
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
-        _, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=event_queue.put)
+        return send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=event_queue.put)
     except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
         if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.
             return None
         _report_once(exc, label=operation.label, seen_labels=seen_error_labels, event_queue=event_queue)
         return None
-    return response
 
 
 def _validate_scenario(
     ctx: EngineContext,
     recorder: ScenarioRecorder,
     *,
+    rate_limited_by_case: dict[str, list[Response]],
     response_checks: ResponseChecks,
     check_context_cache: CheckContextCache,
     continue_on_failure_by_label: dict[str, bool],
@@ -410,13 +413,14 @@ def _validate_scenario(
             auth_enforced_operations=ctx.auth_enforced_operations,
         )
         try:
-            validate_response(
+            _validate_step(
+                ctx,
+                recorder,
                 case=case,
-                ctx=check_ctx,
+                check_ctx=check_ctx,
+                rate_limited=rate_limited_by_case.get(case_id, []),
                 response=interaction.response,
                 continue_on_failure=continue_on_failure_by_label[case.operation.label],
-                recorder=recorder,
-                baseline=ctx.config.load_baseline(),
             )
         except FailureGroup as exc:
             first_failure = first_failure or exc
@@ -426,6 +430,32 @@ def _validate_scenario(
     if has_new_failures(recorder, ctx.config.load_baseline()):
         return Status.FAILURE
     return Status.SUCCESS
+
+
+def _validate_step(
+    ctx: EngineContext,
+    recorder: ScenarioRecorder,
+    *,
+    case: Case,
+    check_ctx: CheckContext,
+    rate_limited: list[Response],
+    response: Response,
+    continue_on_failure: bool,
+) -> None:
+    """Check the step's final response and every 429 it waited out before it."""
+    validate_with_rate_limited(
+        rate_limited,
+        response,
+        lambda answer: validate_response(
+            case=case,
+            ctx=check_ctx,
+            response=answer,
+            continue_on_failure=continue_on_failure,
+            recorder=recorder,
+            baseline=ctx.config.load_baseline(),
+        ),
+        lambda answer: recorder.record_response(case_id=case.id, response=answer),
+    )
 
 
 def _suite_error(exc: Exception) -> events.NonFatalError:
@@ -548,7 +578,7 @@ def _run_forever_thread(
     seen_error_labels: set[str] = set()
 
     @st.composite  # type: ignore[untyped-decorator]
-    def scheduler(draw: hypothesis.strategies.DrawFn) -> ScenarioRecorder:
+    def scheduler(draw: hypothesis.strategies.DrawFn) -> tuple[ScenarioRecorder, dict[str, list[Response]]]:
         """Compose a scenario: weighted-random producers, then link-biased follow-ups."""
         if _must_stop_worker(ctx, weighted_operations=weighted_operations, scenario_started=scenario_started):
             raise _StopFuzzing
@@ -557,6 +587,8 @@ def _run_forever_thread(
         # Capture timing before any draws so elapsed_time covers HTTP calls made in the strategy.
         scenario_started_at = time.monotonic()
         recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL, config=ctx.config.output)
+        # 429s each step waited out before its final response; they get the same checks.
+        rate_limited_by_case: dict[str, list[Response]] = {}
         excluded_operations: set[str] = set()
 
         last_step: tuple[APIOperation, Case, Response] | None = None
@@ -592,11 +624,14 @@ def _run_forever_thread(
                 transition=None,
                 is_transition_applied=False,
             )
-            response = _send_step(
+            sent = _send_step(
                 ctx, case, operation=operation, event_queue=event_queue, seen_error_labels=seen_error_labels
             )
-            if response is None:
+            if sent is None:
                 continue
+            rate_limited, response = sent
+            if rate_limited:
+                rate_limited_by_case[case.id] = rate_limited
             recorder.record_response(case_id=case.id, response=response)
             last_step = (operation, case, response)
 
@@ -607,13 +642,14 @@ def _run_forever_thread(
             worker_id=worker_id,
             event_queue=event_queue,
         )
-        return recorder
+        return recorder, rate_limited_by_case
 
     # Any seed takes precedence over `derandomize`, so deterministic mode skips a generated one.
     seed = ctx.config.seed if not hypothesis_settings.derandomize or ctx.config.has_explicit_seed else None
 
-    def fuzz_test(recorder: ScenarioRecorder) -> None:
+    def fuzz_test(scenario: tuple[ScenarioRecorder, dict[str, list[Response]]]) -> None:
         """Validate all responses in the drawn scenario and emit FuzzScenarioFinished."""
+        recorder, rate_limited_by_case = scenario
         active = scenario_cell.value
         assert active is not None
         status = Status.SUCCESS
@@ -622,6 +658,7 @@ def _run_forever_thread(
             status = _validate_scenario(
                 ctx,
                 recorder,
+                rate_limited_by_case=rate_limited_by_case,
                 response_checks=response_checks,
                 check_context_cache=check_context_cache,
                 continue_on_failure_by_label=continue_on_failure_by_label,
