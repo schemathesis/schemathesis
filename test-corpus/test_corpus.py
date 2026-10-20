@@ -1,6 +1,8 @@
 import pathlib
 import sys
+import time
 from io import StringIO
+from itertools import chain
 from typing import NoReturn
 
 import pytest
@@ -8,6 +10,7 @@ import pytest
 import schemathesis
 import schemathesis.graphql as _graphql
 from schemathesis.checks import CHECKS
+from schemathesis.cli import LoadingFinished
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.har import HarHandler
 from schemathesis.cli.commands.run.handlers.html import HtmlReportHandler
@@ -200,12 +203,7 @@ def combined_check_coverage(ctx, response, case):
     _check_conformance_violation(case)
 
 
-def test_default(corpus, filename, tmp_path):
-    schema = _load_schema(corpus, filename)
-    schema.config.update(suppress_health_check=list(HealthCheck))
-    schema.config.phases.update(phases=["examples", "fuzzing"])
-    schema.config.checks.update(included_check_names=[combined_check.__name__])
-
+def _run_with_reporters(schema, filename, tmp_path):
     handlers = [
         JunitXMLHandler(output=StringIO()),
         VcrHandler(output=StringIO(), config=schema.config.output),
@@ -217,16 +215,38 @@ def test_default(corpus, filename, tmp_path):
     for handler in handlers:
         handler.start(ctx)
 
+    loading_finished = LoadingFinished(
+        location=filename,
+        start_time=time.time(),
+        base_url=schema.get_base_url(),
+        base_path=schema.base_path,
+        specification=schema.specification,
+        statistic=schema.statistic,
+        schema=schema.raw_schema,
+        title=schema.title,
+        config=schema.config,
+        find_operation_by_label=schema.find_operation_by_label,
+    )
     try:
-        for event in from_schema(schema).execute():
+        for event in chain([loading_finished], from_schema(schema).execute()):
             if isinstance(event, events.Interrupted):
                 pytest.exit("Keyboard Interrupt")
             assert_event(filename, event)
+            ctx.on_event(event)
             for handler in handlers:
                 handler.handle_event(ctx, event)
     finally:
         for handler in handlers:
             handler.shutdown(ctx)
+
+
+def test_default(corpus, filename, tmp_path):
+    schema = _load_schema(corpus, filename)
+    schema.config.update(suppress_health_check=list(HealthCheck))
+    schema.config.phases.update(phases=["examples", "fuzzing"])
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
+
+    _run_with_reporters(schema, filename, tmp_path)
 
 
 @pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE], ids=["positive", "negative"])
@@ -416,24 +436,4 @@ def test_graphql(filename, tmp_path):
     schema.config.phases.update(phases=["fuzzing"])
     schema.config.checks.update(included_check_names=[combined_check.__name__])
 
-    handlers = [
-        JunitXMLHandler(output=StringIO()),
-        VcrHandler(output=StringIO(), config=schema.config.output),
-        HarHandler(output=StringIO(), config=schema.config.output),
-        NdjsonHandler(output=StringIO(), config=schema.config),
-        HtmlReportHandler(tmp_path),
-    ]
-    ctx = ExecutionContext(schema.config)
-    for handler in handlers:
-        handler.start(ctx)
-
-    try:
-        for event in from_schema(schema).execute():
-            if isinstance(event, events.Interrupted):
-                pytest.exit("Keyboard Interrupt")
-            assert_event(filename, event)
-            for handler in handlers:
-                handler.handle_event(ctx, event)
-    finally:
-        for handler in handlers:
-            handler.shutdown(ctx)
+    _run_with_reporters(schema, filename, tmp_path)
