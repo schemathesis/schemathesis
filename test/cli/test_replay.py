@@ -578,19 +578,27 @@ def test_replay_applies_non_path_link_parameter(cli, app_runner, ctx, tmp_path, 
     assert received == ["fresh-123"]
 
 
+@pytest.mark.parametrize(
+    ("source_body", "request_body", "case_body", "expected"),
+    [
+        # A link feeding a request body field is re-extracted fresh, not re-sent from the stale recorded body.
+        ({"token": "fresh"}, {"token": "$response.body#/token"}, {"token": "stale"}, {"token": "fresh"}),
+        ({"other": "no token here"}, "$response.body#/token", {"token": "recorded"}, {"token": "recorded"}),
+        ({"token": "fresh"}, "$response.body", NOT_SET, {"token": "fresh"}),
+    ],
+    ids=["re-extract-field", "unresolvable-keeps-recorded", "wholesale"],
+)
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_re_extracts_request_body_link(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
-    # A link feeding a request body field is re-extracted fresh, not re-sent from the stale recorded body.
+def test_replay_request_body_link(
+    cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli, source_body, request_body, case_body, expected
+):
     received = []
     app, _ = ctx.openapi.make_flask_app(
         {
             "/source": {"get": {"responses": {"200": {"description": "OK"}}}},
             "/target": {
                 "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": "object"}}},
-                    },
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
                     "responses": {"500": {"description": "Error"}},
                 }
             },
@@ -599,26 +607,26 @@ def test_replay_re_extracts_request_body_link(cli, app_runner, ctx, tmp_path, cr
 
     @app.route("/source")
     def source():
-        return jsonify({"token": "fresh"})
+        return jsonify(source_body)
 
     @app.route("/target", methods=["POST"])
     def target():
-        received.append(request.get_json().get("token"))
+        received.append(request.get_json())
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
     writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
-            Step(method="GET", path="/source", status=200, body=b'{"token": "fresh"}'),
+            Step(method="GET", path="/source", status=200, body=json.dumps(source_body).encode()),
             Step(
                 method="POST",
                 path="/target",
                 status=500,
                 body=b'{"error": "boom"}',
-                case_body={"token": "stale"},
+                case_body=case_body,
                 media_type="application/json",
-                link=Link(operation_id="target", request_body={"token": "$response.body#/token"}),
+                link=Link(operation_id="target", request_body=request_body),
                 checks=[FailingCheck(name="not_a_server_error")],
             ),
         ]
@@ -626,7 +634,7 @@ def test_replay_re_extracts_request_body_link(cli, app_runner, ctx, tmp_path, cr
     writer.write(crash)
 
     assert cli.main("replay", "--keep") == snapshot_cli
-    assert received == ["fresh"]
+    assert received == [expected]
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -1730,103 +1738,6 @@ def test_replay_non_utf8_response_body_does_not_abort(cli, app_runner, ctx, cras
     crash_file = _get_crash(ctx, app_runner, crash_factory, tmp_path, boom, path="/boom", body='{"error": "boom"}')
 
     assert cli.main("replay", str(crash_file), "--keep") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_unresolvable_request_body_link_keeps_recorded_body(
-    cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
-):
-    received = []
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/source": {"get": {"responses": {"200": {"description": "OK"}}}},
-            "/target": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
-                    "responses": {"500": {"description": "Error"}},
-                }
-            },
-        }
-    )
-
-    @app.route("/source")
-    def source():
-        return jsonify({"other": "no token here"})
-
-    @app.route("/target", methods=["POST"])
-    def target():
-        received.append(request.get_json())
-        return jsonify({"error": "boom"}), 500
-
-    schema_url = app_runner.openapi_url(app)
-    writer = _open_writer(tmp_path, schema_url)
-    crash = crash_factory.chain(
-        steps=[
-            Step(method="GET", path="/source", status=200, body=b'{"other": "no token here"}'),
-            Step(
-                method="POST",
-                path="/target",
-                status=500,
-                body=b'{"error": "boom"}',
-                case_body={"token": "recorded"},
-                media_type="application/json",
-                link=Link(operation_id="target", request_body="$response.body#/token"),
-                checks=[FailingCheck(name="not_a_server_error")],
-            ),
-        ]
-    )
-    writer.write(crash)
-
-    assert cli.main("replay", "--keep") == snapshot_cli
-    assert received == [{"token": "recorded"}]
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_request_body_link_installs_extracted_value_wholesale(
-    cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
-):
-    received = []
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/source": {"get": {"responses": {"200": {"description": "OK"}}}},
-            "/target": {
-                "post": {
-                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
-                    "responses": {"500": {"description": "Error"}},
-                }
-            },
-        }
-    )
-
-    @app.route("/source")
-    def source():
-        return jsonify({"token": "fresh"})
-
-    @app.route("/target", methods=["POST"])
-    def target():
-        received.append(request.get_json())
-        return jsonify({"error": "boom"}), 500
-
-    schema_url = app_runner.openapi_url(app)
-    writer = _open_writer(tmp_path, schema_url)
-    crash = crash_factory.chain(
-        steps=[
-            Step(method="GET", path="/source", status=200, body=b'{"token": "fresh"}'),
-            Step(
-                method="POST",
-                path="/target",
-                status=500,
-                body=b'{"error": "boom"}',
-                media_type="application/json",
-                link=Link(operation_id="target", request_body="$response.body"),
-                checks=[FailingCheck(name="not_a_server_error")],
-            ),
-        ]
-    )
-    writer.write(crash)
-
-    assert cli.main("replay", "--keep") == snapshot_cli
-    assert received == [{"token": "fresh"}]
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
