@@ -733,11 +733,8 @@ class OpenApiSchema(BaseSchema):
                 param.definition for param in operation.security.iter_parameters() if param.location == location
             )
         if definitions:
-            return self._get_parameter_serializer(definitions)
+            return self.adapter.get_parameter_serializer(definitions)
         return None
-
-    def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
-        return self.adapter.get_parameter_serializer(definitions)
 
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:

@@ -62,9 +62,6 @@ class Resolver:
             self._ids = collect_ids(self.schema)
         return self._ids
 
-    def lookup(self, reference: str) -> Any:
-        return self.inner.lookup(reference)
-
     def resolve_local_fragment(self, fragment: str) -> Any:
         """Walk the bound schema to `fragment`. Returns `UNRESOLVABLE` if the walk fails."""
         cache = self.fragment_cache
@@ -335,7 +332,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
         if value is not UNRESOLVABLE:
             return resolved_uri, resolver, value
 
-        resolved = resolver.lookup(reference)
+        resolved = resolver.inner.lookup(reference)
     except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:
         error = RefResolutionError(str(exc))
         error.add_note(reference)
