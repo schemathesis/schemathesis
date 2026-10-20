@@ -3118,6 +3118,34 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
     return {**schema, "type": ty}
 
 
+_SPEC_HINT_KEYS = frozenset({"example", "examples", "default"})
+
+
+def _spec_hint_values(
+    schema: JsonSchemaObject, accepts: Callable[[Any], bool], seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    """The `example`, `examples` and `default` values `accepts` admits, each one not yet in `seen`."""
+    # Sentinel-based reads so falsy spec hints (`default: 0`, `example: ""`) and explicit
+    # `default: null` / `example: null` aren't confused with "key absent".
+    example = schema.get("example", NOT_SET)
+    examples = schema.get("examples")
+    default = schema.get("default", NOT_SET)
+    if example is not NOT_SET and accepts(example) and seen.insert(example):
+        yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
+    if examples:
+        for example in examples:
+            if accepts(example) and seen.insert(example):
+                yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
+    if (
+        default is not NOT_SET
+        and not (example is not NOT_SET and default == example)
+        and not (examples is not None and any(default == ex for ex in examples))
+        and accepts(default)
+        and seen.insert(default)
+    ):
+        yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
+
+
 def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Pin type to "string"; for unions like ["string","null"] the dispatcher yields null separately,
@@ -3146,51 +3174,17 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         declared = schema
         min_length = 1
 
-    # Sentinel-based reads so falsy spec hints (`default: 0`, `example: ""`) and explicit
-    # `default: null` / `example: null` aren't confused with "key absent".
-    example = schema.get("example", NOT_SET)
-    examples = schema.get("examples")
-    default = schema.get("default", NOT_SET)
-
     # Two-layer check to avoid potentially expensive data generation using schema constraints as a key
     seen_values = HashSet()
     seen_constraints: set[tuple] = set()
 
-    if example is not NOT_SET or examples or default is not NOT_SET:
-        has_valid_example = False
-        if (
-            example is not NOT_SET
-            and _is_valid_with_formats(example, declared, ctx)
-            and ctx.wire.representable(example)
-            and seen_values.insert(example)
-        ):
-            has_valid_example = True
-            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
-        if examples:
-            for example in examples:
-                if (
-                    _is_valid_with_formats(example, declared, ctx)
-                    and ctx.wire.representable(example)
-                    and seen_values.insert(example)
-                ):
-                    has_valid_example = True
-                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
-        if (
-            default is not NOT_SET
-            and not (example is not NOT_SET and default == example)
-            and not (examples is not None and any(default == ex for ex in examples))
-            and _is_valid_with_formats(default, declared, ctx)
-            and ctx.wire.representable(default)
-            and seen_values.insert(default)
-        ):
-            has_valid_example = True
-            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-        if not has_valid_example and (not min_length and not max_length or "pattern" in schema):
-            value = ctx.generate_from_schema(schema)
-            seen_values.insert(value)
-            seen_constraints.add((min_length, max_length))
-            yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
-    elif not min_length and not max_length or "pattern" in schema:
+    if not _SPEC_HINT_KEYS.isdisjoint(schema):
+        yield from _spec_hint_values(
+            schema,
+            lambda value: _is_valid_with_formats(value, declared, ctx) and ctx.wire.representable(value),
+            seen_values,
+        )
+    if not seen_values and (not min_length and not max_length or "pattern" in schema):
         value = ctx.generate_from_schema(schema)
         seen_values.insert(value)
         seen_constraints.add((min_length, max_length))
@@ -3380,10 +3374,6 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if is_integer and multiple_of is not None and not isinstance(multiple_of, int):
         # Integer multiples of `p/q` are exactly the multiples of `p`.
         multiple_of = Fraction(Decimal(str(multiple_of))).numerator
-    example = schema.get("example", NOT_SET)
-    examples = schema.get("examples")
-    default = schema.get("default", NOT_SET)
-
     seen = HashSet()
 
     def _within_adjusted_bounds(value: object) -> bool:
@@ -3394,40 +3384,11 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         exact = _exact(value)
         return (minimum is None or exact >= _exact(minimum)) and (maximum is None or exact <= _exact(maximum))
 
-    if example is not NOT_SET or examples or default is not NOT_SET:
-        has_valid_example = False
-        if (
-            example is not NOT_SET
-            and _is_valid_with_formats(example, schema, ctx)
-            and _within_adjusted_bounds(example)
-            and seen.insert(example)
-        ):
-            has_valid_example = True
-            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
-        if examples:
-            for example in examples:
-                if (
-                    _is_valid_with_formats(example, schema, ctx)
-                    and _within_adjusted_bounds(example)
-                    and seen.insert(example)
-                ):
-                    has_valid_example = True
-                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
-        if (
-            default is not NOT_SET
-            and not (example is not NOT_SET and default == example)
-            and not (examples is not None and any(default == ex for ex in examples))
-            and _is_valid_with_formats(default, schema, ctx)
-            and _within_adjusted_bounds(default)
-            and seen.insert(default)
-        ):
-            has_valid_example = True
-            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-        if not has_valid_example and minimum is None and maximum is None:
-            value = ctx.generate_from_schema(schema)
-            seen.insert(value)
-            yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
-    elif minimum is None and maximum is None:
+    if not _SPEC_HINT_KEYS.isdisjoint(schema):
+        yield from _spec_hint_values(
+            schema, lambda value: _is_valid_with_formats(value, schema, ctx) and _within_adjusted_bounds(value), seen
+        )
+    if not seen and minimum is None and maximum is None:
         value = ctx.generate_from_schema(schema)
         seen.insert(value)
         yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
@@ -3497,9 +3458,6 @@ def _fits_array_length(schema: JsonSchemaObject, length: int) -> bool:
 def _positive_array(
     ctx: CoverageContext, schema: JsonSchemaObject, template: list
 ) -> Generator[GeneratedValue, None, None]:
-    example = schema.get("example", NOT_SET)
-    examples = schema.get("examples")
-    default = schema.get("default", NOT_SET)
     # The first `prefixItems` positions answer to their own schemas, so an `items` value can only
     # sit behind values that fill them.
     prefix_values = _tuple_prefix_values(ctx, schema)
@@ -3507,21 +3465,8 @@ def _positive_array(
     seen = HashSet()
     seen_constraints: set[tuple] = set()
 
-    if example is not NOT_SET or examples or default is not NOT_SET:
-        if example is not NOT_SET and _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
-            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
-        if examples:
-            for example in examples:
-                if _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
-                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
-        if (
-            default is not NOT_SET
-            and not (example is not NOT_SET and default == example)
-            and not (examples is not None and any(default == ex for ex in examples))
-            and _is_valid_with_formats(default, schema, ctx)
-            and seen.insert(default)
-        ):
-            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
+    if not _SPEC_HINT_KEYS.isdisjoint(schema):
+        yield from _spec_hint_values(schema, lambda value: _is_valid_with_formats(value, schema, ctx), seen)
     # Rejected annotations must not suppress the generated baseline.
     if not seen:
         # An empty template skips every items-level keyword on the wire; surface a non-empty
