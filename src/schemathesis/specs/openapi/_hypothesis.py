@@ -58,7 +58,7 @@ from schemathesis.generation.meta import (
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
-from schemathesis.resources import ExtraDataSource, PoolDraw, SemanticDraw
+from schemathesis.resources import PoolDraw, SemanticDraw
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiBody,
@@ -193,10 +193,8 @@ def openapi_cases(
             hooks,
             _mode_for(location, generation_mode, negated),
             generation_config,
-            extra_data_source=feedback.extra_data_source,
-            error_feedback=feedback.error_feedback,
+            feedback=feedback,
             mix_examples=mix_examples,
-            constants_value_source=feedback.constants_value_source,
             # Configured auth overwrites these on the wire, so drawing them only repeats the same request.
             exclude=feedback.auth_headers
             if location == ParameterLocation.HEADER and generation_mode.is_positive
@@ -221,10 +219,8 @@ def openapi_cases(
             hooks,
             _mode_for(ParameterLocation.BODY, generation_mode, negated),
             generation_config,
-            extra_data_source=feedback.extra_data_source,
-            error_feedback=feedback.error_feedback,
+            feedback=feedback,
             mix_examples=mix_examples,
-            constants_value_source=feedback.constants_value_source,
         )
     else:
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
@@ -314,10 +310,8 @@ def _generate_body(
     generation_mode: GenerationMode,
     generation_config: GenerationConfig,
     *,
-    extra_data_source: ExtraDataSource | None,
-    error_feedback: ErrorFeedbackStore | None,
+    feedback: FeedbackSources,
     mix_examples: bool,
-    constants_value_source: ConstantsPool | None,
 ) -> tuple[ValueContainer, str]:
     """Draw a body and the media type it is sent with."""
     candidates, generation_mode = _body_candidates(operation.body.items, generation_mode)
@@ -330,10 +324,8 @@ def _generate_body(
         generation_config,
         draw,
         generation_mode,
-        extra_data_source=extra_data_source,
-        error_feedback=error_feedback,
+        feedback=feedback,
         mix_examples=mix_examples,
-        constants_value_source=constants_value_source,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
     if media_types.is_form_urlencoded(media_type):
@@ -708,10 +700,8 @@ def _get_body_strategy(
     generation_config: GenerationConfig,
     draw: st.DrawFn,
     generation_mode: GenerationMode,
-    extra_data_source: ExtraDataSource | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
-    error_feedback: ErrorFeedbackStore | None = None,
-    constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy:
     # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
     if parameter.media_type in FORM_MEDIA_TYPES:
@@ -720,7 +710,7 @@ def _get_body_strategy(
             operation,
             generation_config,
             generation_mode,
-            constants_value_source,
+            feedback.constants_value_source,
         )
         if custom_strategy is not None:
             return custom_strategy
@@ -738,12 +728,10 @@ def _get_body_strategy(
         operation,
         generation_config,
         generation_mode,
-        extra_data_source=extra_data_source,
-        error_feedback=error_feedback,
+        feedback=feedback,
         mix_examples=mix_examples,
-        constants_value_source=constants_value_source,
     )
-    return _maybe_set_optional_body(strategy, parameter, operation, draw, error_feedback)
+    return _maybe_set_optional_body(strategy, parameter, operation, draw, feedback.error_feedback)
 
 
 def get_parameters_value(
@@ -755,10 +743,8 @@ def get_parameters_value(
     hooks: HookDispatcher | None,
     generation_mode: GenerationMode,
     generation_config: GenerationConfig,
-    extra_data_source: ExtraDataSource | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
-    error_feedback: ErrorFeedbackStore | None = None,
-    constants_value_source: ConstantsPool | None = None,
     exclude: frozenset[str] = frozenset(),
 ) -> GeneratedValue:
     """Get the final value for the specified location.
@@ -773,10 +759,8 @@ def get_parameters_value(
             location,
             generation_config,
             exclude=exclude,
-            extra_data_source=extra_data_source,
+            feedback=feedback,
             mix_examples=mix_examples,
-            error_feedback=error_feedback,
-            constants_value_source=constants_value_source,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
@@ -790,10 +774,8 @@ def get_parameters_value(
         location,
         generation_config,
         exclude=value.keys() | exclude,
-        extra_data_source=extra_data_source,
-        error_feedback=error_feedback,
+        feedback=feedback,
         mix_examples=mix_examples,
-        constants_value_source=constants_value_source,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
@@ -907,10 +889,8 @@ def generate_parameter(
     hooks: HookDispatcher | None,
     generator: GenerationMode,
     generation_config: GenerationConfig,
-    extra_data_source: ExtraDataSource | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
-    error_feedback: ErrorFeedbackStore | None = None,
-    constants_value_source: ConstantsPool | None = None,
     exclude: frozenset[str] = frozenset(),
 ) -> ValueContainer:
     """Generate a value for a parameter.
@@ -933,10 +913,8 @@ def generate_parameter(
         hooks,
         generator,
         generation_config,
-        extra_data_source=extra_data_source,
-        error_feedback=error_feedback,
+        feedback=feedback,
         mix_examples=mix_examples,
-        constants_value_source=constants_value_source,
         exclude=exclude,
     )
     value = generated.value
@@ -1060,10 +1038,8 @@ def get_parameters_strategy(
     location: ParameterLocation,
     generation_config: GenerationConfig,
     exclude: Iterable[str] = (),
-    extra_data_source: ExtraDataSource | None = None,
+    feedback: FeedbackSources = NO_FEEDBACK,
     mix_examples: bool = True,
-    error_feedback: ErrorFeedbackStore | None = None,
-    constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
@@ -1074,10 +1050,8 @@ def get_parameters_strategy(
             generation_config,
             generation_mode,
             exclude,
-            extra_data_source=extra_data_source,
+            feedback=feedback,
             mix_examples=mix_examples,
-            error_feedback=error_feedback,
-            constants_value_source=constants_value_source,
         )
     # No parameters defined for this location
     return _NONE_STRATEGY
