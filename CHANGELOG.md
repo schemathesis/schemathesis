@@ -22,6 +22,7 @@
 - Missing boundary in `multipart/mixed` request `Content-Type` headers.
 - False results in `response_headers_conformance` for OpenAPI 3.1 type lists and `1_0`-style numbers.
 - False positive `response_headers_conformance` for object-typed response headers.
+- Unchecked retried `429` responses outside stateful testing with `--rate-limit=auto`.
 - `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
 - Missing `Identity:` line in JUnit and Allure failure reports.

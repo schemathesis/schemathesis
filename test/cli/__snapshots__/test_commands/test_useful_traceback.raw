@@ -37,7 +37,11 @@ division by zero
       File "/package-root/engine/run/unit/_case.py", line XXX, in run_one_case
         _do_call_and_validate(
       File "/package-root/engine/run/unit/_case.py", line XXX, in _do_call_and_validate
-        validate_response(
+        validate_with_rate_limited(
+      File "/package-root/engine/_rate_limit_retry.py", line XXX, in validate_with_rate_limited
+        validate_fn(final)
+      File "/package-root/engine/run/unit/_case.py", line XXX, in <lambda>
+        lambda answer: validate_response(
       File "/package-root/engine/_validate.py", line XXX, in validate_response
         failures = run_checks(
       File "/package-root/checks.py", line XXX, in run_checks
