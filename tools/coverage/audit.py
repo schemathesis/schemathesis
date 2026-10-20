@@ -10,9 +10,7 @@ from enum import StrEnum
 from typing import Any
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
-import hypothesis
 import tracecov
-from hypothesis import HealthCheck, Phase, Verbosity
 from hypothesis.errors import Unsatisfiable
 
 import schemathesis
@@ -29,6 +27,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.drivers import without_unserializable_payload
 from schemathesis.generation.hypothesis.builder import generate_example_cases
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.transport.prepare import normalize_base_url, prepare_request
@@ -382,36 +381,15 @@ def _example_cases(operation: APIOperation) -> Generator[Case]:
     yield from generate_example_cases(test=_noop, operation=operation, fill_missing=False)
 
 
-def _draw(strategy: Any, fuzz_settings: hypothesis.settings) -> list[Case]:
-    cases: list[Case] = []
-
-    @hypothesis.given(strategy)  # type: ignore[untyped-decorator]
-    @fuzz_settings  # type: ignore[untyped-decorator]
-    def collect(case: Case) -> None:
-        cases.append(case)
-
-    collect._hypothesis_internal_database_key = b""
-    collect()
-    return cases
-
-
 def _fuzzing_cases(
     operation: APIOperation,
     generation_modes: list[GenerationMode],
     max_examples: int,
     unsatisfiable: list[GenerationMode],
 ) -> Generator[Case]:
-    fuzz_settings = hypothesis.settings(
-        database=None,
-        max_examples=max_examples,
-        deadline=None,
-        verbosity=Verbosity.quiet,
-        phases=(Phase.generate,),
-        suppress_health_check=list(HealthCheck),
-    )
     for mode in generation_modes:
         try:
-            yield from _draw(operation.as_strategy(generation_mode=mode), fuzz_settings)
+            yield from generate_many(operation.as_strategy(generation_mode=mode), max_examples)
         except Unsatisfiable:
             unsatisfiable.append(mode)
 

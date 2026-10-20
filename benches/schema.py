@@ -4,7 +4,6 @@ import sys
 from io import StringIO
 
 import pytest
-from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
@@ -12,6 +11,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import events, from_schema
 from schemathesis.generation.hypothesis import setup
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.reporting.har import HarWriter
 from schemathesis.reporting.vcr import VcrWriter
@@ -364,20 +364,6 @@ def test_wide_one_of_strategy(benchmark):
         # Drop what a previous iteration memoized, so each one pays for a cold build.
         clear_all()
         operation = schemathesis.openapi.from_dict(deepclone(WIDE_ONE_OF))["/p"]["POST"]
-
-        @seed(0)
-        @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
-        @settings(
-            max_examples=3,
-            database=None,
-            deadline=None,
-            verbosity=Verbosity.quiet,
-            phases=(Phase.generate,),
-            suppress_health_check=list(HealthCheck),
-        )
-        def _draw(case):
-            pass
-
-        _draw()
+        generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 3)
 
     benchmark(_build)
