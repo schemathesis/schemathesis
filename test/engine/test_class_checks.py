@@ -122,9 +122,9 @@ def test_class_check_lifecycle(ctx, restore_checks):
             seen_phases.add(ctx.phase)
 
         def after_run(self, ctx):
-            captured["auth"] = ctx._auth
-            captured["headers"] = dict(ctx._headers) if ctx._headers is not None else None
-            captured["transport"] = ctx._transport_kwargs
+            captured["auth"] = ctx.internals.auth
+            captured["headers"] = dict(ctx.internals.headers) if ctx.internals.headers is not None else None
+            captured["transport"] = ctx.internals.transport_kwargs
 
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)

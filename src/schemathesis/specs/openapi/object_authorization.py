@@ -143,13 +143,13 @@ def _drawn_values(read: _OwnerRead) -> Iterator[tuple[str, object, Case | None]]
 def _linked_values(read: _OwnerRead) -> Iterator[tuple[str, object, Case | None]]:
     """Path values the owner's previous stateful step created or listed, with that step when it was a list."""
     case = read.case
-    parent = read.ctx._find_parent(case_id=case.id)
+    parent = read.ctx.internals.find_parent(case_id=case.id)
     if parent is None or parent._auth_identity != read.owner:
         return
     is_read = parent.method.upper() in SAFE_METHODS
     if is_read and not is_collection(parent.operation):
         return
-    parent_response = read.ctx._find_response(case_id=parent.id)
+    parent_response = read.ctx.internals.find_response(case_id=parent.id)
     parent_body = _json_body(parent_response) if parent_response is not None else None
     referenced = referenced_by(parent)
     for name, value in (case.path_parameters or {}).items():
