@@ -33,21 +33,31 @@ SSE_ITEM_SCHEMA = {
     "required": ["data"],
 }
 
+VALUE_CONTENT = {
+    "contentMediaType": "application/json",
+    "contentSchema": {
+        "type": "object",
+        "properties": {"value": {"type": "integer"}},
+        "required": ["value"],
+    },
+}
+
 SSE_VALUE_ITEM_SCHEMA = {
     "type": "object",
-    "properties": {
-        "data": {
-            "type": "string",
-            "contentMediaType": "application/json",
-            "contentSchema": {
-                "type": "object",
-                "properties": {"value": {"type": "integer"}},
-                "required": ["value"],
-            },
-        },
-    },
+    "properties": {"data": {"type": "string", **VALUE_CONTENT}},
     "required": ["data"],
 }
+
+EVENT_WITH_DATA = {
+    "type": "object",
+    "properties": {
+        "event": {"type": "string"},
+        "data": {"type": "string"},
+    },
+    "required": ["event", "data"],
+}
+
+UPDATE_WITH_VALUE = {"properties": {"event": {"enum": ["update"]}, "data": VALUE_CONTENT}}
 
 
 def _sse_paths(item_schema, *, content_key="itemSchema"):
@@ -73,6 +83,22 @@ def _sse_schema(item_schema, *, version="3.2.0", content_key="itemSchema"):
     }
 
 
+def _sse_stream_schema(media_type_object, *, version="3.2.0"):
+    return {
+        "openapi": version,
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/sse": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "SSE stream", "content": {"text/event-stream": media_type_object}}
+                    }
+                }
+            }
+        },
+    }
+
+
 def _sse_app(app, body):
     @app.route("/sse")
     def _sse():
@@ -95,12 +121,7 @@ def _run_sse_cli(ctx, cli, body, item_schema=SSE_ITEM_SCHEMA, *, content_key="it
 
 
 def _call_sse(raw_schema, body):
-    app = Flask("schemathesis_test")
-
-    @app.route("/sse")
-    def _sse():
-        return Response(body, mimetype="text/event-stream")
-
+    app = _sse_app(Flask("schemathesis_test"), body)
     schema = schemathesis.openapi.from_dict(raw_schema)
     case = schema["/sse"]["GET"].Case()
     return case, case.call(app=app)
@@ -283,201 +304,338 @@ def test_sse_streaming_generator_response(ctx):
     case.validate_response(response, checks=[response_schema_conformance])
 
 
-def test_sse_content_schema_uses_matched_oneof_branch():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "oneOf": [
-            {"properties": {"event": {"enum": ["ping"]}}},
-            {
-                "properties": {
-                    "event": {"enum": ["update"]},
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
+@pytest.mark.parametrize(
+    ("raw_schema", "stream"),
+    [
+        pytest.param(
+            _sse_schema(
+                {**EVENT_WITH_DATA, "oneOf": [{"properties": {"event": {"enum": ["ping"]}}}, UPDATE_WITH_VALUE]}
+            ),
+            'event: ping\ndata: pong\n\nevent: update\ndata: {"value": 42}\n\n',
+            id="content_schema_uses_matched_oneof_branch",
+        ),
+        pytest.param(
+            _sse_schema(
+                {**EVENT_WITH_DATA, "anyOf": [UPDATE_WITH_VALUE, {"properties": {"event": {"type": "string"}}}]}
+            ),
+            "event: update\ndata: not-json\n\n",
+            id="anyof_allows_matching_branch_without_content_schema",
+        ),
+        pytest.param(
+            _sse_schema({**EVENT_WITH_DATA, "anyOf": [True, UPDATE_WITH_VALUE]}),
+            "event: update\ndata: not-json\n\n",
+            id="anyof_with_true_branch_does_not_force_content_schema",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {"data": {"type": "string"}},
+                    "required": ["data"],
+                    "oneOf": [True, {"properties": {"data": VALUE_CONTENT}}],
                 }
-            },
-        ],
-    }
-    case, response = _call_sse(
-        _sse_schema(item_schema), 'event: ping\ndata: pong\n\nevent: update\ndata: {"value": 42}\n\n'
-    )
+            ),
+            "data: not-json\n\n",
+            id="oneof_with_true_branch_is_disambiguated_by_content_schema",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {"data": {"type": "string", "oneOf": [True, VALUE_CONTENT]}},
+                    "required": ["data"],
+                }
+            ),
+            "data: not-json\n\n",
+            id="property_level_oneof_uses_nested_instance_value_for_branch_selection",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    **EVENT_WITH_DATA,
+                    "anyOf": [
+                        UPDATE_WITH_VALUE,
+                        {
+                            "properties": {
+                                "event": {"enum": ["update"]},
+                                "data": {"contentMediaType": "text/plain", "contentSchema": {"type": "string"}},
+                            }
+                        },
+                    ],
+                }
+            ),
+            "event: update\ndata: not-json\n\n",
+            id="anyof_with_matching_non_json_branch_does_not_force_json_content_schema",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    **EVENT_WITH_DATA,
+                    "allOf": [
+                        {"properties": {"event": {"enum": ["update"]}}},
+                        {
+                            "anyOf": [
+                                {"properties": {"data": VALUE_CONTENT}},
+                                {
+                                    "properties": {
+                                        "data": {"contentMediaType": "text/plain", "contentSchema": {"type": "string"}}
+                                    }
+                                },
+                            ]
+                        },
+                    ],
+                }
+            ),
+            "event: update\ndata: not-json\n\n",
+            id="allof_with_nested_anyof_preserves_or_semantics_for_content_schema",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {"data": {"type": "string", "contentMediaType": "application/json"}},
+                    "required": ["data"],
+                }
+            ),
+            "data: not-json\n\n",
+            id="content_media_type_without_content_schema_skips_validation",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": {"type": "string", "contentMediaType": "application/json", "contentSchema": True}
+                    },
+                    "required": ["data"],
+                }
+            ),
+            'data: "anything"\n\n',
+            id="content_schema_true_allows_any_payload",
+        ),
+    ],
+)
+def test_sse_content_schema_accepts(raw_schema, stream):
+    case, response = _call_sse(raw_schema, stream)
     case.validate_response(response, checks=[response_schema_conformance])
 
 
-def test_sse_anyof_allows_matching_branch_without_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "anyOf": [
-            {
-                "properties": {
-                    "event": {"enum": ["update"]},
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
+@pytest.mark.parametrize(
+    ("raw_schema", "stream"),
+    [
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {"data": {"type": "string"}},
+                    "required": ["data"],
+                    "oneOf": [True, {"properties": {"data": VALUE_CONTENT}}],
                 }
-            },
-            {"properties": {"event": {"type": "string"}}},
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "event: update\ndata: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_anyof_with_true_branch_does_not_force_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "anyOf": [
-            True,
-            {
-                "properties": {
-                    "event": {"enum": ["update"]},
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
+            ),
+            'data: {"value": 1}\n\n',
+            id="oneof_with_true_branch_preserves_exclusivity_when_content_schema_matches",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {"data": {"type": "string", "oneOf": [VALUE_CONTENT, {"pattern": "^ok$"}]}},
+                    "required": ["data"],
                 }
-            },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "event: update\ndata: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_oneof_with_true_branch_is_disambiguated_by_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {"data": {"type": "string"}},
-        "required": ["data"],
-        "oneOf": [
-            True,
-            {
-                "properties": {
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
+            ),
+            "data: not-json\n\n",
+            id="property_level_oneof_enforces_content_schema",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    **EVENT_WITH_DATA,
+                    "oneOf": [
+                        {"properties": {"event": {"enum": ["ping"]}}},
+                        {
+                            "allOf": [
+                                {"properties": {"event": {"enum": ["update"]}}},
+                                {"allOf": [{"properties": {"data": VALUE_CONTENT}}]},
+                            ]
                         },
+                    ],
+                }
+            ),
+            'event: update\ndata: {"value": "wrong"}\n\n',
+            id="content_schema_enforced_in_nested_composed_branch",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    **EVENT_WITH_DATA,
+                    "oneOf": [
+                        {"properties": {"event": {"enum": ["ping"]}}},
+                        {
+                            "allOf": [
+                                {"properties": {"event": {"enum": ["update", "delete"]}}},
+                                {
+                                    "oneOf": [
+                                        {
+                                            "properties": {
+                                                "event": {"enum": ["update"]},
+                                                "data": {
+                                                    "contentMediaType": "application/json",
+                                                    "contentSchema": {
+                                                        "type": "object",
+                                                        "properties": {"update_id": {"type": "integer"}},
+                                                        "required": ["update_id"],
+                                                    },
+                                                },
+                                            }
+                                        },
+                                        {
+                                            "properties": {
+                                                "event": {"enum": ["delete"]},
+                                                "data": {
+                                                    "contentMediaType": "application/json",
+                                                    "contentSchema": {
+                                                        "type": "object",
+                                                        "properties": {"delete_id": {"type": "string"}},
+                                                        "required": ["delete_id"],
+                                                    },
+                                                },
+                                            }
+                                        },
+                                    ]
+                                },
+                            ]
+                        },
+                    ],
+                }
+            ),
+            'event: update\ndata: {"delete_id": "abc"}\n\n',
+            id="nested_oneof_uses_nested_branch_predicate_for_content_schema",
+        ),
+        pytest.param(
+            {
+                **_sse_schema(
+                    {
+                        **EVENT_WITH_DATA,
+                        "oneOf": [
+                            {"properties": {"event": {"enum": ["ping"]}}},
+                            {
+                                "properties": {
+                                    "event": {"enum": ["update"]},
+                                    "data": {"$ref": "#/components/schemas/UpdateData"},
+                                }
+                            },
+                        ],
                     }
-                }
+                ),
+                "components": {"schemas": {"UpdateData": {"type": "string", **VALUE_CONTENT}}},
             },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "data: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_oneof_with_true_branch_preserves_exclusivity_when_content_schema_matches():
-    item_schema = {
-        "type": "object",
-        "properties": {"data": {"type": "string"}},
-        "required": ["data"],
-        "oneOf": [
-            True,
+            'event: update\ndata: {"value": "wrong"}\n\n',
+            id="content_schema_with_ref_in_oneof_branch",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": {
+                            "type": "string",
+                            "contentMediaType": "application/json",
+                            "contentSchema": {
+                                "type": "object",
+                                "properties": {"a": {"type": "integer"}},
+                                "required": ["a"],
+                            },
+                        }
+                    },
+                    "required": ["data"],
+                    "allOf": [
+                        {
+                            "properties": {
+                                "data": {
+                                    "contentMediaType": "application/json",
+                                    "contentSchema": {
+                                        "type": "object",
+                                        "properties": {"b": {"type": "integer"}},
+                                        "required": ["b"],
+                                    },
+                                }
+                            }
+                        }
+                    ],
+                }
+            ),
+            'data: {"a": 1}\n\n',
+            id="content_schema_enforces_allof_with_root_constraints",
+        ),
+        pytest.param(
             {
-                "properties": {
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
+                **_sse_schema({"$ref": "#/components/schemas/SSEEvent"}),
+                "components": {
+                    "schemas": {
+                        "SSEEvent": {
+                            **EVENT_WITH_DATA,
+                            "oneOf": [{"properties": {"event": {"enum": ["ping"]}}}, UPDATE_WITH_VALUE],
+                        }
                     }
-                }
+                },
             },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), 'data: {"value": 1}\n\n')
+            'event: update\ndata: {"value": "wrong"}\n\n',
+            id="item_schema_ref_with_composed_branches_enforces_content_schema",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": {"type": "string", "contentMediaType": "application/json", "contentSchema": False}
+                    },
+                    "required": ["data"],
+                }
+            ),
+            'data: {"value": 42}\n\n',
+            id="content_schema_false_rejects_any_payload",
+        ),
+        pytest.param(
+            _sse_stream_schema({"itemSchema": False, "schema": SSE_ITEM_SCHEMA}),
+            'data: {"value": 42}\n\n',
+            id="false_itemschema_takes_precedence_over_schema",
+        ),
+        pytest.param(
+            _sse_stream_schema(
+                {
+                    "itemSchema": {"type": "object", "properties": {"data": {"type": "string"}}, "required": ["data"]},
+                    "schema": {"type": "object", "properties": {"event": {"enum": ["ping"]}}},
+                }
+            ),
+            'data: {"value": 42}\n\n',
+            id="item_schema_and_schema_both_apply",
+        ),
+        pytest.param(
+            {
+                **_sse_stream_schema(
+                    {
+                        "itemSchema": {"type": "object", "required": ["data"]},
+                        "schema": {"type": "array", "items": {"$ref": "#/components/schemas/SSEEvent"}},
+                    }
+                ),
+                "components": {
+                    "schemas": {
+                        "SSEEvent": {"type": "object", "properties": {"data": {"type": "string", **VALUE_CONTENT}}}
+                    }
+                },
+            },
+            'data: {"value": "wrong"}\n\n',
+            id="item_schema_and_schema_resolve_refs",
+        ),
+    ],
+)
+def test_sse_content_schema_rejects(raw_schema, stream):
+    case, response = _call_sse(raw_schema, stream)
 
     with pytest.raises(FailureGroup) as exc:
         case.validate_response(response, checks=[response_schema_conformance])
 
     assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_property_level_oneof_enforces_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "data": {
-                "type": "string",
-                "oneOf": [
-                    {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
-                    {"pattern": "^ok$"},
-                ],
-            }
-        },
-        "required": ["data"],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "data: not-json\n\n")
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_property_level_oneof_uses_nested_instance_value_for_branch_selection():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "data": {
-                "type": "string",
-                "oneOf": [
-                    True,
-                    {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
-                ],
-            }
-        },
-        "required": ["data"],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "data: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
 
 
 def test_sse_content_schema_uses_registered_deserializer():
@@ -499,332 +657,6 @@ def test_sse_content_schema_uses_registered_deserializer():
         "required": ["data"],
     }
     case, response = _call_sse(_sse_schema(item_schema), "data: not-an-int\n\n")
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_anyof_with_matching_non_json_branch_does_not_force_json_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "anyOf": [
-            {
-                "properties": {
-                    "event": {"enum": ["update"]},
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
-                }
-            },
-            {
-                "properties": {
-                    "event": {"enum": ["update"]},
-                    "data": {
-                        "contentMediaType": "text/plain",
-                        "contentSchema": {"type": "string"},
-                    },
-                }
-            },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "event: update\ndata: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_allof_with_nested_anyof_preserves_or_semantics_for_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "allOf": [
-            {"properties": {"event": {"enum": ["update"]}}},
-            {
-                "anyOf": [
-                    {
-                        "properties": {
-                            "data": {
-                                "contentMediaType": "application/json",
-                                "contentSchema": {
-                                    "type": "object",
-                                    "properties": {"value": {"type": "integer"}},
-                                    "required": ["value"],
-                                },
-                            }
-                        }
-                    },
-                    {
-                        "properties": {
-                            "data": {
-                                "contentMediaType": "text/plain",
-                                "contentSchema": {"type": "string"},
-                            }
-                        }
-                    },
-                ]
-            },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "event: update\ndata: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_content_schema_enforced_in_nested_composed_branch():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "oneOf": [
-            {"properties": {"event": {"enum": ["ping"]}}},
-            {
-                "allOf": [
-                    {"properties": {"event": {"enum": ["update"]}}},
-                    {
-                        "allOf": [
-                            {
-                                "properties": {
-                                    "data": {
-                                        "contentMediaType": "application/json",
-                                        "contentSchema": {
-                                            "type": "object",
-                                            "properties": {"value": {"type": "integer"}},
-                                            "required": ["value"],
-                                        },
-                                    }
-                                }
-                            }
-                        ]
-                    },
-                ]
-            },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), 'event: update\ndata: {"value": "wrong"}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_nested_oneof_uses_nested_branch_predicate_for_content_schema():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event", "data"],
-        "oneOf": [
-            {"properties": {"event": {"enum": ["ping"]}}},
-            {
-                "allOf": [
-                    {"properties": {"event": {"enum": ["update", "delete"]}}},
-                    {
-                        "oneOf": [
-                            {
-                                "properties": {
-                                    "event": {"enum": ["update"]},
-                                    "data": {
-                                        "contentMediaType": "application/json",
-                                        "contentSchema": {
-                                            "type": "object",
-                                            "properties": {"update_id": {"type": "integer"}},
-                                            "required": ["update_id"],
-                                        },
-                                    },
-                                }
-                            },
-                            {
-                                "properties": {
-                                    "event": {"enum": ["delete"]},
-                                    "data": {
-                                        "contentMediaType": "application/json",
-                                        "contentSchema": {
-                                            "type": "object",
-                                            "properties": {"delete_id": {"type": "string"}},
-                                            "required": ["delete_id"],
-                                        },
-                                    },
-                                }
-                            },
-                        ]
-                    },
-                ]
-            },
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), 'event: update\ndata: {"delete_id": "abc"}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_content_schema_with_ref_in_oneof_branch():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
-            "/sse": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "SSE stream",
-                            "content": {
-                                "text/event-stream": {
-                                    "itemSchema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "event": {"type": "string"},
-                                            "data": {"type": "string"},
-                                        },
-                                        "required": ["event", "data"],
-                                        "oneOf": [
-                                            {"properties": {"event": {"enum": ["ping"]}}},
-                                            {
-                                                "properties": {
-                                                    "event": {"enum": ["update"]},
-                                                    "data": {"$ref": "#/components/schemas/UpdateData"},
-                                                }
-                                            },
-                                        ],
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-        "components": {
-            "schemas": {
-                "UpdateData": {
-                    "type": "string",
-                    "contentMediaType": "application/json",
-                    "contentSchema": {
-                        "type": "object",
-                        "properties": {"value": {"type": "integer"}},
-                        "required": ["value"],
-                    },
-                }
-            }
-        },
-    }
-    case, response = _call_sse(raw_schema, 'event: update\ndata: {"value": "wrong"}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_content_schema_enforces_allof_with_root_constraints():
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "data": {
-                "type": "string",
-                "contentMediaType": "application/json",
-                "contentSchema": {
-                    "type": "object",
-                    "properties": {"a": {"type": "integer"}},
-                    "required": ["a"],
-                },
-            }
-        },
-        "required": ["data"],
-        "allOf": [
-            {
-                "properties": {
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"b": {"type": "integer"}},
-                            "required": ["b"],
-                        },
-                    }
-                }
-            }
-        ],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), 'data: {"a": 1}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_item_schema_ref_with_composed_branches_enforces_content_schema():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
-            "/sse": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "SSE stream",
-                            "content": {
-                                "text/event-stream": {
-                                    "itemSchema": {"$ref": "#/components/schemas/SSEEvent"},
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-        "components": {
-            "schemas": {
-                "SSEEvent": {
-                    "type": "object",
-                    "properties": {
-                        "event": {"type": "string"},
-                        "data": {"type": "string"},
-                    },
-                    "required": ["event", "data"],
-                    "oneOf": [
-                        {"properties": {"event": {"enum": ["ping"]}}},
-                        {
-                            "properties": {
-                                "event": {"enum": ["update"]},
-                                "data": {
-                                    "contentMediaType": "application/json",
-                                    "contentSchema": {
-                                        "type": "object",
-                                        "properties": {"value": {"type": "integer"}},
-                                        "required": ["value"],
-                                    },
-                                },
-                            }
-                        },
-                    ],
-                }
-            }
-        },
-    }
-    case, response = _call_sse(raw_schema, 'event: update\ndata: {"value": "wrong"}\n\n')
 
     with pytest.raises(FailureGroup) as exc:
         case.validate_response(response, checks=[response_schema_conformance])
@@ -907,175 +739,10 @@ def test_sse_item_schema_with_non_json_value_reports_schema_error():
         case.validate_response(response, checks=[response_schema_conformance])
 
 
-def test_sse_content_media_type_without_content_schema_skips_validation():
-    item_schema = {
-        "type": "object",
-        "properties": {"data": {"type": "string", "contentMediaType": "application/json"}},
-        "required": ["data"],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), "data: not-json\n\n")
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_content_schema_true_allows_any_payload():
-    item_schema = {
-        "type": "object",
-        "properties": {"data": {"type": "string", "contentMediaType": "application/json", "contentSchema": True}},
-        "required": ["data"],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), 'data: "anything"\n\n')
-    case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_content_schema_false_rejects_any_payload():
-    item_schema = {
-        "type": "object",
-        "properties": {"data": {"type": "string", "contentMediaType": "application/json", "contentSchema": False}},
-        "required": ["data"],
-    }
-    case, response = _call_sse(_sse_schema(item_schema), 'data: {"value": 42}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
 def test_sse_validator_is_cached():
     case, response = _call_sse(_sse_schema(SSE_ITEM_SCHEMA), 'data: {"value": 42}\n\n')
     case.validate_response(response, checks=[response_schema_conformance])
     case.validate_response(response, checks=[response_schema_conformance])
-
-
-def test_sse_false_itemschema_takes_precedence_over_schema():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
-            "/sse": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "SSE stream",
-                            "content": {
-                                "text/event-stream": {
-                                    "itemSchema": False,
-                                    "schema": SSE_ITEM_SCHEMA,
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    }
-    case, response = _call_sse(raw_schema, 'data: {"value": 42}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_item_schema_and_schema_both_apply():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
-            "/sse": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "SSE stream",
-                            "content": {
-                                "text/event-stream": {
-                                    "itemSchema": {
-                                        "type": "object",
-                                        "properties": {"data": {"type": "string"}},
-                                        "required": ["data"],
-                                    },
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"event": {"enum": ["ping"]}},
-                                    },
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    }
-    case, response = _call_sse(raw_schema, 'data: {"value": 42}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def test_sse_item_schema_and_schema_resolve_refs():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
-            "/sse": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "SSE stream",
-                            "content": {
-                                "text/event-stream": {
-                                    "itemSchema": {"type": "object", "required": ["data"]},
-                                    "schema": {"type": "array", "items": {"$ref": "#/components/schemas/SSEEvent"}},
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-        "components": {
-            "schemas": {
-                "SSEEvent": {
-                    "type": "object",
-                    "properties": {
-                        "data": {
-                            "type": "string",
-                            "contentMediaType": "application/json",
-                            "contentSchema": {
-                                "type": "object",
-                                "properties": {"value": {"type": "integer"}},
-                                "required": ["value"],
-                            },
-                        }
-                    },
-                }
-            }
-        },
-    }
-    case, response = _call_sse(raw_schema, 'data: {"value": "wrong"}\n\n')
-
-    with pytest.raises(FailureGroup) as exc:
-        case.validate_response(response, checks=[response_schema_conformance])
-
-    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
-
-
-def _sse_stream_schema(media_type_object, *, version="3.2.0"):
-    return {
-        "openapi": version,
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
-            "/sse": {
-                "get": {
-                    "responses": {
-                        "200": {"description": "SSE stream", "content": {"text/event-stream": media_type_object}}
-                    }
-                }
-            }
-        },
-    }
 
 
 TWO_EVENTS = "data: one\n\ndata: two\n\n"
