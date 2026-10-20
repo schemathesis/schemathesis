@@ -11,6 +11,7 @@
 
 - `RecursionError` during generation for arrays whose `items` or `contains` refer back to an enclosing schema.
 - Serialize XML array items that declare their own `prefix` and `namespace`.
+- Show the 429 response for failures on waited-out rate limits with `--rate-limit=auto`.
 - Use captured values for body fields under digit-named properties.
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
 - Duplicate coverage-phase `default` case equal to `example` when `examples` is also declared.
