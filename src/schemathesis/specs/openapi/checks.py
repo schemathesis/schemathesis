@@ -232,7 +232,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         # A header whose schema names a missing component has nothing to validate against.
         if header.unresolvable_reference is not None:
             continue
-        coerced = _coerce_header_value(values[0], header.schema)
+        coerced = _coerce_header_value(values[0], header.schema, explode=header.definition.get("explode", False))
         for exc in header.validator.iter_errors(coerced):
             errors.append(
                 JsonSchemaError.from_exception(
@@ -253,8 +253,22 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
     return maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
 
 
-def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
+def _coerce_header_value(value: str, schema: dict[str, Any], *, explode: bool = False) -> Any:
     types = get_type(schema)
+
+    # OpenAPI 3 headers use `simple` style: `k=v,k=v` when exploded, `k,v,k,v` otherwise.
+    if "object" in types and "type" in schema:
+        if explode:
+            pairs = [item.split("=", 1) for item in value.split(",")]
+        else:
+            items = value.split(",")
+            pairs = [items[i : i + 2] for i in range(0, len(items), 2)]
+        if any(len(pair) != 2 for pair in pairs):
+            return value
+        properties = schema.get("properties") or {}
+        additional = schema.get("additionalProperties")
+        fallback = additional if isinstance(additional, dict) else {}
+        return {key: _coerce_header_value(item, properties.get(key, fallback)) for key, item in pairs}
 
     # An untyped schema also admits arrays, but its header value is not a delimited list.
     if "array" in types and "type" in schema:

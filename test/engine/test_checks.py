@@ -989,6 +989,50 @@ def test_header_conformance_wire_value_coercion(ctx, response_factory, schema, v
             response_headers_conformance(check_context(), response, case)
 
 
+EXTENT_SCHEMA = {
+    "type": "object",
+    "properties": {"start": {"type": "integer"}, "end": {"type": "integer"}},
+    "required": ["start"],
+}
+
+
+@pytest.mark.parametrize(
+    ("explode", "value", "expected"),
+    [
+        (True, "start=-5,end=7", True),
+        (False, "start,-5,end,7", True),
+        (None, "start,-5,end,7", True),
+        (True, "start=x,end=7", False),
+        (True, "end=7", False),
+        (True, "start", False),
+        (False, "start,-5,end", False),
+    ],
+    ids=[
+        "exploded",
+        "not-exploded",
+        "default-not-exploded",
+        "exploded-invalid-value",
+        "exploded-missing-required",
+        "exploded-malformed",
+        "not-exploded-odd-items",
+    ],
+)
+def test_header_conformance_object_value(ctx, response_factory, explode, value, expected):
+    header = {"schema": EXTENT_SCHEMA}
+    if explode is not None:
+        header["explode"] = explode
+    operation = ctx.openapi.load_operation(
+        "GET /data", {"responses": {"200": {"description": "OK", "headers": {"X-Extent": header}}}}
+    )
+    case = operation.Case()
+    response = response_factory.core(headers={"X-Extent": [value]})
+    if expected:
+        assert response_headers_conformance(check_context(), response, case) is None
+    else:
+        with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+            response_headers_conformance(check_context(), response, case)
+
+
 def test_header_conformance_definition_behind_ref(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {
