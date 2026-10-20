@@ -827,8 +827,8 @@ class UnitTestProgressManager:
         if self.live:
             self.live.stop()
 
-    def _get_status_icon(self, default_icon: str = "🕛") -> str:
-        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default=default_icon)
+    def _get_status_icon(self) -> str:
+        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default="🕛")
 
     def get_completion_message(self, icon: str | None = None, *, without_checks: bool = False) -> str:
         """Complete the phase and return status message."""
@@ -999,8 +999,8 @@ class StatefulProgressManager:
         """Update the statistics display."""
         self.stats_progress.update(self.stats_task_id, description=self._get_stats_message())
 
-    def _get_status_icon(self, default_icon: str = "🕛") -> str:
-        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default=default_icon)
+    def _get_status_icon(self) -> str:
+        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default="🕛")
 
     def interrupt(self) -> None:
         """Handle interruption."""
