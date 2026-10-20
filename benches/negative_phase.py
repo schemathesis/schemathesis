@@ -2,11 +2,11 @@ import pathlib
 import sys
 
 import pytest
-from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
 
 import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import setup
+from schemathesis.generation.hypothesis.examples import generate_many
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -30,23 +30,7 @@ OPENAI_CHAT_OP = _load_op("openapi-3.1", "openai.com/2.3.0.json", "/chat/complet
 def _run_negative_benchmark(benchmark, op):
     strategy = op.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
-    def _run():
-        @given(strategy)
-        @seed(0)
-        @settings(
-            max_examples=3,
-            database=None,
-            deadline=None,
-            verbosity=Verbosity.quiet,
-            phases=(Phase.generate,),
-            suppress_health_check=list(HealthCheck),
-        )
-        def inner(_case):
-            pass
-
-        inner()
-
-    benchmark(_run)
+    benchmark(generate_many, strategy, 3)
 
 
 @pytest.mark.benchmark(group="negative-strategy-large-spec")

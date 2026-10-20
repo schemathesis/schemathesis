@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 import click
-from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
 from hypothesis.errors import Unsatisfiable
 
 DEFAULT_CLI_PROFILE_FILENAME = "profiles/profile_cli.html"
@@ -26,11 +25,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import schemathesis  # noqa: E402
 import schemathesis.cli  # noqa: E402
-from schemathesis import Case  # noqa: E402
 from schemathesis.core.result import Err  # noqa: E402
 from schemathesis.generation import GenerationMode, hypothesis  # noqa: E402
 from schemathesis.generation.drivers import CoverageGenerator  # noqa: E402
 from schemathesis.generation.feedback import FeedbackSources  # noqa: E402
+from schemathesis.generation.hypothesis.examples import generate_many  # noqa: E402
 from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict, parse_corpus_path  # noqa: E402
 from tools.stub_call import install_stub_call  # noqa: E402
 
@@ -269,21 +268,7 @@ def fuzzing(
 
             try:
                 with profiler:
-
-                    @seed(0)  # type: ignore[untyped-decorator]
-                    @given(case=strategy)  # type: ignore[untyped-decorator]
-                    @settings(  # type: ignore[untyped-decorator]
-                        max_examples=count,
-                        phases=[Phase.generate],
-                        suppress_health_check=list(HealthCheck),
-                        deadline=None,
-                        database=None,
-                        verbosity=Verbosity.quiet,
-                    )
-                    def _gen(case: Case) -> None:
-                        pass
-
-                    _gen()
+                    generate_many(strategy, count)
             except Unsatisfiable:
                 click.echo(f"  {method:7} {path:50} [{gen_mode.value:8}]  UNSATISFIABLE (skipped)", err=True)
                 continue

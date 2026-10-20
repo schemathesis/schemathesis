@@ -2,12 +2,12 @@ import pathlib
 import sys
 
 import pytest
-from hypothesis import HealthCheck, Phase, given, settings
 
 import schemathesis
 from schemathesis.core.result import Err
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import setup
+from schemathesis.generation.hypothesis.examples import generate_many
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -34,19 +34,8 @@ def _run_all_operations(schema_dict):
             except Exception:
                 continue
 
-            @given(strategy)
-            @settings(
-                max_examples=1,
-                deadline=None,
-                phases=[Phase.generate],
-                database=None,
-                suppress_health_check=list(HealthCheck),
-            )
-            def exercise(case):
-                pass
-
             try:
-                exercise()
+                generate_many(strategy, 1)
             except Exception:
                 pass
 
