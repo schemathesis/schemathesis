@@ -574,17 +574,28 @@ def test_dynamic_auth_cookie_integration(ctx, cli, app_runner, snapshot_cli):
     )
 
 
-def test_dynamic_auth_wsgi_e2e(testdir):
-    testdir.makefile(
-        ".toml",
-        schemathesis="""
+def _run_dynamic_auth_test(testdir, toml, app_source, test_body):
+    testdir.makefile(".toml", schemathesis=toml)
+    testdir.makepyfile(
+        f"""{app_source}@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    {test_body}
+"""
+    )
+    return testdir.runpytest("-s")
+
+
+@pytest.mark.parametrize(
+    ("toml", "app_source"),
+    [
+        pytest.param(
+            """
 [auth.dynamic.openapi.BearerAuth]
 path = "/api/auth"
 extract_selector = "/access_token"
 """,
-    )
-    testdir.makepyfile(
-        """
+            """
 import schemathesis
 from flask import Flask, jsonify, request
 from hypothesis import Phase, settings
@@ -624,29 +635,17 @@ def protected():
 
 schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
 
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    response = case.call()
-    assert response.status_code == 200
-"""
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-
-
-def test_dynamic_auth_cookie_wsgi_e2e(testdir):
-    testdir.makefile(
-        ".toml",
-        schemathesis="""
+""",
+            id="wsgi-bearer",
+        ),
+        pytest.param(
+            """
 [auth.dynamic.openapi.SessionCookie]
 path = "/api/auth"
 extract_from = "cookie"
 extract_selector = "SESSION"
 """,
-    )
-    testdir.makepyfile(
-        """
+            """
 import schemathesis
 from flask import Flask, jsonify, request
 from hypothesis import Phase, settings
@@ -688,29 +687,47 @@ def protected():
 
 schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
 
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    response = case.call()
-    assert response.status_code == 200
-"""
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
+""",
+            id="wsgi-cookie",
+        ),
+        pytest.param(
+            """
+[auth.dynamic.openapi.HTTPBearer]
+path = "/api/auth"
+extract_selector = "/access_token"
+""",
+            """
+import schemathesis
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from hypothesis import Phase, settings
 
+app = FastAPI()
+security = HTTPBearer(auto_error=False)
 
-def test_dynamic_auth_cookie_asgi_e2e(testdir):
-    testdir.makefile(
-        ".toml",
-        schemathesis="""
+@app.post("/api/auth", include_in_schema=False)
+async def auth():
+    return {"access_token": "secret-token"}
+
+@app.get("/protected")
+async def protected(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None or credentials.credentials != "secret-token":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"result": "ok"}
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+""",
+            id="asgi-bearer",
+        ),
+        pytest.param(
+            """
 [auth.dynamic.openapi.SessionCookie]
 path = "/api/auth"
 extract_from = "cookie"
 extract_selector = "SESSION"
 """,
-    )
-    testdir.makepyfile(
-        """
+            """
 import schemathesis
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.security import APIKeyCookie
@@ -733,70 +750,28 @@ async def protected(session: str = Depends(session_cookie)):
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    response = case.call()
-    assert response.status_code == 200
-"""
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(passed=1)
-
-
-def test_dynamic_auth_asgi_e2e(testdir):
-    testdir.makefile(
-        ".toml",
-        schemathesis="""
-[auth.dynamic.openapi.HTTPBearer]
-path = "/api/auth"
-extract_selector = "/access_token"
 """,
+            id="asgi-cookie",
+        ),
+    ],
+)
+def test_dynamic_auth_e2e(testdir, toml, app_source):
+    result = _run_dynamic_auth_test(
+        testdir, toml, app_source, "response = case.call()\n    assert response.status_code == 200"
     )
-    testdir.makepyfile(
-        """
-import schemathesis
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from hypothesis import Phase, settings
-
-app = FastAPI()
-security = HTTPBearer(auto_error=False)
-
-@app.post("/api/auth", include_in_schema=False)
-async def auth():
-    return {"access_token": "secret-token"}
-
-@app.get("/protected")
-async def protected(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials is None or credentials.credentials != "secret-token":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return {"result": "ok"}
-
-schema = schemathesis.openapi.from_asgi("/openapi.json", app)
-
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    response = case.call()
-    assert response.status_code == 200
-"""
-    )
-    result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
 
 
-def test_dynamic_auth_wsgi_transport_error(testdir):
-    testdir.makefile(
-        ".toml",
-        schemathesis="""
+@pytest.mark.parametrize(
+    ("toml", "app_source", "message"),
+    [
+        pytest.param(
+            """
 [auth.dynamic.openapi.BearerAuth]
 path = "/api/auth"
 extract_selector = "/access_token"
 """,
-    )
-    testdir.makepyfile(
-        """
+            """
 import schemathesis
 from flask import Flask, jsonify
 from hypothesis import Phase, settings
@@ -834,28 +809,17 @@ def data():
 
 schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
 
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    case.call()
-"""
-    )
-    result = testdir.runpytest("-s")
-    result.assert_outcomes(failed=1)
-    result.stdout.fnmatch_lines(["*WSGI auth request failed*"])
-
-
-def test_dynamic_auth_asgi_transport_error(testdir):
-    testdir.makefile(
-        ".toml",
-        schemathesis="""
+""",
+            "*WSGI auth request failed*",
+            id="wsgi",
+        ),
+        pytest.param(
+            """
 [auth.dynamic.openapi.HTTPBearer]
 path = "/api/auth"
 extract_selector = "/access_token"
 """,
-    )
-    testdir.makepyfile(
-        """
+            """
 import schemathesis
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -874,15 +838,16 @@ async def protected(credentials: HTTPAuthorizationCredentials = Depends(security
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    case.call()
-"""
-    )
-    result = testdir.runpytest("-s")
+""",
+            "*ASGI auth request failed*",
+            id="asgi",
+        ),
+    ],
+)
+def test_dynamic_auth_transport_error(testdir, toml, app_source, message):
+    result = _run_dynamic_auth_test(testdir, toml, app_source, "case.call()")
     result.assert_outcomes(failed=1)
-    result.stdout.fnmatch_lines(["*ASGI auth request failed*"])
+    result.stdout.fnmatch_lines([message])
 
 
 def test_per_test_auth_skipped_for_negated_security_header(ctx, testdir):
