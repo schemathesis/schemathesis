@@ -116,7 +116,7 @@ def validate_documented_response(
         data = deserialization.deserialize_response(response, content_type, context=context)
     except JSONDecodeError as exc:
         failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
-        _maybe_raise_one_or_more(failures)
+        maybe_raise_one_or_more(failures)
         return None
     except NotImplementedError:
         # Expected for media types without a deserializer (images, binary formats).
@@ -128,7 +128,7 @@ def validate_documented_response(
                 message=f"Failed to deserialize response content:\n\n  {exc}",
             )
         )
-        _maybe_raise_one_or_more(failures)
+        maybe_raise_one_or_more(failures)
         return None
 
     if sse_validator is not None or stream_validator is not None:
@@ -196,7 +196,7 @@ def validate_documented_response(
     discriminator_failure = _check_discriminator(operation, data, resolved)
     if discriminator_failure is not None:
         failures.append(discriminator_failure)
-    _maybe_raise_one_or_more(failures)
+    maybe_raise_one_or_more(failures)
     return None
 
 
@@ -328,7 +328,7 @@ def _response_schema_context(matched_key: str, status_code: int) -> str:
     return f"Validated against the response schema for `{matched_key}` (status code {status_code})."
 
 
-def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
+def maybe_raise_one_or_more(failures: list[Failure]) -> None:
     if not failures:
         return
     if len(failures) == 1:

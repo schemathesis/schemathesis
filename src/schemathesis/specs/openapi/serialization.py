@@ -15,13 +15,19 @@ from schemathesis.core.jsonschema import (
 )
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
 from schemathesis.core.transforms import to_wire_string
-from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
 from schemathesis.transport.serialization import Binary
 
 Generated = dict[str, Any]
 Definition = dict[str, Any]
 DefinitionList = list[Definition]
 MapFunction = Callable[[Generated], Generated]
+
+COLLECTION_FORMAT_DELIMITERS = {
+    "csv": ",",
+    "ssv": " ",
+    "tsv": "\t",
+    "pipes": "|",
+}
 
 
 def make_serializer(
@@ -410,13 +416,13 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | Non
             # Headers should be coerced to a string so we can check it for validity later
             yield to_string(name)
         if type_ in ("array", "object"):
-            outer = _COLLECTION_FORMAT_DELIMITERS.get(collection_format)
+            outer = COLLECTION_FORMAT_DELIMITERS.get(collection_format)
             if outer is None:
                 continue
             items = definition.get("items")
             if isinstance(items, dict) and items.get("type") == "array":
                 inner_format = items.get("collectionFormat", "csv")
-                inner = _COLLECTION_FORMAT_DELIMITERS.get(inner_format, ",")
+                inner = COLLECTION_FORMAT_DELIMITERS.get(inner_format, ",")
                 yield delimited_nested(name, outer=outer, inner=inner)
             elif location in ("query", "path"):
                 yield delimited_encoded(name, delimiter=outer)
