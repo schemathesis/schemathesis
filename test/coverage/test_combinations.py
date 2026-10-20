@@ -409,6 +409,8 @@ def test_negative_maxlength_above_buffer(nctx, max_length):
         # Falsy `default` alongside truthy `examples`: both must be emitted.
         ({"type": "integer", "default": 0, "examples": [1]}, [1, 0], [0]),
         ({"type": "integer", "examples": [42, 44]}, [42, 44], [42, 44]),
+        # A `default` equal to `example` stays deduplicated when `examples` are also declared.
+        ({"type": "number", "example": 1, "examples": [2], "default": 1.0}, [1, 2], [2]),
         ({"type": "number"}, [0], [0]),
         ({"type": "integer", "minimum": 5}, [5, 6], [6, 8]),
         ({"type": "number", "minimum": 5.5}, [5.5, 6.5], [6, 8]),

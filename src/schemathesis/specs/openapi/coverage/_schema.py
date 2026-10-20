@@ -3133,9 +3133,9 @@ def _spec_hint_values(
     if example is not NOT_SET and accepts(example) and seen.insert(example):
         yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
     if examples:
-        for example in examples:
-            if accepts(example) and seen.insert(example):
-                yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
+        for item in examples:
+            if accepts(item) and seen.insert(item):
+                yield PositiveValue(item, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
     if (
         default is not NOT_SET
         and not (example is not NOT_SET and default == example)

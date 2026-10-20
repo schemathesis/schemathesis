@@ -13,6 +13,7 @@
 - Serialize XML array items that declare their own `prefix` and `namespace`.
 - Use captured values for body fields under digit-named properties.
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
+- Duplicate coverage-phase `default` case equal to `example` when `examples` is also declared.
 - False positive `negative_data_rejection` for path and query parameters whose sent text is valid.
 - False positive `negative_data_rejection` when configured auth refilled a negated auth header.
 - Duplicate requests in the coverage phase for operations with a request body.
