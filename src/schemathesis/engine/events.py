@@ -224,6 +224,11 @@ class ScenarioFinished(ScenarioEvent):
         self.skip_warning = skip_warning
         self.is_final = is_final
 
+    @property
+    def is_test_scenario(self) -> bool:
+        # Sign-up and login calls prepare the run; reports that count tests leave them out.
+        return self.phase is not PhaseName.AUTH_BOOTSTRAP
+
 
 @dataclass
 class FuzzScenarioStarted(ScenarioEvent):

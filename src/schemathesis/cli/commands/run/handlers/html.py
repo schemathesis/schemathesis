@@ -104,7 +104,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             self._on_phase_started(event)
         elif isinstance(event, events.PhaseFinished):
             self._on_phase_finished(event)
-        elif isinstance(event, events.ScenarioFinished):
+        elif isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
             self._on_scenario_finished(ctx, event)
         elif isinstance(event, events.FuzzScenarioFinished):
             self._on_fuzz_scenario_finished(ctx, event)

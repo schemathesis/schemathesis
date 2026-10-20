@@ -70,8 +70,7 @@ class ExecutionContext(BaseExecutionContext):
             current, _ = self.phases[event.phase.name]
             if PHASE_STATUS_PRIORITY[event.status] >= PHASE_STATUS_PRIORITY[current]:
                 self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
-        # Sign-up and login calls prepare the run and do not count as test cases.
-        elif isinstance(event, events.ScenarioFinished) and event.phase is not PhaseName.AUTH_BOOTSTRAP:
+        elif isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
             self.statistic.on_scenario_finished(event.recorder)
             collector.on_scenario_finished(self, event)
             if (

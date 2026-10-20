@@ -1,3 +1,6 @@
+import json
+from xml.etree import ElementTree
+
 import pytest
 
 
@@ -43,3 +46,21 @@ def test_auth_auto_signup_disabled(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.sign_up_and_login()
     assert cli.run(api.schema_url, "--phases=examples", config={"auth": {"auto-signup": False}}) == snapshot_cli
     assert [request.path for request in api.requests if request.path.startswith("/auth/")] == []
+
+
+def test_reports_leave_out_sign_up_and_login_calls(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.sign_up_and_login()
+    cli.run(
+        api.schema_url,
+        "--phases=stateful",
+        f"--report-wfc-path={tmp_path / 'wfc.json'}",
+        f"--report-junit-path={tmp_path / 'junit.xml'}",
+        f"--report-allure-path={tmp_path / 'allure'}",
+    )
+    wfc = json.loads((tmp_path / "wfc.json").read_text())
+    junit = ElementTree.parse(tmp_path / "junit.xml")
+    assert {
+        "wfc": (wfc["totalTests"], wfc["problemDetails"]["rest"]["evaluatedHttpCalls"]),
+        "junit": [case.get("name") for case in junit.iter("testcase")],
+        "allure": sorted(path.name for path in (tmp_path / "allure").glob("*-result.json")),
+    } == {"wfc": (0, 0), "junit": [], "allure": []}

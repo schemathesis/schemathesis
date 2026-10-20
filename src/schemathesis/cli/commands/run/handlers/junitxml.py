@@ -23,7 +23,7 @@ class JunitXMLHandler(EventHandler):
         self.writer = JunitXmlWriter(output)
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
-        if isinstance(event, events.ScenarioFinished):
+        if isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
             label = event.recorder.label
             failures = recorder_failures(ctx.statistic, event.recorder) if event.status == Status.FAILURE else []
             self.writer.record_scenario(
