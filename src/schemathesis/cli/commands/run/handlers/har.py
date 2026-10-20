@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import partial
-from queue import Queue
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import BackgroundWriterHandler, TextOutput, write_until_finished
@@ -24,9 +23,8 @@ class HarHandler(BackgroundWriterHandler[RecordedScenario]):
         output: TextOutput,
         config: OutputConfig,
         preserve_bytes: bool = False,
-        queue: Queue[RecordedScenario | None] | None = None,
     ) -> None:
-        super().__init__(queue)
+        super().__init__()
         self.output = output
         self.config = config
         self.preserve_bytes = preserve_bytes
