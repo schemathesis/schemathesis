@@ -608,17 +608,17 @@ def test_coverage_pool_overlay_reaches_nested_body_fields(ctx, shipping, path, b
     assert hits, [case.body for case in cases]
 
 
-def test_coverage_pool_overlay_reaches_field_under_non_ascii_digit_property(ctx):
-    # `²` is a digit to `str.isdigit` but not an array index.
+@pytest.mark.parametrize("name", ["²", "2024"], ids=["non-ascii-digit", "ascii-digits"])
+def test_coverage_pool_overlay_reaches_field_under_digit_named_property(ctx, name):
     schema = ctx.openapi.load_schema(
         {
             **_id_producer("/locations", "Location", {"type": "integer"}),
             **_body_consumer(
                 {
                     "type": "object",
-                    "required": ["²"],
+                    "required": [name],
                     "properties": {
-                        "²": {
+                        name: {
                             "type": "object",
                             "required": ["location_id"],
                             "properties": {"location_id": {"type": "integer"}},
@@ -632,7 +632,7 @@ def test_coverage_pool_overlay_reaches_field_under_non_ascii_digit_property(ctx)
     data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
 
     cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
-    assert [case.body for case in cases] == [{"²": {"location_id": 7340001}}]
+    assert [case.body for case in cases] == [{name: {"location_id": 7340001}}]
 
 
 def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(ctx):

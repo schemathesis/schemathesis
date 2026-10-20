@@ -25,7 +25,7 @@ from schemathesis.core.media_types import (
 )
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import UNRESOLVABLE, deepclone, parse_body_key, resolve_path, split_body_key
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone, is_array_index, resolve_path, split_body_key
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -495,7 +495,7 @@ def _with_body_pool_values(
     filled: set[str] = set()
     updated = schema
     for name, value in fields:
-        path = parse_body_key(name)
+        path = split_body_key(name)
         if path[0] in filled:
             continue
         candidate = _with_leaf_example(updated, path, value, bundled, schema, validator_cls)
@@ -508,7 +508,7 @@ def _with_body_pool_values(
 
 def _with_leaf_example(
     node: dict[str, Any],
-    path: tuple[str | int, ...],
+    path: list[str],
     value: object,
     bundled: object,
     body_schema: dict[str, Any],
@@ -520,15 +520,21 @@ def _with_leaf_example(
         return None
     step, *rest = path
     properties = resolved.get("properties")
-    if isinstance(step, str):
-        child = properties.get(step) if isinstance(properties, dict) else None
-    else:
+    if not isinstance(properties, dict):
+        properties = {}
+    # A digit segment is an array index only when the node has no property of that name.
+    is_property = step in properties
+    if is_property:
+        child = properties[step]
+    elif is_array_index(step):
         # Every array item shares the `items` schema, so the value reaches each generated item.
         child = resolved.get("items")
+    else:
+        child = None
     if not isinstance(child, dict):
         return None
     if rest:
-        replacement = _with_leaf_example(child, tuple(rest), value, bundled, body_schema, validator_cls)
+        replacement = _with_leaf_example(child, rest, value, bundled, body_schema, validator_cls)
         if replacement is None:
             return None
     else:
@@ -537,8 +543,7 @@ def _with_leaf_example(
         if not make_validator(schema_with_bundle(child, body_schema), validator_cls).is_valid(value):
             return None
         replacement = {**child, "examples": [value]}
-    if isinstance(step, str):
-        assert isinstance(properties, dict), "a named step only resolves through `properties`"
+    if is_property:
         return {**resolved, "properties": {**properties, step: replacement}}
     return {**resolved, "items": replacement}
 
