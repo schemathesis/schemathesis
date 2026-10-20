@@ -1869,6 +1869,50 @@ def test_serialize_xml_scalar_body_under_prefixed_root(ctx, body, expected):
     assert operation.Case(body=body).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
 
 
+PREFIXED_ITEM_XML = {"name": "item", "namespace": "http://x", "prefix": "p"}
+
+
+@pytest.mark.parametrize(
+    ("schema", "body", "expected"),
+    [
+        (
+            {"type": "array", "items": {"type": "string", "xml": PREFIXED_ITEM_XML}},
+            ["v"],
+            b'<p:item xmlns:p="http://x">v</p:item>',
+        ),
+        (
+            {
+                "type": "array",
+                "items": {"type": "object", "properties": {"a": {"type": "string"}}, "xml": PREFIXED_ITEM_XML},
+            },
+            [{"a": "v"}],
+            b'<p:item xmlns:p="http://x"><a>v</a></p:item>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "root", "namespace": "http://x", "prefix": "p"},
+                "properties": {
+                    "a": {"type": "array", "items": {"type": "string", "xml": {"name": "item", "prefix": "p"}}}
+                },
+            },
+            {"a": ["v"]},
+            b'<p:root xmlns:p="http://x"><p:item>v</p:item></p:root>',
+        ),
+    ],
+    ids=["primitive", "object", "primitive-bound-by-ancestor"],
+)
+def test_serialize_xml_prefixed_array_items(ctx, schema, body, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "requestBody": {"content": {"application/xml": {"schema": schema}}, "required": True},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    assert operation.Case(body=body).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
+
+
 SIMPLE_TEXT_STRATEGY = st.text(min_size=1, alphabet=st.sampled_from(string.ascii_letters))
 XML_OBJECT_STRATEGY = st.fixed_dictionaries(
     {},

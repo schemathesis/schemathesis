@@ -296,6 +296,7 @@ def _write_array(
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
+    unprefixed_tag = tag
     if options.get("prefix"):
         tag = f"{options['prefix']}:{tag}"
     wrapped = options.get("wrapped", False)
@@ -316,14 +317,22 @@ def _write_array(
         items_resolver, items = resolve_reference(resolver, items["$ref"])
     child_options = items.get("xml", {})
     child_tag = child_options.get("name", tag)
+    # Items with their own namespace declare it on every element they write.
+    items_bind_prefix = "namespace" in child_options
+    items_prefix = child_options.get("prefix")
     if not is_namespace_specified and "namespace" in options:
         child_options.setdefault("namespace", options["namespace"])
     if "prefix" in options:
         child_options.setdefault("prefix", options["prefix"])
     items["xml"] = child_options
-    _validate_prefix(child_options, stack)
+    if not items_bind_prefix:
+        _validate_prefix(child_options, stack)
     for item in obj:
-        _write_xml(buffer, item, child_tag, items, stack, items_resolver)
+        item_tag = child_tag
+        # Objects and arrays prefix their own tags, while scalars expect the caller to do it.
+        if items_prefix and not isinstance(item, (dict, list)):
+            item_tag = f"{items_prefix}:{child_options.get('name', unprefixed_tag)}"
+        _write_xml(buffer, item, item_tag, items, stack, items_resolver)
     if wrapped:
         buffer.write(f"</{tag}>")
     pop_namespace_if_any(stack, options)
