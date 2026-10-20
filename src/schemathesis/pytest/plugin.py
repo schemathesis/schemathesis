@@ -39,7 +39,6 @@ from schemathesis.generation.hypothesis.given import (
     validate_given_args,
 )
 from schemathesis.generation.hypothesis.reporting import (
-    HealthCheckTipStyle,
     build_health_check_error,
     build_unsatisfiable_error,
     ignore_hypothesis_output,
@@ -475,9 +474,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         except FailedHealthCheck as exc:
             operation = ApiOperationMark.get(pyfuncitem.obj)
             assert operation is not None
-            raise build_health_check_error(
-                operation, exc, with_tip=True, tip_style=HealthCheckTipStyle.PYTEST
-            ) from None
+            raise build_health_check_error(operation, exc, with_tip=True) from None
         except Unsatisfiable:
             operation = ApiOperationMark.get(pyfuncitem.obj)
             assert operation is not None

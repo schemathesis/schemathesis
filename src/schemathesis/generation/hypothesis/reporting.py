@@ -4,7 +4,6 @@ import json
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 import jsonschema_rs
@@ -433,16 +432,10 @@ def _get_generic_health_check_message(reason: HealthCheck) -> str:
     return f"{title} for this operation\n\nUnable to identify the specific parameter. Common causes:\n{causes}"
 
 
-class HealthCheckTipStyle(Enum):
-    DEFAULT = "default"
-    PYTEST = "pytest"
-
-
 def build_health_check_error(
     operation: APIOperation,
     original: FailedHealthCheck | InvalidArgument,
     with_tip: bool,
-    tip_style: HealthCheckTipStyle = HealthCheckTipStyle.DEFAULT,
 ) -> FailedHealthCheck | InvalidArgument:
     __tracebackhide__ = True
     reason = _extract_health_check_reason(original)
@@ -456,8 +449,9 @@ def build_health_check_error(
         message = _get_generic_health_check_message(reason)
 
     if with_tip:
-        message += f"\n\nTip: {HEALTH_CHECK_ACTIONS[reason]}"
-        if tip_style == HealthCheckTipStyle.PYTEST:
-            message += f". You can disable this health check with @settings(suppress_health_check=[{reason!r}])"
+        message += (
+            f"\n\nTip: {HEALTH_CHECK_ACTIONS[reason]}. "
+            f"You can disable this health check with @settings(suppress_health_check=[{reason!r}])"
+        )
 
     return FailedHealthCheck(message)
