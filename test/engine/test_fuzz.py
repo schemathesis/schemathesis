@@ -836,6 +836,55 @@ def test_iter_link_candidates_edge_links(ctx, case_factory, response_factory, li
     assert candidates == []
 
 
+def test_fuzz_follows_wildcard_link_with_one_listed_identifier(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "array", "items": {"$ref": "#/components/schemas/User"}}
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/users/{user_id}": {
+                "delete": {
+                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "User": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]},
+            }
+        },
+    )
+    deleted = []
+
+    @app.route("/users", methods=["GET"])
+    def list_users():
+        return [{"id": 1}, {"id": 2}]
+
+    @app.route("/users/<user_id>", methods=["DELETE"])
+    def delete_user(user_id):
+        deleted.append(user_id)
+        return "", 204 if user_id in ("1", "2") else 404
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.seed = 1
+    collected = _collect_until_finished(schema, count=20, config=FuzzConfig())
+    assert not _non_fatal_errors(collected)
+    assert [user_id for user_id in deleted if "MultiMatch" in user_id] == []
+    assert {"1", "2"} <= set(deleted)
+
+
 # A consumer that raises mid-run closes the stream; workers must stop instead of fuzzing forever.
 def test_fuzz_closing_stream_mid_run_stops_workers(ctx):
     api = ctx.openapi.apps.path_variable()
