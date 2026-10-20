@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from warnings import catch_warnings
 
 import requests
-from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
+from hypothesis.errors import Flaky, FlakyStrategyDefinition, Unsatisfiable, UnsatisfiedAssumption
 from hypothesis.strategies import one_of, sampled_from
 from requests.exceptions import ChunkedEncodingError
 from urllib3.exceptions import InsecureRequestWarning
@@ -24,6 +24,7 @@ from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._rate_limit_retry import send_tracked
 from schemathesis.engine._validate import validate_response
+from schemathesis.engine.errors import is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import overrides
@@ -590,10 +591,6 @@ def _run_forever_thread(
     # Any seed takes precedence over `derandomize`, so deterministic mode skips a generated one.
     seed = ctx.config.seed if not hypothesis_settings.derandomize or ctx.config.has_explicit_seed else None
 
-    # Settings go on top: seeding resets the example database, and the configured one must win.
-    @hypothesis.settings(hypothesis_settings)  # type: ignore[untyped-decorator]
-    @hypothesis.seed(seed)  # type: ignore[untyped-decorator]
-    @hypothesis.given(scheduler())  # type: ignore[untyped-decorator]
     def fuzz_test(recorder: ScenarioRecorder) -> None:
         """Validate all responses in the drawn scenario and emit FuzzScenarioFinished."""
         active = scenario_cell.value
@@ -616,9 +613,20 @@ def _run_forever_thread(
                 active, recorder, status=status, suite_id=suite_id, worker_id=worker_id, event_queue=event_queue
             )
 
-    try:
-        with catch_warnings(), ignore_hypothesis_output():
-            warnings.filterwarnings("ignore", category=InsecureRequestWarning)
-            fuzz_test()
-    except (FailureGroup, Exception, KeyboardInterrupt) as exc:
-        _handle_session_end(ctx, exc, operations=plan.operations, event_queue=event_queue)
+    while True:
+        # Settings go on top: seeding resets the example database, and the configured one must win.
+        session = hypothesis.settings(hypothesis_settings)(
+            hypothesis.seed(seed)(hypothesis.given(scheduler())(fuzz_test))
+        )
+        try:
+            with catch_warnings(), ignore_hypothesis_output():
+                warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+                session()
+        except (FailureGroup, Exception, KeyboardInterrupt) as exc:
+            if (isinstance(exc, FlakyStrategyDefinition) or is_inconsistent_replay(exc)) and not ctx.has_to_stop:
+                # Server state changed what a replayed scenario drew; keep fuzzing in a fresh session.
+                if seed is not None:
+                    seed += 1
+                continue
+            _handle_session_end(ctx, exc, operations=plan.operations, event_queue=event_queue)
+        return
