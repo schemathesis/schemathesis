@@ -20,7 +20,7 @@ from schemathesis.core.jsonschema.patterns import is_valid_python_regex, normali
 from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, is_array_index
 from schemathesis.specs.openapi.adapter import v3_1, v3_2
 from schemathesis.specs.openapi.converter import INTEGER_FORMAT_BOUNDS
 
@@ -203,34 +203,43 @@ def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayloa
                 prop[max_keyword] = payload.max
 
 
-def _walk_to_property(schema: dict[str, Any], path: ParameterPath, bundled: object) -> dict[str, Any] | None:
-    """Descend `schema` along `path`; return the first leaf prop dict or None."""
-    leaves = _walk_to_properties(schema, path, bundled)
-    return leaves[0] if leaves else None
+def _walk_to_property(
+    schema: dict[str, Any], path: ParameterPath, bundled: object
+) -> tuple[ParameterPath, dict[str, Any]] | None:
+    """Descend `schema` along `path`; return the path with array steps as integers and the first leaf prop dict."""
+    typed_path, leaves = _walk(schema, path, bundled)
+    return (typed_path, leaves[0]) if leaves else None
 
 
 def _walk_to_properties(schema: dict[str, Any], path: ParameterPath, bundled: object) -> list[dict[str, Any]]:
-    """Descend `schema` along `path`; return every leaf prop dict a value at that path must satisfy.
+    """Descend `schema` along `path`; return every leaf prop dict a value at that path must satisfy."""
+    return _walk(schema, path, bundled)[1]
 
-    String steps navigate `properties[<name>]` (object properties), then composition branches that declare it;
-    int steps navigate `items` (array elements). The index value itself is irrelevant for
-    JSON Schema's uniform-items model — every element shares the `items` schema.
+
+def _walk(schema: dict[str, Any], path: ParameterPath, bundled: object) -> tuple[ParameterPath, list[dict[str, Any]]]:
+    """Descend `schema` along `path`, returning the path with array steps as integers and the leaves it reaches.
+
+    A step navigates `properties[<name>]` (object properties), then composition branches that declare it;
+    a digit step no node declares as a property navigates `items` (array elements). The index value itself
+    is irrelevant for JSON Schema's uniform-items model — every element shares the `items` schema.
     """
     if not path:
-        return []
+        return path, []
     current = [resolve_bundled_ref(schema, bundled)]
+    typed_path: list[str | int] = []
     for step in path:
-        found: list[dict[str, Any]] = []
-        for node in current:
-            if isinstance(step, str):
-                found.extend(_declared_properties(node, step, bundled, set()))
-            else:
-                items = node.get("items")
-                if isinstance(items, dict):
-                    found.append(items)
+        name = str(step)
+        found = [prop for node in current for prop in _declared_properties(node, name, bundled, set())]
+        if found:
+            typed_path.append(name)
+        elif isinstance(step, int) or is_array_index(step):
+            found = [node["items"] for node in current if isinstance(node.get("items"), dict)]
+            typed_path.append(int(step))
+        else:
+            typed_path.append(step)
         # Branches sharing one component resolve to the same dict; keep it once.
         current = list({id(leaf): leaf for leaf in (resolve_bundled_ref(nested, bundled) for nested in found)}.values())
-    return current
+    return tuple(typed_path), current
 
 
 def _declared_properties(node: dict[str, Any], name: str, bundled: object, seen: set[int]) -> list[dict[str, Any]]:

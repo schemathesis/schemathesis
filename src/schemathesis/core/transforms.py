@@ -156,11 +156,6 @@ def split_body_key(key: str) -> list[str]:
     return key.split("/")
 
 
-def parse_body_key(key: str) -> tuple[str | int, ...]:
-    """`"items/0/id"` -> `("items", 0, "id")`, array indices as integers."""
-    return tuple(map(as_index_or_key, split_body_key(key)))
-
-
 def format_body_path(path: Iterable[str]) -> str:
     """`("items", "id")` -> `"/items/id"`, the path a body binding or a body draw is recorded under."""
     return "/" + format_body_key(path)

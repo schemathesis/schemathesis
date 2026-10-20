@@ -12,6 +12,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.result import Ok
+from schemathesis.core.transforms import format_body_key
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
@@ -35,6 +36,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     update_input_field_bindings,
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
+    BodyPath,
     CanonicalizationCache,
     Cardinality,
     DefinitionSource,
@@ -80,7 +82,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
-    deferred_nested_fks: dict[str, list[tuple[str, str, str]]] = {}
+    deferred_nested_fks: dict[str, list[tuple[str, str, BodyPath]]] = {}
     deferred_named_scalars: dict[str, list[tuple[str, str, JsonSchema]]] = {}
     deferred_body_fields: dict[str, list[tuple[str, JsonSchema]]] = {}
     deferred_field_named_path_parameters: dict[str, list[tuple[str, str]]] = {}
@@ -99,7 +101,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 for parameter in operation.iter_parameters()
                 if parameter.location == ParameterLocation.PATH
             }
-            pending: list[tuple[str, str, str]] = []
+            pending: list[tuple[str, str, BodyPath]] = []
             pending_named_scalars: list[tuple[str, str, JsonSchema]] = []
             pending_body_fields: list[tuple[str, JsonSchema]] = []
             pending_field_named_path_parameters: list[tuple[str, str]] = []
@@ -151,7 +153,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # producer paths can sort after their consumers (e.g. /departments alphabetises before
     # /locations) and the per-operation pass would otherwise drop those slots.
     for label, items in deferred_nested_fks.items():
-        for target_resource_name, target_field, parameter_name in items:
+        for target_resource_name, target_field, body_path in items:
             target_resource = resources.get(target_resource_name)
             if target_resource is None:
                 continue
@@ -159,8 +161,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 InputSlot(
                     resource=target_resource,
                     resource_field=target_field,
-                    parameter_name=parameter_name,
+                    parameter_name=format_body_key(body_path),
                     parameter_location=ParameterLocation.BODY,
+                    body_path=body_path,
                 )
             )
 

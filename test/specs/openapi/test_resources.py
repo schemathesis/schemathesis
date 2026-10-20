@@ -1886,6 +1886,7 @@ def _with_shipping(shipping):
         (_with_shipping(_SHIPPING_OR_PICKUP), ("shipping",)),
         (_with_shipping({"type": "array", "minItems": 1, "items": _COMPOSED_SHIPPING}), ("shipping", "*")),
         (_with_shipping({"type": "array", "minItems": 1, "items": _SHIPPING_OR_PICKUP}), ("shipping", "*")),
+        ({"type": "object", "properties": {"2024": _SHIPPING}, "required": ["2024"]}, ("2024",)),
     ],
     ids=[
         "inline-object",
@@ -1903,6 +1904,7 @@ def _with_shipping(shipping):
         "one-of",
         "array-of-all-of",
         "array-of-one-of",
+        "digit-named-property",
     ],
 )
 def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
