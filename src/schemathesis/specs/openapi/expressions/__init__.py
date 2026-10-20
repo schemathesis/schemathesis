@@ -5,13 +5,12 @@ https://swagger.io/docs/specification/links/#runtime-expressions
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from schemathesis.core.deserialization import DeserializationContext, deserialize_response
-from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer_all
+from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer_all, to_wire_text
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi.expressions import lexer, nodes, parser
 from schemathesis.specs.openapi.expressions.nodes import BodyResponse
@@ -101,12 +100,4 @@ def _evaluate_object_key(key: str, output: StepOutput) -> Any:
     evaluated = evaluate(key, output)
     if evaluated is UNRESOLVABLE:
         return evaluated
-    if isinstance(evaluated, str):
-        return evaluated
-    if isinstance(evaluated, bool):
-        return "true" if evaluated else "false"
-    if isinstance(evaluated, int | float):
-        return str(evaluated)
-    if evaluated is None:
-        return "null"
-    return json.dumps(evaluated)
+    return to_wire_text(evaluated)
