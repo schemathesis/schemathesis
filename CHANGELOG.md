@@ -10,6 +10,7 @@
 ### :bug: Fixed
 
 - Serialize XML array items that declare their own `prefix` and `namespace`.
+- Use captured values for body fields under digit-named properties in the coverage phase.
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
 - Duplicate requests in the coverage phase for operations with a request body.
 - Missing boundary in `multipart/mixed` request `Content-Type` headers.
