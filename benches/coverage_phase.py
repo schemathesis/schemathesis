@@ -1,27 +1,21 @@
 """Benchmarks for the coverage phase."""
 
-import pathlib
-import sys
-
 import pytest
 from jsonschema_rs import Draft202012Validator
 
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent))
-
-from schemathesis.core.jsonschema.patterns import update_quantifier  # noqa: E402
-from schemathesis.core.parameters import ParameterLocation  # noqa: E402
-from schemathesis.generation.hypothesis import setup  # noqa: E402
-from schemathesis.specs.openapi.coverage._schema import CoverageContext, cover_schema_iter  # noqa: E402
-from schemathesis.specs.openapi.formats import get_default_format_strategies  # noqa: E402
-from tools.coverage.caches import clear_internal_caches  # noqa: E402
+from schemathesis.core.jsonschema.patterns import update_quantifier
+from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.hypothesis import setup
+from schemathesis.specs.openapi._caches import clear_all
+from schemathesis.specs.openapi.coverage._schema import CoverageContext, cover_schema_iter
+from schemathesis.specs.openapi.formats import get_default_format_strategies
 
 setup()
 
 
 @pytest.fixture(autouse=True)
 def _clear_caches() -> None:
-    clear_internal_caches()
+    clear_all()
 
 
 CONTEXTS = [

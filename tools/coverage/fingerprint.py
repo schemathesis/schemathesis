@@ -15,8 +15,8 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.drivers import without_unserializable_payload
 from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.transport.serialization import Binary
-from tools.coverage.caches import clear_internal_caches
 
 # (operation, scenario, mode, parameter_location, parameter, location, digest); absent fields are "".
 Row = tuple[str, str, str, str, str, str, str]
@@ -86,7 +86,7 @@ def fingerprint_schema(
 ) -> SchemaFingerprint:
     # Generation caches are process-global and seeded draws are reused across schemas; start clean so the
     # fingerprint depends on this schema alone, not on what was processed before it.
-    clear_internal_caches()
+    clear_all()
     modes = list(GenerationMode) if generation_modes is None else generation_modes
     rows: list[Row] = []
     errors: list[str] = []

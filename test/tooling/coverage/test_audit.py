@@ -4,6 +4,9 @@ import pytest
 
 from schemathesis.generation import GenerationMode
 from schemathesis.generation import hypothesis as hypothesis_internals
+from schemathesis.generation.jsonschema import strategy
+from schemathesis.specs.openapi import negative
+from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.specs.openapi.coverage import _schema as coverage_internals
 from tools.coverage.audit import (
     _KNOWN_UNSUPPORTED_MEDIA_TYPES,
@@ -12,7 +15,6 @@ from tools.coverage.audit import (
     _strip_known_unsupported_media_types,
     audit_schema,
 )
-from tools.coverage.caches import clear_internal_caches
 
 _PATHS = {
     "/users/{id}": {
@@ -425,11 +427,12 @@ def test_audit_schema_records_rss_jumps_per_operation(ctx):
     assert all(isinstance(jump["delta_bytes"], int) for jump in outcome.result.rss_jumps)
 
 
-def test_clear_internal_caches_drains_known_caches(ctx):
+def test_clear_all_drains_known_caches(ctx):
     # An audit pass populates the schemathesis internal caches; the shared helper must
     # empty them so audit workers don't carry per-schema state forward to the next task.
     raw = ctx.openapi.build_schema(_PATHS)
     audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    audit_schema(raw, api="t", corpus="external", phase=PhaseName.FUZZING)
     populated_caches = [
         len(coverage_internals.DEFAULT_GENERATION_SESSION.format_validators),
         len(coverage_internals.DEFAULT_GENERATION_SESSION.removed_examples._data),
@@ -437,13 +440,17 @@ def test_clear_internal_caches_drains_known_caches(ctx):
         len(hypothesis_internals.canonical_strategy_cache._data),
     ]
     assert any(populated_caches), populated_caches
-    clear_internal_caches()
+    assert strategy._anything_for.cache_info().currsize > 0
+    assert negative.get_validator.cache_info().currsize > 0
+    clear_all()
     assert coverage_internals.DEFAULT_GENERATION_SESSION.format_validators == {}
     assert coverage_internals.DEFAULT_GENERATION_SESSION.removed_examples._data == {}
     assert coverage_internals.DEFAULT_GENERATION_SESSION.values._data == {}
     assert hypothesis_internals.custom_formats_cache._data == {}
     assert hypothesis_internals.canonical_strategy_cache._data == {}
     assert hypothesis_internals._first_param_cache._data == {}
+    assert strategy._anything_for.cache_info().currsize == 0
+    assert negative.get_validator.cache_info().currsize == 0
 
 
 def test_audit_schema_records_unknown_unsupported(ctx):

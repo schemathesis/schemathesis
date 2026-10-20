@@ -11,11 +11,11 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import events, from_schema
-from schemathesis.generation.hypothesis import canonical_form_cache, canonical_strategy_cache, setup
-from schemathesis.generation.jsonschema import strategy
+from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.reporting.har import HarWriter
 from schemathesis.reporting.vcr import VcrWriter
+from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.specs.openapi._hypothesis import get_parameters_strategy
 from schemathesis.specs.openapi.stateful import dependencies
 
@@ -358,20 +358,11 @@ WIDE_ONE_OF = {
 }
 
 
-def _clear_generation_caches():
-    """Drop what a previous iteration memoized, so each one pays for a cold build."""
-    for cache in (canonical_form_cache, canonical_strategy_cache):
-        cache.clear()
-    for value in vars(strategy).values():
-        clear = getattr(value, "cache_clear", None)
-        if clear is not None:
-            clear()
-
-
 @pytest.mark.benchmark(group="wide-one-of-strategy")
 def test_wide_one_of_strategy(benchmark):
     def _build():
-        _clear_generation_caches()
+        # Drop what a previous iteration memoized, so each one pays for a cold build.
+        clear_all()
         operation = schemathesis.openapi.from_dict(deepclone(WIDE_ONE_OF))["/p"]["POST"]
 
         @seed(0)

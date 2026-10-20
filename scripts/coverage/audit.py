@@ -30,6 +30,7 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskProgressC
 from rich.table import Table
 
 from schemathesis.generation import GenerationMode
+from schemathesis.specs.openapi._caches import clear_all
 from tools.corpus.io import (
     CORPUS_NAMES,
     CorpusEntry,
@@ -47,7 +48,6 @@ from tools.coverage.audit import (
     audit_schema,
     error_from_exc,
 )
-from tools.coverage.caches import clear_internal_caches
 
 DEFAULT_OUT_DIR = Path("out/coverage")
 _MODE_CHOICES = ("all", *(mode.value for mode in GenerationMode))
@@ -145,7 +145,7 @@ def _process_entry(
     )
     # Prevent schema-derived state from carrying across the worker's task batch.
     del outcome
-    clear_internal_caches()
+    clear_all()
     return output
 
 

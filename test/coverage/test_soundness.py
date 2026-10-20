@@ -12,10 +12,10 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.specs.openapi._hypothesis import _canonical_strategy
 from schemathesis.specs.openapi.coverage._schema import MAX_DRAWN_ARRAY_ITEMS, CoverageContext, cover_schema_iter
 from schemathesis.specs.openapi.formats import get_default_format_strategies
-from tools.coverage.caches import clear_internal_caches
 
 DRAFT4 = jsonschema_rs.Draft4Validator
 DRAFT2020 = jsonschema_rs.Draft202012Validator
@@ -187,7 +187,7 @@ SOUNDNESS_SETTINGS = {
 @settings(**SOUNDNESS_SETTINGS)
 def test_generated_body_values_match_their_mode(validator_cls, data):
     # Per-example isolation: generation caches are process-global.
-    clear_internal_caches()
+    clear_all()
     schema = data.draw(schemas(draft4=validator_cls is DRAFT4))
     mode = data.draw(st.sampled_from(list(GenerationMode)))
     assert_sound(schema, mode, validator_cls)
@@ -206,5 +206,5 @@ def test_generated_body_values_match_their_mode_from_metaschema(validator_cls, m
         validator_cls(schema, validate_formats=True, offline=True)
     except jsonschema_rs.ValidationError:
         reject()
-    clear_internal_caches()
+    clear_all()
     assert_sound(schema, data.draw(st.sampled_from(list(GenerationMode))), validator_cls)
