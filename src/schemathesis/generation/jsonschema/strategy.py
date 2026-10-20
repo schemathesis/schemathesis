@@ -461,7 +461,7 @@ def _array(
     # `st.lists` refuses either bound over an element strategy drawing nothing, so the bounds are
     # answered here instead. Skipped while a pointer target is still being built, where `is_empty`
     # would force a strategy that is not there yet.
-    if kwargs and not ctx.pending and element.is_empty:
+    if kwargs and not ctx.building_cycle and element.is_empty:
         # No position can be filled, so the empty array is the only value the bounds may allow.
         return st.nothing() if kwargs.get("min_size") else st.builds(list)
     if all_distinct:
@@ -618,7 +618,7 @@ def _from_layout(
     if layout.entries:
         parts.append(st.tuples(*[from_schema(entry, ctx) for entry in layout.entries]))
     parts.extend(
-        _repeated(placement, unique=all_distinct)
+        _repeated(placement, ctx, unique=all_distinct)
         for placement in layout.placements
         if placement.placed or placement.slack
     )
@@ -839,13 +839,14 @@ def _narrowed(
     return schema
 
 
-def _repeated(placement: _Placement, *, unique: bool) -> SearchStrategy[list[JsonValue]]:
+def _repeated(placement: _Placement, ctx: StrategyContext, *, unique: bool) -> SearchStrategy[list[JsonValue]]:
     """One demand's matches, drawn together rather than as a strategy per position."""
     element = placement.demand.element
     # A placement only ever takes positions the demand can fill; `_laid_out` gives up otherwise.
     assert element is not None
     count = placement.placed
-    if element.is_empty:
+    # Skipped while a pointer target is still being built, where `is_empty` would force a strategy that is not there yet.
+    if not ctx.building_cycle and element.is_empty:
         # A contradiction canonicalization could not see: nothing meets the demand, so no array clears
         # the schema this way. Other layouts, and the schema's other branches, may still.
         return st.nothing()

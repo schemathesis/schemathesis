@@ -94,3 +94,8 @@ class StrategyContext:
     complementing: set[jsonschema_rs.CanonicalSchema] = field(default_factory=set)
     # Whether an integer may be drawn spelled as a float, which only a JSON carrier keeps apart.
     whole_floats: bool = False
+
+    @property
+    def building_cycle(self) -> bool:
+        """Whether a placeholder stands for something still being built, which `is_empty` would force too early."""
+        return bool(self.pending or self.folding)
