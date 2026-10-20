@@ -254,6 +254,9 @@ class OpenAPIApps:
     def users_crud_with_failure(self) -> OpenAPIServer:
         return _start(self.parent, openapi_users.crud_with_failure())
 
+    def linked_users(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_users.linked_users())
+
     def aspnet_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.ASPNET))
 

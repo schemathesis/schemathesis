@@ -33,6 +33,7 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
 from test.utils import EventStream
 
@@ -2289,10 +2290,7 @@ def test_max_time_stops_reserving_once_stateful_proves_idle(ctx, app_runner):
 def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner):
     # A retry that starts with the budget already gone issues no request, so it vouches for nothing.
     app, _ = ctx.openapi.make_flask_app(linked_users())
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return flask.jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):

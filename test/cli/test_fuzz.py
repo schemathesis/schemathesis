@@ -29,6 +29,7 @@ from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.statistic import Statistic
 from schemathesis.engine.summary import build_operations
+from test.apps.fragments import handlers
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import linked_users, null_name_response, null_name_responses
 from test.utils import assert_cli_snapshot
@@ -865,10 +866,7 @@ def test_fuzz_inherits_the_root_time_limit(cli, app_runner, ctx, tmp_path):
     # The root budget covers both commands, so fuzzing stops before the failure this app starts serving.
     app, _ = ctx.openapi.make_flask_app(linked_users())
     started = time.monotonic()
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
