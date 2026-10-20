@@ -6,7 +6,7 @@ from pathlib import Path
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from schemathesis.cli.commands.run.handlers.base import EventHandler, WriterWorker
+from schemathesis.cli.commands.run.handlers.base import BackgroundWriterHandler
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.cache.io import effective_directory
 from schemathesis.engine import Status, events
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     from schemathesis.config import SanitizationConfig
 
 
-class CrashHandler(EventHandler):
+class CrashHandler(BackgroundWriterHandler["_Process"]):
     """CLI event handler that writes crash reproduction files on test failures."""
 
-    __slots__ = ("cache_directory", "schema_location", "base_url", "tls_verify", "sanitization", "queue", "worker")
+    __slots__ = ("cache_directory", "schema_location", "base_url", "tls_verify", "sanitization")
 
     def __init__(
         self,
@@ -32,13 +32,12 @@ class CrashHandler(EventHandler):
         tls_verify: bool | str | None,
         sanitization: SanitizationConfig,
     ) -> None:
+        super().__init__()
         self.cache_directory = cache_directory
         self.schema_location = schema_location
         self.base_url = base_url
         self.tls_verify = tls_verify
         self.sanitization = sanitization
-        self.queue: Queue[_Process | None] = Queue()
-        self.worker: WriterWorker | None = None
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
@@ -53,24 +52,15 @@ class CrashHandler(EventHandler):
     def _start_worker(self, project_title: str | None) -> None:
         assert self.worker is None
         directory = effective_directory(self.cache_directory, project_title) / "crashes"
-        self.worker = WriterWorker(
-            name="SchemathesisCrashWriter",
-            target=_run,
-            kwargs={
-                "directory": directory,
-                "schema_location": self.schema_location,
-                "base_url": self.base_url,
-                "tls_verify": self.tls_verify,
-                "sanitization": self.sanitization,
-                "queue": self.queue,
-            },
+        self._start_writer(
+            "SchemathesisCrashWriter",
+            _run,
+            directory=directory,
+            schema_location=self.schema_location,
+            base_url=self.base_url,
+            tls_verify=self.tls_verify,
+            sanitization=self.sanitization,
         )
-        self.worker.start()
-
-    def shutdown(self, ctx: BaseExecutionContext) -> None:
-        self.queue.put(None)
-        if self.worker is not None:
-            self.worker.join()
 
 
 def _run(

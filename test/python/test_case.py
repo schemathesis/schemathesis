@@ -1,18 +1,10 @@
 import pytest
 
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.schemas import APIOperation
 
 
-def test_formatted_path(swagger_20):
-    operation = APIOperation(
-        "/users/{name}",
-        "GET",
-        {},
-        swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
+def test_formatted_path(ctx):
+    operation = ctx.openapi.load_operation("GET /users/{name}", {"responses": {"200": {"description": "OK"}}})
     case = operation.Case(path_parameters={"name": "test"})
     assert case.formatted_path == "/users/test"
 

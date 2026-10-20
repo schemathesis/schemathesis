@@ -7,14 +7,12 @@ import sys
 import threading
 
 import pytest
-import requests
 from hypothesis import strategies as st
 from hypothesis.vendor.pretty import pretty
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transport import Response
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
@@ -1382,7 +1380,7 @@ def test_unresolvable_pointer(user_schema_builder):
     assert resources == []
 
 
-def test_custom_deserializer(ctx):
+def test_custom_deserializer(ctx, response_factory):
     @deserialization.deserializer("text/x-keyvalue")
     def deserialize_keyvalue(ctx, response):
         data = {}
@@ -1431,14 +1429,12 @@ def test_custom_deserializer(ctx):
     operation = schema["/users"]["POST"]
     case = operation.Case()
 
-    req = requests.Request("POST", "http://test.example/users")
-    prepared = req.prepare()
-    response = Response(
+    response = response_factory.core(
         status_code=201,
-        headers={"content-type": ["text/x-keyvalue"]},
         content=b"id=user123\nname=Alice",
-        request=prepared,
-        elapsed=0.1,
+        content_type="text/x-keyvalue",
+        method="POST",
+        url="http://test.example/users",
         verify=True,
     )
 
@@ -2510,7 +2506,7 @@ def test_pool_overlay_respects_max_properties(ctx, mode):
     assert not oversized, f"`maxProperties` exceeded: {oversized[0]!r}"
 
 
-def test_pool_draw_names_the_identity_that_produced_the_resource(user_schema_builder):
+def test_pool_draw_names_the_identity_that_produced_the_resource(user_schema_builder, response_factory):
     user_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
@@ -2530,12 +2526,11 @@ def test_pool_draw_names_the_identity_that_produced_the_resource(user_schema_bui
     operation = schema["/users"]["POST"]
     case = operation.Case()
     case._auth_identity = "alice"
-    response = Response(
+    response = response_factory.core(
         status_code=CREATED,
-        headers={"content-type": ["application/json"]},
         content=b'{"id": "1", "name": "Alice"}',
-        request=requests.Request("POST", "http://test.example/users").prepare(),
-        elapsed=0.1,
+        method="POST",
+        url="http://test.example/users",
         verify=True,
     )
     data_source.record_response(operation=operation, response=response, case=case)

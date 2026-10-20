@@ -15,7 +15,7 @@ from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.spec import CoverageCapabilities
-from schemathesis.core.transport import USER_AGENT, CallOutcome, Response
+from schemathesis.core.transport import USER_AGENT, CallOutcome
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
@@ -826,18 +826,6 @@ def _make_graphql_case_with_mode(
     )
 
 
-def _make_mock_response(content, status_code=200, content_type="application/json"):
-    response = requests.Response()
-    response._content = json.dumps(content).encode("utf-8")
-    response.status_code = status_code
-    response.headers["Content-Type"] = content_type
-    # Derive `encoding` from headers exactly like requests' adapter does for real responses.
-    response.encoding = requests.utils.get_encoding_from_headers(response.headers)
-    response.request = requests.PreparedRequest()
-    response.request.prepare(method="POST", url="http://127.0.0.1/graphql")
-    return Response.from_requests(response, True)
-
-
 GRAPHQL_RESPONSE_CHECKS = [
     not_a_server_error,
     negative_data_rejection,
@@ -881,9 +869,9 @@ RESOLVER_ERROR = {"data": None, "errors": [{"message": "Internal error in resolv
         "null",
     ],
 )
-def test_graphql_failure_is_reported_by_its_check(ctx, mode, payload, expected):
+def test_graphql_failure_is_reported_by_its_check(ctx, response_factory, mode, payload, expected):
     case = _make_graphql_case_with_mode(_books_schema(ctx), mode)
-    response = _make_mock_response(payload)
+    response = response_factory.core(content=json.dumps(payload).encode())
     check_ctx = check_context()
     raised = {}
     for check in GRAPHQL_RESPONSE_CHECKS:
@@ -941,10 +929,10 @@ def test_not_a_server_error_graphql_positive_mode_server_side_extensions_code_ra
         not_a_server_error(check_ctx, response, case)
 
 
-def test_negative_data_rejection_graphql_includes_description(ctx):
+def test_negative_data_rejection_graphql_includes_description(ctx, response_factory):
     schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
-    response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
+    response = response_factory.core(content=json.dumps({"data": {"addBook": {"id": "1"}}}).encode())
     check_ctx = check_context()
 
     with pytest.raises(AcceptedNegativeData) as exc_info:
@@ -953,12 +941,10 @@ def test_negative_data_rejection_graphql_includes_description(ctx):
     assert "Negative test case" in exc_info.value.message
 
 
-def test_positive_data_acceptance_graphql_without_meta(ctx):
+def test_positive_data_acceptance_graphql_without_meta(ctx, response_factory):
     schema = _books_schema(ctx)
     case = schema["Mutation"]["addBook"].Case()
-    response = _make_mock_response(
-        {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
-    )
+    response = response_factory.core(content=json.dumps(CLIENT_ERROR).encode())
     check_ctx = check_context()
 
     # Without meta, a rejection counts as a rejected positive case.
@@ -969,12 +955,14 @@ def test_positive_data_acceptance_graphql_without_meta(ctx):
 @pytest.mark.parametrize(
     "charset", ["bogus-xyz", "undefined", "ab\x00cd"], ids=["unknown-charset", "undefined-codec", "nul-in-charset"]
 )
-def test_not_a_server_error_graphql_bad_charset(ctx, charset):
+def test_not_a_server_error_graphql_bad_charset(ctx, response_factory, charset):
     # A response lying about its charset over valid GraphQL JSON must validate normally, not crash.
     schema = _books_schema(ctx)
     case = schema["Mutation"]["addBook"].Case()
-    response = _make_mock_response(
-        {"data": {"addBook": {"id": "1"}}}, content_type=f"application/json; charset={charset}"
+    response = response_factory.core(
+        content=json.dumps({"data": {"addBook": {"id": "1"}}}).encode(),
+        content_type=f"application/json; charset={charset}",
+        encoding=charset,
     )
     check_ctx = check_context()
 

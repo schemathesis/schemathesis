@@ -4,14 +4,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import pytest
-import requests
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.core.result import Ok
-from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.stateful.state_machine import ExtractedParam, Transition
 from schemathesis.openapi.checks import UseAfterFree
@@ -86,7 +84,7 @@ def _build_transition(*, link: Link, parent_id: str) -> Transition:
 
 
 @pytest.fixture
-def crash_factory(ctx):
+def crash_factory(ctx, response_factory):
 
     def operation_for(method: str, path: str):
         schema = ctx.openapi.load_schema({path: {method.lower(): {"responses": {"200": {"description": "OK"}}}}})
@@ -117,19 +115,16 @@ def crash_factory(ctx):
         )
 
         request_url = step.request_url or f"http://127.0.0.1{step.path}"
-        prepared = requests.Request(method=step.method.upper(), url=request_url, headers=step.request_headers).prepare()
-        headers = dict(step.response_headers)
-        if step.content_type:
-            headers.setdefault("content-type", [step.content_type])
         recorder.record_response(
             case_id=case.id,
-            response=Response(
+            response=response_factory.core(
                 status_code=step.status,
-                headers=headers,
+                headers=step.response_headers,
                 content=step.body,
-                request=prepared,
-                elapsed=0.1,
-                verify=False,
+                content_type=step.content_type,
+                method=step.method.upper(),
+                url=request_url,
+                request_headers=step.request_headers,
             ),
         )
         for check in step.checks:

@@ -33,6 +33,7 @@ import schemathesis.generation.value  # noqa: F401
 import schemathesis.specs.openapi.schemas  # noqa: F401
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
+from schemathesis.core.transport import Response
 from schemathesis.python._constants.registry import default_registry
 
 from .utils import make_schema, profile_max_examples
@@ -423,6 +424,7 @@ class ResponseFactory:
     httpx2: Callable[..., httpx2.Response]
     requests: Callable[..., requests.Response]
     wsgi: Callable[..., TestResponse]
+    core: Callable[..., Response]
 
 
 @pytest.fixture
@@ -505,7 +507,41 @@ def response_factory():
         )
         return response
 
-    return ResponseFactory(httpx=httpx_factory, httpx2=httpx2_factory, requests=requests_factory, wsgi=werkzeug_factory)
+    def core_factory(
+        *,
+        content: bytes = b"{}",
+        content_type: str | None = "application/json",
+        status_code: int = 200,
+        headers: dict[str, list[str]] | None = None,
+        method: str = "GET",
+        url: str = "http://127.0.0.1/",
+        request_headers: dict[str, str] | None = None,
+        elapsed: float = 0.1,
+        verify: bool = False,
+        message: str = "",
+        encoding: str | None = None,
+    ) -> Response:
+        headers = dict(headers or {})
+        if content_type:
+            headers.setdefault("content-type", [content_type])
+        return Response(
+            status_code=status_code,
+            headers=headers,
+            content=content,
+            request=requests.Request(method=method, url=url, headers=request_headers).prepare(),
+            elapsed=elapsed,
+            verify=verify,
+            message=message,
+            encoding=encoding,
+        )
+
+    return ResponseFactory(
+        httpx=httpx_factory,
+        httpx2=httpx2_factory,
+        requests=requests_factory,
+        wsgi=werkzeug_factory,
+        core=core_factory,
+    )
 
 
 @pytest.fixture

@@ -13,7 +13,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, sch
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transforms import UNRESOLVABLE, as_index_or_key, resolve_path
+from schemathesis.core.transforms import UNRESOLVABLE, format_body_key, parse_body_key, resolve_path
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
@@ -307,7 +307,7 @@ class _VariantSlot:
 
     @property
     def lookup_key(self) -> str:
-        return "/".join(map(str, self.path))
+        return format_body_key(self.path)
 
 
 def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str, Any]) -> dict[str, Any] | list[Any]:
@@ -374,7 +374,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self._nested_body_requirements: dict[str, list[tuple[tuple[str | int, ...], ParameterRequirement]]] = {}
         for (label, location, name), requirement in requirements.items():
             if location == ParameterLocation.BODY and "/" in name:
-                path = tuple(map(as_index_or_key, name.split("/")))
+                path = parse_body_key(name)
                 self._nested_body_requirements.setdefault(label, []).append((path, requirement))
 
     # Opaque repr so Hypothesis' argument rendering never walks the live pool that concurrent workers mutate.

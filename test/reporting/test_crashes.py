@@ -5,14 +5,12 @@ import sys
 import threading
 
 import pytest
-import requests
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core.failures import Failure, ResponseTimeExceeded
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
-from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.stateful.state_machine import ExtractedParam, Transition
 from schemathesis.openapi.checks import UseAfterFree
@@ -36,6 +34,7 @@ def _failure() -> Failure:
 
 def _recorder_with_failure(
     case_factory,
+    response_factory,
     *,
     label: str = "GET /users",
     encoding: str | None = None,
@@ -46,15 +45,8 @@ def _recorder_with_failure(
     recorder = ScenarioRecorder(label=label)
     case = case_factory()
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
-    prepared = requests.Request(method="GET", url="http://127.0.0.1/users").prepare()
-    response = Response(
-        status_code=status,
-        headers={"content-type": ["application/json"]},
-        content=b'{"error": "boom"}',
-        request=prepared,
-        elapsed=0.1,
-        verify=False,
-        encoding=encoding,
+    response = response_factory.core(
+        status_code=status, content=b'{"error": "boom"}', url="http://127.0.0.1/users", encoding=encoding
     )
     recorder.record_response(case_id=case.id, response=response)
     recorder.record_check_failure(name=check_name, case_id=case.id, code_sample="curl x", failure=failure or _failure())
@@ -102,7 +94,7 @@ def test_build_crashes_skips_scenario_with_missing_interaction(case_factory):
     assert crashes == []
 
 
-def test_build_crashes_captures_request_body_link(case_factory):
+def test_build_crashes_captures_request_body_link(case_factory, response_factory):
     # When a link feeds a later request body, the crash records its definition so it can be re-extracted on replay.
     recorder = ScenarioRecorder(label="GET /a -> PATCH /b")
     parent = case_factory()
@@ -119,16 +111,10 @@ def test_build_crashes_captures_request_body_link(case_factory):
     )
     recorder.record_case(parent_id=parent.id, case=child, transition=transition, is_transition_applied=True)
     for case in (parent, child):
-        prepared = requests.Request(method="GET", url="http://127.0.0.1/a").prepare()
         recorder.record_response(
             case_id=case.id,
-            response=Response(
-                status_code=200 if case is parent else 500,
-                headers={"content-type": ["application/json"]},
-                content=b'{"token": "live"}',
-                request=prepared,
-                elapsed=0.1,
-                verify=False,
+            response=response_factory.core(
+                status_code=200 if case is parent else 500, content=b'{"token": "live"}', url="http://127.0.0.1/a"
             ),
         )
     recorder.record_check_failure(name="not_a_server_error", case_id=child.id, code_sample="curl", failure=_failure())
@@ -141,7 +127,7 @@ def test_build_crashes_captures_request_body_link(case_factory):
     assert crashes[0].sequence[-1].link.request_body == {"token": "$response.body#/token"}
 
 
-def test_build_crashes_includes_related_sibling_case(case_factory):
+def test_build_crashes_includes_related_sibling_case(case_factory, response_factory):
     # Use-after-free needs the sibling DELETE that freed the resource, which the failing read's parent chain omits.
     recorder = ScenarioRecorder(label="use-after-free")
     create, delete, read = case_factory(), case_factory(), case_factory()
@@ -149,18 +135,7 @@ def test_build_crashes_includes_related_sibling_case(case_factory):
     recorder.record_case(parent_id=create.id, case=delete, transition=None, is_transition_applied=False)
     recorder.record_case(parent_id=create.id, case=read, transition=None, is_transition_applied=False)
     for case in (create, delete, read):
-        prepared = requests.Request(method="GET", url="http://127.0.0.1/r").prepare()
-        recorder.record_response(
-            case_id=case.id,
-            response=Response(
-                status_code=200,
-                headers={"content-type": ["application/json"]},
-                content=b"{}",
-                request=prepared,
-                elapsed=0.1,
-                verify=False,
-            ),
-        )
+        recorder.record_response(case_id=case.id, response=response_factory.core(url="http://127.0.0.1/r"))
     failure = UseAfterFree(
         operation="GET /r", message="boom", free="DELETE /r", usage="GET /r", deleted_case_id=delete.id
     )
@@ -314,10 +289,12 @@ def test_same_run_keeps_first_case_id(tmp_path):
     assert [s["case_id"] for s in stored] == ["FIRST1"]
 
 
-def test_build_crashes_skips_timing_only_failure(case_factory):
+def test_build_crashes_skips_timing_only_failure(case_factory, response_factory):
     # Response-time failures are timing-dependent; re-sending the request can't reproduce them, so they're not recorded.
     failure = ResponseTimeExceeded(operation="GET /users", elapsed=5.0, deadline=0.1, message="too slow")
-    recorder = _recorder_with_failure(case_factory, failure=failure, check_name="max_response_time", status=200)
+    recorder = _recorder_with_failure(
+        case_factory, response_factory, failure=failure, check_name="max_response_time", status=200
+    )
 
     crashes = build_crashes_from_recorder(
         recorder=recorder, failing_case_id=next(iter(recorder.checks)), sanitization=SanitizationConfig()
@@ -326,9 +303,9 @@ def test_build_crashes_skips_timing_only_failure(case_factory):
     assert crashes == []
 
 
-def test_build_crashes_tolerates_unknown_response_charset(case_factory):
+def test_build_crashes_tolerates_unknown_response_charset(case_factory, response_factory):
     # A server-supplied charset that Python can't resolve must not blow up crash building.
-    recorder = _recorder_with_failure(case_factory, encoding="not-a-real-codec")
+    recorder = _recorder_with_failure(case_factory, response_factory, encoding="not-a-real-codec")
 
     crashes = build_crashes_from_recorder(
         recorder=recorder, failing_case_id=next(iter(recorder.checks)), sanitization=SanitizationConfig()
@@ -387,22 +364,16 @@ def test_crash_step_roundtrips_bytes_in_mutation_metadata():
     assert restored.meta == meta
 
 
-def test_request_headers_are_sanitized(case_factory):
+def test_request_headers_are_sanitized(case_factory, response_factory):
     # Sensitive request headers (e.g. Authorization) must be filtered out of the stored crash step.
     recorder = ScenarioRecorder(label="GET /users")
     case = case_factory()
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
-    prepared = requests.Request(
-        method="GET", url="http://127.0.0.1/users", headers={"Authorization": "super-secret-token"}
-    ).prepare()
-    response = Response(
+    response = response_factory.core(
         status_code=500,
-        headers={"content-type": ["application/json"]},
         content=b'{"error": "boom"}',
-        request=prepared,
-        elapsed=0.1,
-        verify=False,
-        encoding=None,
+        url="http://127.0.0.1/users",
+        request_headers={"Authorization": "super-secret-token"},
     )
     recorder.record_response(case_id=case.id, response=response)
     recorder.record_check_failure(name="not_a_server_error", case_id=case.id, code_sample="curl x", failure=_failure())
@@ -416,20 +387,12 @@ def test_request_headers_are_sanitized(case_factory):
     assert authorization == "[Filtered]"
 
 
-def test_list_root_request_body_is_sanitized(case_factory):
+def test_list_root_request_body_is_sanitized(case_factory, response_factory):
     # A JSON body whose root is a list (not an object) must still be sanitized before it reaches the cache.
     recorder = ScenarioRecorder(label="POST /items")
     case = case_factory(body=[{"token": "secret"}])
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
-    prepared = requests.Request(method="POST", url="http://127.0.0.1/items").prepare()
-    response = Response(
-        status_code=500,
-        headers={"content-type": ["application/json"]},
-        content=b"{}",
-        request=prepared,
-        elapsed=0.1,
-        verify=False,
-    )
+    response = response_factory.core(status_code=500, method="POST", url="http://127.0.0.1/items")
     recorder.record_response(case_id=case.id, response=response)
     recorder.record_check_failure(name="not_a_server_error", case_id=case.id, code_sample="curl", failure=_failure())
 

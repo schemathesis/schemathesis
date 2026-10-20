@@ -11,10 +11,7 @@ from urllib3 import HTTPResponse
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import Response
 from schemathesis.generation.stateful.state_machine import StepOutput
-from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
-from schemathesis.specs.openapi.adapter import v3_0
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
 
@@ -35,30 +32,12 @@ DOCUMENT = {
 
 
 @pytest.fixture
-def operation(openapi_30):
-    media_type = "application/json"
-    content = {"schema": {}}
-    definition = {"requestBody": {"content": {media_type: content}}}
-    instance = APIOperation(
-        "/users/{user_id}",
-        "PUT",
-        OperationDefinition(definition),
-        openapi_30,
-        responses=openapi_30._parse_responses({}, ""),
-        security=openapi_30._parse_security({}),
-        label="PUT /users/{user_id}",
-        base_url="http://127.0.0.1:8080/api",
+def operation(ctx):
+    instance = ctx.openapi.load_operation(
+        "PUT /users/{user_id}",
+        {"requestBody": {"content": {"application/json": {"schema": {}}}}, "responses": {"200": {"description": "OK"}}},
     )
-    instance.add_parameter(
-        OpenApiBody.from_definition(
-            definition=content,
-            media_type=media_type,
-            is_required=False,
-            resource_name=None,
-            name_to_uri={},
-            adapter=v3_0,
-        )
-    )
+    instance.base_url = "http://127.0.0.1:8080/api"
     return instance
 
 

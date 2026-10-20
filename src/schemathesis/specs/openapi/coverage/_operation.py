@@ -25,7 +25,7 @@ from schemathesis.core.media_types import (
 )
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import UNRESOLVABLE, as_index_or_key, deepclone, resolve_path
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone, parse_body_key, resolve_path, split_body_key
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -495,7 +495,7 @@ def _with_body_pool_values(
     filled: set[str] = set()
     updated = schema
     for name, value in fields:
-        path = tuple(map(as_index_or_key, name.split("/")))
+        path = parse_body_key(name)
         if path[0] in filled:
             continue
         candidate = _with_leaf_example(updated, path, value, bundled, schema, validator_cls)
@@ -665,7 +665,7 @@ def _case_slot_value(kwargs: dict[str, Any], location: ParameterLocation, parame
     if container is None:
         return _SENTINEL_ABSENT
     if location == ParameterLocation.BODY:
-        value = resolve_path(container, parameter_name.split("/"))
+        value = resolve_path(container, split_body_key(parameter_name))
         return _SENTINEL_ABSENT if value is UNRESOLVABLE else value
     if not isinstance(container, dict) or parameter_name not in container:
         return _SENTINEL_ABSENT

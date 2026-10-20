@@ -17,6 +17,7 @@ from schemathesis.core.transforms import (
     get_template_fields,
     is_array_index,
     iter_decoded_pointer_segments,
+    split_body_key,
 )
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -668,7 +669,7 @@ def build_nested_body(path: str, value: str) -> dict[str, Any] | list[Any]:
     """
     if "/" not in path:
         return {path: value}
-    parts = path.split("/")
+    parts = split_body_key(path)
     is_index = list(map(is_array_index, parts))
     rest = path.partition("/")[2]
     if is_index[0] and rest:
