@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -95,7 +95,6 @@ if TYPE_CHECKING:
     from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
-SLASH = "/"
 # Probability of generating valid headers in negative mode
 VALID_HEADER_PROBABILITY = 0.95
 # Strategies that take no varying input are deterministic and reusable; allocating
@@ -109,10 +108,6 @@ _LOCATION_NAME_TO_ENUM: dict[str, ParameterLocation] = {
     "cookie": ParameterLocation.COOKIE,
     "body": ParameterLocation.BODY,
 }
-StrategyFactory = Callable[
-    [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema_rs.Validator]],
-    st.SearchStrategy,
-]
 
 
 def _draw(draw: st.DrawFn, strategy: st.SearchStrategy, operation: APIOperation) -> Any:
