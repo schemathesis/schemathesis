@@ -8,11 +8,11 @@ from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
     from schemathesis.checks import CheckContext
     from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.security import SecurityParameter
 
@@ -100,24 +100,7 @@ def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Cas
                 cookies.pop(name, None)
             if headers:
                 remove_auth_from_cookie_header(headers, name)
-    return Case(
-        operation=case.operation,
-        method=case.method,
-        path=case.path,
-        path_parameters=case.path_parameters.copy(),
-        headers=headers,
-        cookies=cookies,
-        query=query,
-        body=case.body.copy() if isinstance(case.body, (list | dict)) else case.body,
-        media_type=case.media_type,
-        multipart_content_types=case.multipart_content_types,
-        meta=case.meta,
-    )
-
-
-def clone_case(case: Case) -> Case:
-    """Return a copy of `case` with a fresh id. No auth scrubbing — use `remove_auth` for that."""
-    return remove_auth(case, [])
+    return case.derive(headers=headers, query=query, cookies=cookies)
 
 
 def build_retry_transport_kwargs(

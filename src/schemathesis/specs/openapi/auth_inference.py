@@ -13,7 +13,7 @@ from schemathesis.core.error_feedback import (
     RequiresAuthPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs, clone_case
+from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.adapter.security import declares_security
 from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -69,7 +69,7 @@ def _send_with_scheme(
     schema = case.operation.schema
     config = schema.auth_schemes[scheme_name]
 
-    retry_case = clone_case(case)
+    retry_case = case.derive()
     recorder.record_case(parent_id=case.id, case=retry_case, transition=None, is_transition_applied=False)
 
     context = AuthContext(operation=case.operation, app=case.operation.app)

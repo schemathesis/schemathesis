@@ -363,6 +363,38 @@ class Case(Generic[OperationT]):
     def freeze_metadata(self) -> None:
         object.__setattr__(self, "_freeze_metadata", True)
 
+    def derive(
+        self,
+        *,
+        headers: CaseInsensitiveDict | None = None,
+        query: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        keep_auth: bool = False,
+    ) -> Case[OperationT]:
+        """Copy this case's request data under a fresh id.
+
+        Containers not passed are shallow-copied. Auth stays behind unless `keep_auth` is set, so a request
+        derived to probe the API never inherits the original's credentials by accident.
+        """
+        derived = Case(
+            operation=self.operation,
+            method=self.method,
+            path=self.path,
+            path_parameters=self.path_parameters.copy(),
+            headers=headers if headers is not None else self.headers.copy(),
+            cookies=cookies if cookies is not None else self.cookies.copy(),
+            query=query if query is not None else self.query.copy(),
+            body=self.body.copy() if isinstance(self.body, (list, dict)) else self.body,
+            media_type=self.media_type,
+            multipart_content_types=self.multipart_content_types,
+            meta=self.meta,
+        )
+        if keep_auth:
+            derived._auth = self._auth
+            derived._has_explicit_auth = self._has_explicit_auth
+            derived._auth_identity = self._auth_identity
+        return derived
+
     @property
     def formatted_path(self) -> str:
         """Path template with variables substituted (e.g., /users/{user_id} -> /users/123)."""
