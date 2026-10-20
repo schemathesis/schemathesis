@@ -26,6 +26,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
+from schemathesis.core.transforms import split_body_path
 from schemathesis.core.transport import CallOutcome, is_uninformative_status
 from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
@@ -665,9 +666,7 @@ def graphql_cases(
                 pool=feedback.constants_value_source,
                 random=draw(st.randoms()),
                 skip=frozenset(
-                    tuple(draw_.body_path.lstrip("/").split("/"))
-                    for draw_ in dictionary_draws
-                    if draw_.body_path is not None
+                    tuple(split_body_path(draw_.body_path)) for draw_ in dictionary_draws if draw_.body_path is not None
                 ),
             )
             constants_draws = tuple(applied_constants_draws)

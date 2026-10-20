@@ -30,7 +30,7 @@ from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, format_body_path
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.generation.modes import GenerationMode
@@ -398,7 +398,7 @@ def build_constants_overlay_strategy(
                     parameter_name=path[-1],
                     value=chosen.data if isinstance(chosen, Binary) else chosen,
                     origin=origin,
-                    body_path="/" + "/".join(path) if location == "body" else None,
+                    body_path=format_body_path(path) if location == "body" else None,
                 )
             )
 

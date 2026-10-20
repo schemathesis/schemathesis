@@ -161,6 +161,16 @@ def parse_body_key(key: str) -> tuple[str | int, ...]:
     return tuple(map(as_index_or_key, split_body_key(key)))
 
 
+def format_body_path(path: Iterable[str]) -> str:
+    """`("items", "id")` -> `"/items/id"`, the path a body binding or a body draw is recorded under."""
+    return "/" + format_body_key(path)
+
+
+def split_body_path(body_path: str) -> list[str]:
+    """`"/items/id"` -> `["items", "id"]`, every segment kept as text."""
+    return split_body_key(body_path[1:])
+
+
 def iter_decoded_pointer_segments(pointer: str) -> Iterator[str]:
     return map(decode_pointer, pointer.split("/")[1:])
 

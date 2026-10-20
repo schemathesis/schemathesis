@@ -7,6 +7,7 @@ from hypothesis import strategies as st
 
 from schemathesis.config._dictionaries import BODY_PREFIX, ParameterDictionaryBinding, parse_body_path
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+from schemathesis.core.transforms import split_body_path
 from schemathesis.generation.case import _contains_bytes
 from schemathesis.generation.dictionaries import _path_matches_pattern, _resolve_body_leaf_schema, _walk_substitute
 from schemathesis.generation.value import GeneratedValue
@@ -45,11 +46,11 @@ def build_body_override_overlay_strategy(
     validator: jsonschema_rs.Validator | None,
 ) -> st.SearchStrategy:
     items = tuple(overrides.items())
-    override_segments = [pointer[1:].split("/") for pointer in overrides]
+    override_segments = [split_body_path(pointer) for pointer in overrides]
 
     def apply(value: JsonValue) -> JsonValue:
         for pointer, literal in items:
-            value = _walk_substitute(value, pointer[1:].split("/"), _make_replace(literal), create_missing=True)
+            value = _walk_substitute(value, split_body_path(pointer), _make_replace(literal), create_missing=True)
         return value
 
     def is_overridden_path(path: tuple[str | int, ...]) -> bool:
@@ -73,12 +74,12 @@ def build_body_override_overlay_strategy(
             dictionary_draws = tuple(
                 d
                 for d in produced.dictionary_draws
-                if d.body_path is None or not is_overridden_path(tuple(d.body_path[1:].split("/")))
+                if d.body_path is None or not is_overridden_path(tuple(split_body_path(d.body_path)))
             )
             constants_draws = tuple(
                 d
                 for d in produced.constants_draws
-                if d.body_path is None or not is_overridden_path(tuple(d.body_path[1:].split("/")))
+                if d.body_path is None or not is_overridden_path(tuple(split_body_path(d.body_path)))
             )
             return GeneratedValue(
                 value=value,

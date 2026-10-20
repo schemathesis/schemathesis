@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Final
 import graphql
 
 from schemathesis.core.text import to_pascal_case, to_snake_case
+from schemathesis.core.transforms import format_body_path
 from schemathesis.python._constants.pool import ConstantDraw, ConstantType, ConstantValue, Origin
 from schemathesis.specs.graphql._helpers import (
     _root_type_for,
@@ -271,7 +272,7 @@ def _scalar_constant_node(
             parameter_name=parameter_name,
             value=chosen,
             origin=origin,
-            body_path="/" + "/".join(path),
+            body_path=format_body_path(path),
         )
     )
     return scalar_value_node(scalar_name, chosen)
