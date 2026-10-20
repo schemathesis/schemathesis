@@ -49,5 +49,9 @@ class FeedbackSources:
         # The examples phase never draws from extracted constants.
         return replace(self, constants_value_source=None)
 
+    def for_negative(self) -> FeedbackSources:
+        # Negative values never take captured values or extracted constants.
+        return replace(self, extra_data_source=None, constants_value_source=None)
+
 
 NO_FEEDBACK = FeedbackSources()

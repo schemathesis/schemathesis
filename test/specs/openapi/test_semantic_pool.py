@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from schemathesis.config import GenerationConfig
 from schemathesis.core import transport
 from schemathesis.core.deserialization import register_deserializer
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import MISSING, GeneratedValue, get_at_path
@@ -570,7 +571,10 @@ def test_request_body_strategy_handles_recursive_all_of(ctx):
     )
     operation = schema["/nodes"]["POST"]
     strategy = operation.body[0].get_strategy(
-        operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=extra_data_source
+        operation,
+        GenerationConfig(),
+        GenerationMode.POSITIVE,
+        feedback=FeedbackSources(extra_data_source=extra_data_source),
     )
     values = generate_many(strategy, 1)
     assert values and all(isinstance(value, dict) and isinstance(value.get("id"), str) for value in values)
@@ -1347,8 +1351,12 @@ def test_strategy_caching_remains_enabled_for_semantic_only_operations(ctx):
     body = operation.body[0]
     config = schema.config.generation_for(operation=operation, phase="fuzzing")
 
-    first = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source)
-    second = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source)
+    first = body.get_strategy(
+        operation, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
+    )
+    second = body.get_strategy(
+        operation, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
+    )
     assert first is second, "semantic-only data source should not disable the body-strategy cache"
 
 
@@ -1391,8 +1399,10 @@ def test_body_cache_distinguishes_semantic_source_from_no_source(ctx):
     body = operation.body[0]
     config = schema.config.generation_for(operation=operation, phase="fuzzing")
 
-    no_source = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=None)
-    with_source = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source)
+    no_source = body.get_strategy(operation, config, GenerationMode.POSITIVE)
+    with_source = body.get_strategy(
+        operation, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
+    )
     assert no_source is not with_source, "cache must differentiate strategies built with vs without a semantic source"
 
 
@@ -1425,9 +1435,9 @@ def test_parameter_set_cache_distinguishes_semantic_source_from_no_source(ctx):
     parameter_set = operation.query
     config = schema.config.generation_for(operation=operation, phase="fuzzing")
 
-    no_source = parameter_set.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=None)
+    no_source = parameter_set.get_strategy(operation, config, GenerationMode.POSITIVE)
     with_source = parameter_set.get_strategy(
-        operation, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source
+        operation, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
     )
     assert no_source is not with_source, (
         "parameter-set cache must differentiate strategies built with vs without a semantic source"
@@ -1475,7 +1485,7 @@ def test_parameter_set_strategy_does_not_leak_generated_value_through_filter(ctx
     parameter_set = operation.query
     config = schema.config.generation_for(operation=operation, phase="fuzzing")
     strategy = parameter_set.get_strategy(
-        operation, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source
+        operation, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
     )
 
     drawn: list[object] = []
@@ -1519,8 +1529,12 @@ def test_strategy_caching_disabled_for_captured_variant_consumer(ctx):
     parameter_set = consumer.path_parameters
     config = schema.config.generation_for(operation=consumer, phase="fuzzing")
 
-    first = parameter_set.get_strategy(consumer, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source)
-    second = parameter_set.get_strategy(consumer, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source)
+    first = parameter_set.get_strategy(
+        consumer, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
+    )
+    second = parameter_set.get_strategy(
+        consumer, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
+    )
     assert first is not second, (
         "consumer-side captured variants are bound at build time; the strategy must not be cached"
     )

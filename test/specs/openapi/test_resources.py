@@ -1669,7 +1669,7 @@ def test_negative_aware_strategy_with_captured_values(ctx):
     config = GenerationConfig()
 
     strategy = operation.path_parameters.get_strategy(
-        operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source
+        operation, config, GenerationMode.NEGATIVE, feedback=FeedbackSources(extra_data_source=data_source)
     )
 
     results = generate_many(strategy, 20)
@@ -1733,12 +1733,18 @@ def test_consumer_strategies_use_values_captured_after_previous_builds(ctx, mode
         return [value.value if isinstance(value, GeneratedValue) else value for value in generate_many(strategy, 30)]
 
     def draw_values() -> tuple[list[object], list[object]]:
-        path = draw(operation.path_parameters.get_strategy(operation, config, mode, extra_data_source=data_source))
-        bodies = draw(body.get_strategy(operation, config, mode, extra_data_source=data_source))
+        path = draw(
+            operation.path_parameters.get_strategy(
+                operation, config, mode, feedback=FeedbackSources(extra_data_source=data_source)
+            )
+        )
+        bodies = draw(
+            body.get_strategy(operation, config, mode, feedback=FeedbackSources(extra_data_source=data_source))
+        )
         return path, bodies
 
     # Negative path strings without captured values are unsatisfiable, so only the body is drawn before capturing.
-    draw(body.get_strategy(operation, config, mode, extra_data_source=data_source))
+    draw(body.get_strategy(operation, config, mode, feedback=FeedbackSources(extra_data_source=data_source)))
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "first-item"})
     path, bodies = draw_values()
     assert {"id": "first-item"} in path
@@ -1812,7 +1818,9 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
     body = operation.body[0]
     config = GenerationConfig()
 
-    strategy = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
+    strategy = body.get_strategy(
+        operation, config, GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=data_source)
+    )
 
     @run_given(strategy, max_examples=200)
     def t(value):
@@ -1946,7 +1954,9 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx, body, path):
 
     operation = schema["/departments"]["POST"]
     body = operation.body[0]
-    strategy = body.get_strategy(operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=data_source)
+    strategy = body.get_strategy(
+        operation, GenerationConfig(), GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=data_source)
+    )
 
     pool_hits = []
     partial_hits = []
@@ -2141,7 +2151,9 @@ def test_negative_aware_strategy_with_captured_values_body(ctx):
     config = GenerationConfig()
     body = operation.body[0]
 
-    strategy = body.get_strategy(operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source)
+    strategy = body.get_strategy(
+        operation, config, GenerationMode.NEGATIVE, feedback=FeedbackSources(extra_data_source=data_source)
+    )
 
     results = generate_many(strategy, 20)
 
@@ -2481,7 +2493,9 @@ def test_pool_overlay_respects_max_properties(ctx, mode):
 
     operation = schema["/posts"]["POST"]
     config = GenerationConfig()
-    strategy = operation.body[0].get_strategy(operation, config, mode, extra_data_source=data_source)
+    strategy = operation.body[0].get_strategy(
+        operation, config, mode, feedback=FeedbackSources(extra_data_source=data_source)
+    )
 
     pool_hits = 0
     oversized = []
@@ -2631,7 +2645,12 @@ def test_negative_aware_strategy_keeps_schema_examples_intact(ctx):
     config = GenerationConfig()
     body = operation.body[0]
 
-    generate_many(body.get_strategy(operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source), 100)
+    generate_many(
+        body.get_strategy(
+            operation, config, GenerationMode.NEGATIVE, feedback=FeedbackSources(extra_data_source=data_source)
+        ),
+        100,
+    )
 
     positive = generate_many(body.get_strategy(operation, config, GenerationMode.POSITIVE), 100)
     assert {"project_id": "captured"} not in positive
