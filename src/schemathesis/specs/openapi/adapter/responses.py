@@ -158,7 +158,6 @@ class OpenApiResponse:
         "_stream_schemas",
         "_sse_stream_validator",
         "_headers",
-        "_default_media_type",
     )
 
     def __post_init__(self) -> None:
@@ -167,14 +166,10 @@ class OpenApiResponse:
         self._stream_schemas: dict[str, ResolvedSchema] = {}
         self._sse_stream_validator: SseValidator | NotSet = NOT_SET
         self._headers: OpenApiResponseHeaders | NotSet = NOT_SET
-        self._default_media_type = self._detect_default_media_type()
 
     def _get_cache_key(self, media_type: str | None) -> str:
         """Convert media type to cache key, using sentinel for None."""
         return media_type if media_type is not None else _NO_MEDIA_TYPE
-
-    def _detect_default_media_type(self) -> str | None:
-        return self.adapter.get_default_response_media_type(self.definition)
 
     def get_schema(self, media_type: str | None = None) -> ResolvedSchema:
         """Return the schema for the given media type (or the default one).
@@ -531,11 +526,6 @@ def _build_prepared_schema(
     return Bundle(schema=converted, name_to_uri=bundled.name_to_uri)
 
 
-def get_default_response_media_type_v2(response: Mapping[str, Any]) -> str | None:
-    """Swagger 2.0 has no default media type in response definition."""
-    return None
-
-
 def resolve_response_media_type_v2(response: Mapping[str, Any], media_type: str | None) -> str | None:
     """Swagger 2.0 has no media type resolution - all handled via produces."""
     return None
@@ -551,14 +541,6 @@ def extract_schema_for_media_type_v2(
 ) -> Bundle | None:
     """Swagger 2.0 has single schema regardless of media type."""
     return extract_response_schema_v2(response, resolver, scope, nullable_keyword, cache)
-
-
-def get_default_response_media_type_v3(response: Mapping[str, Any]) -> str | None:
-    """Get first/default media type from OpenAPI 3.x response content."""
-    content = response.get("content")
-    if isinstance(content, dict) and content:
-        return next(iter(content.keys()))
-    return None
 
 
 def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str | None) -> str | None:
