@@ -64,8 +64,7 @@ class JunitXmlWriter:
         failures = list(failures)
         if failures:
             messages = [
-                group.format(index=idx, curl=group.code_sample, config=config, with_identity=False)
-                for idx, group in enumerate(failures, 1)
+                group.format(index=idx, curl=group.code_sample, config=config) for idx, group in enumerate(failures, 1)
             ]
             codes = ", ".join(sorted({failure.code for group in failures for failure in group.failures}))
             test_case.failures.append(_RecordedOutcome("\n\n".join(messages), message=codes))
