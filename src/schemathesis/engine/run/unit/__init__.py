@@ -481,12 +481,7 @@ def _put_skipped_scenario(
 
 
 def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> dict[str, Any]:
-    kwargs = {}
-    override = overrides.for_operation(ctx.config, operation=operation)
-    for location in ("query", "headers", "cookies", "path_parameters"):
-        entry = getattr(override, location)
-        if entry:
-            kwargs[location] = entry
+    kwargs = overrides.for_operation(ctx.config, operation=operation).as_strategy_kwargs()
     headers = ctx.config.headers_for(operation=operation)
     if headers:
         # A configured User-Agent replaces the generated one on the wire, so pin it when the schema declares it.
