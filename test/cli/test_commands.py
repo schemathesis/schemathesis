@@ -3399,6 +3399,34 @@ def test_parameter_overrides(ctx, cli, verify_overrides):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
+@pytest.fixture
+def verify_configured_headers(ctx):
+    with ctx.hook(
+        """
+@schemathesis.hook
+def before_call(ctx, case, kwargs):
+    assert {key: case.headers.get(key) for key in ("User-Agent", "X-Key")} == {"User-Agent": "ok", "X-Key": "v"}
+"""
+    ) as module:
+        yield module
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_configured_user_agent_in_case_headers_before_call(ctx, cli, snapshot_cli, verify_configured_headers):
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.main(
+            "run",
+            "--phases=examples,coverage,fuzzing",
+            "--max-examples=1",
+            api.schema_url,
+            hooks=verify_configured_headers,
+            config={"headers": {"User-Agent": "ok", "X-Key": "v"}},
+        )
+        == snapshot_cli
+    )
+
+
 def test_header_parameter_override_with_configured_headers(ctx, cli):
     api = ctx.openapi.apps.header_constraint_bug()
     cli.run(

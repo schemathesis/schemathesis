@@ -25,6 +25,7 @@
 - False positive `ignored_auth` when the invalid-auth probe dropped the case's other headers.
 - `st fuzz --mode=negative` crash on operations with nothing to negate.
 - Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
+- Configured `User-Agent` missing from `case.headers` in `before_call` hooks in coverage and examples phases.
 - Malformed XML or wrong tags for prefixed nested properties and array items shared via `$ref`.
 - `Failed Health Check` for request bodies with several `$`-anchored `pattern` strings. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
 - `Failed Health Check` for strings whose `pattern` is stricter than their `format`. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)

@@ -56,6 +56,15 @@ class Override:
         )
 
 
+def strategy_kwargs_for(config: ProjectConfig, *, operation: APIOperation) -> dict[str, dict[str, str]]:
+    """Fixed parameter values from the project config; configured headers win over header overrides."""
+    kwargs = for_operation(config, operation=operation).as_strategy_kwargs()
+    headers = {**kwargs.get("headers", {}), **config.headers_for(operation=operation)}
+    if headers:
+        kwargs["headers"] = headers
+    return kwargs
+
+
 def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override:
     operation_config = config.operations.get_for_operation(operation)
 
