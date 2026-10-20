@@ -10,7 +10,7 @@ from schemathesis.core.jsonschema import resolve_with_root_bundle
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import SAFE_METHODS
 from schemathesis.openapi.checks import ObjectLevelAuthorizationViolation
-from schemathesis.specs.openapi._auth_retry import clone_case, remove_auth_from_cookie_header, send_probe
+from schemathesis.specs.openapi._auth_retry import remove_auth_from_cookie_header, send_probe
 from schemathesis.specs.openapi.adapter.security import declares_security
 from schemathesis.specs.openapi.extra_data_source import declared_response_schema, referenced_by
 from schemathesis.specs.openapi.semantic_pool import resolve_combinator
@@ -179,9 +179,9 @@ def owner_provider(case: Case) -> AuthProvider:
 
 def strip_credentials(case: Case, provider: AuthProvider) -> Case:
     """Copy `case` without anything `provider` puts on a request."""
-    stripped = clone_case(case)
+    stripped = case.derive()
     # Applying the provider to an empty request reveals which keys it owns, whatever their names.
-    probe = clone_case(case)
+    probe = case.derive()
     probe.headers.clear()
     probe.query.clear()
     probe.cookies.clear()

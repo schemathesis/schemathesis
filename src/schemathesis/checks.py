@@ -415,28 +415,11 @@ def _check_content_type_probe(
     ctx: CheckContext, case: Case, scenario: CoverageScenario, status_code: int, expected_statuses: frozenset[int]
 ) -> None:
     """Report a server error only when the probe's `Content-Type` causes it."""
-    from schemathesis.generation.case import Case
-
     headers = case.headers.copy()
     headers.pop("Content-Type", None)
     # The same request with the operation's own media type. When it fails too, the header is not the cause and
     # the operation's ordinary requests report that server error with a plain reproducer.
-    control = Case(
-        operation=case.operation,
-        method=case.method,
-        path=case.path,
-        path_parameters=case.path_parameters.copy(),
-        headers=headers,
-        cookies=case.cookies.copy(),
-        query=case.query.copy(),
-        body=case.body,
-        media_type=case.media_type,
-        multipart_content_types=case.multipart_content_types,
-        meta=case.meta,
-        _auth=case._auth,
-        _has_explicit_auth=case._has_explicit_auth,
-    )
-    control._auth_identity = case._auth_identity
+    control = case.derive(headers=headers, keep_auth=True)
     kwargs = dict(ctx.internals.transport_kwargs or {})
     if case.operation.app is not None:
         kwargs.setdefault("app", case.operation.app)
