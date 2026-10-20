@@ -8,20 +8,17 @@ from typing import TYPE_CHECKING, Any
 from hypothesis import strategies as st
 from hypothesis.stateful import RULE_MARKER, Bundle, Rule
 
-from schemathesis.checks import CheckFunction
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.transport import Response, expand_status_code
+from schemathesis.core.transport import expand_status_code
 from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCalibrationState
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.meta import TestPhase
-from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.control import TransitionController
 from schemathesis.generation.stateful.state_machine import (
     BASE_EXPLORATION_RATE,
@@ -29,6 +26,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepInput,
     StepOutput,
     Transition,
+    _RecordingStateMachine,
     normalize_name,
 )
 from schemathesis.generation.value import prune_overwritten_body_constants
@@ -46,34 +44,14 @@ if TYPE_CHECKING:
 FilterFunction = Callable[["StepOutput"], bool]
 
 
-class OpenAPIStateMachine(APIStateMachine):
+class OpenAPIStateMachine(_RecordingStateMachine):
     _response_matchers: dict[str, Callable[[StepOutput], str | None]]
     _transitions: ApiTransitions
     _root_labels: frozenset[str]
 
     def __init__(self) -> None:
-        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
         self.control = TransitionController(self._transitions, self._root_labels)
         super().__init__()
-
-    def after_call(self, response: Response, case: Case) -> None:
-        # Always record responses so stateful checks can look up prior responses
-        self.recorder.record_response(case_id=case.id, response=response)
-
-    def validate_response(
-        self,
-        response: Response,
-        case: Case,
-        additional_checks: list[CheckFunction] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        __tracebackhide__ = True
-        case.validate_response(
-            response,
-            additional_checks=additional_checks,
-            transport_kwargs=kwargs or None,
-            recorder=self.recorder,
-        )
 
     def _get_target_for_result(self, result: StepOutput) -> str | None:
         matcher = self._response_matchers.get(result.case.operation.label)
