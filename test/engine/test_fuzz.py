@@ -910,3 +910,50 @@ def test_fuzz_relays_event_put_right_before_worker_exit(ctx):
     attach_late_put(event_queue, late_event)
 
     assert list(_relay_events(engine, event_queue=event_queue, threads=[exited])) == [late_event]
+
+
+def test_fuzz_keeps_running_when_server_state_changes_which_links_apply(ctx, app_runner):
+    # The same generated scenario gets a link to follow on one run and none on the next.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/toggle": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"item_id": "$response.body#/id"}}
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    }
+                }
+            },
+            "/items/{item_id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    calls = [0]
+
+    @app.route("/toggle")
+    def toggle():
+        calls[0] += 1
+        if calls[0] % 2:
+            return {"id": 1}
+        return {}, 404
+
+    @app.route("/items/<item_id>")
+    def get_item(item_id):
+        return {}
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.seed = 1
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    collected = _fuzz_events(schema, FuzzConfig(max_time=3))
+    assert [event.value for event in _non_fatal_errors(collected)] == []
+    assert collected[-1].stop_reason == StopReason.MAX_TIME
