@@ -15,17 +15,16 @@ import urllib3
 import yaml
 from hypothesis import HealthCheck, given, settings
 
-import schemathesis
 from schemathesis import Case
 from schemathesis.checks import CheckContext
 from schemathesis.config import ChecksConfig
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
+from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.recorder import Interaction
 from schemathesis.engine.run import Phase, PhaseName
-from schemathesis.schemas import BaseSchema
 from test.apps import builders
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -101,11 +100,6 @@ def to_float32(value: float) -> float:
 SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 
 
-def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseSchema:
-    schema = make_schema(schema_name, **kwargs)
-    return schemathesis.openapi.from_dict(schema)
-
-
 def make_openapi_schema(
     paths: dict[str, Any] | None = None, *, version: str = "3.0.2", **kwargs: Any
 ) -> dict[str, Any]:
@@ -126,7 +120,7 @@ def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
 
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict[str, Any]:
-    schema = load_schema(schema_name)
+    schema = deepclone(load_schema(schema_name))
     return merge_recursively(kwargs, schema)
 
 
