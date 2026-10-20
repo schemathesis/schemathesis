@@ -15,6 +15,7 @@
 - Duplicate requests in the coverage phase for operations with a request body.
 - Send a single listed identifier when `st fuzz` follows links from list responses.
 - Missing boundary in `multipart/mixed` request `Content-Type` headers.
+- False results in `response_headers_conformance` for OpenAPI 3.1 type lists and `1_0`-style numbers.
 - `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
 - `AttributeError` crash with `exclude(deprecated=True)` on GraphQL schemas; skip `@deprecated` fields.

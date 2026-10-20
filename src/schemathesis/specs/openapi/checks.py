@@ -261,25 +261,10 @@ _COLLECTION_FORMAT_DELIMITERS = {
 
 
 def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
-    schema_type = schema.get("type")
+    types = get_type(schema)
 
-    if schema_type == "string":
-        return value
-    if schema_type == "integer":
-        try:
-            return int(value)
-        except ValueError:
-            return value
-    if schema_type == "number":
-        try:
-            return float(value)
-        except ValueError:
-            return value
-    if schema_type == "null" and value.lower() == "null":
-        return None
-    if schema_type == "boolean":
-        return string_to_boolean(value)
-    if schema_type == "array":
+    # An untyped schema also admits arrays, but its header value is not a delimited list.
+    if "array" in types and "type" in schema:
         # Swagger 2.0: array headers use `collectionFormat` (default `csv`) to define
         # how items are joined into a single header value. Split the wire form into
         # items, then coerce each one against `items` so non-string element types validate.
@@ -289,7 +274,13 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
             return value
         items_schema = schema.get("items") or {}
         return [_coerce_header_value(item, items_schema) for item in value.split(delimiter)]
-    return value
+    # Header text is already a valid string, so only non-string types need parsing.
+    if "string" in types:
+        return value
+    if "null" in types and value.lower() == "null":
+        return None
+    coerced = coerce_wire_string(value, types)
+    return value if coerced is None else coerced
 
 
 @schemathesis.check
