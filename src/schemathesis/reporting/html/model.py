@@ -9,8 +9,7 @@ from schemathesis.engine import Status, StopReason
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName
 
 if TYPE_CHECKING:
-    from schemathesis.cli.commands.run.handlers.output import WarningBlock
-    from schemathesis.cli.summary import FailureGroup, SummaryData
+    from schemathesis.engine.summary import FailureGroup, SummaryData, WarningBlock
 
 
 # The phase name for failures from checks that run once after all phases.

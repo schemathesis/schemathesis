@@ -18,13 +18,13 @@ from schemathesis.cli.commands.run.handlers.output import (
 )
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import loader_error_tip, replay_command
-from schemathesis.cli.summary import running_time
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.output import format_response_payload
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName, PhaseSkipReason
+from schemathesis.engine.summary import running_time
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.reporting.html.build import enabled_checks, failing_case, failure_titles, request_name
 from schemathesis.reporting.html.model import (
@@ -43,11 +43,10 @@ from schemathesis.reporting.html.model import (
 )
 
 if TYPE_CHECKING:
-    from schemathesis.cli.commands.run.handlers.output import WarningBlock
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.cli.summary import SummaryData
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures, Statistic
+    from schemathesis.engine.summary import SummaryData, WarningBlock
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
     from schemathesis.schemas import APIOperation
 

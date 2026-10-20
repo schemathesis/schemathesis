@@ -19,7 +19,6 @@ from schemathesis.cli.commands.fuzz.context import FuzzExecutionContext
 from schemathesis.cli.commands.run.handlers.allure import AllureHandler
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
-from schemathesis.cli.summary import build_operations
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.failures import ServerError
 from schemathesis.core.statistic import ApiStatistic
@@ -29,6 +28,7 @@ from schemathesis.engine.events import EngineFinished
 from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.statistic import Statistic
+from schemathesis.engine.summary import build_operations
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import linked_users, null_name_response, null_name_responses
 from test.utils import assert_cli_snapshot

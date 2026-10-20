@@ -6,7 +6,10 @@ from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.cli.summary import (
+from schemathesis.core.failures import RUN_CHECKS_LABEL
+from schemathesis.engine import Status, StopReason, events
+from schemathesis.engine.events import FuzzScenarioFinished
+from schemathesis.engine.summary import (
     SummaryData,
     build_operations,
     reduce_baseline,
@@ -14,9 +17,6 @@ from schemathesis.cli.summary import (
     reduce_failures,
     reduce_test_cases,
 )
-from schemathesis.core.failures import RUN_CHECKS_LABEL
-from schemathesis.engine import Status, StopReason, events
-from schemathesis.engine.events import FuzzScenarioFinished
 
 
 @dataclass

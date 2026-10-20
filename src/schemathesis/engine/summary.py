@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -13,10 +13,30 @@ from schemathesis.engine import Status
 from schemathesis.engine.run import TESTING_PHASES, PhaseName, PhaseSkipReason
 
 if TYPE_CHECKING:
-    from schemathesis.cli.commands.run.warnings import ValidRate
     from schemathesis.core.statistic import ApiStatistic
     from schemathesis.engine import StopReason, events
     from schemathesis.engine.statistic import Statistic
+
+
+@dataclass(slots=True)
+class ValidRate:
+    """How many positive cases an API accepted, and why the rest were turned away."""
+
+    accepted: int = 0
+    # Well-formed, but the addressed resource does not exist.
+    unreachable: int = 0
+    # Well-formed, but at odds with the current state of the resource.
+    conflicts: int = 0
+    # Refused on the data itself.
+    rejected: int = 0
+
+    @property
+    def total(self) -> int:
+        return self.accepted + self.unreachable + self.conflicts + self.rejected
+
+    @property
+    def rate(self) -> float:
+        return self.accepted / self.total if self.total else 0.0
 
 
 @dataclass(slots=True)
@@ -171,6 +191,40 @@ class WarningData:
             )
             if warnings
         )
+
+
+@dataclass(slots=True)
+class WarningItem:
+    text: str
+    # Lines shown under the item, e.g. the patterns an operation could not use.
+    details: list[str] = field(default_factory=list)
+    # Label of the operation the item is about, if any.
+    operation: str | None = None
+
+
+@dataclass(slots=True)
+class WarningGroup:
+    items: list[WarningItem]
+    heading: str | None = None
+    # `None` when the tips that apply follow a later group.
+    tips: list[str] | None = None
+
+
+@dataclass(slots=True)
+class WarningBlock:
+    title: str
+    count: int
+    entity: str
+    # Completes the sentence that starts with the count, e.g. " returned only 401/403 responses".
+    suffix: str
+    groups: list[WarningGroup]
+    # Whether the results may not mean what the verdict says, e.g. every response was 401.
+    affects_verdict: bool = False
+
+    @property
+    def summary(self) -> str:
+        plural = "" if self.count == 1 else "s"
+        return f"{self.count} {self.entity}{plural}{self.suffix}"
 
 
 @dataclass(slots=True)

@@ -33,8 +33,8 @@ from schemathesis.reporting.html.timeline import (
 )
 
 if TYPE_CHECKING:
-    from schemathesis.cli.commands.run.handlers.output import WarningBlock, WarningGroup, WarningItem
     from schemathesis.core.failures import Severity
+    from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
     from schemathesis.reporting.html.model import ErrorEntry, FailingCase, OperationRow, ReportData
 
 _LOGO = (files("schemathesis.reporting.html") / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
