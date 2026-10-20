@@ -67,14 +67,11 @@ def _load_corpus_dict(schema_path: str) -> dict[str, Any]:
 
 def _load_schema(schema_path: str, base_url: str | None) -> Any:
     if schema_path.startswith(CORPUS_SCHEME):
-        schema_dict = _load_corpus_dict(schema_path)
-        kwargs: dict[str, Any] = {}
-        if base_url:
-            kwargs["base_url"] = base_url
-        return schemathesis.openapi.from_dict(schema_dict, **kwargs)
-    if schema_path.lower().startswith(("http://", "https://")):
-        return schemathesis.openapi.from_url(schema_path)
-    schema = schemathesis.openapi.from_path(schema_path)
+        schema = schemathesis.openapi.from_dict(_load_corpus_dict(schema_path))
+    elif schema_path.lower().startswith(("http://", "https://")):
+        schema = schemathesis.openapi.from_url(schema_path)
+    else:
+        schema = schemathesis.openapi.from_path(schema_path)
     if base_url:
         schema.config.update(base_url=base_url)
     return schema
