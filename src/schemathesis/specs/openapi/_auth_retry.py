@@ -146,10 +146,10 @@ def build_retry_transport_kwargs(
 
 def send_probe(ctx: CheckContext, parent: Case, probe: Case) -> Response:
     """Send `probe` as a child of `parent`, keeping the run's transport settings but none of its credentials."""
-    kwargs = build_retry_transport_kwargs(ctx._transport_kwargs, get_security_parameters(parent.operation))
+    kwargs = build_retry_transport_kwargs(ctx.internals.transport_kwargs, get_security_parameters(parent.operation))
     if parent.operation.app is not None:
         kwargs.setdefault("app", parent.operation.app)
-    ctx._record_case(parent_id=parent.id, case=probe)
+    ctx.internals.record_case(parent_id=parent.id, case=probe)
     response = parent.operation.schema.transport.send(probe, **kwargs)
-    ctx._record_response(case_id=probe.id, response=response)
+    ctx.internals.record_response(case_id=probe.id, response=response)
     return response

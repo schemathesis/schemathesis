@@ -842,7 +842,8 @@ _BODY_TRANSPORT_KWARGS = ("json", "data", "content", "files")
 
 def _negative_body_replaced_by_caller(ctx: CheckContext, case: Case) -> bool:
     """Whether the caller sent its own body, so the only invalid part of the case never reached the server."""
-    if not ctx._transport_kwargs or not any(key in ctx._transport_kwargs for key in _BODY_TRANSPORT_KWARGS):
+    transport_kwargs = ctx.internals.transport_kwargs
+    if not transport_kwargs or not any(key in transport_kwargs for key in _BODY_TRANSPORT_KWARGS):
         return False
     meta = case.meta
     assert meta is not None
@@ -1148,7 +1149,7 @@ def _targets_generated_resource(ctx: CheckContext, operation: APIOperation) -> b
     """Whether the resource this request targets was drawn rather than supplied by the user."""
     if "{" not in operation.path:
         return False
-    pinned = ctx._override.path_parameters if ctx._override is not None else {}
+    pinned = ctx.internals.override.path_parameters if ctx.internals.override is not None else {}
     return any(
         parameter.name not in pinned
         for parameter in operation.iter_parameters()
@@ -1389,7 +1390,7 @@ def _resource_recreated_after_delete(
     (DELETE -> POST) or via a second root POST that reuses a freed resource ID.
     """
     found_delete = False
-    for case in ctx._find_all_cases():
+    for case in ctx.internals.find_all_cases():
         if case.id == delete_case_id:
             found_delete = True
             continue
@@ -1397,7 +1398,7 @@ def _resource_recreated_after_delete(
             continue
         if case.id == current_case_id:
             return False
-        resp = ctx._find_response(case_id=case.id)
+        resp = ctx.internals.find_response(case_id=case.id)
         if (
             case.operation.method.lower() not in _NON_CREATION_METHODS
             and resp is not None
@@ -1452,16 +1453,16 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
     if case.operation.method.lower() not in _NON_CREATION_METHODS:
         return None
 
-    for related_case in ctx._find_related(case_id=case.id):
-        parent = ctx._find_parent(case_id=related_case.id)
+    for related_case in ctx.internals.find_related(case_id=case.id):
+        parent = ctx.internals.find_parent(case_id=related_case.id)
         if not parent:
             continue
 
-        parent_response = ctx._find_response(case_id=parent.id)
+        parent_response = ctx.internals.find_response(case_id=parent.id)
 
         # The DELETE itself must have succeeded for a subsequent read to be a use-after-free —
         # a 5xx (server crash) or 404 (nothing to delete) leaves the resource intact.
-        delete_response = ctx._find_response(case_id=related_case.id)
+        delete_response = ctx.internals.find_response(case_id=related_case.id)
         if (
             related_case.operation.method.lower() == "delete"
             and parent_response is not None
@@ -1515,10 +1516,10 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if response.status_code != 404:
         return None
 
-    parent = ctx._find_parent(case_id=case.id)
+    parent = ctx.internals.find_parent(case_id=case.id)
     if parent is None:
         return None
-    parent_response = ctx._find_response(case_id=parent.id)
+    parent_response = ctx.internals.find_response(case_id=parent.id)
     if parent_response is None:
         return None
 
@@ -1546,7 +1547,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
 
     # Look for any successful DELETE operations on this resource across all recorded cases,
     # not just the current root's subtree.
-    if ctx._recorder is not None and resource_was_deleted(ctx._recorder, case, created_by=parent.id):
+    if ctx.internals.recorder is not None and resource_was_deleted(ctx.internals.recorder, case, created_by=parent.id):
         # Resource was properly deleted, 404 is expected
         return None
 
@@ -1651,8 +1652,8 @@ def _has_undeclared_explicit_authorization(
     if any(p.location == ParameterLocation.HEADER and p.name.lower() == "authorization" for p in security_parameters):
         return False
     sources = [
-        ctx._headers,
-        ctx._override.headers if ctx._override else None,
+        ctx.internals.headers,
+        ctx.internals.override.headers if ctx.internals.override else None,
         response._override.headers if response._override else None,
     ]
     return any(headers is not None and any(name.lower() == "authorization" for name in headers) for headers in sources)
@@ -1702,8 +1703,9 @@ def _contains_auth(
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
 
+    internals = ctx.internals
     # If auth comes from explicit `auth` option or a custom auth, it is always explicit
-    if ctx._auth is not None or case._has_explicit_auth:
+    if internals.auth is not None or case._has_explicit_auth:
         return AuthKind.EXPLICIT
     request = response.request
     parsed = urlparse(request.url)
@@ -1733,17 +1735,17 @@ def _contains_auth(
         if has_header(parameter):
             if (
                 # Explicit CLI headers
-                (ctx._headers is not None and name in ctx._headers)
+                (internals.headers is not None and name in internals.headers)
                 # Other kinds of overrides
-                or (ctx._override and name in ctx._override.headers)
+                or (internals.override and name in internals.override.headers)
                 or (response._override and name in response._override.headers)
             ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_cookie(parameter):
             for headers in [
-                ctx._headers,
-                (ctx._override.headers if ctx._override else None),
+                internals.headers,
+                (internals.override.headers if internals.override else None),
                 (response._override.headers if response._override else None),
             ]:
                 if headers is not None and "Cookie" in headers:
@@ -1751,15 +1753,15 @@ def _contains_auth(
                     if name in jar:
                         return AuthKind.EXPLICIT
 
-            if (ctx._override and name in ctx._override.cookies) or (
+            if (internals.override and name in internals.override.cookies) or (
                 response._override and name in response._override.cookies
             ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_query(parameter):
-            transport_params = ctx._transport_kwargs.get("params") if ctx._transport_kwargs else None
+            transport_params = internals.transport_kwargs.get("params") if internals.transport_kwargs else None
             if (
-                (ctx._override and name in ctx._override.query)
+                (internals.override and name in internals.override.query)
                 or (response._override and name in response._override.query)
                 or (isinstance(transport_params, dict) and name in transport_params)
             ):
