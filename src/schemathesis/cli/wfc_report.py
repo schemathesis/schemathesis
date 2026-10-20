@@ -256,7 +256,7 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             self.started_at = event.timestamp
         elif isinstance(event, EngineFinished):
             self.finished = event
-        elif isinstance(event, ScenarioFinished):
+        elif isinstance(event, ScenarioFinished) and event.is_test_scenario:
             self._record(event.recorder)
 
     def _record(self, recorder: ScenarioRecorder) -> None:

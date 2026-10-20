@@ -31,7 +31,7 @@ class AllureHandler(EventHandler):
         self.writer: AllureWriter = AllureWriter(output_dir=output_dir, config=config)
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
-        if isinstance(event, events.ScenarioFinished):
+        if isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
             label = event.recorder.label
             failures = recorder_failures(ctx.statistic, event.recorder) if event.status == Status.FAILURE else []
             is_stateful = event.phase == PhaseName.STATEFUL_TESTING

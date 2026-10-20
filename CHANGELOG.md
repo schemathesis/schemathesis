@@ -24,6 +24,7 @@
 - Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
 - `Failed Health Check` for request bodies with several `$`-anchored `pattern` strings. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
 - `Failed Health Check` for strings whose `pattern` is stricter than their `format`. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
+- Sign-up and login requests counted as tests in WFC, JUnit, Allure and HTML reports.
 - `ValueError` crash in `use_after_free` and `ensure_resource_availability` for non-ASCII digit `Age` headers.
 - Match custom payload strategies to concrete media types selected from wildcard request declarations.
 - Crash and wrong link bodies for request body properties named with non-ASCII digits like `²`.
