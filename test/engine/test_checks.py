@@ -954,6 +954,41 @@ def test_header_conformance(ctx, response_factory, version, header, schema, valu
             response_headers_conformance(check_context(), response, case)
 
 
+@pytest.mark.parametrize(
+    ("schema", "value", "expected"),
+    [
+        ({"type": ["integer", "null"]}, "5", True),
+        ({"type": ["integer", "null"]}, "null", True),
+        ({"type": ["integer", "null"]}, "five", False),
+        ({"type": "integer"}, "1_0", False),
+        ({"type": "number"}, "1_0.5", False),
+        ({"type": ["array", "null"], "items": {"type": "integer"}}, "1,2", True),
+        ({"type": ["array", "null"], "items": {"type": "integer"}}, "1,x", False),
+    ],
+    ids=[
+        "type-list-integer",
+        "type-list-null",
+        "type-list-invalid",
+        "underscore-integer",
+        "underscore-number",
+        "type-list-array",
+        "type-list-array-invalid",
+    ],
+)
+def test_header_conformance_wire_value_coercion(ctx, response_factory, schema, value, expected):
+    schema = ctx.openapi.load_schema(
+        {"/data": {"get": {"responses": {"200": {"description": "OK", "headers": {"X-Count": {"schema": schema}}}}}}},
+        version="3.1.0",
+    )
+    case = schema["/data"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(headers={"X-Count": value}), True)
+    if expected:
+        assert response_headers_conformance(check_context(), response, case) is None
+    else:
+        with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+            response_headers_conformance(check_context(), response, case)
+
+
 def test_header_conformance_definition_behind_ref(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {
