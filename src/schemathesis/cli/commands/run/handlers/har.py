@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from functools import partial
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, WriterWorker
+from schemathesis.cli.commands.run.handlers.base import BackgroundWriterHandler, TextOutput, write_until_finished
 from schemathesis.config import OutputConfig
 from schemathesis.engine import events
 from schemathesis.engine.recorder import RecordedScenario
@@ -14,80 +14,33 @@ if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
 
 
-@dataclass(slots=True)
-class HarHandler(EventHandler):
+class HarHandler(BackgroundWriterHandler[RecordedScenario]):
     """CLI event handler that writes network interactions to a HAR JSON file."""
 
-    output: TextOutput
-    config: OutputConfig
-    preserve_bytes: bool
-    queue: Queue[_Initialize | _Process | _Finalize]
-    worker: WriterWorker | None
+    __slots__ = ("output", "config", "preserve_bytes")
 
     def __init__(
         self,
         output: TextOutput,
         config: OutputConfig,
         preserve_bytes: bool = False,
-        queue: Queue[_Initialize | _Process | _Finalize] | None = None,
+        queue: Queue[RecordedScenario | None] | None = None,
     ) -> None:
+        super().__init__(queue)
         self.output = output
         self.config = config
         self.preserve_bytes = preserve_bytes
-        self.queue = queue or Queue()
-        self.worker = None
 
     def start(self, ctx: BaseExecutionContext) -> None:
-        self.worker = WriterWorker(
-            name="SchemathesisHarWriter",
-            target=_run,
-            kwargs={
-                "output": self.output,
-                "config": self.config,
-                "preserve_bytes": self.preserve_bytes,
-                "queue": self.queue,
-            },
+        writer = HarWriter(output=self.output, config=self.config, preserve_bytes=self.preserve_bytes)
+        self._start_writer(
+            "SchemathesisHarWriter",
+            write_until_finished,
+            writer=writer,
+            open=partial(writer.open, seed=ctx.config.seed),
+            write=writer.write,
         )
-        self.worker.start()
-        self.queue.put(_Initialize(seed=ctx.config.seed))
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, (events.ScenarioFinished, events.FuzzScenarioFinished)):
-            self.queue.put(_Process(recorder=event.recorder))
-
-    def shutdown(self, ctx: BaseExecutionContext) -> None:
-        self.queue.put(_Finalize())
-        if self.worker is not None:
-            self.worker.join()
-
-
-def _run(
-    output: TextOutput,
-    config: OutputConfig,
-    preserve_bytes: bool,
-    queue: Queue[_Initialize | _Process | _Finalize],
-) -> None:
-    with HarWriter(output=output, config=config, preserve_bytes=preserve_bytes) as writer:
-        while True:
-            item = queue.get()
-            if isinstance(item, _Initialize):
-                writer.open(seed=item.seed)
-            elif isinstance(item, _Process):
-                writer.write(item.recorder)
-            else:  # _Finalize
-                break
-
-
-@dataclass(slots=True)
-class _Initialize:
-    seed: int | None
-
-
-@dataclass(slots=True)
-class _Process:
-    recorder: RecordedScenario
-
-
-@dataclass(slots=True)
-class _Finalize:
-    pass
+            self.queue.put(event.recorder)

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import hypothesis
 import hypothesis.errors
 import pytest
-import requests
 from flask import Flask, jsonify, request
 
 import schemathesis
@@ -12,7 +11,6 @@ import schemathesis.openapi
 from schemathesis.checks import not_a_server_error
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.core import ExecutionPlan
@@ -961,7 +959,7 @@ def test_no_reliable_transitions(engine_factory):
     assert result.events[-1].status != Status.ERROR
 
 
-def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
+def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx, response_factory):
     # When a DELETE in one root's subtree deletes a resource that was re-created by a different
     # root, ensure_resource_availability must not be triggered for operations from that second root.
     #
@@ -1001,14 +999,8 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
     delete_op = schema["/users/{userId}"]["DELETE"]
 
     def make_http_response(method, url, status_code):
-        req = requests.Request(method, url).prepare()
-        return Response(
-            status_code=status_code,
-            headers={},
-            content=b"",
-            request=req,
-            elapsed=0.0,
-            verify=False,
+        return response_factory.core(
+            status_code=status_code, content=b"", content_type=None, method=method, url=url, elapsed=0.0
         )
 
     recorder = ScenarioRecorder(label="test")

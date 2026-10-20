@@ -146,6 +146,21 @@ def as_index_or_key(segment: str) -> str | int:
     return int(segment) if is_array_index(segment) else segment
 
 
+def format_body_key(path: Iterable[str | int]) -> str:
+    """`("items", 0, "id")` -> `"items/0/id"`, the key a nested body field is required and captured under."""
+    return "/".join(map(str, path))
+
+
+def split_body_key(key: str) -> list[str]:
+    """`"items/0/id"` -> `["items", "0", "id"]`, every segment kept as text."""
+    return key.split("/")
+
+
+def parse_body_key(key: str) -> tuple[str | int, ...]:
+    """`"items/0/id"` -> `("items", 0, "id")`, array indices as integers."""
+    return tuple(map(as_index_or_key, split_body_key(key)))
+
+
 def iter_decoded_pointer_segments(pointer: str) -> Iterator[str]:
     return map(decode_pointer, pointer.split("/")[1:])
 

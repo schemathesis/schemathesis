@@ -71,7 +71,6 @@ from .utils import PathTemplate, coerce_wire_string, compile_path_template, para
 from .validation import ResponseValidator
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from typing import Self, TypeAlias
 
     from hypothesis import HealthCheck
@@ -79,7 +78,6 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
     from schemathesis.config import GenerationConfig
-    from schemathesis.core.adapter import ParsedParameters
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.error_feedback.store import Observation
@@ -98,7 +96,6 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
     from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
     from schemathesis.specs.openapi.auth_flow.bootstrap import OpenApiAuthFlow
-    from schemathesis.specs.openapi.types import OperationObject
 
     OpenApiOperation: TypeAlias = APIOperation[
         OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters, "OpenApiSchema"
@@ -640,15 +637,6 @@ class OpenApiSchema(BaseSchema):
         __tracebackhide__ = True
         yield from self._operations.iter_all()
 
-    def _raise_invalid_schema(
-        self,
-        error: Exception,
-        path: str | None = None,
-        method: str | None = None,
-    ) -> NoReturn:
-        __tracebackhide__ = True
-        self._operations._raise_invalid_schema(error, path, method)
-
     @override
     def validate(self) -> None:
         error = self._validation_error
@@ -665,37 +653,6 @@ class OpenApiSchema(BaseSchema):
         except TypeError:
             pass
         return None
-
-    def _iter_parameters(
-        self,
-        definition: OperationObject,
-        shared_parameters: Sequence[dict[str, Any]],
-        resolver: Resolver | None = None,
-    ) -> ParsedParameters:
-        return self._operations._iter_parameters(definition, shared_parameters, resolver=resolver)
-
-    def _parse_responses(
-        self, definition: OperationObject, scope: str, resolver: Resolver | None = None
-    ) -> OpenApiResponses:
-        return self._operations._parse_responses(definition, scope, resolver=resolver)
-
-    def _parse_security(self, definition: OperationObject) -> OpenApiSecurityParameters:
-        return self._operations._parse_security(definition)
-
-    def make_operation(
-        self,
-        path: str,
-        method: HttpMethodSchema,
-        parameters: ParsedParameters,
-        definition: OperationObject,
-        scope: str,
-        resolver: Resolver | None = None,
-        path_item: Mapping[str, Any] | None = None,
-    ) -> APIOperation:
-        __tracebackhide__ = True
-        return self._operations.make_operation(
-            path, method, parameters, definition, scope, resolver=resolver, path_item=path_item
-        )
 
     @cached_property
     def root_resolver(self) -> Resolver:
@@ -869,16 +826,17 @@ class MethodMap(Mapping):
         operation = self._path_item[method]
         schema = cast(OpenApiSchema, self._parent._schema)
         path = self._path
-        cached = schema._operations.cached(self._scope, path, method)
+        loader = schema._operations
+        cached = loader.cached(self._scope, path, method)
         if cached is not None:
             return cached
         try:
-            parameters = schema._iter_parameters(
+            parameters = loader._iter_parameters(
                 operation, self._path_item.get("parameters", []), resolver=self._resolver
             )
         except SCHEMA_PARSING_ERRORS as exc:
-            schema._raise_invalid_schema(exc, path, method)
-        return schema.make_operation(
+            loader._raise_invalid_schema(exc, path, method)
+        return loader.make_operation(
             path,
             cast("HttpMethodSchema", method),
             parameters,

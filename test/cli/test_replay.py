@@ -11,7 +11,6 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-import requests
 import strawberry
 import trustme
 from flask import Response, jsonify, request
@@ -30,7 +29,7 @@ from schemathesis.cli.commands.replay.executor import (
 from schemathesis.cli.commands.replay.output import _format_linked_values, render_replay
 from schemathesis.cli.output import make_console
 from schemathesis.config import OutputConfig
-from schemathesis.core import NOT_SET, transport
+from schemathesis.core import NOT_SET
 from schemathesis.core.failures import ServerError
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.reporting.crashes import MANIFEST_FILENAME, CrashCheck, CrashFile, CrashLink, CrashStep, CrashWriter
@@ -1466,7 +1465,7 @@ def test_render_removal_notice(snapshot, crash_factory):
     assert _capture_render(crashes=crashes, outcomes=outcomes, removal_count=5) == snapshot
 
 
-def test_render_step_chain(snapshot, crash_factory):
+def test_render_step_chain(snapshot, crash_factory, response_factory):
     # Step rows colour each status and flag a body change even when the recorded body is invalid JSON.
     crash = crash_factory.chain(
         steps=[
@@ -1485,15 +1484,7 @@ def test_render_step_chain(snapshot, crash_factory):
     # Pin the ephemeral case id so the captured `Test Case ID` / `st replay` lines are deterministic.
     crash.case_id = "Cd1234"
     crashes = [crash]
-    prepared = requests.Request(method="GET", url="http://127.0.0.1/c").prepare()
-    response = transport.Response(
-        status_code=503,
-        headers={"content-type": ["application/json"]},
-        content=b'{"error": "down"}',
-        request=prepared,
-        elapsed=0.1,
-        verify=False,
-    )
+    response = response_factory.core(status_code=503, content=b'{"error": "down"}', url="http://127.0.0.1/c")
     outcomes = [
         ReplayOutcome(
             status=ReplayStatus.FAILED,

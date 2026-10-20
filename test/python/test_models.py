@@ -22,7 +22,6 @@ from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
-from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
 from test.apps.catalog.graphql.bookstore import books
@@ -115,32 +114,18 @@ def test_make_case_missing_media_type(ctx):
         ),
     ],
 )
-def test_case_repr(swagger_20, kwargs, expected):
-    operation = APIOperation(
-        "/users/{name}",
-        "GET",
-        {},
-        swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
+def test_case_repr(ctx, kwargs, expected):
+    operation = ctx.openapi.load_operation("GET /users/{name}", {"responses": {"200": {"description": "OK"}}})
     case = operation.Case(**kwargs)
     assert repr(case) == expected
 
 
 @pytest.mark.parametrize("override", [False, True])
 @pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"], ids=["as-is", "trailing-slash"])
-def test_as_transport_kwargs(ctx, override, swagger_20, converter):
+def test_as_transport_kwargs(ctx, override, converter):
     api = ctx.openapi.apps.success()
     base_url = converter(f"{api.base_url}/api")
-    operation = APIOperation(
-        "/success",
-        "GET",
-        {},
-        swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
+    operation = ctx.openapi.load_operation("GET /success", {"responses": {"200": {"description": "OK"}}})
     case = operation.Case(cookies={"TOKEN": "secret"})
     if override:
         data = case.as_transport_kwargs(base_url)
@@ -170,17 +155,10 @@ def test_mutate_body(ctx):
     assert case.as_transport_kwargs()["json"] == case.body
 
 
-def test_reserved_characters_in_operation_name(swagger_20):
+def test_reserved_characters_in_operation_name(ctx):
     # See GH-992
     # When an API operation name contains `:`
-    operation = APIOperation(
-        "/foo:bar",
-        "GET",
-        {},
-        swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
+    operation = ctx.openapi.load_operation("GET /foo:bar", {"responses": {"200": {"description": "OK"}}})
     case = operation.Case()
     # Then it should not be truncated during API call
     assert case.as_transport_kwargs("/")["url"] == "/foo:bar"
@@ -195,17 +173,10 @@ def test_reserved_characters_in_operation_name(swagger_20):
         ({"UsEr-agEnT": "foo/1.0"}, {"UsEr-agEnT": "foo/1.0", "X-Key": "foo"}),
     ],
 )
-def test_as_transport_kwargs_override_user_agent(ctx, swagger_20, headers, expected):
+def test_as_transport_kwargs_override_user_agent(ctx, headers, expected):
     api = ctx.openapi.apps.success()
-    operation = APIOperation(
-        "/success",
-        "GET",
-        {},
-        swagger_20,
-        base_url=f"{api.base_url}/api",
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
+    operation = ctx.openapi.load_operation("GET /success", {"responses": {"200": {"description": "OK"}}})
+    operation.base_url = f"{api.base_url}/api"
     original_headers = headers.copy()
     case = operation.Case(headers=headers)
     data = case.as_transport_kwargs(headers={"X-Key": "foo"})
@@ -258,17 +229,10 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
 
 
 @pytest.mark.parametrize("override", [False, True])
-def test_call(ctx, override, swagger_20):
+def test_call(ctx, override):
     api = ctx.openapi.apps.success()
     base_url = f"{api.base_url}/api"
-    operation = APIOperation(
-        "/success",
-        "GET",
-        {},
-        swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-    )
+    operation = ctx.openapi.load_operation("GET /success", {"responses": {"200": {"description": "OK"}}})
     case = operation.Case()
     if override:
         response = case.call(base_url)

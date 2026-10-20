@@ -8,7 +8,6 @@ from io import StringIO
 from xml.etree import ElementTree
 
 import pytest
-import requests
 import yaml
 from _pytest.main import ExitCode
 from flask import jsonify, request
@@ -106,7 +105,7 @@ def test_fuzz_operations_summary_accounts_for_failure_limit(ctx, cli, app_runner
 
 
 # A step left unanswered when the failure limit stops the scenario never had a chance to run checks.
-def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx):
+def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx, response_factory):
     ok = {"get": {"responses": {"200": {"description": "OK"}}}}
     schema = ctx.openapi.load_schema({"/answered": ok, "/unanswered": ok})
     answered = schema["/answered"]["GET"].Case()
@@ -115,14 +114,7 @@ def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx
     recorder.record_case(parent_id=None, case=answered, transition=None, is_transition_applied=False)
     recorder.record_response(
         case_id=answered.id,
-        response=Response(
-            status_code=200,
-            headers={},
-            content=b"{}",
-            request=requests.Request(method="GET", url="http://127.0.0.1/answered").prepare(),
-            elapsed=0.1,
-            verify=False,
-        ),
+        response=response_factory.core(content_type=None, url="http://127.0.0.1/answered"),
     )
     recorder.record_check_success(name="not_a_server_error", case_id=answered.id)
     recorder.record_case(parent_id=answered.id, case=unanswered, transition=None, is_transition_applied=False)
@@ -462,7 +454,7 @@ def _make_fuzz_failure_event(operation, response_factory):
     )
 
 
-def _make_fuzz_multi_operation_event(ctx):
+def _make_fuzz_multi_operation_event(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {
             "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
@@ -476,17 +468,10 @@ def _make_fuzz_multi_operation_event(ctx):
         operation = schema[path]["GET"]
         case = operation.Case()
         recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
-        request = requests.Request("GET", f"http://127.0.0.1{path}").prepare()
         recorder.record_response(
             case_id=case.id,
-            response=Response(
-                status_code=200,
-                headers={"content-type": ["application/json"]},
-                content=b"{}",
-                request=request,
-                elapsed=elapsed_by_label[operation.label],
-                verify=True,
-                message="OK",
+            response=response_factory.core(
+                url=f"http://127.0.0.1{path}", elapsed=elapsed_by_label[operation.label], verify=True, message="OK"
             ),
         )
 
@@ -523,8 +508,8 @@ def test_fuzz_junit_report_does_not_duplicate_old_failures(ctx, response_factory
     assert len([child for child in testcase if child.tag == "failure"]) == 1
 
 
-def test_fuzz_junit_report_uses_recorder_elapsed_per_operation(ctx):
-    event, elapsed_by_label = _make_fuzz_multi_operation_event(ctx)
+def test_fuzz_junit_report_uses_recorder_elapsed_per_operation(ctx, response_factory):
+    event, elapsed_by_label = _make_fuzz_multi_operation_event(ctx, response_factory)
     execution_ctx = FuzzExecutionContext(config=SchemathesisConfig().projects.get_default())
     stream = StringIO()
     handler = JunitXMLHandler(stream)
@@ -538,8 +523,8 @@ def test_fuzz_junit_report_uses_recorder_elapsed_per_operation(ctx):
     assert testcases == pytest.approx(elapsed_by_label)
 
 
-def test_fuzz_allure_report_uses_recorder_elapsed_per_operation(ctx, tmp_path):
-    event, elapsed_by_label = _make_fuzz_multi_operation_event(ctx)
+def test_fuzz_allure_report_uses_recorder_elapsed_per_operation(ctx, response_factory, tmp_path):
+    event, elapsed_by_label = _make_fuzz_multi_operation_event(ctx, response_factory)
     execution_ctx = FuzzExecutionContext(config=SchemathesisConfig().projects.get_default())
     handler = AllureHandler(output_dir=tmp_path / "allure-results", config=execution_ctx.config.output)
 

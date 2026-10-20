@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from io import StringIO
 from pathlib import Path
+from queue import Queue
 from typing import IO, TYPE_CHECKING, Any, Generic, TypeVar
 
 from schemathesis.cli.events import LoadingStarted
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
 
 T = TypeVar("T", bound="BaseExecutionContext")
+ItemT = TypeVar("ItemT")
 
 
 class EventHandler(Generic[T]):
@@ -72,3 +75,37 @@ class WriterWorker(threading.Thread):
         super().join(timeout)
         if self.error is not None:
             raise self.error
+
+
+class BackgroundWriterHandler(EventHandler, Generic[ItemT]):
+    """Hands report items to a writer thread; `None` on the queue tells the thread to finish."""
+
+    __slots__ = ("queue", "worker")
+
+    def __init__(self, queue: Queue[ItemT | None] | None = None) -> None:
+        self.queue: Queue[ItemT | None] = queue or Queue()
+        self.worker: WriterWorker | None = None
+
+    def _start_writer(self, name: str, target: Callable[..., None], **kwargs: object) -> None:
+        self.worker = WriterWorker(name=name, target=target, kwargs={**kwargs, "queue": self.queue})
+        self.worker.start()
+
+    def shutdown(self, ctx: BaseExecutionContext) -> None:
+        self.queue.put(None)
+        if self.worker is not None:
+            self.worker.join()
+
+
+def write_until_finished(
+    writer: AbstractContextManager[object],
+    open: Callable[[], None],
+    write: Callable[[ItemT], None],
+    queue: Queue[ItemT | None],
+) -> None:
+    with writer:
+        open()
+        while True:
+            item = queue.get()
+            if item is None:
+                break
+            write(item)

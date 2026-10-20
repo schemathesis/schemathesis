@@ -36,7 +36,6 @@ from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     _canonical_strategy,
     jsonify_python_specific_types,
@@ -44,25 +43,11 @@ from schemathesis.specs.openapi._hypothesis import (
 )
 from schemathesis.specs.openapi.adapter import v2
 from schemathesis.specs.openapi.adapter.parameters import (
-    OpenApiBody,
     OpenApiParameter,
     OpenApiParameterSet,
-    form_data_to_json_schema,
 )
 from schemathesis.transport.serialization import Binary, quote_all
 from test.utils import assert_requests_call, run_given
-
-
-def make_operation(schema, **kwargs) -> APIOperation:
-    return APIOperation(
-        "/users",
-        "POST",
-        definition=OperationDefinition({}),
-        schema=schema,
-        responses=schema._parse_responses({}, ""),
-        security=schema._parse_security({}),
-        **kwargs,
-    )
 
 
 def test_fuzzing_phase_uses_its_generation_config(ctx):
@@ -463,15 +448,12 @@ def test_anyof_disjoint_branches_body(ctx):
 
 @pytest.mark.parametrize("location", sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN}))
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_get_examples(location, swagger_20):
+def test_get_examples(ctx, location):
     if location == ParameterLocation.BODY:
         # In Open API 2.0, the `body` parameter has a name, which is ignored
         # But we'd like to use this object as a payload; therefore, we put one extra level of nesting
         example = expected = {"name": "John"}
         media_type = "application/json"
-        cls = PayloadAlternatives
-        parameter_cls = OpenApiBody
-        kwargs = {"media_type": media_type, "resource_name": None, "is_required": True}
         definition = {
             "in": location,
             "name": "name",
@@ -483,9 +465,6 @@ def test_get_examples(location, swagger_20):
         example = "John"
         expected = {"name": example}
         media_type = None  # there is no payload
-        cls = OpenApiParameterSet
-        parameter_cls = OpenApiParameter
-        kwargs = {}
         definition = {
             "in": location,
             "name": "name",
@@ -494,17 +473,9 @@ def test_get_examples(location, swagger_20):
             "x-example": example,
         }
     container = location.container_name
-    if location == ParameterLocation.BODY:
-        param_set = cls([parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)])
-    else:
-        param_set = cls(
-            location,
-            [parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)],
-            adapter=v2,
-        )
-    operation = make_operation(
-        swagger_20,
-        **{container: param_set},
+    path = "/users/{name}" if location == ParameterLocation.PATH else "/users"
+    operation = ctx.openapi.load_operation(
+        f"POST {path}", {"parameters": [definition], "responses": {"200": {"description": "OK"}}}, version="2.0"
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -528,31 +499,14 @@ def test_get_examples(location, swagger_20):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_no_body_in_get(swagger_20):
-    operation = APIOperation(
-        path="/api/success",
-        method="GET",
-        definition=OperationDefinition({}),
-        schema=swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-        query=OpenApiParameterSet(
-            ParameterLocation.QUERY,
-            [
-                OpenApiParameter.from_definition(
-                    definition={
-                        "required": True,
-                        "in": "query",
-                        "type": "string",
-                        "name": "key",
-                        "x-example": "John",
-                    },
-                    name_to_uri={},
-                    adapter=v2,
-                )
-            ],
-            adapter=v2,
-        ),
+def test_no_body_in_get(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /api/success",
+        {
+            "parameters": [{"required": True, "in": "query", "type": "string", "name": "key", "x-example": "John"}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -560,51 +514,33 @@ def test_no_body_in_get(swagger_20):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_custom_strategies(swagger_20):
+def test_custom_strategies(ctx):
     schemathesis.openapi.format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
-    operation = make_operation(
-        swagger_20,
-        query=OpenApiParameterSet(
-            ParameterLocation.QUERY,
-            [
-                OpenApiParameter.from_definition(
-                    definition={
-                        "name": "id",
-                        "in": "query",
-                        "required": True,
-                        "type": "string",
-                        "format": "even_4_digits",
-                    },
-                    name_to_uri={},
-                    adapter=v2,
-                )
+    operation = ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "parameters": [
+                {"name": "id", "in": "query", "required": True, "type": "string", "format": "even_4_digits"}
             ],
-            adapter=v2,
-        ),
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
     )
     result = operation.as_strategy().example()
     assert len(result.query["id"]) == 4
     assert int(result.query["id"]) % 2 == 0
 
 
-def test_default_strategies_binary(swagger_20):
-    body = OpenApiBody.from_form_parameters(
-        definition=form_data_to_json_schema(
-            [
-                {
-                    "name": "upfile",
-                    "in": "formData",
-                    "type": "file",
-                    "required": True,
-                }
-            ]
-        ),
-        name_to_uri={},
-        media_type="multipart/form-data",
-        adapter=v2,
+def test_default_strategies_binary(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "consumes": ["multipart/form-data"],
+            "parameters": [{"name": "upfile", "in": "formData", "type": "file", "required": True}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
     )
-    operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
-    swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
     case = examples.generate_one(operation.as_strategy())
     assert isinstance(case.body["upfile"], Binary)
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
@@ -985,26 +921,17 @@ def test_binary_is_serializable(ctx, media_type):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_default_strategies_bytes(swagger_20):
-    operation = make_operation(
-        swagger_20,
-        body=PayloadAlternatives(
-            [
-                OpenApiBody.from_definition(
-                    definition={
-                        "in": "body",
-                        "name": "byte",
-                        "required": True,
-                        "schema": {"type": "string", "format": "byte"},
-                    },
-                    is_required=True,
-                    media_type="text/plain",
-                    name_to_uri={},
-                    resource_name=None,
-                    adapter=v2,
-                )
-            ]
-        ),
+def test_default_strategies_bytes(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "consumes": ["text/plain"],
+            "parameters": [
+                {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
     )
     result = operation.as_strategy().example()
     assert isinstance(result.body, str)
@@ -1028,22 +955,12 @@ def test_invalid_custom_strategy(values, error):
 @pytest.mark.parametrize(
     "definition", [{"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"}]
 )
-def test_valid_headers(ctx, swagger_20, definition):
+def test_valid_headers(ctx, definition):
     api = ctx.openapi.apps.success()
-    operation = APIOperation(
-        "/api/success",
-        "GET",
-        definition=OperationDefinition({}),
-        schema=swagger_20,
-        responses=swagger_20._parse_responses({}, ""),
-        security=swagger_20._parse_security({}),
-        base_url=api.base_url,
-        headers=OpenApiParameterSet(
-            ParameterLocation.HEADER,
-            [OpenApiParameter.from_definition(definition=definition, name_to_uri={}, adapter=v2)],
-            adapter=v2,
-        ),
+    operation = ctx.openapi.load_operation(
+        "GET /api/success", {"parameters": [definition], "responses": {"200": {"description": "OK"}}}, version="2.0"
     )
+    operation.base_url = api.base_url
 
     @run_given(case=operation.as_strategy(), max_examples=10)
     def inner(case):
