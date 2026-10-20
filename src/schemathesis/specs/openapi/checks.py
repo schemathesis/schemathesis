@@ -297,7 +297,7 @@ def _declared_parameters_are_valid(case: Case, location: ParameterLocation) -> b
     # Every non-body container defaults to an empty mapping, and the caller never passes `BODY`.
     value = case.get_container(location)
     assert isinstance(value, Mapping)
-    container = getattr(case.operation, location.container_name)
+    container = case.operation.get_parameter_set(location)
     schema = container.schema
     if _has_serialization_sensitive_types(schema, container):
         # Arrays and objects are rewritten on the wire, so post-serialization validity is unknowable.
@@ -633,7 +633,7 @@ def _type_mutation_is_valid_on_wire(case: Case, location: ParameterLocation, nam
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
     case_container = case.get_container(location)
-    parameter = getattr(case.operation, location.container_name).get(name)
+    parameter = case.operation.get_parameter_set(location).get(name)
     if not isinstance(case_container, Mapping) or name not in case_container:
         return False
     if not isinstance(parameter, OpenApiParameter):
@@ -792,7 +792,7 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
             continue
 
         has_negative = True
-        container = getattr(case.operation, location.container_name)
+        container = case.operation.get_parameter_set(location)
         if not container:
             continue
         if location == ParameterLocation.QUERY:
@@ -1249,7 +1249,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         if isinstance(value, Mapping) and location == ParameterLocation.HEADER:
             value = _headers_as_read(value)
         if isinstance(value, Mapping) and meta_for_location is not None and meta_for_location.mode.is_negative:
-            container = getattr(case.operation, location.container_name)
+            container = case.operation.get_parameter_set(location)
             schema = container.schema
 
             if _has_serialization_sensitive_types(schema, container):

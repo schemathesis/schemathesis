@@ -786,7 +786,7 @@ class OpenApiSchema(BaseSchema):
 
 def _as_read_from_wire(operation: APIOperation, location: ParameterLocation, value: Mapping) -> dict[str, Any]:
     """Parameter values as a server parses them from text, e.g. `"5"` for an integer parameter as `5`."""
-    container = getattr(operation, location.container_name)
+    container = operation.get_parameter_set(location)
     parsed = dict(value)
     for name, item in value.items():
         parameter = container.get(name)
