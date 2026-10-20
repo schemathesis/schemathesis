@@ -34,6 +34,7 @@ from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
 from test.fixtures.app_runner import wait_for_port
 from test.utils import HERE, SIMPLE_PATH
@@ -562,10 +563,7 @@ def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
     release = threading.Event()
     calls = count()
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     # Too few timeouts to flag the operation as unresponsive
     @app.route("/users/<int:user_id>")
@@ -2124,10 +2122,7 @@ def test_max_time_reports_the_first_cycle_in_full(ctx, cli, snapshot_cli):
     # Each phase still reports everything it covered on its first pass, budget or no budget.
     app, _ = ctx.openapi.make_flask_app(linked_users())
     counter = count()
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
@@ -2152,10 +2147,7 @@ def test_max_time_reports_the_first_cycle_in_full(ctx, cli, snapshot_cli):
 def test_stateful_unresponsive_operation_counted_as_errored(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
     release = threading.Event()
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
@@ -5280,10 +5272,7 @@ def test_link_extraction_from_invalid_json_response(ctx, cli, snapshot_cli, payl
 def test_network_error_reported_when_suite_ends_with_failure(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
     counter = count()
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
@@ -5312,10 +5301,7 @@ def test_network_error_reported_when_suite_ends_with_failure(ctx, cli, snapshot_
 def test_stateful_flaky_replay_keeps_network_error(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
     counter = count()
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
@@ -5335,15 +5321,7 @@ def test_stateful_flaky_replay_keeps_network_error(ctx, cli, snapshot_cli):
 def test_max_time_does_not_count_unsent_stateful_case(ctx, cli, snapshot_cli, monkeypatch):
     # The hook moves the engine clock past the deadline; restore the real one afterwards
     monkeypatch.setattr(control, "time", time)
-    app, _ = ctx.openapi.make_flask_app(linked_users())
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
-
-    @app.route("/users/<int:user_id>")
-    def get_user(user_id):
-        return jsonify({"id": user_id})
+    api = ctx.openapi.apps.linked_users()
 
     module = ctx.write_pymodule(
         """
@@ -5375,8 +5353,8 @@ def before_generate_case(context, strategy):
     )
 
     assert (
-        cli.run_openapi_app(
-            app,
+        cli.run(
+            api.schema_url,
             "--max-time=60",
             "--max-examples=5",
             "--generation-database=none",
@@ -5391,10 +5369,7 @@ def before_generate_case(context, strategy):
 @pytest.mark.snapshot(replace_test_cases=False, replace_generated=True, replace_reproduce_with=True)
 def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
+    handlers.register_linked_users_create(app)
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
@@ -5418,19 +5393,11 @@ def test_stateful_step_rejected_for_unresponsive_operation_is_not_counted(ctx, c
 
 @pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
 def test_stateful_step_skipped_as_already_passed_is_not_counted(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(linked_users())
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
-
-    @app.route("/users/<int:user_id>")
-    def get_user(user_id):
-        return jsonify({"id": user_id})
+    api = ctx.openapi.apps.linked_users()
 
     assert (
-        cli.run_openapi_app(
-            app,
+        cli.run(
+            api.schema_url,
             "--max-examples=1",
             "--generation-deterministic",
             "--generation-unique-inputs",
@@ -5444,19 +5411,11 @@ def test_stateful_step_skipped_as_already_passed_is_not_counted(ctx, cli, snapsh
 # Every repeated stateful pass folds into the single block reported at the end.
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(linked_users())
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
-
-    @app.route("/users/<int:user_id>")
-    def get_user(user_id):
-        return jsonify({"id": user_id})
+    api = ctx.openapi.apps.linked_users()
 
     assert (
-        cli.run_openapi_app(
-            app,
+        cli.run(
+            api.schema_url,
             "--max-time=5",
             "--max-examples=5",
             "--generation-database=none",
@@ -5470,20 +5429,12 @@ def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
 @pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_keyboard_interrupt_under_time_budget(ctx, cli, snapshot_cli, phase):
-    app, _ = ctx.openapi.make_flask_app(linked_users())
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        return jsonify({"id": 1}), 201
-
-    @app.route("/users/<int:user_id>")
-    def get_user(user_id):
-        return jsonify({"id": user_id})
+    api = ctx.openapi.apps.linked_users()
 
     module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
     assert (
-        cli.run_openapi_app(
-            app,
+        cli.run(
+            api.schema_url,
             "--max-time=10",
             "--max-examples=5",
             f"--phases={phase}",

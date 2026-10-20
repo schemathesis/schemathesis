@@ -253,3 +253,10 @@ def crud_asgi() -> OpenAPIApp:
         return user
 
     return OpenAPIApp(spec=app.openapi(), server=app, kind="fastapi")
+
+
+def linked_users() -> OpenAPIApp:
+    spec = build_schema(schemas.linked_users())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_linked_users(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

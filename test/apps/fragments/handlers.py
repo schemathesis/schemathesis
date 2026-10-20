@@ -434,3 +434,17 @@ def register_flaky_branch_blocks(app: Flask) -> None:
     @app.route("/blocks", methods=["POST"])
     def create_block() -> Any:
         return jsonify({}), 422
+
+
+def register_linked_users_create(app: Flask) -> None:
+    @app.route("/users", methods=["POST"])
+    def create_user() -> Any:
+        return jsonify({"id": 1}), 201
+
+
+def register_linked_users(app: Flask) -> None:
+    register_linked_users_create(app)
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id: int) -> Any:
+        return jsonify({"id": user_id})
