@@ -13,7 +13,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, sch
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transforms import UNRESOLVABLE, format_body_key, parse_body_key, resolve_path
+from schemathesis.core.transforms import UNRESOLVABLE, format_body_key, resolve_path, split_body_key
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
@@ -314,7 +314,7 @@ def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str,
     variant: dict[str, Any] | list[Any] = {}
     for slot in slots:
         if slot.lookup_key in values_by_lookup_key:
-            overlay = build_nested_body(slot.lookup_key, values_by_lookup_key[slot.lookup_key])
+            overlay = build_nested_body(slot.path, values_by_lookup_key[slot.lookup_key])
             variant = merge_request_body(variant, overlay)
     return variant
 
@@ -371,10 +371,10 @@ class OpenApiExtraDataSource(ExtraDataSource):
         # Values that have been successfully DELETEd; pool draws skip them.
         self._tombstoned: set[tuple[str, Any]] = set()
         # Body fields below the top level, e.g. `data/0/groupId`, by operation label.
-        self._nested_body_requirements: dict[str, list[tuple[tuple[str | int, ...], ParameterRequirement]]] = {}
+        self._nested_body_requirements: dict[str, list[tuple[tuple[str, ...], ParameterRequirement]]] = {}
         for (label, location, name), requirement in requirements.items():
             if location == ParameterLocation.BODY and "/" in name:
-                path = parse_body_key(name)
+                path = tuple(split_body_key(name))
                 self._nested_body_requirements.setdefault(label, []).append((path, requirement))
 
     # Opaque repr so Hypothesis' argument rendering never walks the live pool that concurrent workers mutate.
@@ -435,9 +435,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
             for path, requirement in self._nested_body_requirements.get(operation.label, ()):
                 if path[0] in bound:
                     continue
-                leaf_schema = _walk_to_property(schema, path, bundled)
-                if leaf_schema is not None:
-                    slots.append(_VariantSlot(path, leaf_schema, requirement))
+                found = _walk_to_property(schema, path, bundled)
+                if found is not None:
+                    slots.append(_VariantSlot(*found, requirement))
 
         if not slots:
             return None
@@ -447,7 +447,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             slot = slots[0]
             variants = [
                 CapturedVariant(
-                    overlay=build_nested_body(slot.lookup_key, value),
+                    overlay=build_nested_body(slot.path, value),
                     draws=(
                         _build_pool_draw_from_requirement(
                             location=location,

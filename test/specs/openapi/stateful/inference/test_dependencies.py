@@ -3385,6 +3385,32 @@ def test_reference_to_non_object_response_schema(ctx, response_schema):
     assert schema.raw_schema["paths"]["/items"]["get"] == response("200", response_schema)
 
 
+def test_nested_fk_under_digit_named_property_links_into_object_body(ctx):
+    warehouse_id = {"type": "object", "properties": {"warehouse_id": {"type": "string"}}, "required": ["warehouse_id"]}
+    paths = {
+        **operation("get", "/warehouses", "200", {"type": "array", "items": SCHEMA_WITH_ID}),
+        **operation_with_body(
+            "post",
+            "/orders",
+            "201",
+            {"type": "object", "properties": {"2024": warehouse_id}, "required": ["2024"]},
+            operation_id="createOrder",
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1warehouses/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "requestBody": {"2024": {"warehouse_id": "$response.body#/*/id"}},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
 def test_path_param_named_after_collection_links_create_to_read(ctx):
     # `/sessions/{session}` names its path param after the singular collection (route-model-binding
     # style); the create operation must still link into read.

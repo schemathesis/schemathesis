@@ -12,10 +12,12 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import format_body_key
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.converter import is_read_only
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
+    BodyPath,
     CanonicalizationCache,
     Cardinality,
     DefinitionSource,
@@ -50,7 +52,7 @@ def extract_inputs(
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
     nested_fk_cache: NestedFKCache,
-    deferred_nested_fks: list[tuple[str, str, str]],
+    deferred_nested_fks: list[tuple[str, str, BodyPath]],
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_field_named_path_parameters: list[tuple[str, str]] | None = None,
@@ -403,7 +405,7 @@ def _resolve_body_dependencies(
     known_dependencies: set[str],
     nested_fk_cache: NestedFKCache,
     updated_resource: str | None = None,
-    deferred_nested_fks: list[tuple[str, str, str]],
+    deferred_nested_fks: list[tuple[str, str, BodyPath]],
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_writable_body_fields: dict[str, JsonSchema],
@@ -531,7 +533,7 @@ def _resolve_body_dependencies(
 
 
 # FK fields behind a bundled reference, by the reference's original URI and the remaining depth.
-NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[str, str, str]]]
+NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[BodyPath, str, str]]]
 
 
 @dataclass(slots=True)
@@ -543,7 +545,7 @@ class NestedFKScan:
     # Bodies bundle the same references separately, yet find the same FK fields behind them.
     by_reference: NestedFKCache
     # Bodies reuse the same schemas at many places; each is scanned once per remaining depth.
-    by_schema: dict[tuple[int, int], list[tuple[str, str, str]]]
+    by_schema: dict[tuple[int, int], list[tuple[BodyPath, str, str]]]
     # Flattened writable properties, once whatever the remaining depth.
     flattened: dict[int, dict[str, Any]]
 
@@ -552,7 +554,7 @@ def _extract_nested_body_fk_fields(
     schema: dict[str, Any],
     resources: ResourceMap,
     scan: NestedFKScan,
-    deferred: list[tuple[str, str, str]],
+    deferred: list[tuple[str, str, BodyPath]],
 ) -> Iterator[InputSlot]:
     """Recursively extract FK fields from nested request body schemas.
 
@@ -564,35 +566,38 @@ def _extract_nested_body_fk_fields(
     `deferred` so the caller can replay it once every operation has been scanned.
     """
     items = schema.get("items")
+    children: list[tuple[str | int, Any]]
     if isinstance(items, dict):
         # Items of a top-level array body carry FK fields like nested array items: `[{"groupId": ...}]`.
-        properties: dict[str, Any] = {"0": items}
+        children = [(0, items)]
     else:
         properties, _ = _flatten_composition(schema, scan.bundled)
-    for property_name, subschema in properties.items():
+        children = [*properties.items()]
+    for property_name, subschema in children:
         if not isinstance(subschema, dict) or is_read_only(subschema, scan.bundled):
             continue
         for suffix, target_resource_name, target_field in _container_fk_fields(subschema, scan, 5):
-            nested_path = property_name + suffix
+            nested_path = (property_name, *suffix)
             resource = resources.get(target_resource_name)
             if resource is not None:
                 yield InputSlot(
                     resource=resource,
                     resource_field=target_field,
-                    parameter_name=nested_path,
+                    parameter_name=format_body_key(nested_path),
                     parameter_location=ParameterLocation.BODY,
+                    body_path=nested_path,
                 )
             else:
                 deferred.append((target_resource_name, target_field, nested_path))
 
 
-def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: int) -> list[tuple[str, str, str]]:
+def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: int) -> list[tuple[BodyPath, str, str]]:
     """FK fields under `schema` as `(path suffix, target resource, target field)`."""
     key = (id(schema), max_depth)
     cached = scan.by_schema.get(key)
     if cached is not None:
         return cached
-    fields: list[tuple[str, str, str]] = []
+    fields: list[tuple[BodyPath, str, str]] = []
     scan.by_schema[key] = fields
     reference = schema.get("$ref")
     if isinstance(reference, str):
@@ -615,7 +620,7 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
         items = schema.get("items")
         if isinstance(items, dict):
             fields.extend(
-                (f"/0{suffix}", resource, field)
+                ((0, *suffix), resource, field)
                 for suffix, resource, field in _container_fk_fields(items, scan, max_depth)
             )
         return fields
@@ -633,13 +638,13 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
         if fk_info is None:
             continue
         target_resource_name, target_field, _ = fk_info
-        fields.append((f"/{name}", target_resource_name, target_field))
+        fields.append(((name,), target_resource_name, target_field))
 
     if max_depth > 1:
         for name, subschema in properties.items():
             if isinstance(subschema, dict):
                 fields.extend(
-                    (f"/{name}{suffix}", resource, field)
+                    ((name, *suffix), resource, field)
                     for suffix, resource, field in _container_fk_fields(subschema, scan, max_depth - 1)
                 )
     return fields

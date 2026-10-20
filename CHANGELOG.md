@@ -10,7 +10,7 @@
 ### :bug: Fixed
 
 - Serialize XML array items that declare their own `prefix` and `namespace`.
-- Use captured values for body fields under digit-named properties in the coverage phase.
+- Use captured values for body fields under digit-named properties.
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
 - Duplicate requests in the coverage phase for operations with a request body.
 - Send a single listed identifier when `st fuzz` follows links from list responses.
