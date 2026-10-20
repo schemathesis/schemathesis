@@ -20,6 +20,7 @@
 - `AttributeError` crash with `exclude(deprecated=True)` on GraphQL schemas; skip `@deprecated` fields.
 - False positive `ignored_auth` when the invalid-auth probe dropped the case's other headers.
 - Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
+- Malformed XML or wrong tags for prefixed nested properties and array items shared via `$ref`.
 - `Failed Health Check` for request bodies with several `$`-anchored `pattern` strings. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
 - `Failed Health Check` for strings whose `pattern` is stricter than their `format`. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
 - `ValueError` crash in `use_after_free` and `ensure_resource_availability` for non-ASCII digit `Age` headers.

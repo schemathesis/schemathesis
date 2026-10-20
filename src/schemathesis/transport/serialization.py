@@ -164,10 +164,6 @@ def _serialize_xml(value: Any, schema: JsonSchema, resource_name: str | None) ->
         # Opaque payloads are already the wire representation and carry no XML structure to wrap.
         return {"data": value.data if isinstance(value, Binary) else value}
     tag = _get_xml_tag(definition, resource_name)
-    options = definition.get("xml", {})
-    # Objects and arrays prefix their own tags, while scalars expect the caller to do it.
-    if not isinstance(value, (dict, list)) and "prefix" in options:
-        tag = f"{options['prefix']}:{tag}"
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
     namespace_stack: list[str] = []
@@ -267,10 +263,7 @@ def _write_object(
             continue
 
         child_tag = _sanitize_xml_name(child_tag)
-        if child_options.get("prefix"):
-            _validate_prefix(child_options, stack)
-            prefix = child_options["prefix"]
-            child_tag = f"{prefix}:{child_tag}"
+        _validate_prefix(child_options, stack)
         _write_xml(children_buffer, value, child_tag, property_schema, stack, child_resolver)
         pop_namespace_if_any(stack, child_options)
 
@@ -296,7 +289,7 @@ def _write_array(
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
-    unprefixed_tag = tag
+    child_tag = tag
     if options.get("prefix"):
         tag = f"{options['prefix']}:{tag}"
     wrapped = options.get("wrapped", False)
@@ -309,17 +302,18 @@ def _write_array(
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
     if schema:
-        items = dict(schema.get("items", {}))
+        items = schema.get("items", {})
     else:
         items = {}
     items_resolver = resolver
     if "$ref" in items:
         items_resolver, items = resolve_reference(resolver, items["$ref"])
-    child_options = items.get("xml", {})
-    child_tag = child_options.get("name", tag)
+    # The array's namespace and prefix apply to its items only here, not to other arrays sharing the items schema.
+    items = dict(items)
+    child_options = dict(items.get("xml", {}))
+    child_tag = child_options.get("name", child_tag)
     # Items with their own namespace declare it on every element they write.
     items_bind_prefix = "namespace" in child_options
-    items_prefix = child_options.get("prefix")
     if not is_namespace_specified and "namespace" in options:
         child_options.setdefault("namespace", options["namespace"])
     if "prefix" in options:
@@ -328,11 +322,7 @@ def _write_array(
     if not items_bind_prefix:
         _validate_prefix(child_options, stack)
     for item in obj:
-        item_tag = child_tag
-        # Objects and arrays prefix their own tags, while scalars expect the caller to do it.
-        if items_prefix and not isinstance(item, (dict, list)):
-            item_tag = f"{items_prefix}:{child_options.get('name', unprefixed_tag)}"
-        _write_xml(buffer, item, item_tag, items, stack, items_resolver)
+        _write_xml(buffer, item, child_tag, items, stack, items_resolver)
     if wrapped:
         buffer.write(f"</{tag}>")
     pop_namespace_if_any(stack, options)
@@ -346,6 +336,8 @@ def _write_primitive(
     # and this element don't have any children. Therefore, checking the prefix is enough, unless the element binds it
     if "namespace" not in xml_options:
         _validate_prefix(xml_options, namespace_stack)
+    if "prefix" in xml_options:
+        tag = f"{xml_options['prefix']}:{tag}"
     buffer.write(f"<{tag}")
     if "namespace" in xml_options:
         _write_namespace(buffer, xml_options)

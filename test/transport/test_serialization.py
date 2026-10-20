@@ -1913,6 +1913,81 @@ def test_serialize_xml_prefixed_array_items(ctx, schema, body, expected):
     assert operation.Case(body=body).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
 
 
+PREFIXED_CHILD_XML = {"prefix": "p", "namespace": "http://p"}
+
+
+@pytest.mark.parametrize(
+    ("child", "value", "expected"),
+    [
+        (
+            {"type": "object", "properties": {"a": {"type": "string"}}, "xml": PREFIXED_CHILD_XML},
+            {"a": "x"},
+            b'<root><p:child xmlns:p="http://p"><a>x</a></p:child></root>',
+        ),
+        (
+            {"type": "array", "items": {"type": "string"}, "xml": PREFIXED_CHILD_XML},
+            ["x"],
+            b'<root><p:child xmlns:p="http://p">x</p:child></root>',
+        ),
+        (
+            {"type": "array", "items": {"type": "string"}, "xml": {**PREFIXED_CHILD_XML, "wrapped": True}},
+            ["x"],
+            b'<root><p:child xmlns:p="http://p"><p:child>x</p:child></p:child></root>',
+        ),
+    ],
+    ids=["object", "array", "wrapped-array"],
+)
+def test_serialize_xml_prefixed_nested_property(ctx, child, value, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "requestBody": {
+                "content": {
+                    "application/xml": {
+                        "schema": {"type": "object", "xml": {"name": "root"}, "properties": {"child": child}}
+                    }
+                },
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    assert operation.Case(body={"child": value}).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
+
+
+def test_serialize_xml_shared_array_items_keep_own_prefix(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "requestBody": {
+                "content": {
+                    "application/xml": {
+                        "schema": {
+                            "type": "object",
+                            "xml": {"name": "root"},
+                            "properties": {
+                                "a": {
+                                    "type": "array",
+                                    "xml": {"prefix": "p", "namespace": "http://p"},
+                                    "items": {"$ref": "#/components/schemas/Item"},
+                                },
+                                "b": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+                            },
+                        }
+                    }
+                },
+                "required": True,
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"schemas": {"Item": {"type": "string", "xml": {"name": "item"}}}},
+    )
+    assert (
+        operation.Case(body={"a": ["x"], "b": ["y"]}).as_transport_kwargs(base_url="http://127.0.0.1")["data"]
+        == b'<root><p:item xmlns:p="http://p">x</p:item><item>y</item></root>'
+    )
+
+
 SIMPLE_TEXT_STRATEGY = st.text(min_size=1, alphabet=st.sampled_from(string.ascii_letters))
 XML_OBJECT_STRATEGY = st.fixed_dictionaries(
     {},
