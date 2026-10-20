@@ -1050,7 +1050,12 @@ def test_negative_data_rejection_ignores_path_type_mutation_with_valid_wire_text
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
-def test_negative_data_rejection_reports_type_mutation_of_parameter_missing_from_query(ctx, response_factory):
+@pytest.mark.parametrize(
+    ("parameter", "query"),
+    [("id", {"other": "5"}), ("ghost", {"ghost": "5"})],
+    ids=["missing-from-query", "undeclared"],
+)
+def test_negative_data_rejection_reports_type_mutation_of_query_parameter(ctx, response_factory, parameter, query):
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
@@ -1063,12 +1068,12 @@ def test_negative_data_rejection_reports_type_mutation_of_parameter_missing_from
             query=GenerationMode.NEGATIVE,
             generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid type string (expected integer)",
-            parameter="id",
+            parameter=parameter,
             parameter_location=ParameterLocation.QUERY,
         ),
-        query={"other": "5"},
+        query=query,
     )
-    with pytest.raises(AcceptedNegativeData, match="parameter `id` in query - invalid type string"):
+    with pytest.raises(AcceptedNegativeData, match=f"parameter `{parameter}` in query - invalid type string"):
         negative_data_rejection(check_context(), response_factory.requests(status_code=200), case)
 
 
@@ -1086,28 +1091,6 @@ def test_negative_data_rejection_reports_when_one_location_stays_invalid_on_the_
     case = _path_and_query_case(path_and_query_schema, {"id": "7"}, query, headers, mutations)
     with pytest.raises(AcceptedNegativeData):
         negative_data_rejection(check_context(), response_factory.requests(), case)
-
-
-def test_negative_data_rejection_reports_type_mutation_of_undeclared_query_parameter(ctx, response_factory):
-    operation = ctx.openapi.load_operation(
-        "GET /items",
-        {
-            "parameters": [{"in": "query", "name": "id", "required": True, "schema": {"type": "integer"}}],
-            "responses": {"200": {"description": "OK"}},
-        },
-    )
-    case = operation.Case(
-        _meta=build_metadata(
-            query=GenerationMode.NEGATIVE,
-            generation_modes=[GenerationMode.NEGATIVE],
-            description="Invalid type string (expected integer)",
-            parameter="ghost",
-            parameter_location=ParameterLocation.QUERY,
-        ),
-        query={"ghost": "5"},
-    )
-    with pytest.raises(AcceptedNegativeData, match="parameter `ghost` in query - invalid type string"):
-        negative_data_rejection(check_context(), response_factory.requests(status_code=200), case)
 
 
 @pytest.mark.parametrize(("value", "is_accepted"), [("-1", True), ("5", False)], ids=["below-minimum", "valid"])
