@@ -541,6 +541,10 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @abstractmethod
+    def is_deprecated(self, operation: APIOperation) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
     def create_extra_data_source(self) -> ExtraDataSource | None:
         """Create an extra data source for augmenting test generation with real data.
 
