@@ -151,17 +151,6 @@ def iter_cases(operation, *generation_modes, extra_data_source=None, error_feedb
     ]
 
 
-def generate_cases(operation, generation_mode):
-    disable_coverage_extras(operation)
-    return list(
-        operation.schema.iter_coverage_cases(
-            operation,
-            generation_modes=[generation_mode],
-            generation_config=operation.schema.config.generation,
-        )
-    )
-
-
 def generate_hooked_cases(operation, generation_mode):
     # Schema hooks run in the phase driver, not in the schema's case iterator.
     disable_coverage_extras(operation)
