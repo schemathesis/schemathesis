@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from hypothesis import settings
     from hypothesis import strategies as st
-
-SCHEMATHESIS_BENCHMARK_SEED = os.environ.get("SCHEMATHESIS_BENCHMARK_SEED")
 
 
 @lru_cache
@@ -64,7 +61,6 @@ def _add_examples(
     example_generating_inner_function._hypothesis_internal_database_key = b""
 
     # Seed strategy draws so `generate_one(strategy)` is deterministic across processes.
-    seed_value = SCHEMATHESIS_BENCHMARK_SEED if SCHEMATHESIS_BENCHMARK_SEED is not None else 0
-    example_generating_inner_function = seed(seed_value)(example_generating_inner_function)
+    example_generating_inner_function = seed(0)(example_generating_inner_function)
 
     example_generating_inner_function()
