@@ -20,7 +20,9 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Result
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
+from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
+from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 
 StatefulSchemaMark = Mark["BaseSchema"](attr_name="stateful_schema")
 StatefulCallbackMark = Mark[Callable | None](attr_name="stateful_callback")
@@ -450,3 +452,30 @@ class APIStateMachine(RuleBasedStateMachine):
         """
         __tracebackhide__ = True
         case.validate_response(response, additional_checks=additional_checks, transport_kwargs=kwargs)
+
+
+class _RecordingStateMachine(APIStateMachine):
+    """Records every step of a scenario so stateful checks can look up earlier cases and responses."""
+
+    def __init__(self) -> None:
+        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
+        super().__init__()
+
+    def after_call(self, response: Response, case: Case) -> None:
+        # Always record responses so stateful checks can look up prior responses
+        self.recorder.record_response(case_id=case.id, response=response)
+
+    def validate_response(
+        self,
+        response: Response,
+        case: Case,
+        additional_checks: list[CheckFunction] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        __tracebackhide__ = True
+        case.validate_response(
+            response,
+            additional_checks=additional_checks,
+            transport_kwargs=kwargs or None,
+            recorder=self.recorder,
+        )

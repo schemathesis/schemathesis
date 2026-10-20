@@ -8,27 +8,24 @@ from hypothesis.stateful import Bundle, RuleBasedStateMachine
 
 from schemathesis.core.errors import NoProducers
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transport import Response
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
-from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.control import TransitionController
 from schemathesis.generation.stateful.state_machine import (
     APIStateMachine,
     StepInput,
     StepOutput,
     Transition,
+    _RecordingStateMachine,
 )
 from schemathesis.specs.graphql.handles import Handle, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.stateful._rules import generate_rules_for
 
 if TYPE_CHECKING:
-    from schemathesis.checks import CheckFunction
     from schemathesis.specs.graphql.schemas import GraphQLSchema
     from schemathesis.specs.graphql.stateful._transitions import GraphQLTransitions
 
 
-class GraphQLStateMachine(APIStateMachine):
+class GraphQLStateMachine(_RecordingStateMachine):
     """State machine for GraphQL stateful testing built around producer/consumer chains."""
 
     schema: GraphQLSchema  # set on the dynamically-built subclass
@@ -43,30 +40,10 @@ class GraphQLStateMachine(APIStateMachine):
                 "GraphQL stateful testing requires at least one producer mutation "
                 "(a mutation returning an Object type with an `id` field)."
             )
-        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
         self._id_origins: dict[tuple[Handle, str], str] = {}
         self._deleted_id_origins: dict[tuple[Handle, str], str] = {}
         self.control = TransitionController(self._transitions, self._root_labels)
         super().__init__()
-
-    def after_call(self, response: Response, case: Case) -> None:
-        # Always record responses so stateful checks can look up prior responses.
-        self.recorder.record_response(case_id=case.id, response=response)
-
-    def validate_response(
-        self,
-        response: Response,
-        case: Case,
-        additional_checks: list[CheckFunction] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        __tracebackhide__ = True
-        case.validate_response(
-            response,
-            additional_checks=additional_checks,
-            transport_kwargs=kwargs or None,
-            recorder=self.recorder,
-        )
 
     def _add_result_to_targets(self, targets: tuple[str, ...], result: Any) -> None:
         RuleBasedStateMachine._add_result_to_targets(self, targets, result)
