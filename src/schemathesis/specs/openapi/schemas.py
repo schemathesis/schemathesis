@@ -68,7 +68,7 @@ from .operations import SCHEMA_PARSING_ERRORS, OperationLoader, RawSchemaVersion
 from .serialization import _build_urlencoded_serializer
 from .stateful import collect_transitions, create_state_machine
 from .utils import PathTemplate, coerce_wire_string, compile_path_template, parameter_types, parse_spec_version
-from .validation import ResponseValidator
+from .validation import validate_documented_response
 
 if TYPE_CHECKING:
     from typing import Self, TypeAlias
@@ -131,7 +131,6 @@ class OpenApiSchema(BaseSchema):
         self.raw_schema_version = RawSchemaVersion()
         self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
         self._operations = OperationLoader(self)
-        self._response_validator = ResponseValidator(self)
         # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped set.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Per-operation security overlays populated by runtime auth inference. Empty when the server
@@ -781,7 +780,7 @@ class OpenApiSchema(BaseSchema):
         case: Case | None = None,
     ) -> bool | None:
         __tracebackhide__ = True
-        return self._response_validator.validate(operation, response, case=case)
+        return validate_documented_response(self, operation, response, case)
 
 
 def _as_read_from_wire(operation: APIOperation, location: ParameterLocation, value: Mapping) -> dict[str, Any]:
