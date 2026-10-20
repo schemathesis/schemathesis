@@ -35,14 +35,13 @@ class AllureHandler(EventHandler):
             label = event.recorder.label
             failures = recorder_failures(ctx.statistic, event.recorder) if event.status == Status.FAILURE else []
             is_stateful = event.phase == PhaseName.STATEFUL_TESTING
-            operation = ctx.find_operation_by_label(label) if not is_stateful and ctx.find_operation_by_label else None
             self.writer.record_scenario(
                 label=label,
                 elapsed_sec=event.elapsed_time,
                 status=event.status,
                 failures=failures,
                 skip_reason=event.skip_reason,
-                tags=operation.tags if operation is not None else None,
+                tags=_operation_tags(ctx, label) if not is_stateful else None,
             )
         elif isinstance(event, events.FuzzScenarioFinished):
             if event.status in (Status.SUCCESS, Status.FAILURE):
@@ -94,7 +93,5 @@ class AllureHandler(EventHandler):
 
 
 def _operation_tags(ctx: BaseExecutionContext, label: str) -> list[str] | None:
-    if ctx.find_operation_by_label is None:
-        return None
-    operation = ctx.find_operation_by_label(label)
+    operation = ctx.find_operation(label)
     return operation.tags if operation is not None else None
