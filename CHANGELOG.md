@@ -11,6 +11,7 @@
 
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
 - Duplicate requests in the coverage phase for operations with a request body.
+- Send a single listed identifier when `st fuzz` follows links from list responses.
 - Missing boundary in `multipart/mixed` request `Content-Type` headers.
 - `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
