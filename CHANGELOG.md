@@ -9,37 +9,66 @@
 
 ### :bug: Fixed
 
-- `RecursionError` during generation for arrays whose `items` or `contains` refer back to an enclosing schema.
-- Serialize XML array items that declare their own `prefix` and `namespace`.
-- Show the 429 response for failures on waited-out rate limits with `--rate-limit=auto`.
+#### `st fuzz`
+
+- Send a single listed identifier when `st fuzz` follows links from list responses.
+- `st fuzz --mode=negative` crash on operations with nothing to negate.
+- List written reports when `st fuzz` stops on a fatal error like an unreachable schema.
+- Keep `st fuzz` running past `Inconsistent data generation` errors caused by changing server state.
+
+#### Stateful testing
+
 - Use captured values for body fields under digit-named properties.
+- Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
+- Crash and wrong link bodies for request body properties named with non-ASCII digits like `²`.
+
+#### Coverage phase
+
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
 - Duplicate coverage-phase `default` case equal to `example` when `examples` is also declared.
-- False positive `negative_data_rejection` for path and query parameters whose sent text is valid.
-- False positive `negative_data_rejection` when configured auth refilled a negated auth header.
 - Duplicate requests in the coverage phase for operations with a request body.
-- Send a single listed identifier when `st fuzz` follows links from list responses.
-- Missing boundary in `multipart/mixed` request `Content-Type` headers.
-- False results in `response_headers_conformance` for OpenAPI 3.1 type lists and `1_0`-style numbers.
-- False positive `response_headers_conformance` for object-typed response headers.
-- Unchecked retried `429` responses outside stateful testing with `--rate-limit=auto`.
-- `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
-- `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
-- Missing `Identity:` line in JUnit and Allure failure reports.
-- `AttributeError` crash with `exclude(deprecated=True)` on GraphQL schemas; skip `@deprecated` fields.
-- False positive `ignored_auth` when the invalid-auth probe dropped the case's other headers.
-- `st fuzz --mode=negative` crash on operations with nothing to negate.
-- Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
-- Configured `User-Agent` missing from `case.headers` in `before_call` hooks in coverage and examples phases.
-- Malformed XML or wrong tags for prefixed nested properties and array items shared via `$ref`.
+
+#### Data generation
+
+- `RecursionError` during generation for arrays whose `items` or `contains` refer back to an enclosing schema.
 - `Failed Health Check` for request bodies with several `$`-anchored `pattern` strings. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
 - `Failed Health Check` for strings whose `pattern` is stricter than their `format`. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)
-- Sign-up and login requests counted as tests in WFC, JUnit, Allure and HTML reports.
-- `ValueError` crash in `use_after_free` and `ensure_resource_availability` for non-ASCII digit `Age` headers.
 - Match custom payload strategies to concrete media types selected from wildcard request declarations.
-- List written reports when `st fuzz` stops on a fatal error like an unreachable schema.
-- Crash and wrong link bodies for request body properties named with non-ASCII digits like `²`.
-- Keep `st fuzz` running past `Inconsistent data generation` errors caused by changing server state.
+
+#### Request serialization
+
+- Serialize XML array items that declare their own `prefix` and `namespace`.
+- Malformed XML or wrong tags for prefixed nested properties and array items shared via `$ref`.
+- Missing boundary in `multipart/mixed` request `Content-Type` headers.
+
+#### Checks
+
+- False positive `negative_data_rejection` for path and query parameters whose sent text is valid.
+- False positive `negative_data_rejection` when configured auth refilled a negated auth header.
+- False results in `response_headers_conformance` for OpenAPI 3.1 type lists and `1_0`-style numbers.
+- False positive `response_headers_conformance` for object-typed response headers.
+- False positive `ignored_auth` when the invalid-auth probe dropped the case's other headers.
+- `ValueError` crash in `use_after_free` and `ensure_resource_availability` for non-ASCII digit `Age` headers.
+
+#### `--rate-limit=auto`
+
+- Show the 429 response for failures on waited-out rate limits with `--rate-limit=auto`.
+- Unchecked retried `429` responses outside stateful testing with `--rate-limit=auto`.
+
+#### Reports
+
+- `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
+- Missing `Identity:` line in JUnit and Allure failure reports.
+- Sign-up and login requests counted as tests in WFC, JUnit, Allure and HTML reports.
+
+#### GraphQL
+
+- `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
+- `AttributeError` crash with `exclude(deprecated=True)` on GraphQL schemas; skip `@deprecated` fields.
+
+#### Others
+
+- Configured `User-Agent` missing from `case.headers` in `before_call` hooks in coverage and examples phases.
 
 ## [4.32.1](https://github.com/schemathesis/schemathesis/compare/v4.32.0...v4.32.1) - 2026-10-19
 
