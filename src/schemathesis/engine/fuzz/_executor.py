@@ -383,9 +383,7 @@ def _send_step(
     """Send the step's request, waiting out rate limits; `None` when a transport error skips the step."""
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
-        _, response = send_tracked(
-            ctx, case, lambda: case.call(**transport_kwargs), transport_kwargs=transport_kwargs, emit=event_queue.put
-        )
+        _, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=event_queue.put)
     except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
         if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.

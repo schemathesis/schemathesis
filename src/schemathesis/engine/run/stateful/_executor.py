@@ -280,9 +280,9 @@ def _send_step(machine: APIStateMachine, case: Case, *, engine: EngineContext, e
     rate_limited, response = send_tracked(
         engine,
         case,
-        lambda: machine.call(case, **kwargs),
         transport_kwargs=kwargs,
         emit=event_queue.put,
+        send=lambda: machine.call(case, **kwargs),
         after_response=lambda response: machine.after_call(response, case),
     )
     return validate_with_rate_limited(
