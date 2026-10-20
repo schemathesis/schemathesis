@@ -34,6 +34,10 @@ class Override:
             if value:
                 yield key, value
 
+    def as_strategy_kwargs(self) -> dict[str, dict[str, str]]:
+        """Overridden parameters keyed by the `Case` container they fill; `body` is not overridable this way."""
+        return {location.container_name: entry for location, entry in self.items()}
+
     def apply_to(self, case: Case) -> None:
         """Merge the overridden parameters into the case's containers; `body` is not overridable this way."""
         for location, entry in self.items():

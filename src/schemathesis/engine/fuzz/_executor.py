@@ -65,13 +65,7 @@ _LINK_BIAS_CHOICES = [True] * 8 + [False] * 2
 
 
 def _build_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, object]:
-    override = overrides.for_operation(ctx.config, operation=operation)
-    # `body` is not part of the parameter override system and is never populated by `for_operation`.
-    return {
-        loc: getattr(override, loc)
-        for loc in ("query", "headers", "cookies", "path_parameters")
-        if getattr(override, loc)
-    }
+    return dict(overrides.for_operation(ctx.config, operation=operation).as_strategy_kwargs())
 
 
 def _build_strategy_inputs(

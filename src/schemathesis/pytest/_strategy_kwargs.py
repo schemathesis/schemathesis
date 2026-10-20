@@ -11,10 +11,7 @@ if TYPE_CHECKING:
 
 def strategy_kwargs_from_config(config: ProjectConfig, operation: APIOperation) -> dict[str, dict[str, str]]:
     """Fixed parameter values from the project config; configured headers win over header overrides."""
-    kwargs: dict[str, dict[str, str]] = {
-        location.container_name: entry
-        for location, entry in overrides.for_operation(config, operation=operation).items()
-    }
+    kwargs = overrides.for_operation(config, operation=operation).as_strategy_kwargs()
     headers = dict(kwargs.get("headers", {}))
     headers.update(config.headers_for(operation=operation))
     if headers:
