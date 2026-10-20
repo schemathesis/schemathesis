@@ -25,6 +25,7 @@ from schemathesis.cli.output import (
     display_filtered_summary,
     display_final_line,
     display_header,
+    display_reports,
     display_section_name,
     display_seed,
     display_test_cases,
@@ -54,7 +55,6 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from schemathesis.cli.commands.run.context import ExecutionContext
-    from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.core.spec import AuthFlowSteps
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
@@ -554,15 +554,6 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
             )
         )
     return blocks
-
-
-def display_reports(ctx: BaseExecutionContext) -> None:
-    reports = ctx.all_reports()
-    if reports:
-        click.echo(style("Reports:", bold=True))
-        for name, path in reports:
-            click.echo(style(f"  - {name}: {path}"))
-        click.echo()
 
 
 def display_warning_blocks(blocks: list[WarningBlock]) -> None:
@@ -1564,13 +1555,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             ),
         )
         self.console.print(Indent(message))
-
-    def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
-        try:
-            super()._on_fatal_error(ctx, event)
-        finally:
-            # Reports are written even when the run stops before testing
-            display_reports(ctx)
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
 

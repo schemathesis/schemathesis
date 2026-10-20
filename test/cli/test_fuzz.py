@@ -364,8 +364,11 @@ def test_fuzz_unmatched_filter_with_fail_on(cli, ctx, config, expected):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_fuzz_fatal_error_loader(cli, snapshot_cli):
-    assert_cli_snapshot(cli.main("fuzz", "http://127.0.0.1:1/openapi.json"), snapshot_cli)
+def test_fuzz_fatal_error_loader(cli, tmp_path, snapshot_cli):
+    assert_cli_snapshot(
+        cli.main("fuzz", "http://127.0.0.1:1/openapi.json", f"--report-junit-path={tmp_path / 'junit.xml'}"),
+        snapshot_cli,
+    )
 
 
 def test_fuzz_fatal_error_loader_omits_wait_for_schema_tip_when_set(cli):
