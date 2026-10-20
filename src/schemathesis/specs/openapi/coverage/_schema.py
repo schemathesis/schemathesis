@@ -1545,6 +1545,13 @@ def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = Fal
         # A reference that stays unresolved overrides everything folded in beside it, so those
         # constraints would silently vanish from the value.
         return None
+    if any(
+        branch.get("additionalProperties", True) is not True
+        and any(other is not branch and other.get("patternProperties") for other in folded_branches)
+        for branch in folded_branches
+    ):
+        # A branch judging the names it does not match would stop judging the ones another branch's patterns match.
+        return None
     merged_names = set(merged.get("properties", {}))
     for branch in folded_branches:
         extra = branch.get("additionalProperties")

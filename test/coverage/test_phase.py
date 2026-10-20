@@ -9376,6 +9376,26 @@ def test_coverage_bodies_match_their_mode(ctx, version, body):
             {},
             id="single_branch_allof_keeps_outer_additional_properties",
         ),
+        # Another branch's `patternProperties` do not exempt names from the outer `additionalProperties: false`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"additionalProperties": False, "minProperties": 1, "allOf": [{"patternProperties": {"": {}}}]},
+            {},
+            {},
+            id="allof_pattern_properties_keep_outer_additional_properties",
+        ),
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "additionalProperties": {"type": "integer"},
+                "required": ["xa"],
+                "allOf": [{"patternProperties": {"^x": {"minimum": 5}}}],
+            },
+            {},
+            {},
+            id="allof_pattern_properties_keep_outer_additional_properties_schema",
+        ),
     ],
 )
 def test_coverage_bodies_match_a_single_mode(ctx, mode, body, schema_kwargs, assert_kwargs):
