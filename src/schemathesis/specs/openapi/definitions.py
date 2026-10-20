@@ -6,7 +6,6 @@ from typing import Any
 import jsonschema_rs
 
 from schemathesis.core.jsonschema import make_validator
-from schemathesis.core.lazy_import import lazy_import
 
 SWAGGER_20 = {
     "title": "A JSON Schema for Swagger 2.0 API.",
@@ -2580,4 +2579,9 @@ _imports = {
 
 
 def __getattr__(name: str) -> Any:
-    return lazy_import(__name__, name, _imports, globals())
+    loader = _imports.get(name)
+    if loader is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = loader()
+    globals()[name] = value
+    return value
