@@ -28,6 +28,7 @@ from schemathesis.core.transport import (
     Response,
     expand_status_code,
     expand_status_codes,
+    response_content_type,
 )
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
@@ -167,15 +168,14 @@ def content_type_conformance(ctx: CheckContext, response: Response, case: Case) 
     documented_content_types = schema.get_content_types(case.operation, response)
     if not documented_content_types:
         return None
-    content_types = response.headers.get("content-type")
-    if not content_types:
+    content_type = response_content_type(response)
+    if content_type is None:
         all_media_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
         raise MissingContentType(
             operation=case.operation.label,
             message=f"The following media types are documented in the schema:{''.join(all_media_types)}",
             media_types=documented_content_types,
         )
-    content_type = content_types[0]
     for option in documented_content_types:
         try:
             expected_main, expected_sub = media_types.parse(option)

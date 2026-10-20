@@ -8,7 +8,7 @@ from urllib.parse import unquote
 from schemathesis.auths import AuthContext
 from schemathesis.core.jsonschema import resolve_with_root_bundle
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transport import SAFE_METHODS
+from schemathesis.core.transport import SAFE_METHODS, response_content_type
 from schemathesis.openapi.checks import ObjectLevelAuthorizationViolation
 from schemathesis.specs.openapi._auth_retry import remove_auth_from_cookie_header, send_probe
 from schemathesis.specs.openapi.adapter.security import declares_security
@@ -67,8 +67,7 @@ def _owner_read(ctx: CheckContext, response: Response, case: Case) -> _OwnerRead
     owner = case._auth_identity
     if provider is None or owner is None or owner not in provider.peers or _declared_public(case.operation):
         return None
-    content_types = response.headers.get("content-type")
-    schema = declared_response_schema(case.operation, response.status_code, content_types[0] if content_types else None)
+    schema = declared_response_schema(case.operation, response.status_code, response_content_type(response))
     return _OwnerRead(ctx, case, response, _json_body(response), schema or {}, provider, owner)
 
 

@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 from schemathesis.core import media_types
 from schemathesis.core.transforms import encode_pointer
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Response, response_content_type
 from schemathesis.engine.recorder import RecordedScenario
 from schemathesis.schemas import APIOperation
 
@@ -85,8 +85,8 @@ class Observations:
         fruitless = self.fruitless_body_scans.get(operation, 0)
         if len(entries) >= MAX_BODY_URL_SAMPLES or fruitless >= MAX_FRUITLESS_BODY_SCANS:
             return
-        content_type = response.headers.get("content-type")
-        if not content_type or not _is_json(content_type[0]):
+        content_type = response_content_type(response)
+        if not content_type or not _is_json(content_type):
             return
         try:
             # Not `response.json()`: its cache was cleared after checks and would pin the parsed body in memory again

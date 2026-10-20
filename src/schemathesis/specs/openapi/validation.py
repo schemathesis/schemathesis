@@ -11,7 +11,7 @@ from schemathesis.core.errors import InvalidSchema, SchemaLocation
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Response, response_content_type
 from schemathesis.openapi.checks import (
     ContentDeserializationError,
     DiscriminatorMismatch,
@@ -47,8 +47,7 @@ def validate_documented_response(
 
     failures: list[Failure] = []
 
-    content_types = response.headers.get("content-type")
-    resolved_content_type = content_types[0] if content_types else None
+    resolved_content_type = response_content_type(response)
 
     resolved = definition.get_schema(resolved_content_type)
     stream = definition.get_stream_schema(resolved.media_type)
