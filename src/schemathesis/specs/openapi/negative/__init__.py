@@ -25,7 +25,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, Jso
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, to_wire_string
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.generation.jsonschema.strategy import DECLINED
@@ -320,16 +320,12 @@ def negative_schema(
         }
 
     def parameter_reads_as_valid(name: str | int, item: object, validator: jsonschema_rs.Validator) -> bool:
-        if isinstance(item, bool):
-            text = "true" if item else "false"
-        elif item is None:
-            text = "null"
-        elif isinstance(item, (str, int, float)):
-            text = str(item)
-        else:
+        if item is not None and not isinstance(item, (str, int, float)):
             return False
         return sent_text_is_valid(
-            text, lambda reading: validator.is_valid({name: reading}), types_by_parameter.get(str(name), [])
+            to_wire_string(item),
+            lambda reading: validator.is_valid({name: reading}),
+            types_by_parameter.get(str(name), []),
         )
 
     def mutated_parameter_reads_as_valid(
