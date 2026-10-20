@@ -3854,12 +3854,7 @@ def _negative_enum(
     # on the positive path, so emit each mismatched entry as a negative to keep the keyword covered.
     declared_types = set(get_type(schema))
     if declared_types:
-        judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
-        types = parameter_types(schema)
-
-        def is_valid(instance: Any) -> bool:
-            return any(judge.is_valid(instance) for judge in judges)
-
+        reads_as_valid = _reads_as_valid(ctx, schema)
         for entry in value:
             entry_type = to_json_type_name(entry)
             if entry_type in declared_types:
@@ -3868,7 +3863,7 @@ def _negative_enum(
             if entry_type == "integer" and "number" in declared_types:
                 continue
             # A parameter entry travels as text the server may read as valid, e.g. `"1"` as `true`.
-            if any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(entry)):
+            if reads_as_valid(entry):
                 continue
             if not ctx.wire.representable(entry) or not seen.insert(entry):
                 continue
@@ -3991,15 +3986,10 @@ def _negative_array_for_conflicting_type(
     # Forcing `type: array` keeps an `example`/`default` describing the declared (non-array) type
     # from validating as a positive array value and leaking through unchanged below.
     array_schema = {**schema, "type": "array"}
-    judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
-    types = parameter_types(schema)
-
-    def is_valid(instance: Any) -> bool:
-        return any(judge.is_valid(instance) for judge in judges)
-
+    reads_as_valid = _reads_as_valid(ctx, schema)
     for value in _cover_positive_for_type(ctx.with_positive(), array_schema, "array"):
         # A parameter array travels as text the server may read as valid, e.g. `[""]` as an empty header.
-        if any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(value.value)):
+        if reads_as_valid(value.value):
             continue
         if value.generation_mode == GenerationMode.POSITIVE:
             yield NegativeValue(
@@ -4174,11 +4164,16 @@ def _sent_text_judge(ctx: CoverageContext, schema: JsonSchemaObject) -> Callable
     # A body array stays an array, and a query array travels as repeated parameters the server reads as one list.
     if ctx.location in (ParameterLocation.BODY, ParameterLocation.QUERY):
         return lambda value: False
+    return _reads_as_valid(ctx, schema)
+
+
+def _reads_as_valid(ctx: CoverageContext, schema: JsonSchema) -> Callable[[Any], bool]:
+    """Whether a server reads one of a value's wire texts as valid under any draft's reading of the schema."""
     judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
     types = parameter_types(schema)
 
     def is_valid(instance: Any) -> bool:
-        return _admitted_by_any(judges, instance)
+        return any(judge.is_valid(instance) for judge in judges)
 
     return lambda value: any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(value))
 
