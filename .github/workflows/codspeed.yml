@@ -25,7 +25,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SCHEMATHESIS_BENCHMARK_SEED: "42"
   PYTHONHASHSEED: "0"
 
 jobs:
