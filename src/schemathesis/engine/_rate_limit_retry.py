@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.rate_limit import (
@@ -10,9 +10,12 @@ from schemathesis.core.rate_limit import (
     RATE_LIMIT_AUTO_REPORT_THRESHOLD,
     parse_retry_after,
 )
+from schemathesis.engine import events
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import Response
+    from schemathesis.engine.context import EngineContext
+    from schemathesis.generation.case import Case
 
 
 def _get_retry_after(response: Response) -> str:
@@ -52,21 +55,45 @@ def call_with_retry(
     return rate_limited, response
 
 
-def call_and_validate_with_retry(
+def send_tracked(
+    ctx: EngineContext,
+    case: Case,
+    send: Callable[[], Response],
     *,
-    call_fn: Callable[[], Response],
-    validate_fn: Callable[[Response], None],
-    auto_mode: bool,
-    on_delay: Callable[[float, int], None],
-) -> Response:
-    """Call and validate an API response, retrying on 429 + Retry-After.
+    transport_kwargs: dict[str, Any],
+    emit: Callable[[events.EngineEvent], None],
+    after_response: Callable[[Response], None] | None = None,
+) -> tuple[list[Response], Response]:
+    """Send a request the outage tracker remembers, waiting out rate limits when configured.
 
-    All 429 responses are validated through the normal check pipeline.
+    `after_response` runs on every answered attempt, including each retried 429.
+    Returns (rate_limited_responses, final_response).
+    """
+
+    def call_fn() -> Response:
+        response = ctx.server.track(case, send, transport_kwargs=transport_kwargs)
+        if after_response is not None:
+            after_response(response)
+        return response
+
+    def on_delay(delay: float, retries_left: int) -> None:
+        emit(events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left))
+
+    return call_with_retry(
+        call_fn=call_fn,
+        auto_mode=ctx.config.rate_limit_for(operation=case.operation) == "auto",
+        on_delay=on_delay,
+    )
+
+
+def validate_with_rate_limited(
+    rate_limited: list[Response], final: Response, validate_fn: Callable[[Response], None]
+) -> Response:
+    """Validate every 429 received before the final response, then the final one.
+
     Failures from 429s are merged with failures from the final response.
     """
-    rate_limited, final = call_with_retry(call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay)
     pending_failures: list[Failure] = []
-
     for response in rate_limited:
         try:
             validate_fn(response)

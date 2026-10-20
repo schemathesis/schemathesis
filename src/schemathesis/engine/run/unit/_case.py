@@ -12,7 +12,7 @@ from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
 from schemathesis.engine import StopReason, events
-from schemathesis.engine._rate_limit_retry import call_with_retry
+from schemathesis.engine._rate_limit_retry import send_tracked
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.errors import (
     TestingState,
@@ -244,19 +244,16 @@ def _call_with_reauth(
     pending_events: list[events.EngineEvent],
 ) -> Response:
     """Call the server, retrying on rate limits and replaying once with fresh credentials when auth expired."""
-    auto_mode = ctx.config.rate_limit_for(operation=case.operation) == "auto"
-
-    def _call() -> Response:
-        return ctx.server.track(case, lambda: case.call(**transport_kwargs), transport_kwargs=transport_kwargs)
-
-    def _on_delay(delay: float, retries_left: int) -> None:
-        pending_events.append(
-            events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left)
-        )
 
     def _perform_call() -> Response:
         try:
-            _, response = call_with_retry(call_fn=_call, auto_mode=auto_mode, on_delay=_on_delay)
+            _, response = send_tracked(
+                ctx,
+                case,
+                lambda: case.call(**transport_kwargs),
+                transport_kwargs=transport_kwargs,
+                emit=pending_events.append,
+            )
         except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
             if isinstance(error.request, requests.Request):
                 recorder.record_request(case_id=case.id, request=error.request.prepare())
