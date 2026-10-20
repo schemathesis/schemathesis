@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.cli.summary import SummaryData
 from schemathesis.config import ReportFormat
 from schemathesis.engine import StopReason, events
 from schemathesis.engine.statistic import Statistic
+from schemathesis.engine.summary import SummaryData
 
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig

@@ -47,6 +47,7 @@ from schemathesis.engine.errors import never_reached_server
 from schemathesis.engine.run import ELASTIC_PHASES, INTERNAL_PHASES, UNIT_PHASES, PhaseName
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
+from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
 
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType
@@ -231,40 +232,6 @@ def _missing_test_data_advice(
         cause,
         "Check the operations that create this data - their responses do not yield usable identifiers",
     )
-
-
-@dataclass(slots=True)
-class WarningItem:
-    text: str
-    # Lines shown under the item, e.g. the patterns an operation could not use.
-    details: list[str] = field(default_factory=list)
-    # Label of the operation the item is about, if any.
-    operation: str | None = None
-
-
-@dataclass(slots=True)
-class WarningGroup:
-    items: list[WarningItem]
-    heading: str | None = None
-    # `None` when the tips that apply follow a later group.
-    tips: list[str] | None = None
-
-
-@dataclass(slots=True)
-class WarningBlock:
-    title: str
-    count: int
-    entity: str
-    # Completes the sentence that starts with the count, e.g. " returned only 401/403 responses".
-    suffix: str
-    groups: list[WarningGroup]
-    # Whether the results may not mean what the verdict says, e.g. every response was 401.
-    affects_verdict: bool = False
-
-    @property
-    def summary(self) -> str:
-        plural = "" if self.count == 1 else "s"
-        return f"{self.count} {self.entity}{plural}{self.suffix}"
 
 
 def _items(values: set[str], *, operations: bool = True) -> list[WarningItem]:

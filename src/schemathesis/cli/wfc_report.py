@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.cli.summary import running_time
 from schemathesis.core.failures import (
     AcceptedNegativeData,
     MalformedJson,
@@ -20,6 +19,7 @@ from schemathesis.core.failures import (
 from schemathesis.core.shell import ShellType, detect_shell
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import EngineFinished, EngineStarted, ScenarioFinished
+from schemathesis.engine.summary import running_time
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     AuthScenario,

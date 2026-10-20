@@ -15,13 +15,6 @@ import click
 
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.cli.summary import (
-    BaselineSummary,
-    ErrorGroup,
-    FailureGroup,
-    OperationsSummary,
-    TestCasesSummary,
-)
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.failures import (
     CustomFailure,
@@ -29,6 +22,13 @@ from schemathesis.core.failures import (
     is_reproducible_failure,
 )
 from schemathesis.core.timing import Instant
+from schemathesis.engine.summary import (
+    BaselineSummary,
+    ErrorGroup,
+    FailureGroup,
+    OperationsSummary,
+    TestCasesSummary,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator

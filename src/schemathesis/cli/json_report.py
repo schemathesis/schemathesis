@@ -6,18 +6,18 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ExitCode
-from schemathesis.cli.summary import running_time
 from schemathesis.core.errors import HookExecutionError, LoaderError
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
 from schemathesis.engine.events import EngineFinished, EngineStarted, FatalError
 from schemathesis.engine.run import INTERNAL_PHASES
+from schemathesis.engine.summary import running_time
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.cli.summary import SummaryData
     from schemathesis.engine import events
+    from schemathesis.engine.summary import SummaryData
 
 
 def _stop_reason(finished: events.EngineFinished | None, exit_code: int) -> str:

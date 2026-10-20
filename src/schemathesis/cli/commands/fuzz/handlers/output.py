@@ -33,12 +33,6 @@ from schemathesis.cli.output import (
     make_console,
     print_lines,
 )
-from schemathesis.cli.summary import (
-    reduce_baseline,
-    reduce_errors,
-    reduce_failures,
-    reduce_test_cases,
-)
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason
@@ -48,6 +42,12 @@ from schemathesis.engine.events import (
     FatalError,
     FuzzScenarioFinished,
     NonFatalError,
+)
+from schemathesis.engine.summary import (
+    reduce_baseline,
+    reduce_errors,
+    reduce_failures,
+    reduce_test_cases,
 )
 
 if TYPE_CHECKING:
