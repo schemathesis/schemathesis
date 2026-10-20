@@ -16,7 +16,6 @@ from schemathesis.core.failures import (
     MalformedJson,
     ResponseTimeExceeded,
     ServerError,
-    format_failures,
 )
 from schemathesis.core.shell import ShellType, detect_shell
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -187,14 +186,7 @@ def export_failures(
                 continue
             found_faults.extend(fault for _, fault in faults)
             distinct_faults.update(key for key, _ in faults)
-            explanation = format_failures(
-                case_id=f"{index}. Test Case ID: {group.case_id}",
-                response=group.response,
-                failures=group.failures,
-                curl=None,
-                auth_identity=group.auth_identity,
-                config=config,
-            )
+            explanation = group.format(index=index, curl=None, config=config)
             lines.append("")
             start = len(lines)
             lines.append(f"# {label}")

@@ -11,7 +11,6 @@ from allure_commons import hookimpl
 from allure_commons.logger import AllureFileLogger
 from allure_commons.model2 import Attachment, Label, Link, StatusDetails, TestResult, TestStepResult
 
-from schemathesis.core.failures import format_failures
 from schemathesis.engine import Status
 from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
@@ -216,12 +215,8 @@ class AllureWriter:
                         name=f"Test Case: {group.case_id}" if group.case_id is not None else "Run check",
                         status="failed",
                         statusDetails=StatusDetails(
-                            message=format_failures(
-                                case_id=None,
-                                response=group.response,
-                                failures=group.failures,
-                                curl=group.code_sample,
-                                config=self._config,
+                            message=group.format(
+                                index=None, curl=group.code_sample, config=self._config, with_identity=False
                             ).lstrip()
                         ),
                         start=result.start,

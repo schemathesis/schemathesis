@@ -10,7 +10,6 @@ from types import TracebackType
 from typing import IO, TYPE_CHECKING
 from xml.etree import ElementTree
 
-from schemathesis.core.failures import format_failures
 from schemathesis.engine import Status
 from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
@@ -65,13 +64,7 @@ class JunitXmlWriter:
         failures = list(failures)
         if failures:
             messages = [
-                format_failures(
-                    case_id=f"{idx}. Test Case ID: {group.case_id}" if group.case_id is not None else None,
-                    response=group.response,
-                    failures=group.failures,
-                    curl=group.code_sample,
-                    config=config,
-                )
+                group.format(index=idx, curl=group.code_sample, config=config, with_identity=False)
                 for idx, group in enumerate(failures, 1)
             ]
             codes = ", ".join(sorted({failure.code for group in failures for failure in group.failures}))

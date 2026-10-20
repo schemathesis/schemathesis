@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.core.failures import Failure, MalformedJson, ResponseTimeExceeded, format_failures
+from schemathesis.core.failures import Failure, MalformedJson, ResponseTimeExceeded
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import FuzzScenarioFinished, ScenarioFinished
@@ -126,14 +126,7 @@ def render(
             if group.case_id is None:
                 continue
             chain = [step.case_id for step in group.steps if step.case_id in interactions]
-            explanation = format_failures(
-                case_id=f"{index}. Test Case ID: {group.case_id}",
-                response=group.response,
-                failures=group.failures,
-                curl=None,
-                auth_identity=group.auth_identity,
-                config=config,
-            )
+            explanation = group.format(index=index, curl=None, config=config)
             # Non-ASCII word characters are not always valid in identifiers.
             slug = re.sub(r"\W+", "_", group.steps[-1].operation, flags=re.ASCII).strip("_").lower()
             lines.extend(["", ""])
