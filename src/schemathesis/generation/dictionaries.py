@@ -22,6 +22,7 @@ from schemathesis.config._dictionaries import (
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import split_body_path
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.value import GeneratedValue, prune_overwritten_constants
 from schemathesis.resources import PoolDraw, SemanticDraw
@@ -318,7 +319,7 @@ def _resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | 
     bundled = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema, dict) else None
     if not isinstance(bundled, dict):
         bundled = {}
-    leaf = _walk_leaf_schema(schema, pointer[1:].split("/"), bundled, ())
+    leaf = _walk_leaf_schema(schema, split_body_path(pointer), bundled, ())
     if leaf is None:
         return None
     # The leaf may reference other bundled definitions, so keep them reachable for validation.
@@ -407,7 +408,7 @@ def build_body_dictionary_overlay_strategy(
         for binding, eligible in eligible_per_binding:
             value = _walk_substitute(
                 value,
-                binding.pointer[1:].split("/"),
+                split_body_path(binding.pointer),
                 _make_replacement(
                     draw=draw,
                     random=random,
@@ -423,7 +424,7 @@ def build_body_dictionary_overlay_strategy(
 
         meta_to_return = existing_meta
         if existing_meta is not None and new_draws:
-            overwritten_segments = [draw_.body_path[1:].split("/") for draw_ in new_draws if draw_.body_path]
+            overwritten_segments = [split_body_path(draw_.body_path) for draw_ in new_draws if draw_.body_path]
             kept = tuple(
                 mutation
                 for mutation in existing_meta.mutations

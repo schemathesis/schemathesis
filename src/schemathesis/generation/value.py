@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.transforms import split_body_path
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -72,7 +73,9 @@ def prune_overwritten_body_constants(
 
 def constant_value_at_draw(value: object, draw: ConstantDraw) -> object:
     path = (
-        tuple(segment for segment in draw.body_path.split("/") if segment) if draw.body_path else (draw.parameter_name,)
+        tuple(segment for segment in split_body_path(draw.body_path) if segment)
+        if draw.body_path
+        else (draw.parameter_name,)
     )
     current = get_at_path(value, path)
     return current.data if isinstance(current, Binary) else current

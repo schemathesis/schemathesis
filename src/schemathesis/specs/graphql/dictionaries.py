@@ -22,6 +22,7 @@ from schemathesis.config._dictionaries import (
     is_graphql_binding_key,
     parse_graphql_path,
 )
+from schemathesis.core.transforms import format_body_path
 from schemathesis.generation.dictionaries import DictionaryDraw
 from schemathesis.specs.graphql._helpers import (
     _root_type_for,
@@ -247,7 +248,7 @@ def _scalar_node(
             parameter_name=argument_path[-1] if argument_path[-1] != WILDCARD else argument_path[-2],
             value=entry_value,
             matches_schema=True,
-            body_path="/" + "/".join(body_path),
+            body_path=format_body_path(body_path),
         )
     )
     return scalar_value_node(scalar_name, entry_value)
