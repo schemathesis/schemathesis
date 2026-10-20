@@ -138,6 +138,15 @@ class CorpusEntry:
         return self.name.removesuffix(".json")
 
 
+# Recycle corpus workers periodically to release accumulated memory.
+MAX_TASKS_PER_CHILD = 50
+
+
+def result_path(out_dir: pathlib.Path, corpus: str, api: str) -> pathlib.Path:
+    """Per-API JSON file under `out_dir`, grouped by corpus."""
+    return out_dir / corpus / f"{api.replace('/', '__')}.json"
+
+
 def _iter_corpus_members(
     corpus: str | None,
     *,

@@ -33,10 +33,12 @@ from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi._caches import clear_all
 from tools.corpus.io import (
     CORPUS_NAMES,
+    MAX_TASKS_PER_CHILD,
     CorpusEntry,
     iter_corpus_refs,
     iter_corpus_streaming,
     load_corpus_entry,
+    result_path,
 )
 from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict
 from tools.coverage.aggregate import aggregate, render_markdown
@@ -51,8 +53,6 @@ from tools.coverage.audit import (
 
 DEFAULT_OUT_DIR = Path("out/coverage")
 _MODE_CHOICES = ("all", *(mode.value for mode in GenerationMode))
-# Recycle workers periodically to release accumulated memory.
-_MAX_TASKS_PER_CHILD = 50
 
 # A pending unit of work: the corpus tarball and the member name to audit.
 _Ref = tuple[str, str]
@@ -73,10 +73,6 @@ def _count_inputs(args: argparse.Namespace) -> int:
     if args.spec is not None:
         return 1
     return sum(1 for _ in iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit))
-
-
-def _result_path(out_dir: Path, result: SchemaResult) -> Path:
-    return out_dir / result.corpus / f"{result.api.replace('/', '__')}.json"
 
 
 class _WorkerKwargs(TypedDict):
@@ -132,7 +128,7 @@ def _process_entry(
         except Exception as exc:
             result.errors.append(error_from_exc("html_report_failed", exc))
 
-    target = _result_path(out_dir, result)
+    target = result_path(out_dir, result.corpus, result.api)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w") as fd:
         json.dump(asdict(result), fd, default=str, indent=2)
@@ -217,9 +213,7 @@ def _run_pool(
     phase = worker_kwargs["phase"]
     cursor = 0
     while cursor < len(queue):
-        executor = ProcessPoolExecutor(
-            max_workers=max_workers, mp_context=ctx, max_tasks_per_child=_MAX_TASKS_PER_CHILD
-        )
+        executor = ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx, max_tasks_per_child=MAX_TASKS_PER_CHILD)
         in_flight: dict[Future[_WorkerOutput], _Ref] = {}
         try:
             while len(in_flight) < max_workers and cursor < len(queue):

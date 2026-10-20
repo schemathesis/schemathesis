@@ -16,22 +16,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from rich.console import Console
 
 from schemathesis.generation import GenerationMode
-from tools.corpus.io import CORPUS_NAMES, CorpusEntry, iter_corpus_refs, load_corpus_entry
+from tools.corpus.io import (
+    CORPUS_NAMES,
+    MAX_TASKS_PER_CHILD,
+    CorpusEntry,
+    iter_corpus_refs,
+    load_corpus_entry,
+    result_path,
+)
 from tools.corpus.locator import load_schema_dict
 from tools.coverage.fingerprint import diff_rows, fingerprint_schema
 
 DEFAULT_OUT_DIR = Path("out/coverage/fingerprints")
-# Recycle workers periodically to release accumulated memory.
-_MAX_TASKS_PER_CHILD = 50
-
-
-def _target(out_dir: Path, entry: CorpusEntry) -> Path:
-    return out_dir / entry.corpus / f"{entry.api.replace('/', '__')}.json"
 
 
 def _write(entry: CorpusEntry, out_dir: Path, modes: list[GenerationMode] | None) -> Path:
     fingerprint = fingerprint_schema(entry.schema, generation_modes=modes)
-    target = _target(out_dir, entry)
+    target = result_path(out_dir, entry.corpus, entry.api)
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = {"api": entry.api, "corpus": entry.corpus, "errors": fingerprint.errors, "rows": fingerprint.rows}
     target.write_text(json.dumps(payload, separators=(",", ":")))
@@ -86,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         _write(load_schema_dict(args.spec), args.out, modes)
     else:
         refs = list(iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit or None))
-        executor = ProcessPoolExecutor(max_workers=args.workers, max_tasks_per_child=_MAX_TASKS_PER_CHILD)
+        executor = ProcessPoolExecutor(max_workers=args.workers, max_tasks_per_child=MAX_TASKS_PER_CHILD)
         with executor:
             work = partial(_process_ref, out_dir=args.out, modes=modes)
             for index, target in enumerate(executor.map(work, refs), 1):
