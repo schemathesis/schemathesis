@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import datetime
 import json
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.events import LoadingFinished
+from schemathesis.cli.summary import running_time
 from schemathesis.core.failures import (
     AcceptedNegativeData,
     MalformedJson,
@@ -265,12 +265,7 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             self.failing_endpoints[case_id] = (_case_operation_id(case), f"{case.method.upper()} {case.path}")
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
-        if self.finished is not None:
-            elapsed = self.finished.running_time
-        elif self.started_at is not None:
-            elapsed = time.time() - self.started_at
-        else:
-            elapsed = 0.0
+        elapsed = running_time(self.started_at, self.finished) or 0.0
         script_path = self.output.with_suffix(".sh")
         exported = export_failures(ctx.statistic, self.failing_endpoints, ctx.config.output, script_path.name)
         document = {
