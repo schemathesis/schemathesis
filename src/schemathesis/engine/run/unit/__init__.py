@@ -26,7 +26,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.spec import Scheduler
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._direct_executor import run_driver
 from schemathesis.engine.run.unit._pool import WORKER_FINISHED, WorkerPool
 from schemathesis.engine.supervisor import SchedulingDirective, Verdict
@@ -450,11 +450,7 @@ def _put_error(
 
 
 def _is_phase_disabled(phases: PhasesConfig, phase: PhaseName) -> bool:
-    return (
-        (phase == PhaseName.EXAMPLES and not phases.examples.enabled)
-        or (phase == PhaseName.FUZZING and not phases.fuzzing.enabled)
-        or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
-    )
+    return phase in UNIT_PHASES and not phases.get_by_name(name=phase).enabled
 
 
 def _put_skipped_scenario(
