@@ -21,6 +21,7 @@
 - False results in `response_headers_conformance` for OpenAPI 3.1 type lists and `1_0`-style numbers.
 - `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
+- Missing `Identity:` line in JUnit and Allure failure reports.
 - `AttributeError` crash with `exclude(deprecated=True)` on GraphQL schemas; skip `@deprecated` fields.
 - False positive `ignored_auth` when the invalid-auth probe dropped the case's other headers.
 - `st fuzz --mode=negative` crash on operations with nothing to negate.

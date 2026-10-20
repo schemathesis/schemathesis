@@ -215,9 +215,7 @@ class AllureWriter:
                         name=f"Test Case: {group.case_id}" if group.case_id is not None else "Run check",
                         status="failed",
                         statusDetails=StatusDetails(
-                            message=group.format(
-                                index=None, curl=group.code_sample, config=self._config, with_identity=False
-                            ).lstrip()
+                            message=group.format(index=None, curl=group.code_sample, config=self._config).lstrip()
                         ),
                         start=result.start,
                         stop=result.stop,

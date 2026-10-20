@@ -41,7 +41,6 @@ class GroupedFailures:
         curl: str | None,
         config: OutputConfig,
         formatter: BlockFormatter | None = None,
-        with_identity: bool = True,
     ) -> str:
         """Render the failures as text, headed by `<index>. Test Case ID: <case id>` when `index` is given."""
         header = f"{index}. Test Case ID: {self.case_id}" if index is not None and self.case_id is not None else None
@@ -50,7 +49,7 @@ class GroupedFailures:
             response=self.response,
             failures=self.failures,
             curl=curl,
-            auth_identity=self.auth_identity if with_identity else None,
+            auth_identity=self.auth_identity,
             formatter=formatter,
             config=config,
         )

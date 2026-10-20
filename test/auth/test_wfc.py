@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from xml.etree import ElementTree
 
 import pytest
 from fastapi import FastAPI
@@ -1323,6 +1324,34 @@ def test_ndjson_records_the_identity(cli, ctx, tmp_path):
     assert seen, "operation was never dispatched"
     # No identity can reach this operation and dropping credentials is no better, so it stops moving.
     assert len(set(seen[-3:])) == 1, f"kept cycling through the chain: {seen}"
+
+
+def test_junit_and_allure_name_the_identity(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+    junit = tmp_path / "junit.xml"
+    allure = tmp_path / "allure-results"
+
+    cli.run(
+        api.schema_url,
+        "--max-examples=8",
+        "--phases=fuzzing",
+        f"--auth-wfc={auth}",
+        "-c",
+        "not_a_server_error",
+        "--include-path=/api/admin-boom/{itemId}",
+        f"--report-junit-path={junit}",
+        f"--report-allure-path={allure}",
+    )
+
+    line = "Identity: admin (reproduce with --auth-wfc-user admin)"
+    assert [failure.text for failure in ElementTree.parse(junit).iter("failure") if line in failure.text] != []
+    messages = [
+        step["statusDetails"]["message"]
+        for path in allure.glob("*-result.json")
+        for step in json.loads(path.read_text()).get("steps", [])
+    ]
+    assert [message for message in messages if line in message] != []
 
 
 def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
