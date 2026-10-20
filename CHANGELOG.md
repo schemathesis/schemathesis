@@ -12,6 +12,7 @@
 - Serialize XML array items that declare their own `prefix` and `namespace`.
 - Use captured values for body fields under digit-named properties.
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.
+- False positive `negative_data_rejection` for path and query parameters whose sent text is valid.
 - Duplicate requests in the coverage phase for operations with a request body.
 - Send a single listed identifier when `st fuzz` follows links from list responses.
 - Missing boundary in `multipart/mixed` request `Content-Type` headers.
