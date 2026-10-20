@@ -9,6 +9,7 @@
 
 ### :bug: Fixed
 
+- `RecursionError` during generation for arrays whose `items` or `contains` refer back to an enclosing schema.
 - Serialize XML array items that declare their own `prefix` and `namespace`.
 - Use captured values for body fields under digit-named properties in the coverage phase.
 - Invalid positive bodies in the coverage phase for `allOf` branches with `patternProperties` beside `additionalProperties`.

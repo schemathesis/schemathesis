@@ -1935,6 +1935,13 @@ CANONICAL_CASES = [
     # `#` names the document itself; canonicalization resolves these cycles before generation sees them.
     ({"type": "object", "properties": {"child": {"$ref": "#"}}}, ()),
     ({"type": "object", "properties": {"kids": {"type": "array", "items": {"$ref": "#"}}}}, ()),
+    # A demanded element pointing back at the document.
+    ({"contains": {"$ref": "#"}}, (lambda value: isinstance(value, list) and len(value) > 0,)),
+    ({"contains": {"required": ["a"], "$ref": "#"}}, (lambda value: isinstance(value, list) and len(value) > 0,)),
+    (
+        {"items": {"required": ["a"], "$ref": "#"}, "maxItems": 2},
+        (lambda value: isinstance(value, list) and len(value) > 0,),
+    ),
     # An array reaching past the demanded element, not only the shortest one that meets the demand.
     ({"type": "array", "items": {"type": "integer"}, "contains": {"const": 1}}, (lambda value: len(value) > 1,)),
     # Two `contains` demands the canonical form keeps side by side; both values land.
