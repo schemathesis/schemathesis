@@ -455,7 +455,7 @@ def attach_filter_chain(
 
 
 def is_deprecated(ctx: HasAPIOperation) -> bool:
-    return ctx.operation.definition.raw.get("deprecated") is True
+    return ctx.operation.schema.is_deprecated(ctx.operation)
 
 
 def parse_expression(expression: str) -> tuple[str, str, Any]:

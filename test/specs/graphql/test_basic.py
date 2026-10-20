@@ -89,6 +89,12 @@ def test_operation_id_filter_selects_nothing(ctx):
     assert list(schema.get_all_operations()) == []
 
 
+def test_exclude_deprecated_fields():
+    schema = schemathesis.graphql.from_file('type Query { active: Int  legacy: Int @deprecated(reason: "old") }')
+    operations = schema.exclude(deprecated=True).get_all_operations()
+    assert [result.ok().label for result in operations] == ["Query.active"]
+
+
 def test_no_strategies_from_examples(ctx):
     assert _books_schema(ctx)["Query"]["getBooks"].get_strategies_from_examples() == []
 

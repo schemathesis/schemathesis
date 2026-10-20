@@ -417,6 +417,10 @@ class GraphQLSchema(BaseSchema):
         return None
 
     @override
+    def is_deprecated(self, operation: APIOperation) -> bool:
+        return operation.definition.raw.deprecation_reason is not None
+
+    @override
     def validate(self) -> None:
         return None
 

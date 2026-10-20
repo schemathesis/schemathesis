@@ -16,6 +16,7 @@
 - Missing boundary in `multipart/mixed` request `Content-Type` headers.
 - `LookupError` crash in VCR reports and garbled HAR bodies for non-UTF-8 response charsets.
 - `FrozenInstanceError` crash in GraphQL testing with `graphql-core` 3.3.
+- `AttributeError` crash with `exclude(deprecated=True)` on GraphQL schemas; skip `@deprecated` fields.
 - False positive `ignored_auth` when the invalid-auth probe dropped the case's other headers.
 - Link inference from response URLs running when `location-headers` is not in `inference.algorithms`.
 - `Failed Health Check` for request bodies with several `$`-anchored `pattern` strings. [#5491](https://github.com/schemathesis/schemathesis/issues/5491)

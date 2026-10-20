@@ -748,6 +748,10 @@ class OpenApiSchema(BaseSchema):
         return operation.definition.raw.get("operationId")
 
     @override
+    def is_deprecated(self, operation: APIOperation) -> bool:
+        return operation.definition.raw.get("deprecated") is True
+
+    @override
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:
