@@ -57,7 +57,7 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
     [node] = parser.parse(expr)
     assert isinstance(node, BodyResponse) and node.pointer is not None
     response = output.response
-    content_type = response.headers.get("content-type", ["application/json"])[0]
+    content_type = nodes.link_media_type(response)
     context = DeserializationContext(operation=output.case.operation, case=output.case)
     document = deserialize_response(response, content_type, context=context)
     matches = resolve_pointer_all(document, node.pointer[1:])

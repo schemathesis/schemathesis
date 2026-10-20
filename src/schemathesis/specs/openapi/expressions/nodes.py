@@ -10,11 +10,18 @@ from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core.deserialization import DeserializationContext, deserialize_response
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer
+from schemathesis.core.transport import Response, response_content_type
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 if TYPE_CHECKING:
     from .extractors import RegexExtractor
+
+
+def link_media_type(response: Response) -> str:
+    """The media type links read a response body as; one without `Content-Type` is read as JSON."""
+    content_type = response_content_type(response)
+    return "application/json" if content_type is None else content_type
 
 
 @dataclass
@@ -157,7 +164,7 @@ class BodyResponse(Node):
 
     def evaluate(self, output: StepOutput) -> Any:
         response = output.response
-        content_type = response.headers.get("content-type", ["application/json"])[0]
+        content_type = link_media_type(response)
 
         context = DeserializationContext(operation=output.case.operation, case=output.case)
         document = deserialize_response(response, content_type, context=context)

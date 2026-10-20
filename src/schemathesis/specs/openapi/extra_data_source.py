@@ -14,6 +14,7 @@ from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transforms import UNRESOLVABLE, format_body_key, resolve_path, split_body_key
+from schemathesis.core.transport import response_content_type
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
@@ -761,10 +762,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
         )
         if not has_descriptors and not semantic_active:
             return
-        content_types = response.headers.get("content-type")
-        if not content_types:
+        content_type = response_content_type(response)
+        if content_type is None:
             return
-        content_type = content_types[0]
         context = deserialization.DeserializationContext(operation=operation, case=case)
         try:
             payload = deserialization.deserialize_response(response, content_type, context=context)

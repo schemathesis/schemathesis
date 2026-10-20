@@ -60,6 +60,12 @@ _UTF8_BOM = b"\xef\xbb\xbf"
 STREAM_CUT_SHORT_ATTRIBUTE = "_schemathesis_stream_cut_short"
 
 
+def response_content_type(response: Response) -> str | None:
+    """The first `Content-Type` value of a response, or `None` when it has no such header."""
+    values = response.headers.get("content-type")
+    return values[0] if values else None
+
+
 def is_event_stream(content_type: str | None) -> bool:
     if content_type is None:
         return False
