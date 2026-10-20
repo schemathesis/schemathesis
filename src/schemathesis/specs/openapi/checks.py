@@ -556,7 +556,7 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
             continue
 
         schema = param.definition.get("schema", {})
-        expected_types = get_type(schema)
+        expected_types = parameter_types(param.validation_schema)
 
         if _declares_type(schema, "array"):
             continue
@@ -596,17 +596,14 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
     return all((mutation.parameter_location, mutation.parameter) in neutralized for mutation in mutations)
 
 
-def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: list[str], wire_value: str) -> bool:
+def _wire_value_matches_parameter(parameter: OpenApiParameter, wire_value: str) -> bool:
     """Check whether the text actually sent for `parameter` satisfies its original schema."""
-    coerced = coerce_wire_string(wire_value, expected_types)
     try:
         validator = make_validator(parameter.validation_schema, parameter.adapter.jsonschema_validator_cls)
     except Exception:
         # Schema rejected by jsonschema_rs - validity is unknown, so don't report a failure.
         return True
-    if coerced is not None:
-        return numeric_wire_value_is_valid(coerced, validator.is_valid)
-    return validator.is_valid(wire_value)
+    return sent_text_is_valid(wire_value, validator.is_valid, parameter_types(parameter.validation_schema))
 
 
 def _type_mutations_become_valid_after_serialization(case: Case) -> bool:
@@ -659,18 +656,17 @@ def _type_mutation_is_valid_on_wire(case: Case, location: ParameterLocation, nam
         return False
 
     value = case_container[name]
-    expected_types = get_type(parameter.definition.get("schema", {}))
     if isinstance(value, (str, int, float)):
         # `str` subclasses like already-encoded path values are rejected by the validator.
         wire_value = str(value)
         # Path parameters are URL-encoded; decode before parsing.
         if location == ParameterLocation.PATH:
             wire_value = unquote(wire_value)
-        return _wire_value_matches_parameter(parameter, expected_types, wire_value)
+        return _wire_value_matches_parameter(parameter, wire_value)
     if location == ParameterLocation.QUERY and isinstance(value, dict):
         # urlencode(doseq=True) iterates over dict keys, producing one query value per key.
         # e.g. {"5": "x"} becomes ?page_size=5, which the server sees as a valid integer.
-        return any(_wire_value_matches_parameter(parameter, expected_types, str(key)) for key in value)
+        return any(_wire_value_matches_parameter(parameter, str(key)) for key in value)
     return False
 
 

@@ -1028,6 +1028,28 @@ def test_negative_data_rejection_ignores_type_mutations_wire_identical_in_every_
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
+@pytest.mark.parametrize(
+    "path_schema",
+    [{"enum": ["5"]}, {"type": ["integer", "string"], "minimum": 10}, {"anyOf": [{"type": "string"}]}],
+    ids=["enum-string", "type-list-minimum", "any-of-string"],
+)
+def test_negative_data_rejection_ignores_path_type_mutation_with_valid_wire_text(ctx, response_factory, path_schema):
+    # Integer `5` reaches the server as the text `5`, which these schemas accept as a string.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": path_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    case = _path_and_query_case(schema, {"id": 5}, None, None, (_PATH_TYPE_MUTATION,))
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
 def test_negative_data_rejection_reports_type_mutation_of_parameter_missing_from_query(ctx, response_factory):
     operation = ctx.openapi.load_operation(
         "GET /items",
@@ -2675,6 +2697,32 @@ def test_negative_data_rejection_single_element_array_element_validity(
             negative_data_rejection(check_context(), response, case)
     else:
         assert negative_data_rejection(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("version", "schema"),
+    [
+        ("3.0.2", {"anyOf": [{"type": "integer"}]}),
+        ("3.0.2", {"oneOf": [{"type": "integer", "minimum": 1}]}),
+        ("3.1.0", {"enum": [12345678901234567890]}),
+    ],
+    ids=["any-of-integer", "one-of-integer", "enum-large-integer"],
+)
+def test_negative_data_rejection_single_element_array_with_untyped_schema(ctx, response_factory, version, schema):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "id", "in": "query", "required": True, "schema": schema}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+    )
+    value = str(schema["enum"][0]) if "enum" in schema else "5"
+    case = operation.Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        query={"id": [value]},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
 def _type_mutation(name, location, new_value):
