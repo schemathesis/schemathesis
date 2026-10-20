@@ -24,6 +24,7 @@ class FuzzExecutionContext(BaseExecutionContext):
     """Execution state for `st fuzz`."""
 
     errors: set[events.NonFatalError] = field(default_factory=set)
+    skip_reasons: dict[str, set[str]] = field(default_factory=dict)
     stop_reason: StopReason = StopReason.COMPLETED
     warning_collector: WarningCollector = field(init=False)
 
@@ -38,6 +39,7 @@ class FuzzExecutionContext(BaseExecutionContext):
                 api_statistic=self.api_statistic,
                 statistic=self.statistic,
                 errors=self.errors,
+                skip_reasons=self.skip_reasons,
                 stop_reason=self.stop_reason,
             ),
             phases={},
@@ -57,6 +59,8 @@ class FuzzExecutionContext(BaseExecutionContext):
             self.statistic.on_scenario_finished(event.recorder, failure_label=lambda case: case.operation.label)
             if event.status in (Status.FAILURE, Status.ERROR):
                 self.exit_code = ExitCode.FAILURES
+        elif isinstance(event, events.ScenarioFinished) and event.label and event.skip_reason is not None:
+            self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
         elif isinstance(event, events.EngineFinished):
             self.stop_reason = event.stop_reason
             # after_run failures arrive here.

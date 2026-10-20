@@ -4,6 +4,7 @@ import queue
 import sys
 import threading
 import time
+import unittest
 import uuid
 import warnings
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from hypothesis.strategies import one_of, sampled_from
 from requests.exceptions import ChunkedEncodingError
 from urllib3.exceptions import InsecureRequestWarning
 
+from schemathesis.core.control import SkipTest
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
@@ -95,6 +97,7 @@ def _preflight_operations(
     active_generation_modes_by_label = {}
     for operation in operations:
         last_exc: Exception | None = None
+        skip_reason: str | None = None
         viable_modes = []
         for mode in generation_modes_by_label[operation.label]:
             try:
@@ -111,6 +114,8 @@ def _preflight_operations(
                 last_exc = build_unsatisfiable_error(
                     operation, with_tip=False, filter_tracker=operation.filter_case_tracker
                 )
+            except (SkipTest, unittest.SkipTest) as exc:
+                skip_reason = str(exc)
             except Exception as exc:
                 # Real generation errors should exclude the operation entirely.
                 last_exc = exc
@@ -119,6 +124,8 @@ def _preflight_operations(
         if viable_modes:
             active_operations.append(operation)
             active_generation_modes_by_label[operation.label] = viable_modes
+        elif last_exc is None and skip_reason is not None:
+            _report_skipped(operation, skip_reason=skip_reason, event_queue=event_queue)
         elif last_exc is not None:
             event_queue.put(
                 events.NonFatalError(
@@ -129,6 +136,24 @@ def _preflight_operations(
                 )
             )
     return active_operations, active_generation_modes_by_label
+
+
+def _report_skipped(operation: APIOperation, *, skip_reason: str, event_queue: queue.Queue[events.EngineEvent]) -> None:
+    started = events.ScenarioStarted(label=operation.label, phase=PhaseName.FUZZING, suite_id=uuid.uuid4())
+    event_queue.put(started)
+    event_queue.put(
+        events.ScenarioFinished(
+            id=started.id,
+            suite_id=started.suite_id,
+            phase=PhaseName.FUZZING,
+            label=operation.label,
+            status=Status.SKIP,
+            recorder=ScenarioRecorder(label=operation.label),
+            elapsed_time=0.0,
+            skip_reason=skip_reason,
+            is_final=True,
+        )
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,6 +362,10 @@ def _draw_case(
     except UnsatisfiedAssumption:
         # Let Hypothesis handle filtered examples.
         raise
+    except SkipTest:
+        # Values pinned by a link can leave nothing to negate; the operation still runs in other steps.
+        excluded_operations.add(operation.label)
+        return None
     except Exception as exc:
         excluded_operations.add(operation.label)
         _report_once(exc, label=operation.label, seen_labels=seen_error_labels, event_queue=event_queue)

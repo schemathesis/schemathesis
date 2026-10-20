@@ -124,7 +124,11 @@ def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx
     api_statistic.operations.total = api_statistic.operations.selected = 2
 
     operations = build_operations(
-        api_statistic=api_statistic, statistic=statistic, errors=set(), stop_reason=StopReason.FAILURE_LIMIT
+        api_statistic=api_statistic,
+        statistic=statistic,
+        errors=set(),
+        skip_reasons={},
+        stop_reason=StopReason.FAILURE_LIMIT,
     )
 
     assert (operations.tested, operations.skipped, operations.skip_reasons) == (1, 1, ["Failure limit reached"])
@@ -965,3 +969,76 @@ def after_call(context, case, response):
     )
     result = cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module)
     assert re.fullmatch(r"=+ Interrupted after \d+\.\d{2}s =+", result.stdout.strip().splitlines()[-1])
+
+
+PING_PATHS = {"/ping": {"get": {"responses": {"200": {"description": "OK"}}}}}
+
+
+def test_fuzz_negative_skips_operations_without_negatable_parts(cli, app_runner, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            **PING_PATHS,
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({}), 400
+
+    result = cli.main("fuzz", app_runner.openapi_url(app), "--mode=negative", "--max-time=1", "--workers=1")
+
+    assert _parse_operations_summary(result.stdout) == (
+        {"selected": 2, "tested": 1, "skipped": 1},
+        {"Impossible to generate negative test cases"},
+    ), result.stdout
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_negative_without_negatable_operations(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(PING_PATHS)
+    assert_cli_snapshot(cli.main("fuzz", app_runner.openapi_url(app), "--mode=negative"), snapshot_cli)
+
+
+# The link fills the only parameter of the follow-up step, so that step has nothing left to negate.
+def test_fuzz_negative_link_leaves_nothing_to_negate(cli, app_runner, ctx):
+    paths = linked_users()
+    paths["/users"]["post"]["parameters"] = [
+        {"name": "name", "in": "query", "required": True, "schema": {"type": "integer"}}
+    ]
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/users", methods=["POST"])
+    def create():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<user_id>")
+    def get(user_id):
+        return jsonify({})
+
+    result = cli.main(
+        "fuzz",
+        app_runner.openapi_url(app),
+        "--mode=negative",
+        "--checks=not_a_server_error",
+        "--max-time=1",
+        "--workers=1",
+    )
+
+    assert _parse_operations_summary(result.stdout) == ({"selected": 2, "tested": 2}, set()), result.stdout
+
+
+def test_fuzz_negative_skips_graphql_operations_without_negatable_parts(cli, ctx):
+    api = ctx.graphql.apps.books()
+
+    result = cli.main("fuzz", api.schema_url, "--mode=negative", "--max-time=1", "--workers=1")
+
+    assert _parse_operations_summary(result.stdout) == (
+        {"selected": 4, "tested": 2, "skipped": 2},
+        {"Impossible to generate negative test cases for this GraphQL operation"},
+    ), result.stdout

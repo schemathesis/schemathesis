@@ -333,6 +333,7 @@ def build_operations(
     api_statistic: ApiStatistic | None,
     statistic: Statistic,
     errors: set[events.NonFatalError],
+    skip_reasons: dict[str, set[str]],
     stop_reason: StopReason,
 ) -> OperationsSummary | None:
     """Operation counts without phase context; `st run` uses `SummaryData.from_run` instead."""
@@ -343,7 +344,7 @@ def build_operations(
         statistic=statistic,
         errors=errors,
         phases={},
-        skip_reasons={},
+        skip_reasons=skip_reasons,
         stop_reason=stop_reason,
         error_phases=None,
     )
