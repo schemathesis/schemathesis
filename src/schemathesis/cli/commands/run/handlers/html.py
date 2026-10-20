@@ -194,12 +194,9 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
     def _operation_rows(self, ctx: BaseExecutionContext) -> Rows:
         statistic = ctx.statistic
 
-        def find_operation(label: str) -> APIOperation | None:
-            return ctx.find_operation_by_label(label) if ctx.find_operation_by_label is not None else None
-
         def names_operation(label: str) -> bool:
             # An operation that failed to load cannot be looked up again, yet its error names it.
-            return label in self.errored_labels or find_operation(label) is not None
+            return label in self.errored_labels or ctx.find_operation(label) is not None
 
         operations: dict[str, APIOperation] = {}
         failing_cases: dict[str, list[FailingCase]] = {}
@@ -217,7 +214,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
                 else:
                     failed_directly.add(label)
                 # Run-level and undeclared-method failures carry labels that name no operation.
-                operation = find_operation(owner)
+                operation = ctx.find_operation(owner)
                 if operation is None:
                     unattributed_cases.append((label, case))
                     unattributed.update(failure.title for failure in group.failures)

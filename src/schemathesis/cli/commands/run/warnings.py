@@ -365,10 +365,9 @@ class WarningCollector:
         # Warnings that explain why valid input was rejected look only at valid input.
         positive = aggregate_status_codes(event.recorder, positive_only=True)
 
-        assert ctx.find_operation_by_label is not None
         assert event.label is not None
         try:
-            operation = ctx.find_operation_by_label(event.label)
+            operation = ctx.find_operation(event.label)
         except RefResolutionError:
             # This error will be reported elsewhere anyway
             return None
@@ -511,8 +510,7 @@ class WarningCollector:
         """Record a warning surfaced via a supervisor-driven scenario skip."""
         assert event.skip_warning is not None
         assert event.label is not None
-        assert ctx.find_operation_by_label is not None
-        operation = ctx.find_operation_by_label(event.label)
+        operation = ctx.find_operation(event.label)
         warnings = self.config.warnings_for(operation=operation)
         if event.skip_warning is SchemathesisWarning.METHOD_NOT_ALLOWED and warnings.should_display(
             SchemathesisWarning.METHOD_NOT_ALLOWED
