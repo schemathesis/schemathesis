@@ -60,6 +60,7 @@ from schemathesis.specs.openapi._auth_retry import (
     send_probe,
     set_auth_for_case,
 )
+from schemathesis.specs.openapi.serialization import COLLECTION_FORMAT_DELIMITERS
 from schemathesis.specs.openapi.utils import (
     coerce_wire_string,
     numeric_wire_value_is_valid,
@@ -207,7 +208,7 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
 @requires_openapi_schema
 @skips_on_unexpected_http_status
 def response_headers_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    from schemathesis.specs.openapi.validation import _maybe_raise_one_or_more
+    from schemathesis.specs.openapi.validation import maybe_raise_one_or_more
 
     # Find the matching response definition
     response_definition = case.operation.responses.find_by_status_code(response.status_code)
@@ -249,15 +250,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
         errors.append(MissingHeaders(operation=case.operation.label, message=message, missing_headers=missing_headers))
 
-    return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
-
-
-_COLLECTION_FORMAT_DELIMITERS = {
-    "csv": ",",
-    "ssv": " ",
-    "tsv": "\t",
-    "pipes": "|",
-}
+    return maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
 
 
 def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
@@ -269,7 +262,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
         # how items are joined into a single header value. Split the wire form into
         # items, then coerce each one against `items` so non-string element types validate.
         collection_format = schema.get("collectionFormat", "csv")
-        delimiter = _COLLECTION_FORMAT_DELIMITERS.get(collection_format)
+        delimiter = COLLECTION_FORMAT_DELIMITERS.get(collection_format)
         if delimiter is None:
             return value
         items_schema = schema.get("items") or {}

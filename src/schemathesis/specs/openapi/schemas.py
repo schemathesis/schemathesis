@@ -61,6 +61,7 @@ from ...hooks import (
     dispatch_before_process_path,
 )
 from ...schemas import APIOperation, APIOperationMap, BaseSchema
+from . import checks  # noqa: F401
 from ._hypothesis import jsonify_python_specific_types, openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
