@@ -286,7 +286,10 @@ def _send_step(machine: APIStateMachine, case: Case, *, engine: EngineContext, e
         after_response=lambda response: machine.after_call(response, case),
     )
     return validate_with_rate_limited(
-        rate_limited, response, lambda response: machine.validate_response(response, case)
+        rate_limited,
+        response,
+        lambda response: machine.validate_response(response, case),
+        lambda response: machine.recorder.record_response(case_id=case.id, response=response),
     )
 
 

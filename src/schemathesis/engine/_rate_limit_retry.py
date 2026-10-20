@@ -89,27 +89,36 @@ def send_tracked(
 
 
 def validate_with_rate_limited(
-    rate_limited: list[Response], final: Response, validate_fn: Callable[[Response], None]
+    rate_limited: list[Response],
+    final: Response,
+    validate_fn: Callable[[Response], None],
+    record_response: Callable[[Response], None],
 ) -> Response:
     """Validate every 429 received before the final response, then the final one.
 
-    Failures from 429s are merged with failures from the final response.
+    Failures from 429s are merged with failures from the final response, and the first failing 429
+    is recorded as the case's response so reports show the response the failure came from.
     """
     pending_failures: list[Failure] = []
+    failing: Response | None = None
     for response in rate_limited:
         try:
             validate_fn(response)
         except FailureGroup as exc:
             pending_failures.extend(f for f in exc.exceptions if isinstance(f, Failure))
+            if failing is None:
+                failing = response
 
     try:
         validate_fn(final)
     except FailureGroup as exc:
-        if pending_failures:
+        if failing is not None:
+            record_response(failing)
             final_failures = [f for f in exc.exceptions if isinstance(f, Failure)]
             raise FailureGroup(pending_failures + final_failures) from None
         raise
 
-    if pending_failures:
+    if failing is not None:
+        record_response(failing)
         raise FailureGroup(pending_failures)
     return final
