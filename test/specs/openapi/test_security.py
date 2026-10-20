@@ -3,6 +3,7 @@ import pytest
 from schemathesis.config._auth import AuthConfig
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.openapi.adapter.security import extract_security_definitions_v3
 from test.utils import run_given
 
@@ -221,6 +222,37 @@ def test_optional_auth_keeps_configured_credentials(ctx):
     @run_given(case=schema["/test"]["GET"].as_strategy(), max_examples=5)
     def test(case):
         assert case.headers == {"Authorization": "Basic dXNlcjpzZWNyZXQ="}
+
+
+@pytest.mark.parametrize(
+    "auth",
+    [
+        {"openapi": {"basicAuth": {"username": "user", "password": "secret"}}},
+        {"basic": {"username": "user", "password": "secret"}},
+    ],
+    ids=["openapi", "basic"],
+)
+def test_configured_auth_skipped_when_negated_alongside_body(ctx, auth):
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "security": [{"basicAuth": []}],
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "object", "required": ["name"]}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+    operation.schema.config.auth = AuthConfig.from_dict(auth)
+    negated_with_body = [
+        case
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 50)
+        if {mutation.parameter for mutation in case.meta.phase.data.mutations} == {"Authorization", None}
+    ]
+    assert negated_with_body
+    assert "Basic dXNlcjpzZWNyZXQ=" not in [case.headers.get("Authorization") for case in negated_with_body]
 
 
 SECURITY_REQUIRED_CASES = [

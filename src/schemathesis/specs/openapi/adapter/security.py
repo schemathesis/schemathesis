@@ -9,7 +9,7 @@ from schemathesis.config._error import ConfigError
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
+from schemathesis.generation.meta import negated_parameters
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.auths import (
     ApiKeyAuthProvider,
@@ -116,20 +116,11 @@ class OpenApiSecurity:
 
     def is_security_param_negated(self, case: Case) -> bool:
         """Return True if this case is in negative mode targeting one of the schema's security parameters."""
-        meta = case.meta
-        if not meta or not meta.generation.mode.is_negative:
-            return False
-        phase_data = meta.phase.data
-        if not isinstance(phase_data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
-            return False
-        mutated_param = phase_data.parameter
-        mutated_location = phase_data.parameter_location
-        if not mutated_param or not mutated_location:
-            return False
-        for definition in self.security_definitions.values():
-            if _matches_security_parameter(definition, mutated_param, mutated_location):
-                return True
-        return False
+        return any(
+            _matches_security_parameter(definition, name, location)
+            for name, location in negated_parameters(case.meta)
+            for definition in self.security_definitions.values()
+        )
 
     def apply_auth(
         self,
