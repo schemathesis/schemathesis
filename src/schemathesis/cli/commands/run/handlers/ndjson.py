@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import partial
-from queue import Queue
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import BackgroundWriterHandler, TextOutput, write_until_finished
@@ -23,9 +22,8 @@ class NdjsonHandler(BackgroundWriterHandler[events.EngineEvent]):
         self,
         output: TextOutput,
         config: ProjectConfig,
-        queue: Queue[events.EngineEvent | None] | None = None,
     ) -> None:
-        super().__init__(queue)
+        super().__init__()
         self.output = output
         self.config = config
 

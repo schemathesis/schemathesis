@@ -86,8 +86,8 @@ class BackgroundWriterHandler(EventHandler, Generic[ItemT]):
 
     __slots__ = ("queue", "worker")
 
-    def __init__(self, queue: Queue[ItemT | None] | None = None) -> None:
-        self.queue: Queue[ItemT | None] = queue or Queue()
+    def __init__(self) -> None:
+        self.queue: Queue[ItemT | None] = Queue()
         self.worker: WriterWorker | None = None
 
     def _start_writer(self, name: str, target: Callable[..., None], **kwargs: object) -> None:
