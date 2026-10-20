@@ -26,7 +26,6 @@ from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.failures import (
     CustomFailure,
     MessageBlock,
-    format_failures,
     is_reproducible_failure,
 )
 from schemathesis.core.timing import Instant
@@ -370,15 +369,11 @@ def display_failures_for_single_test(
     """Display failures for a single operation."""
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
-        case_id = f"{idx}. Test Case ID: {group.case_id}" if group.case_id is not None else None
         replay = replay_command(group, record_crashes=record_crashes)
         click.echo(
-            format_failures(
-                case_id=case_id,
-                response=group.response,
-                failures=group.failures,
+            group.format(
+                index=idx,
                 curl=group.code_sample if replay is None else append_replay_command(group.code_sample, group.case_id),
-                auth_identity=group.auth_identity,
                 formatter=failure_formatter,
                 config=config,
             )

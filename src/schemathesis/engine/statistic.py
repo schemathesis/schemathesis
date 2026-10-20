@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.baseline import failure_identity
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import BlockFormatter, Failure, format_failures
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
@@ -17,6 +17,7 @@ from schemathesis.generation.meta import coverage_scenario, report_label
 
 if TYPE_CHECKING:
     from schemathesis.baseline import Baseline, Identity
+    from schemathesis.config import OutputConfig
     from schemathesis.generation.stateful.state_machine import ExtractedParam, ExtractionFailure, Transition
 
 
@@ -32,6 +33,27 @@ class GroupedFailures:
     auth_identity: str | None = None
     # Requests the failure needs, oldest first; empty when only the code sample is known.
     steps: list[ReproductionStep] = field(default_factory=list)
+
+    def format(
+        self,
+        *,
+        index: int | None,
+        curl: str | None,
+        config: OutputConfig,
+        formatter: BlockFormatter | None = None,
+        with_identity: bool = True,
+    ) -> str:
+        """Render the failures as text, headed by `<index>. Test Case ID: <case id>` when `index` is given."""
+        header = f"{index}. Test Case ID: {self.case_id}" if index is not None and self.case_id is not None else None
+        return format_failures(
+            case_id=header,
+            response=self.response,
+            failures=self.failures,
+            curl=curl,
+            auth_identity=self.auth_identity if with_identity else None,
+            formatter=formatter,
+            config=config,
+        )
 
 
 def _collect_history(recorder: RecordedScenario, node: CaseNode, response: Response) -> list[tuple[Case, Response]]:
