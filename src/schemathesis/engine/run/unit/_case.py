@@ -247,13 +247,7 @@ def _call_with_reauth(
 
     def _perform_call() -> Response:
         try:
-            _, response = send_tracked(
-                ctx,
-                case,
-                lambda: case.call(**transport_kwargs),
-                transport_kwargs=transport_kwargs,
-                emit=pending_events.append,
-            )
+            _, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
         except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
             if isinstance(error.request, requests.Request):
                 recorder.record_request(case_id=case.id, request=error.request.prepare())

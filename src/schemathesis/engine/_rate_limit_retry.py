@@ -25,7 +25,7 @@ def _get_retry_after(response: Response) -> str:
     return value or ""
 
 
-def call_with_retry(
+def _call_with_retry(
     *,
     call_fn: Callable[[], Response],
     auto_mode: bool,
@@ -58,20 +58,22 @@ def call_with_retry(
 def send_tracked(
     ctx: EngineContext,
     case: Case,
-    send: Callable[[], Response],
     *,
     transport_kwargs: dict[str, Any],
     emit: Callable[[events.EngineEvent], None],
+    send: Callable[[], Response] | None = None,
     after_response: Callable[[Response], None] | None = None,
 ) -> tuple[list[Response], Response]:
     """Send a request the outage tracker remembers, waiting out rate limits when configured.
 
-    `after_response` runs on every answered attempt, including each retried 429.
+    `send` defaults to `case.call(**transport_kwargs)`; `after_response` runs on every answered attempt,
+    including each retried 429.
     Returns (rate_limited_responses, final_response).
     """
+    call = send or (lambda: case.call(**transport_kwargs))
 
     def call_fn() -> Response:
-        response = ctx.server.track(case, send, transport_kwargs=transport_kwargs)
+        response = ctx.server.track(case, call, transport_kwargs=transport_kwargs)
         if after_response is not None:
             after_response(response)
         return response
@@ -79,7 +81,7 @@ def send_tracked(
     def on_delay(delay: float, retries_left: int) -> None:
         emit(events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left))
 
-    return call_with_retry(
+    return _call_with_retry(
         call_fn=call_fn,
         auto_mode=ctx.config.rate_limit_for(operation=case.operation) == "auto",
         on_delay=on_delay,
