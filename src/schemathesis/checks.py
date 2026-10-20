@@ -76,13 +76,14 @@ ResponseChecks = list[ResponseCheckEntry]
 
 @dataclass(slots=True)
 class CheckInternals:
-    """Request inputs and scenario history for built-in checks; not a stable API for custom checks."""
+    """Request inputs, scenario history and enabled checks for built-in checks; not a stable API for custom checks."""
 
     override: Override | None
     auth: tuple[str, str] | None
     headers: CaseInsensitiveDict | None
     transport_kwargs: dict[str, Any] | None
     recorder: ScenarioRecorder | None
+    checks: list[CheckFunction]
 
     def find_parent(self, *, case_id: str) -> Case | None:
         if self.recorder is not None:
@@ -121,7 +122,6 @@ class CheckContext:
     """Configuration settings for validation checks."""
     # Undocumented on purpose: built-in checks only, may change without notice.
     internals: CheckInternals
-    _checks: list[CheckFunction]
     phase: PhaseName | None
     """The testing phase this context belongs to, or `None` for standalone validation."""
     auth_enforced_operations: set[str] | None
@@ -130,7 +130,6 @@ class CheckContext:
     __slots__ = (
         "config",
         "internals",
-        "_checks",
         "phase",
         "auth_enforced_operations",
     )
@@ -149,26 +148,27 @@ class CheckContext:
         auth_enforced_operations: set[str] | None = None,
     ) -> None:
         self.config = config
+        checks: list[CheckFunction] = []
+        for check in CHECKS.get_all():
+            if is_check_class(check):
+                continue
+            name = check.__name__
+            if config.get_by_name(name=name).enabled:
+                checks.append(check)
+        if config.max_response_time.enabled:
+            checks.append(max_response_time)
+        if response_checks is not None:
+            checks.extend(build_response_checks(response_checks))
         self.internals = CheckInternals(
             override=override,
             auth=auth,
             headers=headers,
             transport_kwargs=transport_kwargs,
             recorder=recorder,
+            checks=checks,
         )
         self.phase = phase
         self.auth_enforced_operations = auth_enforced_operations
-        self._checks = []
-        for check in CHECKS.get_all():
-            if is_check_class(check):
-                continue
-            name = check.__name__
-            if self.config.get_by_name(name=name).enabled:
-                self._checks.append(check)
-        if self.config.max_response_time.enabled:
-            self._checks.append(max_response_time)
-        if response_checks is not None:
-            self._checks.extend(build_response_checks(response_checks))
 
 
 CheckMethodName = Literal["after_response", "after_run"]

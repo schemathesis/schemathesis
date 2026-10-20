@@ -575,7 +575,7 @@ class Case(Generic[OperationT]):
         )
         if not checks:
             # Default set: built-ins enabled in config + max_response_time + response checks.
-            checks = list(ctx._checks)
+            checks = list(ctx.internals.checks)
         checks = [
             check for check in list(checks) + list(additional_checks or []) if check not in set(excluded_checks or [])
         ]
