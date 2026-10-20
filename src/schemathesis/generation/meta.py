@@ -11,7 +11,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.resources import PoolDraw, SemanticDraw
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
     from schemathesis.generation.case import Case
     from schemathesis.generation.dictionaries import DictionaryDraw
@@ -480,6 +480,20 @@ def _decode_constant_value(value: str | int | float | dict[str, str]) -> str | i
     if isinstance(value, dict):
         return base64.b64decode(value[_BYTES_TAG])
     return value
+
+
+def negated_parameters(meta: CaseMetadata | None) -> Iterator[tuple[str, ParameterLocation]]:
+    """Named parameters a negative case mutated, including each one when it mutates several components."""
+    if meta is None or not meta.generation.mode.is_negative:
+        return
+    data = meta.phase.data
+    if not isinstance(data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
+        return
+    if data.parameter is not None and data.parameter_location is not None:
+        yield data.parameter, data.parameter_location
+    for mutation in data.mutations:
+        if mutation.parameter is not None:
+            yield mutation.parameter, mutation.parameter_location
 
 
 def coverage_scenario(case: Case) -> CoverageScenario | None:

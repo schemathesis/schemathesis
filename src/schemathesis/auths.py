@@ -21,7 +21,7 @@ from schemathesis.core.errors import AuthenticationError, IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
-from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
+from schemathesis.generation.meta import negated_parameters
 
 if TYPE_CHECKING:
     import requests.auth
@@ -533,15 +533,7 @@ def apply_basic_auth(case: Case, username: str, password: str) -> None:
 
 def _should_skip_auth_for_negative_testing(case: Case, param_name: str, param_location: ParameterLocation) -> bool:
     """Check if auth should be skipped because the parameter was intentionally removed for testing."""
-    meta = case.meta
-    if not meta or not meta.generation.mode.is_negative:
-        return False
-
-    phase_data = meta.phase.data
-    if not isinstance(phase_data, FuzzingPhaseData | CoveragePhaseData | StatefulPhaseData):
-        return False
-
-    return phase_data.parameter == param_name and phase_data.parameter_location == param_location
+    return (param_name, param_location) in negated_parameters(case.meta)
 
 
 def set_on_generated_case(
