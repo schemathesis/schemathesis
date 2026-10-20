@@ -350,19 +350,39 @@ def _items(entries: list[Entry]) -> dict[str, dict[str, Any]]:
     return items
 
 
+# Maps keyed by names the document picks, where an entry called `content` is not a body.
+NAMED_MAPS = frozenset(
+    {
+        "callbacks",
+        "content",
+        "encoding",
+        "examples",
+        "headers",
+        "links",
+        "patternProperties",
+        "properties",
+        "variables",
+        "$defs",
+        "dependentSchemas",
+    }
+)
+
+
 def _rewritten(document: dict[str, Any], media_types: list[str], spec: Spec) -> dict[str, Any]:
     """Every reference resolves, and every body is written in a media type that can be encoded."""
     pointer = spec.seed_pointer
 
-    def walk(value: JsonValue) -> JsonValue:
+    def walk(value: JsonValue, *, named: bool = False) -> JsonValue:
         if isinstance(value, dict):
-            result: dict[str, JsonValue] = {key: walk(item) for key, item in value.items()}
+            result: dict[str, JsonValue] = {
+                key: walk(item, named=not named and key in NAMED_MAPS) for key, item in value.items()
+            }
             if isinstance(result.get("$ref"), str):
                 result["$ref"] = pointer
             if isinstance(result.get("externalValue"), str):
                 result["externalValue"] = EXTERNAL_VALUE
             content = result.get("content")
-            if isinstance(content, dict):
+            if isinstance(content, dict) and not named:
                 entries = list(content.values()) or [{"schema": {"$ref": pointer}}]
                 result["content"] = {
                     media_types[index % len(media_types)]: entry for index, entry in enumerate(entries)
@@ -512,6 +532,18 @@ def test_repointed_references_keep_parameters_unique(version):
         _hostile_document(version, {}), [Entry(item, "get", _OK_RESPONSES)], [], ["application/json"], spec=spec
     )
     assert document["paths"]["/p0"]["post"]["parameters"] == [{"$ref": spec.seed_pointer}]
+
+
+@pytest.mark.parametrize("version", ["3.0", "3.1"])
+def test_entries_named_content_keep_their_value(version):
+    spec = SPECS[version]
+    media_type = {"encoding": {"content": {"style": "form"}}}
+    operation = {**_OK_RESPONSES, "requestBody": {"content": {"application/json": media_type}}}
+    document = _assemble(
+        _hostile_document(version, {}), [Entry({}, "post", operation)], [], ["application/json"], spec=spec
+    )
+    assert document["paths"]["/p0"]["post"]["requestBody"]["content"] == {"application/json": media_type}
+    assert spec.validator.is_valid(document)
 
 
 def test_operation_media_types_are_encodable():
