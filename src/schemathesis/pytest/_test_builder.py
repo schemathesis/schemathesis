@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING
 import hypothesis
 
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.generation import derive_operation_seed
+from schemathesis.generation import derive_operation_seed, overrides
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import GivenInput
-from schemathesis.pytest._strategy_kwargs import strategy_kwargs_from_config
 
 if TYPE_CHECKING:
     from schemathesis.config import PhasesConfig, ProjectConfig
@@ -50,7 +49,7 @@ def build_operation_test(
             modes=modes,
             seed=derive_operation_seed(config.seed, operation.label),
             project=config,
-            as_strategy_kwargs=strategy_kwargs_from_config(config, operation),
+            as_strategy_kwargs=overrides.strategy_kwargs_for(config, operation=operation),
             given_kwargs=given_kwargs,
             feedback=feedback,
         ),
