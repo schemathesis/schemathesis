@@ -445,7 +445,7 @@ def _validate_step_response(
         case=case,
         stateful_ctx=ctx,
         check_ctx=check_ctx,
-        checks=check_ctx._checks,
+        checks=check_ctx.internals.checks,
         control=engine.control,
         recorder=recorder,
         additional_checks=additional_checks,

@@ -48,7 +48,7 @@ def validate_response(
         case=case,
         response=response,
         ctx=ctx,
-        checks=ctx._checks,
+        checks=ctx.internals.checks,
         on_failure=on_failure,
         on_success=on_success,
     )
