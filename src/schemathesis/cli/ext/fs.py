@@ -5,15 +5,13 @@ from typing import TYPE_CHECKING
 
 import click
 
-from schemathesis.core.fs import ensure_parent
-
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
 
 
 def open_file(file: Path, option: str | None) -> None:
     try:
-        ensure_parent(file, fail_silently=False)
+        file.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     except (OSError, ValueError) as exc:
         raise click.BadParameter(
             f"Could not create parent directory for '{display_path(file)}': {describe_path_error(exc)}",
