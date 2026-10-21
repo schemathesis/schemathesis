@@ -36,12 +36,10 @@ from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
-    ExamplesPhaseData,
-    FuzzingPhaseData,
     GenerationInfo,
     PhaseInfo,
-    StatefulPhaseData,
     TestPhase,
+    build_phase_data,
 )
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.schemas import (
@@ -691,27 +689,6 @@ def graphql_cases(
     query_ = _generate_parameter(ParameterLocation.QUERY, query, draw, operation, hook_context, hooks)
 
     description = "Positive test case" if effective_mode == GenerationMode.POSITIVE else "Negative test case"
-    _phase_data = {
-        TestPhase.EXAMPLES: ExamplesPhaseData(
-            description=description,
-            parameter=None,
-            parameter_location=None,
-            location=None,
-        ),
-        TestPhase.FUZZING: FuzzingPhaseData(
-            description=description,
-            parameter=None,
-            parameter_location=None,
-            location=None,
-        ),
-        TestPhase.STATEFUL: StatefulPhaseData(
-            description=description,
-            parameter=None,
-            parameter_location=None,
-            location=None,
-        ),
-    }[phase]
-    phase_data = cast(ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData, _phase_data)
     instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,
@@ -723,7 +700,7 @@ def graphql_cases(
                 time=started_at.elapsed,
                 mode=effective_mode,
             ),
-            phase=PhaseInfo(name=phase, data=phase_data),
+            phase=PhaseInfo(name=phase, data=build_phase_data(phase, description)),
             components={
                 kind: ComponentInfo(mode=effective_mode)
                 for kind, value in [

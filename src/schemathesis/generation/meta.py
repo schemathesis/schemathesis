@@ -151,6 +151,33 @@ class ExamplesPhaseData:
     mutations: tuple[Mutation, ...] = ()
 
 
+PhaseData = ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData
+
+_PHASE_DATA_TYPES: dict[TestPhase, type[PhaseData]] = {
+    TestPhase.EXAMPLES: ExamplesPhaseData,
+    TestPhase.FUZZING: FuzzingPhaseData,
+    TestPhase.STATEFUL: StatefulPhaseData,
+}
+
+
+def build_phase_data(
+    phase: TestPhase,
+    description: str | None,
+    *,
+    parameter: str | None = None,
+    parameter_location: ParameterLocation | None = None,
+    location: str | None = None,
+    mutations: tuple[Mutation, ...] = (),
+) -> PhaseData:
+    return _PHASE_DATA_TYPES[phase](
+        description=description,
+        parameter=parameter,
+        parameter_location=parameter_location,
+        location=location,
+        mutations=mutations,
+    )
+
+
 @dataclass(slots=True)
 class CoveragePhaseData:
     """Metadata specific to coverage phase."""
