@@ -16,7 +16,7 @@ from schemathesis.core.cache.models import FORMAT_VERSION
 from schemathesis.core.errors import LoaderError
 from schemathesis.specs.openapi.object_authorization import apply_as
 from schemathesis.wfc.converter import wfc_to_auth_provider
-from schemathesis.wfc.errors import WFCLoginError, WFCValidationError
+from schemathesis.wfc.errors import WFCLoginError, WFCTokenExtractionError, WFCValidationError
 from schemathesis.wfc.escalation import escalating_provider, identity_assignments, restore_identity_assignments
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
@@ -359,6 +359,19 @@ def test_wfc_wsgi_login_applies_token():
     case = operation.Case()
     provider.set(case, provider.get(case, context), context)
     assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
+def test_wfc_wsgi_login_missing_header_lists_header_names():
+    app = wfc_apps.wfc_login().server
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/api/protected"]["GET"]
+    provider = _provider_for(_login(token=_token(extractFrom="header", extractSelector="X-Absent")))
+    context = AuthContext(operation=operation, app=app)
+    with pytest.raises(WFCTokenExtractionError) as exc:
+        provider.get(operation.Case(), context)
+    assert str(exc.value) == (
+        "Header 'X-Absent' not found in response. "
+        "Available headers: 'Content-Type', 'Content-Length', 'X-Auth-Token', 'Set-Cookie'"
+    )
 
 
 def test_wfc_asgi_login_applies_token():
