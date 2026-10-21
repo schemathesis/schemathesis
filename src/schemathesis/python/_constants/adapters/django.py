@@ -8,15 +8,15 @@ class DjangoAdapter:
 
     def matches(self, app: object) -> bool:
         try:
-            from django.core.handlers.base import BaseHandler  # type: ignore[import-not-found, unused-ignore]
+            from django.core.handlers.base import BaseHandler
         except ImportError:  # pragma: no cover
             return False
         return isinstance(app, BaseHandler)
 
     def handlers(self, app: object) -> Iterable[Callable[..., object]]:
         try:
-            from django.urls import get_resolver  # type: ignore[import-not-found, unused-ignore]
-            from django.urls.resolvers import URLPattern, URLResolver  # type: ignore[import-not-found, unused-ignore]
+            from django.urls import get_resolver
+            from django.urls.resolvers import URLPattern, URLResolver
         except ImportError:  # pragma: no cover
             return []
 

@@ -373,7 +373,9 @@ def negative_schema(
                 lambda value: (
                     filter_values(value, chosen)
                     # Parameter containers are always objects.
-                    and not mutated_parameter_reads_as_valid(cast("dict[str, Any]", value), metadata, parameter_validator)
+                    and not mutated_parameter_reads_as_valid(
+                        cast("dict[str, Any]", value), metadata, parameter_validator
+                    )
                 )
             )
         else:
