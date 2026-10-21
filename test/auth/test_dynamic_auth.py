@@ -512,17 +512,70 @@ def test_dynamic_auth_unsupported_scheme_type_reported(ctx, cli, app_runner, sna
     )
 
 
-def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
-    app = _protected_app(ctx, "BearerAuth", {"type": "http", "scheme": "bearer"})
+def _token_body(token):
+    return jsonify({"access_token": token})
+
+
+def _session_cookie(token):
+    response = jsonify({})
+    response.set_cookie("SESSION", token, path="/")
+    return response
+
+
+@pytest.mark.parametrize(
+    ("scheme_name", "scheme", "overrides", "issue", "read_credential", "token", "expected"),
+    [
+        (
+            "BearerAuth",
+            {"type": "http", "scheme": "bearer"},
+            {},
+            _token_body,
+            lambda: request.headers.get("Authorization", ""),
+            "dynamic-token",
+            "Bearer dynamic-token",
+        ),
+        (
+            "SessionCookie",
+            {"type": "apiKey", "in": "cookie", "name": "SESSION"},
+            {"extract_from": "cookie", "extract_selector": "SESSION"},
+            _session_cookie,
+            lambda: request.cookies.get("SESSION"),
+            "s3ss10nt0k3n",
+            "s3ss10nt0k3n",
+        ),
+        (
+            "OAuth2",
+            OAUTH2_SCHEME,
+            {},
+            _token_body,
+            lambda: request.headers.get("Authorization", ""),
+            "dynamic-token",
+            "Bearer dynamic-token",
+        ),
+        (
+            "ApiKeyAuth",
+            {"type": "apiKey", "in": "header", "name": "X-API-Key"},
+            {},
+            _token_body,
+            lambda: request.headers.get("X-API-Key", ""),
+            "dynamic-key",
+            "dynamic-key",
+        ),
+    ],
+    ids=["bearer", "cookie", "oauth2", "api-key"],
+)
+def test_dynamic_auth_integration(
+    ctx, cli, app_runner, snapshot_cli, scheme_name, scheme, overrides, issue, read_credential, token, expected
+):
+    app = _protected_app(ctx, scheme_name, scheme)
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
-        return jsonify({"access_token": "dynamic-token"})
+        return issue(token)
 
     @app.route("/protected")
     def protected():
-        auth = request.headers.get("Authorization", "")
-        if auth != "Bearer dynamic-token":
+        if read_credential() != expected:
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
 
@@ -535,37 +588,7 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
             "--phases=fuzzing",
             "--mode=positive",
             "-n 3",
-            config={"auth": _dynamic_auth("BearerAuth")},
-        )
-        == snapshot_cli
-    )
-
-
-def test_dynamic_auth_cookie_integration(ctx, cli, app_runner, snapshot_cli):
-    app = _protected_app(ctx, "SessionCookie", {"type": "apiKey", "in": "cookie", "name": "SESSION"})
-
-    @app.route("/api/auth", methods=["POST"])
-    def auth_endpoint():
-        response = jsonify({})
-        response.set_cookie("SESSION", "s3ss10nt0k3n", path="/")
-        return response
-
-    @app.route("/protected")
-    def protected():
-        if request.cookies.get("SESSION") != "s3ss10nt0k3n":
-            return jsonify({"error": "unauthorized"}), 401
-        return jsonify({"result": "ok"})
-
-    assert (
-        _run_cli(
-            cli,
-            app_runner,
-            app,
-            "--include-path=/protected",
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 3",
-            config={"auth": _dynamic_auth("SessionCookie", extract_from="cookie", extract_selector="SESSION")},
+            config={"auth": _dynamic_auth(scheme_name, **overrides)},
         )
         == snapshot_cli
     )
@@ -874,35 +897,6 @@ def test_api(case):
     result.assert_outcomes(passed=1)
 
 
-def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
-    app = _protected_app(ctx, "OAuth2", OAUTH2_SCHEME)
-
-    @app.route("/api/auth", methods=["POST"])
-    def auth_endpoint():
-        return jsonify({"access_token": "dynamic-token"})
-
-    @app.route("/protected")
-    def protected():
-        auth = request.headers.get("Authorization", "")
-        if auth != "Bearer dynamic-token":
-            return jsonify({"error": "unauthorized"}), 401
-        return jsonify({"result": "ok"})
-
-    assert (
-        _run_cli(
-            cli,
-            app_runner,
-            app,
-            "--include-path=/protected",
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 3",
-            config={"auth": _dynamic_auth("OAuth2")},
-        )
-        == snapshot_cli
-    )
-
-
 @pytest.mark.parametrize("cache_by_key", [None, lambda case, ctx: "k"], ids=["unkeyed", "keyed"])
 def test_refresh_auth_refetches(auth_operation, cache_by_key):
     tokens = iter(["old", "new"])
@@ -1036,7 +1030,7 @@ def test_refresh_auth_keeps_static_scheme(ctx):
 
 
 # Single-use token 401s after first use; the hook re-authenticates and replays so the recorded response is the recovered 2xx.
-def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
+def test_reauth_recovers_expired_token(ctx, cli, app_runner, tmp_path, snapshot_cli, snapshot_html):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/protected": {
@@ -1055,42 +1049,9 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
         },
     )
     state = _register_single_use_token(app)
-
-    result = _run_cli(
-        cli,
-        app_runner,
-        app,
-        "--include-path=/protected",
-        "--phases=fuzzing",
-        "--mode=positive",
-        "-n 4",
-        config={
-            "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
-            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
-        },
-    )
-    assert result == snapshot_cli
-    assert state["issued"] >= 2
-
-
-def test_reauth_count_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_html):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/protected": {
-                "get": {
-                    "operationId": "getProtected",
-                    "security": [{"OAuth2": []}],
-                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
-                }
-            }
-        },
-        components={"securitySchemes": {"OAuth2": OAUTH2_SCHEME}},
-    )
-    _register_single_use_token(app)
     report_dir = tmp_path / "report"
 
-    _run_cli(
+    result = _run_cli(
         cli,
         app_runner,
         app,
@@ -1105,6 +1066,8 @@ def test_reauth_count_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_ht
             "auth": _dynamic_auth("OAuth2", retry_on=[401]),
         },
     )
+    assert result == snapshot_cli
+    assert state["issued"] >= 2
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 
 
@@ -1164,35 +1127,6 @@ def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner):
         config={"auth": _dynamic_auth("ApiKeyAuth", retry_on=[401])},
     )
     assert token_requests == ["/api/auth"]
-
-
-def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
-    app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})
-
-    @app.route("/api/auth", methods=["POST"])
-    def auth_endpoint():
-        return jsonify({"access_token": "dynamic-key"})
-
-    @app.route("/protected")
-    def protected():
-        key = request.headers.get("X-API-Key", "")
-        if key != "dynamic-key":
-            return jsonify({"error": "unauthorized"}), 401
-        return jsonify({"result": "ok"})
-
-    assert (
-        _run_cli(
-            cli,
-            app_runner,
-            app,
-            "--include-path=/protected",
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 3",
-            config={"auth": _dynamic_auth("ApiKeyAuth")},
-        )
-        == snapshot_cli
-    )
 
 
 # A no-auth operation's incidental 401 must not trigger a re-authentication that invalidates the shared token cache.
