@@ -61,7 +61,7 @@ def prune_overwritten_constants(
 
 
 def prune_overwritten_body_constants(
-    constants_draws: tuple[ConstantDraw, ...], body: JsonValue
+    constants_draws: tuple[ConstantDraw, ...], body: object
 ) -> tuple[ConstantDraw, ...]:
     """Prune only body-location draws against `body`; other locations aren't part of the body."""
     if not constants_draws:

@@ -180,7 +180,10 @@ class _ValidRuleFallbackFlags:
             return True
         if self._any_valid_enabled is None:
             self._any_valid_enabled = any(
-                self.flags.is_enabled(rule.function.__name__) for rule in self.rules.rules if self.rules.is_valid(rule)
+                self.flags.is_enabled(rule.function.__name__)
+                for rule in self.rules.rules
+                # Private Hypothesis method without annotations.
+                if self.rules.is_valid(rule)  # type: ignore[no-untyped-call]
             )
         return not self._any_valid_enabled
 
@@ -234,7 +237,7 @@ class APIStateMachine(RuleBasedStateMachine):
     # This is a convenience attribute, which happened to clash with `RuleBasedStateMachine` instance level attribute
     # They don't interfere, since it is properly overridden on the Hypothesis side, but it is likely that this
     # attribute will be renamed in the future
-    bundles: ClassVar[dict[str, CaseInsensitiveDict]]
+    bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore[misc, assignment]
     schema: BaseSchema
     # Names of rules that can start a scenario.
     root_rules: ClassVar[frozenset[str]] = frozenset()
@@ -257,13 +260,15 @@ class APIStateMachine(RuleBasedStateMachine):
         rules = self._rules_strategy
         if self.rule_order_seed is not None and self.root_rules:
             _shuffle_root_rules(rules, type(self), self.rule_order_seed)
+        # Hypothesis only calls `is_enabled` on the drawn flags, which the fallback provides.
         rules.enabled_rules_strategy = rules.enabled_rules_strategy.map(
-            lambda flags: _ValidRuleFallbackFlags(flags, rules)
+            lambda flags: _ValidRuleFallbackFlags(flags, rules)  # type: ignore[arg-type, return-value]
         )
         self.setup()
 
+    # Hypothesis memoizes the base method with `lru_cache`; this one caches on the class instead.
     @classmethod
-    def _to_test_case(cls) -> type:
+    def _to_test_case(cls) -> type:  # type: ignore[override]
         # Memoized on the class itself: Hypothesis reads `TestCase` whenever it instantiates a machine,
         # and a process-wide cache would keep every state machine class alive.
         cached = cls.__dict__.get("_test_case_class")
@@ -271,7 +276,8 @@ class APIStateMachine(RuleBasedStateMachine):
             return cached
         from schemathesis.generation.stateful import run_state_machine_as_test
 
-        class StateMachineTestCase(RuleBasedStateMachine.TestCase):
+        # `TestCase` is a descriptor that Hypothesis resolves to a `unittest.TestCase` subclass.
+        class StateMachineTestCase(RuleBasedStateMachine.TestCase):  # type: ignore[valid-type, misc]
             settings = DEFAULT_STATE_MACHINE_SETTINGS
 
             def runTest(self) -> None:
@@ -343,7 +349,8 @@ class APIStateMachine(RuleBasedStateMachine):
 
     def _new_name(self, target: str) -> str:
         target = normalize_name(target)
-        return super()._new_name(target)
+        # Private Hypothesis method without annotations.
+        return super()._new_name(target)  # type: ignore[no-untyped-call]
 
     def bundle(self, name: str) -> CaseInsensitiveDict | tuple[()]:
         # Availability checks should not populate response storage with empty entries.
@@ -357,7 +364,8 @@ class APIStateMachine(RuleBasedStateMachine):
             return
         target = self._get_target_for_result(result)
         if target is not None:
-            super()._add_result_to_targets((target,), result)
+            # Hypothesis <=6.131.15 only; newer versions call `_add_results_to_targets`.
+            super()._add_result_to_targets((target,), result)  # type: ignore[misc]
 
     def _add_results_to_targets(self, targets: tuple[str, ...], results: list[StepOutput | None]) -> None:
         # Hypothesis >6.131.15
@@ -366,7 +374,8 @@ class APIStateMachine(RuleBasedStateMachine):
                 continue
             target = self._get_target_for_result(result)
             if target is not None:
-                super()._add_results_to_targets((target,), [result])
+                # Private Hypothesis method without annotations.
+                super()._add_results_to_targets((target,), [result])  # type: ignore[no-untyped-call]
 
     @classmethod
     def run(cls, *, settings: hypothesis.settings | None = None) -> None:
