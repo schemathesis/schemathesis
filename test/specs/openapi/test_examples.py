@@ -2232,6 +2232,15 @@ def content(schema, **kwargs):
             [],
         ),
         (
+            content(
+                {"$ref": "#/components/schemas/Item"},
+                examples={"Text": "some value text", "Number": 5, "Example1": {"value": {"id": "123456"}}},
+            ),
+            [
+                ("Item", {"id": "123456"}),
+            ],
+        ),
+        (
             content({"$ref": "#/components/schemas/Item"}, **{"x-examples": {"Example1": {"value": {"id": "123456"}}}}),
             [
                 ("Item", {"id": "123456"}),

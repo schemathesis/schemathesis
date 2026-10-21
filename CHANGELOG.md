@@ -6,6 +6,7 @@
 
 - Crash on WSGI apps for `application/x-www-form-urlencoded` bodies that are arrays or scalars.
 - Missing VCR/HAR entries for stateful and `st fuzz` network errors, and `st fuzz` curl reproductions.
+- Crash on non-object entries in response `examples`.
 - `pytest` failing with `Unknown config option: timeout` for tests under `/app` in Docker images.
 
 ## [4.32.2](https://github.com/schemathesis/schemathesis/compare/v4.32.1...v4.32.2) - 2026-10-20
