@@ -25,7 +25,7 @@ def default_settings() -> settings:
 T = TypeVar("T")
 
 
-def generate_one(strategy: st.SearchStrategy[T], suppress_health_check: list | None = None) -> T:  # type: ignore[type-var]
+def generate_one(strategy: st.SearchStrategy[T], suppress_health_check: list | None = None) -> T:
     examples: list[T] = []
     add_single_example(strategy, examples, suppress_health_check)
     return examples[0]
@@ -53,12 +53,13 @@ def _add_examples(
     if suppress_health_check is not None:
         applied_settings = settings(applied_settings, suppress_health_check=suppress_health_check)
 
-    @given(strategy)  # type: ignore[untyped-decorator]
-    @applied_settings  # type: ignore[untyped-decorator]
+    @given(strategy)
+    @applied_settings
     def example_generating_inner_function(ex: T) -> None:
         examples.append(ex)
 
-    example_generating_inner_function._hypothesis_internal_database_key = b""
+    # Private Hypothesis attribute that sets the example database key; there is no public API for it.
+    example_generating_inner_function._hypothesis_internal_database_key = b""  # type: ignore[attr-defined]
 
     # Seed strategy draws so `generate_one(strategy)` is deterministic across processes.
     example_generating_inner_function = seed(0)(example_generating_inner_function)

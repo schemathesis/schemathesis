@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from schemathesis.core.errors import InvalidRateLimit
 
 if TYPE_CHECKING:
-    from pyrate_limiter import Limiter
+    from pyrate_limiter import Duration, Limiter
 
 RATE_LIMIT_AUTO_MAX_WAIT = 60
 RATE_LIMIT_AUTO_MAX_RETRIES = 3
@@ -20,7 +20,7 @@ def ratelimit(rate_limiter: Limiter | str | None, base_url: str | None) -> Abstr
     """Limit the rate of sending generated requests."""
     from pyrate_limiter import Limiter
 
-    label = urlparse(base_url).netloc
+    label = urlparse(base_url or "").netloc
     if isinstance(rate_limiter, Limiter):
         rate_limiter.try_acquire(label)
     return nullcontext()
@@ -52,7 +52,7 @@ def parse_retry_after(header_value: str) -> float | None:
         return None
 
 
-def parse_units(rate: str) -> tuple[int, int]:
+def parse_units(rate: str) -> tuple[int, Duration]:
     from pyrate_limiter import Duration
 
     try:
@@ -74,5 +74,4 @@ def build_limiter(rate: str) -> Limiter:
     from pyrate_limiter import Limiter, Rate
 
     limit, interval = parse_units(rate)
-    rate = Rate(limit, interval)
-    return Limiter(rate)
+    return Limiter(Rate(limit, interval))

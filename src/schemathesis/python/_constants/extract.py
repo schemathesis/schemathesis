@@ -180,9 +180,9 @@ def extract_from_module(module_name: str, *, origin: Origin) -> Iterable[Constan
 
     for value in sorted(result.strings):
         yield ConstantEntry(value=value, type="string", origins=(origin,))
-    for value in sorted(result.integers):
-        yield ConstantEntry(value=value, type="integer", origins=(origin,))
-    for value in sorted(result.floats):
-        yield ConstantEntry(value=value, type="float", origins=(origin,))
-    for value in sorted(result.bytes):
-        yield ConstantEntry(value=value, type="bytes", origins=(origin,))
+    for integer in sorted(result.integers):
+        yield ConstantEntry(value=integer, type="integer", origins=(origin,))
+    for number in sorted(result.floats):
+        yield ConstantEntry(value=number, type="float", origins=(origin,))
+    for raw in sorted(result.bytes):
+        yield ConstantEntry(value=raw, type="bytes", origins=(origin,))

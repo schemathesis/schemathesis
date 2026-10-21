@@ -103,6 +103,7 @@ def _format_min_length_error(error: ValidationError, noun: str) -> str:
     assert error.instance_path
     section = path_to_section_name(error.instance_path[:-1])
     prop_name = error.instance_path[-1]
+    assert isinstance(error.kind, (ValidationErrorKind.MinItems, ValidationErrorKind.MinLength))
     limit = error.kind.limit
     if limit != 1:
         noun += "s"

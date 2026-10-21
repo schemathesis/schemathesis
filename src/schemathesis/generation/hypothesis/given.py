@@ -110,4 +110,5 @@ def validate_given_args(func: Callable, args: tuple, kwargs: dict[str, Any]) -> 
     from hypothesis.internal.reflection import get_signature
 
     signature = get_signature(func)
-    return is_invalid_test(func, signature, args, kwargs)
+    # Private Hypothesis helper without annotations.
+    return is_invalid_test(func, signature, args, kwargs)  # type: ignore[no-untyped-call]

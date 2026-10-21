@@ -303,7 +303,8 @@ class Response:
         else:
             if isinstance(response, httpx2.Response):
                 return Response.from_httpx2(response, verify=True)
-        return response
+        # Unknown response types pass through unchanged.
+        return response  # type: ignore[return-value]
 
     @classmethod
     def from_requests(cls, response: requests.Response, verify: bool, _override: Override | None = None) -> Response:

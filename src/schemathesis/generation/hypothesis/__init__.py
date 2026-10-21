@@ -59,12 +59,13 @@ def setup() -> None:
     core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function
 
     class RepresentationPrinter(pretty.RepresentationPrinter):
-        def pretty(self, obj: object) -> None:
+        def pretty(self, obj: object, *, cycle: bool = False) -> None:
             # This one takes way too much - in the coverage phase it may give >2 orders of magnitude improvement
             # depending on the schema size (~300 seconds -> 4.5 seconds in one of the benchmarks)
             return None
 
-    root_core.RepresentationPrinter = RepresentationPrinter
+    # Hypothesis exposes no hook for its printer, so the class is swapped in place.
+    root_core.RepresentationPrinter = RepresentationPrinter  # type: ignore[misc]
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE

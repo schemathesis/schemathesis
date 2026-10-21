@@ -24,6 +24,8 @@ from schemathesis.hooks import (
 from schemathesis.python import django, wsgi
 
 if TYPE_CHECKING:
+    from werkzeug.datastructures import Headers
+
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -274,7 +276,7 @@ class ContentType(enum.Enum):
     UNKNOWN = enum.auto()
 
 
-def detect_content_type(*, headers: Mapping[str, str] | None = None, path: str | None = None) -> ContentType:
+def detect_content_type(*, headers: Mapping[str, str] | Headers | None = None, path: str | None = None) -> ContentType:
     """Detect content type from various sources."""
     if headers is not None and (content_type := _detect_from_headers(headers)) != ContentType.UNKNOWN:
         return content_type
@@ -283,7 +285,7 @@ def detect_content_type(*, headers: Mapping[str, str] | None = None, path: str |
     return ContentType.UNKNOWN
 
 
-def _detect_from_headers(headers: Mapping[str, str]) -> ContentType:
+def _detect_from_headers(headers: Mapping[str, str] | Headers) -> ContentType:
     """Detect content type from HTTP headers."""
     content_type = headers.get("Content-Type", "").lower()
     try:

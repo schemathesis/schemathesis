@@ -19,6 +19,8 @@ from .payloads import format_login_payload
 from .tokens import extract_token_from_body, extract_token_from_header, format_token
 
 if TYPE_CHECKING:
+    from werkzeug.datastructures import Headers
+
     from schemathesis.auths import AuthContext
     from schemathesis.generation.case import Case
 
@@ -44,7 +46,7 @@ class _LoginResponse:
     status_code: int
     text: str
     get_json: Callable[[], Any]
-    headers: Mapping[str, str]
+    headers: Mapping[str, str] | Headers
     cookies: dict[str, str]
 
 

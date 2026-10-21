@@ -690,6 +690,7 @@ def _sent_base_url(
         or urlsplit(case.operation.base_url or "").netloc
     ):
         return None
+    request_url: object
     if isinstance(response, Response):
         request_url = response.request.url
     else:
