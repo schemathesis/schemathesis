@@ -11,7 +11,7 @@ from typing_extensions import override
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import merge_at, to_wire_text
+from schemathesis.core.transforms import to_wire_text
 from schemathesis.core.transport import Response, is_event_stream, read_event_stream
 from schemathesis.generation.case import Case
 from schemathesis.generation.overrides import Override
@@ -28,12 +28,11 @@ from schemathesis.transport.prepare import (
 )
 from schemathesis.transport.requests import (
     REQUESTS_TRANSPORT,
-    _merge_query_components,
+    merge_params_override,
     prepare_multipart_parts,
     prepare_query,
-    urlencoded_serializer,
 )
-from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
+from schemathesis.transport.serialization import Binary, serialize_binary
 
 if TYPE_CHECKING:
     import requests
@@ -109,10 +108,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             data["base_url"] = urlunsplit((url.scheme, url.netloc, "", "", ""))
 
         if params_override is not None:
-            if isinstance(data.get("query_string"), str) or isinstance(params_override, str):
-                data["query_string"] = _merge_query_components(data.get("query_string"), params_override)
-            else:
-                merge_at(data, "query_string", params_override)
+            merge_params_override(data, "query_string", params_override)
 
         return data
 
@@ -263,18 +259,8 @@ def cookie_handler(client: werkzeug.Client, cookies: dict[str, Any] | None) -> G
 
 
 WSGI_TRANSPORT = WSGITransport()
-
-
-@WSGI_TRANSPORT.serializer("application/json", "text/json")
-def json_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return serialize_json(value)
-
-
-@WSGI_TRANSPORT.serializer(
-    "text/yaml", "text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"
-)
-def yaml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return serialize_yaml(value)
+# Werkzeug encodes multipart forms itself and takes text as `str`; those serializers are replaced below.
+WSGI_TRANSPORT._copy_serializers_from(REQUESTS_TRANSPORT)
 
 
 def _to_werkzeug_parts(files: list | None, data: dict[str, Any] | None) -> dict[str, list]:
@@ -316,21 +302,8 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
     return {"data": stream.read(), "content_type": f'multipart/{subtype}; boundary="{boundary}"'}
 
 
-@WSGI_TRANSPORT.serializer("application/xml", "text/xml")
-def xml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return serialize_xml(ctx.case, value)
-
-
-WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")(urlencoded_serializer)
-
-
 @WSGI_TRANSPORT.serializer("text/plain")
 def text_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     return {"data": to_wire_text(value)}
-
-
-@WSGI_TRANSPORT.serializer("application/octet-stream")
-def binary_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return {"data": serialize_binary(value)}

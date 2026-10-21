@@ -114,6 +114,14 @@ def prepare_query(case: Case) -> dict[str, Any] | str | None:
     return params
 
 
+def merge_params_override(data: dict[str, Any], key: str, params_override: Any) -> None:
+    """Merge explicitly passed query parameters into the serialized query stored under `key`."""
+    if isinstance(data.get(key), str) or isinstance(params_override, str):
+        data[key] = _merge_query_components(data.get(key), params_override)
+    else:
+        merge_at(data, key, params_override)
+
+
 class RequestsTransport(BaseTransport["requests.Session"]):
     @override
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
@@ -172,10 +180,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         }
 
         if params_override is not None:
-            if isinstance(data.get("params"), str) or isinstance(params_override, str):
-                data["params"] = _merge_query_components(data.get("params"), params_override)
-            else:
-                merge_at(data, "params", params_override)
+            merge_params_override(data, "params", params_override)
         if cookies is not None:
             merge_at(data, "cookies", cookies)
         data["cookies"] = prepare_cookies(data["cookies"])
