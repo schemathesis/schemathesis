@@ -5,7 +5,7 @@ import sys
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote, urldefrag, urljoin, urlsplit, urlunsplit
 from urllib.request import urlopen
 
@@ -333,12 +333,14 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
             return resolved_uri, resolver, value
 
         resolved = resolver.inner.lookup(reference)
-    except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:
+    # jsonschema-rs stubs do not declare `ReferencingError` as an exception.
+    except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:  # type: ignore[misc]
         error = RefResolutionError(str(exc))
         error.add_note(reference)
         raise error from exc
     # Bind `resolved.contents` so subsequent local-fragment walks land in the right document.
-    return resolved_uri, Resolver(resolved.resolver, resolved.contents), resolved.contents
+    # A reference may point at any JSON value, not only a schema.
+    return resolved_uri, Resolver(resolved.resolver, cast(JsonSchema, resolved.contents)), resolved.contents
 
 
 NOT_IN_CYCLE = sys.maxsize

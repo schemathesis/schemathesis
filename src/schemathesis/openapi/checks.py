@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.jsonschema.bundler import unbundle, unbundle_path
-from schemathesis.core.jsonschema.types import JsonValue
 from schemathesis.core.output import truncate_json, truncate_text
 from schemathesis.core.transforms import resolve_path
 
@@ -224,7 +223,7 @@ class JsonSchemaError(Failure):
         return f"{prefix}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
 
 
-def _shorten_instance(message: str, instance: JsonValue, config: OutputConfig) -> str:
+def _shorten_instance(message: str, instance: object, config: OutputConfig) -> str:
     # The validator message spells out the whole rejected value on one line, however large.
     if not config.truncation.enabled:
         return message

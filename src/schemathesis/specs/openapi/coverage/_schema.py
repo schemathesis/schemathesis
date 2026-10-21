@@ -150,7 +150,8 @@ def _judges(schema: JsonSchema, ctx: CoverageContext) -> list[jsonschema_rs.Vali
     full_schema: JsonSchema = schema
     if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in ctx.root_schema and BUNDLE_STORAGE_KEY not in schema:
         full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-    latest = jsonschema_rs.validator_cls_for(full_schema)
+    # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
+    latest = jsonschema_rs.validator_cls_for(full_schema)  # type: ignore[type-var]
     judges: list[jsonschema_rs.Validator] = []
     for validator_cls in dict.fromkeys((ctx.validator_cls, latest)):
         try:
@@ -293,7 +294,7 @@ STRATEGIES_FOR_TYPE = {
 def get_strategy_for_type(ty: str | list[str]) -> st.SearchStrategy:
     if isinstance(ty, str):
         return STRATEGIES_FOR_TYPE[ty]
-    return st.one_of(STRATEGIES_FOR_TYPE[t] for t in ty if t in STRATEGIES_FOR_TYPE)
+    return st.one_of([STRATEGIES_FOR_TYPE[t] for t in ty if t in STRATEGIES_FOR_TYPE])
 
 
 UNKNOWN_PROPERTY_KEY = "x-schemathesis-unknown-property"
@@ -1351,7 +1352,8 @@ def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str |
         # an intermediate Python-side deep-copy. Bytes inside the value reject the
         # native call; fall back to the bytes-aware path.
         try:
-            return type(value), _digest(jsonschema_rs.canonical.json.to_string(value))
+            # `type(...) is` checks do not narrow a TypeVar.
+            return type(value), _digest(jsonschema_rs.canonical.json.to_string(value))  # type: ignore[arg-type]
         except (TypeError, ValueError):
             pass
         converted = _convert_bytes_for_hashing(value)
@@ -1791,9 +1793,10 @@ def _honors_contains(schema: JsonSchemaObject) -> bool:
     """Whether `contains` and its bounds are well-formed; Draft 4 never checks them and ignores them, as fuzzing does."""
     if "contains" not in schema:
         return False
-    return jsonschema_rs.meta.is_valid(
-        {key: schema[key] for key in ("contains", "minContains", "maxContains") if key in schema}
-    )
+    contains: JsonSchemaObject = {
+        key: schema[key] for key in ("contains", "minContains", "maxContains") if key in schema
+    }
+    return jsonschema_rs.meta.is_valid(contains)
 
 
 def _ensure_contains_bounds(ctx: CoverageContext, value: list, schema: JsonSchemaObject) -> list:
@@ -2572,7 +2575,10 @@ def cover_schema_iter(
                     check_schema = schema if bundle is None else {**schema, BUNDLE_STORAGE_KEY: bundle}
                     try:
                         unmerged_validator = ctx.validator_cls(
-                            check_schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
+                            # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
+                            check_schema,  # type: ignore[arg-type]
+                            validate_formats=True,
+                            pattern_options=FANCY_REGEX_OPTIONS,
                         )
                     except Exception:
                         pass
@@ -2887,7 +2893,8 @@ def _admitted_by_any(judges: list[jsonschema_rs.Validator], value: Any) -> bool:
 def _branch_drafts(schemas: list[JsonSchema], ctx: CoverageContext) -> dict[type, None]:
     drafts: dict[type, None] = {ctx.validator_cls: None}
     for schema in schemas:
-        drafts[jsonschema_rs.validator_cls_for(schema)] = None
+        # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
+        drafts[jsonschema_rs.validator_cls_for(schema)] = None  # type: ignore[type-var]
     return drafts
 
 
@@ -4052,7 +4059,9 @@ def _negative_pattern(
     if value is MISSING:
         try:
             validator: jsonschema_rs.Validator | None = ctx.validator_cls(
-                {"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS
+                # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
+                {"type": "string", "pattern": pattern},  # type: ignore[arg-type]
+                pattern_options=FANCY_REGEX_OPTIONS,
             )
         except Exception:
             validator = None
@@ -4062,7 +4071,8 @@ def _negative_pattern(
             .filter(ctx.wire.representable)
         )
         if validator is not None:
-            strategy = strategy.filter(lambda v, _v=validator: not _v.is_valid(v))
+            is_valid = validator.is_valid
+            strategy = strategy.filter(lambda v: not is_valid(v))
         try:
             value = ctx.generate_from(strategy)
         except Unsatisfiable:

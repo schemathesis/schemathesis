@@ -39,7 +39,11 @@ class SseValidator:
         self._deserialize_payload: Callable[[str, str], Any] | None = None
         keywords = _make_keywords(validator_cls, schema, self)
         self._validator = validator_cls(
-            schema, validate_formats=True, keywords=keywords, formats=supplemental_formats(validator_cls)
+            # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
+            schema,  # type: ignore[arg-type]
+            validate_formats=True,
+            keywords=keywords,
+            formats=supplemental_formats(validator_cls),  # type: ignore[arg-type]
         )
 
     @contextmanager
@@ -74,10 +78,11 @@ def _make_keywords(
             resolved = schema_with_bundle(content_schema, root_schema)
             self._content = (
                 validator_cls(
-                    resolved,
+                    # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
+                    resolved,  # type: ignore[arg-type]
                     validate_formats=True,
                     keywords={"contentMediaType": ContentMediaTypeKeyword},
-                    formats=supplemental_formats(validator_cls),
+                    formats=supplemental_formats(validator_cls),  # type: ignore[arg-type]
                 ),
                 resolved,
             )

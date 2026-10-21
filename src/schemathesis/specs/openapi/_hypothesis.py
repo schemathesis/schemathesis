@@ -125,7 +125,7 @@ def _draw(draw: st.DrawFn, strategy: st.SearchStrategy, operation: APIOperation)
         ) from None
 
 
-@st.composite  # type: ignore[untyped-decorator]
+@st.composite
 def openapi_cases(
     draw: st.DrawFn,
     *,
@@ -635,7 +635,7 @@ def _build_form_strategy_with_encoding(
             container_schema=base_schema,
         )
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def build_body(draw: st.DrawFn) -> object:
         generated = draw(body_strategy)
         value = generated.value if isinstance(generated, GeneratedValue) else generated
@@ -1077,7 +1077,7 @@ def _build_custom_formats_uncached(
             custom_formats[HEADER_FORMAT] = header_values(codec="ascii", exclude_characters=valid_exclude)
         else:
             # Negative mode: Occasionally allow invalid characters
-            @st.composite  # type: ignore[untyped-decorator]
+            @st.composite
             def header_strategy(draw: st.DrawFn) -> str:
                 random = draw(st.randoms())
                 if random.random() < VALID_HEADER_PROBABILITY:
@@ -1181,7 +1181,8 @@ def _drop_empty_float_branch(schema: dict[str, Any]) -> None:
 def _schema_has_float_format(node: object) -> bool:
     # Escaping keeps the marker from matching inside a string value, so this finds the same dicts as a walk.
     try:
-        return '"format":"float"' in jsonschema_rs.canonical.json.to_string(node)
+        # Any object is accepted; one that is not JSON raises.
+        return '"format":"float"' in jsonschema_rs.canonical.json.to_string(node)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         # Generation reports such a schema as invalid, so there is nothing to snap.
         return False

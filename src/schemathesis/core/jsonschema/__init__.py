@@ -312,12 +312,14 @@ def make_validator_with_seed(
 
 def make_validator_for(schema: JsonSchema) -> jsonschema_rs.Validator:
     """Like `make_validator`, but auto-detects the draft from `$schema` (defaults to Draft 2020-12)."""
-    return make_validator(schema, jsonschema_rs.validator_cls_for(schema))
+    # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
+    return make_validator(schema, jsonschema_rs.validator_cls_for(schema))  # type: ignore[type-var]
 
 
 def build_validator_for(schema: JsonSchema) -> jsonschema_rs.Validator:
     """Like `make_validator_for`, but for callers already memoized on a cheaper key."""
-    validator_cls = jsonschema_rs.validator_cls_for(schema)
+    # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
+    validator_cls = jsonschema_rs.validator_cls_for(schema)  # type: ignore[type-var]
     schema, registry = _split_bundle(schema, validator_cls)
     return _build_validator(schema, validator_cls, registry)
 
