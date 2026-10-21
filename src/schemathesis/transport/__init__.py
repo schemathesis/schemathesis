@@ -154,19 +154,14 @@ class SerializerRegistry:
         """
 
         def register(func: _Serializer) -> None:
-            from schemathesis.transport.asgi import ASGI_TRANSPORT
-            from schemathesis.transport.requests import REQUESTS_TRANSPORT
-            from schemathesis.transport.wsgi import WSGI_TRANSPORT
-
-            @ASGI_TRANSPORT.serializer(*media_types)
-            @REQUESTS_TRANSPORT.serializer(*media_types)
-            @WSGI_TRANSPORT.serializer(*media_types)
             def inner(ctx: SerializationContext, value: Any) -> dict[str, bytes]:
                 result = {}
                 serialized = func(ctx, value)
                 if serialized is not None:
                     result["data"] = serialized
                 return result
+
+            register_serializer(inner, *media_types)
 
         return register
 
@@ -200,9 +195,7 @@ class SerializerRegistry:
             ```
 
         """
-        from schemathesis.transport.asgi import ASGI_TRANSPORT
         from schemathesis.transport.requests import REQUESTS_TRANSPORT
-        from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
         if not source:
             raise ValueError("Source media type cannot be empty")
@@ -219,11 +212,17 @@ class SerializerRegistry:
 
         _, serializer_func = pair
 
-        # Register for all targets across all transports
-        for t in targets:
-            REQUESTS_TRANSPORT._serializers[t] = serializer_func
-            ASGI_TRANSPORT._serializers[t] = serializer_func
-            WSGI_TRANSPORT._serializers[t] = serializer_func
+        register_serializer(serializer_func, *targets)
+
+
+def register_serializer(func: Serializer, *media_types: str) -> None:
+    """Register `func` for `media_types` on every built-in transport."""
+    from schemathesis.transport.asgi import ASGI_TRANSPORT
+    from schemathesis.transport.requests import REQUESTS_TRANSPORT
+    from schemathesis.transport.wsgi import WSGI_TRANSPORT
+
+    for transport in (ASGI_TRANSPORT, REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+        transport.serializer(*media_types)(func)
 
 
 serializer = SerializerRegistry()
