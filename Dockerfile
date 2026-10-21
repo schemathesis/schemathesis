@@ -109,7 +109,6 @@ RUN apk add --no-cache ca-certificates libgcc libstdc++ sqlite-libs
 RUN addgroup --gid 1000 -S schemathesis && \
     adduser --uid 1000 -D -S schemathesis -G schemathesis -s /sbin/nologin
 
-COPY --chown=1000:1000 pyproject.toml README.md src ./
 
 RUN printf 'import os\nif os.environ.get("SCHEMATHESIS_COVERAGE", "true").lower() != "false":\n    import tracecov\n    tracecov.schemathesis.install()\n' > /app/hooks.py && \
     chown -R 1000:1000 /app
