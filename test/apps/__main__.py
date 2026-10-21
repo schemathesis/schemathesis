@@ -15,31 +15,22 @@ The first positional argument is the port; the second is the factory name
 from __future__ import annotations
 
 import argparse
+import importlib
+import pkgutil
 import sys
 from functools import partial
 
+from test.apps.catalog import openapi as openapi_catalog
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
-from test.apps.catalog.openapi import (
-    basic,
-    envelopes,
-    error_feedback,
-    stateful,
-    supervisor,
-    swagger_v2,
-    under_declared_security,
-    users,
-)
+from test.apps.catalog.openapi import envelopes
 from test.apps.catalog.openapi.envelopes import Envelope
 from test.apps.runtime import OpenAPIApp
 
+# Every catalog module; envelopes take an argument, so they get their own entries below.
 _OPENAPI_MODULES = {
-    "basic": basic,
-    "users": users,
-    "stateful": stateful,
-    "supervisor": supervisor,
-    "error_feedback": error_feedback,
-    "swagger_v2": swagger_v2,
-    "under_declared_security": under_declared_security,
+    module.name: importlib.import_module(f"{openapi_catalog.__name__}.{module.name}")
+    for module in pkgutil.iter_modules(openapi_catalog.__path__)
+    if not module.ispkg and module.name != "envelopes"
 }
 
 _ENVELOPE_FACTORIES = {
@@ -53,6 +44,18 @@ _ENVELOPE_FACTORIES = {
 
 _GRAPHQL_FACTORIES = {
     "books": graphql_bookstore.books,
+    "federated_subgraph": graphql_bookstore.federated_subgraph,
+    "use_after_create": graphql_bookstore.use_after_create,
+    "tombstone_pool": graphql_bookstore.tombstone_pool,
+    "use_after_delete": graphql_bookstore.use_after_delete,
+    "slow_mutation": graphql_bookstore.slow_mutation,
+    "double_delete": graphql_bookstore.double_delete,
+    "generic_id_pool": graphql_bookstore.generic_id_pool,
+    "input_object_pool": graphql_bookstore.input_object_pool,
+    "list_argument_pool": graphql_bookstore.list_argument_pool,
+    "non_id_pool": graphql_bookstore.non_id_pool,
+    "bare_slug": graphql_bookstore.bare_slug,
+    "relay_connection": graphql_bookstore.relay_connection,
 }
 
 
