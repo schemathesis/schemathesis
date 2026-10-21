@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 
 from .errors import WFCTokenExtractionError
+
+if TYPE_CHECKING:
+    from werkzeug.datastructures import Headers
 
 
 def extract_token_from_body(body: Any, selector: str) -> str:
@@ -28,13 +31,13 @@ def extract_token_from_body(body: Any, selector: str) -> str:
     )
 
 
-def extract_token_from_header(headers: Mapping[str, str], name: str) -> str:
+def extract_token_from_header(headers: Mapping[str, str] | Headers, name: str) -> str:
     """Extract a token from response headers (case-insensitive)."""
     name_lower = name.lower()
     for header_name, header_value in headers.items():
         if header_name.lower() == name_lower:
             return header_value
-    available = ", ".join(f"'{h}'" for h in headers)
+    available = ", ".join(f"'{header_name}'" for header_name, _ in headers.items())
     raise WFCTokenExtractionError(f"Header '{name}' not found in response. Available headers: {available or 'none'}")
 
 
