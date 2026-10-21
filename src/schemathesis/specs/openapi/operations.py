@@ -30,6 +30,7 @@ from schemathesis.hooks import HookContext, dispatch_before_init_operation, disp
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, has_optional_auth
 from schemathesis.specs.openapi.adapter.servers import resolve_operation_base_url
 from schemathesis.specs.openapi.utils import parse_spec_version
@@ -305,8 +306,7 @@ class OperationLoader:
                         # A vendor extension key inside `responses` may carry any JSON value.
                         if not isinstance(response, dict):
                             continue
-                        if "$ref" in response:
-                            _, response = resolve_reference(path_resolver, response["$ref"])
+                        _, response = maybe_resolve_with_resolver(response, path_resolver)
                         defined_links = response.get(links_keyword)
                         if defined_links is not None:
                             statistic.transitions.total += len(defined_links)
@@ -316,12 +316,13 @@ class OperationLoader:
                 complete_walk = False
                 continue
 
-        def is_link_selected(link: dict) -> bool:
-            if "$ref" in link:
-                try:
-                    _, link = resolve_reference(root_resolver, link["$ref"])
-                except RefResolutionError:
-                    return False
+        def is_link_selected(link: object) -> bool:
+            if not isinstance(link, dict):
+                return False
+            try:
+                _, link = maybe_resolve_with_resolver(link, root_resolver)
+            except (RefResolutionError, InvalidSchema):
+                return False
 
             if "operationId" in link:
                 return link["operationId"] in selected_operations_by_id
