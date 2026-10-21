@@ -15,7 +15,7 @@ class CustomHelpMessageChoice(click.Choice):
         super().__init__(*args, **kwargs)
         self.choices_repr = choices_repr
 
-    def get_metavar(self, param: click.Parameter) -> str:
+    def get_metavar(self, param: click.Parameter, ctx: click.Context | None = None) -> str:
         return self.choices_repr
 
     def get_invalid_choice_message(self, value: Any, ctx: click.Context | None) -> str:
@@ -33,7 +33,7 @@ class BaseCsvChoice(click.Choice):
             invalid_options = set(selected) - set(self.choices)
         return selected, invalid_options
 
-    def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:  # type: ignore[misc]
+    def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:
         # Sort to keep the error output consistent with the passed values
         sorted_options = ", ".join(sorted(invalid_options, key=selected.index))
         available_options = ", ".join(self.choices)
@@ -70,8 +70,9 @@ class RegistryChoice(BaseCsvChoice):
         self.case_sensitive = True
         self.with_all = with_all
 
+    # Read from the registry on each access, so plugins registered later are offered too.
     @property
-    def choices(self) -> list[str]:
+    def choices(self) -> list[str]:  # type: ignore[override]
         choices = self.registry.get_all_names()
         if self.with_all:
             choices.append("all")

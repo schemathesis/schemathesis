@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import click
 
 from schemathesis.checks import CHECKS
@@ -33,7 +35,8 @@ from schemathesis.generation.metrics import METRICS
 class OptionSpec:
     __slots__ = ("args", "kwargs")
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    # Forwarded to `click.option` / `click.argument`, which type their attributes as `Any`.
+    def __init__(self, *args: str, **kwargs: Any) -> None:
         self.args = args
         self.kwargs = kwargs
 
