@@ -31,7 +31,7 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.transport.prepare import normalize_base_url, prepare_request
-from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.requests import REQUESTS_TRANSPORT, _merge_query_components
 
 DEFAULT_FUZZING_MAX_EXAMPLES = 100
 
@@ -282,16 +282,10 @@ def _entry_under_errored_op(entry: dict[str, Any], keys: set[tuple[str, str]], p
 def _attach_query(url: str, params: Any) -> str:
     if not params:
         return url
-    if isinstance(params, str):
-        query_str = params
-    elif isinstance(params, Mapping):
-        query_str = urlencode(list(params.items()), doseq=True)
-    else:
-        query_str = urlencode(params, doseq=True)
-    if not query_str:
-        return url
     scheme, netloc, path, existing, fragment = urlsplit(url)
-    merged = f"{existing}&{query_str}" if existing else query_str
+    merged = _merge_query_components(existing, params)
+    if merged == existing:
+        return url
     return urlunsplit((scheme, netloc, path, merged, fragment))
 
 
