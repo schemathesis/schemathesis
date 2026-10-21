@@ -455,7 +455,7 @@ def force_iterable(value: object) -> list | tuple:
 
     Only relevant for negative test scenarios where the original types might be changed.
     """
-    if isinstance(value, tuple | list):
+    if isinstance(value, (tuple, list)):
         return value
     return [value]
 

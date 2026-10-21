@@ -490,7 +490,7 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
         return False
 
-    if isinstance(exc, requests.Timeout | requests.exceptions.ChunkedEncodingError):
+    if isinstance(exc, (requests.Timeout, requests.exceptions.ChunkedEncodingError)):
         return True
     if isinstance(exc.__context__, ProtocolError):
         if len(exc.__context__.args) == 2 and isinstance(exc.__context__.args[1], RemoteDisconnected):

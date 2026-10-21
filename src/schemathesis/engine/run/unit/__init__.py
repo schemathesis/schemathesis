@@ -102,7 +102,7 @@ def _order_operations(
 
 def _keeps_schema_order(engine: EngineContext, phase: Phase) -> bool:
     phase_config = engine.config.phases.get_by_name(name=phase.name.value)
-    assert isinstance(phase_config, FuzzingPhaseConfig | CoveragePhaseConfig | ExamplesPhaseConfig)
+    assert isinstance(phase_config, (FuzzingPhaseConfig, CoveragePhaseConfig, ExamplesPhaseConfig))
     return phase_config.operation_ordering == OperationOrdering.NONE
 
 

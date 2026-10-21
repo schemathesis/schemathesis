@@ -335,7 +335,7 @@ class Case(Generic[OperationT]):
                     tuple(sorted(((k, self._hash_container(v)) for k, v in value.items()), key=lambda x: str(x[0]))),
                 )
             )
-        if isinstance(value, list | tuple):
+        if isinstance(value, (list, tuple)):
             return hash((type(value), tuple(self._hash_container(item) for item in value)))
         return hash((type(value), value))
 

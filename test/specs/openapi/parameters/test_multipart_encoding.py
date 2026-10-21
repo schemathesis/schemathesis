@@ -103,7 +103,7 @@ def test_multipart_without_custom_encoding_uses_default(ctx):
 
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        assert isinstance(case.body["file"], (bytes | Binary))
+        assert isinstance(case.body["file"], ((bytes, Binary)))
         assert isinstance(case.body["name"], str)
 
 
@@ -126,7 +126,7 @@ def test_multipart_encoding_without_registered_strategy_falls_back(ctx):
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         # Should fall back to default strategy
-        assert isinstance(case.body["file"], (bytes | Binary))
+        assert isinstance(case.body["file"], ((bytes, Binary)))
 
 
 def test_multipart_multiple_properties_with_different_encodings(ctx):
@@ -348,7 +348,7 @@ def test_multipart_defensive_non_string_content_type(ctx):
     @settings(suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         # Should fall back to default strategy
-        assert isinstance(case.body["data"], (bytes | Binary))
+        assert isinstance(case.body["data"], ((bytes, Binary)))
 
     test()
 

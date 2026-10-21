@@ -88,7 +88,7 @@ def translate_iteration_exception(
         return non_fatal_error(exc, code_sample=code_sample)
     if isinstance(
         exc,
-        InvalidSchema | SerializationNotPossible | UnresolvableReference | InvalidHeadersExample,
+        (InvalidSchema, SerializationNotPossible, UnresolvableReference, InvalidHeadersExample),
     ):
         return non_fatal_error(prefer_spec_error(exc, operation))
     clear_hypothesis_notes(exc)
@@ -112,7 +112,7 @@ def classify_test_exception(
     non_fatal_error: NonFatalErrorFactory,
 ) -> tuple[Status, list[events.NonFatalError]]:
     """Map an exception raised by a Hypothesis-driven test into a scenario status and events to report."""
-    if isinstance(exc, FailureGroup | Failure):
+    if isinstance(exc, (FailureGroup, Failure)):
         # A request that timed out or dropped before the failure was found is still this operation's finding.
         stored = state.take_unrecoverable_network_error()
         if stored is not None:

@@ -123,7 +123,7 @@ def serialize_yaml(value: Body) -> dict[str, Any]:
         return {"data": value}
     if isinstance(value, Binary):
         return {"data": value.data}
-    if isinstance(value, (list | dict)):
+    if isinstance(value, ((list, dict))):
         value = transform(value, _replace_binary)
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
@@ -160,7 +160,7 @@ def serialize_xml_with_schema(value: Any, schema: JsonSchema, resource_name: str
     resolver = make_root_resolver(definition)
     if "$ref" in definition:
         resolver, definition = resolve_reference(resolver, definition["$ref"])
-    if isinstance(value, (Binary | str)) and definition.get("format") in ("binary", "file"):
+    if isinstance(value, ((Binary, str))) and definition.get("format") in ("binary", "file"):
         # Opaque payloads are already the wire representation and carry no XML structure to wrap.
         return {"data": value.data if isinstance(value, Binary) else value}
     tag = _get_xml_tag(definition, resource_name)
@@ -353,7 +353,7 @@ def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
 
 def _escape_xml(value: JsonValue) -> str:
     """Escape special characters in XML content."""
-    if value is None or isinstance(value, (int | float | bool)):
+    if value is None or isinstance(value, ((int, float, bool))):
         return to_wire_string(value)
 
     # Filter out invalid XML characters

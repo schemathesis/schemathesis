@@ -2022,7 +2022,7 @@ def _cover_positive_for_type(
             yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
     elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
         yield from _positive_for_describing_keywords(ctx, schema, ty, template)
-    if "not" in schema and isinstance(schema["not"], dict | bool):
+    if "not" in schema and isinstance(schema["not"], (dict, bool)):
         # For 'not' schemas: generate negative cases of inner schema (violations)
         # These violations are positive for the outer schema, so flip the mode.
         # The inner-violation alone doesn't guarantee the value satisfies the outer's
@@ -2523,7 +2523,7 @@ def _negative_one_of(
 def _negative_not(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
-    if not isinstance(value, dict | bool):
+    if not isinstance(value, (dict, bool)):
         return
     # For 'not' schemas: generate positive cases of inner schema (valid values)
     # These valid values are negative for the outer schema, so flip the mode

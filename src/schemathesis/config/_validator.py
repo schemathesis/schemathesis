@@ -20,7 +20,7 @@ def without_temporal_values(value: object, path: InstancePath, replaced: dict[In
         return {key: without_temporal_values(item, (*path, key), replaced) for key, item in value.items()}
     if isinstance(value, list):
         return [without_temporal_values(item, (*path, index), replaced) for index, item in enumerate(value)]
-    if isinstance(value, datetime.date | datetime.time):
+    if isinstance(value, (datetime.date, datetime.time)):
         replaced[path] = value
         return None
     return value

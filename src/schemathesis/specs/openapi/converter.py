@@ -564,7 +564,7 @@ def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
             continue
 
         bound = schema.get(bound_key)
-        if isinstance(bound, bool) or not isinstance(bound, int | float):
+        if isinstance(bound, bool) or not isinstance(bound, (int, float)):
             # `exclusive* = true` without a numeric bound can't be represented in modern drafts.
             schema.pop(exclusive_key, None)
             continue

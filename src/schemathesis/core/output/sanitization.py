@@ -34,11 +34,11 @@ def sanitize_value(item: object, *, config: SanitizationConfig) -> None:
                 else:
                     item[key] = config.replacement
         for value in item.values():
-            if isinstance(value, dict | list):
+            if isinstance(value, (dict, list)):
                 sanitize_value(value, config=config)
     elif isinstance(item, list):
         for value in item:
-            if isinstance(value, dict | list):
+            if isinstance(value, (dict, list)):
                 sanitize_value(value, config=config)
 
 
