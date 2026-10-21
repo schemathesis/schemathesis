@@ -355,7 +355,6 @@ class OpenApiExtraDataSource(ExtraDataSource):
         repository: ResourceRepository,
         requirements: dict[RequirementKey, ParameterRequirement],
         inputs_by_label: dict[str, list[InputSlot]] | None = None,
-        usage_tracker: VariantUsageTracker | None = None,
         semantic_index: SemanticValueIndex | None = None,
         semantic_eligible_operations: frozenset[str] = frozenset(),
         created_keys_by_label: dict[str, list[InputSlot]] | None = None,
@@ -364,7 +363,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self.requirements = requirements
         self.inputs_by_label = inputs_by_label if inputs_by_label is not None else {}
         self.created_keys_by_label = created_keys_by_label if created_keys_by_label is not None else {}
-        self.usage_tracker = usage_tracker if usage_tracker is not None else VariantUsageTracker()
+        self.usage_tracker = VariantUsageTracker()
         self.semantic_index = semantic_index
         self.semantic_eligible_operations = semantic_eligible_operations
         # Operations whose strategies bind captured variants at build time (consumer side).
