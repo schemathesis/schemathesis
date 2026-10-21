@@ -10,6 +10,7 @@ from functools import lru_cache
 from typing import Any, TypeAlias
 
 from schemathesis.core.jsonschema.resolver import Resolver
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, iter_path_parameters
 from schemathesis.core.text import to_pascal_case
 from schemathesis.core.transforms import (
@@ -792,6 +793,29 @@ class OperationNode:
 
 # A body field location, integers marking array items.
 BodyPath: TypeAlias = tuple[str | int, ...]
+
+
+@dataclass(slots=True)
+class DeferredBindings:
+    """Inputs of one operation that bind only once every operation has been scanned."""
+
+    # Nested-body FK lookups whose target resource was not registered yet.
+    nested_fks: list[tuple[str, str, BodyPath]]
+    # Scalar body fields that may name the collection listing their values (`country` <- `GET /countries`).
+    named_scalars: list[tuple[str, str, JsonSchema]]
+    # Required scalar body fields.
+    body_fields: list[tuple[str, JsonSchema]]
+    # `(resource, parameter)` for path parameters named after a field of their owning resource (`/projects/{code}`).
+    field_named_path_parameters: list[tuple[str, str]]
+    # Body fields a client may send.
+    writable_body_fields: dict[str, JsonSchema]
+
+    def __init__(self) -> None:
+        self.nested_fks = []
+        self.named_scalars = []
+        self.body_fields = []
+        self.field_named_path_parameters = []
+        self.writable_body_fields = {}
 
 
 @dataclass(slots=True)

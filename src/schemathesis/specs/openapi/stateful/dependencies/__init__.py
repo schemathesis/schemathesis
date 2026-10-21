@@ -36,9 +36,9 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     update_input_field_bindings,
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
-    BodyPath,
     CanonicalizationCache,
     Cardinality,
+    DeferredBindings,
     DefinitionSource,
     DependencyGraph,
     InputSlot,
@@ -80,13 +80,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     response_resource_cache: ResponseResourceCache = {}
     nested_fk_cache: NestedFKCache = {}
 
-    # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
-    # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
-    deferred_nested_fks: dict[str, list[tuple[str, str, BodyPath]]] = {}
-    deferred_named_scalars: dict[str, list[tuple[str, str, JsonSchema]]] = {}
-    deferred_body_fields: dict[str, list[tuple[str, JsonSchema]]] = {}
-    deferred_field_named_path_parameters: dict[str, list[tuple[str, str]]] = {}
-    writable_body_fields: dict[str, dict[str, JsonSchema]] = {}
+    # Inputs that bind only after every operation is scanned, keyed by operation label.
+    deferred: dict[str, DeferredBindings] = {}
 
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
     candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
@@ -101,11 +96,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 for parameter in operation.iter_parameters()
                 if parameter.location == ParameterLocation.PATH
             }
-            pending: list[tuple[str, str, BodyPath]] = []
-            pending_named_scalars: list[tuple[str, str, JsonSchema]] = []
-            pending_body_fields: list[tuple[str, JsonSchema]] = []
-            pending_field_named_path_parameters: list[tuple[str, str]] = []
-            pending_writable_body_fields: dict[str, JsonSchema] = {}
+            bindings = DeferredBindings()
             inputs = list(
                 extract_inputs(
                     operation=operation,
@@ -115,11 +106,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     canonicalization_cache=canonicalization_cache,
                     response_resource_cache=response_resource_cache,
                     nested_fk_cache=nested_fk_cache,
-                    deferred_nested_fks=pending,
-                    deferred_named_scalars=pending_named_scalars,
-                    deferred_body_fields=pending_body_fields,
-                    deferred_field_named_path_parameters=pending_field_named_path_parameters,
-                    deferred_writable_body_fields=pending_writable_body_fields,
+                    deferred=bindings,
                     candidate_resource_names=candidate_resource_names,
                 )
             )
@@ -138,22 +125,13 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 inputs=inputs,
                 outputs=list(outputs),
             )
-            if pending:
-                deferred_nested_fks[operation.label] = pending
-            if pending_named_scalars:
-                deferred_named_scalars[operation.label] = pending_named_scalars
-            if pending_body_fields:
-                deferred_body_fields[operation.label] = pending_body_fields
-            if pending_field_named_path_parameters:
-                deferred_field_named_path_parameters[operation.label] = pending_field_named_path_parameters
-            if pending_writable_body_fields:
-                writable_body_fields[operation.label] = pending_writable_body_fields
+            deferred[operation.label] = bindings
 
     # Replay nested-FK lookups whose target resource was registered later in the scan -
     # producer paths can sort after their consumers (e.g. /departments alphabetises before
     # /locations) and the per-operation pass would otherwise drop those slots.
-    for label, items in deferred_nested_fks.items():
-        for target_resource_name, target_field, body_path in items:
+    for label, bindings in deferred.items():
+        for target_resource_name, target_field, body_path in bindings.nested_fks:
             target_resource = resources.get(target_resource_name)
             if target_resource is None:
                 continue
@@ -169,8 +147,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Bind path parameters named after a field of the resource owning the path (`/projects/{code}` -> `Project.code`,
     # `/rounds/{round_seq}` -> `Round.seq`). Deferred to here so the resource's fields are known regardless of order.
-    for label, bindings in deferred_field_named_path_parameters.items():
-        for resource_name, parameter_name in bindings:
+    for label, bindings in deferred.items():
+        for resource_name, parameter_name in bindings.field_named_path_parameters:
             owner = resources.get(resource_name)
             if owner is None or owner.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
                 continue
@@ -199,10 +177,10 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 primitive_producers.add(output.resource.name)
             elif output.cardinality == Cardinality.MANY:
                 object_collection_producers.add(output.resource.name)
-    for label, named_scalars in deferred_named_scalars.items():
+    for label, bindings in deferred.items():
         node = operations[label]
         bound = {slot.parameter_name for slot in node.inputs}
-        for resource_name, property_name, property_schema in named_scalars:
+        for resource_name, property_name, property_schema in bindings.named_scalars:
             if property_name in bound or (
                 resource_name not in primitive_producers and resource_name not in object_collection_producers
             ):
@@ -239,7 +217,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     merge_related_resources(operations, resources)
 
     # Bind required body fields to a producer only when the response field identifies it uniquely.
-    rebind_body_fields_to_unique_producers(operations, deferred_body_fields)
+    rebind_body_fields_to_unique_producers(operations, deferred)
 
     # Rebind orphan synthetics (e.g. `Spouse` from `spouse_id`) to the path-derived parent.
     rebind_orphan_synthetics(operations, resources)
@@ -257,7 +235,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     align_created_identifiers(operations)
 
     # A key the client chooses on `POST /things` is what `/things/{key}` takes when the response does not echo it.
-    bind_created_item_keys(schema, operations, writable_body_fields)
+    bind_created_item_keys(schema, operations, deferred)
 
     # `fromAirportId` names what responses return under `fromAirport` (`AirportResponse.id`).
     bind_id_fields_to_returned_resources(operations)
@@ -266,7 +244,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     bind_parent_keys_to_item_fields(schema, operations)
 
     # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
-    bind_echoed_body_fields(schema, operations, writable_body_fields)
+    bind_echoed_body_fields(schema, operations, deferred)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)
