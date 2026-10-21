@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Crash on WSGI apps for `application/x-www-form-urlencoded` bodies that are arrays or scalars.
 - Missing VCR/HAR entries for stateful and `st fuzz` network errors, and `st fuzz` curl reproductions.
 - `pytest` failing with `Unknown config option: timeout` for tests under `/app` in Docker images.
 
