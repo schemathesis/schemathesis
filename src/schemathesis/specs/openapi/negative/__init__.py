@@ -191,7 +191,8 @@ def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     for name in cache_key.custom_format_names - _ALWAYS_INVALID_FORMATS - natively_validated - formats.keys():
         formats[name] = _standard_format_check(name) if name in STANDARD_FORMATS else _always_invalid
     return cache_key.validator_cls(
-        cache_key.schema,
+        # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
+        cache_key.schema,  # type: ignore[arg-type]
         formats=formats,
         validate_formats=True,
         pattern_options=FANCY_REGEX_OPTIONS,
@@ -216,7 +217,8 @@ def get_real_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     if cache_key.validator_cls is jsonschema_rs.Draft4Validator:
         formats.update(DRAFT4_SUPPLEMENTAL_FORMATS)
     return cache_key.validator_cls(
-        cache_key.schema,
+        # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
+        cache_key.schema,  # type: ignore[arg-type]
         formats=formats,
         validate_formats=True,
         pattern_options=FANCY_REGEX_OPTIONS,
@@ -370,7 +372,8 @@ def negative_schema(
             strategy = strategy.filter(
                 lambda value: (
                     filter_values(value, chosen)
-                    and not mutated_parameter_reads_as_valid(value, metadata, parameter_validator)
+                    # Parameter containers are always objects.
+                    and not mutated_parameter_reads_as_valid(cast("dict[str, Any]", value), metadata, parameter_validator)
                 )
             )
         else:
@@ -447,7 +450,7 @@ def _with_value_channel(
 ) -> st.SearchStrategy:
     """Sometimes break a single value of a valid body instead of mutating the schema."""
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def hybrid(draw: Any) -> GeneratedValue:
         random = draw(st.randoms())
         if random.random() < VALUE_CHANNEL_PROBABILITY:
@@ -507,7 +510,7 @@ def _with_syntax_fuzzing(mutated_strategy: st.SearchStrategy, location: Paramete
         lambda data: GeneratedValue(data, _syntax_fuzzing_metadata(location))
     )
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def with_syntax_fuzzing(draw: Any) -> GeneratedValue:
         random = draw(st.randoms())
         if random.random() < SYNTAX_FUZZING_PROBABILITY:
@@ -534,7 +537,7 @@ def is_non_empty_query(query: dict[str, Any]) -> bool:
     return urlencode(result, doseq=True) != ""
 
 
-@st.composite  # type: ignore[untyped-decorator]
+@st.composite
 def mutated(
     draw: Draw,
     *,
