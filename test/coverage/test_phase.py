@@ -309,6 +309,28 @@ def test_with_examples_openapi_3(ctx):
     assert_positive_coverage(schema, EXPECTED_EXAMPLES)
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_with_referenced_examples(ctx, version):
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "schema": {"type": "string"},
+                "required": True,
+                "examples": {
+                    "first": {"$ref": "#/components/examples/Special"},
+                    "second": {"value": "inline"},
+                },
+            },
+        ],
+        version=version,
+        components={"examples": {"Special": {"value": "special-ref"}}},
+    )
+    assert_positive_coverage(schema, [{"query": {"q1": "inline"}}, {"query": {"q1": "special-ref"}}])
+
+
 def test_with_optional_parameters(ctx):
     schema = build_schema(
         ctx,
