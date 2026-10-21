@@ -86,7 +86,7 @@ def extract_inputs(
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
             parameter_schema=_parameter_schema(param),
-            parameter_types=parameter_types(param),
+            parameter_types=declared_parameter_types(param),
             parameter_location=param.location,
             operation=operation,
             resources=resources,
@@ -141,7 +141,7 @@ def _parameter_schema(parameter: OpenApiParameter) -> JsonSchema:
         return {}
 
 
-def parameter_types(parameter: OpenApiParameter) -> list[str]:
+def declared_parameter_types(parameter: OpenApiParameter) -> list[str]:
     try:
         return get_type(parameter.raw_schema)
     except InvalidSchema:
@@ -1377,7 +1377,7 @@ def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: Operation
 def _fits_path_parameter(field_types: set[str], parameter: OpenApiParameter) -> bool:
     if not field_types & _SCALAR_TYPES:
         return False
-    declared_types = parameter_types(parameter)
+    declared_types = declared_parameter_types(parameter)
     if field_types & set(declared_types):
         return True
     # A plain string segment carries a number as is; a `format` or `pattern` (`uuid`) rules numbers out.

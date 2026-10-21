@@ -25,11 +25,11 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     bind_id_fields_to_returned_resources,
     bind_item_parameters_to_collections,
     bind_parent_keys_to_item_fields,
+    declared_parameter_types,
     disambiguate_module_variants,
     disambiguate_path_suffix_matches,
     extract_inputs,
     merge_related_resources,
-    parameter_types,
     rebind_body_fields_to_unique_producers,
     rebind_inherited_suffix_matches,
     rebind_orphan_synthetics,
@@ -97,7 +97,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
         if isinstance(result, Ok):
             operation = result.ok()
             path_parameter_types[operation.label] = {
-                parameter.name: parameter_types(parameter)
+                parameter.name: declared_parameter_types(parameter)
                 for parameter in operation.iter_parameters()
                 if parameter.location == ParameterLocation.PATH
             }
