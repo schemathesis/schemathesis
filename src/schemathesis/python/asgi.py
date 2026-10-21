@@ -8,7 +8,7 @@ import threading
 import types
 from collections.abc import Awaitable, Callable
 from contextlib import ExitStack
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import unquote, urljoin, urlsplit
 
 import anyio
@@ -29,7 +29,8 @@ from schemathesis.core.transport import (
 if TYPE_CHECKING:
     from concurrent.futures import Future
 
-    from anyio.abc import BlockingPortal
+    from anyio.from_thread import BlockingPortal
+    from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
 Message = dict[str, Any]
 Scope = dict[str, Any]
@@ -126,8 +127,9 @@ class _Lifespan:
                 self.task.result()
         finally:
             for stream in (self.receive_stream, self.send_stream):
-                stream.send_stream.close()
-                stream.receive_stream.close()
+                # Both halves are memory object streams, which close synchronously.
+                cast("MemoryObjectSendStream[Any]", stream.send_stream).close()
+                cast("MemoryObjectReceiveStream[Any]", stream.receive_stream).close()
 
     async def _app_receive(self) -> Message:
         self.asked_for_message = True

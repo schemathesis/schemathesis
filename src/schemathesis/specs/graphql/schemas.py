@@ -257,7 +257,7 @@ class GraphQLSchema(BaseSchema):
     def client_schema(self) -> graphql.GraphQLSchema:
         import graphql
 
-        return graphql.build_client_schema(self.raw_schema)
+        return graphql.build_client_schema(cast("graphql.IntrospectionQuery", self.raw_schema))
 
     @property
     @override
@@ -344,7 +344,7 @@ class GraphQLSchema(BaseSchema):
         root_type: RootType,
         operation_type: graphql.GraphQLObjectType,
         field_name: str,
-        field: graphql.GraphQlField,
+        field: graphql.GraphQLField,
     ) -> APIOperation:
         return APIOperation(
             base_url=self.get_base_url(),
@@ -543,7 +543,7 @@ class FieldMap(Mapping):
             raise KeyError(message) from exc
 
 
-@st.composite  # type: ignore[untyped-decorator]
+@st.composite
 def graphql_cases(
     draw: Callable,
     *,
@@ -582,7 +582,8 @@ def graphql_cases(
         operation.schema.client_schema,
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
-        print_ast=_noop,
+        # hypothesis-graphql types `print_ast` as returning `str`; the node is kept and printed later.
+        print_ast=_noop,  # type: ignore[arg-type]
         allow_x00=generation.allow_x00,
         allow_null=generation.graphql_allow_null,
         codec=generation.codec,
@@ -601,7 +602,8 @@ def graphql_cases(
             operation.schema.client_schema,
             fields=[definition.field_name],
             custom_scalars=custom_scalars,
-            print_ast=_noop,
+            # hypothesis-graphql types `print_ast` as returning `str`; the node is kept and printed later.
+            print_ast=_noop,  # type: ignore[arg-type]
             allow_x00=generation.allow_x00,
             allow_null=generation.graphql_allow_null,
             codec=generation.codec,

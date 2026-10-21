@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-def ignore(_: str) -> None:
+def ignore(_: object) -> None:
     pass
 
 
@@ -205,7 +205,11 @@ def _blame(schema: JsonSchema, reasons: dict[str, canonical.UnsatisfiableReason]
         reason = reasons[pointer]
         if isinstance(reason, canonical.UnsatisfiableReason.Literal):
             return pointer
-        causes = [reason.cause] if isinstance(reason, canonical.UnsatisfiableReason.Empty) else reason.causes
+        if isinstance(reason, canonical.UnsatisfiableReason.Empty):
+            causes = [reason.cause]
+        else:
+            assert isinstance(reason, canonical.UnsatisfiableReason.Conflict)
+            causes = reason.causes
         for cause in causes:
             for candidate in _passed_on_to(schema, cause):
                 if candidate in reasons and candidate not in seen:
@@ -274,6 +278,7 @@ def describe_unsatisfiable(
         detail = f"Nothing satisfies {_describe_cause(schema, reason.cause, pointer, name_to_uri, draft)}"
         located = reason.cause.pointer != pointer
     else:
+        assert isinstance(reason, canonical.UnsatisfiableReason.Conflict)
         parts = [_describe_cause(schema, cause, pointer, name_to_uri, draft) for cause in reason.causes]
         # The subject is plural when the first part names more than one keyword or branch.
         detail = (" conflict with " if " and " in parts[0] else " conflicts with ").join(parts)

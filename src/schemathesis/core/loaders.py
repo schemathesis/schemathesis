@@ -3,7 +3,7 @@ from __future__ import annotations
 import http.client
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn, Protocol, TypeVar
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, get_request_error_extras, get_request_error_message
 from schemathesis.core.timing import Instant
@@ -11,6 +11,21 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 
 if TYPE_CHECKING:
     import requests
+
+
+class _SentRequest(Protocol):
+    @property
+    def url(self) -> str | None: ...
+
+
+class _SchemaResponse(Protocol):
+    @property
+    def status_code(self) -> int: ...
+    @property
+    def request(self) -> _SentRequest: ...
+
+
+SchemaResponse = TypeVar("SchemaResponse", bound=_SchemaResponse)
 
 
 def prepare_request_kwargs(kwargs: dict[str, Any]) -> None:
@@ -39,7 +54,7 @@ def handle_request_error(exc: requests.RequestException) -> NoReturn:
     ) from exc
 
 
-def raise_for_status(response: requests.Response) -> requests.Response:
+def raise_for_status(response: SchemaResponse) -> SchemaResponse:
     """Handle response status codes."""
     status_code = response.status_code
     if status_code < 400:

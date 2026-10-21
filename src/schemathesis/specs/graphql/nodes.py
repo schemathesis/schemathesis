@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from graphql import ValueNode
+    from hypothesis_graphql.nodes import Boolean, Enum, Float, Int, List, Null, Object, String
 
 # Re-export `hypothesis_graphql` helpers
 
-__all__ = [  # noqa: F822
+__all__ = [
     "Boolean",
     "Enum",
     "Float",
@@ -19,7 +19,7 @@ __all__ = [  # noqa: F822
 ]
 
 
-def __getattr__(name: str) -> ValueNode | None:
+def __getattr__(name: str) -> object:
     if name in __all__:
         import hypothesis_graphql.nodes
 

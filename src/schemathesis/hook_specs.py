@@ -146,31 +146,37 @@ def flatmap_case(context: HookContext, case: Case) -> SearchStrategy:
 @all_scopes
 def before_generate_path_parameters(context: HookContext, strategy: SearchStrategy) -> SearchStrategy:
     """Called on a strategy that generates values for ``path_parameters``."""
+    raise NotImplementedError
 
 
 @all_scopes
 def before_generate_headers(context: HookContext, strategy: SearchStrategy) -> SearchStrategy:
     """Called on a strategy that generates values for ``headers``."""
+    raise NotImplementedError
 
 
 @all_scopes
 def before_generate_cookies(context: HookContext, strategy: SearchStrategy) -> SearchStrategy:
     """Called on a strategy that generates values for ``cookies``."""
+    raise NotImplementedError
 
 
 @all_scopes
 def before_generate_query(context: HookContext, strategy: SearchStrategy) -> SearchStrategy:
     """Called on a strategy that generates values for ``query``."""
+    raise NotImplementedError
 
 
 @all_scopes
 def before_generate_body(context: HookContext, strategy: SearchStrategy) -> SearchStrategy:
     """Called on a strategy that generates values for ``body``."""
+    raise NotImplementedError
 
 
 @all_scopes
 def before_generate_case(context: HookContext, strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
     """Called on a strategy that generates ``Case`` instances."""
+    raise NotImplementedError
 
 
 @all_scopes

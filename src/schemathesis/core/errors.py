@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from textwrap import indent
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn, TypeGuard
 from urllib.parse import urldefrag
 
 from jsonschema_rs import ValidationError
@@ -374,7 +374,7 @@ class UnsupportedRegexPattern(InvalidRegexPattern):
         )
 
 
-def is_regex_validation_error(exc: BaseException) -> bool:
+def is_regex_validation_error(exc: BaseException) -> TypeGuard[ValidationError]:
     """Check if exception is a jsonschema_rs.ValidationError for invalid regex."""
     return isinstance(exc, ValidationError) and exc.kind.name == "format" and exc.kind.value == "regex"
 

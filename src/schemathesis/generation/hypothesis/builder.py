@@ -86,8 +86,10 @@ def create_test(
     }
     generation = config.project.generation_for(operation=operation, phase=HypothesisTestMode.FUZZING.value)
     strategy = st.one_of(
-        operation.as_strategy(generation_mode=mode, feedback=config.feedback, **strategy_kwargs)
-        for mode in generation.modes
+        [
+            operation.as_strategy(generation_mode=mode, feedback=config.feedback, **strategy_kwargs)
+            for mode in generation.modes
+        ]
     )
 
     hypothesis_test = create_base_test(
@@ -117,6 +119,8 @@ def create_test(
         user_settings = given_settings
 
     default = hypothesis.settings.default
+    # Hypothesis always has a loaded profile.
+    assert default is not None
     if user_settings.verbosity == default.verbosity:
         user_settings = hypothesis.settings(user_settings, verbosity=Verbosity.quiet)
 
@@ -160,7 +164,7 @@ def create_test(
         settings = user_settings
 
     if Phase.explain in settings.phases:
-        phases = tuple(phase for phase in settings.phases if phase != Phase.explain)
+        phases: tuple[Phase, ...] = tuple(phase for phase in settings.phases if phase != Phase.explain)
         settings = hypothesis.settings(settings, phases=phases)
 
     # Remove `reuse` & `generate` phases to avoid yielding any test cases if we don't do fuzzing
@@ -264,7 +268,8 @@ def create_base_test(
     funcobj = hypothesis.given(*args, **{**kwargs, "case": strategy})(test_wrapper)
 
     if inspect.iscoroutinefunction(test_function):
-        funcobj.hypothesis.inner_test = make_async_test(test_function)
+        # `hypothesis.inner_test` is documented Hypothesis API that its annotations leave out.
+        funcobj.hypothesis.inner_test = make_async_test(test_function)  # type: ignore[attr-defined]
     return funcobj
 
 

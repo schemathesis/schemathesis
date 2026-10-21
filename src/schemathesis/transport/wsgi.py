@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from typing_extensions import override
@@ -36,6 +36,8 @@ from schemathesis.transport.requests import (
 from schemathesis.transport.serialization import Binary, serialize_binary
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     import requests
     import werkzeug
 
@@ -182,7 +184,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         if is_event_stream(response.content_type):
             # An event stream may never end; stop reading once the request timeout passes in total.
             content, stream_cut_short = read_event_stream(
-                response.response,
+                # A WSGI application iterates over bytes.
+                cast("Iterable[bytes]", response.response),
                 timeout or config.request_timeout_for(operation=case.operation),
                 config.max_stream_events_for(operation=case.operation),
             )

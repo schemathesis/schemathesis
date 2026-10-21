@@ -70,7 +70,7 @@ class ProjectConfig(DiffBase):
     workers: int
     continue_on_failure: bool | None
     tls_verify: bool | str | None
-    rate_limit: Limiter | None
+    rate_limit: Limiter | Literal["auto"] | None
     max_redirects: int | None
     max_stream_events: int | None
     request_timeout: float | int | None
@@ -173,10 +173,12 @@ class ProjectConfig(DiffBase):
         self.proxy = proxy
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
-        if rate_limit is not None and rate_limit != "auto":
-            self.rate_limit = build_limiter(rate_limit)
+        if rate_limit is None:
+            self.rate_limit = None
+        elif rate_limit == "auto":
+            self.rate_limit = "auto"
         else:
-            self.rate_limit = rate_limit
+            self.rate_limit = build_limiter(rate_limit)
         self._rate_limit = rate_limit
         self.max_redirects = max_redirects
         self.max_stream_events = max_stream_events
@@ -313,7 +315,7 @@ class ProjectConfig(DiffBase):
             if rate_limit != "auto":
                 self.rate_limit = build_limiter(rate_limit)
             else:
-                self.rate_limit = rate_limit
+                self.rate_limit = "auto"
             self._mark_source_keys(("rate_limit",))
 
         self._apply(

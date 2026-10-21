@@ -338,8 +338,10 @@ def _draw_case(
     try:
         return draw(
             one_of(
-                operation.as_strategy(generation_mode=mode, feedback=feedback, **merged_kwargs)
-                for mode in generation_modes
+                [
+                    operation.as_strategy(generation_mode=mode, feedback=feedback, **merged_kwargs)
+                    for mode in generation_modes
+                ]
             )
         )
     except UnsatisfiedAssumption:
@@ -548,7 +550,7 @@ def _run_forever_thread(
     # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
     seen_error_labels: set[str] = set()
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def scheduler(draw: hypothesis.strategies.DrawFn) -> tuple[ScenarioRecorder, dict[str, list[Response]]]:
         """Compose a scenario: weighted-random producers, then link-biased follow-ups."""
         if _must_stop_worker(ctx, weighted_operations=weighted_operations, scenario_started=scenario_started):
