@@ -10,9 +10,6 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.drf import DRFParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
 from schemathesis.core.error_feedback.parsers.rails import (
     RailsParser,
     _classify_message,
@@ -20,7 +17,6 @@ from schemathesis.core.error_feedback.parsers.rails import (
     _walk_legacy,
     _walk_modern,
 )
-from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.parameters import ParameterLocation
 
 _RAILS_PRESENCE_REQUIRED_MODERN = {
@@ -504,20 +500,3 @@ def test_rails_parser_envelope_shapes_agree_on_observations(make_operation, mode
         parser.parse(operation=operation, body=_wrap_rails_modern(modern), case=case_factory())
     )
     assert modern_signatures == legacy_signatures == wrapped_signatures
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [PydanticParser(), SpringParser(), JacksonParser()],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _RAILS_ACCEPTED_BODIES)
-def test_other_parsers_reject_rails_bodies(parser, body):
-    assert parser.can_parse(body=body) is False
-
-
-def test_rails_outranks_drf_when_both_claim_a_body():
-    body = {"email": ["can't be blank"], "name": ["is too short (minimum is 2 characters)"]}
-    assert RailsParser().can_parse(body=body) is True
-    assert DRFParser().can_parse(body=body) is True
-    assert RailsParser.priority > DRFParser.priority

@@ -12,17 +12,7 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.confluent import ConfluentParser
-from schemathesis.core.error_feedback.parsers.drf import DRFParser
-from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
 from schemathesis.core.error_feedback.parsers.marshmallow import MarshmallowParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
-from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -424,30 +414,3 @@ def test_marshmallow_parser_drops_unknown_message(make_operation, case_factory):
 
 def test_marshmallow_parser_drops_regex_pattern_with_no_template(make_operation, case_factory):
     assert parse_observations(MarshmallowParser(), _PLAIN_REGEX, make_operation, case_factory) == ()
-
-
-def test_marshmallow_outranks_drf_when_both_claim_a_body():
-    body = {"username": ["Missing data for required field."]}
-    assert MarshmallowParser().can_parse(body=body) is True
-    assert DRFParser().can_parse(body=body) is True
-    assert MarshmallowParser.priority > DRFParser.priority
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [
-        AjvParser(),
-        AspNetParser(),
-        ConfluentParser(),
-        GoValidatorParser(),
-        LaravelParser(),
-        PydanticParser(),
-        JacksonParser(),
-        SymfonyParser(),
-        ZodParser(),
-    ],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _MARSHMALLOW_ACCEPTED_BODIES)
-def test_other_parsers_reject_marshmallow_bodies(parser, body):
-    assert parser.can_parse(body=body) is False

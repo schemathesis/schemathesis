@@ -13,17 +13,7 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
 from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
-from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -519,10 +509,6 @@ def test_symfony_parser_api_platform_multi_field(make_operation, case_factory):
     )
 
 
-def test_symfony_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(SymfonyParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
 def test_symfony_parser_get_routes_to_query_location(make_operation, case_factory):
     obs = SymfonyParser().parse(
         operation=make_operation(method="get", path="/api/users"),
@@ -572,22 +558,3 @@ def test_symfony_parser_drops_malformed_violation(make_operation, violation, cas
     actual = parse_observations(SymfonyParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [
-        AjvParser(),
-        AspNetParser(),
-        GoValidatorParser(),
-        LaravelParser(),
-        RailsParser(),
-        PydanticParser(),
-        JacksonParser(),
-        ZodParser(),
-    ],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _SYMFONY_ACCEPTED_BODIES)
-def test_other_parsers_reject_symfony_bodies(parser, body):
-    assert parser.can_parse(body=body) is False

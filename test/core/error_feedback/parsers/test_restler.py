@@ -14,23 +14,7 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.confluent import ConfluentParser
-from schemathesis.core.error_feedback.parsers.flask_rest import FlaskRestParser
-from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.litestar import LitestarParser
-from schemathesis.core.error_feedback.parsers.marshmallow import MarshmallowParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
 from schemathesis.core.error_feedback.parsers.restler import RestlerParser
-from schemathesis.core.error_feedback.parsers.spring import SpringParser
-from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
-from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -55,7 +39,8 @@ def _restler(message: str, *, version: str = "v3") -> dict:
     return body
 
 
-_RESTLER_VERSIONS = pytest.mark.parametrize("version", ["v3", "v3-production", "v6"])
+RESTLER_VERSIONS = ("v3", "v3-production", "v6")
+_RESTLER_VERSIONS = pytest.mark.parametrize("version", RESTLER_VERSIONS)
 
 
 def _invalid(name: str, detail: str) -> str:
@@ -313,29 +298,3 @@ def test_restler_parser_parse(make_operation, case_factory, message, expected, v
         (o.location, o.parameter_path, o.kind, o.payload)
         for o in parse_observations(RestlerParser(), _restler(message, version=version), make_operation, case_factory)
     ) == ((ParameterLocation.BODY, *expected),)
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [
-        AjvParser(),
-        AspNetParser(),
-        ConfluentParser(),
-        FlaskRestParser(),
-        GoValidatorParser(),
-        JacksonParser(),
-        LaravelParser(),
-        LitestarParser(),
-        MarshmallowParser(),
-        PydanticParser(),
-        RailsParser(),
-        SpringParser(),
-        SymfonyParser(),
-        ZodParser(),
-    ],
-    ids=lambda p: type(p).__name__,
-)
-@_RESTLER_VERSIONS
-@pytest.mark.parametrize(("message", "expected"), _RESTLER_MESSAGES)
-def test_other_parsers_reject_restler_bodies(parser, message, expected, version):
-    assert parser.can_parse(body=_restler(message, version=version)) is False

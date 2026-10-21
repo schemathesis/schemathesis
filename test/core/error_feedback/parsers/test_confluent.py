@@ -7,20 +7,8 @@ from schemathesis.core.error_feedback import (
     PatternPayload,
     SizeBoundPayload,
 )
-from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
 from schemathesis.core.error_feedback.parsers.confluent import ConfluentParser
-from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
-from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
-from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
 
 # Wire-form envelopes captured against a live cp-kafka-rest; older-release wordings
 # carried in alongside the current ones so both arms of each regex stay covered.
@@ -256,10 +244,6 @@ def test_confluent_parser_p4_drops_when_no_empty_string_in_body(make_operation, 
     assert actual == ()
 
 
-def test_confluent_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(ConfluentParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
 def test_confluent_parser_get_routes_to_query_location(make_operation, case_factory):
     obs = ConfluentParser().parse(
         operation=make_operation(method="get", path="/api/topics"),
@@ -267,23 +251,3 @@ def test_confluent_parser_get_routes_to_query_location(make_operation, case_fact
         case=case_factory(query={"topic_name": "foo!bar"}),
     )
     assert obs and obs[0].location == ParameterLocation.QUERY
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [
-        AjvParser(),
-        AspNetParser(),
-        GoValidatorParser(),
-        LaravelParser(),
-        RailsParser(),
-        PydanticParser(),
-        JacksonParser(),
-        SymfonyParser(),
-        ZodParser(),
-    ],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _CONFLUENT_ACCEPTED_BODIES)
-def test_other_parsers_reject_confluent_bodies(parser, body):
-    assert parser.can_parse(body=body) is False
