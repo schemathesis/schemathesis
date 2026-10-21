@@ -20,6 +20,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     BodyPath,
     CanonicalizationCache,
     Cardinality,
+    DeferredBindings,
     DefinitionSource,
     InputSlot,
     OperationMap,
@@ -52,11 +53,7 @@ def extract_inputs(
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
     nested_fk_cache: NestedFKCache,
-    deferred_nested_fks: list[tuple[str, str, BodyPath]],
-    deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
-    deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
-    deferred_field_named_path_parameters: list[tuple[str, str]] | None = None,
-    deferred_writable_body_fields: dict[str, JsonSchema],
+    deferred: DeferredBindings,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
@@ -64,13 +61,8 @@ def extract_inputs(
     Connects each parameter (e.g., `userId`) to its resource definition (`User`),
     creating placeholder resources if not yet discovered from their schemas.
 
-    `deferred_nested_fks` collects nested-body FK lookups whose target resource
-    isn't yet registered. The caller replays them after every operation has been
-    scanned so the slot lands once the producer has been seen.
-
-    `deferred_field_named_path_parameters` collects `(resource, parameter)` pairs for path
-    parameters named after a field of their owning resource (`/projects/{code}`), bound once
-    every resource definition is known.
+    `deferred` collects what binds only after every operation has been scanned, e.g. nested-body
+    FK lookups whose target resource isn't registered yet.
 
     `candidate_resource_names` gates `<word>_name` body-field synthetics: only
     creates a placeholder when the inferred name is backed by a path segment or
@@ -101,10 +93,10 @@ def extract_inputs(
             if param.location == ParameterLocation.PATH and param.name == updated_parameter:
                 updated_resource = input_slot.resource.name
             yield input_slot
-        elif param.location == ParameterLocation.PATH and deferred_field_named_path_parameters is not None:
+        elif param.location == ParameterLocation.PATH:
             owner = naming.owning_resource(param.name, operation.path)
             if owner is not None:
-                deferred_field_named_path_parameters.append((owner, param.name))
+                deferred.field_named_path_parameters.append((owner, param.name))
 
     json_bodies = []
     form_bodies = []
@@ -126,10 +118,7 @@ def extract_inputs(
             known_dependencies=known_dependencies,
             nested_fk_cache=nested_fk_cache,
             updated_resource=updated_resource,
-            deferred_nested_fks=deferred_nested_fks,
-            deferred_named_scalars=deferred_named_scalars,
-            deferred_body_fields=deferred_body_fields,
-            deferred_writable_body_fields=deferred_writable_body_fields,
+            deferred=deferred,
             candidate_resource_names=candidate_resource_names,
         )
 
@@ -405,10 +394,7 @@ def _resolve_body_dependencies(
     known_dependencies: set[str],
     nested_fk_cache: NestedFKCache,
     updated_resource: str | None = None,
-    deferred_nested_fks: list[tuple[str, str, BodyPath]],
-    deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
-    deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
-    deferred_writable_body_fields: dict[str, JsonSchema],
+    deferred: DeferredBindings,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
@@ -450,9 +436,9 @@ def _resolve_body_dependencies(
         # Generation never sends `readOnly` fields, so a link must not either.
         if is_read_only(subschema, bundled):
             continue
-        deferred_writable_body_fields[property_name] = subschema
-        if deferred_body_fields is not None and property_name in required and _is_scalar(subschema):
-            deferred_body_fields.append((property_name, subschema))
+        deferred.writable_body_fields[property_name] = subschema
+        if property_name in required and _is_scalar(subschema):
+            deferred.body_fields.append((property_name, subschema))
         resource_name = naming.from_parameter(property_name, path, body_field=True)
         # `_name` body fields are usually attributes; only invent a resource when its
         # name is backed by a path segment or component schema. Otherwise fall through
@@ -489,10 +475,10 @@ def _resolve_body_dependencies(
             )
             continue
 
-        if resource_name is None and deferred_named_scalars is not None and _is_scalar(subschema):
+        if resource_name is None and _is_scalar(subschema):
             # A field carrying no identifier suffix may still name the collection listing its
             # accepted values (`country` <- `GET /countries`). The producer is confirmed later.
-            deferred_named_scalars.append((naming.to_pascal_case(property_name), property_name, subschema))
+            deferred.named_scalars.append((naming.to_pascal_case(property_name), property_name, subschema))
 
         # Skip generic property names & optional fields (at least for now)
         if property_name in GENERIC_FIELD_NAMES or property_name not in required:
@@ -529,7 +515,7 @@ def _resolve_body_dependencies(
     scan = NestedFKScan(
         bundled=bundled, name_to_uri=body.name_to_uri, by_reference=nested_fk_cache, by_schema={}, flattened={}
     )
-    yield from _extract_nested_body_fk_fields(resolved, resources, scan, deferred=deferred_nested_fks)
+    yield from _extract_nested_body_fk_fields(resolved, resources, scan, deferred=deferred.nested_fks)
 
 
 # FK fields behind a bundled reference, by the reference's original URI and the remaining depth.
@@ -786,7 +772,7 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap) ->
 
 def rebind_body_fields_to_unique_producers(
     operations: OperationMap,
-    deferred_body_fields: dict[str, list[tuple[str, JsonSchema]]],
+    deferred: dict[str, DeferredBindings],
 ) -> None:
     """Bind required scalar body fields to the sole response output that declares them."""
     candidates: dict[str, list[tuple[OperationNode, OutputSlot]]] = {}
@@ -802,7 +788,8 @@ def rebind_body_fields_to_unique_producers(
             for field in declared:
                 candidates.setdefault(field, []).append((operation, output))
 
-    for label, fields in deferred_body_fields.items():
+    for label, bindings in deferred.items():
+        fields = bindings.body_fields
         consumer = operations[label]
         slots = {
             slot.parameter_name: slot
@@ -860,11 +847,12 @@ def rebind_body_fields_to_unique_producers(
 
 
 def bind_echoed_body_fields(
-    schema: OpenApiSchema, operations: OperationMap, writable_body_fields: dict[str, dict[str, JsonSchema]]
+    schema: OpenApiSchema, operations: OperationMap, deferred: dict[str, DeferredBindings]
 ) -> None:
     """Bind update body fields to what the item `GET` returns but creation cannot set, e.g. a `version` token."""
     labels = {(node.method.lower(), node.path): label for label, node in operations.items()}
-    for label, fields in writable_body_fields.items():
+    for label, bindings in deferred.items():
+        fields = bindings.writable_body_fields
         update = operations[label]
         if update.method.lower() not in ("put", "patch") or naming.trailing_path_parameter(update.path) is None:
             continue
@@ -873,9 +861,10 @@ def bind_echoed_body_fields(
         if reader is None:
             continue
         # Only creation tells client-set fields apart from server-set ones; client-set fields keep generated values.
-        settable = writable_body_fields.get(labels.get(("post", naming.collection_path(update.path)), ""))
-        if settable is None:
+        creation = deferred.get(labels.get(("post", naming.collection_path(update.path)), ""))
+        if creation is None or not creation.writable_body_fields:
             continue
+        settable = creation.writable_body_fields
         bound = {slot.parameter_name for slot in update.inputs if slot.parameter_location == ParameterLocation.BODY}
         for output in reader.outputs:
             # Only a single object that declares its fields can promise a value to send back.
@@ -1239,7 +1228,7 @@ def align_created_identifiers(operations: OperationMap) -> None:
 
 
 def bind_created_item_keys(
-    schema: OpenApiSchema, operations: OperationMap, writable_body_fields: dict[str, dict[str, JsonSchema]]
+    schema: OpenApiSchema, operations: OperationMap, deferred: dict[str, DeferredBindings]
 ) -> None:
     """Link the key a client sends to `POST /things` to what `/things/{key}` takes, e.g. a chosen `title`."""
     item_slots: dict[str, dict[str, InputSlot]] = {}
@@ -1253,7 +1242,8 @@ def bind_created_item_keys(
             ):
                 collection = naming.collection_path(operation.path)
                 item_slots.setdefault(collection, {})[input_slot.resource.name] = input_slot
-    for label, fields in writable_body_fields.items():
+    for label, bindings in deferred.items():
+        fields = bindings.writable_body_fields
         create = operations[label]
         slots = item_slots.get(create.path.rstrip("/"), {})
         if create.method.lower() != "post" or len(slots) != 1:
