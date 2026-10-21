@@ -190,7 +190,7 @@ class GraphQLSchema(BaseSchema):
         return create_state_machine(self)
 
     @override
-    def _build_state_machine(
+    def build_state_machine(
         self,
         *,
         feedback: FeedbackSources,
@@ -264,10 +264,10 @@ class GraphQLSchema(BaseSchema):
     def base_path(self) -> str:
         if self.config.base_url:
             return urlsplit(self.config.base_url).path
-        return self._get_base_path()
+        return self.declared_base_path()
 
     @override
-    def _get_base_path(self) -> str:
+    def declared_base_path(self) -> str:
         parts = urlsplit(self.location or "")
         # A `file://` location points at the schema file, not at the GraphQL endpoint.
         if parts.scheme not in ("", "http", "https"):

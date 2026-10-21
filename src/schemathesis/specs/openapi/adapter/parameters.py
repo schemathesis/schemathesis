@@ -30,7 +30,7 @@ from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
-from schemathesis.core.transforms import deepclone, format_body_path
+from schemathesis.core.transforms import deepclone, format_body_path, jsonify_python_specific_types
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
@@ -743,7 +743,6 @@ def _serialize_for_location(
     from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query
     from schemathesis.specs.openapi._hypothesis import (
         _can_skip_header_filter,
-        jsonify_python_specific_types,
         jsonify_query_parameters,
     )
     from schemathesis.specs.openapi.negative import (

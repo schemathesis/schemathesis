@@ -38,7 +38,7 @@ from schemathesis.core.media_types import (
 from schemathesis.core.mutations import MutationMetadata
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import deepclone, to_wire_string
+from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
@@ -1022,20 +1022,6 @@ def get_parameters_strategy(
         )
     # No parameters defined for this location
     return _NONE_STRATEGY
-
-
-def jsonify_python_specific_types(value: Any) -> Any:
-    """Convert Python-specific values to their JSON equivalents.
-
-    Builds a new value: the input may be a spec-declared example that every other case reuses.
-    """
-    if value is None or isinstance(value, bool):
-        return to_wire_string(value)
-    if isinstance(value, dict):
-        return {key: jsonify_python_specific_types(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [jsonify_python_specific_types(item) for item in value]
-    return value
 
 
 def jsonify_query_parameters(value: dict[str, Any], optional: frozenset[str]) -> dict[str, Any]:

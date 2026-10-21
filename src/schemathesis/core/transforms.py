@@ -39,6 +39,22 @@ def to_wire_string(value: object) -> str:
     return str(value)
 
 
+def jsonify_python_specific_types(value: Any) -> Any:
+    """Spell `None` and booleans inside a value as their JSON text, e.g. `True` -> "true".
+
+    Builds a new value: the input may be a spec-declared example that every other case reuses.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    if isinstance(value, dict):
+        return {key: jsonify_python_specific_types(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [jsonify_python_specific_types(item) for item in value]
+    return value
+
+
 def to_wire_text(value: object) -> str:
     """Render a whole value as text on the wire: containers as JSON, scalars as their JSON spelling."""
     if isinstance(value, (dict, list)):

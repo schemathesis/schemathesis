@@ -7,22 +7,9 @@ from urllib.parse import quote
 
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import to_wire_string
+from schemathesis.core.transforms import jsonify_python_specific_types, to_wire_string
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
-
-
-def jsonify(value: Any) -> Any:
-    # Builds a new value: the input may be a spec-declared example that every other case reuses.
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if value is None:
-        return "null"
-    if isinstance(value, dict):
-        return {key: jsonify(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [jsonify(item) for item in value]
-    return value
 
 
 def stringify_value(val: Any, container_name: str) -> Any:
@@ -149,9 +136,9 @@ class WireSemantics:
     def rendered(self, value: Any) -> Any:
         """The value as this location transmits it."""
         if self.location == ParameterLocation.PATH:
-            return quote_path_parameter(jsonify(value))
+            return quote_path_parameter(jsonify_python_specific_types(value))
         if self.location == ParameterLocation.QUERY:
-            return jsonify(value)
+            return jsonify_python_specific_types(value)
         return value
 
     def observed(self, value: Any) -> str:

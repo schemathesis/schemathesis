@@ -23,7 +23,7 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ContainerName, ParameterLocation
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
@@ -36,7 +36,6 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi._hypothesis import (
     _build_custom_formats,
-    jsonify_python_specific_types,
     jsonify_query_parameters,
     openapi_cases,
     snapped_float32_clone,

@@ -147,7 +147,7 @@ class BaseSchema(Mapping):
         # Generated credentials that only some of the accepted security requirements need.
         return []
 
-    def _security_auth_providers(self) -> Iterator[AuthProvider]:
+    def security_auth_providers(self) -> Iterator[AuthProvider]:
         # Auth providers bound to declared security schemes. Only OpenAPI has them.
         return iter(())
 
@@ -318,17 +318,17 @@ class BaseSchema(Mapping):
         if self.config.base_url:
             path = urlsplit(self.config.base_url).path
         else:
-            path = self._get_base_path()
+            path = self.declared_base_path()
         if not path.endswith("/"):
             path += "/"
         return path
 
     @abstractmethod
-    def _get_base_path(self) -> str:
+    def declared_base_path(self) -> str:
         raise NotImplementedError
 
     def _build_base_url(self) -> str:
-        path = self._get_base_path()
+        path = self.declared_base_path()
         parts = urlsplit(self.location or "")[:2] + (path, "", "")
         return urlunsplit(parts)
 
@@ -522,7 +522,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @abstractmethod
-    def _build_state_machine(
+    def build_state_machine(
         self,
         *,
         feedback: FeedbackSources,
