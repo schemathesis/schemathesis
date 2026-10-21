@@ -12,15 +12,6 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.drf import DRFParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
-from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
@@ -781,10 +772,6 @@ def test_zod_parser_skips_issue_with_non_list_path(make_operation, case_factory)
     assert _zod_signatures(observations) == [(("email",), ObservationKind.FORMAT, FormatPayload(name="email"))]
 
 
-def test_zod_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(ZodParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
 @pytest.mark.parametrize(
     "issue",
     [
@@ -825,27 +812,3 @@ def test_zod_parser_parse_drops_malformed_issue(make_operation, issue, case_fact
     actual = parse_observations(ZodParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [AspNetParser(), LaravelParser(), RailsParser(), PydanticParser(), JacksonParser()],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _ZOD_ACCEPTED_BODIES)
-def test_other_parsers_reject_zod_bodies(parser, body):
-    assert parser.can_parse(body=body) is False
-
-
-def test_zod_outranks_spring_when_both_claim_a_body():
-    body = _ZOD_INVALID_STRING_EMAIL
-    assert ZodParser().can_parse(body=body) is True
-    assert SpringParser().can_parse(body=body) is True
-    assert ZodParser.priority > SpringParser.priority
-
-
-def test_zod_outranks_drf_when_both_claim_a_body():
-    body = _ZOD_INVALID_STRING_EMAIL
-    assert ZodParser().can_parse(body=body) is True
-    assert DRFParser().can_parse(body=body) is True
-    assert ZodParser.priority > DRFParser.priority

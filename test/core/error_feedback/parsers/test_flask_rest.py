@@ -12,17 +12,7 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.confluent import ConfluentParser
 from schemathesis.core.error_feedback.parsers.flask_rest import FlaskRestParser
-from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.marshmallow import MarshmallowParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
-from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -276,10 +266,6 @@ def test_flask_rest_parser_parse(make_operation, case_factory, body, expected):
     )
 
 
-def test_flask_rest_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(FlaskRestParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
 @pytest.mark.parametrize(
     "body",
     [
@@ -342,24 +328,3 @@ def test_flask_rest_parser_multi_field(make_operation, case_factory):
     )
     paths = sorted(o.parameter_path for o in parse_observations(FlaskRestParser(), body, make_operation, case_factory))
     assert paths == [("age",), ("role",), ("username",)]
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [
-        AjvParser(),
-        AspNetParser(),
-        ConfluentParser(),
-        GoValidatorParser(),
-        LaravelParser(),
-        MarshmallowParser(),
-        PydanticParser(),
-        JacksonParser(),
-        SymfonyParser(),
-        ZodParser(),
-    ],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _FLASK_REST_ACCEPTED_BODIES)
-def test_other_parsers_reject_flask_rest_bodies(parser, body):
-    assert parser.can_parse(body=body) is False

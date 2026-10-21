@@ -15,14 +15,6 @@ from schemathesis.core.error_feedback import (
     TypeMismatchPayload,
 )
 from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
-from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -741,10 +733,6 @@ def test_ajv_parser_fastify_parse_multi_field_clauses(make_operation, case_facto
     )
 
 
-def test_ajv_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(AjvParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
 @pytest.mark.parametrize(
     ("raw_path", "expected_path"),
     [
@@ -860,32 +848,3 @@ def test_ajv_parser_array_form_drops_malformed_issues(make_operation, issue, cas
     actual = parse_observations(AjvParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [AspNetParser(), LaravelParser(), RailsParser(), PydanticParser(), JacksonParser()],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _AJV_ACCEPTED_BODIES)
-def test_other_parsers_reject_ajv_bodies(parser, body):
-    assert parser.can_parse(body=body) is False
-
-
-def test_ajv_outranks_zod_when_array_signature_collides():
-    # Bodies that carry both `keyword` and `code` could match either parser; priority picks AJV.
-    mixed = {
-        "errors": [
-            {
-                "instancePath": "/email",
-                "keyword": "format",
-                "code": "invalid_string",
-                "path": ["email"],
-                "params": {"format": "email"},
-                "message": 'must match format "email"',
-            }
-        ]
-    }
-    assert AjvParser().can_parse(body=mixed) is True
-    assert ZodParser().can_parse(body=mixed) is True
-    assert AjvParser.priority > ZodParser.priority

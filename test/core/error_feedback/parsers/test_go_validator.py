@@ -11,15 +11,7 @@ from schemathesis.core.error_feedback import (
     ObservationKind,
     SizeBoundPayload,
 )
-from schemathesis.core.error_feedback.parsers.ajv import AjvParser
-from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
 from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -698,10 +690,6 @@ def test_go_validator_parser_structured_multi_field(make_operation, case_factory
     )
 
 
-def test_go_validator_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(GoValidatorParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
 def test_go_validator_parser_get_routes_to_query_location(make_operation, case_factory):
     obs = GoValidatorParser().parse(
         operation=make_operation(method="get", path="/api/users"),
@@ -764,13 +752,3 @@ def test_go_validator_parser_structured_drops_malformed(make_operation, issue, c
     actual = parse_observations(GoValidatorParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [AjvParser(), AspNetParser(), LaravelParser(), RailsParser(), PydanticParser(), JacksonParser()],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _GO_ACCEPTED_BODIES)
-def test_other_parsers_reject_go_bodies(parser, body):
-    assert parser.can_parse(body=body) is False

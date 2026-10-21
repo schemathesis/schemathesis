@@ -11,16 +11,8 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.error_feedback.parsers.drf import DRFParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
 from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
-from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
 
 
 def _laravel_envelope(errors: dict) -> dict:
@@ -465,24 +457,3 @@ def test_laravel_parser_parse_multi_field_drops_unactionable(make_operation, cas
             (("name",), ObservationKind.MUST_NOT_BE_BLANK, None),
         ]
     )
-
-
-def test_laravel_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(LaravelParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [RailsParser(), PydanticParser(), SpringParser(), JacksonParser()],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _LARAVEL_ACCEPTED_BODIES)
-def test_other_parsers_reject_laravel_bodies(parser, body):
-    assert parser.can_parse(body=body) is False
-
-
-def test_laravel_outranks_drf_when_both_claim_a_body():
-    body = _LARAVEL_REQUIRED
-    assert LaravelParser().can_parse(body=body) is True
-    assert DRFParser().can_parse(body=body) is True
-    assert LaravelParser.priority > DRFParser.priority

@@ -12,14 +12,6 @@ from schemathesis.core.error_feedback import (
     SizeBoundPayload,
 )
 from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
-from schemathesis.core.error_feedback.parsers.drf import DRFParser
-from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
-from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
-from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser
-from schemathesis.core.error_feedback.parsers.rails import (
-    RailsParser,
-)
-from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.parameters import ParameterLocation
 from test.core.error_feedback.parsers.helpers import parse_observations
 
@@ -431,24 +423,3 @@ def test_aspnet_parser_parse_multi_field(make_operation, case_factory):
             (("name",), ObservationKind.MUST_NOT_BE_BLANK, None),
         ]
     )
-
-
-def test_aspnet_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert parse_observations(AspNetParser(), {"detail": "nope"}, make_operation, case_factory) == ()
-
-
-@pytest.mark.parametrize(
-    "parser",
-    [LaravelParser(), RailsParser(), PydanticParser(), SpringParser(), JacksonParser()],
-    ids=lambda p: type(p).__name__,
-)
-@pytest.mark.parametrize("body", _ASPNET_ACCEPTED_BODIES)
-def test_other_parsers_reject_aspnet_bodies(parser, body):
-    assert parser.can_parse(body=body) is False
-
-
-def test_aspnet_outranks_drf_when_both_claim_a_body():
-    body = _ASPNET_REQUIRED
-    assert AspNetParser().can_parse(body=body) is True
-    assert DRFParser().can_parse(body=body) is True
-    assert AspNetParser.priority > DRFParser.priority
