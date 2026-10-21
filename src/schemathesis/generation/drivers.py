@@ -103,19 +103,26 @@ def without_unserializable_payload(case: Case, transport: BaseTransport, unseria
     return case
 
 
-def _capture_missing_path_parameters(operation: APIOperation, controller: Controller) -> None:
-    # Schema-injected path parameter placeholders surface as a deferred schema error.
+def missing_path_parameters_error(operation: APIOperation) -> InvalidSchema | None:
+    """The schema error for path parameters the schema uses in its path but never defines."""
     injected = [
         parameter.name
         for parameter in operation.path_parameters
         if parameter.definition.get(INJECTED_PATH_PARAMETER_KEY)
     ]
     if not injected:
-        return
+        return None
     names = ", ".join(f"'{name}'" for name in injected)
     plural = "s" if len(injected) > 1 else ""
     verb = "are" if len(injected) > 1 else "is"
-    controller.deferred_errors.append(InvalidSchema(f"Path parameter{plural} {names} {verb} not defined"))
+    return InvalidSchema(f"Path parameter{plural} {names} {verb} not defined")
+
+
+def _capture_missing_path_parameters(operation: APIOperation, controller: Controller) -> None:
+    # Schema-injected path parameter placeholders surface as a deferred schema error.
+    error = missing_path_parameters_error(operation)
+    if error is not None:
+        controller.deferred_errors.append(error)
 
 
 class CoverageGenerator:

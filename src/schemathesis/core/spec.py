@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn, Protocol
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator
 
-    import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
     from requests.structures import CaseInsensitiveDict
 
@@ -32,18 +30,6 @@ if TYPE_CHECKING:
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ExtraDataSource, ResourcePool
     from schemathesis.schemas import APIOperation
-
-
-@dataclass
-class CoverageCapabilities:
-    """Coverage-phase data the engine asks of a specification.
-
-    Specs that do not participate in coverage generation can return an empty instance
-    (`update_pattern=None`, `validator_cls=None`).
-    """
-
-    update_pattern: Callable[[str, int | None, int | None], str] | None
-    validator_cls: type[jsonschema_rs.Validator] | None
 
 
 class SchemaMetadata(Protocol):
@@ -165,15 +151,9 @@ class ApiSchema(SchemaMetadata, SchemaWarnings, Protocol):
         self, operation: APIOperation, feedback: FeedbackSources = ..., **kwargs: Any
     ) -> list[SearchStrategy[Case]]: ...  # pragma: no cover
 
-    def get_custom_format_strategies(
-        self, generation_config: GenerationConfig, mode: GenerationMode
-    ) -> dict[str, SearchStrategy]: ...  # pragma: no cover
-
     def revalidate_case_metadata(self, case: Case) -> None: ...  # pragma: no cover
 
     # Coverage-phase generation.
-    def get_coverage_capabilities(self) -> CoverageCapabilities: ...  # pragma: no cover
-
     def iter_coverage_cases(
         self,
         operation: APIOperation,

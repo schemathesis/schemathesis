@@ -14,7 +14,6 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.transport import USER_AGENT, CallOutcome
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -61,10 +60,8 @@ def test_tags(ctx):
     assert schema["Query"]["getBooks"].tags is None
 
 
-def test_graphql_schema_has_no_spec_specific_coverage_or_format_hooks(ctx):
+def test_graphql_positive_case_keeps_its_mode_after_body_change(ctx):
     schema = _books_schema(ctx)
-    assert schema.get_coverage_capabilities() == CoverageCapabilities(update_pattern=None, validator_cls=None)
-    assert schema.get_custom_format_strategies(schema.config.generation, GenerationMode.POSITIVE) == {}
     case = find(schema["Mutation"]["addBook"].as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
     case.body = "{ __typename }"
     assert case.meta.generation.mode == GenerationMode.POSITIVE

@@ -14,11 +14,10 @@ from hypothesis import strategies as st
 from hypothesis._settings import CI, all_settings
 from hypothesis.errors import Unsatisfiable
 from jsonschema_rs import ValidationError
-from requests.models import CaseInsensitiveDict
 
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import GenerationConfig, ProjectConfig
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, SpecificationFeature
+from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import (
     IncorrectUsage,
     InvalidSchema,
@@ -27,9 +26,9 @@ from schemathesis.core.errors import (
     is_regex_validation_error,
 )
 from schemathesis.core.marks import Mark
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case, adjust_urlencoded_payload, find_invalid_headers
+from schemathesis.generation.drivers import missing_path_parameters_error
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
@@ -228,17 +227,9 @@ def create_test(
             hooks=hook_dispatcher,
         )
 
-    injected_path_parameter_names = [
-        parameter.name
-        for parameter in operation.path_parameters
-        if parameter.definition.get(INJECTED_PATH_PARAMETER_KEY)
-    ]
-    if injected_path_parameter_names:
-        names = ", ".join(f"'{name}'" for name in injected_path_parameter_names)
-        plural = "s" if len(injected_path_parameter_names) > 1 else ""
-        verb = "are" if len(injected_path_parameter_names) > 1 else "is"
-        error = InvalidSchema(f"Path parameter{plural} {names} {verb} not defined")
-        MissingPathParameters.set(hypothesis_test, error)
+    missing_path_parameters = missing_path_parameters_error(operation)
+    if missing_path_parameters is not None:
+        MissingPathParameters.set(hypothesis_test, missing_path_parameters)
 
     # A seed takes precedence over `derandomize`, so deterministic mode gets one only when the user provided it.
     if (
@@ -393,17 +384,6 @@ def add_coverage(
     if unserializable:
         UnserializablePayloadMark.set(test, sorted(unserializable))
     return test
-
-
-def _case_to_kwargs(case: Case) -> dict:
-    kwargs = {}
-    for container_name in LOCATION_TO_CONTAINER.values():
-        value = getattr(case, container_name)
-        if isinstance(value, CaseInsensitiveDict) and value:
-            kwargs[container_name] = dict(value)
-        elif value and value is not NOT_SET:
-            kwargs[container_name] = value
-    return kwargs
 
 
 UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")
