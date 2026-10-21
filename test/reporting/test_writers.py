@@ -10,8 +10,11 @@ import yaml
 
 from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter, get_command_representation
-from schemathesis.reporting._command import sanitize_args
+from schemathesis.reporting._command import get_command_representation, sanitize_args
+from schemathesis.reporting.har import HarWriter
+from schemathesis.reporting.junitxml import JunitXmlWriter
+from schemathesis.reporting.ndjson import NdjsonWriter
+from schemathesis.reporting.vcr import VcrWriter
 
 
 def test_ndjson_writer_context_manager():
