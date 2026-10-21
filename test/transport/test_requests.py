@@ -1,6 +1,5 @@
 import platform
 import socket
-import threading
 from collections.abc import Callable
 from http.client import RemoteDisconnected
 
@@ -10,6 +9,7 @@ from urllib3.exceptions import ProtocolError
 
 import schemathesis
 from schemathesis.transport.requests import _is_dropped_before_response
+from test.fixtures.app_runner import accept_connections
 
 pytestmark = pytest.mark.skipif(
     platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
@@ -22,17 +22,12 @@ def serve_tcp(handle: Callable[[socket.socket, socket.socket], None]) -> tuple[i
     listener = socket.create_server(("127.0.0.1", 0))
     accepted: list[socket.socket] = []
 
-    def serve() -> None:
-        while True:
-            try:
-                connection, _ = listener.accept()
-            except OSError:
-                return
-            accepted.append(connection)
-            with connection:
-                handle(connection, listener)
+    def serve(connection: socket.socket) -> None:
+        accepted.append(connection)
+        with connection:
+            handle(connection, listener)
 
-    threading.Thread(target=serve, daemon=True).start()
+    accept_connections(listener, serve)
     return listener.getsockname()[1], accepted
 
 

@@ -192,6 +192,20 @@ def run_client_cert_flask_app(app: Flask, ca: trustme.CA) -> int:
     return _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
 
 
+def accept_connections(listener: socket.socket, handle: Callable[[socket.socket], None]) -> None:
+    """Pass every connection `listener` accepts to `handle` on a daemon thread, until the listener closes."""
+
+    def serve() -> None:
+        while True:
+            try:
+                connection, _ = listener.accept()
+            except OSError:
+                return
+            handle(connection)
+
+    threading.Thread(target=serve, daemon=True).start()
+
+
 def run_resetting_server() -> int:
     """Start a server that resets every connection, so requests fail at once without a response on every platform."""
     listener = socket.create_server(("127.0.0.1", 0))
@@ -212,16 +226,14 @@ def run_resetting_server() -> int:
                 return
             remaining -= len(chunk)
 
-    def serve() -> None:
-        while True:
-            connection, _ = listener.accept()
-            # Resetting only once the whole request arrived makes the client see the same error every time.
-            read_request(connection)
-            # A zero linger timeout makes `close` send RST instead of FIN.
-            connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
-            connection.close()
+    def reset(connection: socket.socket) -> None:
+        # Resetting only once the whole request arrived makes the client see the same error every time.
+        read_request(connection)
+        # A zero linger timeout makes `close` send RST instead of FIN.
+        connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        connection.close()
 
-    threading.Thread(target=serve, daemon=True).start()
+    accept_connections(listener, reset)
     return listener.getsockname()[1]
 
 
