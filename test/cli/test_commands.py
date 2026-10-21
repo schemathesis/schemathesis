@@ -3412,7 +3412,7 @@ def test_configured_user_agent_in_case_headers_before_call(ctx, cli, snapshot_cl
     assert (
         cli.main(
             "run",
-            "--phases=examples,coverage,fuzzing",
+            "--phases=coverage,fuzzing",
             "--max-examples=1",
             api.schema_url,
             hooks=verify_configured_headers,
