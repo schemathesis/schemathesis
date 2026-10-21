@@ -1,16 +1,12 @@
-from pathlib import Path
-
 import pytest
 
-from test.utils import load_json_or_fail
+from test.utils import allure_results
 
 
 def _allure_results(allure_dir):
-    results = [load_json_or_fail(path) for path in Path(allure_dir).glob("*-result.json")]
-    assert results
     return {
         result["name"]: (result["status"], (result.get("statusDetails", {}).get("message") or "").partition("\n")[0])
-        for result in results
+        for result in allure_results(allure_dir)
     }
 
 

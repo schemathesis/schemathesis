@@ -1,7 +1,7 @@
-import json
-
 from _pytest.main import ExitCode
 from flask import jsonify
+
+from test.utils import allure_results
 
 
 def test_allure_result_files_written(ctx, cli, tmp_path):
@@ -13,10 +13,7 @@ def test_allure_result_files_written(ctx, cli, tmp_path):
         "--checks=not_a_server_error",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    result_files = list(allure_dir.glob("*-result.json"))
-    assert len(result_files) >= 1
-    for f in result_files:
-        data = json.loads(f.read_text())
+    for data in allure_results(allure_dir):
         assert "name" in data
         assert data["status"] in ("passed", "failed", "broken", "skipped")
         assert data["testCaseId"] == data["historyId"]
@@ -43,7 +40,7 @@ def test_allure_failure_has_reproduce_attachment(ctx, cli, tmp_path):
         "--checks=not_a_server_error",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     failed = [r for r in results if r["status"] == "failed"]
     assert failed, "Expected at least one failed result"
     step_messages = [s["statusDetails"]["message"] for r in failed for s in r.get("steps", [])]
@@ -69,7 +66,7 @@ def test_coverage_unspecified_method_in_allure(ctx, cli, tmp_path):
         == ExitCode.TESTS_FAILED
     )
 
-    results = [json.loads(file.read_text()) for file in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     messages = [step["statusDetails"]["message"] for result in results for step in result.get("steps", [])]
     assert any("Wrong response to undeclared method" in message for message in messages)
 
@@ -84,7 +81,7 @@ def test_allure_broken_status_on_non_fatal_error(ctx, cli, tmp_path):
     api = ctx.openapi.apps.invalid()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(api.schema_url, f"--report-allure-path={allure_dir}", exit_code=ExitCode.TESTS_FAILED)
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     broken = [r for r in results if r["status"] == "broken"]
     assert broken
     assert broken[0]["statusDetails"]["message"]
@@ -109,9 +106,7 @@ def test_allure_stateful_phase_produces_result(ctx, cli, tmp_path):
         "--phases=stateful",
         "--max-examples=5",
     )
-    result_files = list(allure_dir.glob("*-result.json"))
-    assert result_files
-    for data in (json.loads(f.read_text()) for f in result_files):
+    for data in allure_results(allure_dir):
         assert data["status"] in ("passed", "failed", "broken", "skipped")
         assert not any(lbl["name"] == "feature" for lbl in data["labels"])
 
@@ -129,9 +124,7 @@ def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
         "--phases=examples,coverage",
         "--checks=all",
     )
-    result_files = list(allure_dir.glob("*-result.json"))
-    assert result_files
-    for data in (json.loads(f.read_text()) for f in result_files):
+    for data in allure_results(allure_dir):
         # Coverage ran real requests — status must not be skipped
         assert data["status"] != "skipped"
         # And the skip reason must not leak into statusDetails
@@ -142,9 +135,7 @@ def test_allure_layer_label(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(api.schema_url, f"--report-allure-path={allure_dir}")
-    result_files = list(allure_dir.glob("*-result.json"))
-    assert result_files
-    data = json.loads(result_files[0].read_text())
+    data = allure_results(allure_dir)[0]
     assert any(lbl["name"] == "layer" and lbl["value"] == "API" for lbl in data["labels"])
 
 
@@ -177,7 +168,7 @@ def test_allure_labels_include_api_title_and_severity(ctx, cli, tmp_path):
         "--max-examples=1",
         exit_code=ExitCode.TESTS_FAILED,
     )
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     assert [{(lbl["name"], lbl["value"]) for lbl in result["labels"]} for result in results] == [
         {
             ("story", "GET /api/failure"),

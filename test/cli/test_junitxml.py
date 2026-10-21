@@ -1,4 +1,3 @@
-import json
 import platform
 import re
 from xml.etree import ElementTree
@@ -6,6 +5,8 @@ from xml.etree import ElementTree
 import pytest
 from _pytest.main import ExitCode
 from flask import Response, jsonify
+
+from test.utils import allure_results
 
 
 def test_junitxml_option(ctx, cli, hypothesis_max_examples, tmp_path):
@@ -391,7 +392,7 @@ def test_after_run_failures_in_reports_are_sorted_and_deduplicated(
     assert testcases_by_name["Run checks"][0].text == (
         "\n- ST901 dup\n\n    aaa duplicated\n\n- ST901 Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"
     )
-    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     [run_checks] = [result for result in results if result["name"] == "Run checks"]
     assert [step["statusDetails"]["message"] for step in run_checks["steps"]] == [
         "- ST901 dup\n\n    aaa duplicated\n\n- ST901 Custom check failed: `ZRunCheck`\n\n    zzz run-level failure"

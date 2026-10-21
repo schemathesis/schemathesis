@@ -21,6 +21,7 @@ from schemathesis.wfc.escalation import escalating_provider, identity_assignment
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
+from test.utils import allure_results
 
 CREDENTIALS = {
     "username": WFC_USERNAME,
@@ -1347,9 +1348,7 @@ def test_junit_and_allure_name_the_identity(cli, ctx, tmp_path):
     line = "Identity: admin (reproduce with --auth-wfc-user admin)"
     assert [failure.text for failure in ElementTree.parse(junit).iter("failure") if line in failure.text] != []
     messages = [
-        step["statusDetails"]["message"]
-        for path in allure.glob("*-result.json")
-        for step in json.loads(path.read_text()).get("steps", [])
+        step["statusDetails"]["message"] for result in allure_results(allure) for step in result.get("steps", [])
     ]
     assert [message for message in messages if line in message] != []
 
