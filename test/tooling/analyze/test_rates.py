@@ -1,6 +1,7 @@
 import pytest
 
 from scripts.analyze.metrics import analyze
+from test.tooling.analyze.helpers import write_run
 
 
 def _failure_block(title, message):
@@ -11,7 +12,7 @@ def _failure_block(title, message):
     }
 
 
-def test_failures_per_minute_uses_unique_count(tmp_path, write_ndjson):
+def test_failures_per_minute_uses_unique_count(tmp_path):
     payload = {
         "ScenarioFinished": {
             "timestamp": 160.0,
@@ -36,10 +37,9 @@ def test_failures_per_minute_uses_unique_count(tmp_path, write_ndjson):
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
@@ -51,7 +51,7 @@ def test_failures_per_minute_uses_unique_count(tmp_path, write_ndjson):
     assert run.rates.failures_per_minute == pytest.approx(2.0)
 
 
-def test_twoxx_per_minute(tmp_path, write_ndjson):
+def test_twoxx_per_minute(tmp_path):
     cases = {
         f"c{i}": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.01}}}}
         for i in range(6)
@@ -64,10 +64,9 @@ def test_twoxx_per_minute(tmp_path, write_ndjson):
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
@@ -90,12 +89,11 @@ def _scenario_at(label, timestamp, status):
     }
 
 
-def test_new_operation_per_minute_timeline(tmp_path, write_ndjson):
+def test_new_operation_per_minute_timeline(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /a", 100.5, 200),  # minute 0
@@ -111,12 +109,11 @@ def test_new_operation_per_minute_timeline(tmp_path, write_ndjson):
     ]
 
 
-def test_timeline_does_not_count_4xx_only_operations(tmp_path, write_ndjson):
+def test_timeline_does_not_count_4xx_only_operations(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /a", 100.5, 200),
@@ -127,7 +124,7 @@ def test_timeline_does_not_count_4xx_only_operations(tmp_path, write_ndjson):
     assert analyze(path).rates.new_operation_per_minute_timeline == [{"minute": 0, "covered": 1}]
 
 
-def test_timeline_uses_per_call_interaction_timestamp_when_present(tmp_path, write_ndjson):
+def test_timeline_uses_per_call_interaction_timestamp_when_present(tmp_path):
     # The scenario `timestamp` is shared by every case in the payload; per-interaction
     # `timestamp` is finer and must be preferred when available. Discovery for /a lands at
     # minute 0 (interaction timestamp 100.5), /b at minute 2 (interaction timestamp 220.0)
@@ -149,10 +146,9 @@ def test_timeline_uses_per_call_interaction_timestamp_when_present(tmp_path, wri
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 240.0}},
@@ -165,12 +161,11 @@ def test_timeline_uses_per_call_interaction_timestamp_when_present(tmp_path, wri
     ]
 
 
-def test_reachability_lists_distinct_operations_with_2xx(tmp_path, write_ndjson):
+def test_reachability_lists_distinct_operations_with_2xx(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /b", 100.5, 200),
@@ -182,7 +177,7 @@ def test_reachability_lists_distinct_operations_with_2xx(tmp_path, write_ndjson)
     assert analyze(path).reachability.covered_operations == ["GET /a", "GET /b"]
 
 
-def test_reachability_counts_negative_2xx(tmp_path, write_ndjson):
+def test_reachability_counts_negative_2xx(tmp_path):
     # Negative-mode 2xx (NEGATIVE_DRIFT) is still a 2xx and marks the operation covered.
     payload = {
         "ScenarioFinished": {
@@ -206,10 +201,9 @@ def test_reachability_counts_negative_2xx(tmp_path, write_ndjson):
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 130.0}},
@@ -218,7 +212,7 @@ def test_reachability_counts_negative_2xx(tmp_path, write_ndjson):
     assert analyze(path).reachability.covered_operations == ["POST /widgets"]
 
 
-def test_reachability_empty_when_no_2xx(tmp_path, write_ndjson):
+def test_reachability_empty_when_no_2xx(tmp_path):
     payload = {
         "ScenarioFinished": {
             "timestamp": 101.0,
@@ -230,10 +224,9 @@ def test_reachability_empty_when_no_2xx(tmp_path, write_ndjson):
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 130.0}},

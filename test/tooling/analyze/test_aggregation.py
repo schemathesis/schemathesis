@@ -1,22 +1,15 @@
+import json
+
 import pytest
 
 from scripts.analyze.metrics import analyze
+from test.tooling.analyze.helpers import write_run
 
 
-def test_analyze_extracts_initialize_header(tmp_path, write_ndjson):
+def test_analyze_extracts_initialize_header(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
-        path,
-        [
-            {
-                "Initialize": {
-                    "command": "schemathesis run http://x/openapi.json",
-                    "schemathesis_version": "4.16.1",
-                    "seed": 42,
-                }
-            }
-        ],
-    )
+    header = {"command": "schemathesis run http://x/openapi.json", "schemathesis_version": "4.16.1", "seed": 42}
+    path.write_text(json.dumps({"Initialize": header}) + "\n")
     run = analyze(path)
     assert run.schemathesis_version == "4.16.1"
     assert run.seed == 42
@@ -113,12 +106,11 @@ def test_analyze_failure_occurrence_count_includes_duplicates(analyzer_ndjson):
         assert run.failure_counts[check_name] >= unique
 
 
-def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_ndjson):
+def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}},
             {
                 "NonFatalError": {
                     "id": "a",
@@ -155,18 +147,17 @@ def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_n
     ]
 
 
-def test_analyze_engine_errors_empty_when_no_failures(tmp_path, write_ndjson):
+def test_analyze_engine_errors_empty_when_no_failures(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(path, [{"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}}])
+    write_run(path, [])
     assert analyze(path).engine_errors == []
 
 
-def test_analyze_truncated_phase(tmp_path, write_ndjson):
+def test_analyze_truncated_phase(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}},
             {"EngineStarted": {"timestamp": 0.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 1.0}},
         ],
@@ -175,12 +166,11 @@ def test_analyze_truncated_phase(tmp_path, write_ndjson):
     assert [(phase.name, phase.truncated) for phase in run.phases] == [("fuzzing", True)]
 
 
-def test_analyze_duration_falls_back_to_last_event_when_truncated(tmp_path, write_ndjson):
+def test_analyze_duration_falls_back_to_last_event_when_truncated(tmp_path):
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.5}},
             {"PhaseFinished": {"phase": {"name": "fuzzing"}, "timestamp": 142.5}},
@@ -189,7 +179,7 @@ def test_analyze_duration_falls_back_to_last_event_when_truncated(tmp_path, writ
     assert analyze(path).duration_seconds == 42.5
 
 
-def test_analyze_routes_stateful_label_into_separate_field(tmp_path, write_ndjson):
+def test_analyze_routes_stateful_label_into_separate_field(tmp_path):
     path = tmp_path / "run.ndjson"
     payload = {
         "ScenarioFinished": {
@@ -200,7 +190,7 @@ def test_analyze_routes_stateful_label_into_separate_field(tmp_path, write_ndjso
             }
         }
     }
-    write_ndjson(path, [{"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}}, payload])
+    write_run(path, [payload])
     run = analyze(path)
     assert "Stateful tests" not in run.operations
     assert run.stateful is not None
@@ -208,7 +198,7 @@ def test_analyze_routes_stateful_label_into_separate_field(tmp_path, write_ndjso
     assert run.stateful.buckets.positive_accepted == 1
 
 
-def test_analyze_phase_timings_accumulate(tmp_path, write_ndjson):
+def test_analyze_phase_timings_accumulate(tmp_path):
     path = tmp_path / "run.ndjson"
     payload = {
         "ScenarioFinished": {
@@ -226,10 +216,9 @@ def test_analyze_phase_timings_accumulate(tmp_path, write_ndjson):
             },
         }
     }
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
@@ -242,7 +231,7 @@ def test_analyze_phase_timings_accumulate(tmp_path, write_ndjson):
     assert fuzzing.response_seconds == pytest.approx(0.50)
 
 
-def test_analyze_per_operation_timings_accumulate(tmp_path, write_ndjson):
+def test_analyze_per_operation_timings_accumulate(tmp_path):
     path = tmp_path / "run.ndjson"
     payload = {
         "ScenarioFinished": {
@@ -260,10 +249,9 @@ def test_analyze_per_operation_timings_accumulate(tmp_path, write_ndjson):
             },
         }
     }
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
         ],
@@ -274,7 +262,7 @@ def test_analyze_per_operation_timings_accumulate(tmp_path, write_ndjson):
     assert operation.response_seconds == pytest.approx(0.30)
 
 
-def test_analyze_phase_timings_skip_missing_fields(tmp_path, write_ndjson):
+def test_analyze_phase_timings_skip_missing_fields(tmp_path):
     # Older NDJSON may omit generation.time and response.elapsed; per-phase totals
     # must stay at 0.0 rather than counting absent values as zero contributions.
     path = tmp_path / "run.ndjson"
@@ -288,10 +276,9 @@ def test_analyze_phase_timings_skip_missing_fields(tmp_path, write_ndjson):
             },
         }
     }
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
             {"PhaseFinished": {"phase": {"name": "fuzzing"}, "timestamp": 101.0}},
@@ -304,7 +291,7 @@ def test_analyze_phase_timings_skip_missing_fields(tmp_path, write_ndjson):
     assert fuzzing.buckets.positive_accepted == 1
 
 
-def test_analyze_fuzz_scenario_uses_per_case_label(tmp_path, write_ndjson):
+def test_analyze_fuzz_scenario_uses_per_case_label(tmp_path):
     # FuzzScenarioFinished carries the synthetic "Fuzz tests" recorder label; per-case
     # method/path must drive operation attribution.
     payload = {
@@ -324,10 +311,9 @@ def test_analyze_fuzz_scenario_uses_per_case_label(tmp_path, write_ndjson):
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 130.0}},
@@ -338,7 +324,7 @@ def test_analyze_fuzz_scenario_uses_per_case_label(tmp_path, write_ndjson):
     assert "Fuzz tests" not in run.operations
 
 
-def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_path, write_ndjson):
+def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_path):
     # Coverage `unspecified_http_method` mutates case.method (e.g. TRACE on a POST-only
     # operation). Route-match must use the *declared* method, so a 404 lands in
     # route_rejected — not positive_drift.
@@ -364,10 +350,9 @@ def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_p
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 130.0}},
@@ -378,7 +363,7 @@ def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_p
     assert run.buckets.positive_drift == 0
 
 
-def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path, write_ndjson):
+def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path):
     # The synthetic "Stateful tests" recorder label must not drive route matching, otherwise
     # every case would compare its method against itself.
     payload = {
@@ -400,10 +385,9 @@ def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path, 
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 130.0}},
@@ -415,7 +399,7 @@ def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path, 
     assert run.stateful.buckets.total == 1
 
 
-def test_analyze_stateful_scenario_dual_bumps_per_op_and_phase_aggregate(tmp_path, write_ndjson):
+def test_analyze_stateful_scenario_dual_bumps_per_op_and_phase_aggregate(tmp_path):
     # Stateful cases with a real per-case method+path must show up in BOTH
     # `run.operations[<op>]` (so per-op drill-downs include stateful contribution) AND
     # `run.stateful` (the phase-level aggregate stays available for stateful-only views).
@@ -432,10 +416,9 @@ def test_analyze_stateful_scenario_dual_bumps_per_op_and_phase_aggregate(tmp_pat
         }
     }
     path = tmp_path / "run.ndjson"
-    write_ndjson(
+    write_run(
         path,
         [
-            {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 130.0}},
