@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- `st fuzz --mode=negative` running no scenarios when startup exceeds `--max-time`.
 - Crash on WSGI apps for `multipart/form-data` bodies that are arrays or scalars.
 - Stateful phase skipped and wrong API link counts for chained `$ref` responses or links.
 
