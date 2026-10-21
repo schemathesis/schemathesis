@@ -79,54 +79,64 @@ class ScenarioRecord:
     tagged: bool
 
 
+def _test_scenario_record(statistic: Statistic, event: events.ScenarioFinished) -> ScenarioRecord:
+    return ScenarioRecord(
+        label=event.recorder.label,
+        elapsed_sec=event.elapsed_time,
+        status=event.status,
+        failures=recorder_failures(statistic, event.recorder) if event.status == Status.FAILURE else [],
+        skip_reason=event.skip_reason,
+        tagged=event.phase != PhaseName.STATEFUL_TESTING,
+    )
+
+
+def _label_record(statistic: Statistic, recorder: RecordedScenario, label: str, *, failed: bool) -> ScenarioRecord:
+    return ScenarioRecord(
+        label=label,
+        elapsed_sec=scenario_elapsed(recorder, label),
+        status=Status.FAILURE if scenario_has_failures(recorder, label) else Status.SUCCESS,
+        failures=scenario_failures(statistic, recorder, label) if failed else [],
+        skip_reason=None,
+        tagged=True,
+    )
+
+
+def _unfinished_fuzz_record(event: events.FuzzScenarioFinished) -> ScenarioRecord:
+    return ScenarioRecord(
+        label=event.recorder.label,
+        elapsed_sec=event.elapsed_time,
+        status=event.status,
+        failures=[],
+        skip_reason=None,
+        tagged=False,
+    )
+
+
+def _fuzz_scenario_records(statistic: Statistic, event: events.FuzzScenarioFinished) -> list[ScenarioRecord]:
+    if event.status not in (Status.SUCCESS, Status.FAILURE):
+        return [_unfinished_fuzz_record(event)]
+    failed = event.status == Status.FAILURE
+    return [_label_record(statistic, event.recorder, label, failed=failed) for label in unique_labels(event.recorder)]
+
+
+def _run_checks_record(statistic: Statistic) -> ScenarioRecord:
+    # Recorded by the execution context before handlers run, deduplicated and sorted.
+    return ScenarioRecord(
+        label=RUN_CHECKS_LABEL,
+        elapsed_sec=0.0,
+        status=Status.FAILURE,
+        failures=list(statistic.failures[RUN_CHECKS_LABEL].values()),
+        skip_reason=None,
+        tagged=False,
+    )
+
+
 def scenario_records(statistic: Statistic, event: events.EngineEvent) -> list[ScenarioRecord]:
     """Report entries for an event that finishes a scenario or the run; empty for any other event."""
     if isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
-        return [
-            ScenarioRecord(
-                label=event.recorder.label,
-                elapsed_sec=event.elapsed_time,
-                status=event.status,
-                failures=recorder_failures(statistic, event.recorder) if event.status == Status.FAILURE else [],
-                skip_reason=event.skip_reason,
-                tagged=event.phase != PhaseName.STATEFUL_TESTING,
-            )
-        ]
+        return [_test_scenario_record(statistic, event)]
     if isinstance(event, events.FuzzScenarioFinished):
-        if event.status in (Status.SUCCESS, Status.FAILURE):
-            return [
-                ScenarioRecord(
-                    label=label,
-                    elapsed_sec=scenario_elapsed(event.recorder, label),
-                    status=Status.FAILURE if scenario_has_failures(event.recorder, label) else Status.SUCCESS,
-                    failures=scenario_failures(statistic, event.recorder, label)
-                    if event.status == Status.FAILURE
-                    else [],
-                    skip_reason=None,
-                    tagged=True,
-                )
-                for label in unique_labels(event.recorder)
-            ]
-        return [
-            ScenarioRecord(
-                label=event.recorder.label,
-                elapsed_sec=event.elapsed_time,
-                status=event.status,
-                failures=[],
-                skip_reason=None,
-                tagged=False,
-            )
-        ]
+        return _fuzz_scenario_records(statistic, event)
     if isinstance(event, events.EngineFinished) and event.failures:
-        # Recorded by the execution context before handlers run, deduplicated and sorted.
-        return [
-            ScenarioRecord(
-                label=RUN_CHECKS_LABEL,
-                elapsed_sec=0.0,
-                status=Status.FAILURE,
-                failures=list(statistic.failures[RUN_CHECKS_LABEL].values()),
-                skip_reason=None,
-                tagged=False,
-            )
-        ]
+        return [_run_checks_record(statistic)]
     return []
