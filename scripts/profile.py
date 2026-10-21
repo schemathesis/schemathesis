@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import webbrowser
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,9 +41,10 @@ class ProfileRecord:
     mode: str
     elapsed: float
     html_path: Path
+    cases: int
 
-    def avg_ms(self, count: int) -> float:
-        return (self.elapsed / count) * 1000 if count > 0 else 0
+    def avg_ms(self) -> float:
+        return (self.elapsed / self.cases) * 1000 if self.cases > 0 else 0
 
 
 def _get_profiler() -> Any:
@@ -78,11 +79,6 @@ def _load_schema(schema_path: str, base_url: str | None) -> Any:
 
 
 _MOCK_BASE_URL = "http://localhost"
-
-
-def _install_call_mock() -> None:
-    """Patch Case.call so the CLI never makes real HTTP requests."""
-    install_stub_call()
 
 
 def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
@@ -159,7 +155,7 @@ def cli(
 
     args, tmp_paths = _resolve_corpus_args(args)
     if tmp_paths:
-        _install_call_mock()
+        install_stub_call()
 
     output_path = Path(output_file or DEFAULT_CLI_PROFILE_FILENAME)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -189,55 +185,58 @@ def cli(
         webbrowser.open(output_path.resolve().as_uri())
 
 
-@click.command("fuzzing")  # type: ignore[untyped-decorator]
-@click.argument("schema_path")  # type: ignore[untyped-decorator]
-@click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")  # type: ignore[untyped-decorator]
-@click.option(  # type: ignore[untyped-decorator]
-    "--include-name",
-    "include_name",
-    multiple=True,
-    metavar="METHOD PATH",
-    help='Match operations by method + path, e.g. "POST /chat/completions".',
-)
-@click.option(
-    "--max-examples", "count", default=100, show_default=True, help="Maximum number of test cases per API operation"
-)  # type: ignore[untyped-decorator]
-@click.option(  # type: ignore[untyped-decorator]
-    "--mode",
-    type=click.Choice(["positive", "negative", "all"]),
-    default="all",
-    show_default=True,
-    help="Test data generation mode",
-)
-@click.option(  # type: ignore[untyped-decorator]
-    "--output-dir",
-    "output_dir",
-    default="profiles",
-    show_default=True,
-    help="Directory to write per-operation HTML profiles.",
-)
-@click.option(  # type: ignore[untyped-decorator]
-    "--open",
-    "open_result",
-    is_flag=True,
-    default=False,
-    help="Open each profile HTML in the browser after generation.",
-)
-def fuzzing(
+def _operation_profile_options(command: Callable) -> Callable:
+    for option in reversed(
+        (
+            click.argument("schema_path"),
+            click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)"),
+            click.option(
+                "--include-name",
+                "include_name",
+                multiple=True,
+                metavar="METHOD PATH",
+                help='Match operations by method + path, e.g. "POST /chat/completions".',
+            ),
+            click.option(
+                "--mode",
+                type=click.Choice(["positive", "negative", "all"]),
+                default="all",
+                show_default=True,
+                help="Test data generation mode",
+            ),
+            click.option(
+                "--output-dir",
+                "output_dir",
+                default="profiles",
+                show_default=True,
+                help="Directory to write per-operation HTML profiles.",
+            ),
+            click.option(
+                "--open",
+                "open_result",
+                is_flag=True,
+                default=False,
+                help="Open each profile HTML in the browser after generation.",
+            ),
+        )
+    ):
+        command = option(command)
+    return command
+
+
+def _profile_operations(
+    *,
     schema_path: str,
     base_url: str | None,
     include_name: tuple[str, ...],
-    count: int,
     mode: str,
     output_dir: str,
     open_result: bool,
-) -> None:
-    """Profile data generation per operation in isolation.
-
-    SCHEMA_PATH may be a file path, a URL, or a corpus:// path:
-
-        python scripts/profile.py generate corpus://openapi-3.0/vercel.com/0.0.1.json
-    """
+    phase: str,
+    run: Callable[[Any, GenerationMode], int | None],
+    describe: Callable[[ProfileRecord], str],
+) -> list[ProfileRecord]:
+    """Profile `run` per operation and mode; `run` returns the case count, or `None` to skip."""
     _get_profiler()
 
     hypothesis.setup()
@@ -259,34 +258,75 @@ def fuzzing(
         path = operation.path
 
         for gen_mode in modes:
-            strategy = operation.as_strategy(generation_mode=gen_mode)
             profiler = _get_profiler()
             t0 = time.perf_counter()
-
-            try:
-                with profiler:
-                    generate_many(strategy, count)
-            except Unsatisfiable:
-                click.echo(f"  {method:7} {path:50} [{gen_mode.value:8}]  UNSATISFIABLE (skipped)", err=True)
+            with profiler:
+                cases = run(operation, gen_mode)
+            if cases is None:
                 continue
-
             elapsed = time.perf_counter() - t0
             mode_label = gen_mode.value
-            html_path = out_dir / f"{_normalize_path(method)}_{_normalize_path(path)}_fuzzing_{mode_label}.html"
+            html_path = out_dir / f"{_normalize_path(method)}_{_normalize_path(path)}_{phase}_{mode_label}.html"
             html_path.write_text(profiler.output_html(), encoding="utf-8")
 
-            record = ProfileRecord(method, path, mode_label, elapsed, html_path)
+            record = ProfileRecord(method, path, mode_label, elapsed, html_path, cases)
             records.append(record)
-            click.echo(f"  {method:7} {path:50} [{mode_label:8}]  {elapsed:7.2f}s  ({record.avg_ms(count):.0f}ms/case)")
+            click.echo(f"  {method:7} {path:50} [{mode_label:8}]  {elapsed:7.2f}s  ({describe(record)})")
 
             if open_result:
                 webbrowser.open(html_path.resolve().as_uri())
 
     if not records:
         click.echo("No operations profiled.")
-        return
-
     records.sort(key=lambda r: r.elapsed, reverse=True)
+    return records
+
+
+@click.command("fuzzing")  # type: ignore[untyped-decorator]
+@_operation_profile_options
+@click.option(
+    "--max-examples", "count", default=100, show_default=True, help="Maximum number of test cases per API operation"
+)  # type: ignore[untyped-decorator]
+def fuzzing(
+    schema_path: str,
+    base_url: str | None,
+    include_name: tuple[str, ...],
+    count: int,
+    mode: str,
+    output_dir: str,
+    open_result: bool,
+) -> None:
+    """Profile data generation per operation in isolation.
+
+    SCHEMA_PATH may be a file path, a URL, or a corpus:// path:
+
+        python scripts/profile.py fuzzing corpus://openapi-3.0/vercel.com/0.0.1.json
+    """
+
+    def run(operation: Any, generation_mode: GenerationMode) -> int | None:
+        try:
+            generate_many(operation.as_strategy(generation_mode=generation_mode), count)
+        except Unsatisfiable:
+            click.echo(
+                f"  {operation.method.upper():7} {operation.path:50} [{generation_mode.value:8}]  UNSATISFIABLE (skipped)",
+                err=True,
+            )
+            return None
+        return count
+
+    records = _profile_operations(
+        schema_path=schema_path,
+        base_url=base_url,
+        include_name=include_name,
+        mode=mode,
+        output_dir=output_dir,
+        open_result=open_result,
+        phase="fuzzing",
+        run=run,
+        describe=lambda record: f"{record.avg_ms():.0f}ms/case",
+    )
+    if not records:
+        return
 
     click.echo()
     click.echo(f"{'METHOD':<7}  {'PATH':<50}  {'MODE':<8}  {'TOTAL':>8}  {'AVG/CASE':>10}  PROFILE")
@@ -294,41 +334,12 @@ def fuzzing(
     for record in records:
         click.echo(
             f"{record.method:<7}  {record.path:<50}  {record.mode:<8}  "
-            f"{record.elapsed:7.2f}s  {record.avg_ms(count):8.0f}ms  {record.html_path}"
+            f"{record.elapsed:7.2f}s  {record.avg_ms():8.0f}ms  {record.html_path}"
         )
 
 
 @click.command("coverage")  # type: ignore[untyped-decorator]
-@click.argument("schema_path")  # type: ignore[untyped-decorator]
-@click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")  # type: ignore[untyped-decorator]
-@click.option(  # type: ignore[untyped-decorator]
-    "--include-name",
-    "include_name",
-    multiple=True,
-    metavar="METHOD PATH",
-    help='Match operations by method + path, e.g. "POST /chat/completions".',
-)
-@click.option(  # type: ignore[untyped-decorator]
-    "--mode",
-    type=click.Choice(["positive", "negative", "all"]),
-    default="all",
-    show_default=True,
-    help="Test data generation mode",
-)
-@click.option(  # type: ignore[untyped-decorator]
-    "--output-dir",
-    "output_dir",
-    default="profiles",
-    show_default=True,
-    help="Directory to write per-operation HTML profiles.",
-)
-@click.option(  # type: ignore[untyped-decorator]
-    "--open",
-    "open_result",
-    is_flag=True,
-    default=False,
-    help="Open each profile HTML in the browser after generation.",
-)
+@_operation_profile_options
 def coverage(
     schema_path: str,
     base_url: str | None,
@@ -343,61 +354,34 @@ def coverage(
 
         python scripts/profile.py coverage corpus://openapi-3.0/vercel.com/0.0.1.json --mode negative
     """
-    _get_profiler()
 
-    hypothesis.setup()
-
-    click.echo(f"Profiling: {schema_path}")
-    click.echo(f"Output:    {output_dir}/")
-    click.echo()
-
-    schema = _load_schema(schema_path, base_url)
-    modes = GenerationMode.from_choice(mode)
-
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    records: list[ProfileRecord] = []
-    case_counts: dict[Path, int] = {}
-
-    for operation in _iter_operations(schema, include_name):
-        method = operation.method.upper()
-        path = operation.path
-        config = operation.schema.config
-
-        for gen_mode in modes:
-            profiler = _get_profiler()
-            t0 = time.perf_counter()
-            with profiler:
-                cases = list(
-                    CoverageGenerator(
-                        operation=operation,
-                        generation_modes=[gen_mode],
-                        auth_storage=None,
-                        as_strategy_kwargs={},
-                        feedback=FeedbackSources(),
-                        generation_config=config.generation,
-                    )
+    def run(operation: Any, generation_mode: GenerationMode) -> int:
+        return len(
+            list(
+                CoverageGenerator(
+                    operation=operation,
+                    generation_modes=[generation_mode],
+                    auth_storage=None,
+                    as_strategy_kwargs={},
+                    feedback=FeedbackSources(),
+                    generation_config=operation.schema.config.generation,
                 )
-            elapsed = time.perf_counter() - t0
-            case_count = len(cases)
-            mode_label = gen_mode.value
-            html_path = out_dir / f"{_normalize_path(method)}_{_normalize_path(path)}_coverage_{mode_label}.html"
-            html_path.write_text(profiler.output_html(), encoding="utf-8")
+            )
+        )
 
-            record = ProfileRecord(method, path, mode_label, elapsed, html_path)
-            records.append(record)
-            case_counts[html_path] = case_count
-            click.echo(f"  {method:7} {path:50} [{mode_label:8}]  {elapsed:7.2f}s  ({case_count} cases)")
-
-            if open_result:
-                webbrowser.open(html_path.resolve().as_uri())
-
+    records = _profile_operations(
+        schema_path=schema_path,
+        base_url=base_url,
+        include_name=include_name,
+        mode=mode,
+        output_dir=output_dir,
+        open_result=open_result,
+        phase="coverage",
+        run=run,
+        describe=lambda record: f"{record.cases} cases",
+    )
     if not records:
-        click.echo("No operations profiled.")
         return
-
-    records.sort(key=lambda r: r.elapsed, reverse=True)
 
     click.echo()
     click.echo(f"{'METHOD':<7}  {'PATH':<50}  {'MODE':<8}  {'TOTAL':>8}  {'CASES':>6}  PROFILE")
@@ -405,7 +389,7 @@ def coverage(
     for record in records:
         click.echo(
             f"{record.method:<7}  {record.path:<50}  {record.mode:<8}  "
-            f"{record.elapsed:7.2f}s  {case_counts[record.html_path]:6}  {record.html_path}"
+            f"{record.elapsed:7.2f}s  {record.cases:6}  {record.html_path}"
         )
 
 
@@ -427,7 +411,7 @@ def stateful(schema_path: str, base_url: str | None, output_file: str, open_resu
 
     For memory, run under memray: memray run -o out.bin scripts/profile.py stateful corpus://...
     """
-    _install_call_mock()
+    install_stub_call()
     profiler = _get_profiler()
 
     hypothesis.setup()
