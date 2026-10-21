@@ -66,11 +66,10 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
-    from schemathesis.core.spec import ApiSchema, Scheduler
+    from schemathesis.core.spec import ApiSchema
     from schemathesis.core.transport import Response
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
-    from schemathesis.engine.run import Phase
     from schemathesis.generation.dictionaries import DictionaryDraw
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantDraw
@@ -247,25 +246,12 @@ class GraphQLSchema(BaseSchema):
         return iter(())
 
     @override
-    def get_unit_scheduler(
-        self,
-        operations: list[Result[APIOperation, InvalidSchema]],
-        phase: Phase,
-    ) -> Scheduler:
-        from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-        from schemathesis.engine.run.unit._pool import DefaultScheduler, split_results
+    def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
         from schemathesis.specs.graphql.ordering import compute_graphql_layers
 
-        successes, errors = split_results(operations)
-        if not successes:
-            return DefaultScheduler(operations=operations)
-
-        layers = compute_graphql_layers(successes)
-        if len(layers) == 1:
-            # Single role: layering would add no information.
-            return DefaultScheduler(operations=operations)
-
-        return LayeredScheduler(layers, errors=errors)
+        layers = compute_graphql_layers(operations)
+        # Single role: layering would add no information, so keep the schema order.
+        return layers if len(layers) > 1 else []
 
     @cached_property
     def client_schema(self) -> graphql.GraphQLSchema:

@@ -14,13 +14,9 @@ from typing_extensions import override
 
 from schemathesis.config import (
     ApiKeyAuthConfig,
-    CoveragePhaseConfig,
     DynamicTokenAuthConfig,
-    ExamplesPhaseConfig,
-    FuzzingPhaseConfig,
     HttpBasicAuthConfig,
     HttpBearerAuthConfig,
-    OperationOrdering,
 )
 from schemathesis.core import NOT_SET, Body, NotSet, Specification, media_types
 from schemathesis.core.errors import (
@@ -33,7 +29,7 @@ from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.result import Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import (
@@ -84,10 +80,9 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.core.spec import ApiSchema, Scheduler
+    from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
-    from schemathesis.engine.run import Phase
     from schemathesis.filters import FilterSet
     from schemathesis.generation.coverage import GenerationSession
     from schemathesis.generation.hypothesis.reporting import SlowParameter, UnsatisfiableParameter
@@ -388,38 +383,15 @@ class OpenApiSchema(BaseSchema):
         return create_state_machine(self, feedback=feedback, link_calibration=link_calibration)
 
     @override
-    def get_unit_scheduler(
-        self,
-        operations: list[Result[APIOperation, InvalidSchema]],
-        phase: Phase,
-    ) -> Scheduler:
-        from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-        from schemathesis.engine.run.unit._pool import DefaultScheduler, split_results
+    def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
         from schemathesis.specs.openapi._ordering import compute_operation_layers
 
-        phase_config = self.config.phases.get_by_name(name=phase.name.value)
-        assert isinstance(phase_config, FuzzingPhaseConfig | CoveragePhaseConfig | ExamplesPhaseConfig)
-        if phase_config.operation_ordering == OperationOrdering.NONE:
-            return DefaultScheduler(operations=operations)
-
-        successes, errors = split_results(operations)
-        if not successes:
-            return DefaultScheduler(operations=operations)
-
-        layers = compute_operation_layers(self, successes)
-
-        if not layers:
-            return DefaultScheduler(operations=operations)
-
+        layers = compute_operation_layers(self, operations)
         if len(layers) == 1:
             # Stable-sort by RESTful priority so producers dispatch before consumers
             # without reordering same-priority operations against each other.
-            ordered_successes = sorted(successes, key=lambda op: restful_method_priority(op.method))
-            ordered: list[Result[APIOperation, InvalidSchema]] = [Ok(op) for op in ordered_successes]
-            ordered.extend(Err(err) for err in errors)
-            return DefaultScheduler(operations=ordered)
-
-        return LayeredScheduler(layers, errors=errors)
+            return [sorted(operations, key=lambda op: restful_method_priority(op.method))]
+        return layers
 
     @override
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
