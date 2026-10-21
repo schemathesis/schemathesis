@@ -39,6 +39,10 @@ class BaseExecutionContext:
     def __post_init__(self) -> None:
         self.statistic.baseline = self.config.load_baseline()
 
+    @property
+    def base_url_is_set(self) -> bool:
+        return self.config.base_url is not None
+
     def find_operation(self, label: str) -> APIOperation | None:
         """The operation behind `label`; `None` before the schema is loaded or when no operation has that label."""
         if self.find_operation_by_label is None:

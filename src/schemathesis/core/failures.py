@@ -410,6 +410,11 @@ def reproducible_by_identity(failures: Sequence[Failure]) -> bool:
     return all(failure.reproducible_by_identity for failure in failures)
 
 
+def case_header(index: int, case_id: str) -> str:
+    """The heading of a numbered failure block."""
+    return f"{index}. Test Case ID: {case_id}"
+
+
 def format_failures(
     *,
     case_id: str | None,

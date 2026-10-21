@@ -17,13 +17,13 @@ from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
     append_replay_command,
     display_section_name,
+    duration_phrase,
     failure_formatter,
-    format_duration,
     format_summary_banner,
     make_console,
 )
 from schemathesis.core import NOT_SET
-from schemathesis.core.failures import format_failures
+from schemathesis.core.failures import case_header, format_failures
 from schemathesis.core.output import truncate_text
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.generation.meta import report_label
@@ -113,7 +113,7 @@ def render_replay(
                     console.print()
                     _print_step_chain(console, sequence=crash.sequence, outcome=outcome)
                     console.print()
-                case_id = f"{index}. Test Case ID: {crash.case_id}" if crash.case_id else None
+                case_id = case_header(index, crash.case_id) if crash.case_id else None
                 reproduce = append_replay_command(outcome.code_sample, crash.case_id)
                 click.echo(
                     format_failures(
@@ -393,8 +393,7 @@ def _print_summary(
     for status in ReplayStatus:
         if counts[status]:
             parts.append(f"{counts[status]} {status.value}")
-    duration = format_duration(duration_ms)
-    duration_message = f"interrupted after {duration}" if interrupted else f"in {duration}"
+    duration_message = duration_phrase(duration_ms, interrupted=interrupted)
     separator = ", " if interrupted else " "
     message = f"{', '.join(parts)}{separator}{duration_message}" if parts else duration_message
 

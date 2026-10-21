@@ -203,6 +203,12 @@ def format_duration(duration_ms: int) -> str:
     return f"{duration_ms / 1000:.2f}s"
 
 
+def duration_phrase(duration_ms: int, *, interrupted: bool) -> str:
+    """How long a phase or run took, as `in 1.00s` or `interrupted after 1.00s`."""
+    duration = format_duration(duration_ms)
+    return f"interrupted after {duration}" if interrupted else f"in {duration}"
+
+
 def make_progress_bar(console: Console, *, indent: str = "", transient: bool = True) -> Progress:
     from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 

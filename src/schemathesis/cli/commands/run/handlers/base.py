@@ -9,14 +9,16 @@ from queue import Queue
 from typing import IO, TYPE_CHECKING, Any, Generic, TypeVar
 
 from schemathesis.cli.events import LoadingStarted
-from schemathesis.cli.output import LoadingProgressManager, display_fatal_error, display_reports
+from schemathesis.cli.output import Indent, LoadingProgressManager, display_fatal_error, display_reports
 from schemathesis.core.output.sanitization import sanitized
+from schemathesis.engine import events
+from schemathesis.engine.recorder import RecordedScenario
 
 if TYPE_CHECKING:
     from rich.console import Console
 
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.engine import events
+    from schemathesis.config import OutputConfig
 
 T = TypeVar("T", bound="BaseExecutionContext")
 ItemT = TypeVar("ItemT")
@@ -44,6 +46,13 @@ class BaseOutputHandler(EventHandler[T]):
         assert location is not None
         self.loading_manager = LoadingProgressManager(console=self.console, location=location)
         self.loading_manager.start()
+
+    def _finish_loading(self) -> None:
+        assert self.loading_manager is not None
+        self.loading_manager.stop()
+        self.console.print(Indent(self.loading_manager.get_completion_message()))
+        self.console.print()
+        self.loading_manager = None
 
     def _on_fatal_error(self, ctx: T, event: events.FatalError) -> None:
         try:
@@ -98,6 +107,22 @@ class BackgroundWriterHandler(EventHandler, Generic[ItemT]):
         self.queue.put(None)
         if self.worker is not None:
             self.worker.join()
+
+
+class RecordedScenarioHandler(BackgroundWriterHandler[RecordedScenario]):
+    """Hands every finished scenario's recorded interactions to a writer thread."""
+
+    __slots__ = ("output", "config", "preserve_bytes")
+
+    def __init__(self, output: TextOutput, config: OutputConfig, preserve_bytes: bool = False) -> None:
+        super().__init__()
+        self.output = output
+        self.config = config
+        self.preserve_bytes = preserve_bytes
+
+    def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
+        if isinstance(event, (events.ScenarioFinished, events.FuzzScenarioFinished)):
+            self.queue.put(event.recorder)
 
 
 def write_until_finished(

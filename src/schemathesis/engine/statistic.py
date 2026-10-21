@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.baseline import failure_identity
-from schemathesis.core.failures import BlockFormatter, Failure, format_failures
+from schemathesis.core.failures import BlockFormatter, Failure, case_header, format_failures
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
@@ -43,7 +43,7 @@ class GroupedFailures:
         formatter: BlockFormatter | None = None,
     ) -> str:
         """Render the failures as text, headed by `<index>. Test Case ID: <case id>` when `index` is given."""
-        header = f"{index}. Test Case ID: {self.case_id}" if index is not None and self.case_id is not None else None
+        header = case_header(index, self.case_id) if index is not None and self.case_id is not None else None
         return format_failures(
             case_id=header,
             response=self.response,
@@ -168,6 +168,11 @@ class Statistic:
     def no_checks_ran(self) -> bool:
         """Cases ran, but no check applied to any of them."""
         return self.cases_without_checks > 0 and not self.tested_operations
+
+    @property
+    def total_failures(self) -> int:
+        """Failures across every operation and case, each counted once."""
+        return sum(len(group.failures) for grouped in self.failures.values() for group in grouped.values())
 
     def on_scenario_finished(
         self, recorder: RecordedScenario, *, failure_label: Callable[[Case], str] | None = None

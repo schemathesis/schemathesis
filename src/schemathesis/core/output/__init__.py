@@ -12,6 +12,10 @@ EMPTY_PAYLOAD = "<EMPTY>"
 BINARY_PAYLOAD = "<BINARY>"
 
 
+def pluralize(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
 def escape_surrogates(text: str) -> str:
     # Lone surrogates (e.g. echoed back by a server) are valid `str` but cannot be UTF-8 encoded
     # for terminal or report output; escape them instead of letting the write crash.

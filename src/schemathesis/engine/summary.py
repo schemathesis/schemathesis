@@ -9,8 +9,12 @@ from typing import TYPE_CHECKING
 
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.failures import RUN_CHECKS_LABEL, Severity
+from schemathesis.core.output import pluralize
 from schemathesis.engine import Status
 from schemathesis.engine.run import TESTING_PHASES, PhaseName, PhaseSkipReason
+
+# Each phase's final status and why it was skipped, if it was.
+PhaseStatuses = dict[PhaseName, tuple[Status, PhaseSkipReason | None]]
 
 if TYPE_CHECKING:
     from schemathesis.core.statistic import ApiStatistic
@@ -143,8 +147,7 @@ class WarningBlock:
 
     @property
     def summary(self) -> str:
-        plural = "" if self.count == 1 else "s"
-        return f"{self.count} {self.entity}{plural}{self.suffix}"
+        return f"{pluralize(self.count, self.entity)}{self.suffix}"
 
 
 @dataclass(slots=True)
@@ -208,7 +211,7 @@ class SummaryData:
     # `None` when the schema never loaded, which is not the same as zero operations.
     operations: OperationsSummary | None
     # Empty for `st fuzz`, which has no phase concept.
-    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]]
+    phases: PhaseStatuses
     test_cases: TestCasesSummary
     failures: list[FailureGroup]
     errors: list[ErrorGroup]
@@ -225,7 +228,7 @@ class SummaryData:
         api_statistic: ApiStatistic | None,
         statistic: Statistic,
         errors: set[events.NonFatalError],
-        phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]],
+        phases: PhaseStatuses,
         skip_reasons: dict[str, set[str]],
         stop_reason: StopReason,
         warnings: WarningData,
@@ -261,7 +264,7 @@ def _reduce_operations(
     api_statistic: ApiStatistic,
     statistic: Statistic,
     errors: set[events.NonFatalError],
-    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]],
+    phases: PhaseStatuses,
     skip_reasons: dict[str, set[str]],
     stop_reason: StopReason,
     error_phases: tuple[PhaseName, ...] | None = TESTING_PHASES,
