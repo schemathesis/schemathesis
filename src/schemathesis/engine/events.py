@@ -10,12 +10,15 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.warnings import SchemathesisWarning
+from schemathesis.engine import Status
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import Phase, PhaseName
 
 if TYPE_CHECKING:
-    from schemathesis.engine import Status, StopReason
+    from queue import Queue
+
+    from schemathesis.engine import StopReason
     from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
     from schemathesis.engine.run.probes import ProbePayload
 
@@ -228,6 +231,34 @@ class ScenarioFinished(ScenarioEvent):
     def is_test_scenario(self) -> bool:
         # Sign-up and login calls prepare the run; reports that count tests leave them out.
         return self.phase is not PhaseName.AUTH_BOOTSTRAP
+
+
+def put_skipped_scenario(
+    events_queue: Queue[EngineEvent],
+    label: str,
+    phase: PhaseName,
+    suite_id: uuid.UUID,
+    *,
+    skip_reason: str | None,
+    skip_warning: SchemathesisWarning | None = None,
+) -> None:
+    """Report an operation that is not tested in this phase as a scenario that started and was skipped."""
+    started = ScenarioStarted(label=label, phase=phase, suite_id=suite_id)
+    events_queue.put(started)
+    events_queue.put(
+        ScenarioFinished(
+            id=started.id,
+            suite_id=suite_id,
+            phase=phase,
+            label=label,
+            status=Status.SKIP,
+            recorder=ScenarioRecorder(label=label),
+            elapsed_time=0.0,
+            skip_reason=skip_reason,
+            skip_warning=skip_warning,
+            is_final=True,
+        )
+    )
 
 
 @dataclass

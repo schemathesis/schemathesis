@@ -54,7 +54,7 @@ class _OperationRecord:
 class Supervisor:
     """Per-operation runtime supervisor consulted by the scheduler.
 
-    `record_response` is called for every response and may flip an operation's
+    `observe` is called for every response and may flip an operation's
     verdict once a rule fires. `verdict` is the read path the scheduler
     consults before queueing each scenario.
     """
@@ -64,6 +64,16 @@ class Supervisor:
     def __init__(self) -> None:
         self._records: dict[str, _OperationRecord] = {}
         self._lock = threading.Lock()
+
+    def observe(self, case: Case, status_code: int, *, cache_writer: CacheWriter | None) -> None:
+        """Record a response status for the case's operation, judging 405s against its documented responses."""
+        self.record_response(
+            operation_label=case.operation.label,
+            status_code=status_code,
+            is_documented_status=case.operation.responses.find_by_status_code(status_code) is not None,
+            case=case,
+            cache_writer=cache_writer,
+        )
 
     def record_response(
         self,
