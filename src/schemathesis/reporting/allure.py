@@ -183,6 +183,13 @@ class AllureWriter:
         if message is not None and not grouped and status in (Status.FAILURE, Status.ERROR):
             self._status_messages.setdefault(recorder.label, message)
 
+    def unskip(self, labels: Iterable[str]) -> None:
+        """Drop skip reasons of the given labels that passed; another scenario tested them."""
+        for label in labels:
+            result = self._results.get(label)
+            if result is not None and result.status == "passed":
+                self._skip_reasons.pop(label, None)
+
     def record_error(self, label: str, message: str) -> None:
         result = self._get_or_create(label)
         result.status = "broken"
