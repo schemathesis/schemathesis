@@ -18,10 +18,9 @@ from schemathesis.core.jsonschema.resolver import load_file_uri, make_root_resol
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import get_template_fields
 from schemathesis.generation.hypothesis.examples import generate_many
-from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.stateful import dependencies
-from test.utils import as_param, get_schema_path, integer, run_given
+from test.utils import get_schema_path, integer, run_given
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
 ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo": {"type": "integer"}}}
@@ -270,292 +269,76 @@ def test_nested_recursive_references(ctx):
         pass
 
 
-def test_simple_dereference(testdir):
-    # When a given parameter contains a JSON reference
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "POST"
-    assert_int(case.body)
-""",
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [
-                        {
-                            "schema": {"$ref": "#/definitions/SimpleIntRef"},
-                            "in": "body",
-                            "name": "object",
-                            "required": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
+def _body_operation(ctx, schema, definitions=None):
+    return ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "parameters": [{"schema": schema, "in": "body", "name": "object", "required": True}],
+            "responses": {"200": {"description": "OK"}},
         },
-        definitions={"SimpleIntRef": {"type": "integer"}},
-        generation_modes=[GenerationMode.POSITIVE],
+        version="2.0",
+        definitions=definitions or {},
     )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
-def test_recursive_dereference(testdir):
-    # When a given parameter contains a JSON reference, that reference an object with another reference
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "POST"
-    assert_int(case.body["id"])
-""",
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [
-                        {
-                            "schema": {"$ref": "#/definitions/ObjectRef"},
-                            "in": "body",
-                            "name": "object",
-                            "required": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        definitions={
-            "ObjectRef": {
-                "required": ["id"],
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
+@pytest.mark.parametrize(
+    ("schema", "definitions", "is_expected"),
+    [
+        (
+            {"$ref": "#/definitions/SimpleIntRef"},
+            {"SimpleIntRef": {"type": "integer"}},
+            lambda body: isinstance(body, int),
+        ),
+        (
+            {"$ref": "#/definitions/ObjectRef"},
+            {
+                "ObjectRef": {
+                    "required": ["id"],
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
+                },
+                "SimpleIntRef": {"type": "integer"},
             },
-            "SimpleIntRef": {"type": "integer"},
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+            lambda body: isinstance(body["id"], int),
+        ),
+        (
+            {"type": "object", "required": ["id"], "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}}},
+            {"SimpleIntRef": {"type": "integer"}},
+            lambda body: isinstance(body["id"], int),
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"allOf": [{"$ref": "#/definitions/A"}, {"$ref": "#/definitions/B"}]}},
+            },
+            {
+                "A": {"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}},
+                "B": {"type": "object", "required": ["b"], "properties": {"b": {"type": "string"}}},
+            },
+            lambda body: isinstance(body["id"]["a"], int) and isinstance(body["id"]["b"], str),
+        ),
+        (
+            {"$ref": "#/definitions/NullableIntRef"},
+            {"NullableIntRef": {"type": "integer", "x-nullable": True}},
+            lambda body: isinstance(body, int) or body is None,
+        ),
+    ],
+    ids=["simple", "recursive", "inner", "inner-all-of", "nullable"],
+)
+def test_body_reference_is_resolved(ctx, schema, definitions, is_expected):
+    operation = _body_operation(ctx, schema, definitions)
+
+    @run_given(case=operation.as_strategy(), max_examples=10)
+    def test(case):
+        assert is_expected(case.body), case.body
 
 
-def test_inner_dereference(testdir):
-    # When a given parameter contains a JSON reference inside a property of an object
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "POST"
-    assert_int(case.body["id"])
-""",
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [
-                        {
-                            "schema": {
-                                "type": "object",
-                                "required": ["id"],
-                                "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
-                            },
-                            "in": "body",
-                            "name": "object",
-                            "required": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        definitions={"SimpleIntRef": {"type": "integer"}},
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
-
-
-def test_inner_dereference_with_lists(testdir):
-    # When a given parameter contains a JSON reference inside a list in `allOf`
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "POST"
-    assert_int(case.body["id"]["a"])
-    assert_str(case.body["id"]["b"])
-""",
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [
-                        {
-                            "schema": {
-                                "type": "object",
-                                "required": ["id"],
-                                "properties": {
-                                    "id": {"allOf": [{"$ref": "#/definitions/A"}, {"$ref": "#/definitions/B"}]}
-                                },
-                            },
-                            "in": "body",
-                            "name": "object",
-                            "required": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        definitions={
-            "A": {"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}},
-            "B": {"type": "object", "required": ["b"], "properties": {"b": {"type": "string"}}},
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
-
-
-@pytest.mark.parametrize("extra", [{}, {"enum": ["foo", None]}], ids=["no-enum", "enum-with-null"])
-@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
-def test_nullable_parameters(ctx, testdir, version, extra):
-    schema = ctx.openapi.build_schema(
-        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}, version=version
-    )
-    if version == "2.0":
-        schema["paths"]["/users"]["get"]["parameters"] = [
-            {"in": "query", "name": "id", "type": "string", "x-nullable": True, "required": True, **extra}
-        ]
-    else:
-        schema["paths"]["/users"]["get"]["parameters"] = [
-            {"in": "query", "name": "id", "schema": {"type": "string", "nullable": True, **extra}, "required": True}
-        ]
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    assume(case.query["id"] == "null")
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "GET"
-""",
-        schema=schema,
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
-
-
-def test_nullable_properties(testdir):
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    assume(case.body["id"] is None)
-    assert case.path == "/users"
-    assert case.method == "POST"
-    request.config.HYPOTHESIS_CASES += 1
-""",
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "body",
-                            "name": "attributes",
-                            "schema": {
-                                "type": "object",
-                                "properties": {"id": {"type": "integer", "format": "int64", "x-nullable": True}},
-                                "required": ["id"],
-                            },
-                            "required": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-vv", "-s")
-    result.assert_outcomes(passed=1)
-    # At least one `None` value should be generated
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
-
-
-def test_nullable_ref(testdir):
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "POST"
-    if not hasattr(case.meta.phase.data, "description"):
-        assert isinstance(case.body, int) or case.body is None
-""",
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "body",
-                            "name": "attributes",
-                            "schema": {"$ref": "#/definitions/NullableIntRef"},
-                            "required": True,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        definitions={"NullableIntRef": {"type": "integer", "x-nullable": True}},
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
-
-
-def test_path_ref(testdir):
-    # When path is specified via `$ref`
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert isinstance(case.body, str)
-""",
-        paths={"/users": {"$ref": "#/x-paths/UsersPath"}},
+def test_path_item_reference_is_resolved(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/users": {"$ref": "#/x-paths/UsersPath"}},
+        version="2.0",
         **{
             # custom extension `x-paths` to be compliant with the spec, otherwise there is no handy place
             # to put the referenced object
@@ -567,34 +350,56 @@ def test_(request, case):
                 }
             }
         },
-        generation_modes=[GenerationMode.POSITIVE],
     )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+
+    @run_given(case=schema["/users"]["POST"].as_strategy(), max_examples=10)
+    def test(case):
+        assert isinstance(case.body, str)
 
 
-def test_nullable_enum(testdir):
-    # An `enum` that omits null keeps null out of requests even though the parameter is nullable.
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1)
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/users"
-    assert case.method == "GET"
-    if not hasattr(case.meta.phase.data, "description"):
+def test_nullable_enum_without_null_keeps_null_out(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /users",
+        {
+            "parameters": [integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
+    )
+
+    @run_given(case=operation.as_strategy(), max_examples=10)
+    def test(case):
         assert case.query["id"] in (1, 2)
-""",
-        **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
-        generation_modes=[GenerationMode.POSITIVE],
+
+
+@pytest.mark.parametrize("extra", [{}, {"enum": ["foo", None]}], ids=["no-enum", "enum-with-null"])
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+def test_nullable_parameters(ctx, version, extra):
+    if version == "2.0":
+        parameter = {"in": "query", "name": "id", "type": "string", "x-nullable": True, "required": True, **extra}
+    else:
+        parameter = {
+            "in": "query",
+            "name": "id",
+            "schema": {"type": "string", "nullable": True, **extra},
+            "required": True,
+        }
+    operation = ctx.openapi.load_operation(
+        "GET /users", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version=version
     )
-    # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
+    assert any(case.query["id"] == "null" for case in generate_many(operation.as_strategy(), 10))
+
+
+def test_nullable_properties(ctx):
+    operation = _body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {"id": {"type": "integer", "format": "int64", "x-nullable": True}},
+            "required": ["id"],
+        },
+    )
+    assert any(case.body["id"] is None for case in generate_many(operation.as_strategy(), 10))
 
 
 def test_complex_dereference(complex_schema):
