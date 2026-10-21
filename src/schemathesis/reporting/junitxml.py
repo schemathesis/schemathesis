@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import platform
 import re
-from collections.abc import Iterable
+from collections.abc import Container, Iterable
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
@@ -99,6 +99,12 @@ class JunitXmlWriter:
             test_case.errors.append(outcome)
         elif status == Status.SKIP:
             test_case.skipped.append(outcome)
+
+    def unskip(self, labels: Container[str]) -> None:
+        """Drop skip notes of the given labels; another scenario tested them."""
+        for label, test_case in self._test_cases.items():
+            if label in labels:
+                test_case.skipped = []
 
     def record_error(self, label: str, message: str) -> None:
         """Record a non-fatal error for a label."""
