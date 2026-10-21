@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI, Request
 from flask import jsonify, request
 from hypothesis import given, settings
+from requests.auth import HTTPBasicAuth
 
 import schemathesis
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
@@ -13,6 +15,7 @@ from schemathesis.engine import Status, from_schema
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.case import Case
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.openapi.auths import DynamicTokenAuthProvider, HttpBearerAuthProvider
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from test.utils import EventStream
@@ -378,3 +381,31 @@ def test_negative_data_rejection_no_false_positive_with_global_cookie_auth(ctx, 
     ).execute()
 
     assert stream.find(ScenarioFinished, status=Status.FAILURE) is None
+
+
+def _wsgi_echo_authorization(ctx):
+    app, _ = ctx.openapi.make_flask_app({"/echo": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/echo")
+    def echo():
+        return jsonify({"authorization": request.headers.get("Authorization")})
+
+    return schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+
+def _asgi_echo_authorization(ctx):
+    app = FastAPI()
+
+    @app.get("/echo")
+    async def echo(request: Request):
+        return {"authorization": request.headers.get("Authorization")}
+
+    return schemathesis.openapi.from_asgi("/openapi.json", app)
+
+
+@pytest.mark.parametrize("load_schema", [_wsgi_echo_authorization, _asgi_echo_authorization], ids=["wsgi", "asgi"])
+def test_set_from_requests_reaches_in_process_app(ctx, load_schema):
+    schema = load_schema(ctx)
+    schema.auth.set_from_requests(HTTPBasicAuth("user", "pass"))
+    (case,) = generate_many(schema["/echo"]["GET"].as_strategy(), 1)
+    assert case.call().json() == {"authorization": "Basic dXNlcjpwYXNz"}

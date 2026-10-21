@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
@@ -43,6 +43,26 @@ if TYPE_CHECKING:
 def _is_raw_multipart(media_type: str, payload: object) -> bool:
     """Whether a multipart payload is passed through as-is instead of being encoded into form parts."""
     return media_types.is_multipart(media_type) and isinstance(payload, (str, bytes))
+
+
+def _auth_headers(
+    case: Case,
+    session_auth: Callable[[requests.PreparedRequest], requests.PreparedRequest] | tuple[str, str] | None,
+    data: dict[str, Any],
+) -> dict[str, str]:
+    """Headers a `requests` auth sets on a request; handshake auths need a network round-trip and set none."""
+    import requests
+
+    # Auth set on the case takes precedence over the session's, as it does for network calls.
+    auth = case._auth or session_auth
+    if auth is None:
+        return {}
+
+    prepared = requests.PreparedRequest()
+    prepared.prepare(method=case.method, url=data.get("base_url", f"http://{wsgi.HOST}") + data["path"])
+    before = dict(prepared.headers)
+    prepared.prepare_auth(auth)
+    return {name: value for name, value in prepared.headers.items() if before.get(name) != value}
 
 
 class WSGITransport(BaseTransport["werkzeug.Client"]):
@@ -129,8 +149,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         excluded_headers = get_exclude_headers(case)
         for name in excluded_headers:
             data["headers"].pop(name, None)
-        if auth is not None and "Authorization" not in excluded_headers:
-            data["auth"] = auth
+        if "Authorization" not in excluded_headers:
+            data["headers"].update(_auth_headers(case, auth, data))
 
         client = session or wsgi.get_client(application)
         cookies = prepare_cookies({**(serialize_cookies(case) or {}), **(cookies or {})})
