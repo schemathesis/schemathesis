@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -10,14 +9,6 @@ import schemathesis.cli
 from test.apps.builders import make_flask_app
 
 from .fixtures import make_fixture_app
-
-
-@pytest.fixture
-def write_ndjson():
-    def _write(path, lines):
-        path.write_text("\n".join(json.dumps(line) for line in lines) + "\n")
-
-    return _write
 
 
 @pytest.fixture(scope="session")

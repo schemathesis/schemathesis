@@ -1,9 +1,7 @@
-import json
-
 import pytest
 
 from scripts.analyze.metrics import analyze
-from test.tooling.analyze.helpers import scenario
+from test.tooling.analyze.helpers import scenario, write_run
 
 
 def _negative_case(case_id, operator, response_status, *, location="body", extra_mutations=()):
@@ -26,12 +24,7 @@ def _negative_case(case_id, operator, response_status, *, location="body", extra
 
 
 def _write_mutation_run(path, payloads):
-    lines = [
-        json.dumps({"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}}),
-        json.dumps({"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}}),
-    ]
-    lines.extend(json.dumps(p) for p in payloads)
-    path.write_text("\n".join(lines) + "\n")
+    write_run(path, [{"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}}, *payloads])
 
 
 def test_mutations_by_operator_counts_each_mutation(tmp_path):
