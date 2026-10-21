@@ -78,7 +78,7 @@ CacheKeyFunction = Callable[["Case", "AuthContext"], str | int]
 class AuthProvider(Generic[Auth], Protocol):
     """Protocol for implementing custom authentication in API tests."""
 
-    def get(self, case: Case, ctx: AuthContext) -> Auth | None:
+    def get(self, case: Case, ctx: AuthContext, /) -> Auth | None:
         """Obtain authentication data for the test case.
 
         Args:
@@ -91,7 +91,7 @@ class AuthProvider(Generic[Auth], Protocol):
         """
         ...  # pragma: no cover
 
-    def set(self, case: Case, data: Auth, ctx: AuthContext) -> None:
+    def set(self, case: Case, data: Auth, ctx: AuthContext, /) -> None:
         """Apply authentication data to the test case.
 
         Args:
