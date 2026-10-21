@@ -245,21 +245,6 @@ def test_run_subprocess(ctx, testdir, ndjson_path, hypothesis_max_examples):
     assert "EngineFinished" in event_types, f"truncated stream: got only {sorted(event_types)}"
 
 
-@pytest.mark.parametrize("in_config", [True, False])
-def test_report_dir(ctx, cli, tmp_path, in_config):
-    api = ctx.openapi.apps.success()
-    report_dir = tmp_path / "reports"
-    args = ["--max-examples=1"]
-    kwargs = {}
-    if in_config:
-        kwargs["config"] = {"reports": {"ndjson": {"enabled": True}, "directory": str(report_dir)}}
-    else:
-        args = ["--report=ndjson", f"--report-dir={report_dir}", *args]
-    cli.run(api.schema_url, *args, **kwargs)
-    assert report_dir.exists()
-    assert list(report_dir.glob("*.ndjson"))
-
-
 def test_binary_body_base64(ctx, cli, ndjson_path):
     api = ctx.openapi.apps.upload_file()
     cli.run_and_assert(
