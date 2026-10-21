@@ -7,11 +7,11 @@ from importlib.resources import files
 from typing import TYPE_CHECKING, NamedTuple
 
 from schemathesis.core.failures import reason_phrase
-from schemathesis.core.output import TRUNCATED, escape_surrogates
+from schemathesis.core.output import TRUNCATED, escape_surrogates, pluralize
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
 from schemathesis.reporting._command import UNKNOWN_ENTRYPOINT
-from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, plural, split_label
+from schemathesis.reporting.html.model import Command, OperationStatus, Verdict, split_label
 from schemathesis.reporting.html.timeline import (
     Lane,
     Marker,
@@ -251,13 +251,13 @@ def _note_rows(data: ReportData) -> list[str]:
             _note_row(
                 "Filtered failures",
                 "note-filtered",
-                f"<p>{plural(data.summary.filtered, 'failure')} dropped by <code>filter_failure</code></p>",
+                f"<p>{pluralize(data.summary.filtered, 'failure')} dropped by <code>filter_failure</code></p>",
             )
         )
     if data.reauth_count or data.reauth_broke:
         parts = []
         if data.reauth_count:
-            parts.append(f"<p>Re-authenticated {plural(data.reauth_count, 'time')}</p>")
+            parts.append(f"<p>Re-authenticated {pluralize(data.reauth_count, 'time')}</p>")
         if data.reauth_broke:
             parts.append(
                 '<p class="note-error">Authentication stopped working mid-run - credentials likely invalidated</p>'
@@ -304,7 +304,7 @@ def _caveat(data: ReportData) -> str:
     if not affecting or data.exit_note is not None:
         return ""
     verb = "affects" if len(affecting) == 1 else "affect"
-    text = f"{plural(len(affecting), 'warning')} {verb} results"
+    text = f"{pluralize(len(affecting), 'warning')} {verb} results"
     return f'<a class="hs-caveat" href="#{_warning_id(affecting[0])}">{text}</a>'
 
 
@@ -375,7 +375,7 @@ def _unchecked_message(data: ReportData) -> Message:
     cases = data.summary.test_cases.without_checks
     return Message(
         f"Finished in {_duration(data)}",
-        f"No selected check applied to {plural(cases, 'response')}",
+        f"No selected check applied to {pluralize(cases, 'response')}",
         tip=_NO_CHECKS_TIP,
     )
 
@@ -463,7 +463,7 @@ def _verdict_line(data: ReportData) -> tuple[str, str]:
     tested = data.tested_operations
     failed = min(len(data.failed_operations), tested)
     if failed:
-        text = f"{failed} of {plural(tested, 'tested operation')} failed"
+        text = f"{failed} of {pluralize(tested, 'tested operation')} failed"
         passed = tested - failed
         passed_segment = f'<span class="seg-passed" style="flex: {passed}"></span>' if passed else ""
         bar = (
@@ -476,7 +476,7 @@ def _verdict_line(data: ReportData) -> tuple[str, str]:
     if data.verdict is Verdict.ERRORED:
         # Tested operations keep their errors in their rows.
         errored = sum(bool(row.errors) or row.status is OperationStatus.ERRORED for row in data.operations)
-        return "", f"{plural(errored, 'operation')} errored" if errored else "Errors not tied to an operation"
+        return "", f"{pluralize(errored, 'operation')} errored" if errored else "Errors not tied to an operation"
     text = "1 tested operation passed" if tested == 1 else f"All {tested} tested operations passed"
     bar = (
         f'<div class="fail-mix-bar" role="img" aria-label="{esc(text)}">'
@@ -497,7 +497,7 @@ def _result(data: ReportData) -> str:
     verdict = data.verdict
     bar, text = _verdict_line(data)
     phases = data.executed_phase_count
-    cases_subtitle = f"across {plural(phases, 'phase')}" if phases else ""
+    cases_subtitle = f"across {pluralize(phases, 'phase')}" if phases else ""
     # The same buckets as the operations table groups, so the counts agree.
     buckets = Counter(row.status for row in data.operations)
     operations_parts = [f"{buckets[status]} {status.value.lower()}" for status in OperationStatus if buckets[status]]
@@ -693,7 +693,7 @@ def _operation_cell(row: OperationRow, anchor: str, toggle: str) -> str:
         kinds = ", ".join(sorted(set(row.known_failures)))
         warned += (
             f'<a class="row-known" href="#note-baseline" title="{esc(kinds)}">'
-            f"{plural(len(row.known_failures), 'known failure')}</a>"
+            f"{pluralize(len(row.known_failures), 'known failure')}</a>"
         )
     return (
         f'<td class="op-cell">{toggle}<span class="op">{method}<span class="path">{_path(row.path)}</span>'
@@ -849,7 +849,7 @@ def _traceback(lines: list[str]) -> str:
     where = ([frame for frame in frames if not _FRAMEWORK_FRAME.search(frame["path"])] or frames)[-1]
     name = re.split(r"[/\\]", where["path"])[-1]
     summary = (
-        f"Traceback ({plural(len(frames), 'frame')}), raised in "
+        f"Traceback ({pluralize(len(frames), 'frame')}), raised in "
         f'<span class="trace-where"><code>{esc(name)}:{where["line"]}</code></span>'
     )
     text = "\n".join(lines)
@@ -1063,7 +1063,7 @@ def _operations_table(data: ReportData, anchors: dict[str, str]) -> str:
         reason = data.stop_reason.skip_explanation or StopReason.INTERRUPTED.skip_explanation
         footer_rows.append(
             '<tr class="not-run-row"><td colspan="3">'
-            f"{esc(plural(data.not_run_operations, 'operation'))} not run: {esc(reason)}</td></tr>"
+            f"{esc(pluralize(data.not_run_operations, 'operation'))} not run: {esc(reason)}</td></tr>"
         )
     footer = f"<tfoot>{''.join(footer_rows)}</tfoot>" if footer_rows else ""
     return (

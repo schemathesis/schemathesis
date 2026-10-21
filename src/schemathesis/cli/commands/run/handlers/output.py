@@ -29,6 +29,7 @@ from schemathesis.cli.output import (
     display_section_name,
     display_seed,
     display_test_cases,
+    duration_phrase,
     format_duration,
     make_console,
     make_progress_bar,
@@ -37,7 +38,8 @@ from schemathesis.cli.output import (
 )
 from schemathesis.config import ProjectConfig
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.output import format_response_payload
+from schemathesis.core.failures import case_header
+from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
@@ -110,6 +112,29 @@ def _format_cache_row(report: CacheReport | None) -> Text | None:
     if not parts:
         return None
     return Text(", ".join(parts))
+
+
+def format_phase_stats(
+    stats: dict[Status, int], *, width: int = 0, without_checks: bool, server_unavailable: bool
+) -> list[str]:
+    """Outcome counts of a phase, right-aligned to `width` so live updates do not shift the line."""
+    parts = []
+    if stats[Status.SUCCESS]:
+        if without_checks:
+            parts.append(f"⏭  {stats[Status.SUCCESS]:{width}d} without checks")
+        else:
+            parts.append(f"✅ {stats[Status.SUCCESS]:{width}d} passed")
+    if stats[Status.FAILURE]:
+        parts.append(f"❌ {stats[Status.FAILURE]:{width}d} failed")
+    if stats[Status.ERROR]:
+        suffix = "s" if stats[Status.ERROR] > 1 else ""
+        parts.append(f"🚫 {stats[Status.ERROR]:{width}d} error{suffix}")
+    skipped = stats[Status.SKIP] + stats.get(Status.INTERRUPTED, 0)
+    if skipped:
+        parts.append(f"⏭  {skipped:{width}d} skipped")
+    if server_unavailable:
+        parts.append("🚫 server stopped responding")
+    return parts
 
 
 def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: str = "🕛") -> str:
@@ -268,10 +293,6 @@ def _detailed_block(title: str, warnings: dict[str, set[str]], suffix: str, tip:
         suffix=suffix,
         groups=[WarningGroup(items=items, tips=[tip])],
     )
-
-
-def pluralize(count: int, word: str) -> str:
-    return f"{count} {word}{'' if count == 1 else 's'}"
 
 
 def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
@@ -698,23 +719,12 @@ class UnitTestProgressManager:
         self.is_interrupted = False
 
     def _get_stats_message(self, *, live: bool = True, without_checks: bool = False) -> str:
-        width = len(str(self.total))
-
-        parts = []
-        if self.stats[Status.SUCCESS]:
-            if without_checks:
-                parts.append(f"⏭  {self.stats[Status.SUCCESS]:{width}d} without checks")
-            else:
-                parts.append(f"✅ {self.stats[Status.SUCCESS]:{width}d} passed")
-        if self.stats[Status.FAILURE]:
-            parts.append(f"❌ {self.stats[Status.FAILURE]:{width}d} failed")
-        if self.stats[Status.ERROR]:
-            suffix = "s" if self.stats[Status.ERROR] > 1 else ""
-            parts.append(f"🚫 {self.stats[Status.ERROR]:{width}d} error{suffix}")
-        if self.stats[Status.SKIP] or self.stats[Status.INTERRUPTED]:
-            parts.append(f"⏭  {self.stats[Status.SKIP] + self.stats[Status.INTERRUPTED]:{width}d} skipped")
-        if self.server_unavailable:
-            parts.append("🚫 server stopped responding")
+        parts = format_phase_stats(
+            self.stats,
+            width=len(str(self.total)),
+            without_checks=without_checks,
+            server_unavailable=self.server_unavailable,
+        )
         if self.suffix and live:
             parts.append(self.suffix)
         return "  ".join(parts)
@@ -831,15 +841,9 @@ class UnitTestProgressManager:
 
     def get_completion_message(self, icon: str | None = None, *, without_checks: bool = False) -> str:
         """Complete the phase and return status message."""
-        duration = format_duration(self.elapsed_ms)
         icon = icon or self._get_status_icon()
-
         message = self._get_stats_message(live=False, without_checks=without_checks) or "No tests were run"
-        if self.is_interrupted:
-            duration_message = f"interrupted after {duration}"
-        else:
-            duration_message = f"in {duration}"
-
+        duration_message = duration_phrase(self.elapsed_ms, interrupted=self.is_interrupted)
         return f"{icon}  {self.title} ({duration_message})\n\n    {message}"
 
 
@@ -933,10 +937,7 @@ class StatefulProgressManager:
 
         # Initialize progress displays
         self.title_task_id = self.title_progress.add_task("Stateful")
-        links = f"0 covered / {self.links_selected} selected / {self.links_total} total"
-        if self.links_inferred:
-            links += f" ({self.links_inferred} inferred)"
-        self.progress_task_id = self.progress_bar.add_task("", scenarios=0, links=links)
+        self.progress_task_id = self.progress_bar.add_task("", scenarios=0, links=self.links_text())
 
         # Create live display
         group = Group(
@@ -970,29 +971,19 @@ class StatefulProgressManager:
     def _update_progress_display(self) -> None:
         """Update the progress display."""
         assert self.progress_task_id is not None
-        links = f"{len(self.links_covered)} covered / {self.links_selected} selected / {self.links_total} total"
+        self.progress_bar.update(self.progress_task_id, scenarios=self.scenarios, links=self.links_text())
+
+    def links_text(self) -> str:
+        text = f"{len(self.links_covered)} covered / {self.links_selected} selected / {self.links_total} total"
         if self.links_inferred:
-            links += f" ({self.links_inferred} inferred)"
-        self.progress_bar.update(self.progress_task_id, scenarios=self.scenarios, links=links)
+            text += f" ({self.links_inferred} inferred)"
+        return text
 
     def _get_stats_message(self, *, without_checks: bool = False) -> str:
         """Get formatted stats message."""
-        parts = []
-        if self.stats[Status.SUCCESS]:
-            if without_checks:
-                parts.append(f"⏭  {self.stats[Status.SUCCESS]} without checks")
-            else:
-                parts.append(f"✅ {self.stats[Status.SUCCESS]} passed")
-        if self.stats[Status.FAILURE]:
-            parts.append(f"❌ {self.stats[Status.FAILURE]} failed")
-        if self.stats[Status.ERROR]:
-            suffix = "s" if self.stats[Status.ERROR] > 1 else ""
-            parts.append(f"🚫 {self.stats[Status.ERROR]} error{suffix}")
-        if self.stats[Status.SKIP]:
-            parts.append(f"⏭  {self.stats[Status.SKIP]} skipped")
-        if self.server_unavailable:
-            parts.append("🚫 server stopped responding")
-        return "  ".join(parts)
+        return "  ".join(
+            format_phase_stats(self.stats, without_checks=without_checks, server_unavailable=self.server_unavailable)
+        )
 
     def _update_stats_display(self) -> None:
         """Update the statistics display."""
@@ -1017,16 +1008,9 @@ class StatefulProgressManager:
 
     def get_completion_message(self, icon: str | None = None, *, without_checks: bool = False) -> tuple[str, str]:
         """Complete the phase and return status message."""
-        duration = format_duration(self.elapsed_ms)
         icon = icon or self._get_status_icon()
-
         message = self._get_stats_message(without_checks=without_checks) or "No tests were run"
-        if self.is_interrupted:
-            duration_message = f"interrupted after {duration}"
-        else:
-            duration_message = f"in {duration}"
-
-        return f"{icon}  {self.title} ({duration_message})", message
+        return f"{icon}  {self.title} ({duration_phrase(self.elapsed_ms, interrupted=self.is_interrupted)})", message
 
 
 @dataclass
@@ -1117,13 +1101,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         self.config = event.config
 
-        assert self.loading_manager is not None
-        self.loading_manager.stop()
-
-        message = Indent(self.loading_manager.get_completion_message())
-        self.console.print(message)
-        self.console.print()
-        self.loading_manager = None
+        self._finish_loading()
 
         table = Table(
             show_header=False,
@@ -1443,12 +1421,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         table.add_column("Field", style=Style(color="bright_white", bold=True))
         table.add_column("Value", style="cyan")
         table.add_row("Scenarios:", f"{manager.scenarios}")
-        message = (
-            f"{len(manager.links_covered)} covered / {manager.links_selected} selected / {manager.links_total} total"
-        )
-        if manager.links_inferred:
-            message += f" ({manager.links_inferred} inferred)"
-        table.add_row("API Links:", message)
+        table.add_row("API Links:", manager.links_text())
 
         self.console.print()
         self.console.print(Indent(table))
@@ -1554,7 +1527,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         for idx, (transition_id, failures) in enumerate(grouped.items(), 1):
             for failure in failures:
-                click.echo(f"\n    {idx}. Test Case ID: {failure.case_id}\n")
+                click.echo(f"\n    {case_header(idx, failure.case_id)}\n")
                 click.echo(f"    {transition_id}")
 
                 indent = "        "
@@ -1693,11 +1666,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         click.echo()
 
     def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
-        unique_failures = sum(
-            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
-        )
         display_final_line(
-            failures=unique_failures,
+            failures=ctx.statistic.total_failures,
             errors=len(ctx.errors),
             warnings=ctx.warnings.kind_count + len({kind for kind, _ in ctx.startup_warnings}),
             running_time=event.running_time,
@@ -1720,7 +1690,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         assert self.unit_tests_manager is None
         assert self.stateful_tests_manager is None
         if ctx.errors:
-            display_errors(ctx.errors, base_url_is_set=ctx.config.base_url is not None)
+            display_errors(ctx.errors, base_url_is_set=ctx.base_url_is_set)
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
         if not ctx.warnings.is_empty:
             self.display_warnings(ctx)
@@ -1753,8 +1723,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         if event.payload is not None:
             if event.payload.reauth_count > 0:
-                suffix = "" if event.payload.reauth_count == 1 else "s"
-                ctx.add_summary_line(f"  Re-authenticated {event.payload.reauth_count} time{suffix}")
+                ctx.add_summary_line(f"  Re-authenticated {pluralize(event.payload.reauth_count, 'time')}")
             if event.payload.reauth_broke:
                 ctx.add_summary_line(
                     style(

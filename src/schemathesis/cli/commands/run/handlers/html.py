@@ -19,12 +19,12 @@ from schemathesis.cli.commands.run.handlers.output import (
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import loader_error_tip, replay_command
 from schemathesis.core.errors import LoaderError
-from schemathesis.core.output import format_response_payload
+from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName, PhaseSkipReason
-from schemathesis.engine.summary import running_time
+from schemathesis.engine.summary import PhaseStatuses, running_time
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.reporting.html.build import enabled_checks, failing_case, failure_titles, request_name
 from schemathesis.reporting.html.model import (
@@ -39,7 +39,6 @@ from schemathesis.reporting.html.model import (
     PhaseSpan,
     ReportData,
     ReportMeta,
-    plural,
 )
 
 if TYPE_CHECKING:
@@ -108,7 +107,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         elif isinstance(event, events.FuzzScenarioFinished):
             self._on_fuzz_scenario_finished(ctx, event)
         elif isinstance(event, events.NonFatalError):
-            self._on_error(event, base_url_is_set=ctx.config.base_url is not None)
+            self._on_error(event, base_url_is_set=ctx.base_url_is_set)
         elif isinstance(event, events.FatalError):
             self.fatal_error = _fatal_entry(event.exception, wait_for_schema=ctx.config.wait_for_schema)
         elif isinstance(event, events.EngineFinished):
@@ -369,9 +368,6 @@ _PHASE_OUTCOMES = {
 }
 
 
-PhaseStatuses = dict[PhaseName, tuple[Status, PhaseSkipReason | None]]
-
-
 class PhaseOutcomes(NamedTuple):
     # Distinct errors per phase name.
     errors: dict[str, int]
@@ -410,10 +406,10 @@ def _phase_outcome(name: str, status: Status, outcomes: PhaseOutcomes) -> tuple[
     elif name in outcomes.failed or status == Status.FAILURE:
         kind = "failed"
     elif errors:
-        return "errored", plural(errors, "error")
+        return "errored", pluralize(errors, "error")
     else:
         kind = _PHASE_OUTCOMES[status]
-    return kind, f"{kind}, {plural(errors, 'error')}" if errors else kind
+    return kind, f"{kind}, {pluralize(errors, 'error')}" if errors else kind
 
 
 def _phases(statuses: PhaseStatuses, outcomes: PhaseOutcomes) -> list[tuple[str, str, str]]:

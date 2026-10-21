@@ -10,7 +10,6 @@ from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
 from schemathesis.cli.commands.run.handlers.output import (
     display_warning_blocks,
     get_status_icon,
-    pluralize,
     unmatched_filter_block,
 )
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
@@ -29,10 +28,11 @@ from schemathesis.cli.output import (
     display_section_name,
     display_seed,
     display_test_cases,
-    format_duration,
+    duration_phrase,
     make_console,
     print_lines,
 )
+from schemathesis.core.output import pluralize
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason
@@ -42,12 +42,6 @@ from schemathesis.engine.events import (
     FatalError,
     FuzzScenarioFinished,
     NonFatalError,
-)
-from schemathesis.engine.summary import (
-    reduce_baseline,
-    reduce_errors,
-    reduce_failures,
-    reduce_test_cases,
 )
 
 if TYPE_CHECKING:
@@ -182,7 +176,6 @@ class FuzzProgressManager:
             self.live.stop()
 
     def get_completion_message(self, *, is_interrupted: bool, without_checks: bool = False) -> str:
-        duration = format_duration(self.started_at.elapsed_ms)
         errors = self.stats[Status.ERROR]
         stats = {
             Status.ERROR: errors,
@@ -201,11 +194,10 @@ class FuzzProgressManager:
         if self.unique_failures:
             parts.append(f"❌ {pluralize(self.unique_failures, 'unique failure')}")
         if errors:
-            suffix = "s" if errors > 1 else ""
-            parts.append(f"🚫 {errors} error{suffix}")
+            parts.append(f"🚫 {pluralize(errors, 'error')}")
         stats_line = "  ".join(parts) if parts else "No scenarios were run"
 
-        duration_message = f"interrupted after {duration}" if is_interrupted else f"in {duration}"
+        duration_message = duration_phrase(self.started_at.elapsed_ms, interrupted=is_interrupted)
         return f"{icon}  Fuzzing ({duration_message})\n\n    {stats_line}"
 
     def update(self, unique_failures: int, *, passed: bool) -> None:
@@ -249,11 +241,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         if isinstance(event, LoadingStarted):
             self._on_loading_started(ctx, event)
         elif isinstance(event, LoadingFinished):
-            assert self.loading_manager is not None
-            self.loading_manager.stop()
-            self.console.print(Indent(self.loading_manager.get_completion_message()))
-            self.console.print()
-            self.loading_manager = None
+            self._finish_loading()
             if ctx.initialization_lines:
                 print_lines(ctx.initialization_lines)
         elif isinstance(event, EngineStarted):
@@ -287,7 +275,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         self.console.print()
 
         if ctx.errors:
-            display_errors(ctx.errors, base_url_is_set=ctx.config.base_url is not None)
+            display_errors(ctx.errors, base_url_is_set=ctx.base_url_is_set)
 
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
 
@@ -298,8 +286,10 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         display_section_name("SUMMARY")
         click.echo()
 
-        if ctx.api_statistic is not None:
-            _display_api_operations(ctx)
+        summary = ctx.summary()
+
+        if summary.operations is not None:
+            display_api_operations(summary.operations)
 
         # The final line says why nothing was tested; a stop reason next to it would read as a normal run.
         if ctx.nothing_tested_reason is None:
@@ -307,30 +297,26 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             click.echo()
 
         if ctx.statistic.failures:
-            display_failures_summary(reduce_failures(ctx.statistic))
+            display_failures_summary(summary.failures)
 
-        baseline = reduce_baseline(ctx.statistic)
-        if baseline is not None:
-            display_baseline_summary(baseline)
+        if summary.baseline is not None:
+            display_baseline_summary(summary.baseline)
 
         if ctx.statistic.filtered_failures:
             display_filtered_summary(ctx.statistic.filtered_failures)
 
         if ctx.errors:
-            display_errors_summary(reduce_errors(ctx.errors))
+            display_errors_summary(summary.errors)
 
         if ctx.summary_lines:
             print_lines(ctx.summary_lines)
             click.echo()
 
-        display_test_cases(reduce_test_cases(ctx.statistic))
+        display_test_cases(summary.test_cases)
         display_reports(ctx)
         display_seed(ctx.config)
-        unique_failures = sum(
-            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
-        )
         display_final_line(
-            failures=unique_failures,
+            failures=ctx.statistic.total_failures,
             errors=len(ctx.errors),
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
@@ -338,9 +324,3 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             no_checks_ran=ctx.statistic.no_checks_ran,
             interrupted=event.stop_reason == StopReason.INTERRUPTED,
         )
-
-
-def _display_api_operations(ctx: FuzzExecutionContext) -> None:
-    operations = ctx.summary().operations
-    assert operations is not None
-    display_api_operations(operations)

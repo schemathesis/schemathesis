@@ -16,10 +16,6 @@ if TYPE_CHECKING:
 AFTER_RUN = "After the run"
 
 
-def plural(count: int, word: str) -> str:
-    return f"{count} {word}" if count == 1 else f"{count} {word}s"
-
-
 def split_label(label: str) -> tuple[str | None, str]:
     """Split "GET /users" into its method and path; other labels ("Query.users", "Run checks") have no method."""
     method, separator, path = label.partition(" ")

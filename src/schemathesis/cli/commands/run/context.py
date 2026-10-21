@@ -14,7 +14,7 @@ from schemathesis.config import ConfigError, SchemathesisWarning
 from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
-from schemathesis.engine.summary import SummaryData, WarningData
+from schemathesis.engine.summary import PhaseStatuses, SummaryData, WarningData
 
 # How telling each outcome is about a phase that ran several times: the summary keeps the highest.
 PHASE_STATUS_PRIORITY = {
@@ -31,9 +31,7 @@ class ExecutionContext(BaseExecutionContext):
     """Execution state for `st run`."""
 
     errors: set[events.NonFatalError] = field(default_factory=set)
-    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
-        default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
-    )
+    phases: PhaseStatuses = field(default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None)))
     # Keyed by operation label - a reason only applies to the operation it came from.
     skip_reasons: dict[str, set[str]] = field(default_factory=dict)
     stop_reason: StopReason = StopReason.INTERRUPTED

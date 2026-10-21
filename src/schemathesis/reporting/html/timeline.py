@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
 
-from schemathesis.reporting.html.model import AFTER_RUN, plural
+from schemathesis.core.output import pluralize
+from schemathesis.reporting.html.model import AFTER_RUN
 
 if TYPE_CHECKING:
     from schemathesis.reporting.html.model import PhaseSpan, ReportData
@@ -199,7 +200,7 @@ class Lane(NamedTuple):
         if self.markers:
             parts.append(f"{failure_count(self.markers)} found")
         if self.errors:
-            parts.append(plural(self.errors, "error"))
+            parts.append(pluralize(self.errors, "error"))
         return ", ".join(parts)
 
 

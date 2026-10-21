@@ -31,9 +31,7 @@ class JunitXMLHandler(EventHandler):
                 config=ctx.config.output,
             )
         if isinstance(event, events.NonFatalError):
-            self.writer.record_error(
-                label=event.label, message=event.info.format(base_url_is_set=ctx.config.base_url is not None)
-            )
+            self.writer.record_error(label=event.label, message=event.info.format(base_url_is_set=ctx.base_url_is_set))
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.writer.unskip(ctx.statistic.tested_operations)
