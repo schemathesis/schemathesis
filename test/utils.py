@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import struct
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypeVar
@@ -408,6 +410,14 @@ def test_api(case):
 """
     testdir.make_test(source)
     return label
+
+
+@contextmanager
+def refusing_url() -> Iterator[str]:
+    # A bound socket that never listens refuses every connection, and no other server can take its port meanwhile.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
 
 
 def allure_results(allure_dir: str | os.PathLike) -> list[Any]:

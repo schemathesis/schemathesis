@@ -1,9 +1,6 @@
 import platform
-import socket
 import threading
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 
 import pytest
 import requests
@@ -13,18 +10,11 @@ from schemathesis.core.transport import Response
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.outage import CONFIRMATION_INTERVAL, REPORTED_REQUESTS, SERVER_LABEL, ServerMonitor
 from schemathesis.engine.run import PhaseName
+from test.utils import refusing_url
 
 # Connecting to an unused loopback port times out on Windows instead of being refused, so there is no
 # refusal for the monitor to classify either way.
 pytestmark = pytest.mark.skipif(platform.system() == "Windows", reason="Unused ports do not refuse connections")
-
-
-@contextmanager
-def refusing_url() -> Iterator[str]:
-    # A bound socket that never listens refuses every connection, and no other server can take its port meanwhile.
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
 
 
 @pytest.fixture

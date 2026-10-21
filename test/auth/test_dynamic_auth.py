@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import itertools
-import socket
 
 import pytest
 import requests
@@ -28,6 +27,7 @@ from schemathesis.specs.openapi.auths import (
     DynamicTokenAuthProvider,
     HttpBearerAuthProvider,
 )
+from test.utils import refusing_url
 
 OAUTH2_SCHEME = {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}}
 
@@ -200,11 +200,6 @@ def test_get_raises_on_connection_error(ctx, cli, app_runner):
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     operation = schema["/data"]["GET"]
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        closed_port = s.getsockname()[1]
-    schema.config.base_url = f"http://127.0.0.1:{closed_port}"
-
     auth_ctx = AuthContext(operation=operation, app=None)
     provider = DynamicTokenAuthProvider(
         path="/api/auth",
@@ -214,8 +209,10 @@ def test_get_raises_on_connection_error(ctx, cli, app_runner):
         extract_selector="/token",
         _applier=HttpBearerAuthProvider(bearer=""),
     )
-    with pytest.raises(AuthenticationError, match="Connection to auth endpoint failed"):
-        provider.get(operation.Case(), auth_ctx)
+    with refusing_url() as url:
+        schema.config.base_url = url
+        with pytest.raises(AuthenticationError, match="Connection to auth endpoint failed"):
+            provider.get(operation.Case(), auth_ctx)
 
 
 def test_get_raises_on_missing_request_cert_file(ctx, app_runner):
