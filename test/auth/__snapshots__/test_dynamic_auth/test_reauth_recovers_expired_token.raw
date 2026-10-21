@@ -37,6 +37,9 @@ Test Phases:
 Test cases:
   N generated, N passed
 
+Reports:
+  - HTML: /tmp/report/index.html
+
 Seed: 42
 
 =========================== No issues found in 1.00s ===========================
