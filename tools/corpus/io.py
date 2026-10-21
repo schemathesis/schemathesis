@@ -101,27 +101,6 @@ def read_corpus_file(name: str, *, data_dir: pathlib.Path = DATA_DIR) -> tarfile
     return tarfile.open(data_dir / f"{name}.tar.gz", "r:gz")
 
 
-def iter_corpus_file(
-    name: str, *, data_dir: pathlib.Path = DATA_DIR
-) -> Generator[tuple[str, dict[str, Any]], None, None]:
-    """Iterate over the corpus file."""
-    with read_corpus_file(name, data_dir=data_dir) as archive:
-        for member in archive.getmembers():
-            extracted = archive.extractfile(member)
-            if extracted is not None:
-                yield member.name, json_loads(extracted.read())
-
-
-def iter_all_corpus_files(
-    *, data_dir: pathlib.Path = DATA_DIR
-) -> Generator[tuple[str, str, dict[str, Any]], None, None]:
-    """Iterate over all corpus files (sorted by archive name for determinism)."""
-    for corpus_path in sorted(data_dir.glob("*.tar.gz")):
-        corpus_name = corpus_path.name.removesuffix(".tar.gz")
-        for file_name, schema in iter_corpus_file(corpus_name, data_dir=data_dir):
-            yield corpus_name, file_name, schema
-
-
 CORPUS_NAMES = ("openapi-3.0", "openapi-3.1", "swagger-2.0")
 
 
@@ -186,34 +165,6 @@ def iter_corpus_refs(
     """
     for corpus_name, member, _ in _iter_corpus_members(corpus, only=only, limit=limit, data_dir=data_dir):
         yield corpus_name, member.name
-
-
-def iter_corpus_entries_from_refs(
-    corpus_name: str,
-    member_names: tuple[str, ...],
-    *,
-    data_dir: pathlib.Path = DATA_DIR,
-) -> Generator[CorpusEntry, None, None]:
-    """Load selected corpus members while scanning the archive once."""
-    requested = tuple(member_names)
-    pending = set(requested)
-    schemas: dict[str, dict[str, Any]] = {}
-    with read_corpus_file(corpus_name, data_dir=data_dir) as archive:
-        for member in archive:
-            if member.name not in pending:
-                continue
-            extracted = archive.extractfile(member)
-            if extracted is None:
-                continue
-            schemas[member.name] = json_loads(extracted.read())
-            pending.remove(member.name)
-            if not pending:
-                break
-    if pending:
-        missing = ", ".join(sorted(pending))
-        raise FileNotFoundError(f"{corpus_name}: {missing}")
-    for member_name in requested:
-        yield CorpusEntry(corpus=corpus_name, name=member_name, schema=schemas[member_name])
 
 
 # Per-process cache of (open archive, member-name index). gzip streams are random-access only
