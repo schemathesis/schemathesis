@@ -15,6 +15,10 @@ __________________________________ GET /users __________________________________
 Network Error
 
 Read timed out after 0.001 seconds
+
+Reproduce with:
+
+    <PLACEHOLDER>
 =================================== SUMMARY ====================================
 
 API Operations:

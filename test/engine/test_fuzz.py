@@ -582,6 +582,15 @@ def test_fuzz_network_error_emits_non_fatal_error(ctx):
             related_to_operation=True,
         )
     ]
+    assert errors[0].info.code_sample == f"curl -X GET {api.base_url}/api/slow"
+    interactions = [
+        interaction for event in _finished_scenarios(collected) for interaction in event.recorder.interactions.values()
+    ]
+    assert interactions
+    assert all(
+        interaction.request.uri == f"{api.base_url}/api/slow" and interaction.response is None
+        for interaction in interactions
+    )
     _assert_engine_started_and_finished(collected)
 
 

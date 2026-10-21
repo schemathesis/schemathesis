@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Missing VCR/HAR entries for stateful and `st fuzz` network errors, and `st fuzz` curl reproductions.
+
 ## [4.32.2](https://github.com/schemathesis/schemathesis/compare/v4.32.1...v4.32.2) - 2026-10-20
 
 ### :racing_car: Performance

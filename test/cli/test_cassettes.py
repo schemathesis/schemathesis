@@ -18,6 +18,7 @@ from hypothesis import strategies as st
 from schemathesis.generation import GenerationMode
 from schemathesis.reporting.har import _cookie_to_har
 from schemathesis.reporting.vcr import write_double_quoted
+from test.apps.catalog.openapi.modifiers.stateful import SlowOperations
 from test.utils import load_json_or_fail, load_yaml_or_fail
 
 
@@ -523,3 +524,31 @@ def test_rejected_report_path_leaves_no_writer_threads(cli, tmp_path):
 
     assert result.exit_code == 2, result.stdout
     assert sorted(thread.name for thread in set(threading.enumerate()) - before) == []
+
+
+def test_store_stateful_timeout(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.stateful_users(SlowOperations({("GET", "/users/<int:user_id>"): 0.5}))
+    vcr_path = tmp_path / "output.yaml"
+    har_path = tmp_path / "output.har"
+    cli.run(
+        api.schema_url,
+        "--phases=stateful",
+        "--max-examples=10",
+        "--request-timeout=0.1",
+        "--seed=1",
+        "-c",
+        "not_a_server_error",
+        f"--report-vcr-path={vcr_path}",
+        f"--report-har-path={har_path}",
+    )
+    timed_out = [
+        interaction["request"]["uri"]
+        for interaction in load_cassette(vcr_path)["http_interactions"]
+        if interaction["response"] is None
+    ]
+    assert timed_out
+    assert all(uri.startswith(f"{api.base_url}/users/") for uri in timed_out)
+    har_entries = [
+        entry for entry in load_json_or_fail(har_path)["log"]["entries"] if entry["response"]["bodySize"] == -1
+    ]
+    assert [entry["request"]["url"] for entry in har_entries] == timed_out

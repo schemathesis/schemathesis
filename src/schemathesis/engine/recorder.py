@@ -125,6 +125,15 @@ class ScenarioRecorder:
         """Record a network-level error for a given test case."""
         self.interactions[case_id] = Interaction(request=Request.from_prepared_request(request), response=None)
 
+    def record_network_error(self, *, case_id: str, error: requests.RequestException) -> None:
+        """Record the request of a call that failed with a network-level error, if it carries one."""
+        import requests
+
+        if isinstance(error.request, requests.Request):
+            self.record_request(case_id=case_id, request=error.request.prepare())
+        elif isinstance(error.request, requests.PreparedRequest):
+            self.record_request(case_id=case_id, request=error.request)
+
     def failing_case_ids(self) -> list[str]:
         """IDs of the cases that failed at least one check."""
         return [

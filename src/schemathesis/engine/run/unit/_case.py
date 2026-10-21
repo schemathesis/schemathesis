@@ -258,10 +258,7 @@ def _call_with_reauth(
         try:
             retried, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
         except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
-            if isinstance(error.request, requests.Request):
-                recorder.record_request(case_id=case.id, request=error.request.prepare())
-            elif isinstance(error.request, requests.PreparedRequest):
-                recorder.record_request(case_id=case.id, request=error.request)
+            recorder.record_network_error(case_id=case.id, error=error)
             raise
         rate_limited.extend(retried)
         return response

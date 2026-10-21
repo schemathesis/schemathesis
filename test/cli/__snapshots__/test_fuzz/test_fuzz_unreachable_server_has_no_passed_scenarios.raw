@@ -18,6 +18,10 @@ Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
 
+Reproduce with:
+
+    curl -X GET http://127.0.0.1:1/api/api/success
+
 Tip: Check that the API is running and reachable at `http://127.0.0.1:1`.
 =================================== SUMMARY ====================================
 
