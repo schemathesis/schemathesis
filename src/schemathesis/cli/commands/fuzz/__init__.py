@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from pathlib import Path
-from typing import IO, Any
+from typing import Any
 
 import click
 
 from schemathesis.checks import load_all_checks
+from schemathesis.cli.commands._options import apply_report_options, build_filter_set
 from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE
 from schemathesis.cli.core import ensure_color, resolve_color
@@ -67,10 +66,8 @@ from schemathesis.cli.options import (
 )
 from schemathesis.cli.validation import validate_auth_overlap, validate_wfc_user
 from schemathesis.config import (
-    DEFAULT_REPORT_DIRECTORY,
     FuzzConfig,
     HealthCheck,
-    ReportFormat,
     SchemathesisConfig,
     SchemathesisWarning,
     WarningsConfig,
@@ -173,29 +170,6 @@ def fuzz(
     max_time: int | None = None,
     max_failures: int | None = None,
     continue_on_failure: bool | None = None,
-    include_path: tuple[str, ...],
-    include_path_regex: str | None,
-    include_method: tuple[str, ...],
-    include_method_regex: str | None,
-    include_name: tuple[str, ...],
-    include_name_regex: str | None,
-    include_tag: tuple[str, ...],
-    include_tag_regex: str | None,
-    include_operation_id: tuple[str, ...],
-    include_operation_id_regex: str | None,
-    exclude_path: tuple[str, ...],
-    exclude_path_regex: str | None,
-    exclude_method: tuple[str, ...],
-    exclude_method_regex: str | None,
-    exclude_name: tuple[str, ...],
-    exclude_name_regex: str | None,
-    exclude_tag: tuple[str, ...],
-    exclude_tag_regex: str | None,
-    exclude_operation_id: tuple[str, ...],
-    exclude_operation_id_regex: str | None,
-    include_by: Callable | None = None,
-    exclude_by: Callable | None = None,
-    exclude_deprecated: bool | None = None,
     workers: int | None = None,
     base_url: str | None,
     wait_for_schema: float | None = None,
@@ -209,18 +183,6 @@ def fuzz(
     request_cert: str | None = None,
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
-    report_formats: list[ReportFormat] | None,
-    report_directory: Path | str = DEFAULT_REPORT_DIRECTORY,
-    report_junit_path: IO[str] | None = None,
-    report_vcr_path: IO[str] | None = None,
-    report_har_path: IO[str] | None = None,
-    report_ndjson_path: IO[str] | None = None,
-    report_json_path: IO[str] | None = None,
-    report_wfc_path: IO[str] | None = None,
-    report_pytest_path: IO[str] | None = None,
-    report_allure_path: str | None = None,
-    report_html_path: str | None = None,
-    report_preserve_bytes: bool | None = None,
     output_sanitize: bool | None = None,
     output_truncate: bool | None = None,
     generation_modes: list[GenerationMode],
@@ -270,20 +232,7 @@ def fuzz(
     )
     config.output.sanitization.update(enabled=output_sanitize)
     config.output.truncation.update(enabled=output_truncate)
-    config.reports.update(
-        formats=report_formats,
-        junit_path=report_junit_path.name if report_junit_path else None,
-        vcr_path=report_vcr_path.name if report_vcr_path else None,
-        har_path=report_har_path.name if report_har_path else None,
-        ndjson_path=report_ndjson_path.name if report_ndjson_path else None,
-        json_path=report_json_path.name if report_json_path else None,
-        wfc_path=report_wfc_path.name if report_wfc_path else None,
-        pytest_path=report_pytest_path.name if report_pytest_path else None,
-        allure_path=report_allure_path,
-        html_path=report_html_path,
-        directory=Path(report_directory),
-        preserve_bytes=report_preserve_bytes,
-    )
+    apply_report_options(config.reports, ctx.params)
     config.projects.override.update(
         base_url=base_url,
         headers=headers or None,
@@ -304,31 +253,7 @@ def fuzz(
         if warnings is not None
         else None,
     )
-    filter_set = {
-        "include_path": include_path,
-        "include_method": include_method,
-        "include_name": include_name,
-        "include_tag": include_tag,
-        "include_operation_id": include_operation_id,
-        "include_path_regex": include_path_regex,
-        "include_method_regex": include_method_regex,
-        "include_name_regex": include_name_regex,
-        "include_tag_regex": include_tag_regex,
-        "include_operation_id_regex": include_operation_id_regex,
-        "exclude_path": exclude_path,
-        "exclude_method": exclude_method,
-        "exclude_name": exclude_name,
-        "exclude_tag": exclude_tag,
-        "exclude_operation_id": exclude_operation_id,
-        "exclude_path_regex": exclude_path_regex,
-        "exclude_method_regex": exclude_method_regex,
-        "exclude_name_regex": exclude_name_regex,
-        "exclude_tag_regex": exclude_tag_regex,
-        "exclude_operation_id_regex": exclude_operation_id_regex,
-        "include_by": include_by,
-        "exclude_by": exclude_by,
-        "exclude_deprecated": exclude_deprecated,
-    }
+    filter_set = build_filter_set(ctx.params)
     config.projects.override.checks.update(
         included_check_names=included_check_names,
         excluded_check_names=excluded_check_names,
