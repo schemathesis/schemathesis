@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import Body
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
-from schemathesis.transport import SerializationContext
+from schemathesis.transport import SerializationContext, register_serializer
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -56,15 +56,11 @@ def register_media_type(name: str, strategy: st.SearchStrategy[bytes], *, aliase
         ```
 
     """
-    from schemathesis.transport.asgi import ASGI_TRANSPORT
-    from schemathesis.transport.requests import REQUESTS_TRANSPORT
-    from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
-    @REQUESTS_TRANSPORT.serializer(name, *aliases)
-    @ASGI_TRANSPORT.serializer(name, *aliases)
-    @WSGI_TRANSPORT.serializer(name, *aliases)
     def serialize(ctx: SerializationContext, value: Body) -> dict[str, Any]:
         return {"data": value}
+
+    register_serializer(serialize, name, *aliases)
 
     MEDIA_TYPE_STRATEGIES[name] = strategy
     for alias in aliases:
