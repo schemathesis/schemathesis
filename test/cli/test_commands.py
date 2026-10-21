@@ -36,7 +36,7 @@ from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
-from test.fixtures.app_runner import wait_for_port
+from test.fixtures.app_runner import accept_connections, wait_for_port
 from test.utils import HERE, SIMPLE_PATH, refusing_url
 
 
@@ -642,16 +642,10 @@ def raw_http_server(ctx):
     def start(reply):
         listener = socket.create_server(("127.0.0.1", 0))
         listeners.append(listener)
-
-        def serve():
-            while True:
-                try:
-                    connection, _ = listener.accept()
-                except OSError:
-                    return
-                threading.Thread(target=handle, args=(connection, reply), daemon=True).start()
-
-        threading.Thread(target=serve, daemon=True).start()
+        accept_connections(
+            listener,
+            lambda connection: threading.Thread(target=handle, args=(connection, reply), daemon=True).start(),
+        )
         return f"http://127.0.0.1:{listener.getsockname()[1]}/openapi.json"
 
     yield start
@@ -946,16 +940,11 @@ def test_chunked_encoding_error(cli, raw_http_server, snapshot_cli):
 def test_remote_disconnected_error(cli, snapshot_cli):
     listener = socket.create_server(("127.0.0.1", 0))
 
-    def close_without_response():
-        while True:
-            try:
-                connection, _ = listener.accept()
-            except OSError:
-                return
-            with connection:
-                connection.recv(65536)
+    def close_without_response(connection):
+        with connection:
+            connection.recv(65536)
 
-    threading.Thread(target=close_without_response, daemon=True).start()
+    accept_connections(listener, close_without_response)
     with listener:
         assert cli.run(f"http://127.0.0.1:{listener.getsockname()[1]}/openapi.json") == snapshot_cli
 
@@ -5103,25 +5092,45 @@ def test_repeated_phase_keeps_its_executed_status():
 
 
 @pytest.mark.parametrize(
-    ("version", "extra"),
+    ("version", "extra", "args", "config"),
     [
-        ("3.0.2", {"servers": [{"url": "/api"}]}),
-        ("2.0", {"basePath": "/api"}),
+        ("3.0.2", {"servers": [{"url": "/api"}]}, ["--origin={base_url}"], None),
+        ("2.0", {"basePath": "/api"}, ["--origin={base_url}"], None),
+        ("3.0.2", {"servers": [{"url": "/api"}]}, [], {"origin": "{base_url}"}),
+        (
+            "3.0.2",
+            {"servers": [{"url": "/api"}]},
+            ["--origin={base_url}"],
+            {"base-url": "http://127.0.0.1:1/nope"},
+        ),
+        ("3.0.2", {"servers": [{"url": "/nope"}]}, ["--url={base_url}/api"], {"origin": "{base_url}"}),
     ],
-    ids=["openapi-3", "swagger-2"],
+    ids=[
+        "openapi-3",
+        "swagger-2",
+        "origin-from-config",
+        "origin-overrides-config-base-url",
+        "url-overrides-config-origin",
+    ],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_origin_appends_declared_base_path(ctx, cli, app_runner, snapshot_cli, version, extra):
+def test_origin_resolution(ctx, cli, app_runner, snapshot_cli, version, extra, args, config):
     app, _ = ctx.openapi.make_flask_app(
         {"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}, version=version, **extra
     )
-
-    @app.route("/api/success")
-    def success():
-        return jsonify({"success": True})
-
+    handlers.register_success(app)
     base_url = app_runner.openapi_url(app, path="")
-    assert cli.run(f"{base_url}/openapi.json", f"--origin={base_url}", "--max-examples=1") == snapshot_cli
+    if config is not None:
+        config = {key: value.format(base_url=base_url) for key, value in config.items()}
+    assert (
+        cli.run(
+            f"{base_url}/openapi.json",
+            *(arg.format(base_url=base_url) for arg in args),
+            "--max-examples=1",
+            config=config,
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.parametrize(
@@ -5156,64 +5165,6 @@ def test_origin_satisfies_the_base_url_requirement_for_files(ctx, cli, app_runne
     )
     origin = app_runner.openapi_url(app, path="")
     assert cli.run(str(schema_path), f"--origin={origin}", "--max-examples=1") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_origin_from_config_file(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}, servers=[{"url": "/api"}]
-    )
-
-    @app.route("/api/success")
-    def success():
-        return jsonify({"success": True})
-
-    base_url = app_runner.openapi_url(app, path="")
-    assert cli.run(f"{base_url}/openapi.json", "--max-examples=1", config={"origin": base_url}) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_origin_overrides_base_url_from_config_file(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}, servers=[{"url": "/api"}]
-    )
-
-    @app.route("/api/success")
-    def success():
-        return jsonify({"success": True})
-
-    base_url = app_runner.openapi_url(app, path="")
-    assert (
-        cli.run(
-            f"{base_url}/openapi.json",
-            f"--origin={base_url}",
-            "--max-examples=1",
-            config={"base-url": "http://127.0.0.1:1/nope"},
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_url_overrides_origin_from_config_file(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}, servers=[{"url": "/nope"}]
-    )
-
-    @app.route("/api/success")
-    def success():
-        return jsonify({"success": True})
-
-    base_url = app_runner.openapi_url(app, path="")
-    assert (
-        cli.run(
-            f"{base_url}/openapi.json",
-            f"--url={base_url}/api",
-            "--max-examples=1",
-            config={"origin": base_url},
-        )
-        == snapshot_cli
-    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

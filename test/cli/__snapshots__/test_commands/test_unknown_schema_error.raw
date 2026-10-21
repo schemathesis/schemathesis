@@ -37,7 +37,7 @@ Something bad happen
       File "/package-root/engine/run/unit/_case.py", line XXX, in run_one_case
         _do_call_and_validate(
       File "/package-root/engine/run/unit/_case.py", line XXX, in _do_call_and_validate
-        metrics.maximize(generation.maximize, case=case, response=response)
+        metrics.maximize(scenario.generation.maximize, case=case, response=response)
       File "/package-root/generation/metrics.py", line XXX, in maximize
         value = metric(ctx)
       File "/tmp/module.py", line XXX, in buggy
