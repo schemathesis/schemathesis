@@ -14,7 +14,6 @@ from warnings import catch_warnings
 import requests
 from hypothesis.errors import Flaky, FlakyStrategyDefinition, Unsatisfiable, UnsatisfiedAssumption
 from hypothesis.strategies import one_of, sampled_from
-from requests.exceptions import ChunkedEncodingError
 from urllib3.exceptions import InsecureRequestWarning
 
 from schemathesis.core.control import SkipTest
@@ -24,7 +23,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
-from schemathesis.engine._rate_limit_retry import send_tracked, validate_case
+from schemathesis.engine._rate_limit_retry import TRANSPORT_ERRORS, send_tracked, validate_case
 from schemathesis.engine.errors import build_code_sample, is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
@@ -372,7 +371,7 @@ def _send_step(
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
         return send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=event_queue.put)
-    except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
+    except TRANSPORT_ERRORS as exc:
         if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.
             return None

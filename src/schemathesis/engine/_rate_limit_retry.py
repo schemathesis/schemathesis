@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard
+
+import requests
+from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.rate_limit import (
@@ -12,6 +15,7 @@ from schemathesis.core.rate_limit import (
 )
 from schemathesis.engine import events
 from schemathesis.engine._validate import validate_response
+from schemathesis.engine.errors import is_unrecoverable_network_error
 
 if TYPE_CHECKING:
     from schemathesis.checks import CheckContext
@@ -19,6 +23,15 @@ if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
+
+
+# Failures `send_tracked` raises when the request got no response.
+TransportError: TypeAlias = requests.ConnectionError | ChunkedEncodingError | requests.Timeout
+TRANSPORT_ERRORS = (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
+
+
+def is_unrecoverable_transport_error(exc: Exception) -> TypeGuard[TransportError]:
+    return isinstance(exc, TRANSPORT_ERRORS) and is_unrecoverable_network_error(exc)
 
 
 def _get_retry_after(response: Response) -> str:

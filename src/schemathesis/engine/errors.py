@@ -33,8 +33,8 @@ from schemathesis.core.output import escape_surrogates
 if TYPE_CHECKING:
     import hypothesis.errors
     import requests
-    from requests.exceptions import ChunkedEncodingError
 
+    from schemathesis.engine._rate_limit_retry import TransportError
     from schemathesis.generation.case import Case
 
 __all__ = ["EngineErrorInfo", "DeadlineExceeded", "UnexpectedError"]
@@ -430,9 +430,9 @@ MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
 URL_IN_ERROR_MESSAGE_RE = re.compile(r"Max retries exceeded with url: .*? \(Caused by")
 
 
-def canonicalize_error_message(error: Exception, with_traceback: bool = True) -> str:
+def canonicalize_error_message(error: Exception) -> str:
     """Canonicalize error messages by removing dynamic components."""
-    message = format_exception(error, with_traceback=with_traceback)
+    message = format_exception(error, with_traceback=True)
     # Replace memory addresses
     message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
     # Remove URL information
@@ -563,13 +563,13 @@ def never_reached_server(exc: BaseException | None) -> bool:
 
 @dataclass(slots=True)
 class UnrecoverableNetworkError:
-    error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout
+    error: TransportError
     code_sample: str
     reason: str | None
 
     def __init__(
         self,
-        error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout,
+        error: TransportError,
         code_sample: str,
         reason: str | None = None,
     ) -> None:
