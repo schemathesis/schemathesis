@@ -584,7 +584,7 @@ def _captured_variants(
         return None
     extra_data_source = cast("OpenApiExtraDataSource", extra_data_source)
     variants = extra_data_source.get_captured_variants(operation=operation, location=location, schema=schema)
-    if not variants or extra_data_source.usage_tracker is None:
+    if not variants:
         return None
     return variants, extra_data_source.usage_tracker
 
