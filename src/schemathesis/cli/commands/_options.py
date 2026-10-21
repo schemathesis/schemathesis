@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
+from schemathesis.config import WarningsConfig
+
 if TYPE_CHECKING:
-    from schemathesis.config import ReportsConfig
+    from schemathesis.config import ProjectConfig, ReportsConfig
 
 _FILTER_OPTIONS = (
     "include_path",
@@ -57,4 +59,33 @@ def apply_report_options(reports: ReportsConfig, params: dict[str, Any]) -> None
         html_path=params["report_html_path"],
         directory=Path(params["report_directory"]),
         preserve_bytes=params["report_preserve_bytes"],
+    )
+
+
+def apply_project_options(
+    override: ProjectConfig, params: dict[str, Any], *, baseline: str | None = None, origin: str | None = None
+) -> None:
+    """Override every project's configuration with the connection, auth and request options."""
+    warnings = params["warnings"]
+    override.update(
+        base_url=params["base_url"],
+        baseline=baseline,
+        origin=origin,
+        headers=params["headers"] or None,
+        basic_auth=params["auth"],
+        wfc_auth=params["auth_wfc"],
+        wfc_user=params["auth_wfc_user"],
+        workers=params["workers"],
+        continue_on_failure=params["continue_on_failure"],
+        rate_limit=params["rate_limit"],
+        max_redirects=params["max_redirects"],
+        request_timeout=params["request_timeout"],
+        request_retries=params["request_retries"],
+        tls_verify=params["request_tls_verify"],
+        request_cert=params["request_cert"],
+        request_cert_key=params["request_cert_key"],
+        proxy=params["request_proxy"],
+        warnings=WarningsConfig.from_value([w.value for w in warnings] if isinstance(warnings, list) else warnings)
+        if warnings is not None
+        else None,
     )
