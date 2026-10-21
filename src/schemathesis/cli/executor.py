@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -28,14 +28,9 @@ from schemathesis.config import DEFAULT_REPORT_DIRECTORY, ReportFormat
 from schemathesis.core.errors import format_exception
 
 if TYPE_CHECKING:
+    from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.config import ProjectConfig
-    from schemathesis.engine.events import EngineEvent, EventGenerator
-
-
-class ExecutionContext(Protocol):
-    exit_code: int
-
-    def on_event(self, event: EngineEvent) -> None: ...  # pragma: no cover
+    from schemathesis.engine.events import EventGenerator
 
 
 _REPORT_HANDLER_FORMATS: dict[type[EventHandler], ReportFormat] = {
@@ -171,7 +166,7 @@ def execute_event_loop(
     args: list[str],
     params: dict[str, Any],
     output_handler: EventHandler,
-    context_factory: Callable[[ProjectConfig], ExecutionContext],
+    context_factory: Callable[[ProjectConfig], BaseExecutionContext],
 ) -> None:
     from rich.text import Text
 
@@ -180,7 +175,7 @@ def execute_event_loop(
 
     load_baseline(config)
     handlers = [*initialize_report_handlers(config=config, args=args, params=params), output_handler]
-    ctx: ExecutionContext | None = None
+    ctx: BaseExecutionContext | None = None
     # Set when the loop ends abnormally; the process and the reports use it instead of the run's verdict.
     abnormal_exit_code: int | None = None
 
