@@ -582,8 +582,7 @@ def graphql_cases(
         operation.schema.client_schema,
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
-        # hypothesis-graphql types `print_ast` as returning `str`; the node is kept and printed later.
-        print_ast=_noop,  # type: ignore[arg-type]
+        print_ast=_noop,
         allow_x00=generation.allow_x00,
         allow_null=generation.graphql_allow_null,
         codec=generation.codec,
@@ -602,8 +601,7 @@ def graphql_cases(
             operation.schema.client_schema,
             fields=[definition.field_name],
             custom_scalars=custom_scalars,
-            # hypothesis-graphql types `print_ast` as returning `str`; the node is kept and printed later.
-            print_ast=_noop,  # type: ignore[arg-type]
+            print_ast=_noop,
             allow_x00=generation.allow_x00,
             allow_null=generation.graphql_allow_null,
             codec=generation.codec,
@@ -730,7 +728,7 @@ def _generate_parameter(
     return draw(strategy)
 
 
-def _draw_ast(draw: Callable, strategy: SearchStrategy) -> graphql.DocumentNode:
+def _draw_ast(draw: Callable, strategy: SearchStrategy[graphql.DocumentNode]) -> graphql.DocumentNode:
     """Draw a query AST, reporting a scalar with no registered strategy as such."""
     from hypothesis.errors import InvalidArgument
 
@@ -743,7 +741,7 @@ def _draw_ast(draw: Callable, strategy: SearchStrategy) -> graphql.DocumentNode:
         raise UnknownScalar(scalar_name) from None
 
 
-def _noop(node: graphql.Node) -> graphql.Node:
+def _noop(node: graphql.DocumentNode) -> graphql.DocumentNode:
     return node
 
 
