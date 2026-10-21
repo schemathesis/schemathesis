@@ -1085,6 +1085,32 @@ def test_custom_format_path_value_that_cannot_be_url_encoded_is_rejected(ctx):
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_referenced_parameter_example_mixed_into_strategy(ctx, version):
+    operation = ctx.openapi.load_operation(
+        "GET /route",
+        {
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string"},
+                    "examples": {"first": {"$ref": "#/components/examples/Special"}},
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+        components={"examples": {"Special": {"value": "special-ref"}}},
+    )
+    strategy = operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
+    assert find(strategy, lambda case: case.query["q"] == "special-ref", settings=settings(database=None)).query == {
+        "q": "special-ref"
+    }
+
+
+@pytest.mark.hypothesis_nested
 def test_path_example_without_slash_does_not_allow_encoded_slash(ctx):
     operation = ctx.openapi.load_operation(
         "GET /blocks/{block}",
