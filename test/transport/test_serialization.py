@@ -1835,48 +1835,32 @@ def test_serialize_xml_unbound_prefix(ctx, schema_object):
             case.as_transport_kwargs()
 
 
-@pytest.mark.parametrize(
-    ("body", "expected"),
-    [
-        ("str", b'<p:root xmlns:p="http://x">str</p:root>'),
-        (1, b'<p:root xmlns:p="http://x">1</p:root>'),
-        (1.5, b'<p:root xmlns:p="http://x">1.5</p:root>'),
-        (True, b'<p:root xmlns:p="http://x">true</p:root>'),
-        (None, b'<p:root xmlns:p="http://x">null</p:root>'),
-    ],
-    ids=["string", "integer", "float", "boolean", "null"],
-)
-def test_serialize_xml_scalar_body_under_prefixed_root(ctx, body, expected):
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "content": {
-                    "application/xml": {
-                        "schema": {
-                            "type": "object",
-                            "xml": {"name": "root", "namespace": "http://x", "prefix": "p"},
-                            "properties": {"a": {"type": "integer"}},
-                            "required": ["a"],
-                        }
-                    }
-                },
-                "required": True,
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-    )
-    assert operation.Case(body=body).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
-
-
+PREFIXED_ROOT_SCHEMA = {
+    "type": "object",
+    "xml": {"name": "root", "namespace": "http://x", "prefix": "p"},
+    "properties": {"a": {"type": "integer"}},
+    "required": ["a"],
+}
 PREFIXED_ITEM_XML = {"name": "item", "namespace": "http://x", "prefix": "p"}
+PREFIXED_CHILD_XML = {"prefix": "p", "namespace": "http://p"}
+
+
+def _with_child(child):
+    return {"type": "object", "xml": {"name": "root"}, "properties": {"child": child}}
 
 
 @pytest.mark.parametrize(
-    ("schema", "body", "expected"),
+    ("schema", "components", "version", "body", "expected"),
     [
+        (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", "str", b'<p:root xmlns:p="http://x">str</p:root>'),
+        (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", 1, b'<p:root xmlns:p="http://x">1</p:root>'),
+        (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", 1.5, b'<p:root xmlns:p="http://x">1.5</p:root>'),
+        (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", True, b'<p:root xmlns:p="http://x">true</p:root>'),
+        (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", None, b'<p:root xmlns:p="http://x">null</p:root>'),
         (
             {"type": "array", "items": {"type": "string", "xml": PREFIXED_ITEM_XML}},
+            {},
+            "3.0.2",
             ["v"],
             b'<p:item xmlns:p="http://x">v</p:item>',
         ),
@@ -1885,6 +1869,8 @@ PREFIXED_ITEM_XML = {"name": "item", "namespace": "http://x", "prefix": "p"}
                 "type": "array",
                 "items": {"type": "object", "properties": {"a": {"type": "string"}}, "xml": PREFIXED_ITEM_XML},
             },
+            {},
+            "3.0.2",
             [{"a": "v"}],
             b'<p:item xmlns:p="http://x"><a>v</a></p:item>',
         ),
@@ -1896,96 +1882,164 @@ PREFIXED_ITEM_XML = {"name": "item", "namespace": "http://x", "prefix": "p"}
                     "a": {"type": "array", "items": {"type": "string", "xml": {"name": "item", "prefix": "p"}}}
                 },
             },
+            {},
+            "3.0.2",
             {"a": ["v"]},
             b'<p:root xmlns:p="http://x"><p:item>v</p:item></p:root>',
         ),
-    ],
-    ids=["primitive", "object", "primitive-bound-by-ancestor"],
-)
-def test_serialize_xml_prefixed_array_items(ctx, schema, body, expected):
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {"content": {"application/xml": {"schema": schema}}, "required": True},
-            "responses": {"200": {"description": "OK"}},
-        },
-    )
-    assert operation.Case(body=body).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
-
-
-PREFIXED_CHILD_XML = {"prefix": "p", "namespace": "http://p"}
-
-
-@pytest.mark.parametrize(
-    ("child", "value", "expected"),
-    [
         (
-            {"type": "object", "properties": {"a": {"type": "string"}}, "xml": PREFIXED_CHILD_XML},
-            {"a": "x"},
+            _with_child({"type": "object", "properties": {"a": {"type": "string"}}, "xml": PREFIXED_CHILD_XML}),
+            {},
+            "3.0.2",
+            {"child": {"a": "x"}},
             b'<root><p:child xmlns:p="http://p"><a>x</a></p:child></root>',
         ),
         (
-            {"type": "array", "items": {"type": "string"}, "xml": PREFIXED_CHILD_XML},
-            ["x"],
+            _with_child({"type": "array", "items": {"type": "string"}, "xml": PREFIXED_CHILD_XML}),
+            {},
+            "3.0.2",
+            {"child": ["x"]},
             b'<root><p:child xmlns:p="http://p">x</p:child></root>',
         ),
         (
-            {"type": "array", "items": {"type": "string"}, "xml": {**PREFIXED_CHILD_XML, "wrapped": True}},
-            ["x"],
+            _with_child({"type": "array", "items": {"type": "string"}, "xml": {**PREFIXED_CHILD_XML, "wrapped": True}}),
+            {},
+            "3.0.2",
+            {"child": ["x"]},
             b'<root><p:child xmlns:p="http://p"><p:child>x</p:child></p:child></root>',
         ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "root"},
+                "properties": {
+                    "a": {
+                        "type": "array",
+                        "xml": {"prefix": "p", "namespace": "http://p"},
+                        "items": {"$ref": "#/components/schemas/Item"},
+                    },
+                    "b": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+                },
+            },
+            {"Item": {"type": "string", "xml": {"name": "item"}}},
+            "3.0.2",
+            {"a": ["x"], "b": ["y"]},
+            b'<root><p:item xmlns:p="http://p">x</p:item><item>y</item></root>',
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "flag": {"type": "boolean"},
+                    "note": {"type": "null"},
+                    "mark": {"type": "boolean", "xml": {"attribute": True}},
+                },
+                "xml": {"name": "Root"},
+            },
+            {},
+            "3.1.0",
+            {"flag": True, "note": None, "mark": False},
+            b'<Root mark="false"><flag>true</flag><note>null</note></Root>',
+        ),
+        (
+            {"$ref": "#/components/schemas/Main"},
+            {
+                "Main": {
+                    "type": "object",
+                    "properties": {"id": {"$ref": "#/components/schemas/IdField"}},
+                    "xml": {"name": "Root"},
+                },
+                "IdField": {"type": "integer", "xml": {"name": "custom-id", "attribute": True}},
+            },
+            "3.0.2",
+            {"id": 42},
+            b'<Root custom-id="42"></Root>',
+        ),
+        (
+            {"$ref": "#/components/schemas/ItemList"},
+            {
+                "ItemList": {
+                    "type": "array",
+                    "items": {"$ref": "#/components/schemas/Item"},
+                    "xml": {"name": "items", "wrapped": True},
+                },
+                "Item": {"type": "integer", "xml": {"name": "item"}},
+            },
+            "3.0.2",
+            [42, 43],
+            b"<items><item>42</item><item>43</item></items>",
+        ),
+        (
+            {"$ref": "#/components/schemas/Container"},
+            {
+                "Container": {
+                    "type": "object",
+                    "properties": {"user": {"$ref": "#/components/schemas/User"}},
+                    "xml": {"name": "container"},
+                },
+                "User": {
+                    "type": "object",
+                    "properties": {"profile": {"$ref": "#/components/schemas/Profile"}},
+                    "xml": {"name": "user-data"},
+                },
+                "Profile": {"type": "string", "xml": {"name": "user-profile", "attribute": True}},
+            },
+            "3.0.2",
+            {"user": {"profile": "admin"}},
+            b'<container><user-data user-profile="admin"></user-data></container>',
+        ),
+        (
+            {"$ref": "#/definitions/UserProfile"},
+            {"UserProfile": {"type": "object", "properties": {"name": {"type": "string"}, "age": {"type": "integer"}}}},
+            "2.0",
+            {"name": "John", "age": 30},
+            b"<UserProfile><name>John</name><age>30</age></UserProfile>",
+        ),
     ],
-    ids=["object", "array", "wrapped-array"],
+    ids=[
+        "scalar-under-prefixed-root-string",
+        "scalar-under-prefixed-root-integer",
+        "scalar-under-prefixed-root-float",
+        "scalar-under-prefixed-root-boolean",
+        "scalar-under-prefixed-root-null",
+        "prefixed-array-items-primitive",
+        "prefixed-array-items-object",
+        "prefixed-array-items-primitive-bound-by-ancestor",
+        "prefixed-nested-property-object",
+        "prefixed-nested-property-array",
+        "prefixed-nested-property-wrapped-array",
+        "shared-array-items-keep-own-prefix",
+        "boolean-and-null-use-json-spelling",
+        "referenced-property-schema",
+        "referenced-array-items",
+        "nested-schema-references",
+        "root-tag-from-reference-openapi2",
+    ],
 )
-def test_serialize_xml_prefixed_nested_property(ctx, child, value, expected):
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "content": {
-                    "application/xml": {
-                        "schema": {"type": "object", "xml": {"name": "root"}, "properties": {"child": child}}
-                    }
-                },
-                "required": True,
+def test_serialize_xml_body(ctx, schema, components, version, body, expected):
+    if version == "2.0":
+        operation = ctx.openapi.load_operation(
+            "POST /test",
+            {
+                "consumes": ["application/xml"],
+                "parameters": [{"in": "body", "name": "body", "required": True, "schema": schema}],
+                "responses": {"200": {"description": "OK"}},
             },
-            "responses": {"200": {"description": "OK"}},
-        },
-    )
-    assert operation.Case(body={"child": value}).as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
-
-
-def test_serialize_xml_shared_array_items_keep_own_prefix(ctx):
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "content": {
-                    "application/xml": {
-                        "schema": {
-                            "type": "object",
-                            "xml": {"name": "root"},
-                            "properties": {
-                                "a": {
-                                    "type": "array",
-                                    "xml": {"prefix": "p", "namespace": "http://p"},
-                                    "items": {"$ref": "#/components/schemas/Item"},
-                                },
-                                "b": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
-                            },
-                        }
-                    }
-                },
-                "required": True,
+            definitions=components,
+            version=version,
+        )
+    else:
+        operation = ctx.openapi.load_operation(
+            "POST /test",
+            {
+                "requestBody": {"content": {"application/xml": {"schema": schema}}, "required": True},
+                "responses": {"200": {"description": "OK"}},
             },
-            "responses": {"200": {"description": "OK"}},
-        },
-        components={"schemas": {"Item": {"type": "string", "xml": {"name": "item"}}}},
-    )
-    assert (
-        operation.Case(body={"a": ["x"], "b": ["y"]}).as_transport_kwargs(base_url="http://127.0.0.1")["data"]
-        == b'<root><p:item xmlns:p="http://p">x</p:item><item>y</item></root>'
-    )
+            components={"schemas": components},
+            version=version,
+        )
+    case = operation.Case(body=body, media_type="application/xml")
+    assert REQUESTS_TRANSPORT.serialize_case(case)["data"] == expected
 
 
 SIMPLE_TEXT_STRATEGY = st.text(min_size=1, alphabet=st.sampled_from(string.ascii_letters))
@@ -2113,187 +2167,6 @@ def test_duplicate_xml_attributes(ctx):
 
     serialized_data = case.as_transport_kwargs()["data"].decode("utf8")
     ElementTree.fromstring(serialized_data)
-
-
-def test_xml_boolean_and_null_use_json_spelling(ctx):
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "required": True,
-                "content": {
-                    "application/xml": {
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "flag": {"type": "boolean"},
-                                "note": {"type": "null"},
-                                "mark": {"type": "boolean", "xml": {"attribute": True}},
-                            },
-                            "xml": {"name": "Root"},
-                        }
-                    }
-                },
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        version="3.1.0",
-    )
-
-    case = operation.Case(body={"flag": True, "note": None, "mark": False}, media_type="application/xml")
-
-    assert (
-        REQUESTS_TRANSPORT.serialize_case(case)["data"]
-        == b'<Root mark="false"><flag>true</flag><note>null</note></Root>'
-    )
-
-
-def test_xml_with_referenced_property_schema(ctx):
-    # When a property references a subschema that contains XML configuration
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "content": {
-                    "application/xml": {
-                        "schema": {
-                            "$ref": "#/components/schemas/Main",
-                        }
-                    }
-                },
-                "required": True,
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        components={
-            "schemas": {
-                "Main": {
-                    "type": "object",
-                    "properties": {
-                        "id": {
-                            "$ref": "#/components/schemas/IdField",
-                        }
-                    },
-                    "xml": {"name": "Root"},
-                },
-                "IdField": {"type": "integer", "xml": {"name": "custom-id", "attribute": True}},
-            }
-        },
-    )
-
-    case = operation.Case(body={"id": 42})
-
-    # Then the XML should use the configuration from the referenced schema
-    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
-    assert data == b'<Root custom-id="42"></Root>'
-
-
-def test_xml_with_referenced_array_items(ctx):
-    # When array items reference a subschema with XML configuration
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "content": {
-                    "application/xml": {
-                        "schema": {
-                            "$ref": "#/components/schemas/ItemList",
-                        }
-                    }
-                },
-                "required": True,
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        components={
-            "schemas": {
-                "ItemList": {
-                    "type": "array",
-                    "items": {"$ref": "#/components/schemas/Item"},
-                    "xml": {"name": "items", "wrapped": True},
-                },
-                "Item": {"type": "integer", "xml": {"name": "item"}},
-            }
-        },
-    )
-
-    case = operation.Case(body=[42, 43])
-
-    # Then the XML should use the referenced item configuration
-    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
-    assert data == b"<items><item>42</item><item>43</item></items>"
-
-
-def test_xml_with_nested_schema_references(ctx):
-    # When schemas reference other schemas that also contain references with XML config
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "content": {
-                    "application/xml": {
-                        "schema": {
-                            "$ref": "#/components/schemas/Container",
-                        }
-                    }
-                },
-                "required": True,
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        components={
-            "schemas": {
-                "Container": {
-                    "type": "object",
-                    "properties": {"user": {"$ref": "#/components/schemas/User"}},
-                    "xml": {"name": "container"},
-                },
-                "User": {
-                    "type": "object",
-                    "properties": {"profile": {"$ref": "#/components/schemas/Profile"}},
-                    "xml": {"name": "user-data"},
-                },
-                "Profile": {"type": "string", "xml": {"name": "user-profile", "attribute": True}},
-            }
-        },
-    )
-
-    case = operation.Case(body={"user": {"profile": "admin"}})
-
-    # Then XML should resolve the entire reference chain correctly
-    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
-    assert data == b'<container><user-data user-profile="admin"></user-data></container>'
-
-
-def test_xml_root_tag_from_reference_openapi2(ctx):
-    # When OpenAPI 2.0 schema references a definition for the request body
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "consumes": [
-                "application/xml",
-            ],
-            "parameters": [
-                {
-                    "in": "body",
-                    "name": "body",
-                    "required": True,
-                    "schema": {"$ref": "#/definitions/UserProfile"},
-                }
-            ],
-            "responses": {"200": {"description": "OK"}},
-        },
-        definitions={
-            "UserProfile": {"type": "object", "properties": {"name": {"type": "string"}, "age": {"type": "integer"}}}
-        },
-        version="2.0",
-    )
-
-    case = operation.Case(body={"name": "John", "age": 30}, media_type="application/xml")
-
-    # Then the root XML tag should be derived from the reference name "UserProfile"
-    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
-    assert data == b"<UserProfile><name>John</name><age>30</age></UserProfile>"
 
 
 @pytest.mark.parametrize(
