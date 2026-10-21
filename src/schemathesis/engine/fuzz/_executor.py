@@ -589,12 +589,7 @@ def _run_forever_thread(
             )
             if case is None:
                 continue
-            recorder.record_case(
-                parent_id=None,
-                case=case,
-                transition=None,
-                is_transition_applied=False,
-            )
+            recorder.record_case(case=case)
             sent = _send_step(
                 ctx,
                 case,

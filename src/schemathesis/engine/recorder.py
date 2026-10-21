@@ -100,7 +100,12 @@ class ScenarioRecorder:
         )
 
     def record_case(
-        self, *, parent_id: str | None, case: Case, transition: Transition | None, is_transition_applied: bool
+        self,
+        *,
+        case: Case,
+        parent_id: str | None = None,
+        transition: Transition | None = None,
+        is_transition_applied: bool = False,
     ) -> None:
         """Record a test case and its relationship to a parent, if applicable."""
         self.cases[case.id] = CaseNode(

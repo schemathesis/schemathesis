@@ -76,7 +76,7 @@ from schemathesis.core.jsonschema.patterns import (
 )
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type, to_json_type_name
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
@@ -2742,8 +2742,8 @@ def is_valid_for_others(
     value: Any,
     idx: int,
     validators: list[jsonschema_rs.Validator],
-    schemas: list[dict | bool] | None = None,
-    will_be_serialized_to_string: bool = False,
+    schemas: list[dict | bool] | None,
+    will_be_serialized_to_string: bool,
 ) -> bool:
     for vidx, validator in enumerate(validators):
         if idx == vidx:
@@ -3159,7 +3159,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
         schema = ensure_valid_path_parameter_schema(schema)
         declared = schema
-    elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in ctx.custom_formats):
+    elif ctx.location in HEADER_LOCATIONS and not ("format" in schema and schema["format"] in ctx.custom_formats):
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and pattern_requires_char_outside(pattern, HEADER_ALLOWED_CHARS):
             return

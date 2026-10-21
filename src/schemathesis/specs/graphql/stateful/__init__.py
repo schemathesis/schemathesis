@@ -12,10 +12,10 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.stateful.control import TransitionController
 from schemathesis.generation.stateful.state_machine import (
     APIStateMachine,
+    RecordingStateMachine,
     StepInput,
     StepOutput,
     Transition,
-    _RecordingStateMachine,
 )
 from schemathesis.specs.graphql.handles import Handle, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.stateful._rules import generate_rules_for
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.graphql.stateful._transitions import GraphQLTransitions
 
 
-class GraphQLStateMachine(_RecordingStateMachine):
+class GraphQLStateMachine(RecordingStateMachine):
     """State machine for GraphQL stateful testing built around producer/consumer chains."""
 
     schema: GraphQLSchema  # set on the dynamically-built subclass

@@ -105,7 +105,7 @@ class CheckInternals:
 
     def record_case(self, *, parent_id: str, case: Case) -> None:
         if self.recorder is not None:
-            self.recorder.record_case(parent_id=parent_id, case=case, transition=None, is_transition_applied=False)
+            self.recorder.record_case(parent_id=parent_id, case=case)
 
     def record_response(self, *, case_id: str, response: Response) -> None:
         if self.recorder is not None:

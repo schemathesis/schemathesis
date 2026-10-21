@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.specs.openapi.checks import resource_was_deleted
 
@@ -46,7 +47,7 @@ def record_link_outcome(
     if (
         step_input.transition is None
         or not step_input.is_applied
-        or response.status_code in {401, 403}
+        or response.status_code in AUTH_REJECTION_STATUSES
         or response.status_code >= 500
     ):
         return

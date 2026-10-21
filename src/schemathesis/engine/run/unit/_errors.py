@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Protocol
 
 import hypothesis.errors
@@ -30,7 +30,6 @@ from schemathesis.engine.errors import (
     clear_hypothesis_notes,
     is_inconsistent_replay,
 )
-from schemathesis.generation.hypothesis.builder import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
     build_unsatisfiable_error,
@@ -38,7 +37,6 @@ from schemathesis.generation.hypothesis.reporting import (
 )
 
 if TYPE_CHECKING:
-    from schemathesis.generation.drivers import Controller
     from schemathesis.schemas import APIOperation
 
 
@@ -48,27 +46,6 @@ class NonFatalErrorFactory(Protocol):
     ) -> events.NonFatalError: ...  # pragma: no cover
 
 
-def iter_mark_error_events(
-    *,
-    test_function: Callable,
-    non_fatal_error: NonFatalErrorFactory,
-) -> Iterator[events.NonFatalError]:
-    """Yield events for errors stashed on a Hypothesis test function via `*Mark` slots."""
-    missing = MissingPathParameters.get(test_function)
-    if missing:
-        yield non_fatal_error(missing)
-
-
-def iter_controller_error_events(
-    *,
-    controller: Controller,
-    non_fatal_error: NonFatalErrorFactory,
-) -> Iterator[events.NonFatalError]:
-    """Yield events for errors stashed on a `Controller` during pre-iteration setup."""
-    for exc in controller.deferred_errors:
-        yield non_fatal_error(exc)
-
-
 def prefer_spec_error(exc: Exception, operation: APIOperation) -> Exception:
     """Prefer the specification's own error - it names the offending object and where it sits in the document."""
     if not isinstance(exc, RejectedSchemaDefinition):
@@ -76,14 +53,18 @@ def prefer_spec_error(exc: Exception, operation: APIOperation) -> Exception:
     try:
         operation.schema.validate()
     except ValidationError as error:
-        return InvalidSchema.from_jsonschema_error(
-            error,
-            path=operation.path,
-            method=operation.method,
-            config=operation.schema.config.output,
-            location=SchemaLocation.maybe_from_error_path(error.instance_path, operation.schema.specification.version),
-        )
+        return _invalid_schema(error, operation)
     return exc
+
+
+def _invalid_schema(error: ValidationError, operation: APIOperation) -> InvalidSchema:
+    return InvalidSchema.from_jsonschema_error(
+        error,
+        path=operation.path,
+        method=operation.method,
+        config=operation.schema.config.output,
+        location=SchemaLocation.maybe_from_error_path(error.instance_path, operation.schema.specification.version),
+    )
 
 
 def translate_iteration_exception(
@@ -266,14 +247,4 @@ def _from_assertion_error(
         except InternalError as internal:
             return non_fatal_error(internal)
     except ValidationError as error:
-        return non_fatal_error(
-            InvalidSchema.from_jsonschema_error(
-                error,
-                path=operation.path,
-                method=operation.method,
-                config=operation.schema.config.output,
-                location=SchemaLocation.maybe_from_error_path(
-                    error.instance_path, operation.schema.specification.version
-                ),
-            )
-        )
+        return non_fatal_error(_invalid_schema(error, operation))

@@ -42,10 +42,10 @@ from schemathesis.transport.prepare import (
 )
 from schemathesis.transport.serialization import (
     Binary,
-    _serialize_xml,
     serialize_binary,
     serialize_json,
     serialize_xml,
+    serialize_xml_with_schema,
     serialize_yaml,
 )
 
@@ -271,13 +271,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             return Response.from_requests(
                 response,
                 verify=verify,
-                _override=Override(
-                    query=kwargs.get("params") or {},
-                    headers=kwargs.get("headers") or {},
-                    cookies=kwargs.get("cookies") or {},
-                    path_parameters={},
-                    body={},
-                ),
+                _override=Override.from_send_kwargs(kwargs),
             )
         finally:
             session.headers = current_session_headers
@@ -382,7 +376,7 @@ def _is_dropped_before_response(exc: requests.exceptions.ConnectionError) -> boo
     )
 
 
-def validate_vanilla_requests_kwargs(data: dict[str, Any], declared_base_url: str | None = None) -> None:
+def validate_vanilla_requests_kwargs(data: dict[str, Any], declared_base_url: str | None) -> None:
     """Check arguments for `requests.Session.request`.
 
     Some arguments can be valid for cases like ASGI integration, but at the same time they won't work for the regular
@@ -569,7 +563,7 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, cont
     _, serializer = pair
     if serializer is xml_serializer:
         # The part is its own XML document, so its root comes from the part schema.
-        result = _serialize_xml(value, _property_schema(ctx, name), resource_name=name)
+        result = serialize_xml_with_schema(value, _property_schema(ctx, name), resource_name=name)
     else:
         result = serializer(ctx, value)
     if "json" in result:

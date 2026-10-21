@@ -199,13 +199,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             elapsed=elapsed,
             verify=False,
             stream_cut_short=stream_cut_short,
-            _override=Override(
-                query=kwargs.get("params") or {},
-                headers=kwargs.get("headers") or {},
-                cookies=kwargs.get("cookies") or {},
-                path_parameters={},
-                body={},
-            ),
+            _override=Override.from_send_kwargs(kwargs),
         )
 
 

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-def _parse_request_retries(value: int | dict | None) -> int | None:
+def parse_request_retries(value: int | dict | None) -> int | None:
     if value is None:
         return None
     if isinstance(value, int):
@@ -389,7 +389,7 @@ class OperationConfig(DiffBase):
             max_redirects=data.get("max-redirects"),
             max_stream_events=data.get("max-stream-events"),
             request_timeout=data.get("request-timeout"),
-            request_retries=_parse_request_retries(data.get("request-retries")),
+            request_retries=parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data, dictionaries=dictionaries or {}),

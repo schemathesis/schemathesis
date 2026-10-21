@@ -64,7 +64,7 @@ def is_built_in_handler(handler: EventHandler) -> bool:
 
 def _report_option(config: ProjectConfig, params: dict[str, Any], format: ReportFormat) -> str | None:
     """CLI option that set the report location, if any."""
-    if getattr(config.reports, format.value).path is not None:
+    if config.reports.get(format).path is not None:
         return f"'--report-{format.value}-path'" if params.get(f"report_{format.value}_path") is not None else None
     if Path(params.get("report_directory", DEFAULT_REPORT_DIRECTORY)) != DEFAULT_REPORT_DIRECTORY:
         return "'--report-dir'"
@@ -96,7 +96,7 @@ def initialize_report_handlers(
         (ReportFormat.PYTEST, PytestReportHandler),
     )
     for report_format, make_handler in file_reports:
-        if getattr(config.reports, report_format.value).enabled:
+        if config.reports.get(report_format).enabled:
             path = config.reports.get_path(report_format)
             open_file(path, _report_option(config, params, report_format))
             handlers.append(make_handler(path))

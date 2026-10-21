@@ -8,9 +8,9 @@ from hypothesis import strategies as st
 from schemathesis.config._dictionaries import BODY_PREFIX, ParameterDictionaryBinding, parse_body_path
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.transforms import split_body_path
-from schemathesis.generation.case import _contains_bytes
-from schemathesis.generation.dictionaries import _path_matches_pattern, _resolve_body_leaf_schema, _walk_substitute
+from schemathesis.generation.dictionaries import path_matches_pattern, resolve_body_leaf_schema, walk_substitute
 from schemathesis.generation.value import GeneratedValue
+from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
     import jsonschema_rs
@@ -33,7 +33,7 @@ def resolve_body_overrides(*, operation: APIOperation, body_schema: JsonSchema) 
             if isinstance(value, ParameterDictionaryBinding):
                 continue
             pointer = parse_body_path(key)
-            if _resolve_body_leaf_schema(body_schema, pointer) is None:
+            if resolve_body_leaf_schema(body_schema, pointer) is None:
                 continue
             resolved.setdefault(pointer, value)
     return resolved
@@ -50,11 +50,11 @@ def build_body_override_overlay_strategy(
 
     def apply(value: JsonValue) -> JsonValue:
         for pointer, literal in items:
-            value = _walk_substitute(value, split_body_path(pointer), _make_replace(literal), create_missing=True)
+            value = walk_substitute(value, split_body_path(pointer), _make_replace(literal), create_missing=True)
         return value
 
     def is_overridden_path(path: tuple[str | int, ...]) -> bool:
-        return any(_path_matches_pattern(path, segments) for segments in override_segments)
+        return any(path_matches_pattern(path, segments) for segments in override_segments)
 
     @st.composite  # type: ignore[untyped-decorator]
     def overlay(draw: st.DrawFn) -> GeneratedValue | JsonValue:
@@ -65,7 +65,7 @@ def build_body_override_overlay_strategy(
             if meta is not None:
                 kept = tuple(m for m in meta.mutations if not is_overridden_path(m.path))
                 # Overriding a field also undoes mutations of its parents, e.g. a removed required field or a changed type.
-                if kept and validator is not None and not _contains_bytes(value) and validator.is_valid(value):
+                if kept and validator is not None and not contains_binary(value) and validator.is_valid(value):
                     kept = ()
                 if not kept:
                     meta = None

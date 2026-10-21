@@ -16,7 +16,6 @@ from schemathesis.engine.run.unit._case import (
     run_one_case,
 )
 from schemathesis.engine.run.unit._errors import (
-    iter_controller_error_events,
     translate_iteration_exception,
 )
 from schemathesis.engine.run.unit._scenario import iter_closing_events, start_scenario
@@ -84,18 +83,7 @@ def run_driver(
                 raise_if_stopped(ctx.stop_reason)
                 any_case_ran = True
                 try:
-                    run_one_case(
-                        case=case,
-                        ctx=ctx,
-                        check_ctx=scenario.check_ctx,
-                        recorder=recorder,
-                        generation=scenario.generation,
-                        transport_kwargs=scenario.transport_kwargs,
-                        continue_on_failure=continue_on_failure,
-                        state=state,
-                        errors=errors,
-                        pending_events=pending_events,
-                    )
+                    run_one_case(case=case, ctx=ctx, scenario=scenario, errors=errors, pending_events=pending_events)
                 except UnexpectedError:
                     # Per-case runtime error — already appended to `errors`. Continue iterating so
                     # subsequent cases still run; their errors are accumulated and surfaced together.
@@ -140,12 +128,10 @@ def run_driver(
     if status == Status.SUCCESS and continue_on_failure and has_new_failures(recorder, ctx.config.load_baseline()):
         status = Status.FAILURE
 
-    for event in iter_controller_error_events(
-        controller=generator.controller,
-        non_fatal_error=non_fatal_error,
-    ):
+    # Errors stashed on the controller during pre-iteration setup.
+    for deferred_error in generator.controller.deferred_errors:
         status = Status.ERROR
-        yield event
+        yield non_fatal_error(deferred_error)
 
     yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 

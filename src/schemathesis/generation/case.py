@@ -41,7 +41,7 @@ from schemathesis.hooks import (
     schema_hook_dispatchers,
 )
 from schemathesis.transport.prepare import base_url_from_request_url, prepare_path, prepare_request
-from schemathesis.transport.serialization import Binary
+from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
     import httpx
@@ -63,17 +63,6 @@ def _default_headers() -> CaseInsensitiveDict:
 
 _NOTSET_HASH = 0x7F3A9B2C
 _NO_SANITIZATION = SanitizationConfig(enabled=False)
-
-
-def _contains_bytes(value: Body) -> bool:
-    """Check if value contains bytes or Binary wrappers anywhere in nested structure."""
-    if isinstance(value, bytes | Binary):
-        return True
-    if isinstance(value, dict):
-        return any(_contains_bytes(v) for v in value.values())
-    if isinstance(value, list):
-        return any(_contains_bytes(item) for item in value)
-    return False
 
 
 OperationT = TypeVar("OperationT", bound="APIOperation")
@@ -305,7 +294,7 @@ class Case(Generic[OperationT]):
 
         if location == ParameterLocation.BODY:
             # Validate body against media type schema
-            if isinstance(value, NotSet) or value is None or self.media_type is None or _contains_bytes(value):
+            if isinstance(value, NotSet) or value is None or self.media_type is None or contains_binary(value):
                 return False
             alternatives = list(self.operation.body)
             # An exact media type wins over a wildcard one like `*/*` that the concrete type was chosen for.

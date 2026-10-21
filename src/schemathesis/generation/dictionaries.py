@@ -297,7 +297,7 @@ def resolve_body_bindings(
                 continue
             seen.add(key)
             pointer = parse_body_path(key)
-            leaf_schema = _resolve_body_leaf_schema(body_schema, pointer)
+            leaf_schema = resolve_body_leaf_schema(body_schema, pointer)
             if leaf_schema is None:
                 continue
             dictionary = dictionaries[binding.dictionary]
@@ -314,7 +314,7 @@ def resolve_body_bindings(
     return resolved
 
 
-def _resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | None:
+def resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | None:
     # `pointer` always comes from `parse_body_path`, so it is `/`-prefixed and non-empty.
     bundled = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema, dict) else None
     if not isinstance(bundled, dict):
@@ -406,7 +406,7 @@ def build_body_dictionary_overlay_strategy(
         random = draw(st.randoms())
         new_draws: list[DictionaryDraw] = []
         for binding, eligible in eligible_per_binding:
-            value = _walk_substitute(
+            value = walk_substitute(
                 value,
                 split_body_path(binding.pointer),
                 _make_replacement(
@@ -428,7 +428,7 @@ def build_body_dictionary_overlay_strategy(
             kept = tuple(
                 mutation
                 for mutation in existing_meta.mutations
-                if not any(_path_matches_pattern(mutation.path, pattern) for pattern in overwritten_segments)
+                if not any(path_matches_pattern(mutation.path, pattern) for pattern in overwritten_segments)
             )
             if not kept:
                 meta_to_return = None
@@ -448,7 +448,7 @@ def build_body_dictionary_overlay_strategy(
     return overlay()
 
 
-def _path_matches_pattern(path: tuple[str | int, ...], segments: list[str]) -> bool:
+def path_matches_pattern(path: tuple[str | int, ...], segments: list[str]) -> bool:
     # Match the overwritten leaf or any descendant: dropping `/user` covers `(user, email)`.
     if len(path) < len(segments):
         return False
@@ -493,7 +493,7 @@ def _make_replacement(
     return replace
 
 
-def _walk_substitute(
+def walk_substitute(
     target: JsonValue,
     segments: list[str],
     replace: Callable[[JsonValue], JsonValue],
@@ -506,7 +506,7 @@ def _walk_substitute(
     if head == "*":
         if not isinstance(target, list):
             return target
-        return [_walk_substitute(item, rest, replace, create_missing=create_missing) for item in target]
+        return [walk_substitute(item, rest, replace, create_missing=create_missing) for item in target]
     if isinstance(target, dict):
         if head not in target:
             # Force-insert only when the remaining path is fully scalar — a `*` in `rest` would
@@ -514,11 +514,11 @@ def _walk_substitute(
             if not create_missing or "*" in rest:
                 return target
             new_dict = dict(target)
-            new_dict[head] = _walk_substitute({}, rest, replace, create_missing=True)
+            new_dict[head] = walk_substitute({}, rest, replace, create_missing=True)
             return new_dict
         new_dict = dict(target)
-        new_dict[head] = _walk_substitute(target[head], rest, replace, create_missing=create_missing)
+        new_dict[head] = walk_substitute(target[head], rest, replace, create_missing=create_missing)
         return new_dict
     if create_missing and "*" not in segments and isinstance(target, (str, int, float, bool, type(None))):
-        return _walk_substitute({}, segments, replace, create_missing=True)
+        return walk_substitute({}, segments, replace, create_missing=True)
     return target

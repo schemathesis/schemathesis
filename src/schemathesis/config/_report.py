@@ -167,7 +167,7 @@ class ReportsConfig(DiffBase):
         }
         for report_format, path in paths.items():
             if path is not None or report_format in formats:
-                report: ReportConfig = getattr(self, report_format.value)
+                report = self.get(report_format)
                 report.enabled = True
                 report.path = Path(path) if path is not None else None
         if directory != DEFAULT_REPORT_DIRECTORY:
@@ -175,9 +175,13 @@ class ReportsConfig(DiffBase):
         if preserve_bytes:
             self.preserve_bytes = preserve_bytes
 
+    def get(self, format: ReportFormat) -> ReportConfig:
+        """The configuration of one report format."""
+        return getattr(self, format.value)
+
     def get_path(self, format: ReportFormat) -> Path:
         """Get the final path for a specific format."""
-        report: ReportConfig = getattr(self, format.value)
+        report = self.get(format)
         if report.path is not None:
             return report.path
 
@@ -196,7 +200,7 @@ class ReportsConfig(DiffBase):
         run produce identical paths regardless of when they start.
         If `suffix` is given it is inserted before the extension (e.g. ``cassette-abc12345.yaml``).
         """
-        report: ReportConfig = getattr(self, format.value)
+        report = self.get(format)
         if report.path is not None:
             return report.path
         if format.is_directory:
