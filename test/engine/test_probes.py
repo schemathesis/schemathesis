@@ -1,7 +1,5 @@
 import _thread
-import contextlib
 import socket
-import struct
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -169,32 +167,9 @@ def test_unreachable_api_does_not_narrow_generation(ctx, unreachable_url):
         assert case.path_parameters == {"name": "a%5Cb"}
 
 
-@pytest.fixture
-def resetting_url():
-    server = socket.socket()
-    server.bind(("127.0.0.1", 0))
-    server.listen()
-
-    def reset_every_connection():
-        while True:
-            try:
-                connection, _ = server.accept()
-            except OSError:
-                return
-            connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
-            connection.close()
-
-    threading.Thread(target=reset_every_connection, daemon=True).start()
-    yield f"http://127.0.0.1:{server.getsockname()[1]}/"
-    # Wakes the blocked `accept` on Linux; Windows refuses to shut down a listening socket, and `close` is enough there.
-    with contextlib.suppress(OSError):
-        server.shutdown(socket.SHUT_RDWR)
-    server.close()
-
-
 # A server that accepts the connection and then drops it has rejected the probe.
-def test_reset_after_connecting_is_a_failure(engine_ctx, resetting_url):
-    engine_ctx.schema.config.update(base_url=resetting_url)
+def test_reset_after_connecting_is_a_failure(engine_ctx, app_runner):
+    engine_ctx.schema.config.update(base_url=f"http://127.0.0.1:{app_runner.run_resetting_server()}/")
     assert [(type(run.probe), run.outcome) for run in probes.run(engine_ctx)] == [
         (probes.NullByteInHeader, probes.ProbeOutcome.FAILURE),
         (probes.UnsafePathDecoder, probes.ProbeOutcome.FAILURE),
