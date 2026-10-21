@@ -550,6 +550,39 @@ def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
     assert case.query == {"bbox": "1.1|1.1|1.1|1.1"}
 
 
+@pytest.mark.parametrize(
+    "declared_media_type",
+    ["application/x-www-form-urlencoded", "application/x-www-form-urlencoded; charset=utf-8"],
+    ids=["plain", "with-parameters"],
+)
+def test_urlencoded_body_with_media_type_parameters(ctx, declared_media_type):
+    operation = ctx.openapi.load_operation(
+        "POST /form",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    declared_media_type: {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "o": {"type": "object", "properties": {"x": {"type": "integer"}}},
+                                "b": {"type": "boolean"},
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    [case] = generate_many(operation.as_strategy(), 1)
+    case.body = {"o": {"x": 1}, "b": True}
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+    prepared = requests.Request(kwargs["method"], kwargs["url"], data=kwargs["data"]).prepare()
+    assert sorted(prepared.body.split("&")) == ["b=true", "x=1"]
+
+
 @pytest.mark.hypothesis_nested
 @given(st.data())
 @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
