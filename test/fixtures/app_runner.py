@@ -36,17 +36,13 @@ def _serve(server: BaseWSGIServer) -> int:
     return server.server_port
 
 
-def _shutdown(server: BaseWSGIServer) -> None:
-    server.shutdown()
-    server.server_close()
-
-
 def _stop(server: BaseWSGIServer | uvicorn.Server) -> None:
     if isinstance(server, uvicorn.Server):
         server.should_exit = True
     else:
         # `shutdown` waits up to the server's poll interval; doing it in the background keeps teardown instant.
-        threading.Thread(target=_shutdown, args=(server,), daemon=True).start()
+        # `serve_forever` closes the socket once stopped; closing it here too races on free-threaded builds.
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
 
 @pytest.fixture(autouse=True)

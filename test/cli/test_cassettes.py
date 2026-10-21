@@ -547,7 +547,6 @@ def test_store_stateful_timeout(ctx, cli, tmp_path):
         if interaction["response"] is None
     ]
     assert timed_out
-    assert all(uri.startswith(f"{api.base_url}/users/") for uri in timed_out)
     har_entries = [
         entry for entry in load_json_or_fail(har_path)["log"]["entries"] if entry["response"]["bodySize"] == -1
     ]

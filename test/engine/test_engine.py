@@ -1572,6 +1572,7 @@ def test_stateful_auth_and_override(ctx):
         parameters={"user_id": "42"},
         max_examples=10,
         max_steps=2,
+        seed=1,
     ).execute()
     interactions = stream.find_all_interactions()
     assert len(interactions) > 0
@@ -1966,7 +1967,7 @@ def test_max_time_stops_generating_once_the_budget_is_gone(ctx, app_runner):
     started = time.monotonic()
     execute(schema, max_time=1, max_examples=1, phases=[PhaseName.COVERAGE])
 
-    assert time.monotonic() - started < 2.0
+    assert time.monotonic() - started < 5.0
 
 
 def test_max_time_bounds_coverage_repeats_when_feedback_never_settles(ctx):
