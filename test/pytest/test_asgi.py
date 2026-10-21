@@ -1,3 +1,5 @@
+import gc
+import warnings
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -478,4 +480,8 @@ def test_second():
     gc.collect()
 """
     )
+    # The inner session runs in this process; garbage from earlier tests must not surface in its `gc.collect()`.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        gc.collect()
     testdir.runpytest("-v").assert_outcomes(passed=2)

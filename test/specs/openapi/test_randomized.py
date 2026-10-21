@@ -26,7 +26,6 @@ from schemathesis.specs.openapi import definitions
 from schemathesis.specs.openapi.formats import get_default_format_strategies
 from schemathesis.specs.openapi.schemas import OpenApiSchema
 from test.apps.builders import build_schema, make_permissive_flask_app
-from test.utils import run_given
 
 IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, hypothesis.errors.FailedHealthCheck)
 config = SchemathesisConfig.from_dict({})
@@ -414,8 +413,15 @@ def catch_all_url(app_runner):
 
 @pytest.mark.parametrize("version", sorted(SPECS))
 def test_random_schemas(catch_all_url, version, hypothesis_max_examples):
-    # Each document is a full engine run; the nightly CI profile raises the budget.
-    @run_given(data=st.data(), max_examples=hypothesis_max_examples or 25, phases=[Phase.generate])
+    # Each document is a full engine run, so the nightly budget is capped to fit the 300s test timeout.
+    @given(data=st.data())
+    @settings(
+        max_examples=min(hypothesis_max_examples or 25, 200),
+        phases=[Phase.generate],
+        deadline=None,
+        database=None,
+        suppress_health_check=list(HealthCheck),
+    )
     def run(data):
         raw = data.draw(openapi_documents(version))
         assert SPECS[version].validator.is_valid(raw), raw
@@ -425,6 +431,8 @@ def test_random_schemas(catch_all_url, version, hypothesis_max_examples):
             assert not isinstance(event, events.FatalError), repr(event)
             if isinstance(event, events.NonFatalError) and not _is_rejection(event.value):
                 raise AssertionError(str(event.info)) from event.value
+
+    run()
 
 
 _OK_RESPONSES = {"responses": {"200": {"description": "OK"}}}

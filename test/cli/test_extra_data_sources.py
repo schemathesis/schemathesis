@@ -1084,6 +1084,7 @@ def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, pr
             "--phases=stateful",
             "--max-examples=10",
             "--mode=positive",
+            "--seed=1",
         )
         == snapshot_cli
     )
