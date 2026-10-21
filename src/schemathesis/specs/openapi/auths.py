@@ -21,6 +21,8 @@ from schemathesis.core.transport import AUTH_REJECTION_STATUSES, decode_lossy, l
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
+    from werkzeug.datastructures import Headers
+
     from schemathesis.auths import AuthContext
     from schemathesis.config import OutputConfig
     from schemathesis.generation.case import Case
@@ -244,7 +246,7 @@ class DynamicTokenAuthProvider:
         status_code: int,
         text: str,
         get_json: Callable[[], Any],
-        headers: Mapping[str, str],
+        headers: Mapping[str, str] | Headers,
         cookies: Mapping[str, str],
         output_config: OutputConfig,
     ) -> str:
