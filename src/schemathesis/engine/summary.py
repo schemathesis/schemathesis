@@ -41,81 +41,35 @@ class ValidRate:
 
 @dataclass(slots=True)
 class WarningData:
-    missing_auth: dict[int, set[str]]
-    missing_test_data: set[str]
-    base_url_mismatch: set[str]
-    base_url_suggestion: str | None
-    auth_flow_suggestion: str | None
-    validation_mismatch: set[str]
-    missing_deserializer: dict[str, dict[str, set[str]]]
-    unused_openapi_auth: set[str]
-    unsupported_regex: dict[str, set[str]]
-    method_not_allowed: set[str]
-    constants_extraction: set[str]
-    unmatched_filter: set[str]
-    unresolvable_reference: dict[str, set[str]]
+    missing_auth: dict[int, set[str]] = field(default_factory=dict)
+    missing_test_data: set[str] = field(default_factory=set)
+    base_url_mismatch: set[str] = field(default_factory=set)
+    base_url_suggestion: str | None = None
+    auth_flow_suggestion: str | None = None
+    validation_mismatch: set[str] = field(default_factory=set)
+    missing_deserializer: dict[str, dict[str, set[str]]] = field(default_factory=dict)
+    unused_openapi_auth: set[str] = field(default_factory=set)
+    unsupported_regex: dict[str, set[str]] = field(default_factory=dict)
+    method_not_allowed: set[str] = field(default_factory=set)
+    constants_extraction: set[str] = field(default_factory=set)
+    unmatched_filter: set[str] = field(default_factory=set)
+    unresolvable_reference: dict[str, set[str]] = field(default_factory=dict)
     # Operations whose acceptance rate fell below the configured threshold.
-    low_valid_rate: set[str]
+    low_valid_rate: set[str] = field(default_factory=set)
     # Operations answered mostly with `429 Too Many Requests`.
-    rate_limited: set[str]
+    rate_limited: set[str] = field(default_factory=set)
     # Dictionary bindings whose entries mostly fail the bound parameter's schema.
-    dictionary_mismatch: set[str]
+    dictionary_mismatch: set[str] = field(default_factory=set)
     # Acceptance counts for every operation and phase, keyed by label then phase, for reporting.
-    valid_rates: dict[str, dict[str, ValidRate]]
+    valid_rates: dict[str, dict[str, ValidRate]] = field(default_factory=dict)
     # Operations the stateful phase actually sent a request for.
-    stateful_exercised: set[str]
+    stateful_exercised: set[str] = field(default_factory=set)
     # Operations some other operation links to; `None` until an operation warns.
-    linked_operations: set[str] | None
+    linked_operations: set[str] | None = None
     # Operations that appear to supply what each consuming one needs; `None` until an operation warns.
-    resource_producers: dict[str, set[str]] | None
+    resource_producers: dict[str, set[str]] | None = None
     # Warned operations that take no parameters and no body, so no value could have been varied.
-    parameterless: set[str]
-
-    def __init__(
-        self,
-        missing_auth: dict[int, set[str]] | None = None,
-        missing_test_data: set[str] | None = None,
-        base_url_mismatch: set[str] | None = None,
-        base_url_suggestion: str | None = None,
-        auth_flow_suggestion: str | None = None,
-        validation_mismatch: set[str] | None = None,
-        missing_deserializer: dict[str, dict[str, set[str]]] | None = None,
-        unused_openapi_auth: set[str] | None = None,
-        unsupported_regex: dict[str, set[str]] | None = None,
-        method_not_allowed: set[str] | None = None,
-        constants_extraction: set[str] | None = None,
-        unmatched_filter: set[str] | None = None,
-        unresolvable_reference: dict[str, set[str]] | None = None,
-        low_valid_rate: set[str] | None = None,
-        rate_limited: set[str] | None = None,
-        dictionary_mismatch: set[str] | None = None,
-        valid_rates: dict[str, dict[str, ValidRate]] | None = None,
-        stateful_exercised: set[str] | None = None,
-        linked_operations: set[str] | None = None,
-        resource_producers: dict[str, set[str]] | None = None,
-        parameterless: set[str] | None = None,
-    ) -> None:
-        self.missing_auth = missing_auth or {}
-        self.missing_test_data = missing_test_data or set()
-        self.base_url_mismatch = base_url_mismatch or set()
-        self.base_url_suggestion = base_url_suggestion
-        self.auth_flow_suggestion = auth_flow_suggestion
-        self.validation_mismatch = validation_mismatch or set()
-        self.missing_deserializer = missing_deserializer or {}
-        self.unused_openapi_auth = unused_openapi_auth or set()
-        self.unsupported_regex = unsupported_regex or {}
-        self.method_not_allowed = method_not_allowed or set()
-        self.constants_extraction = constants_extraction or set()
-        self.unmatched_filter = unmatched_filter or set()
-        self.unresolvable_reference = unresolvable_reference or {}
-        self.low_valid_rate = low_valid_rate or set()
-        self.rate_limited = rate_limited or set()
-        self.dictionary_mismatch = dictionary_mismatch or set()
-        self.valid_rates = valid_rates or {}
-        self.stateful_exercised = stateful_exercised or set()
-        self.linked_operations = linked_operations
-        self.resource_producers = resource_producers
-        self.parameterless = parameterless or set()
+    parameterless: set[str] = field(default_factory=set)
 
     @property
     def low_valid_rate_reported(self) -> set[str]:
@@ -151,46 +105,12 @@ class WarningData:
 
     @property
     def is_empty(self) -> bool:
-        return not bool(
-            self.missing_auth
-            or self.base_url_mismatch
-            or self.missing_test_data
-            or self.validation_mismatch
-            or self.missing_deserializer
-            or self.unused_openapi_auth
-            or self.unsupported_regex
-            or self.method_not_allowed
-            or self.constants_extraction
-            or self.unmatched_filter
-            or self.unresolvable_reference
-            or self.low_valid_rate_reported
-            or self.rate_limited
-            or self.dictionary_mismatch
-        )
+        return not any(self.as_labels().values())
 
     @property
     def kind_count(self) -> int:
         """Count distinct warning kinds currently recorded."""
-        return sum(
-            1
-            for warnings in (
-                self.missing_auth,
-                self.base_url_mismatch,
-                self.missing_test_data,
-                self.validation_mismatch,
-                self.missing_deserializer,
-                self.unused_openapi_auth,
-                self.unsupported_regex,
-                self.method_not_allowed,
-                self.constants_extraction,
-                self.unmatched_filter,
-                self.unresolvable_reference,
-                self.low_valid_rate_reported,
-                self.rate_limited,
-                self.dictionary_mismatch,
-            )
-            if warnings
-        )
+        return sum(1 for labels in self.as_labels().values() if labels)
 
 
 @dataclass(slots=True)
