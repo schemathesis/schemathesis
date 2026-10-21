@@ -24,7 +24,7 @@ from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.failure_codes import get_failure_class
-from schemathesis.pytest.reporting import PytestReportOutcome, remember_report_locations
+from schemathesis.pytest.reporting import PytestReportOutcome, open_writers
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
 
@@ -311,11 +311,6 @@ def _open_writers_from_config(
     writer_config: dict, pytest_config: pytest.Config, *, started_at: float, suffix: str | None = None
 ) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
     """Open report writers on the controller using serialized writer configuration."""
-    from schemathesis.reporting.har import HarWriter
-    from schemathesis.reporting.html.writer import HtmlWriter
-    from schemathesis.reporting.junitxml import JunitXmlWriter
-    from schemathesis.reporting.vcr import VcrWriter
-
     raw = writer_config["sanitization"]
     output = OutputConfig(
         sanitization=SanitizationConfig(
@@ -325,8 +320,6 @@ def _open_writers_from_config(
             replacement=raw["replacement"],
         )
     )
-    seed = writer_config["seed"]
-    command = writer_config["command"]
     paths = writer_config["paths"]
 
     def _rc(fmt: ReportFormat) -> ReportConfig:
@@ -342,58 +335,19 @@ def _open_writers_from_config(
         allure=_rc(ReportFormat.ALLURE),
         html=_rc(ReportFormat.HTML),
     )
-
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter] = []
-    try:
-        if ReportFormat.VCR.value in paths:
-            vcr_writer = VcrWriter(
-                output=reports.get_stable_path(ReportFormat.VCR, suffix=suffix),
-                config=output,
-                preserve_bytes=writer_config["preserve_bytes"],
-            )
-            vcr_writer.open(seed=seed, command=command)
-            writers.append(vcr_writer)
-        if ReportFormat.HAR.value in paths:
-            har_writer = HarWriter(
-                output=reports.get_stable_path(ReportFormat.HAR, suffix=suffix),
-                config=output,
-                preserve_bytes=writer_config["preserve_bytes"],
-            )
-            har_writer.open(seed=seed)
-            writers.append(har_writer)
-        if ReportFormat.JUNIT.value in paths:
-            writers.append(
-                JunitXmlWriter(output=reports.get_stable_path(ReportFormat.JUNIT, suffix=suffix), config=output)
-            )
-        if ReportFormat.ALLURE.value in paths:
-            from schemathesis.reporting.allure import AllureWriter
-
-            writers.append(
-                AllureWriter(
-                    output_dir=reports.get_stable_path(ReportFormat.ALLURE, suffix=suffix),
-                    config=output,
-                    api_title=writer_config.get("api_title"),
-                )
-            )
-        if ReportFormat.HTML.value in paths:
-            writers.append(
-                HtmlWriter(
-                    reports.get_stable_path(ReportFormat.HTML, suffix=suffix),
-                    config=output,
-                    location=writer_config["location"],
-                    base_url=writer_config["base_url"],
-                    command=command,
-                    seed=seed,
-                    checks=writer_config["checks"],
-                    started_at=started_at,
-                )
-            )
-    except Exception:
-        for writer in writers:
-            writer.close()
-        raise
-    remember_report_locations(pytest_config, reports, partial(reports.get_stable_path, suffix=suffix))
-    return writers
+    return open_writers(
+        pytest_config,
+        reports,
+        partial(reports.get_stable_path, suffix=suffix),
+        output=output,
+        seed=writer_config["seed"],
+        command=writer_config["command"],
+        api_title=writer_config.get("api_title"),
+        location=writer_config["location"],
+        base_url=writer_config["base_url"],
+        checks=writer_config["checks"],
+        started_at=started_at,
+    )
 
 
 class XdistReportingPlugin:

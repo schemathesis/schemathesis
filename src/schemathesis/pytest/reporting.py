@@ -17,11 +17,16 @@ if TYPE_CHECKING:
     from _pytest.terminal import TerminalReporter
 
     from schemathesis.checks import CheckResult
-    from schemathesis.config import ReportsConfig
+    from schemathesis.config import OutputConfig, ReportsConfig
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.hooks import HookContext
+    from schemathesis.reporting.allure import AllureWriter
+    from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.html.writer import HtmlWriter
+    from schemathesis.reporting.junitxml import JunitXmlWriter
+    from schemathesis.reporting.vcr import VcrWriter
 
 
 # Reports written during the run, as path -> format name, in the order they were opened.
@@ -41,6 +46,70 @@ def remember_report_locations(
             if format == ReportFormat.HTML:
                 path = path / "index.html"
             locations.setdefault(path, format.display_name)
+
+
+def open_writers(
+    pytest_config: pytest.Config,
+    reports: ReportsConfig,
+    path_of: Callable[[ReportFormat], Path],
+    *,
+    output: OutputConfig,
+    seed: int | None,
+    command: str,
+    api_title: str | None,
+    location: str | None,
+    base_url: str | None,
+    checks: list[str],
+    started_at: float,
+) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
+    """Open a writer for every enabled report, closing the opened ones if a later one fails."""
+    from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.html.writer import HtmlWriter
+    from schemathesis.reporting.junitxml import JunitXmlWriter
+    from schemathesis.reporting.vcr import VcrWriter
+
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter] = []
+    try:
+        if reports.vcr.enabled:
+            vcr_writer = VcrWriter(
+                output=path_of(ReportFormat.VCR), config=output, preserve_bytes=reports.preserve_bytes
+            )
+            vcr_writer.open(seed=seed, command=command)
+            writers.append(vcr_writer)
+        if reports.har.enabled:
+            har_writer = HarWriter(
+                output=path_of(ReportFormat.HAR), config=output, preserve_bytes=reports.preserve_bytes
+            )
+            har_writer.open(seed=seed)
+            writers.append(har_writer)
+        if reports.junit.enabled:
+            writers.append(JunitXmlWriter(output=path_of(ReportFormat.JUNIT), config=output))
+        if reports.allure.enabled:
+            try:
+                from schemathesis.reporting.allure import AllureWriter
+            except ImportError as exc:
+                raise pytest.UsageError(str(exc)) from exc
+
+            writers.append(AllureWriter(output_dir=path_of(ReportFormat.ALLURE), config=output, api_title=api_title))
+        if reports.html.enabled:
+            writers.append(
+                HtmlWriter(
+                    path_of(ReportFormat.HTML),
+                    config=output,
+                    location=location,
+                    base_url=base_url,
+                    command=command,
+                    seed=seed,
+                    checks=checks,
+                    started_at=started_at,
+                )
+            )
+    except Exception:
+        for writer in writers:
+            writer.close()
+        raise
+    remember_report_locations(pytest_config, reports, path_of)
+    return writers
 
 
 def write_report_locations(terminalreporter: TerminalReporter, config: pytest.Config) -> None:
