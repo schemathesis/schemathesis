@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 from _pytest.main import ExitCode
+
+from test.utils import allure_results
 
 
 @pytest.mark.parametrize(
@@ -46,7 +46,7 @@ def test_after_run_failure_rendering(ctx, cli, snapshot_cli, ensure_reachability
         )
         == snapshot_cli
     )
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     run_check_results = [r for r in results if r.get("name") == "Run checks"]
     assert run_check_results, [r.get("name") for r in results]
     assert run_check_results[0]["status"] == "failed"

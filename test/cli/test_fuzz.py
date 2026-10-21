@@ -32,7 +32,7 @@ from schemathesis.engine.summary import build_operations
 from test.apps.fragments import handlers
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import linked_users, null_name_response, null_name_responses
-from test.utils import assert_cli_snapshot
+from test.utils import allure_results, assert_cli_snapshot
 
 
 class _RaisingEngine:
@@ -191,7 +191,7 @@ def test_fuzz_final_line_with_failure(cli, app_runner, ctx, tmp_path, snapshot_c
     testcase = next(tc for tc in ElementTree.parse(xml_path).getroot()[0] if tc.attrib["name"] == "GET /users")
     assert testcase[0].tag == "failure"
     assert "Server error" in ((testcase[0].text or "") + testcase[0].attrib.get("message", ""))
-    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     failure = next(item for item in results if item["name"] == "GET /users")
     assert failure["status"] == "failed"
     assert any("Server error" in step["statusDetails"]["message"] for step in failure.get("steps", []))
@@ -301,7 +301,7 @@ def broken_check(ctx, response, case):
         assert result == snapshot_cli
     testcases = list(ElementTree.parse(xml_path).getroot()[0])
     assert [(testcase.attrib["name"], testcase[0].tag) for testcase in testcases] == [("Fuzz tests", "error")]
-    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
+    results = allure_results(allure_dir)
     assert [(item["name"], item["status"]) for item in results] == [("Fuzz tests", "broken")]
 
 
@@ -539,7 +539,7 @@ def test_fuzz_allure_report_uses_recorder_elapsed_per_operation(ctx, response_fa
     handler.handle_event(execution_ctx, event)
     handler.shutdown(execution_ctx)
 
-    results = [json.loads(file.read_text()) for file in (tmp_path / "allure-results").glob("*-result.json")]
+    results = allure_results(tmp_path / "allure-results")
     durations = {item["name"]: (item["stop"] - item["start"]) / 1000 for item in results}
 
     assert durations == pytest.approx(elapsed_by_label)
