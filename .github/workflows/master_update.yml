@@ -55,6 +55,19 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build for smoke test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          load: true
+          tags: schemathesis:smoke
+          cache-from: type=registry,ref=ghcr.io/schemathesis/schemathesis:buildcache${{ matrix.tag-suffix }}
+
+      - name: Smoke test
+        run: scripts/docker-smoke.sh schemathesis:smoke
+
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
