@@ -8,12 +8,13 @@ import re
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
+from itertools import groupby
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any
 
 import click
 
-from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
+from schemathesis.cli.constants import DISCORD_LINK, EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.failures import (
@@ -484,6 +485,20 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
     parts.extend(_unchecked_parts(test_cases))
 
     click.echo(style(", ".join(parts) + "\n"))
+
+
+def display_errors(errors: Iterable[events.NonFatalError], *, base_url_is_set: bool) -> None:
+    display_section_name("ERRORS")
+    sorted_errors = sorted(errors, key=lambda r: (r.phase.value if r.phase is not None else "", r.label, r.info.title))
+    for label, group_errors in groupby(sorted_errors, key=lambda r: r.label):
+        display_section_name(label, "_", fg="red")
+        _errors = list(group_errors)
+        for idx, error in enumerate(_errors, 1):
+            click.echo(error.info.format(bold=_bold, base_url_is_set=base_url_is_set))
+            if idx < len(_errors):
+                click.echo()
+    click.echo(style(f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}", fg="red"))
+    click.echo()
 
 
 def display_errors_summary(errors: list[ErrorGroup]) -> None:
