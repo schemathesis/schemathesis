@@ -45,13 +45,16 @@ repos:
         # Report, don't rewrite
         args: [--force-exclude]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.4.0
+  - repo: local
     hooks:
       - id: mypy
+        name: mypy
+        # Installs the project with its dependencies from `pyproject.toml`, so third-party types are checked.
+        entry: uvx --python 3.11 --with-editable=.[tests] --with=types-requests --with=types-PyYAML mypy==2.4.0
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
         exclude: ^(docs/|test/|test-corpus/|examples/|benches/).*$
-        args: ["--ignore-missing-imports"]
-        additional_dependencies: [types-requests, types-PyYAML]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.1
