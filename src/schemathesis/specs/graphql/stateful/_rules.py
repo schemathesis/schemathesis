@@ -301,7 +301,8 @@ def _make_producer_rule(
         return self.control.allow_root_transition(_label, self.bundles)
 
     body.__name__ = rule_name
-    decorated = rule(target=target_bundle, data=st.data())(body)
+    # Hypothesis' rule wrapper is not annotated.
+    decorated = rule(target=target_bundle, data=st.data())(body)  # type: ignore[no-untyped-call]
     return rule_name, precondition(_root_precondition)(decorated)
 
 
@@ -391,7 +392,8 @@ def _make_handle_producer_rule(
         return multiple(*values)
 
     body.__name__ = rule_name
-    decorated = rule(target=target_bundle, data=st.data())(body)
+    # Hypothesis' rule wrapper is not annotated.
+    decorated = rule(target=target_bundle, data=st.data())(body)  # type: ignore[no-untyped-call]
     return rule_name, decorated
 
 
@@ -446,7 +448,8 @@ def _make_consumer_rule(
         return any(self.control.allow_transition(producer, _consumer) for producer in _producers)
 
     body.__name__ = rule_name
-    decorated = rule(data=st.data(), **bundle_kwargs)(body)
+    # Unpacking a `str`-keyed dict could reach `target`, which takes no strategy, so overload matching fails.
+    decorated = rule(data=st.data(), **bundle_kwargs)(body)  # type: ignore[call-overload]
     return rule_name, precondition(_consumer_precondition)(decorated)
 
 
@@ -514,8 +517,10 @@ def _make_lifecycle_rule(
 
     body.__name__ = rule_name
     if target_bundle is not None:
-        return rule_name, rule(target=target_bundle, data=st.data(), **bundle_kwargs)(body)
-    return rule_name, rule(data=st.data(), **bundle_kwargs)(body)
+        # Hypothesis' rule wrapper is not annotated.
+        return rule_name, rule(target=target_bundle, data=st.data(), **bundle_kwargs)(body)  # type: ignore[no-untyped-call]
+    # Hypothesis' rule wrapper is not annotated.
+    return rule_name, rule(data=st.data(), **bundle_kwargs)(body)  # type: ignore[no-untyped-call]
 
 
 def _make_cleanup_rule(

@@ -52,6 +52,7 @@ from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import (
     DEFAULT_STATE_MACHINE_SETTINGS,
     APIStateMachine,
+    RecordingStateMachine,
     StepInput,
     StepOutput,
 )
@@ -88,7 +89,7 @@ def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response:
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
     """Get the settings that should be overridden to match the defaults for API state machines."""
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     hypothesis_default = hypothesis.settings.get_profile("default")
     if settings.phases == hypothesis_default.phases:
         kwargs["phases"] = DEFAULT_STATE_MACHINE_SETTINGS.phases
@@ -270,7 +271,9 @@ def _replay_cached_outcome(ctx: StatefulContext, case: Case) -> bool:
     return ctx.get_step_outcome(case) is None
 
 
-def _send_step(machine: APIStateMachine, case: Case, *, engine: EngineContext, event_queue: queue.Queue) -> Response:
+def _send_step(
+    machine: RecordingStateMachine, case: Case, *, engine: EngineContext, event_queue: queue.Queue
+) -> Response:
     """Send the step's request and validate the response, waiting out rate limits when configured."""
     machine.before_call(case)
     kwargs = machine.get_call_kwargs(case)
@@ -474,7 +477,7 @@ def _suite_seed(engine: EngineContext, settings: hypothesis.settings) -> int | N
 
 
 def _run_step(
-    machine: APIStateMachine,
+    machine: RecordingStateMachine,
     case: Case,
     *,
     engine: EngineContext,

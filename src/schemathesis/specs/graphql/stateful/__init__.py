@@ -46,10 +46,12 @@ class GraphQLStateMachine(RecordingStateMachine):
         super().__init__()
 
     def _add_result_to_targets(self, targets: tuple[str, ...], result: Any) -> None:
-        RuleBasedStateMachine._add_result_to_targets(self, targets, result)
+        # Hypothesis <=6.131.15 only; newer versions call `_add_results_to_targets`.
+        RuleBasedStateMachine._add_result_to_targets(self, targets, result)  # type: ignore[attr-defined]
 
     def _add_results_to_targets(self, targets: tuple[str, ...], results: list[Any]) -> None:
-        RuleBasedStateMachine._add_results_to_targets(self, targets, results)
+        # Private Hypothesis method without annotations.
+        RuleBasedStateMachine._add_results_to_targets(self, targets, results)  # type: ignore[no-untyped-call]
 
     def _run_case(
         self,
