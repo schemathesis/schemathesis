@@ -1,19 +1,13 @@
 import concurrent.futures
 import multiprocessing
-import pathlib
-import sys
 
 import pytest
 from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
 from schemathesis.specs.openapi.stateful import dependencies
-
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent))
-
-from tools.corpus.io import CORPUS_NAMES, json_loads, load_from_corpus, read_corpus_file  # noqa: E402
-from tools.corpus.metrics import (  # noqa: E402
+from tools.corpus.io import CORPUS_NAMES, json_loads, load_from_corpus, read_corpus_file
+from tools.corpus.metrics import (
     add_dependency_metrics,
     collect_dependency_metrics,
 )

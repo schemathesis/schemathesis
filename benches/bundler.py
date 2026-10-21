@@ -1,15 +1,8 @@
-import pathlib
-import sys
-
 import pytest
 
 from schemathesis.core.jsonschema.bundler import Bundler
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver
-
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent))
-
-from tools.corpus.io import load_from_corpus, read_corpus_file  # noqa: E402
+from tools.corpus.io import load_from_corpus, read_corpus_file
 
 CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
 COST_MANAGEMENT = load_from_corpus("azure.com/cost-management-costmanagement/2018-08-31.json", CORPUS_SWAGGER_20)

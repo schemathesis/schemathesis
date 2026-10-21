@@ -1,6 +1,5 @@
 import json
 import pathlib
-import sys
 from typing import Any
 
 import pytest
@@ -9,11 +8,10 @@ import yaml
 import schemathesis
 from schemathesis.config import HealthCheck
 from schemathesis.engine import from_schema
+from tools.stub_call import install_stub_call
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent.parent))
 
-from tools.stub_call import install_stub_call  # noqa: E402
 
 install_stub_call()
 

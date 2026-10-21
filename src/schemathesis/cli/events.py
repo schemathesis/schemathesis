@@ -9,7 +9,7 @@ from schemathesis.config import ProjectConfig
 from schemathesis.core import Specification
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.engine import events
-from schemathesis.schemas import APIOperation
+from schemathesis.schemas import APIOperation, BaseSchema
 
 
 @dataclass(init=False)
@@ -79,3 +79,18 @@ class LoadingFinished(events.EngineEvent):
         self.base_path = base_path
         self.config = config
         self.find_operation_by_label = find_operation_by_label
+
+    @classmethod
+    def from_schema(cls, schema: BaseSchema, *, location: str, start_time: float, base_url: str) -> LoadingFinished:
+        return cls(
+            location=location,
+            start_time=start_time,
+            base_url=base_url,
+            base_path=schema.base_path,
+            specification=schema.specification,
+            statistic=schema.statistic,
+            schema=schema.raw_schema,
+            title=schema.title,
+            config=schema.config,
+            find_operation_by_label=schema.find_operation_by_label,
+        )
