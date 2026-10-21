@@ -912,120 +912,104 @@ def test_optional_headers_missing(schema_with_optional_headers, response_factory
 
 INTEGER_HEADER = {"type": "integer", "maximum": 100}
 DATETIME_HEADER = {"type": "string", "format": "date-time"}
-
-
-@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
-@pytest.mark.parametrize(
-    ("header", "schema", "value", "expected"),
-    [
-        ("X-RateLimit-Limit", INTEGER_HEADER, "42", True),
-        ("X-RateLimit-Limit", INTEGER_HEADER, "150", False),
-        ("X-RateLimit-Reset", DATETIME_HEADER, "2021-01-01T00:00:00Z", True),
-        ("X-RateLimit-Reset", DATETIME_HEADER, "Invalid", False),
-    ],
-)
-def test_header_conformance(ctx, response_factory, version, header, schema, value, expected):
-    schema = ctx.openapi.load_schema(
-        {
-            "/data": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "headers": {
-                                header: {
-                                    "description": "Header",
-                                    **({"schema": schema} if version == "3.0.2" else schema),
-                                }
-                            },
-                        }
-                    },
-                }
-            },
-        },
-        version=version,
-    )
-    case = schema["/data"]["GET"].Case()
-    response = Response.from_requests(response_factory.requests(headers={header: value}), True)
-    if expected:
-        assert response_headers_conformance(check_context(), response, case) is None
-    else:
-        with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
-            response_headers_conformance(check_context(), response, case)
-
-
-@pytest.mark.parametrize(
-    ("schema", "value", "expected"),
-    [
-        ({"type": ["integer", "null"]}, "5", True),
-        ({"type": ["integer", "null"]}, "null", True),
-        ({"type": ["integer", "null"]}, "five", False),
-        ({"type": "integer"}, "1_0", False),
-        ({"type": "number"}, "1_0.5", False),
-        ({"type": ["array", "null"], "items": {"type": "integer"}}, "1,2", True),
-        ({"type": ["array", "null"], "items": {"type": "integer"}}, "1,x", False),
-    ],
-    ids=[
-        "type-list-integer",
-        "type-list-null",
-        "type-list-invalid",
-        "underscore-integer",
-        "underscore-number",
-        "type-list-array",
-        "type-list-array-invalid",
-    ],
-)
-def test_header_conformance_wire_value_coercion(ctx, response_factory, schema, value, expected):
-    schema = ctx.openapi.load_schema(
-        {"/data": {"get": {"responses": {"200": {"description": "OK", "headers": {"X-Count": {"schema": schema}}}}}}},
-        version="3.1.0",
-    )
-    case = schema["/data"]["GET"].Case()
-    response = Response.from_requests(response_factory.requests(headers={"X-Count": value}), True)
-    if expected:
-        assert response_headers_conformance(check_context(), response, case) is None
-    else:
-        with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
-            response_headers_conformance(check_context(), response, case)
-
-
 EXTENT_SCHEMA = {
     "type": "object",
     "properties": {"start": {"type": "integer"}, "end": {"type": "integer"}},
     "required": ["start"],
 }
+RATE_LIMIT_ROWS = [
+    ("X-RateLimit-Limit", INTEGER_HEADER, "42", True, "integer-valid"),
+    ("X-RateLimit-Limit", INTEGER_HEADER, "150", False, "integer-above-maximum"),
+    ("X-RateLimit-Reset", DATETIME_HEADER, "2021-01-01T00:00:00Z", True, "date-time-valid"),
+    ("X-RateLimit-Reset", DATETIME_HEADER, "Invalid", False, "date-time-invalid"),
+]
 
 
 @pytest.mark.parametrize(
-    ("explode", "value", "expected"),
+    ("version", "name", "definition", "value", "expected"),
     [
-        (True, "start=-5,end=7", True),
-        (False, "start,-5,end,7", True),
-        (None, "start,-5,end,7", True),
-        (True, "start=x,end=7", False),
-        (True, "end=7", False),
-        (True, "start", False),
-        (False, "start,-5,end", False),
-    ],
-    ids=[
-        "exploded",
-        "not-exploded",
-        "default-not-exploded",
-        "exploded-invalid-value",
-        "exploded-missing-required",
-        "exploded-malformed",
-        "not-exploded-odd-items",
+        *(
+            pytest.param(
+                version,
+                name,
+                {"description": "Header", **({"schema": schema} if version == "3.0.2" else schema)},
+                value,
+                expected,
+                id=f"{case_id}-{version}",
+            )
+            for version in ("2.0", "3.0.2")
+            for name, schema, value, expected, case_id in RATE_LIMIT_ROWS
+        ),
+        pytest.param("3.1.0", "X-Count", {"schema": {"type": ["integer", "null"]}}, "5", True, id="type-list-integer"),
+        pytest.param("3.1.0", "X-Count", {"schema": {"type": ["integer", "null"]}}, "null", True, id="type-list-null"),
+        pytest.param(
+            "3.1.0", "X-Count", {"schema": {"type": ["integer", "null"]}}, "five", False, id="type-list-invalid"
+        ),
+        pytest.param("3.1.0", "X-Count", {"schema": {"type": "integer"}}, "1_0", False, id="underscore-integer"),
+        pytest.param("3.1.0", "X-Count", {"schema": {"type": "number"}}, "1_0.5", False, id="underscore-number"),
+        pytest.param(
+            "3.1.0",
+            "X-Count",
+            {"schema": {"type": ["array", "null"], "items": {"type": "integer"}}},
+            "1,2",
+            True,
+            id="type-list-array",
+        ),
+        pytest.param(
+            "3.1.0",
+            "X-Count",
+            {"schema": {"type": ["array", "null"], "items": {"type": "integer"}}},
+            "1,x",
+            False,
+            id="type-list-array-invalid",
+        ),
+        pytest.param(
+            "3.0.2", "X-Extent", {"schema": EXTENT_SCHEMA, "explode": True}, "start=-5,end=7", True, id="exploded"
+        ),
+        pytest.param(
+            "3.0.2",
+            "X-Extent",
+            {"schema": EXTENT_SCHEMA, "explode": False},
+            "start,-5,end,7",
+            True,
+            id="not-exploded",
+        ),
+        pytest.param("3.0.2", "X-Extent", {"schema": EXTENT_SCHEMA}, "start,-5,end,7", True, id="default-not-exploded"),
+        pytest.param(
+            "3.0.2",
+            "X-Extent",
+            {"schema": EXTENT_SCHEMA, "explode": True},
+            "start=x,end=7",
+            False,
+            id="exploded-invalid-value",
+        ),
+        pytest.param(
+            "3.0.2",
+            "X-Extent",
+            {"schema": EXTENT_SCHEMA, "explode": True},
+            "end=7",
+            False,
+            id="exploded-missing-required",
+        ),
+        pytest.param(
+            "3.0.2", "X-Extent", {"schema": EXTENT_SCHEMA, "explode": True}, "start", False, id="exploded-malformed"
+        ),
+        pytest.param(
+            "3.0.2",
+            "X-Extent",
+            {"schema": EXTENT_SCHEMA, "explode": False},
+            "start,-5,end",
+            False,
+            id="not-exploded-odd-items",
+        ),
     ],
 )
-def test_header_conformance_object_value(ctx, response_factory, explode, value, expected):
-    header = {"schema": EXTENT_SCHEMA}
-    if explode is not None:
-        header["explode"] = explode
+def test_header_conformance(ctx, response_factory, version, name, definition, value, expected):
     operation = ctx.openapi.load_operation(
-        "GET /data", {"responses": {"200": {"description": "OK", "headers": {"X-Extent": header}}}}
+        "GET /data", {"responses": {"200": {"description": "OK", "headers": {name: definition}}}}, version=version
     )
     case = operation.Case()
-    response = response_factory.core(headers={"X-Extent": [value]})
+    response = response_factory.core(headers={name: [value]})
     if expected:
         assert response_headers_conformance(check_context(), response, case) is None
     else:
