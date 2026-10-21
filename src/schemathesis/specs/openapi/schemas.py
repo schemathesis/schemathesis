@@ -26,11 +26,9 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
-from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
-from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transforms import jsonify_python_specific_types
 from schemathesis.core.transport import (
@@ -242,13 +240,6 @@ class OpenApiSchema(BaseSchema):
 
         """
         return self.analysis.extra_data_source
-
-    @override
-    def get_coverage_capabilities(self) -> CoverageCapabilities:
-        return CoverageCapabilities(
-            update_pattern=update_quantifier,
-            validator_cls=self.adapter.jsonschema_validator_cls,
-        )
 
     @override
     def record_runtime_observations(
@@ -489,14 +480,6 @@ class OpenApiSchema(BaseSchema):
         formats.register_string_format(
             HEADER_FORMAT, header_values(exclude_characters=DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00")
         )
-
-    @override
-    def get_custom_format_strategies(
-        self, generation_config: GenerationConfig, mode: GenerationMode
-    ) -> dict[str, SearchStrategy]:
-        from schemathesis.specs.openapi._hypothesis import _build_custom_formats
-
-        return _build_custom_formats(generation_config, mode)
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]

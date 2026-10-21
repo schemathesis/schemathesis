@@ -14,16 +14,18 @@ from typing import TYPE_CHECKING, Any, TypeGuard, cast
 from urllib.parse import unquote
 
 import jsonschema_rs
+from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref, schema_with_bundle
+from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schema
 from schemathesis.core.media_types import (
     FORM_MEDIA_TYPES,
     iter_matching_media_type_strategies,
 )
-from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
+from schemathesis.core.parameters import CONTAINER_TO_LOCATION, LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import UNRESOLVABLE, deepclone, is_array_index, resolve_path, split_body_key
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
@@ -32,7 +34,6 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
-from schemathesis.generation.hypothesis.builder import _case_to_kwargs
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -40,6 +41,7 @@ from schemathesis.generation.meta import (
     GenerationInfo,
     PhaseInfo,
 )
+from schemathesis.specs.openapi._hypothesis import _build_custom_formats
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet, filter_schema_valid_examples
 from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
@@ -65,6 +67,7 @@ if TYPE_CHECKING:
     from schemathesis.resources import PoolDraw, ResourcePool
     from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 # Case keyword arguments that describe the request body.
 BODY_KEYS = ("body", "media_type", "multipart_content_types")
@@ -416,6 +419,17 @@ class CaseEmitter:
         if dedup is Dedup.WIRE_NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(_wire_kwargs(case))):
             return None
         return case
+
+
+def _case_to_kwargs(case: Case) -> dict:
+    kwargs = {}
+    for container_name in LOCATION_TO_CONTAINER.values():
+        value = getattr(case, container_name)
+        if isinstance(value, CaseInsensitiveDict) and value:
+            kwargs[container_name] = dict(value)
+        elif value and value is not NOT_SET:
+            kwargs[container_name] = value
+    return kwargs
 
 
 def _wire_kwargs(case: Case) -> dict[str, Any]:
@@ -1047,17 +1061,8 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                 else:
                     template.set_body(first_positive, body.media_type)
         if not _is_invalid_positive(template, value):
-            data = template.with_body(value=value, media_type=body.media_type)
-            case = emitter.emit(
-                data,
-                mode=value.generation_mode,
-                elapsed=elapsed,
-                scenario=value.scenario,
-                description=value.description,
-                location=value.location,
-                parameter=body.media_type,
-                parameter_location=ParameterLocation.BODY,
-            )
+            case = _emit_body_case(run, value, body.media_type, elapsed)
+            # A deduplicated first value skips the rest of this body alternative.
             if case is None:
                 continue
             yield case
@@ -1068,21 +1073,24 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                 next_value = next(iterator)
                 if _is_invalid_positive(template, next_value):
                     continue
-                data = template.with_body(value=next_value, media_type=body.media_type)
-                case = emitter.emit(
-                    data,
-                    mode=next_value.generation_mode,
-                    elapsed=instant.elapsed,
-                    scenario=next_value.scenario,
-                    description=next_value.description,
-                    location=next_value.location,
-                    parameter=body.media_type,
-                    parameter_location=ParameterLocation.BODY,
-                )
+                case = _emit_body_case(run, next_value, body.media_type, instant.elapsed)
                 if case is not None:
                     yield case
             except StopIteration:
                 break
+
+
+def _emit_body_case(run: CoverageRun, value: GeneratedValue, media_type: str, elapsed: float) -> Case | None:
+    return run.emitter.emit(
+        run.template.with_body(value=value, media_type=media_type),
+        mode=value.generation_mode,
+        elapsed=elapsed,
+        scenario=value.scenario,
+        description=value.description,
+        location=value.location,
+        parameter=media_type,
+        parameter_location=ParameterLocation.BODY,
+    )
 
 
 def _default_positive(run: CoverageRun) -> Generator[Case, None, None]:
@@ -1551,7 +1559,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
 
 def iter_coverage_cases(
     *,
-    operation: APIOperation,
+    operation: OpenApiOperation,
     generation_modes: list[GenerationMode],
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
@@ -1574,12 +1582,9 @@ def iter_coverage_cases(
     )
 
     responses = list(operation.responses.iter_examples())
-    custom_formats = operation.schema.get_custom_format_strategies(generation_config, GenerationMode.POSITIVE)
-
-    capabilities = operation.schema.get_coverage_capabilities()
-    validator_cls = capabilities.validator_cls
-    update_pattern = capabilities.update_pattern
-    assert validator_cls is not None, "Coverage phase requires a JSON schema validator class"
+    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    update_pattern = update_quantifier
 
     correlated: dict[tuple[ParameterLocation, str], Any]
     correlated_draws: tuple[PoolDraw, ...]

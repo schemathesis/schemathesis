@@ -26,7 +26,6 @@ from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation, SkippedParameter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
-from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import CallOutcome, HttpMethod, HttpMethodSchema, Response, is_uninformative_status
 from schemathesis.generation import GenerationMode
@@ -562,10 +561,6 @@ class BaseSchema(Mapping):
     ) -> bool | None:
         raise NotImplementedError
 
-    def get_coverage_capabilities(self) -> CoverageCapabilities:
-        """Return spec-specific data the coverage phase asks of a schema."""
-        return CoverageCapabilities(update_pattern=None, validator_cls=None)
-
     def record_runtime_observations(
         self,
         *,
@@ -712,12 +707,6 @@ class BaseSchema(Mapping):
     def adapt_to_path_decoder_rejection(self) -> None:
         """React to the engine probe finding that the app rejects unsafe characters in URL paths."""
         self._probe_state.path_decoder_strict = True
-
-    def get_custom_format_strategies(
-        self, generation_config: GenerationConfig, mode: GenerationMode
-    ) -> dict[str, SearchStrategy]:
-        """Return spec-specific format strategies (mode-aware)."""
-        return {}
 
     def as_strategy(
         self,
