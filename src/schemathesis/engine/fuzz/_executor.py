@@ -555,7 +555,6 @@ def _run_forever_thread(
         """Compose a scenario: weighted-random producers, then link-biased follow-ups."""
         if _must_stop_worker(ctx, weighted_operations=weighted_operations, scenario_started=scenario_started):
             raise _StopFuzzing
-        scenario_started.set()
 
         # Capture timing before any draws so elapsed_time covers HTTP calls made in the strategy.
         scenario_started_at = time.monotonic()
@@ -608,6 +607,8 @@ def _run_forever_thread(
             recorder.record_response(case_id=case.id, response=response)
             last_step = (operation, case, response)
 
+        # A draw Hypothesis rejects must not spend the one scenario allowed past the time limit.
+        scenario_started.set()
         _start_scenario(
             scenario_cell,
             started_at=scenario_started_at,

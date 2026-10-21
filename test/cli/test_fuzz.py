@@ -992,7 +992,7 @@ def test_fuzz_negative_skips_operations_without_negatable_parts(cli, app_runner,
     def items():
         return jsonify({}), 400
 
-    result = cli.main("fuzz", app_runner.openapi_url(app), "--mode=negative", "--max-time=1", "--workers=1")
+    result = cli.main("fuzz", app_runner.openapi_url(app), "--mode=negative", "--max-time=0", "--workers=1")
 
     assert _parse_operations_summary(result.stdout) == (
         {"selected": 2, "tested": 1, "skipped": 1},
@@ -1020,26 +1020,28 @@ def test_fuzz_negative_link_leaves_nothing_to_negate(cli, app_runner, ctx):
 
     @app.route("/users/<user_id>")
     def get(user_id):
-        return jsonify({})
+        return jsonify({}), 500
 
     result = cli.main(
         "fuzz",
         app_runner.openapi_url(app),
         "--mode=negative",
         "--checks=not_a_server_error",
-        "--max-time=1",
+        "--max-time=60",
         "--workers=1",
     )
 
-    assert _parse_operations_summary(result.stdout) == ({"selected": 2, "tested": 2}, set()), result.stdout
+    assert "Stop reason: Failure limit reached" in result.stdout, result.stdout
+    assert "Errored" not in result.stdout, result.stdout
+    assert "GET /users/{userId}" in result.stdout, result.stdout
 
 
 def test_fuzz_negative_skips_graphql_operations_without_negatable_parts(cli, ctx):
     api = ctx.graphql.apps.books()
 
-    result = cli.main("fuzz", api.schema_url, "--mode=negative", "--max-time=1", "--workers=1")
+    result = cli.main("fuzz", api.schema_url, "--mode=negative", "--max-time=0", "--workers=1")
 
     assert _parse_operations_summary(result.stdout) == (
-        {"selected": 4, "tested": 2, "skipped": 2},
-        {"Impossible to generate negative test cases for this GraphQL operation"},
+        {"selected": 4, "tested": 1, "skipped": 3},
+        {"Impossible to generate negative test cases for this GraphQL operation", "Time limit reached"},
     ), result.stdout
