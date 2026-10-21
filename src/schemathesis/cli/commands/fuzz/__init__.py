@@ -5,7 +5,7 @@ from typing import Any
 import click
 
 from schemathesis.checks import load_all_checks
-from schemathesis.cli.commands._options import apply_report_options, build_filter_set
+from schemathesis.cli.commands._options import apply_project_options, apply_report_options, build_filter_set
 from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE
 from schemathesis.cli.core import ensure_color, resolve_color
@@ -70,7 +70,6 @@ from schemathesis.config import (
     HealthCheck,
     SchemathesisConfig,
     SchemathesisWarning,
-    WarningsConfig,
 )
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.metrics import MetricFunction
@@ -233,26 +232,7 @@ def fuzz(
     config.output.sanitization.update(enabled=output_sanitize)
     config.output.truncation.update(enabled=output_truncate)
     apply_report_options(config.reports, ctx.params)
-    config.projects.override.update(
-        base_url=base_url,
-        headers=headers or None,
-        basic_auth=auth,
-        wfc_auth=auth_wfc,
-        wfc_user=auth_wfc_user,
-        workers=workers,
-        continue_on_failure=continue_on_failure,
-        rate_limit=rate_limit,
-        max_redirects=max_redirects,
-        request_timeout=request_timeout,
-        request_retries=request_retries,
-        tls_verify=request_tls_verify,
-        request_cert=request_cert,
-        request_cert_key=request_cert_key,
-        proxy=request_proxy,
-        warnings=WarningsConfig.from_value([w.value for w in warnings] if isinstance(warnings, list) else warnings)
-        if warnings is not None
-        else None,
-    )
+    apply_project_options(config.projects.override, ctx.params)
     filter_set = build_filter_set(ctx.params)
     config.projects.override.checks.update(
         included_check_names=included_check_names,
