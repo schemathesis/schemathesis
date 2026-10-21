@@ -24,24 +24,20 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
-@click.command(  # type: ignore[untyped-decorator]
+@click.command(
     name="replay",
     short_help="Replay stored crash files",
     context_settings={"terminal_width": get_terminal_width(), "help_option_names": ["-h", "--help"]},
 )
-@click.argument("path", default=None, required=False, type=click.Path())  # type: ignore[untyped-decorator]
-@click.option("--url", "base_url", default=None, help="Override base URL for replay.")  # type: ignore[untyped-decorator]
-@click.option(  # type: ignore[untyped-decorator]
-    "--schema-location", default=None, help="Override schema location for loading."
-)
-@click.option(  # type: ignore[untyped-decorator]
-    "--keep", is_flag=True, default=False, help="Retain fixed crashes instead of removing them."
-)
-@click.option(*HEADER.args, **HEADER.kwargs)  # type: ignore[untyped-decorator]
-@click.option(*AUTH.args, **AUTH.kwargs)  # type: ignore[untyped-decorator]
-@click.option(*AUTH_WFC.args, **AUTH_WFC.kwargs)  # type: ignore[untyped-decorator]
-@click.option(*AUTH_WFC_USER.args, **AUTH_WFC_USER.kwargs)  # type: ignore[untyped-decorator]
-@click.pass_context  # type: ignore[untyped-decorator]
+@click.argument("path", default=None, required=False, type=click.Path())
+@click.option("--url", "base_url", default=None, help="Override base URL for replay.")
+@click.option("--schema-location", default=None, help="Override schema location for loading.")
+@click.option("--keep", is_flag=True, default=False, help="Retain fixed crashes instead of removing them.")
+@click.option(*HEADER.args, **HEADER.kwargs)
+@click.option(*AUTH.args, **AUTH.kwargs)
+@click.option(*AUTH_WFC.args, **AUTH_WFC.kwargs)
+@click.option(*AUTH_WFC_USER.args, **AUTH_WFC_USER.kwargs)
+@click.pass_context
 def replay(
     ctx: click.Context,
     path: str | None,

@@ -13,15 +13,15 @@ from schemathesis.cli.ext.groups import should_use_color
 DEFAULT_WIDTH = 80
 
 
-@click.command(  # type: ignore[untyped-decorator]
+@click.command(
     name="explain",
     short_help="Explain a failure code",
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-@click.argument("code", required=False)  # type: ignore[untyped-decorator]
-@click.option("--list", "show_list", is_flag=True, help="List every failure code.")  # type: ignore[untyped-decorator]
-@click.option("--force-color", is_flag=True, help="Force colored output.")  # type: ignore[untyped-decorator]
-@click.pass_context  # type: ignore[untyped-decorator]
+@click.argument("code", required=False)
+@click.option("--list", "show_list", is_flag=True, help="List every failure code.")
+@click.option("--force-color", is_flag=True, help="Force colored output.")
+@click.pass_context
 def explain(ctx: click.Context, code: str | None, show_list: bool, force_color: bool) -> None:
     """Explain what a failure code means and how to act on it.
 

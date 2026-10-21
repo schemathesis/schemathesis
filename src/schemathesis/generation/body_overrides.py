@@ -56,7 +56,7 @@ def build_body_override_overlay_strategy(
     def is_overridden_path(path: tuple[str | int, ...]) -> bool:
         return any(path_matches_pattern(path, segments) for segments in override_segments)
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def overlay(draw: st.DrawFn) -> GeneratedValue | JsonValue:
         produced = draw(inner)
         if isinstance(produced, GeneratedValue):

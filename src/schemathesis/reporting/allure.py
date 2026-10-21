@@ -285,22 +285,22 @@ class AllureHookForwarder:
         self._label = label
         self._writers = writers
 
-    @hookimpl  # type: ignore[untyped-decorator]
+    @hookimpl
     def attach_data(self, name: str, body: bytes, attachment_type: _HasMimeType | None, extension: str | None) -> None:
         for w in self._writers:
             w.accumulate_attachment(self._label, name, body, attachment_type)
 
-    @hookimpl  # type: ignore[untyped-decorator]
+    @hookimpl
     def add_link(self, url: str, link_type: str, name: str) -> None:
         for w in self._writers:
             w.accumulate_link(self._label, url, link_type, name)
 
-    @hookimpl  # type: ignore[untyped-decorator]
+    @hookimpl
     def add_title(self, test_title: str) -> None:
         for w in self._writers:
             w.accumulate_title(self._label, test_title)
 
-    @hookimpl  # type: ignore[untyped-decorator]
+    @hookimpl
     def add_description(self, test_description: str) -> None:
         for w in self._writers:
             w.accumulate_description(self._label, test_description)

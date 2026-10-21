@@ -122,15 +122,15 @@ def _normalize_path(text: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "_", text).strip("_")
 
 
-@click.command("cli", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})  # type: ignore[untyped-decorator]
-@click.option(  # type: ignore[untyped-decorator]
+@click.command("cli", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@click.option(
     "--output",
     "output_file",
     default=None,
     help=f"Output HTML file path (default: {DEFAULT_CLI_PROFILE_FILENAME}).",
 )
-@click.option("--open", "open_result", is_flag=True, default=False, help="Open the result file after profiling.")  # type: ignore[untyped-decorator]
-@click.argument("raw_args", nargs=-1, type=click.UNPROCESSED)  # type: ignore[untyped-decorator]
+@click.option("--open", "open_result", is_flag=True, default=False, help="Open the result file after profiling.")
+@click.argument("raw_args", nargs=-1, type=click.UNPROCESSED)
 def cli(
     output_file: str | None,
     open_result: bool,
@@ -282,11 +282,11 @@ def _profile_operations(
     return records
 
 
-@click.command("fuzzing")  # type: ignore[untyped-decorator]
+@click.command("fuzzing")
 @_operation_profile_options
 @click.option(
     "--max-examples", "count", default=100, show_default=True, help="Maximum number of test cases per API operation"
-)  # type: ignore[untyped-decorator]
+)
 def fuzzing(
     schema_path: str,
     base_url: str | None,
@@ -338,7 +338,7 @@ def fuzzing(
         )
 
 
-@click.command("coverage")  # type: ignore[untyped-decorator]
+@click.command("coverage")
 @_operation_profile_options
 def coverage(
     schema_path: str,
@@ -393,17 +393,17 @@ def coverage(
         )
 
 
-@click.command("stateful")  # type: ignore[untyped-decorator]
-@click.argument("schema_path")  # type: ignore[untyped-decorator]
-@click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")  # type: ignore[untyped-decorator]
-@click.option(  # type: ignore[untyped-decorator]
+@click.command("stateful")
+@click.argument("schema_path")
+@click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")
+@click.option(
     "--output",
     "output_file",
     default="profiles/profile_stateful.html",
     show_default=True,
     help="Output HTML file path (time profile).",
 )
-@click.option("--open", "open_result", is_flag=True, default=False, help="Open the result file after profiling.")  # type: ignore[untyped-decorator]
+@click.option("--open", "open_result", is_flag=True, default=False, help="Open the result file after profiling.")
 def stateful(schema_path: str, base_url: str | None, output_file: str, open_result: bool) -> None:
     """Profile stateful state-machine construction (link inference + transition collection).
 
@@ -435,7 +435,7 @@ def stateful(schema_path: str, base_url: str | None, output_file: str, open_resu
         webbrowser.open(output_path.resolve().as_uri())
 
 
-@click.group()  # type: ignore[untyped-decorator]
+@click.group()
 def main() -> None:
     """Schemathesis performance profiler."""
 

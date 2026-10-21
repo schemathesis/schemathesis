@@ -91,21 +91,21 @@ def get_header_format_strategies(mode: GenerationMode) -> dict[str, st.SearchStr
             "_range_header": range_values(),
         }
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def mixed_if_match(draw: st.DrawFn) -> str:
         rng = draw(st.randoms())
         if rng.random() < STRUCTURED_HEADER_PROBABILITY:
             return draw(if_match_values())
         return draw(header_values())
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def mixed_http_date(draw: st.DrawFn) -> str:
         rng = draw(st.randoms())
         if rng.random() < STRUCTURED_HEADER_PROBABILITY:
             return draw(http_date_values())
         return draw(header_values())
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def mixed_range(draw: st.DrawFn) -> str:
         rng = draw(st.randoms())
         r = rng.random()

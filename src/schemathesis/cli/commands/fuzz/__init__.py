@@ -77,7 +77,7 @@ from schemathesis.generation.metrics import MetricFunction
 load_all_checks()
 
 
-@click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
+@click.argument(*LOCATION.args, **LOCATION.kwargs)
 @group("Options")
 @grouped_option(*BASE_URL.args, **BASE_URL.kwargs)
 @grouped_option(*WORKERS.args, **WORKERS.kwargs)
@@ -154,7 +154,7 @@ load_all_checks()
 @group("Global options")
 @grouped_option(*NO_COLOR.args, **NO_COLOR.kwargs)
 @grouped_option(*FORCE_COLOR.args, **FORCE_COLOR.kwargs)
-@click.pass_context  # type: ignore[untyped-decorator]
+@click.pass_context
 def fuzz(
     ctx: click.Context,
     *,

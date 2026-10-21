@@ -91,7 +91,7 @@ LIKELY_MILLISECONDS = 1000
 OBJECT_LEVEL_AUTHORIZATION_GUIDE = "https://schemathesis.readthedocs.io/en/stable/guides/object-level-authorization/"
 
 
-@click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
+@click.argument(*LOCATION.args, **LOCATION.kwargs)
 @group("Options")
 @grouped_option(*BASE_URL.args, **BASE_URL.kwargs)
 @grouped_option(*ORIGIN.args, **ORIGIN.kwargs)
@@ -180,7 +180,7 @@ OBJECT_LEVEL_AUTHORIZATION_GUIDE = "https://schemathesis.readthedocs.io/en/stabl
 @group("Global options")
 @grouped_option(*NO_COLOR.args, **NO_COLOR.kwargs)
 @grouped_option(*FORCE_COLOR.args, **FORCE_COLOR.kwargs)
-@click.pass_context  # type: ignore[untyped-decorator]
+@click.pass_context
 def run(
     ctx: click.Context,
     *,
