@@ -26,7 +26,7 @@ from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._rate_limit_retry import send_tracked, validate_with_rate_limited
 from schemathesis.engine._validate import validate_response
-from schemathesis.engine.errors import is_inconsistent_replay
+from schemathesis.engine.errors import build_code_sample, is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import overrides
@@ -299,12 +299,19 @@ def _run_forever(
 
 
 def _report_once(
-    exc: Exception, *, label: str, seen_labels: set[str], event_queue: queue.Queue[events.EngineEvent]
+    exc: Exception,
+    *,
+    label: str,
+    seen_labels: set[str],
+    event_queue: queue.Queue[events.EngineEvent],
+    code_sample: str | None = None,
 ) -> None:
     """Report an operation's error the first time this worker sees one for it."""
     if label not in seen_labels:
         seen_labels.add(label)
-        event_queue.put(events.NonFatalError(error=exc, phase=None, label=label, related_to_operation=True))
+        event_queue.put(
+            events.NonFatalError(error=exc, phase=None, label=label, related_to_operation=True, code_sample=code_sample)
+        )
 
 
 def _draw_operation(
@@ -371,6 +378,7 @@ def _send_step(
     case: Case,
     *,
     operation: APIOperation,
+    recorder: ScenarioRecorder,
     event_queue: queue.Queue[events.EngineEvent],
     seen_error_labels: set[str],
 ) -> tuple[list[Response], Response] | None:
@@ -385,7 +393,14 @@ def _send_step(
         if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.
             return None
-        _report_once(exc, label=operation.label, seen_labels=seen_error_labels, event_queue=event_queue)
+        recorder.record_network_error(case_id=case.id, error=exc)
+        _report_once(
+            exc,
+            label=operation.label,
+            seen_labels=seen_error_labels,
+            event_queue=event_queue,
+            code_sample=build_code_sample(case, exc.request, transport_kwargs),
+        )
         return None
 
 
@@ -625,7 +640,12 @@ def _run_forever_thread(
                 is_transition_applied=False,
             )
             sent = _send_step(
-                ctx, case, operation=operation, event_queue=event_queue, seen_error_labels=seen_error_labels
+                ctx,
+                case,
+                operation=operation,
+                recorder=recorder,
+                event_queue=event_queue,
+                seen_error_labels=seen_error_labels,
             )
             if sent is None:
                 continue

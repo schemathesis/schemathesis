@@ -69,8 +69,9 @@ def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: 
     """
     for recorder in recorders:
         for case_id, interaction in recorder.interactions.items():
-            # Stateful steps record an interaction only once the server answered.
-            assert interaction.response is not None
+            # A step that failed with a network error has no response to learn from.
+            if interaction.response is None:
+                continue
             _record_into_pool(extra_data_source, recorder.cases[case_id].value, interaction.response)
 
 
@@ -526,6 +527,8 @@ def _run_step(
         ctx.step_failed()
         raise
     except Exception as exc:
+        if isinstance(exc, (requests.Timeout, requests.ConnectionError, ChunkedEncodingError)):
+            machine.recorder.record_network_error(case_id=case.id, error=exc)
         outage = _detect_outage(exc, engine)
         _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
         _remember_step_outcome(ctx, case, exc, unique_inputs=unique_inputs)
