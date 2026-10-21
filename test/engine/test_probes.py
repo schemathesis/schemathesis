@@ -15,7 +15,7 @@ from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import PhaseName, probes
-from test.utils import EventStream, run_given
+from test.utils import EventStream, refusing_url, run_given
 
 
 def _make_strict_server(app_runner, reject: Callable[[], object]) -> str:
@@ -125,13 +125,13 @@ def test_detect_null_byte_with_response(engine_ctx, null_byte_strict_url, respon
 
 @pytest.fixture(params=["refused", "connect-timeout"])
 def unreachable_url(request):
+    if request.param == "refused":
+        with refusing_url() as url:
+            yield f"{url}/"
+        return
     server = socket.socket()
     server.bind(("127.0.0.1", 0))
     port = server.getsockname()[1]
-    if request.param == "refused":
-        server.close()
-        yield f"http://127.0.0.1:{port}/"
-        return
     # The only accept-queue slot is taken and never accepted, so the kernel drops further connection attempts.
     server.listen(0)
     queued = socket.create_connection(("127.0.0.1", port))

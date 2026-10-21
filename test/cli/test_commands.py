@@ -37,7 +37,7 @@ from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
 from test.fixtures.app_runner import wait_for_port
-from test.utils import HERE, SIMPLE_PATH
+from test.utils import HERE, SIMPLE_PATH, refusing_url
 
 
 def test_commands_help(cli, snapshot_cli):
@@ -2793,13 +2793,8 @@ def test_wait_for_schema(cli, app_runner, schema_path, make_app):
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
 def test_wait_for_schema_not_enough(cli, snapshot_cli):
-    # A bound socket that never listens refuses every connection for the whole wait window.
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        port = sock.getsockname()[1]
-        assert (
-            cli.run(f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
-        )
+    with refusing_url() as url:
+        assert cli.run(f"{url}/openapi.json", "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 
 
 def test_wait_for_schema_retries_503(cli, app_runner, ctx):

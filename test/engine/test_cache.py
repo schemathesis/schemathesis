@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import socket
 import threading
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import cache
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.specs.openapi.auth_inference import record_auth_inference
+from test.utils import refusing_url
 
 
 def _manifest() -> Manifest:
@@ -386,27 +386,21 @@ def test_auth_required_skipped_when_no_credentials_configured(ctx, tmp_path):
     assert [entry.id for entry in entries] == [1]
 
 
-def test_skipped_on_network_error(ctx, tmp_path, app_runner):
+@pytest.mark.parametrize("kind", [Kind.METHOD_NOT_ALLOWED, Kind.ERROR_FEEDBACK, Kind.AUTH_REQUIRED])
+def test_skipped_on_network_error(ctx, tmp_path, app_runner, kind):
     app, _ = ctx.openapi.make_flask_app({"/x": {"post": {"responses": {"200": {"description": "OK"}}}}})
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        closed_port = sock.getsockname()[1]
-    schema.config.base_url = f"http://127.0.0.1:{closed_port}"
     schema.config.request_timeout = 1
     _point_cache_at(schema, tmp_path)
-    _seed(
-        tmp_path,
-        [Entry(id=1, kind=Kind.METHOD_NOT_ALLOWED, operation="POST /x", request=Request(method="POST"))],
-    )
+    _seed(tmp_path, [Entry(id=1, kind=kind, operation="POST /x", request=Request(method="POST"))])
 
-    report = _engine_for(schema).cache.run()
+    with refusing_url() as url:
+        schema.config.base_url = url
+        report = _engine_for(schema).cache.run()
 
     assert report.skipped == 1
-    surviving = load(tmp_path)
-    assert surviving is not None
-    _, entries = surviving
-    assert [entry.id for entry in entries] == [1]
+    _, entries = load(tmp_path)
+    assert entries == [Entry(id=1, kind=kind, operation="POST /x", request=Request(method="POST"), last_replayed_run=1)]
 
 
 def test_replay_rotates_across_runs_when_cache_exceeds_budget(ctx, tmp_path):
