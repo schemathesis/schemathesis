@@ -170,7 +170,7 @@ def build_semantic_overlay(
             # Malformed container schema; substitutions skip the container-level revalidation.
             container_validator = None
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def overlaid(draw: st.DrawFn) -> JsonValue | GeneratedValue:
         base = draw(inner_strategy)
         # Inner may already be a GeneratedValue carrying pool_draws / meta; unwrap once and re-wrap
@@ -624,7 +624,7 @@ def _mix_negative_into_positive(
     # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
     positive_strategy = positive_strategy.map(_as_generated_value)
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
         random = draw(st.randoms())
         if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
@@ -864,7 +864,7 @@ def build_hybrid_strategy(
     variant_keys = [jsonschema_rs.canonical.json.to_string(v.overlay) for v in captured_variants]
     n_variants = len(captured_variants)
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def hybrid(draw: st.DrawFn) -> Any:
         random = draw(st.randoms())
 
@@ -1038,7 +1038,7 @@ def build_positive_biased_path_strategy(
     """Wrap a path parameter strategy to bias integers toward positive values."""
     from hypothesis import strategies as st
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def biased(draw: st.DrawFn) -> dict[str, Any] | None:
         params = draw(strategy)
         if params is None:
@@ -1077,7 +1077,7 @@ def build_example_aware_strategy(
     """
     from hypothesis import strategies as st
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def with_examples(draw: st.DrawFn) -> Any:
         # Use true random for uniform distribution (like stateful phase)
         random = draw(st.randoms(use_true_random=True))
@@ -1133,7 +1133,7 @@ def build_parameter_example_aware_strategy(
 
     correlated = correlated_examples or []
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def with_parameter_examples(draw: st.DrawFn) -> dict[str, Any] | None:
         result = draw(original_strategy)
         if result is None:

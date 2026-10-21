@@ -184,7 +184,7 @@ def build_dictionary_overlay_strategy(
     if not eligible_per_parameter:
         return inner
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def overlay(draw: st.DrawFn) -> GeneratedValue | dict[str, JsonValue]:
         produced = draw(inner)
         existing_meta: MutationMetadata | None = None
@@ -385,7 +385,7 @@ def build_body_dictionary_overlay_strategy(
     if not eligible_per_binding:
         return inner
 
-    @st.composite  # type: ignore[untyped-decorator]
+    @st.composite
     def overlay(draw: st.DrawFn) -> GeneratedValue | JsonValue:
         produced = draw(inner)
         existing_meta: MutationMetadata | None = None
