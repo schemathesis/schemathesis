@@ -446,8 +446,8 @@ def conversion(func: Callable[..., None]) -> Callable:
     return _wrapper
 
 
-def make_delimited(data: dict[str, Any] | None, delimiter: str = ",") -> str:
-    return delimiter.join(f"{key}={to_wire_string(value)}" for key, value in force_dict(data or {}).items())
+def make_delimited(data: dict[str, Any] | None) -> str:
+    return ",".join(f"{key}={to_wire_string(value)}" for key, value in force_dict(data or {}).items())
 
 
 def force_iterable(value: object) -> list | tuple:
