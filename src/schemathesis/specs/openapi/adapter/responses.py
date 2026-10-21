@@ -846,7 +846,7 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
             examples = definition.get(examples_container_keyword, {})
             if isinstance(examples, dict):
                 for example in examples.values():
-                    if "value" in example:
+                    if isinstance(example, dict) and "value" in example:
                         yield name, example["value"]
             elif isinstance(examples, list):
                 for example in examples:
