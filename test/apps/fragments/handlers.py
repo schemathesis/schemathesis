@@ -221,16 +221,6 @@ def register_write_only(app: Flask) -> None:
         raise InternalServerError
 
 
-def register_chunked_success(app: Flask) -> None:
-    @app.route("/api/success", methods=["GET"])
-    def chunked_success_endpoint() -> Any:
-        def generate():
-            yield b'{"success":'
-            yield b" true}"
-
-        return Response(generate(), content_type="application/json")
-
-
 def register_text(app: Flask) -> None:
     @app.route("/api/text", methods=["GET"])
     def text_endpoint() -> Any:

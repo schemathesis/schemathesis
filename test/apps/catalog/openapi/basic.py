@@ -310,14 +310,6 @@ def invalid() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
-def chunked_success() -> OpenAPIApp:
-    """`/api/success` returning JSON via a generator so Werkzeug emits Transfer-Encoding: chunked."""
-    spec = build_schema(schemas.success())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_chunked_success(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
-
-
 def success_text_and_write_only() -> OpenAPIApp:
     """Composite for filter-combination tests.
 
