@@ -19,6 +19,10 @@ Your `filter_case` hook rejected all generated test cases
 Schemathesis generated test data, but every case was rejected by your hook.
 
 Tip: Review your `filter_case` hook to ensure it accepts at least some generated cases.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
 =================================== SUMMARY ====================================
 
 API Operations:

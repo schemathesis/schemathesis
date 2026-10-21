@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from itertools import groupby
 from typing import TYPE_CHECKING
 
 import click
@@ -19,6 +18,7 @@ from schemathesis.cli.output import (
     Indent,
     display_api_operations,
     display_baseline_summary,
+    display_errors,
     display_errors_summary,
     display_failures,
     display_failures_summary,
@@ -287,20 +287,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         self.console.print()
 
         if ctx.errors:
-            display_section_name("ERRORS")
-            sorted_errors = sorted(ctx.errors, key=lambda r: (r.label, r.info.title))
-            for label, group_errors in groupby(sorted_errors, key=lambda r: r.label):
-                display_section_name(label, "_", fg="red")
-                _errors = list(group_errors)
-                for idx, error in enumerate(_errors, 1):
-                    click.echo(
-                        error.info.format(
-                            bold=lambda x: click.style(x, bold=True),
-                            base_url_is_set=ctx.config.base_url is not None,
-                        )
-                    )
-                    if idx < len(_errors):
-                        click.echo()
+            display_errors(ctx.errors, base_url_is_set=ctx.config.base_url is not None)
 
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
 

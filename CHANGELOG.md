@@ -9,6 +9,7 @@
 - Crash on non-object entries in response `examples`.
 - Auth from `set_from_requests` not applied to WSGI apps.
 - `pytest` failing with `Unknown config option: timeout` for tests under `/app` in Docker images.
+- Missing help footer in `st fuzz` error output.
 - Coverage and fuzzing phases ignoring `$ref`'d parameter examples.
 
 ## [4.32.2](https://github.com/schemathesis/schemathesis/compare/v4.32.1...v4.32.2) - 2026-10-20

@@ -10,6 +10,7 @@ ISSUE_TRACKER_URL = (
     "labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"
 )
 EXTENSIONS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/guides/extending/"
+DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 
 
 class ExitCode(IntEnum):

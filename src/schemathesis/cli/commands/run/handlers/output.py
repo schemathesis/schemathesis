@@ -3,7 +3,6 @@ from __future__ import annotations
 import textwrap
 import time
 from dataclasses import dataclass, field
-from itertools import groupby
 from json.decoder import JSONDecodeError
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -19,6 +18,7 @@ from schemathesis.cli.output import (
     SpinnerProgressManager,
     display_api_operations,
     display_baseline_summary,
+    display_errors,
     display_errors_summary,
     display_failures,
     display_failures_summary,
@@ -60,7 +60,6 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
-DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 UNMATCHED_FILTER_TIP = "Check the filter for a typo, or update it if the operation was renamed"
 DICTIONARY_MISMATCH_REASON = "with entries that mostly fail the bound parameter's schema"
 
@@ -1721,29 +1720,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         assert self.unit_tests_manager is None
         assert self.stateful_tests_manager is None
         if ctx.errors:
-            display_section_name("ERRORS")
-            errors = sorted(
-                ctx.errors, key=lambda r: (r.phase.value if r.phase is not None else "", r.label, r.info.title)
-            )
-            for label, group_errors in groupby(errors, key=lambda r: r.label):
-                display_section_name(label, "_", fg="red")
-                _errors = list(group_errors)
-                for idx, error in enumerate(_errors, 1):
-                    click.echo(
-                        error.info.format(
-                            bold=lambda x: click.style(x, bold=True),
-                            base_url_is_set=ctx.config.base_url is not None,
-                        )
-                    )
-                    if idx < len(_errors):
-                        click.echo()
-            click.echo(
-                style(
-                    f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
-                    fg="red",
-                )
-            )
-            click.echo()
+            display_errors(ctx.errors, base_url_is_set=ctx.config.base_url is not None)
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
         if not ctx.warnings.is_empty:
             self.display_warnings(ctx)
