@@ -43,8 +43,8 @@ class BaselineEntry:
         return (self.operation, self.check, self.failure, self.signature)
 
     @classmethod
-    def from_failure(cls, failure: Failure, *, check: str, today: date | None = None) -> BaselineEntry:
-        stamp = (today or date.today()).isoformat()
+    def from_failure(cls, failure: Failure, *, check: str) -> BaselineEntry:
+        stamp = date.today().isoformat()
         return cls(
             operation=failure.operation or "",
             check=check,
