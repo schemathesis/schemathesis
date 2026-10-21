@@ -476,6 +476,12 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
+def encode_non_object_multipart(value: Any) -> tuple[bytes, str]:
+    """Encode a body from an uncommon schema, e.g. `{"type": "string"}`, and return it with its Content-Type."""
+    boundary = choose_boundary()
+    return _encode_multipart(value, boundary), f"multipart/form-data; boundary={boundary}"
+
+
 def _is_structured_schema(schema: dict[str, Any], root_schema: dict[str, Any]) -> bool:
     # An array part takes the default of its items: JSON for nested structures, plain text for primitives and files.
     items = schema.get("items")
@@ -614,10 +620,7 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
             content_type = prepared.headers["Content-Type"].replace("multipart/form-data", "multipart/mixed", 1)
             return {"data": prepared.body, "headers": {"Content-Type": content_type}}
         return {"files": files, "data": data}
-    # Uncommon schema. For example - `{"type": "string"}`
-    boundary = choose_boundary()
-    raw_data = _encode_multipart(value, boundary)
-    content_type = f"multipart/form-data; boundary={boundary}"
+    raw_data, content_type = encode_non_object_multipart(value)
     return {"data": raw_data, "headers": {"Content-Type": content_type}}
 
 

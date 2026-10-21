@@ -28,6 +28,7 @@ from schemathesis.transport.prepare import (
 )
 from schemathesis.transport.requests import (
     REQUESTS_TRANSPORT,
+    encode_non_object_multipart,
     merge_params_override,
     prepare_multipart_parts,
     prepare_query,
@@ -286,10 +287,22 @@ def _to_werkzeug_parts(files: list | None, data: dict[str, Any] | None) -> dict[
     return parts
 
 
+def _serialize_non_object_multipart(value: Body) -> dict[str, Any]:
+    # A raw payload is sent verbatim; other values are wrapped into a single part
+    if value is None or isinstance(value, (str, bytes)):
+        return {"data": value}
+    raw_data, content_type = encode_non_object_multipart(value)
+    return {"data": raw_data, "content_type": content_type}
+
+
 @WSGI_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
 def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        return {"data": value}
+    if isinstance(value, dict):
+        return _serialize_multipart_parts(ctx, value)
+    return _serialize_non_object_multipart(value)
+
+
+def _serialize_multipart_parts(ctx: SerializationContext, value: dict[str, Any]) -> dict[str, Any]:
     files, data = prepare_multipart_parts(ctx, value)
     parts = _to_werkzeug_parts(files, data)
     subtype = media_types.parse(ctx.case.media_type or "multipart/form-data")[1]

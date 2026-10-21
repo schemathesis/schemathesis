@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- Crash on WSGI apps for `multipart/form-data` bodies that are arrays or scalars.
+
 ## [4.32.3](https://github.com/schemathesis/schemathesis/compare/v4.32.2...v4.32.3) - 2026-10-21
 
 ### :bug: Fixed

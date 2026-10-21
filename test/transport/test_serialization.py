@@ -577,6 +577,40 @@ def test_urlencoded_non_object_body_is_sent_as_json(ctx, app_runner, body, trans
     assert case.call().content == json.dumps(body).encode()
 
 
+@pytest.mark.parametrize("body", [[1, 2], 5, True], ids=["array", "integer", "boolean"])
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+def test_multipart_non_object_body_is_sent_as_text(ctx, app_runner, body, transport):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/form": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"multipart/form-data": {"schema": {}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+    )
+
+    @app.route("/form", methods=["POST"])
+    def form():
+        return jsonify({"content_type": request.content_type, "body": request.get_data().decode()})
+
+    if transport == "wsgi":
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/form"]["POST"].Case(body=body, media_type="multipart/form-data")
+    received = case.call().json()
+    boundary = received["content_type"].removeprefix("multipart/form-data; boundary=")
+    assert received == {
+        "content_type": f"multipart/form-data; boundary={boundary}",
+        "body": f"--{boundary}\r\n{body}--{boundary}--\r\n",
+    }
+
+
 def _received_part(part):
     name = part.get_param("name", header="content-disposition")
     if part.is_multipart():
