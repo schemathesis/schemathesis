@@ -115,6 +115,15 @@ class ExtraDataSource(ResourcePool, ResourceRecorder, Protocol):
     """Provides extra data from captured API responses for test generation."""
 
 
+def record_interaction(source: ResourceRecorder, case: Case, response: Response) -> None:
+    """Capture the response and the request inputs of one call, where the source records them."""
+    operation = case.operation
+    if source.should_record(operation=operation.label):
+        source.record_response(operation=operation, response=response, case=case)
+    if source.should_record_request(operation=operation.label):
+        source.record_request(operation=operation, case=case, status_code=response.status_code)
+
+
 __all__ = [
     "Cardinality",
     "ExtraDataSource",

@@ -24,8 +24,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
-from schemathesis.engine._rate_limit_retry import send_tracked, validate_with_rate_limited
-from schemathesis.engine._validate import validate_response
+from schemathesis.engine._rate_limit_retry import send_tracked, validate_case
 from schemathesis.engine.errors import build_code_sample, is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
@@ -37,7 +36,7 @@ if TYPE_CHECKING:
     import hypothesis
     from hypothesis.strategies import DrawFn
 
-    from schemathesis.checks import CheckContext, ResponseChecks
+    from schemathesis.checks import ResponseChecks
     from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
@@ -119,7 +118,9 @@ def _preflight_operations(
             active_operations.append(operation)
             active_generation_modes_by_label[operation.label] = viable_modes
         elif last_exc is None and skip_reason is not None:
-            _report_skipped(operation, skip_reason=skip_reason, event_queue=event_queue)
+            events.put_skipped_scenario(
+                event_queue, operation.label, PhaseName.FUZZING, uuid.uuid4(), skip_reason=skip_reason
+            )
         elif last_exc is not None:
             event_queue.put(
                 events.NonFatalError(
@@ -130,24 +131,6 @@ def _preflight_operations(
                 )
             )
     return active_operations, active_generation_modes_by_label
-
-
-def _report_skipped(operation: APIOperation, *, skip_reason: str, event_queue: queue.Queue[events.EngineEvent]) -> None:
-    started = events.ScenarioStarted(label=operation.label, phase=PhaseName.FUZZING, suite_id=uuid.uuid4())
-    event_queue.put(started)
-    event_queue.put(
-        events.ScenarioFinished(
-            id=started.id,
-            suite_id=started.suite_id,
-            phase=PhaseName.FUZZING,
-            label=operation.label,
-            status=Status.SKIP,
-            recorder=ScenarioRecorder(label=operation.label),
-            elapsed_time=0.0,
-            skip_reason=skip_reason,
-            is_final=True,
-        )
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -428,7 +411,7 @@ def _validate_scenario(
             auth_enforced_operations=ctx.auth_enforced_operations,
         )
         try:
-            _validate_step(
+            validate_case(
                 ctx,
                 recorder,
                 case=case,
@@ -445,32 +428,6 @@ def _validate_scenario(
     if has_new_failures(recorder, ctx.config.load_baseline()):
         return Status.FAILURE
     return Status.SUCCESS
-
-
-def _validate_step(
-    ctx: EngineContext,
-    recorder: ScenarioRecorder,
-    *,
-    case: Case,
-    check_ctx: CheckContext,
-    rate_limited: list[Response],
-    response: Response,
-    continue_on_failure: bool,
-) -> None:
-    """Check the step's final response and every 429 it waited out before it."""
-    validate_with_rate_limited(
-        rate_limited,
-        response,
-        lambda answer: validate_response(
-            case=case,
-            ctx=check_ctx,
-            response=answer,
-            continue_on_failure=continue_on_failure,
-            recorder=recorder,
-            baseline=ctx.config.load_baseline(),
-        ),
-        lambda answer: recorder.record_response(case_id=case.id, response=answer),
-    )
 
 
 def _suite_error(exc: Exception) -> events.NonFatalError:

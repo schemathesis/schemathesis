@@ -39,7 +39,7 @@ from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, Hyp
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
-    from schemathesis.config import PhasesConfig, SchemathesisWarning
+    from schemathesis.config import PhasesConfig
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
     from schemathesis.schemas import APIOperation
@@ -312,8 +312,8 @@ def _run_operation(
     ctx.take_operation_slice()
     verdict = _scheduling_verdict(ctx, operation, phase)
     if verdict.directive is SchedulingDirective.SKIP:
-        _put_skipped_scenario(
-            events_queue, operation, phase, suite_id, skip_reason=verdict.reason, skip_warning=verdict.warning
+        events.put_skipped_scenario(
+            events_queue, operation.label, phase, suite_id, skip_reason=verdict.reason, skip_warning=verdict.warning
         )
         return
     _run_scenario(operation, events_queue=events_queue, ctx=ctx, mode=mode, phase=phase, suite_id=suite_id)
@@ -482,30 +482,3 @@ def _put_error(
 
 def _is_phase_disabled(phases: PhasesConfig, phase: PhaseName) -> bool:
     return phase in UNIT_PHASES and not phases.get_by_name(name=phase).enabled
-
-
-def _put_skipped_scenario(
-    events_queue: Queue,
-    operation: APIOperation,
-    phase: PhaseName,
-    suite_id: uuid.UUID,
-    *,
-    skip_reason: str | None,
-    skip_warning: SchemathesisWarning | None = None,
-) -> None:
-    scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
-    events_queue.put(scenario_started)
-    events_queue.put(
-        events.ScenarioFinished(
-            id=scenario_started.id,
-            suite_id=suite_id,
-            phase=phase,
-            label=operation.label,
-            status=Status.SKIP,
-            recorder=ScenarioRecorder(label=operation.label),
-            elapsed_time=0.0,
-            skip_reason=skip_reason,
-            skip_warning=skip_warning,
-            is_final=True,
-        )
-    )

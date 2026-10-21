@@ -11,10 +11,13 @@ from schemathesis.core.rate_limit import (
     parse_retry_after,
 )
 from schemathesis.engine import events
+from schemathesis.engine._validate import validate_response
 
 if TYPE_CHECKING:
+    from schemathesis.checks import CheckContext
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
 
 
@@ -92,7 +95,8 @@ def validate_with_rate_limited(
     rate_limited: list[Response],
     final: Response,
     validate_fn: Callable[[Response], None],
-    record_response: Callable[[Response], None],
+    recorder: ScenarioRecorder,
+    case_id: str,
 ) -> Response:
     """Validate every 429 received before the final response, then the final one.
 
@@ -113,12 +117,39 @@ def validate_with_rate_limited(
         validate_fn(final)
     except FailureGroup as exc:
         if failing is not None:
-            record_response(failing)
+            recorder.record_response(case_id=case_id, response=failing)
             final_failures = [f for f in exc.exceptions if isinstance(f, Failure)]
             raise FailureGroup(pending_failures + final_failures) from None
         raise
 
     if failing is not None:
-        record_response(failing)
+        recorder.record_response(case_id=case_id, response=failing)
         raise FailureGroup(pending_failures)
     return final
+
+
+def validate_case(
+    ctx: EngineContext,
+    recorder: ScenarioRecorder,
+    *,
+    case: Case,
+    check_ctx: CheckContext,
+    rate_limited: list[Response],
+    response: Response,
+    continue_on_failure: bool,
+) -> None:
+    """Check the case's final response and every 429 it waited out before it."""
+    validate_with_rate_limited(
+        rate_limited,
+        response,
+        lambda answer: validate_response(
+            case=case,
+            ctx=check_ctx,
+            response=answer,
+            continue_on_failure=continue_on_failure,
+            recorder=recorder,
+            baseline=ctx.config.load_baseline(),
+        ),
+        recorder,
+        case.id,
+    )

@@ -52,6 +52,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
+from schemathesis.resources import record_interaction
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -76,13 +77,9 @@ def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: 
 
 
 def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response: Response) -> None:
-    operation = case.operation
-    if extra_data_source.should_record(operation=operation.label):
-        extra_data_source.record_response(operation=operation, response=response, case=case)
-    if extra_data_source.should_record_request(operation=operation.label):
-        extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
+    record_interaction(extra_data_source, case, response)
     if 200 <= response.status_code < 300 or response.status_code == 404:
-        extra_data_source.record_successful_delete(operation=operation, case=case)
+        extra_data_source.record_successful_delete(operation=case.operation, case=case)
     response.clear_cache()
 
 
@@ -290,7 +287,8 @@ def _send_step(machine: APIStateMachine, case: Case, *, engine: EngineContext, e
         rate_limited,
         response,
         lambda response: machine.validate_response(response, case),
-        lambda response: machine.recorder.record_response(case_id=case.id, response=response),
+        machine.recorder,
+        case.id,
     )
 
 
@@ -389,16 +387,6 @@ def _calibrate_link(
     )
 
 
-def _supervise_response(engine: EngineContext, case: Case, response: Response) -> None:
-    engine.supervisor.record_response(
-        operation_label=case.operation.label,
-        status_code=response.status_code,
-        is_documented_status=case.operation.responses.find_by_status_code(response.status_code) is not None,
-        case=case,
-        cache_writer=engine.cache.writer,
-    )
-
-
 def _feed_error_feedback(
     engine: EngineContext,
     case: Case,
@@ -434,7 +422,7 @@ def _validate_step_response(
     observations = _parse_step_observations(engine, case, response)
     _calibrate_link(engine, response, observations=observations, step_input=step_input, recorder=recorder)
     ctx.current_response = response
-    _supervise_response(engine, case, response)
+    engine.supervisor.observe(case, response.status_code, cache_writer=engine.cache.writer)
     _feed_error_feedback(engine, case, response, observations=observations, recorder=recorder)
     check_ctx = check_context_cache.get_or_create(
         operation=case.operation, ctx=engine, phase="stateful"
