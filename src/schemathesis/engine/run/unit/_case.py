@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import requests
-from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import CheckContext
@@ -12,13 +11,17 @@ from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
 from schemathesis.engine import StopReason, events
-from schemathesis.engine._rate_limit_retry import send_tracked, validate_case
+from schemathesis.engine._rate_limit_retry import (
+    TRANSPORT_ERRORS,
+    is_unrecoverable_transport_error,
+    send_tracked,
+    validate_case,
+)
 from schemathesis.engine.errors import (
     TestingState,
     UnexpectedError,
     UnrecoverableNetworkError,
     build_code_sample,
-    is_unrecoverable_network_error,
 )
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.supervisor import SchedulingDirective
@@ -196,9 +199,7 @@ def _raise_case_error(
 def _as_unrecoverable_network_error(
     exc: Exception, case: Case, transport_kwargs: dict[str, Any]
 ) -> UnrecoverableNetworkError | None:
-    if isinstance(
-        exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
-    ) and is_unrecoverable_network_error(exc):
+    if is_unrecoverable_transport_error(exc):
         code_sample = build_code_sample(case, exc.request, transport_kwargs)
         return UnrecoverableNetworkError(error=exc, code_sample=code_sample)
     return None
@@ -253,7 +254,7 @@ def _call_with_reauth(
     def _perform_call() -> Response:
         try:
             retried, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
-        except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
+        except TRANSPORT_ERRORS as error:
             recorder.record_network_error(case_id=case.id, error=error)
             raise
         rate_limited.extend(retried)

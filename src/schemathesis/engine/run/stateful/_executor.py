@@ -3,7 +3,7 @@ from __future__ import annotations  # noqa: I001
 import queue
 import time
 import unittest
-from typing import TYPE_CHECKING, Any, NoReturn, TypeGuard
+from typing import TYPE_CHECKING, Any, NoReturn
 from warnings import catch_warnings, filterwarnings
 
 import hypothesis
@@ -12,7 +12,6 @@ from hypothesis import reject
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, HypothesisWarning, Unsatisfiable, UnsatisfiedAssumption
 from hypothesis.stateful import Rule
-from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.control import SkipTest
@@ -32,12 +31,17 @@ from schemathesis.engine.errors import (
     build_code_sample,
     clear_hypothesis_notes,
     is_inconsistent_replay,
-    is_unrecoverable_network_error,
 )
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import BudgetExpired, ServerWentAway
 from schemathesis.engine._baseline import is_known
-from schemathesis.engine._rate_limit_retry import send_tracked, validate_with_rate_limited
+from schemathesis.engine._rate_limit_retry import (
+    TRANSPORT_ERRORS,
+    TransportError,
+    is_unrecoverable_transport_error,
+    send_tracked,
+    validate_with_rate_limited,
+)
 from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ReproductionStep, ScenarioRecorder
 from schemathesis.generation import overrides
@@ -201,9 +205,7 @@ def _classify_suite_error(
     )
 
 
-def _unresponsive_operation_error(
-    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
-) -> events.NonFatalError:
+def _unresponsive_operation_error(exc: TransportError, *, case: Case, engine: EngineContext) -> events.NonFatalError:
     health = engine.health.operations[case.operation.label]
     total = health.completed + health.transport_failures
     error = UnresponsiveOperationError(
@@ -220,9 +222,7 @@ def _unresponsive_operation_error(
     )
 
 
-def _absorbed_timeout_error(
-    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
-) -> events.NonFatalError:
+def _absorbed_timeout_error(exc: TransportError, *, case: Case, engine: EngineContext) -> events.NonFatalError:
     transport_kwargs = engine.get_transport_kwargs(operation=case.operation)
     return events.NonFatalError(
         error=exc,
@@ -234,7 +234,7 @@ def _absorbed_timeout_error(
 
 
 def _unrecoverable_network_error(
-    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
+    exc: TransportError, *, case: Case, engine: EngineContext
 ) -> UnrecoverableNetworkError | None:
     """Describe a fatal transport failure, or `None` when the health monitor absorbs it."""
     reason: str | None = None
@@ -300,16 +300,8 @@ def _detect_outage(exc: Exception, engine: EngineContext) -> bool:
     return outage
 
 
-def _is_connection_failure(
-    exc: Exception,
-) -> TypeGuard[requests.ConnectionError | ChunkedEncodingError | requests.Timeout]:
-    return isinstance(exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)) and (
-        is_unrecoverable_network_error(exc)
-    )
-
-
 def _absorb_transport_failure(
-    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout,
+    exc: TransportError,
     *,
     case: Case,
     engine: EngineContext,
@@ -338,7 +330,7 @@ def _record_network_error(
     """Keep a connection-level failure for the suite report; a timeout the health monitor absorbs skips the step."""
     # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level failures
     # (reset, chunked-encoding break) usually mean the server crashed; surface those on the first occurrence.
-    if not _is_connection_failure(exc):
+    if not is_unrecoverable_transport_error(exc):
         return
     network_error = _unrecoverable_network_error(exc, case=case, engine=engine)
     if network_error is None:
@@ -515,7 +507,7 @@ def _run_step(
         ctx.step_failed()
         raise
     except Exception as exc:
-        if isinstance(exc, (requests.Timeout, requests.ConnectionError, ChunkedEncodingError)):
+        if isinstance(exc, TRANSPORT_ERRORS):
             machine.recorder.record_network_error(case_id=case.id, error=exc)
         outage = _detect_outage(exc, engine)
         _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
