@@ -49,7 +49,7 @@ from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest._test_builder import schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.pytest.reporting import PytestReportOutcome, remember_report_locations, write_report_locations
+from schemathesis.pytest.reporting import PytestReportOutcome, open_writers, write_report_locations
 from schemathesis.pytest.warnings import (
     emit_constants_warnings,
     emit_openapi_auth_warnings,
@@ -519,54 +519,23 @@ def _has_reports(reports: ReportsConfig) -> bool:
 def _open_writers(
     schema: SchemaMetadata, pytest_config: pytest.Config
 ) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter]:
-    from schemathesis.config._report import ReportFormat
     from schemathesis.reporting._command import get_command_representation
-    from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.html.build import enabled_checks
-    from schemathesis.reporting.html.writer import HtmlWriter
-    from schemathesis.reporting.junitxml import JunitXmlWriter
-    from schemathesis.reporting.vcr import VcrWriter
 
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | HtmlWriter] = []
     reports = schema.config.reports
-    seed = schema.config.seed
-    command = get_command_representation(schema.config.output.sanitization)
-    if reports.vcr.enabled:
-        path = reports.get_path(ReportFormat.VCR)
-        vcr_writer = VcrWriter(output=path, config=schema.config.output, preserve_bytes=reports.preserve_bytes)
-        vcr_writer.open(seed=seed, command=command)
-        writers.append(vcr_writer)
-    if reports.har.enabled:
-        path = reports.get_path(ReportFormat.HAR)
-        har_writer = HarWriter(output=path, config=schema.config.output, preserve_bytes=reports.preserve_bytes)
-        har_writer.open(seed=seed)
-        writers.append(har_writer)
-    if reports.junit.enabled:
-        path = reports.get_path(ReportFormat.JUNIT)
-        writers.append(JunitXmlWriter(output=path, config=schema.config.output))
-    if reports.allure.enabled:
-        try:
-            from schemathesis.reporting.allure import AllureWriter
-        except ImportError as exc:
-            raise pytest.UsageError(str(exc)) from exc
-
-        path = reports.get_path(ReportFormat.ALLURE)
-        writers.append(AllureWriter(output_dir=path, config=schema.config.output, api_title=schema.title))
-    if reports.html.enabled:
-        writers.append(
-            HtmlWriter(
-                reports.get_path(ReportFormat.HTML),
-                config=schema.config.output,
-                location=schema.location,
-                base_url=schema.get_base_url() or None,
-                command=command,
-                seed=seed,
-                checks=enabled_checks(schema.config.checks_config_for()),
-                started_at=time.time(),
-            )
-        )
-    remember_report_locations(pytest_config, reports, reports.get_path)
-    return writers
+    return open_writers(
+        pytest_config,
+        reports,
+        reports.get_path,
+        output=schema.config.output,
+        seed=schema.config.seed,
+        command=get_command_representation(schema.config.output.sanitization),
+        api_title=schema.title,
+        location=schema.location,
+        base_url=schema.get_base_url() or None,
+        checks=enabled_checks(schema.config.checks_config_for()),
+        started_at=time.time(),
+    )
 
 
 def _write_to_writers(
