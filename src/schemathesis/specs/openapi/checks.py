@@ -622,7 +622,7 @@ def _type_mutations_become_valid_after_serialization(case: Case) -> bool:
         return False
 
     phase_data = meta.phase.data
-    if not isinstance(phase_data, FuzzingPhaseData | StatefulPhaseData) or not phase_data.mutations:
+    if not isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)) or not phase_data.mutations:
         return False
 
     locations = set()
@@ -1263,7 +1263,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
 
             if _has_serialization_sensitive_types(schema, container):
                 # Wire-serialized arrays and objects can't be re-validated, so only mutation metadata can tell.
-                if isinstance(phase_data, FuzzingPhaseData | StatefulPhaseData) and any(
+                if isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)) and any(
                     _negates_declared_parameter(mutation, location, schema) for mutation in phase_data.mutations
                 ):
                     return False
@@ -1284,7 +1284,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                     for k, v in value.items()
                     if k in container
                 }
-                if isinstance(phase_data, FuzzingPhaseData | StatefulPhaseData):
+                if isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)):
                     # Generated nulls are sent as the text `null`, but in a mutated parameter it may be a negated string.
                     mutated = {
                         mutation.parameter

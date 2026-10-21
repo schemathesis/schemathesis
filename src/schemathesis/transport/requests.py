@@ -79,7 +79,7 @@ def _normalize_query_component(params: Any) -> str:
         return params.lstrip("?")
     if isinstance(params, Mapping):
         return urlencode(params, doseq=True)
-    if isinstance(params, tuple | list):
+    if isinstance(params, (tuple, list)):
         return urlencode(params, doseq=True)
     return str(params)
 
@@ -423,7 +423,7 @@ def yaml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
 def _should_coerce_to_bytes(item: object) -> bool:
     """Whether the item should be converted to bytes."""
     # These types are OK in forms, others should be coerced to bytes
-    return isinstance(item, Binary) or not isinstance(item, (bytes | str | int))
+    return isinstance(item, Binary) or not isinstance(item, ((bytes, str, int)))
 
 
 def _prepare_form_data(data: dict[str, Any]) -> dict[str, Any]:

@@ -57,7 +57,7 @@ from test.utils import assert_requests_call, check_context
 
 class AnyNumber:
     def __eq__(self, value: object, /) -> bool:
-        return not isinstance(value, bool) and isinstance(value, (int | float))
+        return not isinstance(value, bool) and isinstance(value, ((int, float)))
 
 
 @dataclass

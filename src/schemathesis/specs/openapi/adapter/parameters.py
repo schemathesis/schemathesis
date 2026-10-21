@@ -1982,7 +1982,7 @@ def _hashable(value: object) -> object:
 
 def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
     if "schema" in parameter:
-        if not isinstance(parameter["schema"], dict | bool):
+        if not isinstance(parameter["schema"], (dict, bool)):
             raise InvalidSchema(
                 INVALID_SCHEMA_MESSAGE.format(
                     location=parameter.get("in", ""),

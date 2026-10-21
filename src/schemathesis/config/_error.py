@@ -224,7 +224,7 @@ def _type_name(value: object) -> str:
 def _format_value(value: object) -> str:
     if isinstance(value, str):
         return f"'{value}'"
-    if isinstance(value, datetime.date | datetime.time):
+    if isinstance(value, (datetime.date, datetime.time)):
         # TOML spells a zero UTC offset as `Z`
         text = value.isoformat()
         if text.endswith("+00:00"):
@@ -236,7 +236,7 @@ def _format_value(value: object) -> str:
 
 def _format_type_error(error: ValidationError, replaced: dict[InstancePath, object]) -> str:
     expected = resolve_path(CONFIG_SCHEMA, error.schema_path)
-    assert isinstance(expected, str | list)
+    assert isinstance(expected, (str, list))
     if isinstance(expected, list):
         expectation = f"one of: {' or '.join(expected)}"
     else:

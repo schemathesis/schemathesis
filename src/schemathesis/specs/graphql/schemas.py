@@ -226,7 +226,7 @@ class GraphQLSchema(BaseSchema):
     @override
     def prepare_request_body(self, case: Case) -> Body:
         body = case.body
-        if isinstance(body, NotSet | bytes):
+        if isinstance(body, (NotSet, bytes)):
             return body
         return {"query": body}
 

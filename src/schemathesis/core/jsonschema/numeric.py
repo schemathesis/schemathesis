@@ -43,7 +43,7 @@ def next_float32(value: int | float, *, going_up: bool) -> float:
 
 
 def is_numeric_bound(value: Any) -> TypeGuard[int | float]:
-    return isinstance(value, int | float) and not isinstance(value, bool)
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def bounds_are_unsatisfiable(minimum: int | float | None, maximum: int | float | None) -> bool:
