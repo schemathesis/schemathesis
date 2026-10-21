@@ -863,6 +863,38 @@ def test_multiple_incoming_link_without_override(ctx):
     )
 
 
+def test_transition_count_follows_chained_response_references(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"responses": {"201": {"$ref": "#/components/responses/Alias"}}}},
+            "/users/{id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "responses": {
+                "Alias": {"$ref": "#/components/responses/Created"},
+                "Created": {
+                    "description": "Created",
+                    "links": {"Get": {"operationId": "getUser", "parameters": {"id": "$response.body#/id"}}},
+                },
+            },
+        },
+    )
+    assert (schema.statistic.transitions.total, schema.statistic.transitions.selected) == (1, 1)
+
+
+def test_transition_count_with_non_object_links(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "OK", "links": {"A": "note", "B": [1]}}}}}}
+    )
+    assert (schema.statistic.transitions.total, schema.statistic.transitions.selected) == (2, 0)
+
+
 SHARED_RESPONSE_SCHEMA = {
     "openapi": "3.0.2",
     "info": {"title": "Test", "version": "1.0"},

@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Crash on WSGI apps for `multipart/form-data` bodies that are arrays or scalars.
+- Stateful phase skipped and wrong API link counts for chained `$ref` responses or links.
 
 ## [4.32.3](https://github.com/schemathesis/schemathesis/compare/v4.32.2...v4.32.3) - 2026-10-21
 
