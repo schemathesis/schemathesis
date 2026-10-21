@@ -12,7 +12,6 @@ from schemathesis.cli.commands.replay.executor import (
     ReplayOutcome,
     ReplayStatus,
     bodies_equal,
-    link_body_pointers,
 )
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
@@ -340,12 +339,14 @@ def _lineage(sequence: list[CrashStep], index: int) -> list[int]:
 
 def _link_source_pointers(sequence: list[CrashStep]) -> list[list[str]]:
     """For each step, the JSON Pointers into its response body that later steps' links extract from."""
+    from schemathesis.specs.openapi.expressions import body_pointers
+
     pointers: list[list[str]] = [[] for _ in sequence]
     for index, step in enumerate(sequence):
         parent = _parent(sequence, index)
         if step.link is None or parent is None:
             continue
-        pointers[parent].extend(link_body_pointers([*step.link.parameters.values(), step.link.request_body]))
+        pointers[parent].extend(body_pointers([*step.link.parameters.values(), step.link.request_body]))
     return pointers
 
 

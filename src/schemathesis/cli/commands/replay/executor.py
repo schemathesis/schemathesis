@@ -409,7 +409,7 @@ def _send_as(case: Case, identities: EscalatingAuthProvider, name: str) -> None:
 
 
 def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> list[LinkedValue]:
-    from schemathesis.specs.openapi.expressions import evaluate
+    from schemathesis.specs.openapi.expressions import body_pointers, evaluate
 
     linked: list[LinkedValue] = []
     # Re-extract each link parameter from the previous response into its container.
@@ -424,7 +424,7 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
                 name=name,
                 recorded=container.get(name, NOT_SET),
                 fresh=value,
-                pointers=link_body_pointers(expression),
+                pointers=body_pointers(expression),
             )
         )
         if value is UNRESOLVABLE:
@@ -443,7 +443,7 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
                     name=name,
                     recorded=recorded_body.get(name, NOT_SET),
                     fresh=value,
-                    pointers=link_body_pointers(link.request_body.get(name)),
+                    pointers=body_pointers(link.request_body.get(name)),
                 )
                 for name, value in body.items()
             )
@@ -455,36 +455,12 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
                     name="body",
                     recorded=case.body,
                     fresh=body,
-                    pointers=link_body_pointers(link.request_body),
+                    pointers=body_pointers(link.request_body),
                 )
             )
             if body is not UNRESOLVABLE:
                 case.body = body
     return linked
-
-
-def link_body_pointers(expressions: object) -> list[str]:
-    """JSON Pointers into the parent's response body that link expressions, possibly nested, extract from."""
-    from schemathesis.specs.openapi.expressions import nodes, parser
-    from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
-
-    pointers: list[str] = []
-    pending = [expressions]
-    while pending:
-        item = pending.pop()
-        if isinstance(item, dict):
-            pending.extend(item.values())
-        elif isinstance(item, list):
-            pending.extend(item)
-        elif isinstance(item, str):
-            try:
-                parsed = parser.parse(item)
-            except RuntimeExpressionError:
-                continue
-            pointers.extend(
-                node.pointer[1:] for node in parsed if isinstance(node, nodes.BodyResponse) and node.pointer
-            )
-    return pointers
 
 
 def _evaluate_checks(

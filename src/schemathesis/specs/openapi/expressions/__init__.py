@@ -13,6 +13,7 @@ from schemathesis.core.deserialization import DeserializationContext, deserializ
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer_all, to_wire_text
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi.expressions import lexer, nodes, parser
+from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.nodes import BodyResponse
 
 __all__ = ["MultiMatch", "lexer", "nodes", "parser"]
@@ -67,6 +68,27 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
         if matches:
             return MultiMatch(matches)
     return UNRESOLVABLE
+
+
+def body_pointers(expressions: object) -> list[str]:
+    """JSON Pointers into the parent's response body that link expressions, possibly nested, extract from."""
+    pointers: list[str] = []
+    pending = [expressions]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, dict):
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
+        elif isinstance(item, str):
+            try:
+                parsed = parser.parse(item)
+            except RuntimeExpressionError:
+                continue
+            pointers.extend(
+                node.pointer[1:] for node in parsed if isinstance(node, nodes.BodyResponse) and node.pointer
+            )
+    return pointers
 
 
 def _evaluate_nested_value(expr: Any, output: StepOutput) -> Any:
