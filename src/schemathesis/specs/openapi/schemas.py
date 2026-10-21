@@ -32,6 +32,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
+from schemathesis.core.transforms import jsonify_python_specific_types
 from schemathesis.core.transport import (
     HTTP_METHODS_SCHEMA,
     HttpMethodSchema,
@@ -58,7 +59,7 @@ from ...hooks import (
 )
 from ...schemas import APIOperation, APIOperationMap, BaseSchema
 from . import checks  # noqa: F401
-from ._hypothesis import jsonify_python_specific_types, openapi_cases
+from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader, RawSchemaVersion
@@ -211,7 +212,7 @@ class OpenApiSchema(BaseSchema):
         ]
 
     @override
-    def _security_auth_providers(self) -> Iterator[AuthProvider]:
+    def security_auth_providers(self) -> Iterator[AuthProvider]:
         return iter(self.security._auth_provider_cache.values())
 
     @property
@@ -364,13 +365,13 @@ class OpenApiSchema(BaseSchema):
     def as_state_machine(self) -> type[APIStateMachine]:
         from schemathesis.python._constants.orchestrator import make_constants_value_source
 
-        return self._build_state_machine(
+        return self.build_state_machine(
             feedback=FeedbackSources(constants_value_source=make_constants_value_source(self)),
             link_calibration=None,
         )
 
     @override
-    def _build_state_machine(
+    def build_state_machine(
         self,
         *,
         feedback: FeedbackSources,
@@ -518,7 +519,7 @@ class OpenApiSchema(BaseSchema):
         return self.adapter.get_default_media_types(self.raw_schema)
 
     @override
-    def _get_base_path(self) -> str:
+    def declared_base_path(self) -> str:
         return self.adapter.get_base_path(self.raw_schema, self.config.servers.variables or None)
 
     @cached_property

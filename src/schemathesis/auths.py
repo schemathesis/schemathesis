@@ -619,7 +619,7 @@ def _caching_providers_in(storage: AuthStorage) -> Iterator[CachingAuthProvider]
 
 def _iter_caching_providers(case: Case) -> Iterator[CachingAuthProvider]:
     """Caching auth providers reachable for this case: config dynamic-token, schema-level and global ``@auth``."""
-    for provider in case.operation.schema._security_auth_providers():
+    for provider in case.operation.schema.security_auth_providers():
         if isinstance(provider, CachingAuthProvider):
             yield provider
     yield from _caching_providers_in(case.operation.schema.auth)

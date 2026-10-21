@@ -77,7 +77,7 @@ from schemathesis.core.jsonschema.patterns import (
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type, to_json_type_name
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
@@ -93,7 +93,6 @@ from schemathesis.specs.openapi.coverage._wire import (
     WireSemantics,
     ensure_valid_headers_schema,
     ensure_valid_path_parameter_schema,
-    jsonify,
 )
 from schemathesis.specs.openapi.formats import format_length_bounds, format_lengths_for
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
@@ -4129,7 +4128,9 @@ def _negative_unique_items(
     if not unique_items:
         return
     reads_back_valid = _sent_text_judge(ctx, schema)
-    unique = jsonify(ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1}))
+    unique = jsonify_python_specific_types(
+        ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1})
+    )
     if not reads_back_valid(unique + unique):
         yield NegativeValue(
             unique + unique,
@@ -4153,7 +4154,7 @@ def _negative_unique_items(
             "uniqueItems": True,
         }
         try:
-            pair = jsonify(ctx.generate_from_schema(pair_schema))
+            pair = jsonify_python_specific_types(ctx.generate_from_schema(pair_schema))
         except (InvalidArgument, Unsatisfiable):
             return
         if isinstance(pair, list) and len(pair) == 2 and pair[0] != pair[1] and not reads_back_valid(pair):

@@ -170,7 +170,7 @@ def missing_base_path(operation: APIOperation) -> str | None:
     configured = schema.config.base_url
     if configured is None:
         return None
-    declared = schema._get_base_path().rstrip("/")
+    declared = schema.declared_base_path().rstrip("/")
     if not declared:
         return None
     return declared if not urlsplit(configured).path.rstrip("/").endswith(declared) else None

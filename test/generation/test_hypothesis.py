@@ -29,6 +29,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import jsonify_python_specific_types
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -38,7 +39,6 @@ from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, Generat
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi._hypothesis import (
     _canonical_strategy,
-    jsonify_python_specific_types,
     make_positive_strategy,
 )
 from schemathesis.specs.openapi.adapter import v2

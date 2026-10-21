@@ -27,7 +27,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     from schemathesis.engine.run.stateful._executor import execute_state_machine_loop
 
     try:
-        state_machine = engine.schema._build_state_machine(
+        state_machine = engine.schema.build_state_machine(
             feedback=_stateful_feedback(engine), link_calibration=engine.link_calibration
         )
     except Exception as exc:
