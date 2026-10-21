@@ -30,7 +30,8 @@ if HAS_CORE_SUBTESTS:
     from _pytest.subtests import SubtestReport
 
     def make_subtests(request: FixtureRequest) -> pytest.Subtests:
-        return pytest.Subtests(request.node.ihook, _suspend_capture(request), request, _ispytest=True)
+        # Private constructor; a fixture's request is a `SubRequest` at runtime.
+        return pytest.Subtests(request.node.ihook, _suspend_capture(request), request, _ispytest=True)  # type: ignore[arg-type]
 
     def is_subtest_report(report: pytest.TestReport) -> bool:
         return isinstance(report, SubtestReport)
@@ -92,9 +93,9 @@ else:
 
     def make_subtests(request: FixtureRequest) -> pytest.Subtests:
         # Stand-in for the core type, which does not exist on pytest 8
-        return _Subtests(request)
+        return _Subtests(request)  # type: ignore[return-value]
 
-    @pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
+    @pytest.hookimpl(tryfirst=True)
     def pytest_report_teststatus(report: pytest.TestReport, config: pytest.Config) -> tuple[str, str, str] | None:
         if report.when != "call" or not is_subtest_report(report):
             return None

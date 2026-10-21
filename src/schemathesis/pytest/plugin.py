@@ -284,14 +284,14 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def collect(self) -> list[Function]:  # type: ignore[return]
+    def collect(self) -> list[Function]:
         """Generate different test items for all API operations available in the given schema."""
         try:
             track_schema(self.config, self.schema)
             emit_openapi_auth_warnings(self.schema)
             emit_constants_warnings(self.schema)
             feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
-            items = [
+            items: list[Function] = [
                 item for operation in self.schema.get_all_operations() for item in self._gen_items(operation, feedback)
             ]
             if not items:
@@ -322,9 +322,11 @@ class SchemathesisMultiCase(PyCollector):
         self.schemas = schemas
         super().__init__(*args, **kwargs)
 
-    def collect(self) -> list[Function]:  # type: ignore[return]
+    def collect(self) -> list[Function]:
         try:
             items = []
+            # A collector created by pytest always has a parent.
+            assert self.parent is not None
             for schema_name, schema in self.schemas.items():
                 case = SchemathesisPrefixedCase.from_parent(
                     self.parent,
@@ -341,7 +343,7 @@ class SchemathesisMultiCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-@hookimpl(hookwrapper=True)  # type: ignore[untyped-decorator]
+@hookimpl(hookwrapper=True)
 def pytest_pycollect_makeitem(collector: Module | Class, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
@@ -362,7 +364,7 @@ def pytest_pycollect_makeitem(collector: Module | Class, name: str, obj: Any) ->
         outcome.get_result()
 
 
-@hookimpl(hookwrapper=True, trylast=True)  # type: ignore[untyped-decorator]
+@hookimpl(hookwrapper=True, trylast=True)
 def pytest_report_teststatus(
     report: pytest.TestReport,
     config: pytest.Config,
@@ -381,7 +383,7 @@ def pytest_report_teststatus(
                     break
 
 
-@pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
+@pytest.hookimpl(tryfirst=True)
 def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pytest.TestReport) -> None:
     if call.excinfo:
         if issubclass(call.excinfo.type, SchemathesisError) and hasattr(call.excinfo.value, "__notes__"):
@@ -650,7 +652,7 @@ def _get_pytest_report_outcome(report: pytest.TestReport, call: pytest.CallInfo)
     return PytestReportOutcome(Status.ERROR, f"{type(exception).__name__}: {exception}")
 
 
-@hookimpl(wrapper=True)  # type: ignore[untyped-decorator]
+@hookimpl(wrapper=True)
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
@@ -693,7 +695,8 @@ def _write_pytest_result(
             outcome = PytestReportOutcome(Status.FAILURE)
     if _is_xdist_worker(item.config):
         _push_to_xdist_workeroutput(
-            item.config.workeroutput,
+            # pytest-xdist sets `workeroutput` on worker configs.
+            item.config.workeroutput,  # type: ignore[attr-defined]
             schema,
             recorder,
             elapsed_sec,
@@ -765,11 +768,10 @@ def report_subtest(
 
 
 # Report writers must be attached before a `skip` marker raises during setup, or the skip is never reported.
-@pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
+@pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item: pytest.Item) -> None:
     item_cls = getattr(item, "cls", None)
-    schema = StatefulSchemaMark.get(item_cls) if item_cls is not None else None
-    if schema is not None:
+    if item_cls is not None and (schema := StatefulSchemaMark.get(item_cls)) is not None:
         # Attach a callback to the TestCase class so the state machine can hand off
         # its recorder to the report writers once the scenario finishes.
         _schema = schema
@@ -778,10 +780,12 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             if _has_reports(reports):
 
                 def _xdist_stateful_callback(recorder: Any, elapsed_sec: float) -> None:
-                    _push_to_xdist_workeroutput(item.config.workeroutput, _schema, recorder, elapsed_sec)
+                    # pytest-xdist sets `workeroutput` on worker configs.
+                    workeroutput = item.config.workeroutput  # type: ignore[attr-defined]
+                    _push_to_xdist_workeroutput(workeroutput, _schema, recorder, elapsed_sec)
 
                 item.stash[_STATEFUL_WRITERS_KEY] = []
-                StatefulCallbackMark.set(item.cls, _xdist_stateful_callback)
+                StatefulCallbackMark.set(item_cls, _xdist_stateful_callback)
         else:
             writers = _open_writers(_schema, item.config)
             item.stash[_STATEFUL_WRITERS_KEY] = writers
@@ -791,7 +795,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
                     # Tags are not available for stateful tests — operations are discovered dynamically
                     _write_to_writers(writers, recorder, elapsed_sec)
 
-                StatefulCallbackMark.set(item.cls, _stateful_callback)
+                StatefulCallbackMark.set(item_cls, _stateful_callback)
         return
 
     if not isinstance(item, SchemathesisFunction):
