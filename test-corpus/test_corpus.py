@@ -1,5 +1,3 @@
-import pathlib
-import sys
 import time
 from io import StringIO
 from itertools import chain
@@ -34,13 +32,9 @@ from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.stateful import dependencies
-
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent))
-
-from tools.corpus.conformance import check_conformance  # noqa: E402
-from tools.corpus.io import CORPUS_NAMES, load_from_corpus, read_corpus_file  # noqa: E402
-from tools.stub_call import install_stub_call  # noqa: E402
+from tools.corpus.conformance import check_conformance
+from tools.corpus.io import CORPUS_NAMES, load_from_corpus, read_corpus_file
+from tools.stub_call import install_stub_call
 
 CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_NAMES}
 GRAPHQL_CORPUS = read_corpus_file("graphql")
@@ -215,17 +209,8 @@ def _run_with_reporters(schema, filename, tmp_path):
     for handler in handlers:
         handler.start(ctx)
 
-    loading_finished = LoadingFinished(
-        location=filename,
-        start_time=time.time(),
-        base_url=schema.get_base_url(),
-        base_path=schema.base_path,
-        specification=schema.specification,
-        statistic=schema.statistic,
-        schema=schema.raw_schema,
-        title=schema.title,
-        config=schema.config,
-        find_operation_by_label=schema.find_operation_by_label,
+    loading_finished = LoadingFinished.from_schema(
+        schema, location=filename, start_time=time.time(), base_url=schema.get_base_url()
     )
     try:
         for event in chain([loading_finished], from_schema(schema).execute()):

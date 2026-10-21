@@ -66,17 +66,8 @@ def into_event_stream(
         yield FatalError(exception=LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, exc.message))
         return
 
-    yield LoadingFinished(
-        location=location,
-        start_time=loading_started.timestamp,
-        base_url=base_url,
-        specification=schema.specification,
-        statistic=schema.statistic,
-        schema=schema.raw_schema,
-        title=schema.title,
-        config=schema.config,
-        base_path=schema.base_path,
-        find_operation_by_label=schema.find_operation_by_label,
+    yield LoadingFinished.from_schema(
+        schema, location=location, start_time=loading_started.timestamp, base_url=base_url
     )
 
     try:

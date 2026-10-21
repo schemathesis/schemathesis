@@ -113,6 +113,8 @@ verbosity_assertions = 1
 truncation_limit_lines = 0
 truncation_limit_chars = 0
 testpaths = "test"
+# Benches and the corpus tests import the repository's `tools` package.
+pythonpath = ["."]
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 filterwarnings = [
     "error::pytest.PytestUnraisableExceptionWarning",

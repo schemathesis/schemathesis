@@ -1,6 +1,3 @@
-import pathlib
-import sys
-
 import pytest
 
 import schemathesis
@@ -8,11 +5,7 @@ from schemathesis.core.result import Err
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.hypothesis.examples import generate_many
-
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent))
-
-from tools.corpus.io import load_from_corpus, read_corpus_file  # noqa: E402
+from tools.corpus.io import load_from_corpus, read_corpus_file
 
 setup()
 

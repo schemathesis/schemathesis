@@ -1,6 +1,5 @@
 import json
 import pathlib
-import sys
 from io import StringIO
 
 import pytest
@@ -18,13 +17,11 @@ from schemathesis.reporting.vcr import VcrWriter
 from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.specs.openapi._hypothesis import get_parameters_strategy
 from schemathesis.specs.openapi.stateful import dependencies
+from tools.corpus.io import load_from_corpus, read_corpus_file
+from tools.stub_call import install_stub_call
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-sys.path.append(str(CURRENT_DIR.parent))
 CATALOG_DIR = CURRENT_DIR / "data"
-
-from tools.corpus.io import load_from_corpus, read_corpus_file  # noqa: E402
-from tools.stub_call import install_stub_call  # noqa: E402
 
 setup()
 CONFIG = SchemathesisConfig()
