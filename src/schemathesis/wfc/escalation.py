@@ -5,14 +5,12 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES
+
 if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthProvider
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.generation.case import Case
-
-# Both say the identity cannot do this operation. A 401 reaches this point only after
-# `reauth_and_replay` has already refreshed the token and replayed, so a stale token is ruled out.
-DENIED = frozenset({401, 403})
 
 
 def _is_admitted(status_code: int) -> bool:
@@ -138,7 +136,9 @@ class EscalatingAuthProvider:
             if _is_admitted(status_code):
                 self._settled.add(label)
                 return
-            if status_code not in DENIED:
+            # Both say the identity cannot do this operation. A 401 reaches this point only after
+            # `reauth_and_replay` has already refreshed the token and replayed, so a stale token is ruled out.
+            if status_code not in AUTH_REJECTION_STATUSES:
                 return
             current = self._assigned.get(label, 0)
             # Cases may carry an identity picked before earlier responses moved the assignment on.

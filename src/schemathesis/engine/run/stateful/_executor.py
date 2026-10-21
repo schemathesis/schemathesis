@@ -56,7 +56,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
-from schemathesis.resources import record_interaction
+from schemathesis.resources import record_delete_attempt, record_interaction
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -82,8 +82,7 @@ def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: 
 
 def _record_into_pool(extra_data_source: ResourceRecorder, case: Case, response: Response) -> None:
     record_interaction(extra_data_source, case, response)
-    if 200 <= response.status_code < 300 or response.status_code == 404:
-        extra_data_source.record_successful_delete(operation=case.operation, case=case)
+    record_delete_attempt(extra_data_source, case, response.status_code)
     response.clear_cache()
 
 

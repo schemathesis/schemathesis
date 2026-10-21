@@ -13,6 +13,7 @@ from schemathesis.core.error_feedback import (
     RequiresAuthPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.adapter.security import declares_security
 from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -47,7 +48,7 @@ def _is_auth_success(operation: APIOperation, retry_status: int) -> bool:
     """A retry confirms inference iff it slips past the auth gate without crashing the server."""
     if 200 <= retry_status < 300:
         return True
-    if retry_status in {401, 403} or retry_status >= 500:
+    if retry_status in AUTH_REJECTION_STATUSES or retry_status >= 500:
         return False
     # 4xx outside the auth band confirms only when the spec actually documents that status —
     # otherwise an undocumented 404/405 (route mismatch) would falsely look like inference success.
@@ -70,7 +71,7 @@ def _send_with_scheme(
     config = schema.auth_schemes[scheme_name]
 
     retry_case = case.derive()
-    recorder.record_case(parent_id=case.id, case=retry_case, transition=None, is_transition_applied=False)
+    recorder.record_case(parent_id=case.id, case=retry_case)
 
     context = AuthContext(operation=case.operation, app=case.operation.app)
 
@@ -108,7 +109,7 @@ def record_auth_inference(
     Each operation is inferred at most once. Probe failures (provider errors, network errors,
     5xx, undocumented 4xx) skip the current scheme.
     """
-    if response.status_code not in (401, 403):
+    if response.status_code not in AUTH_REJECTION_STATUSES:
         return
     operation = case.operation
     if not isinstance(operation.schema, OpenApiSchema):

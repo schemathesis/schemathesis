@@ -288,7 +288,7 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
     reports = schema.config.reports
     paths: dict[str, str | None] = {}
     for fmt in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT, ReportFormat.ALLURE, ReportFormat.HTML):
-        report = getattr(reports, fmt.value)
+        report = reports.get(fmt)
         if report.enabled:
             paths[fmt.value] = str(report.path) if report.path is not None else None
 

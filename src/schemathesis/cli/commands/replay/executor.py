@@ -14,6 +14,7 @@ from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import UNRESOLVABLE, iter_decoded_pointer_segments
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 from schemathesis.reporting.crashes import CrashCheck, CrashFile, CrashLink, CrashStep
 
 if TYPE_CHECKING:
@@ -39,8 +40,6 @@ class ReplayStatus(Enum):
 
 # A single passing replay does not prove a fix; an intermittent failure needs more attempts to show itself.
 MAX_REPLAY_ATTEMPTS = 3
-# Statuses an API answers when it does not accept the credentials a request carries.
-AUTH_REJECTION_STATUSES = frozenset({401, 403})
 
 
 @dataclass(slots=True)
@@ -341,7 +340,7 @@ def _replay_sequence(
                 unsupplied.append(parameter)
 
         parent_id = parent_output.case.id if parent_output is not None else None
-        recorder.record_case(parent_id=parent_id, case=case, transition=None, is_transition_applied=False)
+        recorder.record_case(parent_id=parent_id, case=case)
         recorder.record_response(case_id=case.id, response=response)
 
         # Built from the headers this step actually sent, the same way a run reports its failures.

@@ -145,10 +145,10 @@ def serialize_xml(case: Case, value: Body) -> dict[str, Any]:
         resource_name = body.resource_name
         break
 
-    return _serialize_xml(value, schema, resource_name=resource_name)
+    return serialize_xml_with_schema(value, schema, resource_name=resource_name)
 
 
-def _serialize_xml(value: Any, schema: JsonSchema, resource_name: str | None) -> dict[str, Any]:
+def serialize_xml_with_schema(value: Any, schema: JsonSchema, resource_name: str | None) -> dict[str, Any]:
     """Serialize a generated Python object as an XML string.
 
     Schemas may contain additional information for fine-tuned XML serialization.

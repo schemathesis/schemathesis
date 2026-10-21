@@ -18,11 +18,12 @@ from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, Failure
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import (
+    AUTH_REJECTION_STATUSES,
     HTTP_METHODS_SCHEMA,
     SAFE_METHODS,
     Response,
@@ -562,7 +563,7 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
         # A single element serializes identically to a scalar; multiple elements become repeated keys and
         # some frameworks pick one of them. Either way, the request is valid if any element is.
         try:
-            validator = make_validator(param.validation_schema, param.adapter.jsonschema_validator_cls)
+            validator = param.get_validator()
         except Exception:
             neutralized.add((location, param_name))
             continue
@@ -597,7 +598,7 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
 def _wire_value_matches_parameter(parameter: OpenApiParameter, wire_value: str) -> bool:
     """Check whether the text actually sent for `parameter` satisfies its original schema."""
     try:
-        validator = make_validator(parameter.validation_schema, parameter.adapter.jsonschema_validator_cls)
+        validator = parameter.get_validator()
     except Exception:
         # Schema rejected by jsonschema_rs - validity is unknown, so don't report a failure.
         return True
@@ -930,10 +931,8 @@ def _collect_declared_properties(
         return set(), False
     reference = schema.get("$ref")
     if isinstance(reference, str):
-        if reference in visited:
-            return set(), False
-        target = bundle.get(reference.rsplit("/", 1)[-1])
-        if target is None:
+        target = resolve_bundled_ref(schema, bundle)
+        if reference in visited or target is schema:
             return set(), False
         return _collect_declared_properties(target, bundle, visited | {reference})
     properties = schema.get("properties")
@@ -1133,10 +1132,6 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
                 message=f"Got {response.status_code} when missing required '{data.parameter}' header, expected {allowed}",
             )
     return None
-
-
-# Statuses that mean the server rejected the request at the authentication layer.
-AUTH_REJECTION_STATUSES = frozenset({401, 403})
 
 
 def _targets_generated_resource(ctx: CheckContext, operation: APIOperation) -> bool:
@@ -1571,11 +1566,6 @@ class AuthKind(enum.StrEnum):
     GENERATED = "generated"
 
 
-# Statuses that mean the API refused an unauthenticated or badly authenticated request. Frameworks whose
-# first authentication scheme offers no challenge answer 403 instead of 401, and gateways do the same.
-AUTH_ENFORCED_STATUSES = frozenset({401, 403})
-
-
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -1654,7 +1644,7 @@ def _has_undeclared_explicit_authorization(
 
 
 def _enforces_auth(response: Response, authenticated: Response) -> bool:
-    if response.status_code in AUTH_ENFORCED_STATUSES or 300 <= response.status_code < 400:
+    if response.status_code in AUTH_REJECTION_STATUSES or 300 <= response.status_code < 400:
         return True
     # Session-based auth redirects to a sign-in page; a followed redirect ends on a different path.
     return urlparse(response.request.url).path != urlparse(authenticated.request.url).path

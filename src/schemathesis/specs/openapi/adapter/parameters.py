@@ -125,9 +125,13 @@ CONSTANTS_OVERLAY_PROBABILITY = 0.15
 _TYPE_DECIDING_KEYWORDS = ("anyOf", "oneOf", "allOf", "not", "$ref")
 
 
-def _variant_key(variant: dict[str, Any] | list[Any]) -> str:
-    """Create a stable string key for a variant dict."""
-    return jsonschema_rs.canonical.json.to_string(variant)
+def example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:
+    if validator is None:
+        return True
+    try:
+        return validator.is_valid(value)
+    except Exception:
+        return True
 
 
 def build_semantic_overlay(
@@ -147,7 +151,6 @@ def build_semantic_overlay(
     """
     from hypothesis import strategies as st
 
-    from schemathesis.specs.openapi.examples import _example_is_valid
     from schemathesis.specs.openapi.semantic_pool import SEMANTIC_OVERLAY_PROBABILITY
 
     paired: list[tuple[LeafDescriptor, jsonschema_rs.Validator | None]] = []
@@ -209,7 +212,7 @@ def build_semantic_overlay(
                 continue
             candidate = draw(st.sampled_from(candidates))
             value = candidate.value
-            if validator is not None and not _example_is_valid(value, validator):
+            if validator is not None and not example_is_valid(value, validator):
                 continue
             if not copied:
                 body = deepclone(body)
@@ -218,7 +221,7 @@ def build_semantic_overlay(
             if original is MISSING:
                 continue
             _set_at_path(body, descriptor.path, value)
-            if container_validator is not None and not _example_is_valid(body, container_validator):
+            if container_validator is not None and not example_is_valid(body, container_validator):
                 _set_at_path(body, descriptor.path, original)
                 continue
             semantic_index.record_draw(
@@ -305,11 +308,10 @@ def build_constants_overlay_strategy(
     from hypothesis import strategies as st
 
     from schemathesis.openapi.generation.filters import is_valid_header
-    from schemathesis.specs.openapi.examples import _example_is_valid
 
     # Header and cookie values funnel through `is_valid_header`; a constant it would reject makes the
     # location filter discard the whole case, so screen those out here instead of paying that cost.
-    header_like = location in ("header", "cookie")
+    header_like = location in HEADER_LOCATIONS
 
     # Resolve once: property path -> tuple of (schema-valid pool value, its origin) for that property.
     candidates: dict[tuple[str, ...], list[tuple[ConstantValue, Origin | None]]] = {}
@@ -346,11 +348,11 @@ def build_constants_overlay_strategy(
             (value, origin)
             for value, origin in pool_values
             # `Binary` renders as an empty `str`, so `jsonschema_rs` rejects its type and
-            # `_example_is_valid` swallows that error into `True`; length-check the raw bytes instead.
+            # `example_is_valid` swallows that error into `True`; length-check the raw bytes instead.
             if (
                 _binary_length_fits(value.data, schema)
                 if isinstance(value, Binary)
-                else _example_is_valid(value, validator)
+                else example_is_valid(value, validator)
             )
         )
         if header_like:
@@ -407,7 +409,7 @@ def build_constants_overlay_strategy(
             return produced
 
         # Guard against cross-field constraints that leaf-level validation can't catch.
-        if not _example_is_valid(new_value, container_validator):
+        if not example_is_valid(new_value, container_validator):
             return produced
 
         if isinstance(produced, GeneratedValue):
@@ -850,8 +852,6 @@ def build_hybrid_strategy(
     """
     from hypothesis import strategies as st
 
-    from schemathesis.specs.openapi.examples import _example_is_valid
-
     container_validator: jsonschema_rs.Validator | None = None
     if container_schema is not None and validator_cls is not None:
         try:
@@ -861,7 +861,7 @@ def build_hybrid_strategy(
             container_validator = None
 
     # Pre-compute keys for all variants
-    variant_keys = [_variant_key(v.overlay) for v in captured_variants]
+    variant_keys = [jsonschema_rs.canonical.json.to_string(v.overlay) for v in captured_variants]
     n_variants = len(captured_variants)
 
     @st.composite  # type: ignore[untyped-decorator]
@@ -921,7 +921,7 @@ def build_hybrid_strategy(
         # The drawn value may be a schema example shared with every later draw.
         merged = deepclone(base)
         _apply_overlay(merged, overlay)
-        if container_validator is not None and not _example_is_valid(merged, container_validator):
+        if container_validator is not None and not example_is_valid(merged, container_validator):
             return drawn
         base = merged
         usage_tracker.record_draw(variant_keys[idx])
@@ -1053,7 +1053,6 @@ def filter_schema_valid_examples(examples: list[JsonValue], schema: JsonSchema, 
     if not examples:
         return examples
     from schemathesis.specs.openapi._hypothesis import snapped_float32_clone
-    from schemathesis.specs.openapi.examples import _example_is_valid
 
     # Snap `format: float` bounds so examples that collapse to an out-of-range value once narrowed are evicted.
     schema = snapped_float32_clone(schema)
@@ -1061,7 +1060,7 @@ def filter_schema_valid_examples(examples: list[JsonValue], schema: JsonSchema, 
         validator = make_validator(schema, validator_cls)
     except Exception:
         return examples
-    return [ex for ex in examples if _example_is_valid(ex, validator)]
+    return [ex for ex in examples if example_is_valid(ex, validator)]
 
 
 def build_example_aware_strategy(
@@ -1258,7 +1257,7 @@ class OpenApiComponent(ABC):
             merge_ref_siblings=self.adapter.ref_siblings,
         )
 
-    def _get_validator(self) -> jsonschema_rs.Validator:
+    def get_validator(self) -> jsonschema_rs.Validator:
         if self._validator is NOT_SET:
             self._validator = make_validator(self.validation_schema, self.adapter.jsonschema_validator_cls)
         assert not isinstance(self._validator, NotSet)
@@ -1274,7 +1273,7 @@ class OpenApiComponent(ABC):
             jsonschema_rs.ValidationError: If the value does not conform to the schema.
 
         """
-        self._get_validator().validate(value)
+        self.get_validator().validate(value)
 
     def is_valid(self, value: Any) -> bool:
         """Check whether a value conforms to this parameter's schema.
@@ -1286,7 +1285,7 @@ class OpenApiComponent(ABC):
             `True` if the value is valid, `False` otherwise.
 
         """
-        return self._get_validator().is_valid(value)
+        return self.get_validator().is_valid(value)
 
     @abstractmethod
     def _get_raw_schema(self) -> JsonSchema:
@@ -1381,23 +1380,7 @@ class OpenApiComponent(ABC):
             examples.extend(ex["value"] for ex in container.values() if isinstance(ex, dict) and "value" in ex)
         elif isinstance(container, list):
             examples.extend(container)
-
-        example = self.definition.get(self.adapter.example_keyword, NOT_SET)
-        if example is not NOT_SET:
-            examples.append(example)
-
-        # Also extract from the schema if present (e.g., parameter.schema.example)
-        raw_schema = self.raw_schema
-        if isinstance(raw_schema, dict):
-            schema_example = raw_schema.get(self.adapter.example_keyword, NOT_SET)
-            if schema_example is not NOT_SET:
-                examples.append(schema_example)
-
-            # JSON Schema supports 'examples' as an array
-            schema_examples = raw_schema.get("examples")
-            if isinstance(schema_examples, list):
-                examples.extend(schema_examples)
-
+        examples.extend(self._iter_single_and_schema_examples())
         return examples
 
     def _get_strategy_examples(self, operation: OpenApiOperation) -> list[JsonValue]:
@@ -1414,22 +1397,23 @@ class OpenApiComponent(ABC):
         container = self.definition.get(self.adapter.examples_container_keyword)
         if container is not None:
             examples.extend(extract_inner_examples(container, operation.schema))
+        examples.extend(self._iter_single_and_schema_examples())
+        return examples
 
+    def _iter_single_and_schema_examples(self) -> Iterator[JsonValue]:
+        """The definition's single `example`, then the nested schema's `example` and `examples` array."""
         example = self.definition.get(self.adapter.example_keyword, NOT_SET)
         if example is not NOT_SET:
-            examples.append(example)
-
+            yield example
         raw_schema = self.raw_schema
         if isinstance(raw_schema, dict):
             schema_example = raw_schema.get(self.adapter.example_keyword, NOT_SET)
             if schema_example is not NOT_SET:
-                examples.append(schema_example)
-
+                yield schema_example
+            # JSON Schema supports 'examples' as an array
             schema_examples = raw_schema.get("examples")
             if isinstance(schema_examples, list):
-                examples.extend(schema_examples)
-
-        return examples
+                yield from schema_examples
 
 
 def _admits_raising_minimum(schema: JsonSchemaObject, minimum_keyword: str, maximum_keyword: str) -> bool:
@@ -1921,7 +1905,7 @@ class OpenApiBody(OpenApiComponent):
             strategy = build_body_override_overlay_strategy(
                 strategy,
                 overrides=body_overrides,
-                validator=self._get_validator() if generation_mode.is_negative else None,
+                validator=self.get_validator() if generation_mode.is_negative else None,
             )
         return strategy
 

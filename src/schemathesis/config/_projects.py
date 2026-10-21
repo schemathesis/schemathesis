@@ -17,7 +17,7 @@ from schemathesis.config._error import ConfigError
 from schemathesis.config._fuzz import FuzzConfig
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._health_check import HealthCheck
-from schemathesis.config._operations import OperationConfig, OperationsConfig, _parse_request_retries
+from schemathesis.config._operations import OperationConfig, OperationsConfig, parse_request_retries
 from schemathesis.config._output import OutputConfig
 from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
@@ -232,7 +232,7 @@ class ProjectConfig(DiffBase):
             max_redirects=data.get("max-redirects"),
             max_stream_events=data.get("max-stream-events"),
             request_timeout=data.get("request-timeout"),
-            request_retries=_parse_request_retries(data.get("request-retries")),
+            request_retries=parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data, dictionaries=dictionaries),

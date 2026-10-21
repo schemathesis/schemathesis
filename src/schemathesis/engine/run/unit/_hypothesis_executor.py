@@ -16,8 +16,9 @@ from schemathesis.engine.run.unit._case import (
     BudgetExpired,
     ServerWentAway,
 )
-from schemathesis.engine.run.unit._errors import classify_test_exception, iter_mark_error_events
+from schemathesis.engine.run.unit._errors import classify_test_exception
 from schemathesis.engine.run.unit._scenario import iter_closing_events, start_scenario
+from schemathesis.generation.hypothesis.builder import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
@@ -47,17 +48,7 @@ def run_test(
     try:
         setup_hypothesis_database_key(test_function, operation, generation=generation)
         with catch_warnings(record=True), ignore_hypothesis_output():
-            test_function(
-                ctx=ctx,
-                state=state,
-                errors=errors,
-                check_ctx=scenario.check_ctx,
-                recorder=recorder,
-                generation=generation,
-                transport_kwargs=scenario.transport_kwargs,
-                continue_on_failure=scenario.continue_on_failure,
-                pending_events=pending_events,
-            )
+            test_function(ctx=ctx, scenario=scenario, errors=errors, pending_events=pending_events)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         status = Status.SUCCESS
     except (SkipTest, unittest.case.SkipTest) as exc:
@@ -106,12 +97,10 @@ def run_test(
     if status == Status.SUCCESS and has_new_failures(recorder, ctx.config.load_baseline()):
         status = Status.FAILURE
 
-    for event in iter_mark_error_events(
-        test_function=test_function,
-        non_fatal_error=non_fatal_error,
-    ):
+    missing = MissingPathParameters.get(test_function)
+    if missing:
         status = Status.ERROR
-        yield event
+        yield non_fatal_error(missing)
 
     yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 

@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import quote
 
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import jsonify_python_specific_types, to_wire_string
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
@@ -82,7 +82,7 @@ class WireSemantics:
         `declared` marks a value the schema author wrote verbatim, where a `/` is intent to send `%2F`
         rather than an artifact of generation, so the path filter judges its encoded form instead.
         """
-        if self.location in ("header", "cookie"):
+        if self.location in HEADER_LOCATIONS:
             if isinstance(value, str):
                 return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
             # Containers travel as their joined keys and items, so each one must fit the header on its own.
@@ -146,7 +146,7 @@ class WireSemantics:
         # An XML null serializes to an empty element, which reads back as "".
         if self.media_type is not None and is_xml_parts(self.media_type) and value is None:
             return ""
-        if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE):
+        if self.location in HEADER_LOCATIONS:
             return str(stringify_value(value, self.location))
         return str(value)
 
@@ -154,7 +154,7 @@ class WireSemantics:
         """The texts a server reads for a parameter value that travels as text, one per repeated query item."""
         if self.location == ParameterLocation.BODY or not self.serializes_to_string():
             return []
-        if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE):
+        if self.location in HEADER_LOCATIONS:
             return [self.observed(value)]
         if self.location == ParameterLocation.PATH and isinstance(value, list):
             return [stringify_value(value, self.location)]

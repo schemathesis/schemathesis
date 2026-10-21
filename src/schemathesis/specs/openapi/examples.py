@@ -45,6 +45,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiParameter,
     OpenApiParameterSet,
     _deep_merge_overlay,
+    example_is_valid,
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from schemathesis.specs.openapi.formats import format_lengths_for
@@ -265,7 +266,7 @@ def _with_pool_values(operation: OpenApiOperation, combo: dict[str, Any], pool_c
         example_body = result.get("body")
         body: dict[str, Any] = cast("dict[str, Any]", deepclone(example_body)) if isinstance(example_body, dict) else {}
         _deep_merge_overlay(body, pool_body)
-        if _example_is_valid(body, _make_example_validator(_body_schema(operation, pool_combo["media_type"]))):
+        if example_is_valid(body, _make_example_validator(_body_schema(operation, pool_combo["media_type"]))):
             pool_combo = {**pool_combo, "body": body}
         else:
             # The captured fields cannot make a conforming body here, so the example's body goes as is.
@@ -285,12 +286,12 @@ def _with_complete_pool_body(operation: OpenApiOperation, combo: dict[str, Any])
         return result
     schema = _body_schema(operation, combo["media_type"])
     validator = _make_example_validator(schema)
-    if _example_is_valid(pool_body, validator):
+    if example_is_valid(pool_body, validator):
         return result
     drawn = _draw_object(schema, operation) if isinstance(schema, dict) else None
     if drawn is not None:
         _deep_merge_overlay(drawn, pool_body)
-        if _example_is_valid(drawn, validator):
+        if example_is_valid(drawn, validator):
             result["body"] = drawn
             return result
     # Generation fills the body when the captured fields cannot make one that conforms.
@@ -336,7 +337,7 @@ def _iter_parameter_defaults(operation: OpenApiOperation) -> Generator[tuple[Ope
         if (
             isinstance(schema, dict)
             and "default" in schema
-            and _example_is_valid(schema["default"], _make_example_validator(schema))
+            and example_is_valid(schema["default"], _make_example_validator(schema))
         ):
             yield parameter, schema["default"]
 
@@ -382,7 +383,7 @@ def extract_top_level(
             for example_keyword in dict.fromkeys((parameter.adapter.example_keyword, "example", "x-example")):
                 if isinstance(definition, dict) and example_keyword in definition:
                     value = definition[example_keyword]
-                    if _example_is_valid(value, validator):
+                    if example_is_valid(value, validator):
                         yield ParameterExample(
                             container=parameter.location.container_name,
                             name=parameter.name,
@@ -394,7 +395,7 @@ def extract_top_level(
                 for example_name, value in extract_named_inner_examples(
                     parameter.definition[container_keyword], operation.schema
                 ):
-                    if _example_is_valid(value, param_validator):
+                    if example_is_valid(value, param_validator):
                         yield ParameterExample(
                             container=parameter.location.container_name,
                             name=parameter.name,
@@ -408,14 +409,14 @@ def extract_top_level(
             expanded_validator = _make_example_validator(expanded_schema)
             for container_keyword in container_keywords:
                 for value in _iter_schema_examples(expanded_schema.get(container_keyword), operation.schema):
-                    if _example_is_valid(value, expanded_validator) and _example_survives_float32(
+                    if example_is_valid(value, expanded_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
                         yield ParameterExample(
                             container=parameter.location.container_name, name=parameter.name, value=value
                         )
         for value in find_matching_in_responses(responses, parameter.name):
-            if _example_is_valid(value, param_validator):
+            if example_is_valid(value, param_validator):
                 yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
@@ -434,9 +435,9 @@ def extract_top_level(
                 if isinstance(definition, dict) and example_keyword in definition:
                     value = definition[example_keyword]
                     if (
-                        _example_is_valid(value, body_validator)
+                        example_is_valid(value, body_validator)
                         if definition is body.definition
-                        else _example_is_valid(value, declared_validator)
+                        else example_is_valid(value, declared_validator)
                         and _example_survives_float32(value, definition)
                     ):
                         yield BodyExample(value=value, media_type=body.media_type)
@@ -450,7 +451,7 @@ def extract_top_level(
             for value in extract_inner_examples(
                 body.definition[body.adapter.examples_container_keyword], operation.schema
             ):
-                if _example_is_valid(value, body_validator):
+                if example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
                 else:
                     completed = _completed_body_example(value, body.validation_schema, declared_validator, operation)
@@ -460,7 +461,7 @@ def extract_top_level(
             if isinstance(expanded_schema, dict):
                 container = expanded_schema.get(body.adapter.examples_container_keyword)
                 for value in _iter_schema_examples(container, operation.schema):
-                    if _example_is_valid(value, declared_validator) and _example_survives_float32(
+                    if example_is_valid(value, declared_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
                         yield BodyExample(value=value, media_type=body.media_type)
@@ -772,7 +773,7 @@ def extract_from_schemas(
                 resolver=resolver,
                 reference_path=(),
             ):
-                if _example_is_valid(value, parameter_validator):
+                if example_is_valid(value, parameter_validator):
                     yield ParameterExample(
                         container=parameter.location.container_name, name=parameter.name, value=value
                     )
@@ -809,7 +810,7 @@ def _extract_body_examples_from_schemas(
                 resolver=resolver,
                 reference_path=(),
             ):
-                if _example_is_valid(value, body_validator):
+                if example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
 
 
@@ -853,7 +854,7 @@ def _example_survives_float32(value: object, schema: Any) -> bool:
         declared_validator = make_validator_for(schema)
     except jsonschema_rs.ValidationError:
         return True
-    return _example_is_valid(value, snapped_validator) or not _example_is_valid(value, declared_validator)
+    return example_is_valid(value, snapped_validator) or not example_is_valid(value, declared_validator)
 
 
 def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -889,22 +890,13 @@ def _completed_body_example(
     if generated is None:
         return None
     merged = _deep_merge(generated, value)
-    return merged if _example_is_valid(merged, validator) else None
+    return merged if example_is_valid(merged, validator) else None
 
 
 def _draw_object(validation_schema: dict[str, Any], operation: APIOperation) -> dict[str, Any] | None:
     config = operation.schema.config.generation_for(operation=operation, phase="examples")
     generated = _generate_single_example(validation_schema, config, operation.schema.adapter.jsonschema_validator_cls)
     return generated if isinstance(generated, dict) else None
-
-
-def _example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:
-    if validator is None:
-        return True
-    try:
-        return validator.is_valid(value)
-    except Exception:
-        return True
 
 
 def _with_bundle_storage(schema: dict[str, Any], bundle_storage: dict[str, Any] | None) -> dict[str, Any]:

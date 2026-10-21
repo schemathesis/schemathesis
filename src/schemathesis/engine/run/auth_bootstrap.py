@@ -94,7 +94,7 @@ def _call(
     yield started
     case = operation.Case(body=body, media_type=media_type)
     recorder = ScenarioRecorder(label=operation.label)
-    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+    recorder.record_case(case=case)
     start = time.monotonic()
     result: Response | Exception
     try:

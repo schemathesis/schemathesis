@@ -454,7 +454,7 @@ class APIStateMachine(RuleBasedStateMachine):
         case.validate_response(response, additional_checks=additional_checks, transport_kwargs=kwargs)
 
 
-class _RecordingStateMachine(APIStateMachine):
+class RecordingStateMachine(APIStateMachine):
     """Records every step of a scenario so stateful checks can look up earlier cases and responses."""
 
     def __init__(self) -> None:

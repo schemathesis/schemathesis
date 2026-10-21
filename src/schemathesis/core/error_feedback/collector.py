@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from schemathesis.core.cache import CacheWriter, Kind, request_from_case
 from schemathesis.core.error_feedback.pipeline import get_pipeline
 from schemathesis.core.error_feedback.store import ErrorFeedbackStore, Observation, observation_fingerprint
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import Response
@@ -26,7 +27,7 @@ def parse_observations(
         # Only 4xx is actionable: 5xx is already a check finding; 401/403 are auth noise.
         status < 400
         or status >= 500
-        or status in (401, 403)
+        or status in AUTH_REJECTION_STATUSES
         # Negative-mode is meant to fail — recording it would poison the signal.
         or (case.meta is not None and case.meta.generation.mode.is_negative)
     ):

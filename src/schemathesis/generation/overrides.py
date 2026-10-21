@@ -24,6 +24,17 @@ class Override:
     path_parameters: dict[str, str]
     body: dict[str, str]
 
+    @classmethod
+    def from_send_kwargs(cls, kwargs: Mapping[str, Any]) -> Override:
+        """The query, headers and cookies a request was sent with, as passed to the transport."""
+        return cls(
+            query=kwargs.get("params") or {},
+            headers=kwargs.get("headers") or {},
+            cookies=kwargs.get("cookies") or {},
+            path_parameters={},
+            body={},
+        )
+
     def items(self) -> Iterator[tuple[ParameterLocation, dict[str, str]]]:
         for key, value in (
             (ParameterLocation.QUERY, self.query),

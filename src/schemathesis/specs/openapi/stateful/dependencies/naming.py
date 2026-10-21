@@ -90,8 +90,8 @@ def referenced_values(
     path: str,
     path_parameters: Mapping[str, object],
     query: Mapping[str, object],
-    body: object = None,
-    created_fields: Collection[str] = (),
+    body: object,
+    created_fields: Collection[str],
 ) -> set[str]:
     """Values a request sent to name existing objects, rather than the one it creates."""
     # A write creates what its trailing path parameter, its created body keys and its own `id` name.

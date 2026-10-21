@@ -96,8 +96,8 @@ class Engine:
         self,
         phase_name: PhaseName,
         *,
-        is_supported: bool = True,
-        requires_transitions: bool = False,
+        is_supported: bool,
+        requires_transitions: bool,
     ) -> Phase:
         """Helper to determine phase configuration with proper skip reasons."""
         # Check if feature is supported by the schema

@@ -38,6 +38,6 @@ def extract_token_from_header(headers: Mapping[str, str], name: str) -> str:
     raise WFCTokenExtractionError(f"Header '{name}' not found in response. Available headers: {available or 'none'}")
 
 
-def format_token(token: str, template: str = "{token}") -> str:
+def format_token(token: str, template: str) -> str:
     """Interpolate a token into a `{token}` template, e.g. 'Bearer {token}'."""
     return template.replace("{token}", token)

@@ -28,6 +28,9 @@ HttpMethodSchema: TypeAlias = Literal["get", "post", "put", "patch", "delete", "
 HTTP_METHODS_SCHEMA: frozenset[HttpMethodSchema] = frozenset(get_args(HttpMethodSchema))
 # Methods that must not change server state.
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+# Statuses an API answers when it does not accept the credentials a request carries. Frameworks whose first
+# authentication scheme offers no challenge answer 403 instead of 401, and gateways do the same.
+AUTH_REJECTION_STATUSES = frozenset({401, 403})
 
 
 def is_http_method_schema(value: str) -> TypeGuard[HttpMethodSchema]:

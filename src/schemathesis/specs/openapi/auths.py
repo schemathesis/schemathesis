@@ -17,7 +17,7 @@ from schemathesis.core.failures import reason_phrase
 from schemathesis.core.media_types import is_form_urlencoded, is_json
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
-from schemathesis.core.transport import decode_lossy, load_json_lossy
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES, decode_lossy, load_json_lossy
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
@@ -248,7 +248,7 @@ class DynamicTokenAuthProvider:
         cookies: Mapping[str, str],
         output_config: OutputConfig,
     ) -> str:
-        if status_code in (401, 403):
+        if status_code in AUTH_REJECTION_STATUSES:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",
