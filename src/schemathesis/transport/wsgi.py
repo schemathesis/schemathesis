@@ -31,6 +31,7 @@ from schemathesis.transport.requests import (
     _merge_query_components,
     prepare_multipart_parts,
     prepare_query,
+    urlencoded_serializer,
 )
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
@@ -300,9 +301,7 @@ def xml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_xml(ctx.case, value)
 
 
-@WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")
-def urlencoded_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return {"data": value}
+WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")(urlencoded_serializer)
 
 
 @WSGI_TRANSPORT.serializer("text/plain")

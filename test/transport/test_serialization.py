@@ -548,6 +548,35 @@ def test_urlencoded_body_follows_encoding(ctx, app_runner, body_schema, encoding
     assert sorted(parse_qsl(case.call().text)) == sorted(expected)
 
 
+@pytest.mark.parametrize("body", [[1, 2], 5], ids=["array", "scalar"])
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+def test_urlencoded_non_object_body_is_sent_as_json(ctx, app_runner, body, transport):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/form": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/x-www-form-urlencoded": {"schema": {}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+    )
+
+    @app.route("/form", methods=["POST"])
+    def form():
+        return request.get_data()
+
+    if transport == "wsgi":
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/form"]["POST"].Case(body=body, media_type="application/x-www-form-urlencoded")
+    assert case.call().content == json.dumps(body).encode()
+
+
 def _received_part(part):
     name = part.get_param("name", header="content-disposition")
     if part.is_multipart():
