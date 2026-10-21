@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from hypothesis.errors import InvalidArgument
 from jsonschema_rs import ValidationError
 
+from schemathesis.config import CoveragePhaseConfig, ExamplesPhaseConfig, FuzzingPhaseConfig, OperationOrdering
 from schemathesis.core.errors import (
     AuthenticationError,
     HookExecutionError,
@@ -22,13 +23,14 @@ from schemathesis.core.errors import (
     InvalidSchema,
     is_regex_validation_error,
 )
-from schemathesis.core.result import Ok, Result
+from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import Scheduler
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._direct_executor import run_driver
-from schemathesis.engine.run.unit._pool import WORKER_FINISHED, WorkerPool
+from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+from schemathesis.engine.run.unit._pool import WORKER_FINISHED, DefaultScheduler, WorkerPool, split_results
 from schemathesis.engine.supervisor import SchedulingDirective, Verdict
 from schemathesis.generation import overrides
 from schemathesis.generation.drivers import CaseGenerator, CoverageGenerator, ExamplesGenerator
@@ -86,7 +88,36 @@ def _create_scheduler(
         operations = [item for item in operations if isinstance(item, Ok) and item.ok().label in only]
     # Entries the schema could not produce never claim a share, so counting them shrinks every other one.
     engine.start_unit_phase(total_operations=sum(1 for item in operations if isinstance(item, Ok)))
-    return engine.schema.get_unit_scheduler(operations, phase), len(operations)
+    return _order_operations(engine, phase, operations), len(operations)
+
+
+def _order_operations(
+    engine: EngineContext, phase: Phase, operations: list[Result[APIOperation, InvalidSchema]]
+) -> Scheduler:
+    if _keeps_schema_order(engine, phase):
+        return DefaultScheduler(operations=operations)
+    successes, errors = split_results(operations)
+    return _scheduler_for_layers(engine.schema.get_operation_layers(successes), operations, errors)
+
+
+def _keeps_schema_order(engine: EngineContext, phase: Phase) -> bool:
+    phase_config = engine.config.phases.get_by_name(name=phase.name.value)
+    assert isinstance(phase_config, FuzzingPhaseConfig | CoveragePhaseConfig | ExamplesPhaseConfig)
+    return phase_config.operation_ordering == OperationOrdering.NONE
+
+
+def _scheduler_for_layers(
+    layers: list[list[APIOperation]],
+    operations: list[Result[APIOperation, InvalidSchema]],
+    errors: list[InvalidSchema],
+) -> Scheduler:
+    if not layers:
+        return DefaultScheduler(operations=operations)
+    if len(layers) == 1:
+        return DefaultScheduler(
+            operations=[*(Ok(operation) for operation in layers[0]), *(Err(error) for error in errors)]
+        )
+    return LayeredScheduler(layers, errors=errors)
 
 
 _TEST_MODES = {PhaseName.EXAMPLES: HypothesisTestMode.EXAMPLES, PhaseName.COVERAGE: HypothesisTestMode.COVERAGE}

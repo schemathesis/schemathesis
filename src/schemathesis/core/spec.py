@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
-    from schemathesis.engine.run import Phase
     from schemathesis.generation import GenerationMode
     from schemathesis.generation.case import Case
     from schemathesis.generation.feedback import FeedbackSources
@@ -97,11 +96,7 @@ class OperationsProvider(Protocol):
 
     def get_tags(self, operation: APIOperation) -> list[str] | None: ...  # pragma: no cover
 
-    def get_unit_scheduler(
-        self,
-        operations: list[Result[APIOperation, InvalidSchema]],
-        phase: Phase,
-    ) -> Scheduler: ...  # pragma: no cover
+    def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]: ...  # pragma: no cover
 
 
 class CaseFactory(Protocol):

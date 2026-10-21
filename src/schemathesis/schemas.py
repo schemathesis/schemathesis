@@ -69,11 +69,10 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.core.spec import AuthFlow, Scheduler
+    from schemathesis.core.spec import AuthFlow
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
-    from schemathesis.engine.run import Phase
     from schemathesis.generation.hypothesis.reporting import FilterCaseTracker, SlowParameter, UnsatisfiableParameter
     from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
     from schemathesis.python._constants.pool import ConstantsPool
@@ -601,15 +600,9 @@ class BaseSchema(Mapping):
         for location in list(meta._dirty):
             meta.clear_dirty(location)
 
-    def get_unit_scheduler(
-        self,
-        operations: list[Result[APIOperation, InvalidSchema]],
-        phase: Phase,
-    ) -> Scheduler:
-        """Return the scheduler that decides operation execution order in the unit phase."""
-        from schemathesis.engine.run.unit._pool import DefaultScheduler
-
-        return DefaultScheduler(operations=operations)
+    def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
+        """Partition operations into layers that dispatch in order; no layers keeps the given order."""
+        return []
 
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
         """Discover spec-specific stateful transitions; return the counts available."""
