@@ -154,33 +154,22 @@ class ReportsConfig(DiffBase):
         preserve_bytes: bool | None = None,
     ) -> None:
         formats = formats or []
-        if junit_path is not None or ReportFormat.JUNIT in formats:
-            self.junit.enabled = True
-            self.junit.path = Path(junit_path) if junit_path is not None else junit_path
-        if vcr_path is not None or ReportFormat.VCR in formats:
-            self.vcr.enabled = True
-            self.vcr.path = Path(vcr_path) if vcr_path is not None else vcr_path
-        if har_path is not None or ReportFormat.HAR in formats:
-            self.har.enabled = True
-            self.har.path = Path(har_path) if har_path is not None else har_path
-        if ndjson_path is not None or ReportFormat.NDJSON in formats:
-            self.ndjson.enabled = True
-            self.ndjson.path = Path(ndjson_path) if ndjson_path is not None else ndjson_path
-        if json_path is not None or ReportFormat.JSON in formats:
-            self.json.enabled = True
-            self.json.path = Path(json_path) if json_path is not None else json_path
-        if wfc_path is not None or ReportFormat.WFC in formats:
-            self.wfc.enabled = True
-            self.wfc.path = Path(wfc_path) if wfc_path is not None else wfc_path
-        if pytest_path is not None or ReportFormat.PYTEST in formats:
-            self.pytest.enabled = True
-            self.pytest.path = Path(pytest_path) if pytest_path is not None else pytest_path
-        if allure_path is not None or ReportFormat.ALLURE in formats:
-            self.allure.enabled = True
-            self.allure.path = Path(allure_path) if allure_path is not None else allure_path
-        if html_path is not None or ReportFormat.HTML in formats:
-            self.html.enabled = True
-            self.html.path = Path(html_path) if html_path is not None else html_path
+        paths = {
+            ReportFormat.JUNIT: junit_path,
+            ReportFormat.VCR: vcr_path,
+            ReportFormat.HAR: har_path,
+            ReportFormat.NDJSON: ndjson_path,
+            ReportFormat.JSON: json_path,
+            ReportFormat.WFC: wfc_path,
+            ReportFormat.PYTEST: pytest_path,
+            ReportFormat.ALLURE: allure_path,
+            ReportFormat.HTML: html_path,
+        }
+        for report_format, path in paths.items():
+            if path is not None or report_format in formats:
+                report: ReportConfig = getattr(self, report_format.value)
+                report.enabled = True
+                report.path = Path(path) if path is not None else None
         if directory != DEFAULT_REPORT_DIRECTORY:
             self.directory = directory
         if preserve_bytes:

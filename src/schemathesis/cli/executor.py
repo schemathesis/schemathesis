@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import click
 
+from schemathesis.cli.commands.fuzz.handlers.output import FuzzOutputHandler
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
 from schemathesis.cli.commands.run.handlers.har import HarHandler
@@ -37,54 +38,29 @@ class ExecutionContext(Protocol):
     def on_event(self, event: EngineEvent) -> None: ...  # pragma: no cover
 
 
+_REPORT_HANDLER_FORMATS: dict[type[EventHandler], ReportFormat] = {
+    VcrHandler: ReportFormat.VCR,
+    HarHandler: ReportFormat.HAR,
+    JunitXMLHandler: ReportFormat.JUNIT,
+    NdjsonHandler: ReportFormat.NDJSON,
+    JsonReportHandler: ReportFormat.JSON,
+    WfcReportHandler: ReportFormat.WFC,
+    PytestReportHandler: ReportFormat.PYTEST,
+    HtmlReportHandler: ReportFormat.HTML,
+}
 try:
     from schemathesis.cli.commands.run.handlers.allure import AllureHandler
 
-    _REPORT_HANDLER_FORMATS: dict[type[EventHandler], ReportFormat] = {
-        VcrHandler: ReportFormat.VCR,
-        HarHandler: ReportFormat.HAR,
-        JunitXMLHandler: ReportFormat.JUNIT,
-        NdjsonHandler: ReportFormat.NDJSON,
-        JsonReportHandler: ReportFormat.JSON,
-        WfcReportHandler: ReportFormat.WFC,
-        PytestReportHandler: ReportFormat.PYTEST,
-        AllureHandler: ReportFormat.ALLURE,
-        HtmlReportHandler: ReportFormat.HTML,
-    }
-    _BUILT_IN_HANDLERS: tuple[type[EventHandler], ...] = (
-        VcrHandler,
-        HarHandler,
-        JunitXMLHandler,
-        NdjsonHandler,
-        WfcReportHandler,
-        PytestReportHandler,
-        OutputHandler,
-        CrashHandler,
-        HtmlReportHandler,
-        AllureHandler,
-    )
+    _REPORT_HANDLER_FORMATS[AllureHandler] = ReportFormat.ALLURE
 except ImportError:
-    _REPORT_HANDLER_FORMATS = {
-        VcrHandler: ReportFormat.VCR,
-        HarHandler: ReportFormat.HAR,
-        JunitXMLHandler: ReportFormat.JUNIT,
-        NdjsonHandler: ReportFormat.NDJSON,
-        JsonReportHandler: ReportFormat.JSON,
-        WfcReportHandler: ReportFormat.WFC,
-        PytestReportHandler: ReportFormat.PYTEST,
-        HtmlReportHandler: ReportFormat.HTML,
-    }
-    _BUILT_IN_HANDLERS = (
-        VcrHandler,
-        HarHandler,
-        JunitXMLHandler,
-        NdjsonHandler,
-        WfcReportHandler,
-        PytestReportHandler,
-        OutputHandler,
-        CrashHandler,
-        HtmlReportHandler,
-    )
+    pass
+
+_BUILT_IN_HANDLERS: tuple[type[EventHandler], ...] = (
+    *_REPORT_HANDLER_FORMATS,
+    OutputHandler,
+    FuzzOutputHandler,
+    CrashHandler,
+)
 
 
 def is_built_in_handler(handler: EventHandler) -> bool:
@@ -109,34 +85,26 @@ def initialize_report_handlers(
     """Initialize built-in report handlers and custom handlers."""
     handlers: list[EventHandler] = []
 
-    if config.reports.junit.enabled:
-        path = config.reports.get_path(ReportFormat.JUNIT)
-        open_file(path, _report_option(config, params, ReportFormat.JUNIT))
-        handlers.append(JunitXMLHandler(path))
-    if config.reports.vcr.enabled:
-        path = config.reports.get_path(ReportFormat.VCR)
-        open_file(path, _report_option(config, params, ReportFormat.VCR))
-        handlers.append(VcrHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes))
-    if config.reports.har.enabled:
-        path = config.reports.get_path(ReportFormat.HAR)
-        open_file(path, _report_option(config, params, ReportFormat.HAR))
-        handlers.append(HarHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes))
-    if config.reports.ndjson.enabled:
-        path = config.reports.get_path(ReportFormat.NDJSON)
-        open_file(path, _report_option(config, params, ReportFormat.NDJSON))
-        handlers.append(NdjsonHandler(output=path, config=config))
-    if config.reports.json.enabled:
-        path = config.reports.get_path(ReportFormat.JSON)
-        open_file(path, _report_option(config, params, ReportFormat.JSON))
-        handlers.append(JsonReportHandler(path))
-    if config.reports.wfc.enabled:
-        path = config.reports.get_path(ReportFormat.WFC)
-        open_file(path, _report_option(config, params, ReportFormat.WFC))
-        handlers.append(WfcReportHandler(path))
-    if config.reports.pytest.enabled:
-        path = config.reports.get_path(ReportFormat.PYTEST)
-        open_file(path, _report_option(config, params, ReportFormat.PYTEST))
-        handlers.append(PytestReportHandler(path))
+    file_reports: tuple[tuple[ReportFormat, Callable[[Path], EventHandler]], ...] = (
+        (ReportFormat.JUNIT, JunitXMLHandler),
+        (
+            ReportFormat.VCR,
+            lambda path: VcrHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes),
+        ),
+        (
+            ReportFormat.HAR,
+            lambda path: HarHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes),
+        ),
+        (ReportFormat.NDJSON, lambda path: NdjsonHandler(output=path, config=config)),
+        (ReportFormat.JSON, JsonReportHandler),
+        (ReportFormat.WFC, WfcReportHandler),
+        (ReportFormat.PYTEST, PytestReportHandler),
+    )
+    for report_format, make_handler in file_reports:
+        if getattr(config.reports, report_format.value).enabled:
+            path = config.reports.get_path(report_format)
+            open_file(path, _report_option(config, params, report_format))
+            handlers.append(make_handler(path))
     if config.reports.allure.enabled:
         try:
             from schemathesis.cli.commands.run.handlers.allure import AllureHandler

@@ -5,7 +5,10 @@ import pytest
 from _pytest.main import ExitCode
 
 import schemathesis
+from schemathesis.cli.commands.fuzz.handlers.output import FuzzOutputHandler
 from schemathesis.cli.events import LoadingFinished
+from schemathesis.cli.executor import is_built_in_handler
+from schemathesis.cli.json_report import JsonReportHandler
 from schemathesis.engine.events import ScenarioFinished
 
 
@@ -256,3 +259,7 @@ def after_load_schema(context, schema):
         "error",
         [{"title": "Hook Error", "count": 1}],
     ), result.stdout
+
+
+def test_json_and_fuzz_output_handlers_are_built_in(json_path):
+    assert (is_built_in_handler(JsonReportHandler(json_path)), is_built_in_handler(FuzzOutputHandler())) == (True, True)
