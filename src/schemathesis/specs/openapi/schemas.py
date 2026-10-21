@@ -715,12 +715,17 @@ class OpenApiSchema(BaseSchema):
         body = case.body
         if not isinstance(body, dict) or case.media_type is None or not media_types.is_form_urlencoded(case.media_type):
             return body
-        for alternative in case.operation.body:
-            if alternative.media_type == case.media_type:
-                # Each property is serialized like a query parameter, following the media type's `encoding`
-                serialize = _build_urlencoded_serializer(alternative.definition)
-                return jsonify_python_specific_types(serialize(dict(body)))
-        return body
+        operation = case.operation
+        # An exact match wins over one that differs in parameters (`; charset=utf-8`) or uses a wildcard
+        alternative = next(
+            (alternative for alternative in operation.body if alternative.media_type == case.media_type),
+            None,
+        ) or next(operation.get_bodies_for_media_type(case.media_type), None)
+        if alternative is None:
+            return body
+        # Each property is serialized like a query parameter, following the media type's `encoding`
+        serialize = _build_urlencoded_serializer(alternative.definition)
+        return jsonify_python_specific_types(serialize(dict(body)))
 
     @override
     def _case_media_type(self, operation: APIOperation, body: Body, media_type: str | None) -> str | None:
