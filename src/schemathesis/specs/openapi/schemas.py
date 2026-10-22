@@ -40,7 +40,7 @@ from schemathesis.core.transport import (
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.meta import ComponentInfo, TestPhase
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, ComponentInfo, TestPhase, coverage_scenario
 from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.parameters import RequestBodySchemaCache
@@ -321,16 +321,21 @@ class OpenApiSchema(BaseSchema):
             else:
                 validation_value = value
             is_valid: bool | None
-            try:
-                is_valid = case._validate_component(location, validation_value, validator_cls)
-                if not is_valid and location != ParameterLocation.BODY and isinstance(validation_value, Mapping):
-                    # Parameters travel as text, so `"5"` written for an integer parameter reaches the server as `5`.
-                    is_valid = case._validate_component(
-                        location, read_from_wire(case.operation, location, validation_value), validator_cls
-                    )
-            except jsonschema_rs.ValidationError:
-                # A schema its own draft rejects cannot judge the value, so the generation-time mode stands.
+            if location == ParameterLocation.HEADER and coverage_scenario(case) in CONTENT_TYPE_PROBES:
+                # A Content-Type probe is negative through its media type, which no header parameter declares,
+                # so the headers cannot judge it and the generation-time mode stands.
                 is_valid = None
+            else:
+                try:
+                    is_valid = case._validate_component(location, validation_value, validator_cls)
+                    if not is_valid and location != ParameterLocation.BODY and isinstance(validation_value, Mapping):
+                        # Parameters travel as text, so `"5"` written for an integer parameter reaches the server as `5`.
+                        is_valid = case._validate_component(
+                            location, read_from_wire(case.operation, location, validation_value), validator_cls
+                        )
+                except jsonschema_rs.ValidationError:
+                    # A schema its own draft rejects cannot judge the value, so the generation-time mode stands.
+                    is_valid = None
             if location in meta.components and is_valid is not None:
                 new_mode = GenerationMode.POSITIVE if is_valid else GenerationMode.NEGATIVE
                 meta.components[location] = ComponentInfo(mode=new_mode)
