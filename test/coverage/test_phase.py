@@ -2818,6 +2818,53 @@ def failed(ctx, response, case):
         )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unspecified_http_methods_stay_negative_with_form_body(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify({})
+
+    with ctx.check(
+        """
+import schemathesis
+from schemathesis.generation.meta import CoverageScenario
+
+@schemathesis.check
+def probe_mode(ctx, response, case):
+    if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD and case.meta.generation.mode.is_positive:
+        raise AssertionError(f"Positive mode: {case.meta.phase.data.description}")
+"""
+    ) as module:
+        assert (
+            cli.run_openapi_app(
+                app, "--phases=coverage", "--mode=negative", "--max-examples=1", "-c", "probe_mode", hooks=module
+            )
+            == snapshot_cli
+        )
+
+
 def test_content_type_probes(ctx):
     bodyless_operation = load_schema(ctx, path="/bodyless", method="get")["/bodyless"]["get"]
     assert [
