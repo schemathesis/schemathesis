@@ -7,6 +7,9 @@
 - `st fuzz --mode=negative` running no scenarios when startup exceeds `--max-time`.
 - Crash on WSGI apps for `multipart/form-data` bodies that are arrays or scalars.
 - Missing form encoding for `application/x-www-form-urlencoded` bodies declared with media-type parameters.
+- False positive `negative_data_rejection` for request bodies declared with media-type parameters.
+- Missing extra-properties hint in `positive_data_acceptance` for bodies declared with media-type parameters.
+- Wrong XML root element when a media range like `*/*` is declared before `application/xml`.
 - Stateful phase skipped and wrong API link counts for chained `$ref` responses or links.
 - Header values, tokens included, leaking into the WFC missing-header error on WSGI apps.
 

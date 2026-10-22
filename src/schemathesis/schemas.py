@@ -952,6 +952,15 @@ class APIOperation(Generic[P, R, S, SchemaT]):
             return container.get(name)
         return None
 
+    def get_body_for_media_type(self, media_type: str | None) -> P | None:
+        """The body declared for `media_type`, preferring an exact match over a media range or other parameters."""
+        if media_type is None:
+            return None
+        for body in self.body:
+            if body.media_type == media_type:
+                return body
+        return next(self.get_bodies_for_media_type(media_type), None)
+
     def get_bodies_for_media_type(self, media_type: str) -> Iterator[P]:
         main_target, sub_target = media_types.parse(media_type)
         for body in self.body:

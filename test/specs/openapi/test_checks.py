@@ -1982,11 +1982,15 @@ def test_negative_data_rejection_read_only_property(ctx, response_factory, ref, 
 
 # Only the alternative matching the case media type decides; an undeclared one leaves the failure standing.
 @pytest.mark.parametrize(
-    ("media_type", "raises"),
-    [("application/xml", False), ("application/yaml", True)],
-    ids=["declared-media-type", "undeclared-media-type"],
+    ("declared", "media_type", "raises"),
+    [
+        ("application/xml", "application/xml", False),
+        ("application/xml; charset=utf-8", "application/xml", False),
+        ("application/xml", "application/yaml", True),
+    ],
+    ids=["declared-media-type", "declared-with-parameters", "undeclared-media-type"],
 )
-def test_negative_data_rejection_read_only_property_media_types(ctx, response_factory, media_type, raises):
+def test_negative_data_rejection_read_only_property_media_types(ctx, response_factory, declared, media_type, raises):
     operation = ctx.openapi.load_operation(
         "POST /items",
         {
@@ -1994,7 +1998,7 @@ def test_negative_data_rejection_read_only_property_media_types(ctx, response_fa
                 "required": True,
                 "content": {
                     "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}},
-                    "application/xml": {"schema": {"$ref": "#/components/schemas/Item"}},
+                    declared: {"schema": {"$ref": "#/components/schemas/Item"}},
                 },
             },
             "responses": {"201": {"description": "Created"}, "400": {"description": "Bad Request"}},
@@ -2133,6 +2137,19 @@ def test_negative_data_rejection_accepts_form_scalars_sent_as_valid_strings(
     )
     response = case.call()
     assert wire in response.request.body
+    assert negative_data_rejection(check_context(), response, case) is None
+
+
+def test_negative_data_rejection_accepts_form_scalars_declared_with_media_type_parameters(ctx, app_runner):
+    # Generated cases carry the media type without the declared `; charset=utf-8`.
+    operation = _load_form_operation(ctx, app_runner, f"{URLENCODED}; charset=utf-8")
+    case = operation.Case(
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        body={"reason": "dmca", "description": True},
+        media_type=URLENCODED,
+    )
+    response = case.call()
+    assert "description=true" in response.request.body
     assert negative_data_rejection(check_context(), response, case) is None
 
 
@@ -4592,6 +4609,15 @@ _NAME_PROPERTY = {"type": "object", "properties": {"name": {"type": "string"}}}
             "application/json",
             _EXTRA_PROPERTY_HINT,
             id="matching-media-type-after-another",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"application/json; charset=utf-8": {"schema": _NAME_PROPERTY}},
+            {},
+            {"name": "x", "extra": "yes"},
+            "application/json",
+            _EXTRA_PROPERTY_HINT,
+            id="declared-with-parameters",
         ),
         pytest.param(
             "3.1.0",
