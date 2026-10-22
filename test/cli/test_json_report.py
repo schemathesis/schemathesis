@@ -263,3 +263,18 @@ def after_load_schema(context, schema):
 
 def test_json_and_fuzz_output_handlers_are_built_in(json_path):
     assert (is_built_in_handler(JsonReportHandler(json_path)), is_built_in_handler(FuzzOutputHandler())) == (True, True)
+
+
+def test_unique_inputs_are_counted_by_every_phase_that_generates_them(ctx, cli, json_path):
+    api = ctx.openapi.apps.success()
+    cli.run_and_assert(
+        api.schema_url,
+        f"--report-json-path={json_path}",
+        "--phases=coverage,fuzzing",
+        "--max-examples=10",
+        "--generation-unique-inputs",
+    )
+    # The operation takes no input, so both phases generate the same request. Each phase sends it once,
+    # and the fuzzing phase records it even though the coverage phase already sent it.
+    valid_rates = load_report(json_path)["valid_rates"]["GET /api/success"]
+    assert (valid_rates["coverage"]["accepted"], valid_rates["fuzzing"]["accepted"]) == (1, 1)

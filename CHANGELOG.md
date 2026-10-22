@@ -9,6 +9,7 @@
 - Missing form encoding for `application/x-www-form-urlencoded` bodies declared with media-type parameters.
 - Stateful phase skipped and wrong API link counts for chained `$ref` responses or links.
 - Header values, tokens included, leaking into the WFC missing-header error on WSGI apps.
+- `--generation-unique-inputs` skipping inputs an earlier phase sent, under-reporting later phases.
 
 ## [4.32.3](https://github.com/schemathesis/schemathesis/compare/v4.32.2...v4.32.3) - 2026-10-21
 

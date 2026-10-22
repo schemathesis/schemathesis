@@ -109,8 +109,8 @@ def _is_skipped_by_supervisor(case: Case, ctx: EngineContext) -> bool:
 def _call_and_validate_once(
     *, case: Case, ctx: EngineContext, scenario: Scenario, pending_events: list[events.EngineEvent]
 ) -> None:
-    """Send an input only the first time it is seen; later copies repeat the first outcome."""
-    cached = ctx.get_cached_outcome(case)
+    """Send an input only the first time the phase sees it; later copies repeat the first outcome."""
+    cached = ctx.get_cached_outcome(case, phase=scenario.phase)
     if isinstance(cached, BaseException):
         raise cached
     if cached is None:
@@ -118,10 +118,10 @@ def _call_and_validate_once(
     try:
         _do_call_and_validate(case=case, ctx=ctx, scenario=scenario, pending_events=pending_events)
     except BaseException as exc:
-        ctx.cache_outcome(case, exc)
+        ctx.cache_outcome(case, exc, phase=scenario.phase)
         raise
     else:
-        ctx.cache_outcome(case, None)
+        ctx.cache_outcome(case, None, phase=scenario.phase)
 
 
 def _raise_case_error(

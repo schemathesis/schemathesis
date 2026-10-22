@@ -68,7 +68,9 @@ class EngineContext:
 
     schema: ApiSchema
     control: ExecutionControl
-    outcome_cache: dict[int, BaseException | None]
+    # Keyed by phase as well: `--generation-unique-inputs` removes duplicates within a phase, so each phase
+    # sends and records the inputs it generates even if an earlier phase sent the same request.
+    outcome_cache: dict[tuple[PhaseName, int], BaseException | None]
     start_time: float
     observations: Observations | None
     link_calibration: LinkCalibrationState | None
@@ -260,11 +262,11 @@ class EngineContext:
         self.control.is_server_unavailable = True
         return True
 
-    def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
-        self.outcome_cache[hash(case)] = outcome
+    def cache_outcome(self, case: Case, outcome: BaseException | None, *, phase: PhaseName) -> None:
+        self.outcome_cache[phase, hash(case)] = outcome
 
-    def get_cached_outcome(self, case: Case) -> BaseException | None | NotSet:
-        return self.outcome_cache.get(hash(case), NOT_SET)
+    def get_cached_outcome(self, case: Case, *, phase: PhaseName) -> BaseException | None | NotSet:
+        return self.outcome_cache.get((phase, hash(case)), NOT_SET)
 
     def get_session(self, *, operation: APIOperation | None = None) -> requests.Session:
         session = getattr(self._thread_local, "session", None)
