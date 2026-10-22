@@ -565,20 +565,12 @@ def json_body_operation(ctx):
     return schema["/items"]["POST"]
 
 
-def _coverage_cases(operation, mode):
-    return list(
-        operation.schema.iter_coverage_cases(
-            operation, generation_modes=[mode], generation_config=operation.schema.config.generation
-        )
-    )
-
-
 def test_content_type_probe_stays_negative_when_a_hook_adds_a_header(json_body_operation):
-    probes = [
-        case
-        for case in _coverage_cases(json_body_operation, GenerationMode.NEGATIVE)
-        if coverage_scenario(case) in CONTENT_TYPE_PROBES
-    ]
+    schema = json_body_operation.schema
+    cases = schema.iter_coverage_cases(
+        json_body_operation, generation_modes=[GenerationMode.NEGATIVE], generation_config=schema.config.generation
+    )
+    probes = [case for case in cases if coverage_scenario(case) in CONTENT_TYPE_PROBES]
     assert {coverage_scenario(case) for case in probes} == CONTENT_TYPE_PROBES
     for case in probes:
         case.headers["X-Test-Mode"] = "true"
