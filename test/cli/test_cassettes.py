@@ -398,26 +398,6 @@ def test_cookie_to_har(value, expected):
     assert list(_cookie_to_har(value)) == expected
 
 
-@pytest.fixture(params=["tls-verify", "cert", "cert-and-key", "proxies"])
-def request_args(request, tmp_path):
-    if request.param == "tls-verify":
-        return ["--tls-verify=false"], "verify", False, ExitCode.OK
-    cert = tmp_path / "cert.tmp"
-    cert.touch()
-    if request.param == "cert":
-        return [f"--request-cert={cert}"], "cert", str(cert), ExitCode.OK
-    if request.param == "cert-and-key":
-        key = tmp_path / "key.tmp"
-        key.touch()
-        return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key)), ExitCode.OK
-    if request.param == "proxies":
-        if platform.system() == "Windows":
-            exit_code = ExitCode.OK
-        else:
-            exit_code = ExitCode.TESTS_FAILED
-        return ["--proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
-
-
 @pytest.mark.parametrize("value", ["true", "false"])
 def test_output_sanitization(ctx, cli, hypothesis_max_examples, cassette_path, value):
     api = ctx.openapi.apps.headers()
