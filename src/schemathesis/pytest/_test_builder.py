@@ -49,7 +49,7 @@ def build_operation_test(
             modes=modes,
             seed=derive_operation_seed(config.seed, operation.label),
             project=config,
-            as_strategy_kwargs=overrides.strategy_kwargs_for(config, operation=operation),
+            override=overrides.with_config_headers(config, operation=operation),
             given_kwargs=given_kwargs,
             feedback=feedback,
         ),

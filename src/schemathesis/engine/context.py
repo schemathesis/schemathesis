@@ -101,7 +101,6 @@ class EngineContext:
         "_constants_extraction",
         "_constants_extraction_lock",
         "coverage_session",
-        "coverage_unexpected_methods_seen",
         "auth_enforced_operations",
         "auth_header_log",
         "reauth",
@@ -149,7 +148,6 @@ class EngineContext:
         self.reauth = ReauthState(retry_on_statuses=schema.reauth_retry_statuses)
         # Coverage generation state lives and dies with the run.
         self.coverage_session = GenerationSession()
-        self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Operations whose missing and invalid credentials were already rejected in this run.
         self.auth_enforced_operations: set[str] = set()
         self.auth_header_log = AuthHeaderLog()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from hypothesis.errors import Unsatisfiable
 from jsonschema_rs import ValidationError
@@ -20,7 +20,7 @@ from schemathesis.core.errors import (
     UnresolvableReference,
     is_regex_validation_error,
 )
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._hooks import case_hook_dispatchers
 from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
     from schemathesis.generation.case import Case
     from schemathesis.generation.feedback import FeedbackSources
+    from schemathesis.generation.overrides import Override
     from schemathesis.schemas import APIOperation
     from schemathesis.transport import BaseTransport
 
@@ -135,20 +136,18 @@ class CoverageGenerator:
         generation_modes: list[GenerationMode],
         generation_config: GenerationConfig,
         auth_storage: AuthStorage | None,
-        as_strategy_kwargs: dict[str, Any],
+        override: Override,
         feedback: FeedbackSources,
         session: GenerationSession | None = None,
-        unexpected_methods_seen: set[tuple[str, str]] | None = None,
         hooks: HookDispatcher | None = None,
     ) -> None:
         self._operation = operation
         self._generation_modes = generation_modes
         self._generation_config = generation_config
         self._auth_storage = auth_storage
-        self._as_strategy_kwargs = as_strategy_kwargs
+        self._override = override
         self._feedback = feedback
         self._session = session
-        self._unexpected_methods_seen = unexpected_methods_seen
         self._hooks = hooks
         self._controller = Controller()
         _capture_missing_path_parameters(operation, self._controller)
@@ -163,15 +162,10 @@ class CoverageGenerator:
 
     def __iter__(self) -> Iterator[Case]:
         operation = self._operation
-        as_strategy_kwargs = self._as_strategy_kwargs
         auth_context = auths.AuthContext(operation=operation, app=operation.app)
         extra_data_source = self._feedback.extra_data_source
         error_feedback = self._feedback.error_feedback
-        overrides = {
-            container: as_strategy_kwargs[container]
-            for container in LOCATION_TO_CONTAINER.values()
-            if container in as_strategy_kwargs
-        }
+        overrides = self._override.as_strategy_kwargs()
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -189,7 +183,6 @@ class CoverageGenerator:
                 generation_config=self._generation_config,
                 extra_data_source=extra_data_source,
                 error_feedback=error_feedback,
-                unexpected_methods_seen=self._unexpected_methods_seen,
                 session=self._session,
             ):
                 if without_unserializable_payload(case, operation.schema.transport, unserializable) is None:
@@ -215,12 +208,12 @@ class ExamplesGenerator:
         self,
         *,
         operation: APIOperation,
-        as_strategy_kwargs: dict[str, Any],
+        override: Override,
         feedback: FeedbackSources,
         fill_missing: bool,
     ) -> None:
         self._operation = operation
-        self._as_strategy_kwargs = as_strategy_kwargs
+        self._as_strategy_kwargs = override.as_strategy_kwargs()
         self._feedback = feedback
         self._fill_missing = fill_missing
         self._controller = Controller()

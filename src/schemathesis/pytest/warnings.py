@@ -9,11 +9,10 @@ from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.warnings import iter_constants_warnings
 
 if TYPE_CHECKING:
-    from schemathesis.core.spec import SchemaWarnings
     from schemathesis.schemas import BaseSchema
 
 
-def emit_openapi_auth_warnings(schema: SchemaWarnings) -> None:
+def emit_openapi_auth_warnings(schema: BaseSchema) -> None:
     """Emit Python warnings for unused OpenAPI auth configuration."""
     for warning in schema.iter_schema_warnings():
         if warning.kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:

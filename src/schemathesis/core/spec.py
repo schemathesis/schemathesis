@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.generation import GenerationMode
     from schemathesis.generation.case import Case
     from schemathesis.generation.feedback import FeedbackSources
-    from schemathesis.generation.meta import CaseMetadata
+    from schemathesis.generation.meta import CaseMetadata, TestPhase
     from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ExtraDataSource, ResourcePool
@@ -52,12 +52,6 @@ class SchemaMetadata(Protocol):
     def get_base_url(self) -> str: ...  # pragma: no cover
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None: ...  # pragma: no cover
-
-
-class SchemaWarnings(Protocol):
-    """Static-analysis warnings collected from the schema."""
-
-    def iter_schema_warnings(self) -> list[SchemaWarning]: ...  # pragma: no cover
 
 
 class Scheduler(Protocol):
@@ -103,8 +97,11 @@ class AuthFlow(Protocol):
     def authenticate(self, credentials: dict[str, JsonValue], token: str) -> None: ...  # pragma: no cover
 
 
-class ApiSchema(SchemaMetadata, SchemaWarnings, Protocol):
+class ApiSchema(SchemaMetadata, Protocol):
     """Full schema contract."""
+
+    # Static-analysis warnings collected from the schema.
+    def iter_schema_warnings(self) -> list[SchemaWarning]: ...  # pragma: no cover
 
     # Operation enumeration, lookup, statistics, and unit-phase scheduling.
     @property
@@ -128,7 +125,14 @@ class ApiSchema(SchemaMetadata, SchemaWarnings, Protocol):
         auth_storage: AuthStorage | None = ...,
         generation_mode: GenerationMode = ...,
         feedback: FeedbackSources = ...,
-        **kwargs: Any,
+        *,
+        path_parameters: dict[str, Any] | None = ...,
+        headers: dict[str, Any] | None = ...,
+        cookies: dict[str, Any] | None = ...,
+        query: dict[str, Any] | None = ...,
+        body: Any = ...,
+        media_type: str | None = ...,
+        phase: TestPhase = ...,
     ) -> SearchStrategy[Case]: ...  # pragma: no cover
 
     def make_case(

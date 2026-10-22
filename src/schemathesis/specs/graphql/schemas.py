@@ -239,7 +239,6 @@ class GraphQLSchema(BaseSchema):
         generation_config: GenerationConfig,
         extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
-        unexpected_methods_seen: set[tuple[str, str]] | None = None,
         session: GenerationSession | None = None,
     ) -> Iterator[Case]:
         # GraphQL has no coverage phase yet; the schema-level case enumerator is empty.
@@ -372,7 +371,14 @@ class GraphQLSchema(BaseSchema):
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         feedback: FeedbackSources = NO_FEEDBACK,
-        **kwargs: Any,
+        *,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+        body: Any = NOT_SET,
+        media_type: str | None = None,
+        phase: TestPhase = TestPhase.FUZZING,
     ) -> SearchStrategy[Case]:
         return graphql_cases(
             operation=operation,
@@ -380,7 +386,13 @@ class GraphQLSchema(BaseSchema):
             auth_storage=auth_storage,
             generation_mode=generation_mode,
             feedback=feedback,
-            **kwargs,
+            path_parameters=path_parameters,
+            headers=headers,
+            cookies=cookies,
+            query=query,
+            body=body,
+            media_type=media_type,
+            phase=phase,
         )
 
     @override
@@ -551,10 +563,10 @@ def graphql_cases(
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.POSITIVE,
-    path_parameters: NotSet | dict[str, Any] = NOT_SET,
-    headers: NotSet | dict[str, Any] = NOT_SET,
-    cookies: NotSet | dict[str, Any] = NOT_SET,
-    query: NotSet | dict[str, Any] = NOT_SET,
+    path_parameters: NotSet | dict[str, Any] | None = NOT_SET,
+    headers: NotSet | dict[str, Any] | None = NOT_SET,
+    cookies: NotSet | dict[str, Any] | None = NOT_SET,
+    query: NotSet | dict[str, Any] | None = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
@@ -713,7 +725,7 @@ def graphql_cases(
 
 def _generate_parameter(
     location: ParameterLocation,
-    explicit: NotSet | dict[str, Any],
+    explicit: NotSet | dict[str, Any] | None,
     draw: Callable,
     operation: APIOperation,
     context: HookContext,
@@ -721,7 +733,7 @@ def _generate_parameter(
 ) -> Any:
     # Schemathesis does not generate anything but `body` for GraphQL, hence use `None`
     container = location.container_name
-    if isinstance(explicit, NotSet):
+    if explicit is None or isinstance(explicit, NotSet):
         strategy = apply_to_all_dispatchers(operation, context, hooks, _NONE_STRATEGY, container)
     else:
         strategy = apply_to_all_dispatchers(operation, context, hooks, st.just(explicit), container)
