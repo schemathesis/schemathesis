@@ -1182,7 +1182,7 @@ def _schema_has_float_format(node: object) -> bool:
     # Escaping keeps the marker from matching inside a string value, so this finds the same dicts as a walk.
     try:
         # Any object is accepted; one that is not JSON raises.
-        return '"format":"float"' in jsonschema_rs.canonical.json.to_string(node)  # type: ignore[arg-type]
+        return '"format":"float"' in jsonschema_rs.canonical.json.to_string(node)
     except (TypeError, ValueError):
         # Generation reports such a schema as invalid, so there is nothing to snap.
         return False

@@ -56,11 +56,10 @@ def _build_response_validator(
     schema: JsonSchema, validator_cls: type[jsonschema_rs.Validator], validate_formats: bool
 ) -> jsonschema_rs.Validator:
     return validator_cls(
-        # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
-        schema,  # type: ignore[arg-type]
+        schema,
         validate_formats=validate_formats,
         pattern_options=FANCY_REGEX_OPTIONS,
-        formats=supplemental_formats(validator_cls),  # type: ignore[arg-type]
+        formats=supplemental_formats(validator_cls),
     )
 
 
@@ -767,8 +766,7 @@ class OpenApiResponseHeader:
         """JSON Schema validator for this header."""
         if self._validator is NOT_SET:
             self._validator = self.adapter.jsonschema_validator_cls(
-                # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
-                self.schema,  # type: ignore[arg-type]
+                self.schema,
                 validate_formats=True,
                 pattern_options=FANCY_REGEX_OPTIONS,
             )

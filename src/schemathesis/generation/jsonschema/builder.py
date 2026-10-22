@@ -104,8 +104,7 @@ def _build(
         with _reported():
             try:
                 canonical_schema = jsonschema_rs.canonicalize(
-                    # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
-                    schema,  # type: ignore[type-var]
+                    schema,
                     draft=draft,
                     pattern_options=FANCY_REGEX_OPTIONS,
                     # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a

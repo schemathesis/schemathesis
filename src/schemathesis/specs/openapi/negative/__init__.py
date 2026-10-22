@@ -191,8 +191,7 @@ def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     for name in cache_key.custom_format_names - _ALWAYS_INVALID_FORMATS - natively_validated - formats.keys():
         formats[name] = _standard_format_check(name) if name in STANDARD_FORMATS else _always_invalid
     return cache_key.validator_cls(
-        # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
-        cache_key.schema,  # type: ignore[arg-type]
+        cache_key.schema,
         formats=formats,
         validate_formats=True,
         pattern_options=FANCY_REGEX_OPTIONS,
@@ -217,8 +216,7 @@ def get_real_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     if cache_key.validator_cls is jsonschema_rs.Draft4Validator:
         formats.update(DRAFT4_SUPPLEMENTAL_FORMATS)
     return cache_key.validator_cls(
-        # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
-        cache_key.schema,  # type: ignore[arg-type]
+        cache_key.schema,
         formats=formats,
         validate_formats=True,
         pattern_options=FANCY_REGEX_OPTIONS,
