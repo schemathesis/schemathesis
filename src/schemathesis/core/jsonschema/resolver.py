@@ -333,8 +333,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
             return resolved_uri, resolver, value
 
         resolved = resolver.inner.lookup(reference)
-    # jsonschema-rs stubs do not declare `ReferencingError` as an exception.
-    except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:  # type: ignore[misc]
+    except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:
         error = RefResolutionError(str(exc))
         error.add_note(reference)
         raise error from exc

@@ -150,8 +150,7 @@ def _judges(schema: JsonSchema, ctx: CoverageContext) -> list[jsonschema_rs.Vali
     full_schema: JsonSchema = schema
     if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in ctx.root_schema and BUNDLE_STORAGE_KEY not in schema:
         full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-    # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
-    latest = jsonschema_rs.validator_cls_for(full_schema)  # type: ignore[type-var]
+    latest = jsonschema_rs.validator_cls_for(full_schema)
     judges: list[jsonschema_rs.Validator] = []
     for validator_cls in dict.fromkeys((ctx.validator_cls, latest)):
         try:
@@ -1353,7 +1352,7 @@ def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str |
         # native call; fall back to the bytes-aware path.
         try:
             # `type(...) is` checks do not narrow a TypeVar.
-            return type(value), _digest(jsonschema_rs.canonical.json.to_string(value))  # type: ignore[arg-type]
+            return type(value), _digest(jsonschema_rs.canonical.json.to_string(value))
         except (TypeError, ValueError):
             pass
         converted = _convert_bytes_for_hashing(value)
@@ -2575,8 +2574,7 @@ def cover_schema_iter(
                     check_schema = schema if bundle is None else {**schema, BUNDLE_STORAGE_KEY: bundle}
                     try:
                         unmerged_validator = ctx.validator_cls(
-                            # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
-                            check_schema,  # type: ignore[arg-type]
+                            check_schema,
                             validate_formats=True,
                             pattern_options=FANCY_REGEX_OPTIONS,
                         )
@@ -2893,8 +2891,7 @@ def _admitted_by_any(judges: list[jsonschema_rs.Validator], value: Any) -> bool:
 def _branch_drafts(schemas: list[JsonSchema], ctx: CoverageContext) -> dict[type, None]:
     drafts: dict[type, None] = {ctx.validator_cls: None}
     for schema in schemas:
-        # jsonschema-rs constrains `_SchemaT` to `dict` or `bool`, so a union of both is rejected.
-        drafts[jsonschema_rs.validator_cls_for(schema)] = None  # type: ignore[type-var]
+        drafts[jsonschema_rs.validator_cls_for(schema)] = None
     return drafts
 
 
@@ -4059,8 +4056,7 @@ def _negative_pattern(
     if value is MISSING:
         try:
             validator: jsonschema_rs.Validator | None = ctx.validator_cls(
-                # jsonschema-rs constructor TypeVars do not resolve through the `Validator` class union.
-                {"type": "string", "pattern": pattern},  # type: ignore[arg-type]
+                {"type": "string", "pattern": pattern},
                 pattern_options=FANCY_REGEX_OPTIONS,
             )
         except Exception:

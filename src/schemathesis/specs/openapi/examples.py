@@ -1180,8 +1180,7 @@ def _generate_single_example(
             alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
         )
         return examples.generate_one(strategy)
-    # jsonschema-rs stubs do not declare `ReferencingError` as an exception.
-    except (  # type: ignore[misc]
+    except (
         InvalidSchema,
         InvalidArgument,
         Unsatisfiable,

@@ -4,20 +4,13 @@ import json
 import string
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import Any, overload
 
 import jsonschema_rs
 
 from schemathesis.core.jsonschema.types import JsonValue
 
-if TYPE_CHECKING:
-    _Json = TypeVar("_Json", bound=jsonschema_rs.JSONType)
-
-    # A clone has the shape of its input; the native function is typed loosely.
-    def deepclone(value: _Json, /) -> _Json: ...
-
-else:
-    deepclone = jsonschema_rs.canonical.schema.clone
+deepclone = jsonschema_rs.canonical.schema.clone
 
 
 @lru_cache
@@ -74,7 +67,7 @@ def stringify_keys(document: object) -> None:
     try:
         # Serializing rejects non-string keys and is several times faster than the walk below.
         # Any object is accepted; one that is not JSON raises, which is the check here.
-        jsonschema_rs.canonical.json.to_string(document)  # type: ignore[arg-type]
+        jsonschema_rs.canonical.json.to_string(document)
         return
     except ValueError:
         pass
