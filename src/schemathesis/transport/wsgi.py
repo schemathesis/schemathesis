@@ -18,12 +18,14 @@ from schemathesis.generation.overrides import Override
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import (
+    BODY_KWARGS,
     get_exclude_headers,
     normalize_base_url,
     prepare_body,
     prepare_cookies,
     prepare_headers,
     prepare_path,
+    replaces_body,
     serialize_cookies,
 )
 from schemathesis.transport.requests import (
@@ -83,8 +85,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             media_type, serializer = self._resolve_serializer(media_type)
 
         extra: dict[str, Any]
-        # Handle serialization
-        if serializer is not None:
+        # Handle serialization. A body the caller passes replaces the generated one, so that one is not serialized.
+        if serializer is not None and not replaces_body(kwargs):
             context = SerializationContext(case=case)
             extra = serializer(context, prepare_body(case))
         else:
@@ -142,7 +144,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         application = kwargs.pop("app")
         base_url = normalize_base_url(kwargs.pop("base_url", None), host=wsgi.HOST)
 
-        data = self.serialize_case(case, headers=headers, params=params, base_url=base_url)
+        body = {key: kwargs[key] for key in BODY_KWARGS if key in kwargs}
+        data = self.serialize_case(case, headers=headers, params=params, base_url=base_url, **body)
         data.update({key: value for key, value in kwargs.items() if key not in data})
 
         excluded_headers = get_exclude_headers(case)
@@ -175,7 +178,10 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             headers=headers,
             params=params,
             cookies=cookies,
+            **body,
         )
+        # The reported request is the one sent, with the caller's body rather than the generated one.
+        requests_kwargs.update(body)
 
         headers = {}
         for name, value in response.headers:
