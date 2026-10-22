@@ -3,13 +3,12 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
-from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import format_body_key
@@ -18,11 +17,11 @@ from schemathesis.specs.openapi.converter import is_read_only
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     BodyPath,
-    CanonicalizationCache,
     Cardinality,
     DeferredBindings,
     DefinitionSource,
     InputSlot,
+    NestedFKCache,
     OperationMap,
     OperationNode,
     OutputSlot,
@@ -31,7 +30,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     infer_fk_target,
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
-    ResponseResourceCache,
+    InferenceState,
     allowed_values,
     cached_resources_from_responses,
     contains_value,
@@ -47,14 +46,8 @@ if TYPE_CHECKING:
 def extract_inputs(
     *,
     operation: APIOperation,
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
-    response_resource_cache: ResponseResourceCache,
-    nested_fk_cache: NestedFKCache,
+    state: InferenceState,
     deferred: DeferredBindings,
-    candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
 
@@ -64,7 +57,7 @@ def extract_inputs(
     `deferred` collects what binds only after every operation has been scanned, e.g. nested-body
     FK lookups whose target resource isn't registered yet.
 
-    `candidate_resource_names` gates `<word>_name` body-field synthetics: only
+    `state.candidate_resource_names` gates `<word>_name` body-field synthetics: only
     creates a placeholder when the inferred name is backed by a path segment or
     component schema.
     """
@@ -81,11 +74,7 @@ def extract_inputs(
             parameter_types=declared_parameter_types(param),
             parameter_location=param.location,
             operation=operation,
-            resources=resources,
-            updated_resources=updated_resources,
-            resolver=resolver,
-            canonicalization_cache=canonicalization_cache,
-            response_resource_cache=response_resource_cache,
+            state=state,
         )
         if input_slot is not None:
             if input_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES:
@@ -114,12 +103,12 @@ def extract_inputs(
         yield from _resolve_body_dependencies(
             body=body,
             operation=operation,
-            resources=resources,
+            resources=state.resources,
             known_dependencies=known_dependencies,
-            nested_fk_cache=nested_fk_cache,
+            nested_fk_cache=state.nested_fk_cache,
             updated_resource=updated_resource,
             deferred=deferred,
-            candidate_resource_names=candidate_resource_names,
+            candidate_resource_names=state.candidate_resource_names,
         )
 
 
@@ -144,11 +133,7 @@ def _resolve_parameter_dependency(
     parameter_types: list[str],
     parameter_location: ParameterLocation,
     operation: APIOperation,
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
-    response_resource_cache: ResponseResourceCache,
+    state: InferenceState,
 ) -> InputSlot | None:
     """Connect a parameter to its resource definition, creating placeholder if needed.
 
@@ -162,21 +147,14 @@ def _resolve_parameter_dependency(
 
     if resource_name is None:
         return None
+    resources = state.resources
 
     resource = resources.get(resource_name)
 
     # Upgrade low-quality resource definitions (e.g., from parameter inference)
     # by searching this operation's responses for actual schema
     if resource is None or resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
-        resource = _find_resource_in_responses(
-            operation=operation,
-            resource_name=resource_name,
-            resources=resources,
-            updated_resources=updated_resources,
-            resolver=resolver,
-            canonicalization_cache=canonicalization_cache,
-            response_resource_cache=response_resource_cache,
-        )
+        resource = _find_resource_in_responses(operation=operation, resource_name=resource_name, state=state)
         if resource is not None:
             resources[resource_name] = resource
 
@@ -205,7 +183,7 @@ def _resolve_parameter_dependency(
                 # Resource exists but was empty - update with parameter field
                 resources[resource_name].fields = [parameter_name]
                 resources[resource_name].source = DefinitionSource.PARAMETER_INFERENCE
-                updated_resources.add(resource_name)
+                state.updated_resources.add(resource_name)
                 resource = resources[resource_name]
             else:
                 resource = ResourceDefinition.inferred_from_parameter(
@@ -236,25 +214,14 @@ def _find_resource_in_responses(
     *,
     operation: APIOperation,
     resource_name: str,
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
-    response_resource_cache: ResponseResourceCache,
+    state: InferenceState,
 ) -> ResourceDefinition | None:
     """Search operation's successful responses for a specific resource definition.
 
     Used when a parameter references a resource not yet discovered. Scans this
     operation's response schemas hoping to find the resource definition.
     """
-    for _, extracted in cached_resources_from_responses(
-        operation=operation,
-        resources=resources,
-        updated_resources=updated_resources,
-        resolver=resolver,
-        canonicalization_cache=canonicalization_cache,
-        cache=response_resource_cache,
-    ):
+    for _, extracted in cached_resources_from_responses(operation=operation, state=state):
         if extracted.resource.name == resource_name:
             return extracted.resource
 
@@ -516,10 +483,6 @@ def _resolve_body_dependencies(
         bundled=bundled, name_to_uri=body.name_to_uri, by_reference=nested_fk_cache, by_schema={}, flattened={}
     )
     yield from _extract_nested_body_fk_fields(resolved, resources, scan, deferred=deferred.nested_fks)
-
-
-# FK fields behind a bundled reference, by the reference's original URI and the remaining depth.
-NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[BodyPath, str, str]]]
 
 
 @dataclass(slots=True)

@@ -18,7 +18,6 @@ from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_res
 from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
-    NestedFKCache,
     align_created_identifiers,
     bind_created_item_keys,
     bind_echoed_body_fields,
@@ -36,7 +35,6 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     update_input_field_bindings,
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
-    CanonicalizationCache,
     Cardinality,
     DeferredBindings,
     DefinitionSource,
@@ -46,11 +44,10 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     OperationMap,
     OperationNode,
     ResourceDefinition,
-    ResourceMap,
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
-    ResponseResourceCache,
+    InferenceState,
     remove_unused_resources,
 )
 from schemathesis.specs.openapi.stateful.links import find_link_target
@@ -70,21 +67,11 @@ __all__ = [
 def analyze(schema: OpenApiSchema) -> DependencyGraph:
     """Build a dependency graph by inferring resource producers and consumers from API operations."""
     operations: OperationMap = {}
-    resources: ResourceMap = {}
-    # Track resources that got upgraded (e.g., from parameter inference to schema definition)
-    # to propagate better field information to existing input slots
-    updated_resources: set[str] = set()
-    # Cache for expensive canonicalize() calls - same schemas are often processed multiple times
-    canonicalization_cache: CanonicalizationCache = {}
-    # Per-operation response resources, materialized once and replayed by input + output extraction
-    response_resource_cache: ResponseResourceCache = {}
-    nested_fk_cache: NestedFKCache = {}
+    state = InferenceState.for_schema(schema)
+    resources = state.resources
 
     # Inputs that bind only after every operation is scanned, keyed by operation label.
     deferred: dict[str, DeferredBindings] = {}
-
-    # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
-    candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
 
     # Declared types of each operation's path parameters, so a bound value can be checked against them
     path_parameter_types: dict[str, dict[str, list[str]]] = {}
@@ -97,28 +84,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 if parameter.location == ParameterLocation.PATH
             }
             bindings = DeferredBindings()
-            inputs = list(
-                extract_inputs(
-                    operation=operation,
-                    resources=resources,
-                    updated_resources=updated_resources,
-                    resolver=schema.root_resolver,
-                    canonicalization_cache=canonicalization_cache,
-                    response_resource_cache=response_resource_cache,
-                    nested_fk_cache=nested_fk_cache,
-                    deferred=bindings,
-                    candidate_resource_names=candidate_resource_names,
-                )
-            )
-            outputs = extract_outputs(
-                operation=operation,
-                inputs=inputs,
-                resources=resources,
-                updated_resources=updated_resources,
-                resolver=schema.root_resolver,
-                canonicalization_cache=canonicalization_cache,
-                response_resource_cache=response_resource_cache,
-            )
+            inputs = list(extract_inputs(operation=operation, state=state, deferred=bindings))
+            outputs = extract_outputs(operation=operation, inputs=inputs, state=state)
             operations[operation.label] = OperationNode(
                 method=operation.method,
                 path=operation.path,
@@ -211,7 +178,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Example:
     #   - `DELETE /users/{userId}` initially inferred `User.fields=["userId"]`
     #   - then `POST /users` response revealed `User.fields=["id", "email"]`
-    update_input_field_bindings(updated_resources, operations)
+    update_input_field_bindings(state.updated_resources, operations)
 
     # Merge parameter-inferred resources with schema-defined ones
     merge_related_resources(operations, resources)

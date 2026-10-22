@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
     Cardinality,
     DefinitionSource,
+    NestedFKCache,
     OperationMap,
     ResourceDefinition,
     ResourceMap,
@@ -34,6 +35,7 @@ from schemathesis.specs.openapi.stateful.dependencies.schemas import (
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.responses import OpenApiResponse
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 @dataclass(slots=True)
@@ -56,12 +58,7 @@ class ExtractedResource:
 
 
 def extract_resources_from_responses(
-    *,
-    operation: APIOperation,
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
+    *, operation: APIOperation, state: InferenceState
 ) -> Iterator[tuple[OpenApiResponse, ExtractedResource]]:
     """Extract resource definitions from operation's successful responses.
 
@@ -76,10 +73,7 @@ def extract_resources_from_responses(
                     method=operation.method,
                     path=operation.path,
                     response=response,
-                    resources=resources,
-                    updated_resources=updated_resources,
-                    resolver=resolver,
-                    canonicalization_cache=canonicalization_cache,
+                    state=state,
                 )
             )
         except (RefResolutionError, InvalidSchema):
@@ -92,31 +86,47 @@ def extract_resources_from_responses(
 ResponseResourceCache: TypeAlias = dict[str, list[tuple["OpenApiResponse", ExtractedResource]]]
 
 
+@dataclass(slots=True)
+class InferenceState:
+    """What the per-operation scan shares across every operation of one schema."""
+
+    resolver: Resolver
+    # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
+    candidate_resource_names: frozenset[str]
+    resources: ResourceMap
+    # Resources upgraded to a better definition, so existing input slots pick up their fields.
+    updated_resources: set[str]
+    # Same schemas are often canonicalized multiple times.
+    canonicalization_cache: CanonicalizationCache
+    # Per-operation response resources, materialized once and replayed by input + output extraction.
+    response_resource_cache: ResponseResourceCache
+    nested_fk_cache: NestedFKCache
+
+    @classmethod
+    def for_schema(cls, schema: OpenApiSchema) -> InferenceState:
+        return cls(
+            resolver=schema.root_resolver,
+            candidate_resource_names=naming.collect_candidate_resource_names(schema.raw_schema),
+            resources={},
+            updated_resources=set(),
+            canonicalization_cache={},
+            response_resource_cache={},
+            nested_fk_cache={},
+        )
+
+
 def cached_resources_from_responses(
-    *,
-    operation: APIOperation,
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
-    cache: ResponseResourceCache,
+    *, operation: APIOperation, state: InferenceState
 ) -> list[tuple[OpenApiResponse, ExtractedResource]]:
     """Materialize an operation's response resources once; replay on repeat scans.
 
     Both input resolution and output extraction scan the same responses within one
     operation's analysis pass; the first call registers resources, the rest reuse the list.
     """
+    cache = state.response_resource_cache
     cached = cache.get(operation.label)
     if cached is None:
-        cached = list(
-            extract_resources_from_responses(
-                operation=operation,
-                resources=resources,
-                updated_resources=updated_resources,
-                resolver=resolver,
-                canonicalization_cache=canonicalization_cache,
-            )
-        )
+        cached = list(extract_resources_from_responses(operation=operation, state=state))
         cache[operation.label] = cached
     return cached
 
@@ -126,11 +136,11 @@ def iter_resources_from_response(
     method: str,
     path: str,
     response: OpenApiResponse,
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
+    state: InferenceState,
 ) -> Iterator[ExtractedResource]:
+    resources = state.resources
+    updated_resources = state.updated_resources
+    canonicalization_cache = state.canonicalization_cache
     schema = response.get_raw_schema()
 
     if isinstance(schema, bool):
@@ -162,7 +172,7 @@ def iter_resources_from_response(
                 yield primitive_array
                 return None
 
-    current_resolver = response.resolver if response.resolver is not None else resolver
+    current_resolver = response.resolver if response.resolver is not None else state.resolver
 
     # Handle map-by-id GET responses: `{type: object, additionalProperties: <object>}` with no
     # explicit properties. Keys are the identifiers (Kubernetes pod-statuses, TBA team-statuses).

@@ -793,6 +793,8 @@ class OperationNode:
 
 # A body field location, integers marking array items.
 BodyPath: TypeAlias = tuple[str | int, ...]
+# FK fields behind a bundled reference, by the reference's original URI and the remaining depth.
+NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[BodyPath, str, str]]]
 
 
 @dataclass(slots=True)
