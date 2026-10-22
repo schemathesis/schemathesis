@@ -63,7 +63,7 @@ from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader, RawSchemaVersion
 from .serialization import _build_urlencoded_serializer
 from .stateful import collect_transitions, create_state_machine
-from .utils import PathTemplate, coerce_wire_string, compile_path_template, parameter_types, parse_spec_version
+from .utils import PathTemplate, compile_path_template, parse_spec_version, read_from_wire
 from .validation import validate_documented_response
 
 if TYPE_CHECKING:
@@ -327,7 +327,7 @@ class OpenApiSchema(BaseSchema):
                 if not is_valid and location != ParameterLocation.BODY and isinstance(validation_value, Mapping):
                     # Parameters travel as text, so `"5"` written for an integer parameter reaches the server as `5`.
                     is_valid = case._validate_component(
-                        location, _as_read_from_wire(case.operation, location, validation_value), validator_cls
+                        location, read_from_wire(case.operation, location, validation_value), validator_cls
                     )
             except jsonschema_rs.ValidationError:
                 # A schema its own draft rejects cannot judge the value, so the generation-time mode stands.
@@ -743,20 +743,6 @@ class OpenApiSchema(BaseSchema):
     ) -> bool | None:
         __tracebackhide__ = True
         return validate_documented_response(self, operation, response, case)
-
-
-def _as_read_from_wire(operation: APIOperation, location: ParameterLocation, value: Mapping) -> dict[str, Any]:
-    """Parameter values as a server parses them from text, e.g. `"5"` for an integer parameter as `5`."""
-    container = operation.get_parameter_set(location)
-    parsed = dict(value)
-    for name, item in value.items():
-        parameter = container.get(name)
-        if parameter is None or not isinstance(item, str):
-            continue
-        coerced = coerce_wire_string(item, parameter_types(parameter.validation_schema))
-        if coerced is not None:
-            parsed[name] = coerced
-    return parsed
 
 
 @dataclass

@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     merge_request_body,
 )
 from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, referenced_values
+from schemathesis.specs.openapi.utils import read_from_wire
 
 if TYPE_CHECKING:
     from random import Random
@@ -335,6 +336,15 @@ def _variant_satisfies_paths(
         if not validator.is_valid(value):
             return False
     return True
+
+
+def _path_parameters_as_read(operation: APIOperation, case: Case) -> dict[str, Any]:
+    """The path parameters the request carried, in their declared types.
+
+    The coverage phase sends path parameters as text, so `"2"` for an integer `parent_pk`. Captured as is, it
+    would never pair with or lead a schema that declares an integer.
+    """
+    return read_from_wire(operation, ParameterLocation.PATH, case.path_parameters or {})
 
 
 @dataclass(slots=True)
@@ -728,12 +738,14 @@ class OpenApiExtraDataSource(ExtraDataSource):
             ]
             if not slots:
                 return
+        path_parameters = _path_parameters_as_read(operation, case)
         self.repository.record_request(
             operation=operation.label,
             inputs=slots,
             case=case,
+            path_parameters=path_parameters,
             status_code=status_code,
-            context=case.path_parameters or {},
+            context=path_parameters,
             identity=case._auth_identity,
             query=case.query or {},
             referenced=referenced_by(case),
@@ -774,7 +786,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 operation=operation.label,
                 status_code=response.status_code,
                 payload=payload,
-                context=case.path_parameters or {},
+                context=_path_parameters_as_read(operation, case),
                 identity=case._auth_identity,
                 query=case.query or {},
                 referenced=referenced_by(case),

@@ -2649,3 +2649,97 @@ def test_negative_aware_strategy_keeps_schema_examples_intact(ctx):
 
     positive = generate_many(body.get_strategy(operation, config, GenerationMode.POSITIVE), 100)
     assert {"project_id": "captured"} not in positive
+
+
+_ID = {"type": "integer", "minimum": 1}
+_CHILD = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+_PARENT_PK = {"name": "parent_pk", "in": "path", "required": True, "schema": _ID}
+_NAME = {"type": "object", "properties": {"name": {"type": "string"}}}
+_NESTED_CHILDREN = {
+    "/parents/{id}/": {
+        "get": {
+            "parameters": [{"name": "id", "in": "path", "required": True, "schema": _ID}],
+            "responses": {
+                "200": {
+                    "description": "Parent",
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+                    },
+                }
+            },
+        }
+    },
+    "/parents/{parent_pk}/children/": {
+        "post": {
+            "parameters": [_PARENT_PK],
+            "requestBody": {"required": True, "content": {"application/json": {"schema": _NAME}}},
+            "responses": {"201": {"description": "Created", "content": {"application/json": {"schema": _CHILD}}}},
+        }
+    },
+    "/parents/{parent_pk}/children/{id}/": {
+        "patch": {
+            "parameters": [_PARENT_PK, {"name": "id", "in": "path", "required": True, "schema": _ID}],
+            "requestBody": {"required": True, "content": {"application/json": {"schema": _NAME}}},
+            "responses": {"200": {"description": "Updated", "content": {"application/json": {"schema": _CHILD}}}},
+        }
+    },
+}
+
+
+def _child_created_under(schema, data_source, response_factory, parent_pk):
+    create = schema["/parents/{parent_pk}/children/"]["POST"]
+    response = response_factory.core(
+        status_code=201,
+        content=b'{"id": 4, "name": "x"}',
+        method="POST",
+        url=f"http://test.example/parents/{parent_pk}/children/",
+        verify=True,
+    )
+    data_source.record_response(
+        operation=create, response=response, case=create.Case(path_parameters={"parent_pk": parent_pk})
+    )
+
+
+# The coverage phase sends path parameters as text; the fuzzing phase keeps their declared type.
+@pytest.mark.parametrize("parent_pk", ["2", 2], ids=["as-sent-by-coverage", "typed"])
+def test_captured_child_is_paired_with_its_parent_in_the_declared_type(ctx, response_factory, parent_pk):
+    schema = ctx.openapi.load_schema(_NESTED_CHILDREN)
+    data_source = schema.create_extra_data_source()
+    _child_created_under(schema, data_source, response_factory, parent_pk)
+
+    picked = data_source.pick_correlated_values(operation=schema["/parents/{parent_pk}/children/{id}/"]["PATCH"])
+
+    assert picked.values == {(ParameterLocation.PATH, "parent_pk"): 2, (ParameterLocation.PATH, "id"): 4}
+
+
+def test_path_values_captured_from_a_request_keep_their_declared_type(ctx):
+    schema = ctx.openapi.load_schema(_NESTED_CHILDREN)
+    data_source = schema.create_extra_data_source()
+    update = schema["/parents/{parent_pk}/children/{id}/"]["PATCH"]
+
+    data_source.record_request(
+        operation=update, case=update.Case(path_parameters={"parent_pk": "2", "id": "4"}), status_code=200
+    )
+
+    captured = [(instance.data, instance.context) for instance in data_source.repository.iter_instances("Child")]
+    assert captured == [({"id": 4}, {"parent_pk": 2, "id": 4})]
+
+
+def test_coverage_sends_a_captured_child_under_the_parent_it_was_created_under(ctx, response_factory):
+    schema = ctx.openapi.load_schema(_NESTED_CHILDREN)
+    data_source = schema.create_extra_data_source()
+    _child_created_under(schema, data_source, response_factory, "2")
+    update = schema["/parents/{parent_pk}/children/{id}/"]["PATCH"]
+
+    cases = list(
+        schema.iter_coverage_cases(
+            update,
+            generation_modes=[GenerationMode.POSITIVE],
+            generation_config=schema.config.generation,
+            extra_data_source=data_source,
+        )
+    )
+    # The base cases carry the captured pair; only a boundary mutation of `parent_pk` moves away from it.
+    base = [case.path_parameters for case in cases if case._meta.phase.data.scenario.value.endswith("object")]
+    assert base, "the coverage phase produced no base case"
+    assert all(path == {"parent_pk": "2", "id": "4"} for path in base), base
