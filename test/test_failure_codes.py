@@ -23,9 +23,10 @@ def test_every_built_in_failure_class_is_listed():
         cls = pending.pop()
         pending.extend(cls.__subclasses__())
         # Classes importable by name; skips ones defined in tests or rebuilt from xdist workers.
+        # A rebuilt class can outlive its module: `pytester` unloads modules an inline run imported.
         if (
             cls.__module__.startswith("schemathesis.")
-            and getattr(sys.modules[cls.__module__], cls.__qualname__, None) is cls
+            and getattr(sys.modules.get(cls.__module__), cls.__qualname__, None) is cls
         ):
             found.add(cls)
     assert found == set(FAILURE_CLASSES)
