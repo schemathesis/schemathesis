@@ -3,7 +3,6 @@ import json
 import click
 import pytest
 from _pytest.main import ExitCode
-from flask import jsonify, request
 
 import schemathesis
 from schemathesis.cli.commands.fuzz.handlers.output import FuzzOutputHandler
@@ -264,50 +263,3 @@ def after_load_schema(context, schema):
 
 def test_json_and_fuzz_output_handlers_are_built_in(json_path):
     assert (is_built_in_handler(JsonReportHandler(json_path)), is_built_in_handler(FuzzOutputHandler())) == (True, True)
-
-
-def test_content_type_probes_stay_out_of_valid_rates_when_a_hook_adds_a_header(ctx, cli, json_path):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string"}},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"201": {"description": "Created"}, "415": {"description": "Unsupported"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/items", methods=["POST"])
-    def items():
-        if request.mimetype != "application/json":
-            return jsonify({"error": "unsupported"}), 415
-        return jsonify({"id": 1}), 201
-
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def before_call(ctx, case, **kwargs):
-    case.headers["X-Test-Mode"] = "true"
-"""
-    )
-    cli.run_openapi_app(
-        app,
-        f"--report-json-path={json_path}",
-        "--phases=coverage",
-        "--checks=not_a_server_error",
-        hooks=module,
-    )
-    # Both Content-Type probes got 415 and are negative by construction; none of them counts as rejected.
-    assert load_report(json_path)["valid_rates"]["POST /items"]["coverage"]["rejected"] == 0

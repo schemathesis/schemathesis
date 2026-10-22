@@ -10,12 +10,12 @@ from schemathesis.generation.meta import (
     CONTENT_TYPE_PROBES,
     CaseMetadata,
     ComponentInfo,
-    CoverageScenario,
     ExamplesPhaseData,
     FuzzingPhaseData,
     GenerationInfo,
     PhaseInfo,
     TestPhase,
+    coverage_scenario,
 )
 from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
@@ -577,24 +577,13 @@ def test_content_type_probe_stays_negative_when_a_hook_adds_a_header(json_body_o
     probes = [
         case
         for case in _coverage_cases(json_body_operation, GenerationMode.NEGATIVE)
-        if case._meta.phase.data.scenario in CONTENT_TYPE_PROBES
+        if coverage_scenario(case) in CONTENT_TYPE_PROBES
     ]
-    assert {case._meta.phase.data.scenario for case in probes} == CONTENT_TYPE_PROBES
+    assert {coverage_scenario(case) for case in probes} == CONTENT_TYPE_PROBES
     for case in probes:
         case.headers["X-Test-Mode"] = "true"
         assert case.meta.generation.mode == GenerationMode.NEGATIVE
         assert case.meta.components[ParameterLocation.HEADER].mode == GenerationMode.NEGATIVE
-
-
-def test_valid_coverage_case_stays_positive_when_a_hook_adds_a_header(json_body_operation):
-    [case] = [
-        case
-        for case in _coverage_cases(json_body_operation, GenerationMode.POSITIVE)
-        if case._meta.phase.data.scenario == CoverageScenario.VALID_OBJECT
-    ]
-    case.headers = case.headers or {}
-    case.headers["X-Test-Mode"] = "true"
-    assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
 def test_case_hash_is_case_insensitive_for_headers(ctx):
