@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from packaging import version
 
 from schemathesis.core import string_to_boolean
 from schemathesis.core.jsonschema.types import JsonSchema, get_type, to_json_type_name
+
+if TYPE_CHECKING:
+    from schemathesis.core.parameters import ParameterLocation
+    from schemathesis.schemas import APIOperation
 
 _NUMERIC_PREFIX = re.compile(r"\d+(?:\.\d+)*")
 _PATH_PARAMETER = re.compile(r"\{([^{}]+)\}")
@@ -63,6 +68,20 @@ def coerce_wire_string(value: str, expected_types: list[str]) -> int | float | b
         if isinstance(coerced, bool):
             return coerced
     return None
+
+
+def read_from_wire(operation: APIOperation, location: ParameterLocation, value: Mapping[str, Any]) -> dict[str, Any]:
+    """Parameter values as a server parses them from text, e.g. `"5"` for an integer parameter as `5`."""
+    container = operation.get_parameter_set(location)
+    parsed = dict(value)
+    for name, item in value.items():
+        parameter = container.get(name)
+        if parameter is None or not isinstance(item, str):
+            continue
+        coerced = coerce_wire_string(item, parameter_types(parameter.validation_schema))
+        if coerced is not None:
+            parsed[name] = coerced
+    return parsed
 
 
 def numeric_wire_value_is_valid(coerced: int | float | list[int | float], is_valid: Callable[[object], bool]) -> bool:

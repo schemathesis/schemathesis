@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from collections import defaultdict, deque
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -183,6 +183,7 @@ class ResourceRepository:
         inputs: Sequence[ResourceFieldRef],
         case: Case,
         status_code: int,
+        path_parameters: Mapping[str, Any] | None = None,
         context: dict[str, Any] | None = None,
         identity: str | None = None,
         query: dict[str, Any] | None = None,
@@ -192,13 +193,16 @@ class ResourceRepository:
 
         Mirrors `record_response` but reads from the case (path parameters and
         JSON body fields) instead of the response payload. Only fires on 2xx.
+        `path_parameters` are the case's path parameters in their declared types, when the caller knows them.
         """
         if not (200 <= status_code < 300):
             return
         for slot in inputs:
             if slot.resource_field is None:
                 continue
-            value = _extract_request_value(slot, case)
+            value = _extract_request_value(
+                slot, case, case.path_parameters if path_parameters is None else path_parameters
+            )
             if value is None:
                 continue
             self._store(
@@ -319,14 +323,14 @@ def _wrap_extracted_values(values: Iterable[Any], descriptor: ResourceDescriptor
     return results
 
 
-def _extract_request_value(slot: ResourceFieldRef, case: Case) -> Any:
+def _extract_request_value(slot: ResourceFieldRef, case: Case, path_parameters: Mapping[str, Any]) -> Any:
     """Pull the value for a resource-field reference out of a generated Case.
 
     Returns None when the slot's location isn't supported (query, header,
     body-array-index) or when the named field is absent from the case.
     """
     if slot.parameter_location == ParameterLocation.PATH:
-        return case.path_parameters.get(slot.parameter_name) if isinstance(slot.parameter_name, str) else None
+        return path_parameters.get(slot.parameter_name) if isinstance(slot.parameter_name, str) else None
     if slot.parameter_location == ParameterLocation.BODY:
         if not isinstance(slot.parameter_name, str):
             return None
