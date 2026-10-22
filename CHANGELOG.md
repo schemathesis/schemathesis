@@ -16,6 +16,7 @@
 - Coverage phase sending a captured child id under the wrong parent on nested routes.
 - Coverage phase sending "Missing `Authorization`" cases with the configured credentials under `--generation-unique-inputs` or when a hook reads `case.meta`.
 - Coverage phase counting Content-Type negative cases as rejected valid data when a hook edits headers.
+- Report undeclared-method coverage probes as negative for `application/x-www-form-urlencoded` bodies.
 
 ## [4.32.3](https://github.com/schemathesis/schemathesis/compare/v4.32.2...v4.32.3) - 2026-10-21
 

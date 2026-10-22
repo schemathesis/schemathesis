@@ -40,7 +40,14 @@ from schemathesis.core.transport import (
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.meta import CONTENT_TYPE_PROBES, ComponentInfo, TestPhase, coverage_scenario
+from schemathesis.generation.meta import (
+    CONTENT_TYPE_PROBES,
+    CaseMetadata,
+    ComponentInfo,
+    CoverageScenario,
+    TestPhase,
+    coverage_scenario,
+)
 from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.parameters import RequestBodySchemaCache
@@ -99,6 +106,24 @@ if TYPE_CHECKING:
 
 _V3_1 = version.parse("3.1")
 _V3_2 = version.parse("3.2")
+
+
+def _validation_value(meta: CaseMetadata, location: ParameterLocation, value: object, current_hash: int) -> object:
+    raw = meta.raw_containers.get(location)
+    # When the container still equals its generated form, validate the typed
+    # snapshot, as coverage stringifies query/path values for the wire and the
+    # validation schema is expressed in the typed form.
+    if current_hash == meta._initial_hashes.get(location) and raw is not None:
+        return raw
+    if isinstance(value, Mapping) and isinstance(raw, Mapping):
+        # A key still equal to its generated wire form validates against the typed snapshot;
+        # a key a hook overwrote (or one auth/overrides added) validates against its live value.
+        original = meta._initial_containers.get(location, {})
+        return {
+            key: raw[key] if key in raw and key in original and original[key] == current else current
+            for key, current in value.items()
+        }
+    return value
 
 
 @dataclass(eq=False, repr=False)
@@ -304,22 +329,7 @@ class OpenApiSchema(BaseSchema):
                 # Header names are case-insensitive, and undeclared headers like auth never make the input invalid.
                 declared = {parameter.name.lower(): parameter.name for parameter in case.operation.headers}
                 value = {declared[name.lower()]: item for name, item in value.items() if name.lower() in declared}
-            raw = meta.raw_containers.get(location)
-            # When the container still equals its generated form, validate the typed
-            # snapshot — coverage stringifies query/path values for the wire and the
-            # validation schema is expressed in the typed form.
-            if current_hash == meta._initial_hashes.get(location) and raw is not None:
-                validation_value = raw
-            elif isinstance(value, Mapping) and isinstance(raw, Mapping):
-                # A key still equal to its generated wire form validates against the typed snapshot;
-                # a key a hook overwrote (or one auth/overrides added) validates against its live value.
-                original = meta._initial_containers.get(location, {})
-                validation_value = {
-                    key: raw[key] if key in raw and key in original and original[key] == current else current
-                    for key, current in value.items()
-                }
-            else:
-                validation_value = value
+            validation_value = _validation_value(meta, location, value, current_hash)
             is_valid: bool | None
             if location == ParameterLocation.HEADER and coverage_scenario(case) in CONTENT_TYPE_PROBES:
                 # A Content-Type probe is negative through its media type, which no header parameter declares,
@@ -341,7 +351,8 @@ class OpenApiSchema(BaseSchema):
                 meta.components[location] = ComponentInfo(mode=new_mode)
             meta.update_validated_hash(location, current_hash)
             meta.clear_dirty(location)
-        if meta.components:
+        # The undeclared method is the violation itself, so no container edit makes the request valid.
+        if meta.components and coverage_scenario(case) != CoverageScenario.UNSPECIFIED_HTTP_METHOD:
             if all(info.mode.is_positive for info in meta.components.values()):
                 meta.generation.mode = GenerationMode.POSITIVE
             else:
