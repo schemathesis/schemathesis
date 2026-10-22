@@ -715,12 +715,7 @@ class OpenApiSchema(BaseSchema):
         body = case.body
         if not isinstance(body, dict) or case.media_type is None or not media_types.is_form_urlencoded(case.media_type):
             return body
-        operation = case.operation
-        # An exact match wins over one that differs in parameters (`; charset=utf-8`) or uses a wildcard
-        alternative = next(
-            (alternative for alternative in operation.body if alternative.media_type == case.media_type),
-            None,
-        ) or next(operation.get_bodies_for_media_type(case.media_type), None)
+        alternative = case.operation.get_body_for_media_type(case.media_type)
         if alternative is None:
             return body
         # Each property is serialized like a query parameter, following the media type's `encoding`

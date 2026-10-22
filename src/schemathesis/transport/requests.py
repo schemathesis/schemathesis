@@ -533,7 +533,8 @@ def _is_already_serialized(value: object) -> bool:
 
 def _property_schema(ctx: SerializationContext, name: str) -> dict[str, Any]:
     """Return the schema of a multipart property, with `$ref` resolved."""
-    body = next(iter(ctx.case.operation.get_bodies_for_media_type(ctx.case.media_type or "multipart/form-data")))
+    body = ctx.case.operation.get_body_for_media_type(ctx.case.media_type or "multipart/form-data")
+    assert body is not None
     schema_node = body.definition.get("schema")
     properties = schema_node.get("properties", {}) if isinstance(schema_node, dict) else {}
     if isinstance(properties.get(name), dict):
