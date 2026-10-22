@@ -537,15 +537,6 @@ def test_header_replaced_by_hook_with_invalid_value_is_negative(header_operation
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
 
-def test_hashing_leaves_revalidation_to_the_next_metadata_read(header_operation):
-    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
-    case.headers = {"X-Count": "abc"}
-    hash(case)
-    # The hash neither relabels the case nor swallows the edit: the next read still sees it.
-    assert case._meta.generation.mode == GenerationMode.POSITIVE
-    assert case.meta.generation.mode == GenerationMode.NEGATIVE
-
-
 def test_case_hash_is_case_insensitive_for_headers(ctx):
     operation = ctx.openapi.load_operation(
         "GET /users",

@@ -195,6 +195,7 @@ class CoverageGenerator:
                         setattr(case, container_name, value)
                     else:
                         container.update(value)
+                case._record_starting_state()
                 processed = _apply_filter_and_map_hooks(case, dispatchers, hook_context)
                 if processed is None:
                     continue

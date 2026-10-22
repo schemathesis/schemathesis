@@ -219,14 +219,7 @@ class Case(Generic[OperationT]):
 
     def __hash__(self) -> int:
         # Identity is the wire request with unmasked values; masked ones would make distinct cases collide.
-        # Hashing must not revalidate: auth and config headers are applied in place before `call()` syncs the
-        # modification baseline, so reading `meta` here would take them for edits and relabel the case.
-        frozen = self._freeze_metadata
-        object.__setattr__(self, "_freeze_metadata", True)
-        try:
-            request = prepare_request(self, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
-        finally:
-            object.__setattr__(self, "_freeze_metadata", frozen)
+        request = prepare_request(self, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
         headers = tuple(sorted((name.lower(), value) for name, value in request.headers.items()))
         return hash((request.method, request.url, headers, request.body))
 
@@ -269,6 +262,25 @@ class Case(Generic[OperationT]):
             # ones a hook overwrote and validate those against their live values.
             if isinstance(value, Mapping):
                 self._meta._initial_containers[location] = dict(value)
+
+    def _sync_validated_hashes(self) -> None:
+        """Take the current containers as the modification baseline for the generated components."""
+        if self._meta is None:
+            return
+        for location in self._meta.components:
+            self._meta.update_validated_hash(location, self._hash_container(self.get_container(location)))
+
+    def _record_starting_state(self) -> None:
+        """Take the containers as they are now as the case's starting state, not as edits to the generated values.
+
+        Auth and configured overrides are written after generation; without this, the first `meta` read
+        revalidates them and can relabel a negative case (e.g. "Missing `Authorization`") as positive.
+        """
+        if self._meta is None:
+            return
+        self._sync_validated_hashes()
+        for location in list(self._meta._dirty):
+            self._meta.clear_dirty(location)
 
     def _check_modifications(self) -> None:
         """Detect in-place modifications by comparing container hashes."""
@@ -446,11 +458,8 @@ class Case(Generic[OperationT]):
 
         """
         hook_context = HookContext(operation=self.operation)
-        # Sync the modification baseline to the current container state so revalidation reacts
-        # only to edits a `before_call` hook makes, not to auth/overrides applied earlier in place.
-        if self._meta is not None:
-            for location in self._meta.components:
-                self._meta.update_validated_hash(location, self._hash_container(self.get_container(location)))
+        # Revalidation reacts only to edits a `before_call` hook makes, not to auth/overrides applied earlier in place.
+        self._sync_validated_hashes()
         dispatch_before_call(GLOBAL_HOOK_DISPATCHER, context=hook_context, case=self, kwargs=kwargs)
 
         # Detect in-place container edits the hook made, then revalidate before freezing so
