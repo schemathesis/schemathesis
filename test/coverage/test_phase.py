@@ -3236,6 +3236,51 @@ def test_missing_authorization(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.parametrize("filter_reads_meta", [False, True], ids=["no-hook", "filter-reads-meta"])
+@pytest.mark.parametrize("unique_inputs", [False, True], ids=["default", "unique-inputs"])
+def test_missing_authorization_is_sent_without_the_configured_credentials(ctx, cli, unique_inputs, filter_reads_meta):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "security": [{"bearer": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"bearer": {"type": "http", "scheme": "bearer"}}},
+    )
+
+    @app.route("/items")
+    def items():
+        if request.headers.get("Authorization") != "Bearer secret":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify([]), 200
+
+    hooks = {}
+    if filter_reads_meta:
+        hooks["hooks"] = ctx.write_pymodule(
+            """
+@schemathesis.hook
+def filter_case(ctx, case):
+    case.meta
+    return True
+"""
+        )
+    result = cli.run_openapi_app(
+        app,
+        "--header=Authorization: Bearer secret",
+        "--phases=coverage",
+        "--checks=missing_required_header",
+        *(["--generation-unique-inputs"] if unique_inputs else []),
+        **hooks,
+    )
+    # Any `meta` read after the driver applied the configured credentials (hashing for
+    # `--generation-unique-inputs`, or a hook) used to take them for an edit and relabel the
+    # "Missing `Authorization`" case as positive, so it went out with the header and failed ST203.
+    assert result.exit_code == 0, result.output
+
+
 def test_unnecessary_auth_warning(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.basic()
     # If a test for missing Authorization is the only thing that happen, there should be no warning for missing Authorization header

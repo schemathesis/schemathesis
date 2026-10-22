@@ -263,6 +263,25 @@ class Case(Generic[OperationT]):
             if isinstance(value, Mapping):
                 self._meta._initial_containers[location] = dict(value)
 
+    def _sync_validated_hashes(self) -> None:
+        """Take the current containers as the modification baseline for the generated components."""
+        if self._meta is None:
+            return
+        for location in self._meta.components:
+            self._meta.update_validated_hash(location, self._hash_container(self.get_container(location)))
+
+    def _record_starting_state(self) -> None:
+        """Take the containers as they are now as the case's starting state, not as edits to the generated values.
+
+        Auth and configured overrides are written after generation; without this, the first `meta` read
+        revalidates them and can relabel a negative case (e.g. "Missing `Authorization`") as positive.
+        """
+        if self._meta is None:
+            return
+        self._sync_validated_hashes()
+        for location in list(self._meta._dirty):
+            self._meta.clear_dirty(location)
+
     def _check_modifications(self) -> None:
         """Detect in-place modifications by comparing container hashes."""
         if self._meta is None:
@@ -439,11 +458,8 @@ class Case(Generic[OperationT]):
 
         """
         hook_context = HookContext(operation=self.operation)
-        # Sync the modification baseline to the current container state so revalidation reacts
-        # only to edits a `before_call` hook makes, not to auth/overrides applied earlier in place.
-        if self._meta is not None:
-            for location in self._meta.components:
-                self._meta.update_validated_hash(location, self._hash_container(self.get_container(location)))
+        # Revalidation reacts only to edits a `before_call` hook makes, not to auth/overrides applied earlier in place.
+        self._sync_validated_hashes()
         dispatch_before_call(GLOBAL_HOOK_DISPATCHER, context=hook_context, case=self, kwargs=kwargs)
 
         # Detect in-place container edits the hook made, then revalidate before freezing so
