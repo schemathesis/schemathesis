@@ -391,7 +391,7 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
     fields = _sent_form_fields(response, media_type)
     if fields is None:
         return False
-    alternative = next((item for item in case.operation.body if item.media_type == media_type), None)
+    alternative = case.operation.get_body_for_media_type(media_type)
     if alternative is None:
         return False
     # Urlencoded names round-trip exactly, while multipart escapes some characters in part names.
@@ -485,22 +485,21 @@ def _body_negation_is_only_forbidden_property(case: Case) -> bool:
         return False
 
     validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
-    for alternative in case.operation.body:
-        if alternative.media_type != case.media_type:
-            continue
-        schema = alternative.optimized_schema
-        permissive = alternative.permissive_schema
-        # No property was forbidden, so validating against the permissive schema would repeat the check below.
-        if permissive is schema:
+    alternative = case.operation.get_body_for_media_type(case.media_type)
+    if alternative is None:
+        return False
+    schema = alternative.optimized_schema
+    permissive = alternative.permissive_schema
+    # No property was forbidden, so validating against the permissive schema would repeat the check below.
+    if permissive is schema:
+        return False
+    try:
+        if make_validator(schema, validator_cls).is_valid(case.body):
             return False
-        try:
-            if make_validator(schema, validator_cls).is_valid(case.body):
-                return False
-            return make_validator(permissive, validator_cls).is_valid(case.body)
-        except Exception:
-            # Schemas or values the validator cannot read — can't tell what was negated
-            return False
-    return False
+        return make_validator(permissive, validator_cls).is_valid(case.body)
+    except Exception:
+        # Schemas or values the validator cannot read — can't tell what was negated
+        return False
 
 
 def _single_element_array_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
@@ -988,46 +987,45 @@ def _additional_properties_hint(case: Case, response: Response) -> str | None:
 
     validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
 
-    for alternative in case.operation.body:
-        if alternative.media_type != case.media_type:
-            continue
-        raw = alternative.raw_schema
-        if not isinstance(raw, dict):
-            return None
-        declared, forbids_extras = _collect_declared_properties(raw, raw.get(BUNDLE_STORAGE_KEY) or {}, set())
-        if forbids_extras:
-            return None
+    alternative = case.operation.get_body_for_media_type(case.media_type)
+    if alternative is None:
+        return None
+    raw = alternative.raw_schema
+    if not isinstance(raw, dict):
+        return None
+    declared, forbids_extras = _collect_declared_properties(raw, raw.get(BUNDLE_STORAGE_KEY) or {}, set())
+    if forbids_extras:
+        return None
 
-        extra = set(case.body.keys()) - declared
-        if not extra:
-            return None
-        # Many servers reject any string with a NUL character, so the extras are not the only plausible cause.
-        if _contains_nul(case.body):
-            return None
+    extra = set(case.body.keys()) - declared
+    if not extra:
+        return None
+    # Many servers reject any string with a NUL character, so the extras are not the only plausible cause.
+    if _contains_nul(case.body):
+        return None
 
-        stripped = {k: v for k, v in case.body.items() if k not in extra}
-        # `format: binary` fields hold raw bytes the JSON Schema validator cannot accept.
-        if contains_binary(stripped):
-            return None
-        if not make_validator(alternative.optimized_schema, validator_cls).is_valid(stripped):
-            return None
+    stripped = {k: v for k, v in case.body.items() if k not in extra}
+    # `format: binary` fields hold raw bytes the JSON Schema validator cannot accept.
+    if contains_binary(stripped):
+        return None
+    if not make_validator(alternative.optimized_schema, validator_cls).is_valid(stripped):
+        return None
 
-        # The server named a declared field and none of the extras, so the extras did not cause the rejection.
-        blamed = _blamed_body_properties(case, response)
-        if blamed & declared and not blamed & extra:
-            return None
+    # The server named a declared field and none of the extras, so the extras did not cause the rejection.
+    blamed = _blamed_body_properties(case, response)
+    if blamed & declared and not blamed & extra:
+        return None
 
-        count = len(extra)
-        examples = ", ".join(f"`{k}`" for k in sorted(extra)[:3])
-        if count > 3:
-            examples += f" and {count - 3} more"
-        noun = "property" if count == 1 else "properties"
-        return (
-            f"\nHint: The request body contains {count} additional {noun} not defined in the schema "
-            f"({examples}). The server appears to reject properties the schema allows. "
-            "Declare `additionalProperties: false` if extras are not accepted, or make the server ignore unknown fields."
-        )
-    return None
+    count = len(extra)
+    examples = ", ".join(f"`{k}`" for k in sorted(extra)[:3])
+    if count > 3:
+        examples += f" and {count - 3} more"
+    noun = "property" if count == 1 else "properties"
+    return (
+        f"\nHint: The request body contains {count} additional {noun} not defined in the schema "
+        f"({examples}). The server appears to reject properties the schema allows. "
+        "Declare `additionalProperties: false` if extras are not accepted, or make the server ignore unknown fields."
+    )
 
 
 # Statuses a credential-granting operation may answer to a well-formed request carrying credentials that do not exist.

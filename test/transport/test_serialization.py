@@ -180,6 +180,26 @@ def test_explicit_content_type_overrides_payload_media_type(ctx):
     } == {"multipart/form-data"}
 
 
+def test_exact_media_type_wins_over_earlier_media_range(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /data",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "*/*": {"schema": {"type": "object"}},
+                    "application/xml": {"schema": {"type": "object", "xml": {"name": "item"}}},
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body={"x": 1}, media_type="application/xml")
+    assert {transport.serialize_case(case)["data"] for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT)} == {
+        b"<item><x>1</x></item>"
+    }
+
+
 def test_custom_serializer_returning_none_omits_body(ctx):
     @schemathesis.serializer("application/x-empty")
     def serialize_empty(ctx, value):
