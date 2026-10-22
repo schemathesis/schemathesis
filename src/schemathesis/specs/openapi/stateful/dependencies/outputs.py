@@ -3,19 +3,16 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
-from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import assigns_identifier
 from schemathesis.specs.openapi.stateful.dependencies.models import (
-    CanonicalizationCache,
     Cardinality,
     InputSlot,
     OutputSlot,
-    ResourceMap,
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
-    ResponseResourceCache,
+    InferenceState,
     cached_resources_from_responses,
 )
 
@@ -33,22 +30,11 @@ def extract_outputs(
     *,
     operation: APIOperation,
     inputs: list[InputSlot],
-    resources: ResourceMap,
-    updated_resources: set[str],
-    resolver: Resolver,
-    canonicalization_cache: CanonicalizationCache,
-    response_resource_cache: ResponseResourceCache,
+    state: InferenceState,
 ) -> Iterator[OutputSlot]:
     """Extract resources from API operation's responses."""
     extracted_resource_names: set[str] = set()
-    for response, extracted in cached_resources_from_responses(
-        operation=operation,
-        resources=resources,
-        updated_resources=updated_resources,
-        resolver=resolver,
-        canonicalization_cache=canonicalization_cache,
-        cache=response_resource_cache,
-    ):
+    for response, extracted in cached_resources_from_responses(operation=operation, state=state):
         extracted_resource_names.add(extracted.resource.name)
         yield OutputSlot(
             resource=extracted.resource,
