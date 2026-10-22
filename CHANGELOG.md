@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.4...HEAD) - TBD
 
+### :bug: Fixed
+
+- Type hints rejecting `tag` and `operation_id` filters in auth `apply_to`/`skip_for`.
+
 ## [4.32.4](https://github.com/schemathesis/schemathesis/compare/v4.32.3...v4.32.4) - 2026-10-22
 
 ### :bug: Fixed

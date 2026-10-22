@@ -11,6 +11,7 @@ from typing import (
     Any,
     Generic,
     Protocol,
+    Self,
     TypeVar,
     overload,
     runtime_checkable,
@@ -20,7 +21,7 @@ from schemathesis.config._auth import DEFAULT_RETRY_ON
 from schemathesis.core.errors import AuthenticationError, IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
+from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, attach_filter_chain
 from schemathesis.generation.meta import negated_parameters
 
 if TYPE_CHECKING:
@@ -231,92 +232,54 @@ class KeyedCachingAuthProvider(CachingAuthProvider[Auth]):
         self.cache_entries.clear()
 
 
-class FilterableRegisterAuth(Protocol):
+class _FilterChain(Protocol):
+    def apply_to(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+    ) -> Self: ...  # pragma: no cover
+
+    def skip_for(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+    ) -> Self: ...  # pragma: no cover
+
+
+class FilterableRegisterAuth(_FilterChain, Protocol):
     """Protocol that adds filters to the return value of `register`."""
 
     def __call__(self, provider_class: type[AuthProvider]) -> type[AuthProvider]: ...  # pragma: no cover
 
-    def apply_to(
-        self,
-        func: MatcherFunc | None = None,
-        *,
-        name: FilterValue | None = None,
-        name_regex: str | None = None,
-        method: FilterValue | None = None,
-        method_regex: str | None = None,
-        path: FilterValue | None = None,
-        path_regex: str | None = None,
-    ) -> FilterableRegisterAuth: ...  # pragma: no cover
 
-    def skip_for(
-        self,
-        func: MatcherFunc | None = None,
-        *,
-        name: FilterValue | None = None,
-        name_regex: str | None = None,
-        method: FilterValue | None = None,
-        method_regex: str | None = None,
-        path: FilterValue | None = None,
-        path_regex: str | None = None,
-    ) -> FilterableRegisterAuth: ...  # pragma: no cover
-
-
-class FilterableApplyAuth(Protocol):
+class FilterableApplyAuth(_FilterChain, Protocol):
     """Protocol that adds filters to the return value of `apply`."""
 
     def __call__(self, test: Callable) -> Callable: ...  # pragma: no cover
 
-    def apply_to(
-        self,
-        func: MatcherFunc | None = None,
-        *,
-        name: FilterValue | None = None,
-        name_regex: str | None = None,
-        method: FilterValue | None = None,
-        method_regex: str | None = None,
-        path: FilterValue | None = None,
-        path_regex: str | None = None,
-    ) -> FilterableApplyAuth: ...  # pragma: no cover
 
-    def skip_for(
-        self,
-        func: MatcherFunc | None = None,
-        *,
-        name: FilterValue | None = None,
-        name_regex: str | None = None,
-        method: FilterValue | None = None,
-        method_regex: str | None = None,
-        path: FilterValue | None = None,
-        path_regex: str | None = None,
-    ) -> FilterableApplyAuth: ...  # pragma: no cover
-
-
-class FilterableRequestsAuth(Protocol):
+class FilterableRequestsAuth(_FilterChain, Protocol):
     """Protocol that adds filters to the return value of `set_from_requests`."""
-
-    def apply_to(
-        self,
-        func: MatcherFunc | None = None,
-        *,
-        name: FilterValue | None = None,
-        name_regex: str | None = None,
-        method: FilterValue | None = None,
-        method_regex: str | None = None,
-        path: FilterValue | None = None,
-        path_regex: str | None = None,
-    ) -> FilterableRequestsAuth: ...  # pragma: no cover
-
-    def skip_for(
-        self,
-        func: MatcherFunc | None = None,
-        *,
-        name: FilterValue | None = None,
-        name_regex: str | None = None,
-        method: FilterValue | None = None,
-        method_regex: str | None = None,
-        path: FilterValue | None = None,
-        path_regex: str | None = None,
-    ) -> FilterableRequestsAuth: ...  # pragma: no cover
 
 
 @dataclass
