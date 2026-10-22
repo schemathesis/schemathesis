@@ -415,7 +415,7 @@ def test_graphql(filename, tmp_path):
     raw_schema = load_from_corpus(filename, GRAPHQL_CORPUS)
     schema = _graphql.from_dict(raw_schema)
     schema.config.update(base_url="http://127.0.0.1:8080/graphql")
-    schema.config.generation.update(database=None, max_examples=1)
+    schema.config.generation.update(database="none", max_examples=1)
     schema.config.output.sanitization.update(enabled=False)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["fuzzing"])
