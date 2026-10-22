@@ -275,7 +275,9 @@ def _with_pool_values(operation: OpenApiOperation, combo: dict[str, Any], pool_c
 
 
 def _body_schema(operation: OpenApiOperation, media_type: str) -> JsonSchema:
-    return next(candidate for candidate in operation.body if candidate.media_type == media_type).validation_schema
+    body = operation.get_body_for_media_type(media_type)
+    assert body is not None
+    return body.validation_schema
 
 
 def _with_complete_pool_body(operation: OpenApiOperation, combo: dict[str, Any]) -> dict[str, Any]:

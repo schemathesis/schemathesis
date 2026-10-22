@@ -296,11 +296,7 @@ class Case(Generic[OperationT]):
             # Validate body against media type schema
             if isinstance(value, NotSet) or value is None or self.media_type is None or contains_binary(value):
                 return False
-            alternatives = list(self.operation.body)
-            # An exact media type wins over a wildcard one like `*/*` that the concrete type was chosen for.
-            alternative = next((a for a in alternatives if a.media_type == self.media_type), None) or next(
-                (a for a in alternatives if media_types.matches(a.media_type, self.media_type)), None
-            )
+            alternative = self.operation.get_body_for_media_type(self.media_type)
             if alternative is None:
                 return False
             return make_validator(alternative.validation_schema, validator_cls).is_valid(value)
