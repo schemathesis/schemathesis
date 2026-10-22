@@ -219,7 +219,14 @@ class Case(Generic[OperationT]):
 
     def __hash__(self) -> int:
         # Identity is the wire request with unmasked values; masked ones would make distinct cases collide.
-        request = prepare_request(self, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
+        # Hashing must not revalidate: auth and config headers are applied in place before `call()` syncs the
+        # modification baseline, so reading `meta` here would take them for edits and relabel the case.
+        frozen = self._freeze_metadata
+        object.__setattr__(self, "_freeze_metadata", True)
+        try:
+            request = prepare_request(self, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
+        finally:
+            object.__setattr__(self, "_freeze_metadata", frozen)
         headers = tuple(sorted((name.lower(), value) for name, value in request.headers.items()))
         return hash((request.method, request.url, headers, request.body))
 

@@ -13,6 +13,7 @@
 - Stateful phase skipped and wrong API link counts for chained `$ref` responses or links.
 - Header values, tokens included, leaking into the WFC missing-header error on WSGI apps.
 - Coverage phase sending a captured child id under the wrong parent on nested routes.
+- `--generation-unique-inputs` sending "Missing `Authorization`" cases with the configured credentials.
 
 ## [4.32.3](https://github.com/schemathesis/schemathesis/compare/v4.32.2...v4.32.3) - 2026-10-21
 
