@@ -107,6 +107,7 @@ exclude = [
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 # Fail a test running over 5 minutes and dump every thread's stack, so a stalled CI job names the culprit.
 timeout = 300
+asyncio_default_fixture_loop_scope = "function"
 xfail_strict = true
 # Duplicate parametrize ids hide repeated or mislabelled cases. pytest 9+ only; the pytest 8 tox env drops `--strict-config`.
 strict_parametrization_ids = true
