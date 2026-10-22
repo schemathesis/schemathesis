@@ -7,8 +7,10 @@ from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
+    CONTENT_TYPE_PROBES,
     CaseMetadata,
     ComponentInfo,
+    CoverageScenario,
     ExamplesPhaseData,
     FuzzingPhaseData,
     GenerationInfo,
@@ -535,6 +537,64 @@ def test_header_replaced_by_hook_with_invalid_value_is_negative(header_operation
     case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
     case.headers = headers
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
+
+
+@pytest.fixture
+def json_body_operation(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            }
+        }
+    )
+    return schema["/items"]["POST"]
+
+
+def _coverage_cases(operation, mode):
+    return list(
+        operation.schema.iter_coverage_cases(
+            operation, generation_modes=[mode], generation_config=operation.schema.config.generation
+        )
+    )
+
+
+def test_content_type_probe_stays_negative_when_a_hook_adds_a_header(json_body_operation):
+    probes = [
+        case
+        for case in _coverage_cases(json_body_operation, GenerationMode.NEGATIVE)
+        if case._meta.phase.data.scenario in CONTENT_TYPE_PROBES
+    ]
+    assert {case._meta.phase.data.scenario for case in probes} == CONTENT_TYPE_PROBES
+    for case in probes:
+        case.headers["X-Test-Mode"] = "true"
+        assert case.meta.generation.mode == GenerationMode.NEGATIVE
+        assert case.meta.components[ParameterLocation.HEADER].mode == GenerationMode.NEGATIVE
+
+
+def test_valid_coverage_case_stays_positive_when_a_hook_adds_a_header(json_body_operation):
+    [case] = [
+        case
+        for case in _coverage_cases(json_body_operation, GenerationMode.POSITIVE)
+        if case._meta.phase.data.scenario == CoverageScenario.VALID_OBJECT
+    ]
+    case.headers = case.headers or {}
+    case.headers["X-Test-Mode"] = "true"
+    assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
 def test_case_hash_is_case_insensitive_for_headers(ctx):

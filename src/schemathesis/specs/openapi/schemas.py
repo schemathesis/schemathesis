@@ -40,7 +40,7 @@ from schemathesis.core.transport import (
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.meta import ComponentInfo, TestPhase
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, ComponentInfo, TestPhase, coverage_scenario
 from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.parameters import RequestBodySchemaCache
@@ -330,6 +330,10 @@ class OpenApiSchema(BaseSchema):
                     )
             except jsonschema_rs.ValidationError:
                 # A schema its own draft rejects cannot judge the value, so the generation-time mode stands.
+                is_valid = None
+            if location == ParameterLocation.HEADER and coverage_scenario(case) in CONTENT_TYPE_PROBES:
+                # A Content-Type probe is negative through its media type, which no header parameter declares,
+                # so the headers above cannot judge it and the generation-time mode stands.
                 is_valid = None
             if location in meta.components and is_valid is not None:
                 new_mode = GenerationMode.POSITIVE if is_valid else GenerationMode.NEGATIVE
