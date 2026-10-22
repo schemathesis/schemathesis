@@ -10,7 +10,7 @@ import uuid
 import warnings
 from dataclasses import dataclass
 from queue import Queue
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from hypothesis.errors import InvalidArgument
 from jsonschema_rs import ValidationError
@@ -42,34 +42,34 @@ if TYPE_CHECKING:
     from schemathesis.config import PhasesConfig
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
+    from schemathesis.generation.overrides import Override
     from schemathesis.schemas import APIOperation
 
 WORKER_TIMEOUT = 0.1
 
 
 def _build_coverage_generator(
-    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any], feedback: FeedbackSources
+    operation: APIOperation, ctx: EngineContext, override: Override, feedback: FeedbackSources
 ) -> CoverageGenerator:
     generation = ctx.config.generation_for(operation=operation, phase=PhaseName.COVERAGE.value)
     return CoverageGenerator(
         operation=operation,
         generation_modes=generation.modes,
         generation_config=generation,
-        auth_storage=as_strategy_kwargs.get("auth_storage"),
-        as_strategy_kwargs=as_strategy_kwargs,
+        auth_storage=None,
+        override=override,
         feedback=feedback,
         session=ctx.coverage_session,
-        unexpected_methods_seen=ctx.coverage_unexpected_methods_seen,
     )
 
 
 def _build_examples_generator(
-    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any], feedback: FeedbackSources
+    operation: APIOperation, ctx: EngineContext, override: Override, feedback: FeedbackSources
 ) -> ExamplesGenerator:
     phases_config = ctx.config.phases_for(operation=operation)
     return ExamplesGenerator(
         operation=operation,
-        as_strategy_kwargs=as_strategy_kwargs,
+        override=override,
         feedback=feedback,
         fill_missing=phases_config.examples.fill_missing,
     )
@@ -338,11 +338,11 @@ def _run_scenario(
     phase: PhaseName,
     suite_id: uuid.UUID,
 ) -> None:
-    as_strategy_kwargs = overrides.strategy_kwargs_for(ctx.config, operation=operation)
+    override = overrides.with_config_headers(ctx.config, operation=operation)
     feedback = ctx.feedback_for(operation=operation, phase=phase)
     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
     if phase in (PhaseName.COVERAGE, PhaseName.EXAMPLES):
-        generator = _build_driver_generator(operation, ctx, phase, as_strategy_kwargs, feedback)
+        generator = _build_driver_generator(operation, ctx, phase, override, feedback)
         events_queue.put(scenario_started)
         _put_all(
             events_queue,
@@ -356,7 +356,7 @@ def _run_scenario(
             mode=mode,
             phase=phase,
             scenario_started=scenario_started,
-            as_strategy_kwargs=as_strategy_kwargs,
+            override=override,
             feedback=feedback,
         )
 
@@ -365,12 +365,12 @@ def _build_driver_generator(
     operation: APIOperation,
     ctx: EngineContext,
     phase: PhaseName,
-    as_strategy_kwargs: dict[str, Any],
+    override: Override,
     feedback: FeedbackSources,
 ) -> CaseGenerator:
     if phase == PhaseName.COVERAGE:
-        return _build_coverage_generator(operation, ctx, as_strategy_kwargs, feedback)
-    return _build_examples_generator(operation, ctx, as_strategy_kwargs, feedback)
+        return _build_coverage_generator(operation, ctx, override, feedback)
+    return _build_examples_generator(operation, ctx, override, feedback)
 
 
 def _run_hypothesis_test(
@@ -381,7 +381,7 @@ def _run_hypothesis_test(
     mode: HypothesisTestMode,
     phase: PhaseName,
     scenario_started: events.ScenarioStarted,
-    as_strategy_kwargs: dict[str, Any],
+    override: Override,
     feedback: FeedbackSources,
 ) -> None:
     from schemathesis.engine.run.unit._case import run_one_case
@@ -401,7 +401,7 @@ def _run_hypothesis_test(
                 apply_ci_profile=False,
                 seed=ctx.operation_seed(operation),
                 project=ctx.config,
-                as_strategy_kwargs=as_strategy_kwargs,
+                override=override,
                 feedback=feedback,
             ),
         )

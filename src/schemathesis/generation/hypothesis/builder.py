@@ -34,6 +34,7 @@ from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
 from schemathesis.generation.meta import TestPhase, content_type_probes_first
+from schemathesis.generation.overrides import Override
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -63,10 +64,23 @@ class HypothesisTestConfig:
     # Whether the `ci` profile Hypothesis loads on its own in CI environments applies; the CLI skips it.
     apply_ci_profile: bool = True
     seed: int | None = None
-    as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
+    override: Override = field(default_factory=Override)
     feedback: FeedbackSources = field(default_factory=FeedbackSources)
     given_args: tuple[GivenInput, ...] = ()
     given_kwargs: dict[str, GivenInput] = field(default_factory=dict)
+
+
+def _fuzzing_strategy(
+    operation: APIOperation, config: HypothesisTestConfig, strategy_kwargs: dict[str, Any]
+) -> st.SearchStrategy[Case]:
+    """Draw a case in any of the configured generation modes."""
+    generation = config.project.generation_for(operation=operation, phase=HypothesisTestMode.FUZZING.value)
+    return st.one_of(
+        [
+            operation.as_strategy(generation_mode=mode, feedback=config.feedback, **strategy_kwargs)
+            for mode in generation.modes
+        ]
+    )
 
 
 def create_test(
@@ -82,19 +96,11 @@ def create_test(
     strategy_kwargs = {
         "hooks": hook_dispatcher,
         "auth_storage": auth_storage,
-        **config.as_strategy_kwargs,
+        **config.override.as_strategy_kwargs(),
     }
-    generation = config.project.generation_for(operation=operation, phase=HypothesisTestMode.FUZZING.value)
-    strategy = st.one_of(
-        [
-            operation.as_strategy(generation_mode=mode, feedback=config.feedback, **strategy_kwargs)
-            for mode in generation.modes
-        ]
-    )
-
     hypothesis_test = create_base_test(
         test_function=test_func,
-        strategy=strategy,
+        strategy=_fuzzing_strategy(operation, config, strategy_kwargs),
         args=config.given_args,
         kwargs=config.given_kwargs,
     )
@@ -225,7 +231,7 @@ def create_test(
             operation,
             coverage_generation.modes,
             auth_storage,
-            config.as_strategy_kwargs,
+            config.override,
             feedback=config.feedback,
             generation_config=coverage_generation,
             hooks=hook_dispatcher,
@@ -366,7 +372,7 @@ def add_coverage(
     operation: APIOperation,
     generation_modes: list[GenerationMode],
     auth_storage: AuthStorage | None,
-    as_strategy_kwargs: dict[str, Any],
+    override: Override,
     feedback: FeedbackSources,
     generation_config: GenerationConfig,
     hooks: HookDispatcher | None = None,
@@ -378,7 +384,7 @@ def add_coverage(
         generation_modes=generation_modes,
         generation_config=generation_config,
         auth_storage=auth_storage,
-        as_strategy_kwargs=as_strategy_kwargs,
+        override=override,
         feedback=feedback,
         hooks=hooks,
     )

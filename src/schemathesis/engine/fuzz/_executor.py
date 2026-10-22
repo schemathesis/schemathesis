@@ -8,7 +8,7 @@ import unittest
 import uuid
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from warnings import catch_warnings
 
 import requests
@@ -62,13 +62,13 @@ MAX_SCENARIO_STEPS = 6
 _LINK_BIAS_CHOICES = [True] * 8 + [False] * 2
 
 
-def _build_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, object]:
+def _build_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, Any]:
     return dict(overrides.for_operation(ctx.config, operation=operation).as_strategy_kwargs())
 
 
 def _build_strategy_inputs(
     ctx: EngineContext, *, operations: list[APIOperation]
-) -> tuple[dict[str, dict[str, object]], dict[str, FeedbackSources]]:
+) -> tuple[dict[str, dict[str, Any]], dict[str, FeedbackSources]]:
     strategy_kwargs_by_label = {op.label: _build_strategy_kwargs(ctx, operation=op) for op in operations}
     feedback_by_label = {op.label: ctx.feedback_for(operation=op, phase=PhaseName.FUZZING) for op in operations}
     return strategy_kwargs_by_label, feedback_by_label
@@ -77,7 +77,7 @@ def _build_strategy_inputs(
 def _preflight_operations(
     *,
     operations: list[APIOperation],
-    strategy_kwargs_by_label: dict[str, dict[str, object]],
+    strategy_kwargs_by_label: dict[str, dict[str, Any]],
     feedback_by_label: dict[str, FeedbackSources],
     generation_modes_by_label: dict[str, list],
     event_queue: queue.Queue[events.EngineEvent],
@@ -304,9 +304,9 @@ def _draw_operation(
     weighted_operations: list[APIOperation],
     operations_by_label: dict[str, APIOperation],
     excluded_operations: set[str],
-) -> tuple[APIOperation, dict[str, object]]:
+) -> tuple[APIOperation, dict[str, Any]]:
     """Mostly follow a link from the previous step, otherwise pick a weighted-random operation."""
-    candidates: list[tuple[APIOperation, dict[str, object]]] = []
+    candidates: list[tuple[APIOperation, dict[str, Any]]] = []
     if last_step is not None:
         previous_operation, previous_case, previous_response = last_step
         candidates = ctx.schema.iter_link_candidates(
@@ -325,8 +325,8 @@ def _draw_case(
     draw: DrawFn,
     operation: APIOperation,
     *,
-    strategy_kwargs: dict[str, object],
-    link_overrides: dict[str, object],
+    strategy_kwargs: dict[str, Any],
+    link_overrides: dict[str, Any],
     feedback: FeedbackSources,
     generation_modes: list,
     excluded_operations: set[str],
@@ -524,7 +524,7 @@ def _run_forever_thread(
     event_queue: queue.Queue[events.EngineEvent],
     worker_id: int,
     plan: FuzzPlan,
-    strategy_kwargs_by_label: dict[str, dict[str, object]],
+    strategy_kwargs_by_label: dict[str, dict[str, Any]],
     feedback_by_label: dict[str, FeedbackSources],
     generation_modes_by_label: dict[str, list],
     scenario_started: threading.Event,

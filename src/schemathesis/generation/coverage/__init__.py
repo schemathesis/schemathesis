@@ -25,6 +25,7 @@ class GenerationSession:
         "ready_bundles",
         "removed_examples",
         "static_bundles",
+        "unexpected_methods_seen",
         "values",
     )
 
@@ -37,6 +38,8 @@ class GenerationSession:
         self.distinct_elements: BoundedCache = BoundedCache(maxsize=16)
         self.pattern_strategies: BoundedCache = BoundedCache(maxsize=128)
         self.static_bundles: BoundedCache = BoundedCache(maxsize=64)
+        # `(path, method)` pairs already probed with an undeclared method, so each path gets one probe per method.
+        self.unexpected_methods_seen: set[tuple[str, str]] = set()
         # Pinning a registry keeps its `id` from being recycled into a colliding token.
         self._pinned: OrderedDict[int, object] = OrderedDict()
         self._lock = threading.Lock()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ProjectConfig
@@ -18,11 +18,11 @@ if TYPE_CHECKING:
 class Override:
     """Overrides for various parts of a test case."""
 
-    query: dict[str, str]
-    headers: dict[str, str]
-    cookies: dict[str, str]
-    path_parameters: dict[str, str]
-    body: dict[str, str]
+    query: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
+    cookies: dict[str, str] = field(default_factory=dict)
+    path_parameters: dict[str, str] = field(default_factory=dict)
+    body: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_send_kwargs(cls, kwargs: Mapping[str, Any]) -> Override:
@@ -45,7 +45,7 @@ class Override:
             if value:
                 yield key, value
 
-    def as_strategy_kwargs(self) -> dict[str, dict[str, str]]:
+    def as_strategy_kwargs(self) -> dict[str, Any]:
         """Overridden parameters keyed by the `Case` container they fill; `body` is not overridable this way."""
         return {location.container_name: entry for location, entry in self.items()}
 
@@ -67,19 +67,17 @@ class Override:
         )
 
 
-def strategy_kwargs_for(config: ProjectConfig, *, operation: APIOperation) -> dict[str, dict[str, str]]:
+def with_config_headers(config: ProjectConfig, *, operation: APIOperation) -> Override:
     """Fixed parameter values from the project config; configured headers win over header overrides."""
-    kwargs = for_operation(config, operation=operation).as_strategy_kwargs()
-    headers = {**kwargs.get("headers", {}), **config.headers_for(operation=operation)}
-    if headers:
-        kwargs["headers"] = headers
-    return kwargs
+    override = for_operation(config, operation=operation)
+    override.headers = {**override.headers, **config.headers_for(operation=operation)}
+    return override
 
 
 def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override:
     operation_config = config.operations.get_for_operation(operation)
 
-    output = Override(query={}, headers={}, cookies={}, path_parameters={}, body={})
+    output = Override()
     groups = [
         (output.query, operation.query),
         (output.headers, operation.headers),

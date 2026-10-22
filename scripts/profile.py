@@ -30,6 +30,7 @@ from schemathesis.generation import GenerationMode, hypothesis  # noqa: E402
 from schemathesis.generation.drivers import CoverageGenerator  # noqa: E402
 from schemathesis.generation.feedback import FeedbackSources  # noqa: E402
 from schemathesis.generation.hypothesis.examples import generate_many  # noqa: E402
+from schemathesis.generation.overrides import Override  # noqa: E402
 from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict, parse_corpus_path  # noqa: E402
 from tools.stub_call import install_stub_call  # noqa: E402
 
@@ -362,7 +363,7 @@ def coverage(
                     operation=operation,
                     generation_modes=[generation_mode],
                     auth_storage=None,
-                    as_strategy_kwargs={},
+                    override=Override(),
                     feedback=FeedbackSources(),
                     generation_config=operation.schema.config.generation,
                 )

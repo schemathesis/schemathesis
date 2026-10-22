@@ -16,6 +16,7 @@ from schemathesis.generation.drivers import CoverageGenerator
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
+from schemathesis.generation.overrides import Override
 from schemathesis.specs.openapi.coverage._schema import cover_schema_iter
 from test.utils import assert_requests_call
 
@@ -159,7 +160,7 @@ def generate_hooked_cases(operation, generation_mode):
             operation=operation,
             generation_modes=[generation_mode],
             auth_storage=None,
-            as_strategy_kwargs={},
+            override=Override(),
             feedback=FeedbackSources(),
             generation_config=operation.schema.config.generation,
         )

@@ -40,7 +40,7 @@ from schemathesis.core.transport import (
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.meta import ComponentInfo
+from schemathesis.generation.meta import ComponentInfo, TestPhase
 from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.parameters import RequestBodySchemaCache
@@ -126,7 +126,7 @@ class OpenApiSchema(BaseSchema):
         self.raw_schema_version = RawSchemaVersion()
         self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
         self._operations = OperationLoader(self)
-        # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped set.
+        # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped session.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Per-operation security overlays populated by runtime auth inference. Empty when the server
         # never enforces auth on a declared-public operation; otherwise generations consult this
@@ -272,7 +272,6 @@ class OpenApiSchema(BaseSchema):
         generation_config: GenerationConfig,
         extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
-        unexpected_methods_seen: set[tuple[str, str]] | None = None,
         session: GenerationSession | None = None,
     ) -> Iterator[Case]:
         from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
@@ -285,8 +284,8 @@ class OpenApiSchema(BaseSchema):
             unexpected_methods=phases_config.coverage.unexpected_methods,
             generation_config=generation_config,
             extra_data_source=extra_data_source,
-            unexpected_methods_seen=unexpected_methods_seen
-            if unexpected_methods_seen is not None
+            unexpected_methods_seen=session.unexpected_methods_seen
+            if session is not None
             else self.coverage_unexpected_methods_seen,
             error_feedback=error_feedback,
             session=session,
@@ -669,7 +668,14 @@ class OpenApiSchema(BaseSchema):
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         feedback: FeedbackSources = NO_FEEDBACK,
-        **kwargs: Any,
+        *,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+        body: Any = NOT_SET,
+        media_type: str | None = None,
+        phase: TestPhase = TestPhase.FUZZING,
     ) -> SearchStrategy[Case]:
         return openapi_cases(
             operation=operation,
@@ -677,7 +683,13 @@ class OpenApiSchema(BaseSchema):
             auth_storage=auth_storage,
             generation_mode=generation_mode,
             feedback=feedback,
-            **kwargs,
+            path_parameters=path_parameters,
+            headers=headers,
+            cookies=cookies,
+            query=query,
+            body=body,
+            media_type=media_type,
+            phase=phase,
         )
 
     @override

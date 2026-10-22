@@ -25,6 +25,7 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, ContentTypeServerError, FailureGroup
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
@@ -7139,13 +7140,13 @@ def test_undeclared_method_probes_dedup_across_operations(ctx):
     schema.config.phases.coverage.unexpected_methods = unexpected_methods
 
     seen: list[tuple[str, str]] = []
-    seen_dedup: set[tuple[str, str]] = set()
+    session = GenerationSession()
     for declared in ("GET", "POST", "PUT", "DELETE"):
         for case in schema.iter_coverage_cases(
             schema["/items"][declared],
             generation_modes=[GenerationMode.NEGATIVE],
             generation_config=schema.config.generation,
-            unexpected_methods_seen=seen_dedup,
+            session=session,
         ):
             if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
                 seen.append((case.operation.path, case.method))
