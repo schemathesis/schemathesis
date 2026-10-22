@@ -13,8 +13,10 @@ from schemathesis.core import NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.drivers import without_unserializable_payload
+from schemathesis.generation.drivers import CoverageGenerator
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.generation.overrides import Override
 from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.transport.serialization import Binary
 
@@ -94,20 +96,22 @@ def fingerprint_schema(
         schema = schemathesis.openapi.from_dict(raw_schema)
     except Exception as exc:
         return SchemaFingerprint(rows=[], errors=[f"load_failed: {type(exc).__name__}: {exc}"])
-    transport = schema.transport
     config = GenerationConfig()
-    unserializable: set[str] = set()
     for result in schema.get_all_operations():
         if not isinstance(result, Ok):
             errors.append(f"operation_build_failed: {result.err()}")
             continue
         operation = result.ok()
+        generator = CoverageGenerator(
+            operation=operation,
+            generation_modes=modes,
+            generation_config=config,
+            auth_storage=None,
+            override=Override(),
+            feedback=FeedbackSources(),
+        )
         try:
-            for case in schema.iter_coverage_cases(operation, generation_modes=modes, generation_config=config):
-                # Mirror the runner: an unserializable media type must not forfeit what the case tests outside the payload.
-                sent = without_unserializable_payload(case, transport, unserializable)
-                if sent is not None:
-                    rows.append(fingerprint_case(sent))
+            rows.extend(fingerprint_case(case) for case in generator)
         except Exception as exc:
             errors.append(f"{operation.method.upper()} {operation.full_path}: {type(exc).__name__}: {exc}")
     rows.sort()
