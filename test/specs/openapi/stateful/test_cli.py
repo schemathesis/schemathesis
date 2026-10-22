@@ -161,12 +161,13 @@ def test_filtered_out(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
-def test_proxy_error(ctx, cli, snapshot_cli):
+def test_proxy_error(ctx, cli, snapshot_cli, app_runner):
     api = ctx.openapi.apps.users_crud_with_success()
     assert (
         cli.run(
             api.schema_url,
-            "--proxy=http://127.0.0.1",
+            # A port nothing listens on: port 80 may well be taken by a local web server, which then answers as the proxy.
+            f"--proxy=http://127.0.0.1:{app_runner.unused_port()}",
             "--phases=stateful",
         )
         == snapshot_cli
