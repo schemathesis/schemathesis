@@ -10,10 +10,11 @@
 - False positive `negative_data_rejection` for request bodies declared with media-type parameters.
 - Missing extra-properties hint in `positive_data_acceptance` for bodies declared with media-type parameters.
 - Wrong XML root element when a media range like `*/*` is declared before `application/xml`.
+- `Case.call` dropping a `json=` or `data=` body on WSGI apps or over `null`/binary bodies.
 - Stateful phase skipped and wrong API link counts for chained `$ref` responses or links.
 - Header values, tokens included, leaking into the WFC missing-header error on WSGI apps.
 - Coverage phase sending a captured child id under the wrong parent on nested routes.
-- `Case.call` dropping a `json=` or `data=` body on WSGI apps or over `null`/binary bodies.
+- Coverage phase counting Content-Type negative cases as rejected valid data when a hook edits headers.
 
 ## [4.32.3](https://github.com/schemathesis/schemathesis/compare/v4.32.2...v4.32.3) - 2026-10-21
 
