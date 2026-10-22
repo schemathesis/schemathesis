@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import warnings
-
 import pytest
 
 IGNORED_WARNING_STRICT_FILTERS = (
@@ -38,4 +36,3 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "snapshot(**kwargs): Configure snapshot tests.")
     config.addinivalue_line("markers", "snapshot_suffix(suffix): Append a suffix to the snapshot file name.")
     config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
-    warnings.filterwarnings("ignore", category=pytest.PytestDeprecationWarning)

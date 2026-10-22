@@ -312,6 +312,15 @@ def openapi_31(ctx):
 
 
 @pytest.fixture
+def pytester(request, pytester, monkeypatch):
+    # Inner runs read no project config, so they get the outer loop scope instead of a pytest-asyncio warning each.
+    # `pytester` discards outer options from `PYTEST_ADDOPTS` when it starts, so this is set after it.
+    scope = request.config.getini("asyncio_default_fixture_loop_scope")
+    monkeypatch.setenv("PYTEST_ADDOPTS", f"-o asyncio_default_fixture_loop_scope={scope}")
+    return pytester
+
+
+@pytest.fixture
 def testdir(testdir):
     def maker(
         content,
