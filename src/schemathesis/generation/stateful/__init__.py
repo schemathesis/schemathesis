@@ -39,8 +39,7 @@ def run_state_machine_as_test(
 
     try:
         with ignore_hypothesis_output():
-            # Hypothesis leaves this function unannotated.
-            return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)  # type: ignore[no-untyped-call]
+            return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)
     except Exception as exc:
         clear_hypothesis_notes(exc)
         raise

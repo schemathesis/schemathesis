@@ -180,10 +180,7 @@ class _ValidRuleFallbackFlags:
             return True
         if self._any_valid_enabled is None:
             self._any_valid_enabled = any(
-                self.flags.is_enabled(rule.function.__name__)
-                for rule in self.rules.rules
-                # Private Hypothesis method without annotations.
-                if self.rules.is_valid(rule)  # type: ignore[no-untyped-call]
+                self.flags.is_enabled(rule.function.__name__) for rule in self.rules.rules if self.rules.is_valid(rule)
             )
         return not self._any_valid_enabled
 
@@ -352,7 +349,8 @@ class APIStateMachine(RuleBasedStateMachine):
         # Private Hypothesis method without annotations.
         return super()._new_name(target)  # type: ignore[no-untyped-call]
 
-    def bundle(self, name: str) -> CaseInsensitiveDict | tuple[()]:
+    # Bundles hold responses keyed by name, not Hypothesis variable references.
+    def bundle(self, name: str) -> CaseInsensitiveDict | tuple[()]:  # type: ignore[override]
         # Availability checks should not populate response storage with empty entries.
         return self.bundles.get(name, ())
 
