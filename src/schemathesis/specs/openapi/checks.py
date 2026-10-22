@@ -70,7 +70,7 @@ from schemathesis.specs.openapi.utils import (
     reads_as_null,
     sent_text_is_valid,
 )
-from schemathesis.transport.prepare import prepare_path
+from schemathesis.transport.prepare import prepare_path, replaces_body
 from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
@@ -830,14 +830,10 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
     return has_negative
 
 
-# Transport keyword arguments that replace the generated request body.
-_BODY_TRANSPORT_KWARGS = ("json", "data", "content", "files")
-
-
 def _negative_body_replaced_by_caller(ctx: CheckContext, case: Case) -> bool:
     """Whether the caller sent its own body, so the only invalid part of the case never reached the server."""
     transport_kwargs = ctx.internals.transport_kwargs
-    if not transport_kwargs or not any(key in transport_kwargs for key in _BODY_TRANSPORT_KWARGS):
+    if not transport_kwargs or not replaces_body(transport_kwargs):
         return False
     meta = case.meta
     assert meta is not None

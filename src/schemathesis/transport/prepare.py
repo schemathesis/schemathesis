@@ -24,6 +24,15 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
+#: Transport keyword arguments that replace the generated request body.
+BODY_KWARGS = ("json", "data", "content", "files")
+
+
+def replaces_body(kwargs: Mapping[str, Any]) -> bool:
+    """Whether the caller passes its own request body, so the generated one is not sent."""
+    return any(key in kwargs for key in BODY_KWARGS)
+
+
 @lru_cache
 def get_default_headers() -> CaseInsensitiveDict:
     from requests.utils import default_headers
