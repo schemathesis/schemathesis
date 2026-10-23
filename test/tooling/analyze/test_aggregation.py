@@ -3,7 +3,7 @@ import json
 import pytest
 
 from scripts.analyze.metrics import analyze
-from test.tooling.analyze.helpers import write_run
+from test.tooling.analyze.helpers import scenario, write_run
 
 
 def test_analyze_extracts_initialize_header(tmp_path):
@@ -181,15 +181,11 @@ def test_analyze_duration_falls_back_to_last_event_when_truncated(tmp_path):
 
 def test_analyze_routes_stateful_label_into_separate_field(tmp_path):
     path = tmp_path / "run.ndjson"
-    payload = {
-        "ScenarioFinished": {
-            "recorder": {
-                "label": "Stateful tests",
-                "cases": {"a": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
-                "interactions": {"a": {"response": {"status_code": 200}}},
-            }
-        }
-    }
+    payload = scenario(
+        "Stateful tests",
+        {"a": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
+        {"a": {"response": {"status_code": 200}}},
+    )
     write_run(path, [payload])
     run = analyze(path)
     assert "Stateful tests" not in run.operations
@@ -200,22 +196,17 @@ def test_analyze_routes_stateful_label_into_separate_field(tmp_path):
 
 def test_analyze_phase_timings_accumulate(tmp_path):
     path = tmp_path / "run.ndjson"
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 100.5,
-            "recorder": {
-                "label": "GET /a",
-                "cases": {
-                    "x": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.05}}}},
-                    "y": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.07}}}},
-                },
-                "interactions": {
-                    "x": {"response": {"status_code": 200, "elapsed": 0.20}},
-                    "y": {"response": {"status_code": 200, "elapsed": 0.30}},
-                },
-            },
-        }
-    }
+    payload = scenario(
+        "GET /a",
+        {
+            "x": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.05}}}},
+            "y": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.07}}}},
+        },
+        {
+            "x": {"response": {"status_code": 200, "elapsed": 0.20}},
+            "y": {"response": {"status_code": 200, "elapsed": 0.30}},
+        },
+    )
     write_run(
         path,
         [
@@ -233,22 +224,17 @@ def test_analyze_phase_timings_accumulate(tmp_path):
 
 def test_analyze_per_operation_timings_accumulate(tmp_path):
     path = tmp_path / "run.ndjson"
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 100.5,
-            "recorder": {
-                "label": "GET /a",
-                "cases": {
-                    "x": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.04}}}},
-                    "y": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.06}}}},
-                },
-                "interactions": {
-                    "x": {"response": {"status_code": 200, "elapsed": 0.10}},
-                    "y": {"response": {"status_code": 200, "elapsed": 0.20}},
-                },
-            },
-        }
-    }
+    payload = scenario(
+        "GET /a",
+        {
+            "x": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.04}}}},
+            "y": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive", "time": 0.06}}}},
+        },
+        {
+            "x": {"response": {"status_code": 200, "elapsed": 0.10}},
+            "y": {"response": {"status_code": 200, "elapsed": 0.20}},
+        },
+    )
     write_run(
         path,
         [
@@ -266,16 +252,11 @@ def test_analyze_phase_timings_skip_missing_fields(tmp_path):
     # Older NDJSON may omit generation.time and response.elapsed; per-phase totals
     # must stay at 0.0 rather than counting absent values as zero contributions.
     path = tmp_path / "run.ndjson"
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 100.5,
-            "recorder": {
-                "label": "GET /a",
-                "cases": {"x": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
-                "interactions": {"x": {"response": {"status_code": 200}}},
-            },
-        }
-    }
+    payload = scenario(
+        "GET /a",
+        {"x": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
+        {"x": {"response": {"status_code": 200}}},
+    )
     write_run(
         path,
         [
@@ -328,27 +309,23 @@ def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_p
     # Coverage `unspecified_http_method` mutates case.method (e.g. TRACE on a POST-only
     # operation). Route-match must use the *declared* method, so a 404 lands in
     # route_rejected — not positive_drift.
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 101.0,
-            "recorder": {
-                "label": "POST /widgets",
-                "cases": {
-                    "c1": {
-                        "value": {
-                            "method": "TRACE",
-                            "path": "/widgets",
-                            "meta": {
-                                "generation": {"mode": "positive"},
-                                "phase": {"name": "coverage", "data": {"scenario": "unspecified_http_method"}},
-                            },
-                        }
-                    }
-                },
-                "interactions": {"c1": {"response": {"status_code": 404}}},
-            },
-        }
-    }
+    payload = scenario(
+        "POST /widgets",
+        {
+            "c1": {
+                "value": {
+                    "method": "TRACE",
+                    "path": "/widgets",
+                    "meta": {
+                        "generation": {"mode": "positive"},
+                        "phase": {"name": "coverage", "data": {"scenario": "unspecified_http_method"}},
+                    },
+                }
+            }
+        },
+        {"c1": {"response": {"status_code": 404}}},
+        timestamp=101.0,
+    )
     path = tmp_path / "run.ndjson"
     write_run(
         path,
@@ -366,24 +343,20 @@ def test_analyze_coverage_method_mutation_404_classified_as_route_rejected(tmp_p
 def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path):
     # The synthetic "Stateful tests" recorder label must not drive route matching, otherwise
     # every case would compare its method against itself.
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 101.0,
-            "recorder": {
-                "label": "Stateful tests",
-                "cases": {
-                    "c1": {
-                        "value": {
-                            "method": "GET",
-                            "path": "/widgets/{id}",
-                            "meta": {"generation": {"mode": "positive"}},
-                        }
-                    }
-                },
-                "interactions": {"c1": {"response": {"status_code": 404}}},
-            },
-        }
-    }
+    payload = scenario(
+        "Stateful tests",
+        {
+            "c1": {
+                "value": {
+                    "method": "GET",
+                    "path": "/widgets/{id}",
+                    "meta": {"generation": {"mode": "positive"}},
+                }
+            }
+        },
+        {"c1": {"response": {"status_code": 404}}},
+        timestamp=101.0,
+    )
     path = tmp_path / "run.ndjson"
     write_run(
         path,
@@ -403,18 +376,12 @@ def test_analyze_stateful_scenario_dual_bumps_per_op_and_phase_aggregate(tmp_pat
     # Stateful cases with a real per-case method+path must show up in BOTH
     # `run.operations[<op>]` (so per-op drill-downs include stateful contribution) AND
     # `run.stateful` (the phase-level aggregate stays available for stateful-only views).
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 101.0,
-            "recorder": {
-                "label": "Stateful tests",
-                "cases": {
-                    "c1": {"value": {"method": "GET", "path": "/owners", "meta": {"generation": {"mode": "positive"}}}}
-                },
-                "interactions": {"c1": {"response": {"status_code": 200}}},
-            },
-        }
-    }
+    payload = scenario(
+        "Stateful tests",
+        {"c1": {"value": {"method": "GET", "path": "/owners", "meta": {"generation": {"mode": "positive"}}}}},
+        {"c1": {"response": {"status_code": 200}}},
+        timestamp=101.0,
+    )
     path = tmp_path / "run.ndjson"
     write_run(
         path,
