@@ -318,9 +318,11 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         display_final_line(
             failures=ctx.statistic.total_failures,
             errors=len(ctx.errors),
+            warnings=ctx.warning_collector.data.kind_count,
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
             nothing_tested_reason=ctx.nothing_tested_reason,
+            exit_code=ctx.exit_code,
             no_checks_ran=ctx.statistic.no_checks_ran,
             interrupted=event.stop_reason == StopReason.INTERRUPTED,
         )
