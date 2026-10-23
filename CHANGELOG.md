@@ -15,6 +15,7 @@
 - False negative `negative_data_rejection` for invalid path parameters on Open API 2.0.
 - `st fuzz` showing "No issues found" when `warnings.fail-on` fails the run.
 - `st run` requests hanging indefinitely when `--request-timeout` is not set.
+- Multipart parts serialized with another multipart media type's schema and `encoding`.
 
 ## [4.32.4](https://github.com/schemathesis/schemathesis/compare/v4.32.3...v4.32.4) - 2026-10-22
 

@@ -2536,3 +2536,26 @@ def test_wsgi_swagger_multipart_mixed_form_field_reaches_the_app(ctx):
         "multipart/mixed",
         True,
     )
+
+
+def test_multipart_parts_follow_body_for_case_media_type(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/mixed": {
+                        "schema": {"type": "object", "properties": {"file": {"type": "object"}}},
+                        "encoding": {"file": {"contentType": "application/xml"}},
+                    },
+                    "multipart/form-data": {
+                        "schema": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}
+                    },
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body={"file": b"data"}, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [("file", ("file", b"data"))]
