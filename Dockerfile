@@ -22,7 +22,7 @@ RUN apk add --no-cache \
         tk-dev \
         util-linux-dev
 
-ARG PYTHON_VERSION=3.14.8
+ARG PYTHON_VERSION=3.14.9
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz && \
     tar -xf Python-${PYTHON_VERSION}.tar.xz
 
