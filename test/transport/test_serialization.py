@@ -631,6 +631,9 @@ def test_multipart_non_object_body_is_sent_as_text(ctx, app_runner, body, transp
     }
 
 
+FILE_LIST_SCHEMA = {"type": "array", "items": {"type": "string", "format": "binary"}}
+
+
 def _received_part(part):
     name = part.get_param("name", header="content-disposition")
     if part.is_multipart():
@@ -680,6 +683,13 @@ def _received_part(part):
             {"x": "1"},
             [["f", "application/xml", "<item><x>1</x></item>"]],
         ),
+        ("image/png", FILE_LIST_SCHEMA, 0, [["f", "image/png", "0"]]),
+        ("image/png", FILE_LIST_SCHEMA, 0.5, [["f", "image/png", "0.5"]]),
+        ("image/png", FILE_LIST_SCHEMA, True, [["f", "image/png", "true"]]),
+        ("image/png", FILE_LIST_SCHEMA, None, [["f", "image/png", "null"]]),
+        ("image/png", FILE_LIST_SCHEMA, {}, [["f", "image/png", "{}"]]),
+        ("image/png", {**FILE_LIST_SCHEMA, "type": ["array", "null"]}, 0, [["f", "image/png", "0"]]),
+        ("image/png", {}, 0, [["f", "image/png", "0"]]),
     ],
     ids=[
         "nested-multipart",
@@ -690,6 +700,13 @@ def _received_part(part):
         "xml-name",
         "xml-property-name",
         "xml-ref",
+        "file-list-integer",
+        "file-list-number",
+        "file-list-boolean",
+        "file-list-null",
+        "file-list-object",
+        "nullable-file-list-integer",
+        "untyped-integer",
     ],
 )
 def test_multipart_part_encoded_with_its_content_type(
@@ -727,6 +744,29 @@ def test_multipart_part_encoded_with_its_content_type(
         loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     case = loaded["/upload"]["POST"].Case(body={"f": value}, media_type="multipart/form-data")
     assert case.call().json() == expected
+
+
+def test_multipart_array_part_items_need_a_serializer(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"f": {"type": "array", "items": {"type": "integer"}}},
+                        },
+                        "encoding": {"f": {"contentType": "image/png"}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body={"f": [1]}, media_type="multipart/form-data")
+    with pytest.raises(SerializationNotPossible, match="image/png"):
+        case.as_transport_kwargs(base_url="http://h")
 
 
 @pytest.mark.parametrize(

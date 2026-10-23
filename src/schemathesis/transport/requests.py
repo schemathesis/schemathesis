@@ -19,7 +19,7 @@ from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
-from schemathesis.core.jsonschema import resolve_bundled_root, resolve_with_root_bundle
+from schemathesis.core.jsonschema import get_type, resolve_bundled_root, resolve_with_root_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -562,6 +562,10 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, cont
         return content, f"{main}/{sub}; boundary={boundary}"
     pair = REQUESTS_TRANSPORT.get_first_matching_media_type(content_type)
     if pair is None:
+        if not isinstance(value, list) and "array" in get_type(_property_schema(ctx, name)):
+            # An array's media type describes its items. A value of another type, e.g. `0` for a list of files,
+            # has no items to encode, so it goes out as the text it would have without `encoding`.
+            return value, content_type
         raise SerializationNotPossible.for_media_type(content_type)
     _, serializer = pair
     if serializer is xml_serializer:
