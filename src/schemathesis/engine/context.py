@@ -323,10 +323,13 @@ class EngineContext:
             cached = {
                 "headers": config.headers_for(operation=operation),
                 "max_redirects": config.max_redirects_for(operation=operation),
-                "timeout": config.request_timeout_for(operation=operation),
                 "verify": config.tls_verify_for(operation=operation),
                 "cert": config.request_cert_for(operation=operation),
             }
+            # An explicit `None` would override the transport's default timeout and let a request hang forever.
+            timeout = config.request_timeout_for(operation=operation)
+            if timeout is not None:
+                cached["timeout"] = timeout
             proxy = config.proxy_for(operation=operation)
             if proxy is not None:
                 cached["proxies"] = {"all": proxy}
