@@ -264,6 +264,11 @@ class CaseMetadata:
     # form (use the typed snapshot) or was overwritten by a hook (validate the live value).
     _initial_containers: dict[ParameterLocation, Any] = field(default_factory=dict, init=False)
 
+    def is_negative_at(self, location: ParameterLocation) -> bool:
+        """Whether the component at `location` was generated in negative mode."""
+        component = self.components.get(location)
+        return component is not None and component.mode.is_negative
+
     def mark_dirty(self, location: ParameterLocation) -> None:
         """Mark a component as modified and needing revalidation."""
         self._dirty.add(location)
