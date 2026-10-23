@@ -356,16 +356,23 @@ def test_fuzz_unmatched_filter_suggests_the_operation_it_nearly_names(cli, ctx, 
 
 
 @pytest.mark.parametrize(
-    ("config", "expected"),
-    [({"warnings": {"fail-on": ["unmatched_filter"]}}, ExitCode.TESTS_FAILED), ({}, ExitCode.OK)],
+    ("config", "expected", "final_line"),
+    [
+        ({"warnings": {"fail-on": ["unmatched_filter"]}}, ExitCode.TESTS_FAILED, "Warnings fail the run in"),
+        ({}, ExitCode.OK, "1 warning in"),
+    ],
     ids=["fail-on", "default"],
 )
-def test_fuzz_unmatched_filter_with_fail_on(cli, ctx, config, expected):
+def test_fuzz_unmatched_filter_with_fail_on(cli, ctx, config, expected, final_line):
     api = ctx.openapi.apps.success()
     result = cli.main(
         "fuzz", api.schema_url, "--include-path=/api/success", "--include-path=/api/nope", "--max-time=1", config=config
     )
-    assert (result.exit_code, "Unmatched filters" in result.stdout) == (expected, True)
+    assert (result.exit_code, "Unmatched filters" in result.stdout, final_line in result.stdout.splitlines()[-1]) == (
+        expected,
+        True,
+        True,
+    ), result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
