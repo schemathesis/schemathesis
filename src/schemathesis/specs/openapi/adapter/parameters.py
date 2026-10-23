@@ -1636,9 +1636,12 @@ class OpenApiBody(OpenApiComponent):
     def is_negatable(self) -> bool:
         """Whether this body schema can be negated for negative test generation."""
         if self._is_negatable is NOT_SET:
-            from schemathesis.specs.openapi.negative.utils import can_negate
+            from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
 
             schema = self.optimized_schema
+            if is_binary_format(schema):
+                # Any bytes are a binary string, so only its other constraints can be violated on the wire.
+                schema = {key: value for key, value in schema.items() if key not in ("type", "format")}
             self._is_negatable = isinstance(schema, dict) and can_negate(schema)
         assert not isinstance(self._is_negatable, NotSet)
         return self._is_negatable
