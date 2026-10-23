@@ -49,7 +49,7 @@ dependencies = [
 [project.optional-dependencies]
 tests = [
   # coverage 7.13.3+ can drop modules other threads are importing: coveragepy#2247
-  "coverage>=6,<7.13.3",
+  "coverage>=6,<7.16.3",
   "Django>=5.2,<6",
   "fastapi>=0.86.0",
   "Flask>=2.1.1,<4.0",
@@ -72,9 +72,9 @@ tests = [
 ]
 allure = ["allure-python-commons>=2.13.0"]
 # coverage 7.13.3+ can drop modules other threads are importing: coveragepy#2247
-cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3,<7.13.3"]
+cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3,<7.16.3"]
 bench = ["pytest-asyncio>=1.0,<2.0", "pytest-codspeed==5.0.3", "pytest-timeout>=2.3,<3.0"]
-docs = ["mkdocs-material", "mkdocstrings[python]", "pymdown-extensions<12.2"]
+docs = ["mkdocs-material", "mkdocstrings[python]", "pymdown-extensions<12.4"]
 profiling = ["pyinstrument>=5.1"]
 scripts = ["tracecov>=0.21", "seaborn>=0.13"]
 dev = ["schemathesis[tests,cov,bench,docs,scripts]"]
