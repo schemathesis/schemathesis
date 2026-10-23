@@ -17,6 +17,7 @@ from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.examples import ExampleWalk, extract_from_schema
 from test.engine.helpers import examples_only
+from test.utils import EventStream
 
 
 def _schema_with_query_and_body_example(ctx, *, query_schema=None, extra_operation=None):
@@ -83,6 +84,35 @@ def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, AuthenticationError) for event in errors), [
         type(e.value).__name__ for e in errors
+    ]
+
+
+# Replays hit the token-fetch breaker and fail differently, so Hypothesis reports the failure grouped.
+def test_stateful_auth_provider_failure_surfaces_as_authentication_error(ctx):
+    api = ctx.openapi.apps.users_crud()
+
+    @schemathesis.auth()
+    class _BrokenAuth:
+        def get(self, case, context):
+            raise AuthenticationError("provider", "get", "creds expired")
+
+        def set(self, case, data, context):
+            pass
+
+    try:
+        stream = EventStream(
+            schemathesis.openapi.from_url(api.schema_url),
+            phases=[PhaseName.STATEFUL_TESTING],
+            max_examples=10,
+            seed=1,
+        ).execute()
+    finally:
+        schemathesis.auths.unregister()
+
+    errors = stream.find_all(events.NonFatalError, phase=PhaseName.STATEFUL_TESTING)
+    assert [str(event.value).splitlines()[0].partition(";")[0] for event in errors] == [
+        "creds expired",
+        "Token fetch failed 3 times in a row",
     ]
 
 

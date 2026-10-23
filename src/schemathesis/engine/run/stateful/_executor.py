@@ -15,6 +15,7 @@ from hypothesis.stateful import Rule
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.control import SkipTest
+from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
@@ -181,6 +182,11 @@ def _classify_suite_error(
         return Status.SKIP, False, []
     if isinstance(exc, FailureGroup):
         return _classify_failure_group(exc, ctx=ctx, engine=engine, state=state)
+    # Several rules failing to authenticate, or a replay hitting the token-fetch breaker, arrive grouped.
+    if isinstance(exc, BaseExceptionGroup):
+        auth_errors = exc.subgroup(AuthenticationError)
+        if auth_errors is not None:
+            return Status.ERROR, False, [_stateful_error(error) for error in _distinct_errors(auth_errors)]
     if isinstance(exc, Flaky) or is_inconsistent_replay(exc):
         return _classify_flaky(ctx=ctx, engine=engine, state=state)
     if isinstance(exc, Unsatisfiable) and not isinstance(exc, UnsatisfiableSchema) and ctx.completed_scenarios > 0:
@@ -190,19 +196,29 @@ def _classify_suite_error(
         return Status.SUCCESS, ctx.completed_scenarios < settings.max_examples, []
     clear_hypothesis_notes(exc)
     # Any other exception is an inner error and the test run should be stopped
-    return _network_error_outcome(state) or (
-        Status.ERROR,
-        False,
-        [
-            events.NonFatalError(
-                error=exc,
-                phase=PhaseName.STATEFUL_TESTING,
-                label=STATEFUL_TESTS_LABEL,
-                related_to_operation=False,
-                code_sample=None,
-            )
-        ],
+    return _network_error_outcome(state) or (Status.ERROR, False, [_stateful_error(exc)])
+
+
+def _stateful_error(exc: Exception) -> events.NonFatalError:
+    return events.NonFatalError(
+        error=exc,
+        phase=PhaseName.STATEFUL_TESTING,
+        label=STATEFUL_TESTS_LABEL,
+        related_to_operation=False,
+        code_sample=None,
     )
+
+
+def _distinct_errors(group: BaseExceptionGroup) -> list[Exception]:
+    distinct: dict[str, Exception] = {}
+    for error in group.exceptions:
+        if isinstance(error, BaseExceptionGroup):
+            for nested in _distinct_errors(error):
+                distinct.setdefault(str(nested), nested)
+        elif isinstance(error, Exception):
+            clear_hypothesis_notes(error)
+            distinct.setdefault(str(error), error)
+    return list(distinct.values())
 
 
 def _unresponsive_operation_error(exc: TransportError, *, case: Case, engine: EngineContext) -> events.NonFatalError:
