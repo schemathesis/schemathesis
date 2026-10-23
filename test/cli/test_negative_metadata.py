@@ -170,8 +170,13 @@ def test_text_plain_with_valid_boolean_query_not_reported(ctx, cli, app_runner):
     )
 
 
-def test_removed_auth_parameter_not_reapplied_no_credentials(ctx):
-    # No credentials configured — server always returns 401; negative_data_rejection must not fire.
+@pytest.mark.parametrize(
+    ("credentials", "max_examples"),
+    [(None, 20), (("test", "test"), 50)],
+    ids=["no-credentials", "with-credentials"],
+)
+def test_removed_auth_parameter_not_reapplied(ctx, credentials, max_examples):
+    # The server answers 401 without Authorization; a removal mutation must keep it absent even with credentials.
     api = ctx.openapi.apps.basic()
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.seed = 42
@@ -179,30 +184,9 @@ def test_removed_auth_parameter_not_reapplied_no_credentials(ctx):
     schema.config.phases.examples.enabled = False
     schema.config.phases.coverage.enabled = False
     schema.config.phases.stateful.enabled = False
-    schema.config.phases.fuzzing.generation.update(max_examples=20)
-    schema.config.checks.update(included_check_names=["negative_data_rejection"])
-
-    failures = []
-    for event in schemathesis.engine.from_schema(schema).execute():
-        if isinstance(event, events.ScenarioFinished) and event.status == Status.FAILURE:
-            failures.append(event)
-
-    assert not failures, f"unexpected negative_data_rejection failures: {failures}"
-
-
-def test_removed_auth_parameter_not_reapplied_with_credentials(ctx):
-    # When auth credentials are configured, a removal mutation must leave the
-    # Authorization header absent — interceptor must not re-add it — so the
-    # server returns 401 and negative_data_rejection does not fire.
-    api = ctx.openapi.apps.basic()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.seed = 42
-    schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
-    schema.config.phases.examples.enabled = False
-    schema.config.phases.coverage.enabled = False
-    schema.config.phases.stateful.enabled = False
-    schema.config.phases.fuzzing.generation.update(max_examples=50)
-    schema.config.auth.update(basic=("test", "test"))
+    schema.config.phases.fuzzing.generation.update(max_examples=max_examples)
+    if credentials is not None:
+        schema.config.auth.update(basic=credentials)
     schema.config.checks.update(included_check_names=["negative_data_rejection"])
 
     failures = []
@@ -211,7 +195,7 @@ def test_removed_auth_parameter_not_reapplied_with_credentials(ctx):
             failures.append(event)
 
     auth_removed = [r for r in api.requests if "Authorization" not in r.headers]
-    assert auth_removed, "no auth-removal mutation fired in 50 examples"
+    assert auth_removed, f"no auth-removal mutation fired in {max_examples} examples"
     assert not failures, f"unexpected negative_data_rejection failures: {failures}"
 
 

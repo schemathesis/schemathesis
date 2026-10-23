@@ -149,12 +149,10 @@ def test_missing_deserializer_warning_names_unvalidated_media_type(cli, ctx, sna
     )
 
     api = ctx.openapi.apps.success()
-    result = cli.run(
-        str(schema_path), f"--url={api.base_url}/api", "--warnings=missing_deserializer", "--max-examples=1"
+    assert (
+        cli.run(str(schema_path), f"--url={api.base_url}/api", "--warnings=missing_deserializer", "--max-examples=1")
+        == snapshot_cli
     )
-    assert "1 operation cannot validate text/csv responses" in result.stdout
-    assert "operation cannot validate responses" not in result.stdout
-    assert result == snapshot_cli
 
 
 def test_missing_deserializer_warning_with_fail_on(cli, ctx, tmp_path, monkeypatch):

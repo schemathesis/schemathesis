@@ -47,14 +47,15 @@ def test_external_ref_in_failure_schema_resolves(ctx, cli, snapshot_cli, referen
     def data():
         return jsonify({})
 
-    result = cli.run_openapi_app(
-        app,
-        "--max-examples=1",
-        "--checks=response_schema_conformance",
-        "--phases=examples,fuzzing",
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-examples=1",
+            "--checks=response_schema_conformance",
+            "--phases=examples,fuzzing",
+        )
+        == snapshot_cli
     )
-    assert '"$ref": "#/components/schemas/schema000001"' in result.stdout
-    assert result == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -99,13 +100,14 @@ def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
         # Return an integer for host instead of a string — always a type error
         return jsonify({"host": 42}), 200
 
-    result = cli.run_openapi_app(
-        app,
-        "--checks=response_schema_conformance",
-        "--max-examples=1",
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=response_schema_conformance",
+            "--max-examples=1",
+        )
+        == snapshot_cli
     )
-    assert "x-bundled" not in result.stdout
-    assert result == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -258,17 +260,16 @@ def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
             return jsonify({"error": "non-printable"}), 400
         return jsonify({"id": 1}), 201
 
-    result = cli.run_openapi_app(
-        app,
-        "--checks=negative_data_rejection",
-        "--phases=fuzzing",
-        "--mode=negative",
-        "--max-examples=10",
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=negative_data_rejection",
+            "--phases=fuzzing",
+            "--mode=negative",
+            "--max-examples=10",
+        )
+        == snapshot_cli
     )
-
-    assert "#/x-bundled/" not in result.stdout
-
-    assert result == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -297,11 +298,12 @@ def test_whole_external_file_reference_in_schema_location(ctx, cli, app_runner, 
         # Missing "name" — always violates the externally referenced schema
         return jsonify([{"x": 1}]), 200
 
-    result = cli.run(
-        str(schema_path),
-        f"--url={base_url}/api",
-        "--checks=response_schema_conformance",
-        "--max-examples=1",
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={base_url}/api",
+            "--checks=response_schema_conformance",
+            "--max-examples=1",
+        )
+        == snapshot_cli
     )
-    assert "Schema at /pets.json" in result.stdout
-    assert result == snapshot_cli

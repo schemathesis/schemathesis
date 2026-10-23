@@ -308,48 +308,63 @@ def test_cli_auth_precedence_over_openapi(cli, auth_schema_url, snapshot_cli):
     )
 
 
-def test_global_security_overridden_by_operation(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/operation-override": {
-                "get": {
-                    "operationId": "operation_override",
-                    "security": [{"OperationAuth": []}],  # Override with operation-specific
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        },
-        components={
-            "securitySchemes": {
+@pytest.mark.parametrize(
+    ("operation_security", "schemes", "extra", "accepted", "auth"),
+    [
+        pytest.param(
+            [{"OperationAuth": []}],
+            {
                 "GlobalAuth": {"type": "apiKey", "name": "X-Global", "in": "header"},
                 "OperationAuth": {"type": "apiKey", "name": "X-Operation", "in": "header"},
-            }
-        },
-        security=[{"GlobalAuth": []}],  # Global default
+            },
+            {"security": [{"GlobalAuth": []}]},
+            {"X-Operation": "operation-key"},
+            {"GlobalAuth": {"api_key": "global-key"}, "OperationAuth": {"api_key": "operation-key"}},
+            id="global-overridden-by-operation",
+        ),
+        pytest.param(
+            [{"FirstAuth": []}, {"SecondAuth": []}, {"ThirdAuth": []}],
+            {
+                "FirstAuth": {"type": "apiKey", "name": "X-First", "in": "header"},
+                "SecondAuth": {"type": "apiKey", "name": "X-Second", "in": "header"},
+                "ThirdAuth": {"type": "apiKey", "name": "X-Third", "in": "header"},
+            },
+            {},
+            {"X-First": "first-key", "X-Second": "second-key", "X-Third": "third-key"},
+            # Only the second alternative is configured, so it is used although the first one comes first.
+            {"SecondAuth": {"api_key": "second-key"}},
+            id="multiple-or-requirements",
+        ),
+        pytest.param(
+            [{"ApiKeyAlias": []}],
+            {
+                "ActualApiKey": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
+                "ApiKeyAlias": {"$ref": "#/components/securitySchemes/ActualApiKey"},
+            },
+            {},
+            {"X-API-Key": "valid-key"},
+            {"ApiKeyAlias": {"api_key": "valid-key"}},
+            id="referenced-scheme",
+        ),
+    ],
+)
+def test_operation_security_uses_configured_scheme(
+    ctx, cli, snapshot_cli, operation_security, schemes, extra, accepted, auth
+):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/items": {"get": {"security": operation_security, "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": schemes},
+        **extra,
     )
 
-    @app.route("/operation-override")
-    def operation_override():
-        # Should receive OperationAuth, not GlobalAuth
-        if request.headers.get("X-Operation") == "operation-key":
+    @app.route("/items")
+    def items():
+        if any(request.headers.get(name) == value for name, value in accepted.items()):
             return jsonify({"status": "authenticated"})
         return jsonify({"error": "unauthorized"}), 401
 
     assert (
-        cli.run_openapi_app(
-            app,
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 5",
-            config={
-                "auth": {
-                    "openapi": {
-                        "GlobalAuth": {"api_key": "global-key"},
-                        "OperationAuth": {"api_key": "operation-key"},
-                    }
-                }
-            },
-        )
+        cli.run_openapi_app(app, "--phases=fuzzing", "--mode=positive", "-n 5", config={"auth": {"openapi": auth}})
         == snapshot_cli
     )
 
@@ -422,60 +437,6 @@ def test_no_security_requirements(ctx, cli, snapshot_cli):
     )
 
 
-def test_multiple_or_requirements_first_match(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/multi-or": {
-                "get": {
-                    "operationId": "multi_or",
-                    "security": [
-                        {"FirstAuth": []},
-                        {"SecondAuth": []},
-                        {"ThirdAuth": []},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        },
-        components={
-            "securitySchemes": {
-                "FirstAuth": {"type": "apiKey", "name": "X-First", "in": "header"},
-                "SecondAuth": {"type": "apiKey", "name": "X-Second", "in": "header"},
-                "ThirdAuth": {"type": "apiKey", "name": "X-Third", "in": "header"},
-            }
-        },
-    )
-
-    @app.route("/multi-or")
-    def multi_or():
-        # Accept any of the three auth methods
-        if (
-            request.headers.get("X-First") == "first-key"
-            or request.headers.get("X-Second") == "second-key"
-            or request.headers.get("X-Third") == "third-key"
-        ):
-            return jsonify({"status": "authenticated"})
-        return jsonify({"error": "unauthorized"}), 401
-
-    # Only configure SecondAuth - should use it even though FirstAuth comes first in schema
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 5",
-            config={
-                "auth": {
-                    "openapi": {
-                        "SecondAuth": {"api_key": "second-key"},
-                    }
-                }
-            },
-        )
-        == snapshot_cli
-    )
-
-
 def test_auth_with_invalid_scheme_in_schema(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -515,50 +476,6 @@ def test_auth_with_invalid_scheme_in_schema(ctx, cli, snapshot_cli):
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
-        )
-        == snapshot_cli
-    )
-
-
-def test_referenced_security_scheme(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/api-key": {
-                "get": {
-                    "security": [{"ApiKeyAlias": []}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        },
-        components={
-            "securitySchemes": {
-                "ActualApiKey": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
-                "ApiKeyAlias": {"$ref": "#/components/securitySchemes/ActualApiKey"},
-            }
-        },
-    )
-
-    @app.route("/api-key")
-    def api_key():
-        key = request.headers.get("X-API-Key", "")
-        if key == "valid-key":
-            return jsonify({"status": "authenticated"})
-        return jsonify({"error": "unauthorized"}), 401
-
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--include-path=/api-key",
-            "--phases=fuzzing",
-            "--mode=positive",
-            "-n 5",
-            config={
-                "auth": {
-                    "openapi": {
-                        "ApiKeyAlias": {"api_key": "valid-key"},
-                    }
-                }
-            },
         )
         == snapshot_cli
     )

@@ -230,15 +230,16 @@ def test_unmatched_filters_for_graphql(ctx, cli, snapshot_cli, arg):
 def test_operation_id_filter_on_graphql(ctx, cli, snapshot_cli):
     # GraphQL has no `operationId`, so such a filter matches nothing instead of erroring.
     api = ctx.graphql.apps.books()
-    result = cli.run(
-        api.schema_url,
-        "--max-examples=1",
-        "--mode=positive",
-        "--include-name=Query.getBooks",
-        "--exclude-operation-id=nope",
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=1",
+            "--mode=positive",
+            "--include-name=Query.getBooks",
+            "--exclude-operation-id=nope",
+        )
+        == snapshot_cli
     )
-    assert "Traceback" not in result.stdout, result.stdout
-    assert result == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
