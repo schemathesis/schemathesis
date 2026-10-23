@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from schemathesis.config._diff_base import DiffBase
@@ -147,6 +147,29 @@ class MissingRequiredHeaderConfig(CheckConfig):
     _DEFAULT_EXPECTED_STATUSES = MISSING_REQUIRED_HEADER_EXPECTED_STATUSES
 
 
+# Built-in checks with a section of their own; `max_response_time` takes a bare number instead.
+_BUILTIN_CHECK_CONFIGS: dict[
+    str,
+    type[SimpleCheckConfig] | type[ResponseSchemaConformanceConfig] | type[CheckConfig],
+] = {
+    "not_a_server_error": NotAServerErrorConfig,
+    "status_code_conformance": SimpleCheckConfig,
+    "content_type_conformance": SimpleCheckConfig,
+    "response_schema_conformance": ResponseSchemaConformanceConfig,
+    "response_headers_conformance": SimpleCheckConfig,
+    "positive_data_acceptance": PositiveDataAcceptanceConfig,
+    "negative_data_rejection": NegativeDataRejectionConfig,
+    "use_after_free": SimpleCheckConfig,
+    "ensure_resource_availability": SimpleCheckConfig,
+    "missing_required_header": MissingRequiredHeaderConfig,
+    "ignored_auth": SimpleCheckConfig,
+    "object_level_authorization": SimpleCheckConfig,
+    "unsupported_method": SimpleCheckConfig,
+    "allow_header_conformance": SimpleCheckConfig,
+}
+_BUILTIN_CHECK_NAMES = frozenset({*_BUILTIN_CHECK_CONFIGS, "max_response_time"})
+
+
 @dataclass(repr=False, slots=True)
 class ChecksConfig(DiffBase):
     not_a_server_error: NotAServerErrorConfig
@@ -226,41 +249,11 @@ class ChecksConfig(DiffBase):
                 return {"enabled": default_enabled, **sub}
             return sub
 
-        _known_field_names = {f.name for f in fields(cls) if not f.name.startswith("_")}
-
-        config = cls(
-            not_a_server_error=NotAServerErrorConfig.from_dict(
-                merge(data.get("not_a_server_error", {})),
-            ),
-            status_code_conformance=SimpleCheckConfig.from_dict(merge(data.get("status_code_conformance", {}))),
-            content_type_conformance=SimpleCheckConfig.from_dict(merge(data.get("content_type_conformance", {}))),
-            response_schema_conformance=ResponseSchemaConformanceConfig.from_dict(
-                merge(data.get("response_schema_conformance", {}))
-            ),
-            response_headers_conformance=SimpleCheckConfig.from_dict(
-                merge(data.get("response_headers_conformance", {}))
-            ),
-            positive_data_acceptance=PositiveDataAcceptanceConfig.from_dict(
-                merge(data.get("positive_data_acceptance", {})),
-            ),
-            negative_data_rejection=NegativeDataRejectionConfig.from_dict(
-                merge(data.get("negative_data_rejection", {})),
-            ),
-            use_after_free=SimpleCheckConfig.from_dict(merge(data.get("use_after_free", {}))),
-            ensure_resource_availability=SimpleCheckConfig.from_dict(
-                merge(data.get("ensure_resource_availability", {}))
-            ),
-            missing_required_header=MissingRequiredHeaderConfig.from_dict(
-                merge(data.get("missing_required_header", {})),
-            ),
-            ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
-            object_level_authorization=SimpleCheckConfig.from_dict(merge(data.get("object_level_authorization", {}))),
-            unsupported_method=SimpleCheckConfig.from_dict(merge(data.get("unsupported_method", {}))),
-            allow_header_conformance=SimpleCheckConfig.from_dict(merge(data.get("allow_header_conformance", {}))),
-            max_response_time=MaxResponseTimeConfig(limit=data.get("max_response_time")),
-        )
+        config = cls(max_response_time=MaxResponseTimeConfig(limit=data.get("max_response_time")))
+        for name, check_config in _BUILTIN_CHECK_CONFIGS.items():
+            setattr(config, name, check_config.from_dict(merge(data.get(name, {}))))
         for name, value in data.items():
-            if name in _known_field_names:
+            if name in _BUILTIN_CHECK_NAMES:
                 continue
             if not isinstance(value, dict):
                 # Top-level non-dict values (e.g. `enabled = true`) are not custom check sections.
@@ -294,11 +287,10 @@ class ChecksConfig(DiffBase):
         )
         # `enabled = True` is the default, so the generic merge cannot tell it from "not configured";
         # without this a lower-priority `false` would win over a check named on the command line.
-        known_names = {f.name for f in fields(cls) if not f.name.startswith("_")}
         for config in configs:
             for name, enabled in config._explicit.items():
                 if name not in merged._explicit:
-                    merged._set_enabled(name, known_names=known_names, enabled=enabled)
+                    merged._set_enabled(name, enabled=enabled)
         return merged
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
@@ -311,9 +303,9 @@ class ChecksConfig(DiffBase):
                 return existing
             return SimpleCheckConfig(enabled=self._default_enabled is not False)
 
-    def _set_enabled(self, name: str, *, known_names: set[str], enabled: bool) -> None:
+    def _set_enabled(self, name: str, *, enabled: bool) -> None:
         self._explicit[name] = enabled
-        if name in known_names:
+        if name in _BUILTIN_CHECK_NAMES:
             self.get_by_name(name=name).enabled = enabled
         else:
             self._unknown[name] = SimpleCheckConfig(enabled=enabled)
@@ -327,11 +319,14 @@ class ChecksConfig(DiffBase):
     ) -> None:
         from schemathesis.checks import CHECKS
 
-        known_names = {f.name for f in fields(self) if not f.name.startswith("_")}
         # Registered custom checks aren't dataclass fields; apply the same include/exclude rules to
         # them so `included_check_names` disables unlisted custom checks too, not just built-in ones.
-        custom_names = set(CHECKS.get_all_names()) - known_names
-        all_names = known_names | custom_names | set(included_check_names or []) | set(excluded_check_names or [])
+        all_names = (
+            set(_BUILTIN_CHECK_NAMES)
+            | set(CHECKS.get_all_names())
+            | set(included_check_names or [])
+            | set(excluded_check_names or [])
+        )
         all_names.discard("all")
 
         for name in all_names:
@@ -341,9 +336,9 @@ class ChecksConfig(DiffBase):
                 and "all" not in included_check_names
                 and name not in included_check_names
             ):
-                self._set_enabled(name, known_names=known_names, enabled=False)
+                self._set_enabled(name, enabled=False)
             elif included_check_names is not None and ("all" in included_check_names or name in included_check_names):
-                self._set_enabled(name, known_names=known_names, enabled=True)
+                self._set_enabled(name, enabled=True)
 
         if max_response_time is not None:
             self._explicit["max_response_time"] = True
