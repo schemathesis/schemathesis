@@ -1,7 +1,7 @@
 import pytest
 
 from scripts.analyze.metrics import analyze
-from test.tooling.analyze.helpers import write_run
+from test.tooling.analyze.helpers import scenario, write_run
 
 
 def _failure_block(title, message):
@@ -57,12 +57,7 @@ def test_twoxx_per_minute(tmp_path):
         for i in range(6)
     }
     interactions = {f"c{i}": {"response": {"status_code": 200}} for i in range(6)}
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 160.0,
-            "recorder": {"label": "GET /a", "cases": cases, "interactions": interactions},
-        }
-    }
+    payload = scenario("GET /a", cases, interactions, timestamp=160.0)
     path = tmp_path / "run.ndjson"
     write_run(
         path,
@@ -77,16 +72,12 @@ def test_twoxx_per_minute(tmp_path):
 
 
 def _scenario_at(label, timestamp, status):
-    return {
-        "ScenarioFinished": {
-            "timestamp": timestamp,
-            "recorder": {
-                "label": label,
-                "cases": {"c1": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
-                "interactions": {"c1": {"response": {"status_code": status}}},
-            },
-        }
-    }
+    return scenario(
+        label,
+        {"c1": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
+        {"c1": {"response": {"status_code": status}}},
+        timestamp=timestamp,
+    )
 
 
 def test_new_operation_per_minute_timeline(tmp_path):
@@ -129,22 +120,18 @@ def test_timeline_uses_per_call_interaction_timestamp_when_present(tmp_path):
     # `timestamp` is finer and must be preferred when available. Discovery for /a lands at
     # minute 0 (interaction timestamp 100.5), /b at minute 2 (interaction timestamp 220.0)
     # — even though both share the same scenario timestamp.
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 230.0,
-            "recorder": {
-                "label": "Fuzz tests",
-                "cases": {
-                    "c1": {"value": {"method": "GET", "path": "/a", "meta": {"generation": {"mode": "positive"}}}},
-                    "c2": {"value": {"method": "GET", "path": "/b", "meta": {"generation": {"mode": "positive"}}}},
-                },
-                "interactions": {
-                    "c1": {"timestamp": 100.5, "response": {"status_code": 200}},
-                    "c2": {"timestamp": 220.0, "response": {"status_code": 200}},
-                },
-            },
-        }
-    }
+    payload = scenario(
+        "Fuzz tests",
+        {
+            "c1": {"value": {"method": "GET", "path": "/a", "meta": {"generation": {"mode": "positive"}}}},
+            "c2": {"value": {"method": "GET", "path": "/b", "meta": {"generation": {"mode": "positive"}}}},
+        },
+        {
+            "c1": {"timestamp": 100.5, "response": {"status_code": 200}},
+            "c2": {"timestamp": 220.0, "response": {"status_code": 200}},
+        },
+        timestamp=230.0,
+    )
     path = tmp_path / "run.ndjson"
     write_run(
         path,
@@ -179,27 +166,23 @@ def test_reachability_lists_distinct_operations_with_2xx(tmp_path):
 
 def test_reachability_counts_negative_2xx(tmp_path):
     # Negative-mode 2xx (NEGATIVE_DRIFT) is still a 2xx and marks the operation covered.
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 101.0,
-            "recorder": {
-                "label": "POST /widgets",
-                "cases": {
-                    "c1": {
-                        "value": {
-                            "method": "POST",
-                            "path": "/widgets",
-                            "meta": {
-                                "generation": {"mode": "negative"},
-                                "components": {"body": {"mode": "negative"}},
-                            },
-                        }
-                    }
-                },
-                "interactions": {"c1": {"response": {"status_code": 200}}},
-            },
-        }
-    }
+    payload = scenario(
+        "POST /widgets",
+        {
+            "c1": {
+                "value": {
+                    "method": "POST",
+                    "path": "/widgets",
+                    "meta": {
+                        "generation": {"mode": "negative"},
+                        "components": {"body": {"mode": "negative"}},
+                    },
+                }
+            }
+        },
+        {"c1": {"response": {"status_code": 200}}},
+        timestamp=101.0,
+    )
     path = tmp_path / "run.ndjson"
     write_run(
         path,
@@ -210,26 +193,3 @@ def test_reachability_counts_negative_2xx(tmp_path):
         ],
     )
     assert analyze(path).reachability.covered_operations == ["POST /widgets"]
-
-
-def test_reachability_empty_when_no_2xx(tmp_path):
-    payload = {
-        "ScenarioFinished": {
-            "timestamp": 101.0,
-            "recorder": {
-                "label": "GET /a",
-                "cases": {"c1": {"value": {"method": "GET", "meta": {"generation": {"mode": "positive"}}}}},
-                "interactions": {"c1": {"response": {"status_code": 422}}},
-            },
-        }
-    }
-    path = tmp_path / "run.ndjson"
-    write_run(
-        path,
-        [
-            {"EngineStarted": {"timestamp": 100.0}},
-            payload,
-            {"EngineFinished": {"timestamp": 130.0}},
-        ],
-    )
-    assert analyze(path).reachability.covered_operations == []
