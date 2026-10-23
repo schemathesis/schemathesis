@@ -1383,6 +1383,47 @@ def test_multipart_binary_field_filename_extension(ctx, value, expected_filename
 
 
 @pytest.mark.parametrize(
+    "property_schema, value, expected",
+    [
+        ({"type": "string", "format": "binary"}, b"abc", [("file", ("file", b"abc"))]),
+        ({"$ref": "#/components/schemas/File"}, b"abc", [("file", ("file", b"abc"))]),
+        (
+            {"type": "array", "items": {"$ref": "#/components/schemas/File"}},
+            [b"a", b"b"],
+            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+        ),
+        (
+            {"$ref": "#/components/schemas/Files"},
+            [b"a", b"b"],
+            [("file", ("file", b"a")), ("file", ("file", b"b"))],
+        ),
+    ],
+    ids=["inline", "ref", "ref-items", "ref-array"],
+)
+def test_multipart_binary_property_filename_behind_ref(ctx, property_schema, value, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {"schema": {"type": "object", "properties": {"file": property_schema}}}
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={
+            "schemas": {
+                "File": {"type": "string", "format": "binary"},
+                "Files": {"type": "array", "items": {"$ref": "#/components/schemas/File"}},
+            }
+        },
+    )
+    case = operation.Case(body={"file": value}, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == expected
+
+
+@pytest.mark.parametrize(
     "encoding,expected_filename",
     [
         # No encoding: field name is used as filename for binary list items

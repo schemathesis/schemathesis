@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Missing filename on `multipart/form-data` binary parts declared via `$ref`.
 - Type hints rejecting `tag` and `operation_id` filters in auth `apply_to`/`skip_for`.
 - False negative `negative_data_rejection` for invalid path parameters on Open API 2.0.
 - `st fuzz` showing "No issues found" when `warnings.fail-on` fails the run.

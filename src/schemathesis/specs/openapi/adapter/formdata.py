@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.core.file_samples import file_extension
+from schemathesis.core.jsonschema import resolve_with_root_bundle
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -66,6 +67,19 @@ def _filename(name: str, value: object) -> str:
     return f"{name}.{extension}" if extension else name
 
 
+def _resolved_properties(schema: dict[str, Any]) -> dict[str, Any]:
+    """Body properties and their `items` with `$ref` resolved, so file parts behind a reference keep a filename."""
+    resolved = {}
+    for name, property_schema in schema.get("properties", {}).items():
+        if isinstance(property_schema, dict):
+            property_schema = resolve_with_root_bundle(property_schema, schema)
+            items = property_schema.get("items")
+            if isinstance(items, dict):
+                property_schema = {**property_schema, "items": resolve_with_root_bundle(items, schema)}
+        resolved[name] = property_schema
+    return resolved
+
+
 def prepare_multipart_v3(
     operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
@@ -79,8 +93,9 @@ def prepare_multipart_v3(
             body_param = body
             break
 
+    properties = _resolved_properties(schema)
     for name, value in form_data.items():
-        property_schema = schema.get("properties", {}).get(name)
+        property_schema = properties.get(name)
         # Use the selected content type if available, otherwise check encoding definition
         content_type = None
         if selected_content_types and name in selected_content_types:
@@ -89,9 +104,9 @@ def prepare_multipart_v3(
             content_type = next(iter(body_param.get_property_content_types(name)), None)
 
         if isinstance(property_schema, dict):
+            declared = body_param.get_property_filename(name) if body_param else None
             if isinstance(value, list):
                 if _is_file_part(property_schema.get("items")):
-                    declared = body_param.get_property_filename(name) if body_param else None
                     for item in value:
                         filename = declared or _filename(name, item)
                         if content_type:
@@ -103,7 +118,7 @@ def prepare_multipart_v3(
                 else:
                     files.extend((name, (None, item)) for item in value)
             elif _is_file_part(property_schema):
-                filename = (body_param.get_property_filename(name) if body_param else None) or _filename(name, value)
+                filename = declared or _filename(name, value)
                 if content_type:
                     files.append((name, (filename, value, content_type)))
                 else:
