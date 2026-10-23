@@ -97,6 +97,8 @@ from flask import jsonify
         ),
         pytest.param('base-url = "not-a-url"', id="invalid_base_url"),
         pytest.param('origin = "http://127.0.0.1/api"', id="origin_with_path"),
+        pytest.param('base-url = "http://[::1"', id="base_url_unparsable"),
+        pytest.param('origin = "http://[::1"', id="origin_unparsable"),
         pytest.param(
             textwrap.dedent(
                 """
@@ -158,19 +160,6 @@ def test_incorrect_config(cli, snapshot_cli, tmp_path, config_content):
     if result.exception and not isinstance(result.exception, SystemExit):
         raise result.exception
     assert result == snapshot_cli
-
-
-@pytest.mark.parametrize(
-    "config_content",
-    [
-        pytest.param('base-url = "http://[::1"', id="base_url"),
-        pytest.param('origin = "http://[::1"', id="origin"),
-    ],
-)
-def test_unparsable_url_in_config(cli, snapshot_cli, tmp_path, config_content):
-    config_file = tmp_path / "config.toml"
-    config_file.write_text(config_content, encoding="utf-8")
-    assert cli.main(f"--config-file={config_file}", "run", "http://127.0.0.1") == snapshot_cli
 
 
 def test_non_existing_file(cli, snapshot_cli):

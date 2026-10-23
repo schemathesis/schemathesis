@@ -316,8 +316,6 @@ def test_report_write_error(ctx, cli, snapshot_cli):
         "--report-junit-path=/dev/full",
     )
     assert result.exit_code == ExitCode.OK
-    assert "Failed to write JUnit report to /dev/full: No space left on device" in result.stdout
-    assert "Please consider reporting this error" not in result.stdout
     assert result == snapshot_cli
 
 

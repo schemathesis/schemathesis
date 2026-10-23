@@ -150,30 +150,6 @@ def test_sse_multiple_failing_events(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_sse_multiline_data(ctx, cli, snapshot_cli):
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "data": {
-                "type": "string",
-                "contentMediaType": "application/json",
-                "contentSchema": {
-                    "type": "object",
-                    "properties": {"a": {"type": "integer"}},
-                },
-            },
-        },
-        "required": ["data"],
-    }
-    assert _run_sse_cli(ctx, cli, 'data: {"a":\ndata:  1}\n\n', item_schema) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_sse_fallback_to_schema_key(ctx, cli, snapshot_cli):
-    assert _run_sse_cli(ctx, cli, 'data: {"value": 42}\n\n', content_key="schema") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_empty_stream(ctx, cli, snapshot_cli):
     assert _run_sse_cli(ctx, cli, "") == snapshot_cli
 
@@ -217,39 +193,6 @@ def test_sse_itemschema_ignored_for_json(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sse_with_openapi_32(ctx, cli, snapshot_cli):
     assert _run_sse_cli(ctx, cli, 'data: {"value": 42}\n\n', version="3.2.0") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_sse_oneof_polymorphic_events(ctx, cli, snapshot_cli):
-    item_schema = {
-        "type": "object",
-        "properties": {
-            "event": {"type": "string"},
-            "data": {"type": "string"},
-        },
-        "required": ["event"],
-        "oneOf": [
-            {
-                "properties": {
-                    "event": {"enum": ["ping"]},
-                }
-            },
-            {
-                "properties": {
-                    "event": {"enum": ["update"]},
-                    "data": {
-                        "contentMediaType": "application/json",
-                        "contentSchema": {
-                            "type": "object",
-                            "properties": {"value": {"type": "integer"}},
-                            "required": ["value"],
-                        },
-                    },
-                }
-            },
-        ],
-    }
-    assert _run_sse_cli(ctx, cli, 'event: ping\n\nevent: update\ndata: {"value": 42}\n\n', item_schema) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -412,6 +355,42 @@ def test_sse_streaming_generator_response(ctx):
             ),
             'data: "anything"\n\n',
             id="content_schema_true_allows_any_payload",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": {
+                            "type": "string",
+                            "contentMediaType": "application/json",
+                            "contentSchema": {"type": "object", "properties": {"a": {"type": "integer"}}},
+                        }
+                    },
+                    "required": ["data"],
+                },
+                version="3.0.2",
+            ),
+            'data: {"a":\ndata:  1}\n\n',
+            id="multiline_data",
+        ),
+        pytest.param(
+            _sse_schema(SSE_ITEM_SCHEMA, version="3.0.2", content_key="schema"),
+            'data: {"value": 42}\n\n',
+            id="fallback_to_schema_key",
+        ),
+        pytest.param(
+            _sse_schema(
+                {
+                    "type": "object",
+                    "properties": {"event": {"type": "string"}, "data": {"type": "string"}},
+                    "required": ["event"],
+                    "oneOf": [{"properties": {"event": {"enum": ["ping"]}}}, UPDATE_WITH_VALUE],
+                },
+                version="3.0.2",
+            ),
+            'event: ping\n\nevent: update\ndata: {"value": 42}\n\n',
+            id="oneof_polymorphic_events",
         ),
     ],
 )

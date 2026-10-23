@@ -1488,14 +1488,9 @@ def test_replay_applies_per_operation_check_config(cli, app_runner, ctx, crash_f
     assert not crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_empty_sequence_marked_incompatible(cli, app_runner, ctx, tmp_path, snapshot_cli):
+def _write_empty_sequence(path):
     # Foreign file the writer never emits: an empty sequence, treated as incompatible rather than crashing.
-    schema_url, _ = _users_app(ctx, app_runner)
-    crash_dir = crash_cache_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
-    (crash_dir / "broken_x.json").write_text(
+    path.write_text(
         json.dumps(
             {
                 "operation": "GET /users",
@@ -1509,23 +1504,24 @@ def test_replay_empty_sequence_marked_incompatible(cli, app_runner, ctx, tmp_pat
         )
     )
 
-    assert cli.main("replay") == snapshot_cli
-    # An unreadable crash file is never auto-deleted; another version may still reproduce it.
-    assert (crash_dir / "broken_x.json").exists()
-
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_unreadable_crash_file_is_skipped(cli, app_runner, ctx, tmp_path, snapshot_cli):
-    # A crash file that errors on read (permissions, or vanished mid-scan) is skipped and kept, not aborted.
+@pytest.mark.parametrize(
+    "plant",
+    # A directory matches the `*.json` scan but raises OSError on read, like a permission error or a vanished file.
+    [_write_empty_sequence, Path.mkdir],
+    ids=["empty-sequence", "unreadable"],
+)
+def test_replay_incompatible_crash_file_is_skipped_and_kept(cli, app_runner, ctx, tmp_path, snapshot_cli, plant):
     schema_url, _ = _users_app(ctx, app_runner)
     crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
-    # A path that matches the `*.json` scan but raises OSError on read.
-    (crash_dir / "unreadable.json").mkdir()
+    plant(crash_dir / "broken_x.json")
 
     assert cli.main("replay") == snapshot_cli
-    assert (crash_dir / "unreadable.json").exists()
+    # An unreadable crash file is never auto-deleted; another version may still reproduce it.
+    assert (crash_dir / "broken_x.json").exists()
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -1802,22 +1798,24 @@ def test_replay_honors_configured_cache_directory(cli, app_runner, ctx, crash_fa
     assert not crash_file.exists()
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_configured_cache_without_crashes_reports_none(cli, tmp_path, snapshot_cli):
-    assert cli.main("replay", config={"cache": {"directory": str(tmp_path / "fresh")}}) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_no_crashes_reports_none_found(cli, tmp_path, snapshot_cli):
-    assert cli.main("replay") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_empty_directory_reports_none_found(cli, tmp_path, snapshot_cli):
+def _empty_directory(tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
+    return [str(empty)]
 
-    assert cli.main("replay", str(empty)) == snapshot_cli
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    ("make_args", "config"),
+    [
+        (lambda tmp_path: [], lambda tmp_path: {"cache": {"directory": str(tmp_path / "fresh")}}),
+        (lambda tmp_path: [], lambda tmp_path: None),
+        (_empty_directory, lambda tmp_path: None),
+    ],
+    ids=["configured-cache", "default-cache", "empty-directory"],
+)
+def test_replay_without_crashes_reports_none_found(cli, tmp_path, snapshot_cli, make_args, config):
+    assert cli.main("replay", *make_args(tmp_path), config=config(tmp_path)) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

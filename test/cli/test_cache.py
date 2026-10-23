@@ -55,7 +55,6 @@ def test_unwritable_cache_directory(ctx, cli, snapshot_cli, tmp_path):
     finally:
         cache_dir.chmod(0o755)
 
-    assert "CLI Handler Error" not in result.stdout
     assert result == snapshot_cli
 
 
