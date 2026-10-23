@@ -17,7 +17,7 @@ from schemathesis.engine.run.unit._case import (
     ServerWentAway,
 )
 from schemathesis.engine.run.unit._errors import classify_test_exception
-from schemathesis.engine.run.unit._scenario import iter_closing_events, start_scenario
+from schemathesis.engine.run.unit._scenario import Scenario, iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis.builder import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
@@ -59,31 +59,15 @@ def run_test(
     except BudgetExpired:
         # The operation ran out of its share, not the whole run — keep whatever it already produced,
         # errors included: running out of time does not undo them.
-        stored = state.unrecoverable_network_error
+        status, skip_reason, stored = _settle_stopped(scenario, errors, skip_reason="Time limit reached")
         if stored is not None:
-            # The request that outlasted the budget timed out before the next case found it expired.
-            status = Status.ERROR
-            yield non_fatal_error(stored.error, code_sample=stored.code_sample)
-        elif errors:
-            status = Status.ERROR
-        elif not recorder.interactions:
-            status = Status.SKIP
-            skip_reason = "Time limit reached"
-        else:
-            status = Status.SUCCESS
+            yield stored
     except ServerWentAway:
-        stored = state.unrecoverable_network_error
+        status, skip_reason, stored = _settle_stopped(
+            scenario, errors, skip_reason=StopReason.SERVER_UNAVAILABLE.skip_explanation
+        )
         if stored is not None:
-            # A crash caught before the replay was refused is still this operation's own finding.
-            status = Status.ERROR
-            yield non_fatal_error(stored.error, code_sample=stored.code_sample)
-        elif errors:
-            status = Status.ERROR
-        elif not recorder.has_responses():
-            status = Status.SKIP
-            skip_reason = StopReason.SERVER_UNAVAILABLE.skip_explanation
-        else:
-            status = Status.SUCCESS
+            yield stored
     except KeyboardInterrupt:
         yield scenario.finished(Status.INTERRUPTED, skip_reason)
         yield events.Interrupted(phase=phase)
@@ -105,6 +89,21 @@ def run_test(
     yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 
     yield scenario.finished(status, skip_reason)
+
+
+def _settle_stopped(
+    scenario: Scenario, errors: list[Exception], *, skip_reason: str | None
+) -> tuple[Status, str | None, events.NonFatalError | None]:
+    """Status of a scenario the run stopped early, plus the error event of a request that failed before the stop."""
+    stored = scenario.state.unrecoverable_network_error
+    if stored is not None:
+        # A request that timed out or crashed before the stop is still this operation's own finding.
+        return Status.ERROR, None, scenario.non_fatal_error(stored.error, code_sample=stored.code_sample)
+    if errors:
+        return Status.ERROR, None, None
+    if not scenario.recorder.has_responses():
+        return Status.SKIP, skip_reason, None
+    return Status.SUCCESS, None, None
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation, generation: GenerationConfig) -> None:
