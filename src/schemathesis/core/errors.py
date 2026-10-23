@@ -442,6 +442,12 @@ class AuthenticationError(SchemathesisError):
 class NoLinksFound(IncorrectUsage):
     """Raised when no valid links are available for stateful testing."""
 
+    suggestion: str | None
+
+    def __init__(self, message: str, suggestion: str | None = None) -> None:
+        super().__init__(message)
+        self.suggestion = suggestion
+
 
 class NoProducers(IncorrectUsage):
     """Raised when GraphQL stateful testing has no producer mutations to seed bundles.

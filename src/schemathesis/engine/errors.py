@@ -209,7 +209,7 @@ class EngineErrorInfo:
         return self._code_sample
 
     def suggestion(self, *, bold: Callable[[str], str] = str, base_url_is_set: bool = False) -> str | None:
-        if isinstance(self._error, UnsupportedType):
+        if isinstance(self._error, (UnsupportedType, errors.NoLinksFound)):
             return self._error.suggestion
         import requests
 
@@ -279,7 +279,6 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
         f"Record every request sent with {bold('`--report=har`')}.",
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE: "Review all parameters and request body schemas for conflicting constraints.",
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK: "Review your `filter_case` hook to ensure it accepts at least some generated cases.",
-        RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Review your endpoint filters to include linked operations",
         RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex follows ECMA 262 (JavaScript) syntax.\n"
         "For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions",
         RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION: "The pattern is valid - values matching it are what "

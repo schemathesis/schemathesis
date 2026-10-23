@@ -260,6 +260,38 @@ def test_not_enough_links(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_links_from_operation_with_unusable_body(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetUser": {"operationId": "getUser", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/users/{id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert cli.run_openapi_app(app, "--phases=stateful") == snapshot_cli
+
+
 def test_invalid_parameter_reference(ctx, cli, snapshot_cli):
     # When a link references a non-existent parameter
     api = ctx.openapi.apps.stateful_users(InvalidParameter())

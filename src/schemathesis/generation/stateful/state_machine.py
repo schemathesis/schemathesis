@@ -17,7 +17,7 @@ from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
 from schemathesis.core.failures import FailureGroup, as_reported_failure
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.result import Result
+from schemathesis.core.result import Ok, Result
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -247,12 +247,25 @@ class APIStateMachine(RuleBasedStateMachine):
             super().__init__()
         except InvalidDefinition as exc:
             if "defines no rules" in str(exc):
+                suggestion = None
+                unusable_bodies = [
+                    result.ok().label
+                    for result in self.schema.get_all_operations()
+                    if isinstance(result, Ok) and result.ok().has_skipped_required_body
+                ]
                 if not self.schema.statistic.transitions.total:
                     message = "Schema contains no link definitions required for stateful testing"
+                elif self.schema.statistic.transitions.selected and unusable_bodies:
+                    message = (
+                        "Linked operations have required request bodies that could not be parsed:\n\n"
+                        + "\n".join(f"  - {label}" for label in unusable_bodies)
+                    )
+                    suggestion = "Fix the request body schemas of these operations to test their links"
                 else:
                     message = "All link definitions required for stateful testing are excluded by filters"
+                    suggestion = "Review your endpoint filters to include linked operations"
                 message += f"\n\nLearn how to define links: {STATEFUL_TESTING_GUIDE_URL}"
-                raise NoLinksFound(message) from None
+                raise NoLinksFound(message, suggestion) from None
             raise
         rules = self._rules_strategy
         if self.rule_order_seed is not None and self.root_rules:
