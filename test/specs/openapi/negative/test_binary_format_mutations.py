@@ -120,6 +120,7 @@ def test_custom_media_type_raw_binary_body_in_negative_mode(ctx):
     operation = ctx.openapi.load_operation(
         "POST /upload",
         {
+            "parameters": [{"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}}],
             "requestBody": {
                 "content": {"application/x-tar": {"schema": {"type": "string", "format": "binary"}}},
                 "required": True,
