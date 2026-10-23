@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     OutputSlot,
     ResourceDefinition,
     ResourceMap,
+    find_input,
     infer_fk_target,
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
@@ -1171,9 +1172,9 @@ def align_created_identifiers(operations: OperationMap) -> None:
         if not segments[-1].startswith("{"):
             continue
         parameter_name = segments[-1][1:-1]
-        for input_slot in operation.inputs:
-            if input_slot.parameter_location == ParameterLocation.PATH and input_slot.parameter_name == parameter_name:
-                item_resources.setdefault("/".join(segments[:-1]), {})[input_slot.resource.name] = input_slot.resource
+        input_slot = find_input(operation.inputs, ParameterLocation.PATH, parameter_name)
+        if input_slot is not None:
+            item_resources.setdefault("/".join(segments[:-1]), {})[input_slot.resource.name] = input_slot.resource
     for operation in operations.values():
         if operation.method not in ("post", "put"):
             continue
@@ -1284,15 +1285,8 @@ def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: Operation
         item_parameter = naming.trailing_path_parameter(operation.path)
         if item_parameter is None:
             continue
-        item = next(
-            (
-                input_slot.resource
-                for input_slot in operation.inputs
-                if input_slot.parameter_location == ParameterLocation.PATH
-                and input_slot.parameter_name == item_parameter
-            ),
-            None,
-        )
+        item_slot = find_input(operation.inputs, ParameterLocation.PATH, item_parameter)
+        item = item_slot.resource if item_slot is not None else None
         if item is None or item.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
             continue
         declared = schema.find_operation_by_label(label)
