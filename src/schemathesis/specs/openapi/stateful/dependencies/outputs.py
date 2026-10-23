@@ -10,6 +10,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     Cardinality,
     InputSlot,
     OutputSlot,
+    find_input,
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
     InferenceState,
@@ -83,14 +84,7 @@ def _path_keyed_outputs(
     ):
         return
 
-    matching = next(
-        (
-            slot
-            for slot in inputs
-            if slot.parameter_location == ParameterLocation.PATH and slot.parameter_name == trailing
-        ),
-        None,
-    )
+    matching = find_input(inputs, ParameterLocation.PATH, trailing)
     if matching is None:
         return
 

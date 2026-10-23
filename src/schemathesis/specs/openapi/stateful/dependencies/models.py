@@ -4,7 +4,7 @@ import difflib
 import enum
 import re
 from collections import defaultdict
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from typing import Any, TypeAlias
@@ -626,10 +626,7 @@ def _confirmed_input(producer: OperationNode, output_slot: OutputSlot) -> InputS
         location, name = ParameterLocation.BODY, output_slot.body_field
     else:
         return None
-    return next(
-        (slot for slot in producer.inputs if slot.parameter_location == location and slot.parameter_name == name),
-        None,
-    )
+    return find_input(producer.inputs, location, name)
 
 
 def _takes_confirmed_value(input_slot: InputSlot, confirmed: InputSlot) -> bool:
@@ -789,6 +786,11 @@ class OperationNode:
     inputs: list[InputSlot]
     # What this operation PRODUCES
     outputs: list[OutputSlot]
+
+
+def find_input(inputs: Iterable[InputSlot], location: ParameterLocation, name: str) -> InputSlot | None:
+    """The first input bound to the `location` parameter called `name`."""
+    return next((slot for slot in inputs if slot.parameter_location == location and slot.parameter_name == name), None)
 
 
 # A body field location, integers marking array items.
