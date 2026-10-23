@@ -6,6 +6,10 @@
 
 - `Case.auth_identity`: name of the WFC auth entry a case was sent with.
 
+### :wrench: Changed
+
+- Docker images use Python 3.14.9.
+
 ### :bug: Fixed
 
 - Stateful authentication failures hidden or reported as a Hypothesis traceback.
