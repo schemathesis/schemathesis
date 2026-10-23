@@ -1314,6 +1314,36 @@ def test_invalid_response_definition(ctx, cli, snapshot_cli):
     )
 
 
+def test_invalid_response_definition_behind_reference(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/success": {
+                "get": {
+                    "responses": {
+                        "default": {
+                            "description": "text",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Offset"}}},
+                        }
+                    }
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Base": {"type": "object"},
+                "Offset": {
+                    "allOf": [{"$ref": "#/components/schemas/Base"}, {"properties": {"earliest": {"type": "int64"}}}]
+                },
+            }
+        },
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={api.base_url}/api", "-c response_schema_conformance", "--max-examples=1")
+        == snapshot_cli
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_useless_traceback(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()

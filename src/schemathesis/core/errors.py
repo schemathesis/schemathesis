@@ -135,6 +135,7 @@ class InvalidSchema(SchemathesisError):
         method: str | None,
         config: OutputConfig,
         location: SchemaLocation | None = None,
+        location_path: list[str | int] | None = None,
     ) -> InvalidSchema:
         # This default message contains the instance which we already printed
         if "is not valid under any of the schemas" in error.message:
@@ -143,7 +144,7 @@ class InvalidSchema(SchemathesisError):
             error_message = error.message
         return cls._from_raw_components(
             instance_path=error.instance_path,
-            location_path=error.instance_path,
+            location_path=error.instance_path if location_path is None else location_path,
             instance=error.instance,
             error_message=error_message,
             path=path,
