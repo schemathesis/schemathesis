@@ -350,60 +350,51 @@ class ProjectConfig(DiffBase):
             return self._parent.config_path
         return None
 
+    def _operation_config(self, operation: APIOperation | None) -> OperationConfig | None:
+        if operation is None:
+            return None
+        return self.operations.get_for_operation(operation=operation)
+
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
         """Get auth credentials, prioritizing operation-specific configs."""
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.auth.basic is not None:
-                return config.auth.basic
-        if self.auth.basic is not None:
-            return self.auth.basic
-        return None
+        config = self._operation_config(operation)
+        if config is not None and config.auth.basic is not None:
+            return config.auth.basic
+        return self.auth.basic
 
     def headers_for(self, *, operation: APIOperation | None = None) -> dict[str, str]:
         """Get explicitly configured headers."""
         headers = self.headers.copy() if self.headers else {}
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.headers is not None:
-                headers.update(config.headers)
+        config = self._operation_config(operation)
+        if config is not None and config.headers is not None:
+            headers.update(config.headers)
         return headers
 
     def max_redirects_for(self, *, operation: APIOperation | None = None) -> int | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.max_redirects is not None:
-                return config.max_redirects
-        if self.max_redirects is not None:
-            return self.max_redirects
-        return None
+        config = self._operation_config(operation)
+        if config is not None and config.max_redirects is not None:
+            return config.max_redirects
+        return self.max_redirects
 
     def max_stream_events_for(self, *, operation: APIOperation | None = None) -> int:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.max_stream_events is not None:
-                return config.max_stream_events
+        config = self._operation_config(operation)
+        if config is not None and config.max_stream_events is not None:
+            return config.max_stream_events
         if self.max_stream_events is not None:
             return self.max_stream_events
         return DEFAULT_MAX_STREAM_EVENTS
 
     def request_timeout_for(self, *, operation: APIOperation | None = None) -> float | int | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.request_timeout is not None:
-                return config.request_timeout
-        if self.request_timeout is not None:
-            return self.request_timeout
-        return None
+        config = self._operation_config(operation)
+        if config is not None and config.request_timeout is not None:
+            return config.request_timeout
+        return self.request_timeout
 
     def request_retries_for(self, *, operation: APIOperation | None = None) -> int | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.request_retries is not None:
-                return config.request_retries
-        if self.request_retries is not None:
-            return self.request_retries
-        return None
+        config = self._operation_config(operation)
+        if config is not None and config.request_retries is not None:
+            return config.request_retries
+        return self.request_retries
 
     def continue_on_failure_for(self, *, operation: APIOperation) -> bool:
         config = self.operations.get_for_operation(operation=operation)
@@ -412,19 +403,17 @@ class ProjectConfig(DiffBase):
         return bool(self.continue_on_failure)
 
     def tls_verify_for(self, *, operation: APIOperation | None = None) -> bool | str | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.tls_verify is not None:
-                return config.tls_verify
+        config = self._operation_config(operation)
+        if config is not None and config.tls_verify is not None:
+            return config.tls_verify
         return self.tls_verify
 
     def request_cert_for(self, *, operation: APIOperation | None = None) -> str | tuple[str, str] | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.request_cert is not None:
-                if config.request_cert_key:
-                    return config.request_cert, config.request_cert_key
-                return config.request_cert
+        config = self._operation_config(operation)
+        if config is not None and config.request_cert is not None:
+            if config.request_cert_key:
+                return config.request_cert, config.request_cert_key
+            return config.request_cert
         if self.request_cert is not None:
             if self.request_cert_key:
                 return self.request_cert, self.request_cert_key
@@ -446,29 +435,22 @@ class ProjectConfig(DiffBase):
         return kwargs
 
     def proxy_for(self, *, operation: APIOperation | None = None) -> str | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.proxy is not None:
-                return config.proxy
-        if self.proxy is not None:
-            return self.proxy
-        return None
+        config = self._operation_config(operation)
+        if config is not None and config.proxy is not None:
+            return config.proxy
+        return self.proxy
 
     def rate_limit_for(self, *, operation: APIOperation | None = None) -> Limiter | Literal["auto"] | None:
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.rate_limit is not None:
-                return config.rate_limit
-        if self.rate_limit is not None:
-            return self.rate_limit
-        return None
+        config = self._operation_config(operation)
+        if config is not None and config.rate_limit is not None:
+            return config.rate_limit
+        return self.rate_limit
 
     def warnings_for(self, *, operation: APIOperation | None = None) -> WarningsConfig:
         # Operation can be absent on some non-fatal errors due to schema parsing
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            if config.warnings is not None:
-                return config.warnings
+        config = self._operation_config(operation)
+        if config is not None and config.warnings is not None:
+            return config.warnings
         return self.warnings
 
     def phases_for(self, *, operation: APIOperation | None) -> PhasesConfig:
