@@ -558,6 +558,25 @@ def test_connection_timeout(ctx, cli, workers):
         assert "Read timed out" in result.stdout, result.stdout
 
 
+# Only the first request stalls, and only past the default timeout, so a missing timeout fails instead of hanging.
+def test_default_request_timeout(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app({"/stall": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    release = threading.Event()
+    calls = count()
+
+    @app.route("/stall")
+    def stall():
+        if next(calls) == 0:
+            release.wait(15)
+        return jsonify({})
+
+    try:
+        result = cli.run_openapi_app(app, "--max-examples=1", "--phases=fuzzing", "--checks=not_a_server_error")
+    finally:
+        release.set()
+    assert "Read timed out after 10 seconds" in result.stdout, result.stdout
+
+
 @pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
 def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(linked_users())
