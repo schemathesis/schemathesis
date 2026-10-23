@@ -400,6 +400,11 @@ class Case(Generic[OperationT]):
         return derived
 
     @property
+    def auth_identity(self) -> str | None:
+        """Name of the auth entry this case was sent with, when several are configured."""
+        return self._auth_identity
+
+    @property
     def formatted_path(self) -> str:
         """Path template with variables substituted (e.g., /users/{user_id} -> /users/123)."""
         return prepare_path(self.path, self.path_parameters)

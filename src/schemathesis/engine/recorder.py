@@ -335,9 +335,9 @@ class ReproductionStep:
     ) -> ReproductionStep:
         curl = case.as_curl_command(headers=headers, verify=verify)
         # Requests sent as different identities look alike once credentials are masked.
-        role = roles.get(case._auth_identity) if case._auth_identity is not None else None
+        role = roles.get(case.auth_identity) if case.auth_identity is not None else None
         if role is not None:
-            curl = f"# as {case._auth_identity} ({role})\n{curl}"
+            curl = f"# as {case.auth_identity} ({role})\n{curl}"
         return cls(
             case_id=case.id,
             operation=case.operation.label,

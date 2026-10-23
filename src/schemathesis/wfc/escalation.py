@@ -206,4 +206,4 @@ def record_auth_outcome(case: Case, status_code: int) -> None:
     """Let an escalating provider learn from this response."""
     provider = escalating_provider(case.operation.schema)
     if provider is not None:
-        provider.record(case.operation.label, case._auth_identity, status_code)
+        provider.record(case.operation.label, case.auth_identity, status_code)

@@ -64,7 +64,7 @@ def _owner_read(ctx: CheckContext, response: Response, case: Case) -> _OwnerRead
     if case.method != "GET" or not 200 <= response.status_code < 300 or case.meta is None:
         return None
     provider = escalating_provider(case.operation.schema)
-    owner = case._auth_identity
+    owner = case.auth_identity
     if provider is None or owner is None or owner not in provider.peers or _declared_public(case.operation):
         return None
     schema = declared_response_schema(case.operation, response.status_code, response_content_type(response))
@@ -143,7 +143,7 @@ def _linked_values(read: _OwnerRead) -> Iterator[tuple[str, object, Case | None]
     """Path values the owner's previous stateful step created or listed, with that step when it was a list."""
     case = read.case
     parent = read.ctx.internals.find_parent(case_id=case.id)
-    if parent is None or parent._auth_identity != read.owner:
+    if parent is None or parent.auth_identity != read.owner:
         return
     is_read = parent.method.upper() in SAFE_METHODS
     if is_read and not is_collection(parent.operation):
@@ -172,8 +172,8 @@ def _apply(case: Case, provider: AuthProvider) -> None:
 
 def owner_provider(case: Case) -> AuthProvider:
     provider = escalating_provider(case.operation.schema)
-    assert provider is not None and case._auth_identity is not None
-    return provider.provider_for(case._auth_identity)
+    assert provider is not None and case.auth_identity is not None
+    return provider.provider_for(case.auth_identity)
 
 
 def strip_credentials(case: Case, provider: AuthProvider) -> Case:
@@ -305,7 +305,7 @@ def listing_case(case: Case, operation: APIOperation | None, query: dict[str, An
     path_parameters = {name: case.path_parameters[name] for name in names}
     # The list's own query picks the page the value was on.
     listing = operation.Case(path_parameters=path_parameters, query=dict(query) if query else None)
-    listing._auth_identity = case._auth_identity
+    listing._auth_identity = case.auth_identity
     return listing
 
 
