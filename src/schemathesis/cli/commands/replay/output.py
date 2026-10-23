@@ -24,7 +24,7 @@ from schemathesis.cli.output import (
 )
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import case_header, format_failures
-from schemathesis.core.output import truncate_text
+from schemathesis.core.output import pluralize, truncate_text
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.generation.meta import report_label
 from schemathesis.reporting.crashes import CrashFile, CrashStep
@@ -137,10 +137,9 @@ def render_replay(
 def _print_run_header(console: Console, *, count: int, source: str, base_url: str | None) -> None:
     from rich.text import Text
 
-    noun = "case" if count == 1 else "cases"
     line = Text()
     line.append("Replaying ", style="dim")
-    line.append(f"{count} {noun}", style="bold")
+    line.append(pluralize(count, "case"), style="bold")
     line.append(" from ", style="dim")
     line.append(source, style="cyan")
     console.print(line)
@@ -363,9 +362,8 @@ def _print_incompatible_notice(console: Console, count: int) -> None:
 def _print_removal_notice(console: Console, count: int) -> None:
     from rich.text import Text
 
-    noun = "crash file" if count == 1 else "crash files"
     line = Text()
-    line.append(f"Removed {count} {noun} (pass --keep to retain).", style="dim")
+    line.append(f"Removed {pluralize(count, 'crash file')} (pass --keep to retain).", style="dim")
     console.print(line)
     console.print()
 

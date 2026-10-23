@@ -22,12 +22,14 @@ from schemathesis.core.failures import (
     MessageBlock,
     is_reproducible_failure,
 )
+from schemathesis.core.output import pluralize
 from schemathesis.core.timing import Instant
 from schemathesis.engine.summary import (
     BaselineSummary,
     ErrorGroup,
     FailureGroup,
     OperationsSummary,
+    SummaryData,
     TestCasesSummary,
 )
 
@@ -131,16 +133,11 @@ def display_final_line(
     no_checks_ran: bool = False,
     interrupted: bool = False,
 ) -> None:
-    parts = []
-    if failures:
-        suffix = "s" if failures > 1 else ""
-        parts.append(f"{failures} failure{suffix}")
-    if errors:
-        suffix = "s" if errors > 1 else ""
-        parts.append(f"{errors} error{suffix}")
-    if warnings:
-        suffix = "s" if warnings > 1 else ""
-        parts.append(f"{warnings} warning{suffix}")
+    parts = [
+        pluralize(count, word)
+        for count, word in ((failures, "failure"), (errors, "error"), (warnings, "warning"))
+        if count
+    ]
 
     if nothing_tested_reason is not None:
         message = nothing_tested_reason
@@ -556,6 +553,35 @@ def display_reports(ctx: BaseExecutionContext) -> None:
         for name, path in reports:
             click.echo(style(f"  - {name}: {path}"))
         click.echo()
+
+
+def issue_parts(*, unique_failures: int, errors: int) -> list[str]:
+    parts = []
+    if unique_failures:
+        parts.append(f"❌ {pluralize(unique_failures, 'unique failure')}")
+    if errors:
+        parts.append(f"🚫 {pluralize(errors, 'error')}")
+    return parts
+
+
+def display_summary_counts(summary: SummaryData) -> None:
+    if summary.failures:
+        display_failures_summary(summary.failures)
+    if summary.baseline:
+        display_baseline_summary(summary.baseline)
+    if summary.filtered:
+        display_filtered_summary(summary.filtered)
+    if summary.errors:
+        display_errors_summary(summary.errors)
+
+
+def display_summary_footer(ctx: BaseExecutionContext, summary: SummaryData) -> None:
+    if ctx.summary_lines:
+        print_lines(ctx.summary_lines)
+        click.echo()
+    display_test_cases(summary.test_cases)
+    display_reports(ctx)
+    display_seed(ctx.config)
 
 
 def display_fatal_error(

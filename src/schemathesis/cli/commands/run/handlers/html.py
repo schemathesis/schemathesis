@@ -502,7 +502,7 @@ def _nothing_tested(reason: str | None, summary: SummaryData) -> NothingTested |
     operations = summary.operations
     if operations is not None and operations.total and not operations.selected:
         return NothingTested(
-            title=f"0 of {operations.total} operation{'' if operations.total == 1 else 's'} matched the filters",
+            title=f"0 of {pluralize(operations.total, 'operation')} matched the filters",
             filters=sorted(summary.warnings.unmatched_filter),
             tip=UNMATCHED_FILTER_TIP,
         )
