@@ -160,6 +160,45 @@ def test_negative_data_rejection_path_parameter_type_mutation(ctx, cli, snapshot
     )
 
 
+@pytest.mark.parametrize(
+    ("version", "path", "parameter"),
+    [
+        ("2.0", "/items/{id}", {"type": "integer"}),
+        ("3.0.2", "/api/items/{id}", {"schema": {"type": "integer"}}),
+    ],
+    ids=["swagger-2.0", "openapi-3.0"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_accepted_path_parameter(ctx, cli, snapshot_cli, version, path, parameter):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            path: {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, **parameter}],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        },
+        version=version,
+    )
+
+    @app.route("/api/items/<id>")
+    def item(id):
+        return "", 200 if id.isalpha() else 400
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--phases=fuzzing",
+            "--max-examples=10",
+            "--seed=1",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, cli, snapshot_cli):
     # Like the integer variant, string mutations for a float path parameter can decode to valid floats.

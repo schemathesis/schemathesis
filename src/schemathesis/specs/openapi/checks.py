@@ -19,7 +19,7 @@ from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator, resolve_bundled_ref
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.types import JsonSchema, as_object_schema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import (
@@ -553,8 +553,8 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
         if not elements and not sent_texts:
             continue
 
-        schema = param.definition.get("schema", {})
-        expected_types = parameter_types(param.validation_schema)
+        schema = param.validation_schema
+        expected_types = parameter_types(schema)
 
         if _declares_type(schema, "array"):
             continue
@@ -698,11 +698,11 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
         parameter = operation_container.get(param_name)
         if not isinstance(parameter, OpenApiParameter):
             continue
-        schema = parameter.definition.get("schema", {})
+        schema = as_object_schema(parameter.validation_schema)
         if "array" not in get_type(schema) or parameter.definition.get("style", "simple") != "simple":
             continue
         try:
-            validator = make_validator(schema, parameter.adapter.jsonschema_validator_cls)
+            validator = parameter.get_validator()
         except Exception:
             return True
         # `unquote` keeps `str` subclasses intact, and splitting an empty string keeps the input
