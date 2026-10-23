@@ -17,20 +17,16 @@ from schemathesis.cli.output import (
     LoadingProgressManager,
     SpinnerProgressManager,
     display_api_operations,
-    display_baseline_summary,
     display_errors,
-    display_errors_summary,
     display_failures,
-    display_failures_summary,
-    display_filtered_summary,
     display_final_line,
     display_header,
-    display_reports,
     display_section_name,
-    display_seed,
-    display_test_cases,
+    display_summary_counts,
+    display_summary_footer,
     duration_phrase,
     format_duration,
+    issue_parts,
     make_console,
     make_progress_bar,
     print_lines,
@@ -105,8 +101,7 @@ def _format_cache_row(report: CacheReport | None) -> Text | None:
         return Text("unavailable, running without cache")
     parts = []
     if report.replayed:
-        noun = "request" if report.replayed == 1 else "requests"
-        parts.append(f"{report.replayed} {noun} replayed")
+        parts.append(f"{pluralize(report.replayed, 'request')} replayed")
     if report.dropped:
         parts.append(f"{report.dropped} stale removed")
     if not parts:
@@ -1177,12 +1172,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     def _cycle_metrics(self, ctx: ExecutionContext) -> str:
         # Per-cycle pass/fail counts swing as operations flip between passes; these only grow.
         parts = [f"{ctx.statistic.total_cases} cases"]
-        unique = len(ctx.statistic.unique_failures_map)
-        if unique:
-            parts.append(f"❌ {unique} unique failure{'' if unique == 1 else 's'}")
-        errors = len(ctx.errors)
-        if errors:
-            parts.append(f"🚫 {errors} error{'' if errors == 1 else 's'}")
+        parts.extend(issue_parts(unique_failures=len(ctx.statistic.unique_failures_map), errors=len(ctx.errors)))
         if self.cycle_links:
             parts.append(self.cycle_links)
         extra = self._progress_suffix(ctx)
@@ -1679,9 +1669,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             interrupted=event.stop_reason == StopReason.INTERRUPTED,
         )
 
-    def display_seed(self) -> None:
-        display_seed(self.config)
-
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         self._flush_coverage()
         self._stop_cycle_line()
@@ -1706,17 +1693,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         self.display_phases(ctx)
 
-        if summary.failures:
-            display_failures_summary(summary.failures)
-
-        if summary.baseline is not None:
-            display_baseline_summary(summary.baseline)
-
-        if summary.filtered:
-            display_filtered_summary(summary.filtered)
-
-        if summary.errors:
-            display_errors_summary(summary.errors)
+        display_summary_counts(summary)
 
         if not ctx.warnings.is_empty:
             self.display_warnings_summary(ctx)
@@ -1732,11 +1709,5 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                     )
                 )
 
-        if ctx.summary_lines:
-            print_lines(ctx.summary_lines)
-            click.echo()
-
-        display_test_cases(summary.test_cases)
-        display_reports(ctx)
-        self.display_seed()
+        display_summary_footer(ctx, summary)
         self.display_final_line(ctx, event)
