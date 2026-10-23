@@ -15,7 +15,6 @@ from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transforms import UNRESOLVABLE, format_body_key, resolve_path, split_body_key
 from schemathesis.core.transport import response_content_type
-from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.error_feedback import _walk_to_property
@@ -730,12 +729,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not slots:
             return
         if case.meta is not None:
-            slots = [
-                slot
-                for slot in slots
-                if (component := case.meta.components.get(slot.parameter_location)) is None
-                or component.mode == GenerationMode.POSITIVE
-            ]
+            slots = [slot for slot in slots if not case.meta.is_negative_at(slot.parameter_location)]
             if not slots:
                 return
         path_parameters = _path_parameters_as_read(operation, case)
@@ -746,7 +740,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             path_parameters=path_parameters,
             status_code=status_code,
             context=path_parameters,
-            identity=case._auth_identity,
+            identity=case.auth_identity,
             query=case.query or {},
             referenced=referenced_by(case),
         )
@@ -787,7 +781,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 status_code=response.status_code,
                 payload=payload,
                 context=_path_parameters_as_read(operation, case),
-                identity=case._auth_identity,
+                identity=case.auth_identity,
                 query=case.query or {},
                 referenced=referenced_by(case),
             )

@@ -401,7 +401,7 @@ def build_crashes_from_recorder(
                 case_body=case_body,
                 media_type=case.media_type,
                 parent_index=index_by_case_id.get(node.parent_id) if node.parent_id is not None else None,
-                auth_identity=case._auth_identity,
+                auth_identity=case.auth_identity,
                 operation=case.operation.label,
             )
         )

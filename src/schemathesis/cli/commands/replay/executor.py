@@ -294,7 +294,7 @@ def _replay_sequence(
         if (
             identities is not None
             and step.auth_identity is not None
-            and case._auth_identity not in (None, step.auth_identity)
+            and case.auth_identity not in (None, step.auth_identity)
         ):
             _send_as(case, identities, step.auth_identity)
 

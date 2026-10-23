@@ -241,7 +241,7 @@ class Statistic:
                     steps=last_failure_info.steps,
                     failures=current_case_failures,
                     response=recorder.interactions[case_id].response,
-                    auth_identity=case.value._auth_identity,
+                    auth_identity=case.value.auth_identity,
                 )
 
             if current_case_failures:

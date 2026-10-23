@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.4...HEAD) - TBD
 
+### :rocket: Added
+
+- `Case.auth_identity`: name of the WFC auth entry a case was sent with.
+
 ### :bug: Fixed
 
 - Type hints rejecting `tag` and `operation_id` filters in auth `apply_to`/`skip_for`.
