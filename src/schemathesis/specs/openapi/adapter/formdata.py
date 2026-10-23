@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.file_samples import file_extension
-from schemathesis.core.jsonschema import resolve_with_root_bundle
+from schemathesis.core.jsonschema import resolve_bundled_root, resolve_with_root_bundle
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ def prepare_multipart_v2(
     for parameter in operation.body:
         schema = parameter.definition.get("schema")
         if isinstance(schema, dict):
-            known_fields.update(schema.get("properties", {}))
+            known_fields.update(resolve_bundled_root(schema).get("properties", {}))
 
     def add_part(name: str, value: Any, is_file: bool) -> None:
         content_type = selected.get(name)
@@ -91,7 +91,7 @@ def prepare_multipart_v3(
     files: list[tuple[str, Any]] = []
     body_param = operation.get_body_for_media_type(media_type)
     schema_node = body_param.definition.get("schema") if body_param is not None else None
-    schema: dict[str, Any] = schema_node if isinstance(schema_node, dict) else {}
+    schema: dict[str, Any] = resolve_bundled_root(schema_node) if isinstance(schema_node, dict) else {}
 
     properties = _resolved_properties(schema)
     for name, value in form_data.items():

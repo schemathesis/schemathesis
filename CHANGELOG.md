@@ -14,6 +14,7 @@
 
 - Stateful authentication failures hidden or reported as a Hypothesis traceback.
 - Missing filename on `multipart/form-data` binary parts declared via `$ref`.
+- Missing multipart filenames and part encodings for a `$ref` body schema with nested references.
 - Type hints rejecting `tag` and `operation_id` filters in auth `apply_to`/`skip_for`.
 - Stateful phase blaming filters when linked operations have unparsable required request bodies.
 - Internal `x-bundled` location in errors for invalid response schemas behind `$ref`.

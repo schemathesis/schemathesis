@@ -8,8 +8,8 @@ from urllib.parse import quote
 
 from schemathesis.core import media_types
 from schemathesis.core.jsonschema import (
-    BUNDLE_STORAGE_KEY,
     maybe_resolve_bundled,
+    resolve_bundled_root,
     resolve_with_root_bundle,
     schema_with_bundle,
 )
@@ -80,10 +80,7 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
             schema_was_top_ref = False
             if isinstance(schema, dict):
                 schema_was_top_ref = isinstance(schema.get("$ref"), str)
-                bundled = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema.get(BUNDLE_STORAGE_KEY), dict) else None
-                schema = maybe_resolve_bundled(schema)
-                if bundled is not None and BUNDLE_STORAGE_KEY not in schema:
-                    schema = {**schema, BUNDLE_STORAGE_KEY: bundled}
+                schema = resolve_bundled_root(schema)
                 type_ = schema.get("type")
             else:
                 type_ = None

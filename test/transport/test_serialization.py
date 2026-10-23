@@ -941,6 +941,90 @@ def test_multipart_ref_to_scalar_is_not_json_encoded(ctx, case_factory):
     assert _multipart_payload(serialized, "part") == "raw"
 
 
+@pytest.mark.parametrize(
+    "properties, encoding, body, expected",
+    [
+        (
+            {"file": {"type": "string", "format": "binary"}},
+            {},
+            {"file": b"abc", "kind": "a"},
+            [("file", ("file", b"abc")), ("kind", (None, "a"))],
+        ),
+        (
+            {"files": {"type": "array", "items": {"type": "string", "format": "binary"}}},
+            {},
+            {"files": [b"a", b"b"], "kind": "a"},
+            [("files", ("files", b"a")), ("files", ("files", b"b")), ("kind", (None, "a"))],
+        ),
+        (
+            {"meta": {"type": "object", "properties": {"x": {"type": "integer"}}}},
+            {},
+            {"meta": {"x": 1}, "kind": "a"},
+            [("meta", (None, b'{"x": 1}', "application/json")), ("kind", (None, "a"))],
+        ),
+        (
+            {"doc": {"type": "object", "xml": {"name": "item"}}},
+            {"doc": {"contentType": "application/xml"}},
+            {"doc": {"x": "1"}, "kind": "a"},
+            [("doc", (None, b"<item><x>1</x></item>", "application/xml")), ("kind", (None, "a"))],
+        ),
+    ],
+    ids=["file", "file-array", "object", "xml"],
+)
+@pytest.mark.parametrize("declared", ["inline", "ref"])
+def test_multipart_parts_of_body_behind_ref(ctx, declared, properties, encoding, body, expected):
+    # The `kind` reference keeps a referenced body bundled with a `$ref` at its root
+    upload = {"type": "object", "properties": {**properties, "kind": {"$ref": "#/components/schemas/Kind"}}}
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": upload if declared == "inline" else {"$ref": "#/components/schemas/Upload"},
+                        "encoding": encoding,
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"schemas": {"Upload": upload, "Kind": {"type": "string", "enum": ["a"]}}},
+    )
+    case = operation.Case(body=body, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == expected
+
+
+@pytest.mark.parametrize("declared", ["inline", "ref"])
+def test_multipart_swagger2_body_parameter_behind_ref(ctx, declared):
+    # The `kind` reference keeps a referenced body bundled with a `$ref` at its root
+    upload = {
+        "type": "object",
+        "properties": {"file": {"type": "string", "format": "binary"}, "kind": {"$ref": "#/definitions/Kind"}},
+    }
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "consumes": ["multipart/form-data"],
+            "parameters": [
+                {
+                    "in": "body",
+                    "name": "body",
+                    "schema": upload if declared == "inline" else {"$ref": "#/definitions/Upload"},
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
+        definitions={"Upload": upload, "Kind": {"type": "string"}},
+    )
+    case = operation.Case(body={"file": b"abc", "kind": "a"}, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [
+        ("file", ("file", b"abc")),
+        ("kind", (None, "a")),
+    ]
+
+
 def test_multipart_nullable_object_property_serializes_as_json(ctx, case_factory):
     operation = ctx.openapi.load_operation(
         "POST /upload",
@@ -1400,20 +1484,25 @@ def test_multipart_binary_field_filename_extension(ctx, value, expected_filename
     ],
     ids=["inline", "ref", "ref-items", "ref-array"],
 )
-def test_multipart_binary_property_filename_behind_ref(ctx, property_schema, value, expected):
+@pytest.mark.parametrize("body_is_ref", [False, True], ids=["inline-body", "ref-body"])
+def test_multipart_binary_property_filename_behind_ref(ctx, body_is_ref, property_schema, value, expected):
+    upload = {"type": "object", "properties": {"file": property_schema}}
     operation = ctx.openapi.load_operation(
         "POST /upload",
         {
             "requestBody": {
                 "required": True,
                 "content": {
-                    "multipart/form-data": {"schema": {"type": "object", "properties": {"file": property_schema}}}
+                    "multipart/form-data": {
+                        "schema": {"$ref": "#/components/schemas/Upload"} if body_is_ref else upload
+                    }
                 },
             },
             "responses": {"200": {"description": "OK"}},
         },
         components={
             "schemas": {
+                "Upload": upload,
                 "File": {"type": "string", "format": "binary"},
                 "Files": {"type": "array", "items": {"$ref": "#/components/schemas/File"}},
             }

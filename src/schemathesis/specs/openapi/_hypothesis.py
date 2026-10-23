@@ -22,14 +22,14 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, resolve_bundled_root
 from schemathesis.core.jsonschema.numeric import (
     bounds_are_unsatisfiable,
     is_numeric_bound,
     next_float32,
     resolve_inclusive_bounds,
 )
-from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, as_object_schema
 from schemathesis.core.media_types import (
     FORM_MEDIA_TYPES,
     find_media_type_strategy,
@@ -567,8 +567,8 @@ def _build_form_strategy_with_encoding(
 
     Returns `None` if no custom encoding with registered strategies or comma-separated content types is found.
     """
-    schema = parameter.optimized_schema
-    if not isinstance(schema, dict) or schema.get("type") != "object":
+    schema = resolve_bundled_root(as_object_schema(parameter.optimized_schema))
+    if schema.get("type") != "object":
         return None
 
     properties = schema.get("properties", {})
