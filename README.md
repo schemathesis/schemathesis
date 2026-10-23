@@ -117,6 +117,14 @@ TestAPI = APIWorkflow.TestCase
     schema: "https://your-api.com/openapi.json"
 ```
 
+**Nix:**
+
+```console
+nix run "github:enola-dev/schemathesis.nix" -- --version
+```
+
+See https://github.com/enola-dev/schemathesis.nix.
+
 ## Who uses it
 
 Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordPress](https://github.com/WordPress/openverse)**, **JetBrains**, and **Red Hat**.
