@@ -9,7 +9,7 @@ import jsonschema_rs
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, SchemaLocation
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX, unbundle_path
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.transport import Response, response_content_type
 from schemathesis.openapi.checks import (
@@ -95,6 +95,7 @@ def validate_documented_response(
                 method=operation.method,
                 config=schema.config.output,
                 location=SchemaLocation.response_schema(schema.specification.version),
+                location_path=unbundle_path(exc.instance_path, resolved.name_to_uri),
             ) from exc
         if validator is None:
             return None
