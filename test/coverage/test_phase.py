@@ -8118,10 +8118,21 @@ def test_body_example_is_dropped_when_an_inferred_bound_contradicts_it(ctx, mini
     assert ({"name": "ab"} in bodies) is keeps_example
 
 
-def test_multipart_template_body_built_from_custom_property_encodings(ctx):
+@pytest.mark.parametrize("declared", ["inline", "ref"])
+def test_multipart_template_body_built_from_custom_property_encodings(ctx, declared):
     # A property with a registered `encoding.contentType` draws from that strategy; other required
     # properties get plain fillers so the multipart template stays complete.
     schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
+    upload = {
+        "type": "object",
+        "properties": {
+            "file": {"type": "string", "format": "binary"},
+            # Keeps a referenced body bundled with a `$ref` at its root
+            "note": {"$ref": "#/components/schemas/Note"},
+            "name": {"type": "string"},
+        },
+        "required": ["file", "name"],
+    }
     operation = load_schema(
         ctx,
         parameters=[{"name": "q", "in": "query", "schema": {"type": "string", "enum": ["a", "b"]}}],
@@ -8129,19 +8140,12 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx):
             "required": True,
             "content": {
                 "multipart/form-data": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "file": {"type": "string", "format": "binary"},
-                            "note": {"type": "string"},
-                            "name": {"type": "string"},
-                        },
-                        "required": ["file", "name"],
-                    },
+                    "schema": upload if declared == "inline" else {"$ref": "#/components/schemas/Upload"},
                     "encoding": {"file": {"contentType": "image/png"}},
                 }
             },
         },
+        components={"schemas": {"Upload": upload, "Note": {"type": "string"}}},
     )["/foo"]["post"]
     bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
     assert {"file": b"\x89PNG", "name": ""} in bodies, bodies[:5]

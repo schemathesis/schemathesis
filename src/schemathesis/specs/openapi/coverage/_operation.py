@@ -18,7 +18,13 @@ from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref, schema_with_bundle
+from schemathesis.core.jsonschema import (
+    BUNDLE_STORAGE_KEY,
+    make_validator,
+    resolve_bundled_ref,
+    resolve_bundled_root,
+    schema_with_bundle,
+)
 from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schema
 from schemathesis.core.media_types import (
@@ -599,7 +605,7 @@ def _generate_multipart_body_from_custom_strategies(
     if body.media_type not in FORM_MEDIA_TYPES:
         return None
 
-    schema = as_object_schema(body.definition.get("schema", {}))
+    schema = resolve_bundled_root(as_object_schema(body.definition.get("schema", {})))
     properties = schema.get("properties", {})
     required = schema.get("required", [])
 
