@@ -1,3 +1,4 @@
+import base64
 import datetime
 import re
 
@@ -16,56 +17,44 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
-from test.utils import as_param, run_given
+from test.utils import assert_requests_call, run_given
 
 
-@pytest.mark.parametrize("schema_name", ["simple_swagger.yaml", "simple_openapi.yaml"])
+def _parameter(version, name, location, type_):
+    if version == "2.0":
+        return {"name": name, "in": location, "required": True, "type": type_}
+    return {"name": name, "in": location, "required": True, "schema": {"type": type_}}
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
 @pytest.mark.parametrize("type_", ["string", "integer", "array", "boolean", "number"])
-def test_headers(testdir, schema_name, type_):
-    # When parameter is specified for "header"
-    if schema_name == "simple_swagger.yaml":
-        kwargs = {"type": type_}
-    else:
-        kwargs = {"schema": {"type": type_}}
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None, max_examples=3)
-def test_(case):
-    assert_str(case.headers["X-Header"])
-    assert_requests_call(case)
-        """,
-        schema_name=schema_name,
-        **as_param({"name": "X-Header", "in": "header", "required": True, **kwargs}),
-        generation_modes=[GenerationMode.POSITIVE],
+def test_headers(ctx, version, type_):
+    operation = ctx.openapi.load_operation(
+        "GET /users",
+        {"parameters": [_parameter(version, "X-Header", "header", type_)], "responses": {"200": {"description": "OK"}}},
+        version=version,
     )
-    # Then the generated test case should contain it in its `headers` attribute
-    testdir.run_and_assert(passed=1)
+
+    @run_given(case=operation.as_strategy(), max_examples=3)
+    def test(case):
+        assert isinstance(case.headers["X-Header"], str)
+        assert_requests_call(case)
 
 
 @pytest.mark.parametrize("type_", ["string", "integer", "array", "object", "boolean", "number"])
-def test_cookies(testdir, type_):
-    # When parameter is specified for "cookie"
-    parameter = {"name": "token", "in": "cookie", "required": True, "schema": {"type": type_}}
-    # The default form-style `explode=true` collapses array/object cookies to no
-    # value (a single cookie name cannot carry repeated values), so for those
-    # types we use `explode=false` to get a serialized scalar cookie value.
+def test_cookies(ctx, type_):
+    parameter = _parameter("3.0.2", "token", "cookie", type_)
+    # Exploded array/object cookies serialize to no value: one cookie name cannot carry repeated values.
     if type_ in ("array", "object"):
         parameter["explode"] = False
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.data_too_large], deadline=None, max_examples=20)
-def test_(case):
-    assert_str(case.cookies["token"])
-    assert_requests_call(case)
-        """,
-        schema_name="simple_openapi.yaml",
-        **as_param(parameter),
-        generation_modes=[GenerationMode.POSITIVE],
+    operation = ctx.openapi.load_operation(
+        "GET /users", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}
     )
-    # Then the generated test case should contain it in its `cookies` attribute
-    testdir.run_and_assert(passed=1)
+
+    @run_given(case=operation.as_strategy(), max_examples=20)
+    def test(case):
+        assert isinstance(case.cookies["token"], str)
+        assert_requests_call(case)
 
 
 def test_cookie_names_are_case_sensitive(ctx):
@@ -85,106 +74,70 @@ def test_cookie_names_are_case_sensitive(ctx):
         assert case.cookies == {"sid": "lower", "SID": "upper"}
 
 
-def test_body(testdir):
-    # When parameter is specified for "body"
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=3, deadline=None)
-def test_(case):
-    assert_int(case.body)
-    assert_requests_call(case)
-        """,
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [{"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK"}},
+@pytest.mark.parametrize(
+    ("label", "definition", "version", "is_expected"),
+    [
+        (
+            "POST /users",
+            {"parameters": [{"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}]},
+            "2.0",
+            lambda case: isinstance(case.body, int),
+        ),
+        (
+            "GET /users/{user_id}",
+            {"parameters": [{"name": "user_id", "required": True, "in": "path", "type": "integer"}]},
+            "2.0",
+            lambda case: isinstance(case.path_parameters["user_id"], int),
+        ),
+        (
+            "GET /users/{user_id}/{event_id}",
+            {
+                "parameters": [
+                    {"name": "user_id", "required": True, "in": "path", "type": "integer"},
+                    {"name": "event_id", "required": True, "in": "path", "type": "integer"},
+                ]
+            },
+            "2.0",
+            lambda case: (
+                isinstance(case.path_parameters["user_id"], int) and isinstance(case.path_parameters["event_id"], int)
+            ),
+        ),
+        (
+            "POST /users",
+            {"parameters": [{"name": "status", "in": "formData", "required": True, "type": "string"}]},
+            "2.0",
+            lambda case: isinstance(case.body["status"], str),
+        ),
+        (
+            "POST /users",
+            {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/problem+json": {
+                            "schema": {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}
+                        }
+                    },
                 }
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
+            },
+            "3.0.2",
+            lambda case: (
+                case.as_transport_kwargs()["headers"]["Content-Type"] == "application/problem+json"
+                and "key" in case.as_transport_kwargs()["json"]
+            ),
+        ),
+    ],
+    ids=["body", "path", "multiple-path-variables", "form-data", "json-media-type"],
+)
+def test_parameter_location_is_generated(ctx, label, definition, version, is_expected):
+    operation = ctx.openapi.load_operation(
+        label, {**definition, "responses": {"200": {"description": "OK"}}}, version=version
     )
-    # Then the generated test case should contain it in its `body` attribute
-    testdir.run_and_assert(passed=1)
 
-
-def test_path(testdir):
-    # When parameter is specified for "path"
-    testdir.make_test(
-        """
-@schema.include(path_regex="/users/{user_id}").parametrize()
-@settings(max_examples=3, deadline=None)
-def test_(case):
-    if not hasattr(case.meta.phase.data, "description"):
-        assert_int(case.path_parameters["user_id"])
-    assert_requests_call(case)
-        """,
-        paths={
-            "/users/{user_id}": {
-                "get": {
-                    "parameters": [{"name": "user_id", "required": True, "in": "path", "type": "integer"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated test case should contain it its `path_parameters` attribute
-    testdir.run_and_assert(passed=1)
-
-
-def test_multiple_path_variables(testdir):
-    # When there are multiple parameters for "path"
-    testdir.make_test(
-        """
-@schema.include(path_regex="/users/{user_id}/{event_id}").parametrize()
-@settings(max_examples=3, deadline=None)
-def test_(case):
-    if not hasattr(case.meta.phase.data, "description"):
-        assert_int(case.path_parameters["user_id"])
-        assert_int(case.path_parameters["event_id"])
-    assert_requests_call(case)
-        """,
-        paths={
-            "/users/{user_id}/{event_id}": {
-                "get": {
-                    "parameters": [
-                        {"name": "user_id", "required": True, "in": "path", "type": "integer"},
-                        {"name": "event_id", "required": True, "in": "path", "type": "integer"},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated test case should contain them its `path_parameters` attribute
-    testdir.run_and_assert(passed=1)
-
-
-def test_form_data(testdir):
-    # When parameter is specified for "formData"
-    testdir.make_test(
-        """
-@schema.include(method="POST").parametrize()
-@settings(max_examples=1, deadline=None)
-def test_(case):
-    assert_str(case.body["status"])
-    assert_requests_call(case)
-        """,
-        paths={
-            "/users": {
-                "post": {
-                    "parameters": [{"name": "status", "in": "formData", "required": True, "type": "string"}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated test case should contain it in its `body` attribute
-    testdir.run_and_assert(passed=1)
+    @run_given(case=operation.as_strategy(), max_examples=3)
+    def test(case):
+        assert is_expected(case), case
+        assert_requests_call(case)
 
 
 @pytest.fixture(params=["swagger", "openapi"])
@@ -218,23 +171,13 @@ def schema(schema_spec, location, base_schema):
     return base_schema
 
 
-def test_security_definitions_api_key(testdir, schema, location):
-    # When schema contains "apiKeySecurity" security definition
-    # And it is in query or header
-    location = "headers" if location == "header" else location
-    testdir.make_test(
-        f"""
-@schema.parametrize()
-@settings(max_examples=1, deadline=None)
-def test_(case):
-    assert_str(case.{location}["api_key"])
-    assert_requests_call(case)
-        """,
-        schema=schema,
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated test case should contain API key in a proper place
-    testdir.run_and_assert(passed=1)
+def test_security_definitions_api_key(ctx, schema, location):
+    container = "headers" if location == "header" else location
+
+    @run_given(case=ctx.openapi.from_full_schema(schema).as_strategy(), max_examples=1)
+    def test(case):
+        assert isinstance(getattr(case, container)["api_key"], str)
+        assert_requests_call(case)
 
 
 @pytest.fixture
@@ -245,22 +188,11 @@ def cookie_schema(simple_openapi):
     return simple_openapi
 
 
-def test_security_definitions_api_key_cookie(testdir, cookie_schema):
-    # When schema contains "apiKeySecurity" security definition
-    # And it is in cookie
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1, deadline=None)
-def test_(case):
-    assert_str(case.cookies["api_key"])
-    assert_requests_call(case)
-        """,
-        schema=cookie_schema,
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated test case should contain API key in a proper place
-    testdir.run_and_assert(passed=1)
+def test_security_definitions_api_key_cookie(ctx, cookie_schema):
+    @run_given(case=ctx.openapi.from_full_schema(cookie_schema).as_strategy(), max_examples=1)
+    def test(case):
+        assert isinstance(case.cookies["api_key"], str)
+        assert_requests_call(case)
 
 
 def _assert_parameter(schema, schema_spec, location, expected=None):
@@ -322,21 +254,14 @@ def overridden_security_schema(schema, schema_spec):
     return schema
 
 
-def test_security_definitions_override(testdir, overridden_security_schema, location):
-    # When "security" is an empty list in the API operation definition
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1, deadline=None)
-def test_(case):
-    assert "api_key" not in (case.headers or [])
-    assert "api_key" not in (case.query or [])
-    assert_requests_call(case)
-        """,
-        schema=overridden_security_schema,
-    )
-    # Then the generated test case should not contain API key
-    testdir.run_and_assert(passed=1)
+def test_security_definitions_override(ctx, overridden_security_schema, location):
+    strategy = ctx.openapi.from_full_schema(overridden_security_schema).as_strategy()
+
+    @run_given(case=strategy, max_examples=1)
+    def test(case):
+        assert "api_key" not in (case.headers or [])
+        assert "api_key" not in (case.query or [])
+        assert_requests_call(case)
 
 
 @pytest.fixture
@@ -350,48 +275,24 @@ def basic_auth_schema(base_schema, schema_spec):
     return base_schema
 
 
-def test_security_definitions_basic_auth(testdir, basic_auth_schema):
-    # When schema is using HTTP Basic Auth
-    testdir.make_test(
-        """
-import base64
-
-@schema.parametrize()
-@settings(max_examples=10, deadline=None)
-def test_(case):
-    assert "Authorization" in case.headers
-    auth = case.headers["Authorization"]
-    assert auth.startswith("Basic ")
-    assert isinstance(base64.b64decode(auth[6:]), bytes)
-    assert_requests_call(case)
-        """,
-        schema=basic_auth_schema,
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated data should contain a valid "Authorization" header
-    testdir.run_and_assert(passed=1)
+def test_security_definitions_basic_auth(ctx, basic_auth_schema):
+    @run_given(case=ctx.openapi.from_full_schema(basic_auth_schema).as_strategy(), max_examples=10)
+    def test(case):
+        auth = case.headers["Authorization"]
+        assert auth.startswith("Basic ")
+        base64.b64decode(auth[6:])
+        assert_requests_call(case)
 
 
-def test_security_definitions_bearer_auth(testdir, simple_openapi):
-    # When schema is using HTTP Bearer Auth scheme
+def test_security_definitions_bearer_auth(ctx, simple_openapi):
     components = simple_openapi.setdefault("components", {})
     components["securitySchemes"] = {"bearer_auth": {"type": "http", "scheme": "bearer"}}
     simple_openapi["security"] = [{"bearer_auth": []}]
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1, deadline=None)
-def test_(case):
-    assert "Authorization" in case.headers
-    auth = case.headers["Authorization"]
-    assert auth.startswith("Bearer ")
-    assert_requests_call(case)
-        """,
-        schema=simple_openapi,
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the generated test case should contain a valid "Authorization" header
-    testdir.run_and_assert("-s", passed=1)
+
+    @run_given(case=ctx.openapi.from_full_schema(simple_openapi).as_strategy(), max_examples=1)
+    def test(case):
+        assert case.headers["Authorization"].startswith("Bearer ")
+        assert_requests_call(case)
 
 
 def test_bearer_auth_valid_header():
@@ -415,20 +316,19 @@ def test_positive_bearer_tokens_are_ascii(ctx):
         find(strategy, lambda case: not case.headers["Authorization"].isascii())
 
 
-def test_unknown_data(testdir):
-    # When parameter is specified for unknown "in"
-    # And schema validation is disabled
-    testdir.make_test(
-        """
-@schema.parametrize()
-@settings(max_examples=1)
-def test_(case):
-    pass
-        """,
-        **as_param({"name": "status", "in": "unknown", "required": True, "type": "string"}),
+def test_unknown_data(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /users",
+        {
+            "parameters": [{"name": "status", "in": "unknown", "required": True, "type": "string"}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
     )
-    # Then the generated test ignores this parameter
-    testdir.run_and_assert(passed=1)
+
+    @run_given(case=operation.as_strategy(), max_examples=1)
+    def test(case):
+        assert not case.query and not case.headers and not case.cookies, case
 
 
 @pytest.mark.hypothesis_nested
@@ -469,51 +369,6 @@ def test_date_deserializing(ctx):
         assert isinstance(case.query["key"], str)
 
     test()
-
-
-def test_json_media_type(testdir):
-    # When API operation expects a JSON-compatible media type
-    testdir.make_test(
-        """
-@settings(max_examples=10, deadline=None)
-@schema.parametrize()
-def test_(case):
-    kwargs = case.as_transport_kwargs()
-    assert kwargs["headers"]["Content-Type"] == "application/problem+json"
-    assert "key" in kwargs["json"]
-    assert_requests_call(case)
-        """,
-        schema={
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": {
-                "/users": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "application/problem+json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"key": {"type": "string"}},
-                                        "required": ["key"],
-                                    }
-                                }
-                            },
-                        },
-                        "responses": {
-                            "200": {
-                                "description": "OK",
-                            }
-                        },
-                    }
-                }
-            },
-        },
-        generation_modes=[GenerationMode.POSITIVE],
-    )
-    # Then the payload should be serialized as json
-    testdir.run_and_assert(passed=1)
 
 
 def test_nullable_body_behind_a_reference(ctx):
