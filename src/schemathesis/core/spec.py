@@ -227,6 +227,7 @@ class ApiSchema(SchemaMetadata, Protocol):
         self,
         form_data: dict[str, Any],
         operation: APIOperation,
+        media_type: str,
         selected_content_types: dict[str, str] | None = ...,
     ) -> tuple[list | None, dict[str, Any] | None]: ...  # pragma: no cover
 

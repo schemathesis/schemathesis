@@ -734,9 +734,13 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def prepare_multipart(
-        self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
+        self,
+        form_data: dict[str, Any],
+        operation: APIOperation,
+        media_type: str,
+        selected_content_types: dict[str, str] | None = None,
     ) -> tuple[list | None, dict[str, Any] | None]:
-        return self.adapter.prepare_multipart(operation, form_data, selected_content_types)
+        return self.adapter.prepare_multipart(operation, form_data, media_type, selected_content_types)
 
     @override
     def prepare_request_body(self, case: Case) -> Body:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.core import media_types
 from schemathesis.core.file_samples import file_extension
 from schemathesis.core.jsonschema import resolve_with_root_bundle
 from schemathesis.transport.serialization import Binary
@@ -12,7 +11,10 @@ if TYPE_CHECKING:
 
 
 def prepare_multipart_v2(
-    operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
+    operation: APIOperation,
+    form_data: dict[str, Any],
+    media_type: str,
+    selected_content_types: dict[str, str] | None = None,
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
     data: dict[str, Any] = {}
@@ -81,17 +83,15 @@ def _resolved_properties(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def prepare_multipart_v3(
-    operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
+    operation: APIOperation,
+    form_data: dict[str, Any],
+    media_type: str,
+    selected_content_types: dict[str, str] | None = None,
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
-    schema: dict[str, Any] = {}
-    body_param = None
-    for body in operation.body:
-        if media_types.is_multipart_form_parts(media_types.parse(body.media_type)):
-            schema_node = body.definition.get("schema")
-            schema = schema_node if isinstance(schema_node, dict) else {}
-            body_param = body
-            break
+    body_param = operation.get_body_for_media_type(media_type)
+    schema_node = body_param.definition.get("schema") if body_param is not None else None
+    schema: dict[str, Any] = schema_node if isinstance(schema_node, dict) else {}
 
     properties = _resolved_properties(schema)
     for name, value in form_data.items():

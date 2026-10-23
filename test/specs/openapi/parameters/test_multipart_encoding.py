@@ -529,7 +529,7 @@ def test_multipart_comma_separated_without_custom_strategy(ctx):
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         if isinstance(case.body, dict):
-            files, _ = case.operation.prepare_multipart(case.body, case.multipart_content_types)
+            files, _ = case.operation.prepare_multipart(case.body, case.media_type, case.multipart_content_types)
 
             if files:
                 for file_tuple in files:

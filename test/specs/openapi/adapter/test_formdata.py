@@ -22,7 +22,7 @@ def test_content_type_for_undefined_single_property(ctx):
     )
     form_data = {"field": "value"}
 
-    files, data = prepare_multipart_v3(operation, form_data)
+    files, data = prepare_multipart_v3(operation, form_data, "multipart/form-data")
 
     assert files == [("field", (None, "value", "text/plain"))]
 
@@ -46,7 +46,7 @@ def test_content_type_for_undefined_array_property(ctx):
     )
     form_data = {"items": ["data1", "data2"]}
 
-    files, data = prepare_multipart_v3(operation, form_data)
+    files, data = prepare_multipart_v3(operation, form_data, "multipart/form-data")
 
     assert files == [
         ("items", (None, "data1", "image/jpeg")),
@@ -89,7 +89,7 @@ def make_multipart_operation(ctx, property_schema, *, version):
 def test_filename_only_for_binary_parts(ctx, version, property_schema, expected):
     operation = make_multipart_operation(ctx, property_schema, version=version)
 
-    assert prepare_multipart_v3(operation, {"file": "data"}) == ([("file", expected)], None)
+    assert prepare_multipart_v3(operation, {"file": "data"}, "multipart/form-data") == ([("file", expected)], None)
 
 
 @pytest.mark.parametrize(
@@ -113,4 +113,4 @@ def test_filename_only_for_binary_parts(ctx, version, property_schema, expected)
 def test_filename_only_for_binary_array_parts(ctx, version, items_schema, expected):
     operation = make_multipart_operation(ctx, {"type": "array", "items": items_schema}, version=version)
 
-    assert prepare_multipart_v3(operation, {"file": ["a", "b"]}) == (expected, None)
+    assert prepare_multipart_v3(operation, {"file": ["a", "b"]}, "multipart/form-data") == (expected, None)

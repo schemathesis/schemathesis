@@ -500,27 +500,26 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
     operation = ctx.case.operation
     selected = ctx.case.multipart_content_types or {}
     result: dict[str, str] = {}
-    for body in operation.body:
-        if not media_types.is_multipart_form_parts(media_types.parse(body.media_type)):
-            continue
-        for name in body.definition.get("encoding", {}):
-            # Without a recorded choice, a part is sent with the first listed media type.
-            content_type = selected.get(name) or next(iter(body.get_property_content_types(name)), None)
-            if content_type is not None:
-                result[name] = content_type
-        # Default nested-object / array form-parts to JSON so the wire payload is parsable.
-        schema_node = body.definition.get("schema")
-        if isinstance(schema_node, dict):
-            properties = schema_node.get("properties")
-            if isinstance(properties, dict):
-                for name, prop in properties.items():
-                    if name in result or not isinstance(prop, dict):
-                        continue
-                    # Resolve a property-level `$ref` against the body schema's bundle so
-                    # a referent like `{type: string}` is left alone and `{type: object}` triggers JSON.
-                    if _is_structured_schema(resolve_with_root_bundle(prop, schema_node), schema_node):
-                        result[name] = "application/json"
-        break
+    body = operation.get_body_for_media_type(ctx.case.media_type or "multipart/form-data")
+    if body is None:
+        return result
+    for name in body.definition.get("encoding", {}):
+        # Without a recorded choice, a part is sent with the first listed media type.
+        content_type = selected.get(name) or next(iter(body.get_property_content_types(name)), None)
+        if content_type is not None:
+            result[name] = content_type
+    # Default nested-object / array form-parts to JSON so the wire payload is parsable.
+    schema_node = body.definition.get("schema")
+    if isinstance(schema_node, dict):
+        properties = schema_node.get("properties")
+        if isinstance(properties, dict):
+            for name, prop in properties.items():
+                if name in result or not isinstance(prop, dict):
+                    continue
+                # Resolve a property-level `$ref` against the body schema's bundle so
+                # a referent like `{type: string}` is left alone and `{type: object}` triggers JSON.
+                if _is_structured_schema(resolve_with_root_bundle(prop, schema_node), schema_node):
+                    result[name] = "application/json"
     return result
 
 
@@ -591,7 +590,7 @@ def prepare_multipart_parts(
     multipart = _prepare_form_data(value)
     # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
     selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}
-    return ctx.case.operation.prepare_multipart(multipart, selected)
+    return ctx.case.operation.prepare_multipart(multipart, ctx.case.media_type or "multipart/form-data", selected)
 
 
 @REQUESTS_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")

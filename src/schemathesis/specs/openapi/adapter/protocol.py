@@ -35,7 +35,7 @@ ExtractSecurityParameters = Callable[
     Iterator["SecurityParameter"],
 ]
 PrepareMultipart = Callable[
-    ["APIOperation", dict[str, Any], dict[str, str] | None],
+    ["APIOperation", dict[str, Any], str, dict[str, str] | None],
     tuple[list[tuple[str, Any]] | None, dict[str, Any] | None],
 ]
 GetResponseContentTypes = Callable[["APIOperation", "Response"], list[str]]
