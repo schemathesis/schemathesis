@@ -94,23 +94,7 @@ def _isolate_schemathesis_state(tmp_path, monkeypatch):
 
 @pytest.fixture
 def simple_schema():
-    return {
-        "swagger": "2.0",
-        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
-        "host": "api.example.com",
-        "basePath": "/v1",
-        "schemes": ["https"],
-        "paths": {
-            "/users": {
-                "get": {
-                    "summary": "Returns a list of users.",
-                    "description": "Optional extended description in Markdown.",
-                    "produces": ["application/json"],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-    }
+    return make_schema()
 
 
 @pytest.fixture
@@ -431,43 +415,27 @@ class ResponseFactory:
 
 @pytest.fixture
 def response_factory():
-    def httpx_factory(
-        *,
-        content: bytes = b"{}",
-        content_type: str | None = "application/json",
-        status_code: int = 200,
-        headers: dict[str, Any] | None = None,
-    ) -> httpx.Response:
-        headers = headers or {}
-        if content_type:
-            headers.setdefault("Content-Type", content_type)
-        response = httpx.Response(
-            status_code=status_code,
-            headers=headers,
-            content=content,
-            request=httpx.Request(method="POST", url="http://127.0.0.1", headers=headers),
-        )
-        response.elapsed = datetime.timedelta(seconds=1)
-        return response
+    def _httpx_like(module):
+        def factory(
+            *,
+            content: bytes = b"{}",
+            content_type: str | None = "application/json",
+            status_code: int = 200,
+            headers: dict[str, Any] | None = None,
+        ):
+            headers = headers or {}
+            if content_type:
+                headers.setdefault("Content-Type", content_type)
+            response = module.Response(
+                status_code=status_code,
+                headers=headers,
+                content=content,
+                request=module.Request(method="POST", url="http://127.0.0.1", headers=headers),
+            )
+            response.elapsed = datetime.timedelta(seconds=1)
+            return response
 
-    def httpx2_factory(
-        *,
-        content: bytes = b"{}",
-        content_type: str | None = "application/json",
-        status_code: int = 200,
-        headers: dict[str, Any] | None = None,
-    ) -> httpx2.Response:
-        headers = headers or {}
-        if content_type:
-            headers.setdefault("Content-Type", content_type)
-        response = httpx2.Response(
-            status_code=status_code,
-            headers=headers,
-            content=content,
-            request=httpx2.Request(method="POST", url="http://127.0.0.1", headers=headers),
-        )
-        response.elapsed = datetime.timedelta(seconds=1)
-        return response
+        return factory
 
     def requests_factory(
         *,
@@ -538,8 +506,8 @@ def response_factory():
         )
 
     return ResponseFactory(
-        httpx=httpx_factory,
-        httpx2=httpx2_factory,
+        httpx=_httpx_like(httpx),
+        httpx2=_httpx_like(httpx2),
         requests=requests_factory,
         wsgi=werkzeug_factory,
         core=core_factory,
