@@ -11,7 +11,7 @@ from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.parameters import DelimitedValue, EncodedPath
-from schemathesis.core.transforms import to_wire_string, transform
+from schemathesis.core.transforms import to_wire_string, to_wire_text, transform
 
 
 def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -108,7 +108,13 @@ def serialize_binary(value: Body) -> bytes:
         return value
     if isinstance(value, Binary):
         return value.data
-    return str(value).encode(errors="ignore")
+    # Non-bytes values use their JSON spelling rather than Python's, e.g. `true` and `null`.
+    try:
+        text = to_wire_text(value)
+    except TypeError:
+        # Containers holding raw bytes have no JSON spelling
+        text = str(value)
+    return text.encode(errors="ignore")
 
 
 def serialize_yaml(value: Body) -> dict[str, Any]:

@@ -411,6 +411,38 @@ def test_text_plain_boolean_and_null_use_json_spelling(ctx, value, expected):
     )
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (True, b"true"),
+        (False, b"false"),
+        (None, b"null"),
+        ({"a": None}, b'{"a": null}'),
+        # Not JSON-encodable, so sent as before
+        ([b"x"], b"[b'x']"),
+    ],
+    ids=["true", "false", "null", "object", "bytes-in-list"],
+)
+def test_octet_stream_non_bytes_use_json_spelling(ctx, value, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /test",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    case = operation.Case(body=value, media_type="application/octet-stream")
+
+    assert [transport.serialize_case(case)["data"] for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT)] == [
+        expected,
+        expected,
+    ]
+
+
 def multipart_echo_app(ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -690,6 +722,7 @@ def _received_part(part):
         ("image/png", FILE_LIST_SCHEMA, {}, [["f", "image/png", "{}"]]),
         ("image/png", {**FILE_LIST_SCHEMA, "type": ["array", "null"]}, 0, [["f", "image/png", "0"]]),
         ("image/png", {}, 0, [["f", "image/png", "0"]]),
+        ("application/octet-stream", FILE_LIST_SCHEMA, True, [["f", "application/octet-stream", "true"]]),
     ],
     ids=[
         "nested-multipart",
@@ -707,6 +740,7 @@ def _received_part(part):
         "file-list-object",
         "nullable-file-list-integer",
         "untyped-integer",
+        "octet-stream-file-list-boolean",
     ],
 )
 def test_multipart_part_encoded_with_its_content_type(
