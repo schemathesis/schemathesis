@@ -1,0 +1,74 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total
+
+     No tests were run
+
+==================================== ERRORS ====================================
+________________________________ Stateful tests ________________________________
+Missing Open API links
+
+Linked operations have required request bodies that could not be parsed:
+
+  - POST /users
+
+Learn how to define links: https://schemathesis.readthedocs.io/en/stable/guides/stateful-testing/
+
+Tip: Fix the request body schemas of these operations to test their links
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== WARNINGS ===================================
+
+Unresolvable references: 1 operation skipped parts of the schema
+
+  - POST /users
+    `body` - unresolvable reference `#/components/schemas/Missing`
+
+💡 Resolve these references so the skipped parts get tested
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 0
+  Skipped: 2
+    - Phase errored
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  🚫 Stateful
+
+Errors:
+  🚫 Missing Open API links: 1
+
+Warnings:
+  ⚠️ Unresolvable references: 1 operation had parts of the schema skipped
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+========================= 1 error, 1 warning in 1.00s ==========================
