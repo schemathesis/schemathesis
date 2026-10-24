@@ -30,6 +30,7 @@
 - Multipart parts serialized with another multipart media type's schema and `encoding`.
 - Serialization error for negative cases of `multipart/form-data` file arrays with `encoding.contentType`.
 - Internal error in `st fuzz` for unknown checks in the configuration file.
+- Coverage phase sending or dropping list-style request body `examples` of Example Objects.
 
 ## [4.32.4](https://github.com/schemathesis/schemathesis/compare/v4.32.3...v4.32.4) - 2026-10-22
 
