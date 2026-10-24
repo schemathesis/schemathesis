@@ -8188,6 +8188,32 @@ def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ct
     assert CoverageScenario.INVALID_ENUM_VALUE in scenarios, scenarios
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object"},
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    ],
+    ids=["loose", "strict"],
+)
+def test_body_list_examples_are_unwrapped(ctx, schema):
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {"application/json": {"schema": schema, "examples": [{"value": {"name": "marker"}}]}},
+        },
+    )["/foo"]["post"]
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
+    assert {"name": "marker"} in bodies, bodies
+    assert not any(isinstance(body, list) or (isinstance(body, dict) and "value" in body) for body in bodies), bodies
+
+
 def test_object_parameter_example_out_of_range_as_float32_is_not_a_positive_value(ctx):
     # `0.99999999` narrows to `1.0` in single precision, which `exclusiveMaximum` rejects.
     operation = load_schema(
