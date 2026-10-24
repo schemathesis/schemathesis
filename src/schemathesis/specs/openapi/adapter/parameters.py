@@ -1379,7 +1379,8 @@ class OpenApiComponent(ABC):
         if isinstance(container, dict):
             examples.extend(ex["value"] for ex in container.values() if isinstance(ex, dict) and "value" in ex)
         elif isinstance(container, list):
-            examples.extend(container)
+            # Items may be Example Objects or raw values
+            examples.extend(ex["value"] if isinstance(ex, dict) and "value" in ex else ex for ex in container)
         examples.extend(self._iter_single_and_schema_examples())
         return examples
 
