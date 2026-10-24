@@ -23,6 +23,7 @@ from schemathesis.core.jsonschema import (
     make_validator,
     resolve_bundled_ref,
     resolve_bundled_root,
+    resolve_with_root_bundle,
     schema_with_bundle,
 )
 from schemathesis.core.jsonschema.patterns import update_quantifier
@@ -622,7 +623,7 @@ def _generate_multipart_body_from_custom_strategies(
 
     for prop_name in required:
         if prop_name not in result:
-            prop_schema = properties.get(prop_name, {})
+            prop_schema = resolve_with_root_bundle(properties.get(prop_name, {}), schema)
             result[prop_name] = b"" if prop_schema.get("format") == "binary" else ""
 
     return (result, content_types) if content_types else None
