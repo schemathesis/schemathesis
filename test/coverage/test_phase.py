@@ -8136,8 +8136,9 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
             # Keeps a referenced body bundled with a `$ref` at its root
             "note": {"$ref": "#/components/schemas/Note"},
             "name": {"type": "string"},
+            "avatar": {"$ref": "#/components/schemas/Bin"},
         },
-        "required": ["file", "name"],
+        "required": ["file", "name", "avatar"],
     }
     operation = load_schema(
         ctx,
@@ -8151,10 +8152,12 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
                 }
             },
         },
-        components={"schemas": {"Upload": upload, "Note": {"type": "string"}}},
+        components={
+            "schemas": {"Upload": upload, "Note": {"type": "string"}, "Bin": {"type": "string", "format": "binary"}}
+        },
     )["/foo"]["post"]
     bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
-    assert {"file": b"\x89PNG", "name": ""} in bodies, bodies[:5]
+    assert {"file": b"\x89PNG", "name": "", "avatar": b""} in bodies, bodies[:5]
 
 
 def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ctx):
