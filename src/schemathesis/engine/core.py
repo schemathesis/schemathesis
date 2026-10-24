@@ -130,6 +130,20 @@ class Engine:
         )
 
 
+def preflight_error(engine: EngineContext) -> events.NonFatalError | None:
+    """Report run-wide configuration problems before any test starts."""
+    try:
+        # Build checks up front: config errors surface here, not in a worker thread mid-run.
+        _ = engine.checks
+        # Same for the base URL - a malformed `servers` entry is a schema error, not a phase crash.
+        engine.schema.get_base_url()
+    except ConfigError as exc:
+        return events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="checks", related_to_operation=False)
+    except InvalidSchema as exc:
+        return events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="schema", related_to_operation=False)
+    return None
+
+
 # An API whose rejections keep naming something new never stops teaching; without a cap it would
 # keep coverage regenerating until the budget is gone and leave the other phases nothing.
 MAX_COVERAGE_CATCHUP_PASSES = 3
@@ -149,17 +163,9 @@ class ExecutionPlan:
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
         yield events.EngineStarted()
-        try:
-            # Build checks up front: config errors surface here, not in a worker thread mid-run.
-            _ = engine.checks
-            # Same for the base URL - a malformed `servers` entry is a schema error, not a phase crash.
-            engine.schema.get_base_url()
-        except ConfigError as exc:
-            yield events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="checks", related_to_operation=False)
-            yield events.EngineFinished(running_time=engine.running_time, stop_reason=engine.stop_reason)
-            return
-        except InvalidSchema as exc:
-            yield events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="schema", related_to_operation=False)
+        error = preflight_error(engine)
+        if error is not None:
+            yield error
             yield events.EngineFinished(running_time=engine.running_time, stop_reason=engine.stop_reason)
             return
         try:
