@@ -13,6 +13,7 @@
 ### :bug: Fixed
 
 - Stateful authentication failures hidden or reported as a Hypothesis traceback.
+- pytest HTML report counting tested operations as errored when some of their tests errored.
 - Missing filename on `multipart/form-data` binary parts declared via `$ref`.
 - Missing multipart filenames and part encodings for a `$ref` body schema with nested references.
 - Type hints rejecting `tag` and `operation_id` filters in auth `apply_to`/`skip_for`.
