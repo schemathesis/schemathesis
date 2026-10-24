@@ -18,7 +18,12 @@ from schemathesis.core.errors import (
     RefResolutionError,
     UnresolvableReference,
 )
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, is_valid, make_validator_for
+from schemathesis.core.jsonschema import (
+    CANONICALIZE_DRAFT_BY_VALIDATOR,
+    is_valid,
+    make_validator_for,
+    resolve_bundled_root,
+)
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema
@@ -130,6 +135,7 @@ def _get_pool_combos(
         body_schema = body.definition.get("schema")
         if not isinstance(body_schema, dict):
             continue
+        body_schema = resolve_bundled_root(body_schema)
         variants = extra_data_source.get_captured_variants(
             operation=operation,
             location=ParameterLocation.BODY,

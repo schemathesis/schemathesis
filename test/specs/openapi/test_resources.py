@@ -795,6 +795,53 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
     assert variants[0].draws[0].parameter_name == "itemId"
 
 
+@pytest.mark.parametrize(
+    "note", [{"type": "string"}, {"$ref": "#/components/schemas/Note"}], ids=["flat", "nested-ref"]
+)
+def test_captured_values_reach_body_behind_ref(ctx, note):
+    item = {"type": "object", "properties": {"id": {"type": "integer"}}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {"responses": {"201": {"description": "OK", "content": {"application/json": {"schema": item}}}}}
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": item}}}},
+                }
+            },
+            "/orders": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}},
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Note": {"type": "string"},
+                "Order": {
+                    "type": "object",
+                    "required": ["itemId"],
+                    "properties": {"itemId": {"type": "integer"}, "note": note},
+                },
+            }
+        },
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 987654})
+
+    cases = generate_many(
+        schema["/orders"]["POST"].as_strategy(feedback=FeedbackSources(extra_data_source=data_source)), 30
+    )
+
+    assert any(isinstance(case.body, dict) and case.body.get("itemId") == 987654 for case in cases)
+
+
 def test_top_level_body_requirement_takes_precedence_over_nested_requirement(ctx):
     repository = ResourceRepository(
         [
