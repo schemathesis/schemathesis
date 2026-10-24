@@ -23,6 +23,7 @@ from schemathesis.core.jsonschema import (
     BundleError,
     Bundler,
     make_validator,
+    resolve_bundled_root,
     resolve_with_root_bundle,
     schema_with_bundle,
 )
@@ -586,6 +587,8 @@ def _captured_variants(
     if extra_data_source is None:
         return None
     extra_data_source = cast("OpenApiExtraDataSource", extra_data_source)
+    if isinstance(schema, dict):
+        schema = resolve_bundled_root(schema)
     variants = extra_data_source.get_captured_variants(operation=operation, location=location, schema=schema)
     if not variants:
         return None
@@ -1408,6 +1411,7 @@ class OpenApiComponent(ABC):
             yield example
         raw_schema = self.raw_schema
         if isinstance(raw_schema, dict):
+            raw_schema = resolve_bundled_root(raw_schema)
             schema_example = raw_schema.get(self.adapter.example_keyword, NOT_SET)
             if schema_example is not NOT_SET:
                 yield schema_example

@@ -23,6 +23,7 @@
 - Internal `x-bundled` location in errors for invalid response schemas behind `$ref`.
 - Health check failure in negative mode for operations with only an unconstrained binary body.
 - False negative `negative_data_rejection` for invalid path parameters on Open API 2.0.
+- Captured values and schema `example` unused for `$ref` request bodies with nested references.
 - `st fuzz` showing "No issues found" when `warnings.fail-on` fails the run.
 - `st run` requests hanging indefinitely when `--request-timeout` is not set.
 - Python spelling like `True` or `None` sent in binary bodies and multipart file parts.

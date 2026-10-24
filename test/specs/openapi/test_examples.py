@@ -2037,6 +2037,26 @@ def test_schema_level_body_example_not_completed_when_base_is_not_an_object(ctx)
     assert [example.value for example in extract_top_level(operation)] == []
 
 
+@pytest.mark.parametrize(
+    "name", [{"type": "string"}, {"$ref": "#/components/schemas/Name"}], ids=["flat", "nested-ref"]
+)
+def test_schema_level_body_example_drawn_behind_ref(ctx, name):
+    operation = _json_body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/User"},
+        components={
+            "schemas": {
+                "Name": {"type": "string"},
+                "User": {"type": "object", "properties": {"name": name}, "example": {"name": "marker"}},
+            }
+        },
+    )
+
+    cases = examples.generate_many(operation.as_strategy(), 60)
+
+    assert {"name": "marker"} in [case.body for case in cases]
+
+
 def test_schema_level_body_example_completed_at_nested_level(ctx):
     # The missing required field sits under a property the example does supply, so the merge has to go deep.
     operation = _json_body_operation(
@@ -4485,6 +4505,53 @@ def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
     assert strategies
     for strategy in strategies:
         examples.generate_one(strategy)
+
+
+@pytest.mark.parametrize(
+    "note", [{"type": "string"}, {"$ref": "#/components/schemas/Note"}], ids=["flat", "nested-ref"]
+)
+def test_pool_body_behind_ref_in_examples_phase(ctx, note):
+    item = {"type": "object", "properties": {"id": {"type": "integer"}}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {"responses": {"201": {"description": "OK", "content": {"application/json": {"schema": item}}}}}
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": item}}}},
+                }
+            },
+            "/orders": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}},
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Note": {"type": "string"},
+                "Order": {
+                    "type": "object",
+                    "required": ["itemId"],
+                    "properties": {"itemId": {"type": "integer"}, "note": note},
+                },
+            }
+        },
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 987654})
+
+    strategies = get_strategies_from_examples(
+        schema["/orders"]["POST"], feedback=FeedbackSources(extra_data_source=data_source), fill_missing=True
+    )
+
+    assert [examples.generate_one(strategy).body for strategy in strategies] == [{"itemId": 987654}]
 
 
 def test_generated_property_with_recursive_ref(ctx):
