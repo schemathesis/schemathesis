@@ -139,6 +139,27 @@ def test_token_behind_chained_references(ctx):
 
 
 @pytest.mark.parametrize(
+    "credentials",
+    [
+        {"type": "object", "properties": {"username": {"type": "string"}, "password": {"type": "string"}}},
+        {
+            "type": "object",
+            "properties": {"username": {"$ref": "#/components/schemas/Name"}, "password": {"type": "string"}},
+        },
+    ],
+    ids=["single-reference", "nested-reference"],
+)
+def test_credential_bodies_behind_references(ctx, credentials):
+    paths = _flow()
+    for path in ("/register", "/login"):
+        paths[path]["post"]["requestBody"]["content"]["application/json"]["schema"] = {
+            "$ref": "#/components/schemas/Credentials"
+        }
+    schemas = {"Credentials": credentials, "Name": {"type": "string"}}
+    assert _detect(ctx, paths, schemas=schemas) == EXPECTED
+
+
+@pytest.mark.parametrize(
     ("schemes", "login_security", "expected"),
     [
         ({**BEARER, **API_KEY}, [{"BearerAuth": []}, {"ApiKey": []}], "BearerAuth"),
