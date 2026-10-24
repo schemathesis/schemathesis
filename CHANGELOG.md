@@ -23,6 +23,7 @@
 - `st fuzz` showing "No issues found" when `warnings.fail-on` fails the run.
 - `st run` requests hanging indefinitely when `--request-timeout` is not set.
 - Python spelling like `True` or `None` sent in binary bodies and multipart file parts.
+- Fuzzing sending a parameter `example` or one known resource id in most requests. [#4848](https://github.com/schemathesis/schemathesis/issues/4848)
 - Multipart parts serialized with another multipart media type's schema and `encoding`.
 - Serialization error for negative cases of `multipart/form-data` file arrays with `encoding.contentType`.
 
