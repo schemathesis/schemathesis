@@ -719,6 +719,33 @@ def test_api(case, user):
     ]
 
 
+def test_html_report_operation_tested_and_errored(testdir, ctx):
+    api = ctx.openapi.apps.success()
+    report_dir = testdir.tmpdir.join("report")
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.reports.update(html_path=r"{report_dir}")
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_ok(case):
+    case.call_and_validate()
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_err(case):
+    raise RuntimeError("boom")
+""",
+        schema=ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}),
+    )
+    testdir.runpytest().assert_outcomes(passed=1, failed=1)
+
+    html = report_dir.join("index.html").read_text("utf-8")
+    groups = re.findall(r'<span class="group-title">(\w+)</span><span class="group-count">(\d+)</span>', html)
+    assert groups == [("Passed", "1")]
+
+
 def test_html_report_merged_via_xdist(testdir, ctx, snapshot_html):
     api = ctx.openapi.apps.success_and_failure()
     testdir.makefile(".toml", schemathesis='seed = 42\n\n[reports.html]\npath = "report"\n')

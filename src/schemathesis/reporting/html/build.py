@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core.failures import group_failures, reproducible_by_identity
 from schemathesis.core.output import format_response_payload
-from schemathesis.reporting.html.model import Command, FailingCase, FailureEntry, split_label
+from schemathesis.reporting.html.model import Command, FailingCase, FailureEntry, OperationStatus, split_label
 
 if TYPE_CHECKING:
     from schemathesis.config import ChecksConfig, OutputConfig
@@ -30,6 +30,18 @@ def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | 
         replay=replay,
         auth_identity=group.auth_identity if reproducible_by_identity(group.failures) else None,
     )
+
+
+def operation_status(*, failed: bool, tested: bool, errored: bool) -> OperationStatus | None:
+    """Status of an operation row, or `None` when the operation did not run."""
+    if failed:
+        return OperationStatus.FAILED
+    # The terminal summary counts an operation that was also tested as tested, not errored.
+    if tested:
+        return OperationStatus.PASSED
+    if errored:
+        return OperationStatus.ERRORED
+    return None
 
 
 def failure_titles(cases: list[FailingCase]) -> list[str]:

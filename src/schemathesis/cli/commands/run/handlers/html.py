@@ -26,7 +26,13 @@ from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import INTERNAL_PHASES, PhaseName, PhaseSkipReason
 from schemathesis.engine.summary import PhaseStatuses, running_time
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
-from schemathesis.reporting.html.build import enabled_checks, failing_case, failure_titles, request_name
+from schemathesis.reporting.html.build import (
+    enabled_checks,
+    failing_case,
+    failure_titles,
+    operation_status,
+    request_name,
+)
 from schemathesis.reporting.html.model import (
     AFTER_RUN,
     Command,
@@ -237,17 +243,15 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
             failures = failure_titles(cases)
             errors = list(self.errors.get(label, {}).values())
             note = errors[0].title if errors else None
-            if failures:
-                status = OperationStatus.FAILED
-            elif label in statistic.tested_operations:
-                # The terminal summary counts an operation that was also tested as tested, not errored.
-                status = OperationStatus.PASSED
-            elif errors or label in statistic.errored_operations:
-                status = OperationStatus.ERRORED
-            elif stopped_early:
-                # The footer counts these as not run, matching the operations count in the hero.
-                continue
-            else:
+            status = operation_status(
+                failed=bool(failures),
+                tested=label in statistic.tested_operations,
+                errored=bool(errors) or label in statistic.errored_operations,
+            )
+            if status is None:
+                if stopped_early:
+                    # The footer counts these as not run, matching the operations count in the hero.
+                    continue
                 status = OperationStatus.SKIPPED
                 reasons = self.skip_reasons.get(label, set())
                 if label in statistic.operations_without_checks:

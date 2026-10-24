@@ -19,7 +19,7 @@ from schemathesis.engine.summary import (
     reduce_test_cases,
 )
 from schemathesis.reporting.html import write_report
-from schemathesis.reporting.html.build import failing_case, failure_titles
+from schemathesis.reporting.html.build import failing_case, failure_titles, operation_status
 from schemathesis.reporting.html.model import ErrorEntry, OperationRow, OperationStatus, ReportData, ReportMeta
 from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
@@ -160,15 +160,9 @@ class HtmlWriter:
             for group in self._statistic.failures.get(label, {}).values()
         ]
         failures = failure_titles(cases)
-        note = None
-        if failures:
-            status = OperationStatus.FAILED
-        elif operation.errors:
-            status = OperationStatus.ERRORED
-            note = operation.errors[0].title
-        elif operation.ran:
-            status = OperationStatus.PASSED
-        else:
+        note = operation.errors[0].title if operation.errors else None
+        status = operation_status(failed=bool(failures), tested=operation.ran, errored=bool(operation.errors))
+        if status is None:
             status = OperationStatus.SKIPPED
             note = ", ".join(sorted(operation.skip_reasons))
         return OperationRow(
