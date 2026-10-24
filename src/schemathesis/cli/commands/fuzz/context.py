@@ -6,6 +6,7 @@ from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
+from schemathesis.config import ConfigError
 from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.events import FuzzScenarioFinished
@@ -72,4 +73,7 @@ class FuzzExecutionContext(BaseExecutionContext):
             self.on_engine_finished(event.stop_reason)
         elif isinstance(event, events.NonFatalError):
             self.errors.add(event)
-            self.exit_code = ExitCode.FAILURES
+            if isinstance(event.value, ConfigError) and not event.related_to_operation:
+                self.exit_code = ExitCode.ERROR
+            else:
+                self.exit_code = ExitCode.FAILURES

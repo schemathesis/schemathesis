@@ -1,0 +1,39 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 N errors
+
+==================================== ERRORS ====================================
+____________________________________ checks ____________________________________
+Configuration Error
+
+Unknown check(s) in configuration: no_such_check. Each configured `[checks.<name>]` must match a built-in check or a registered custom check.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+  Skipped: 1
+
+Stop reason: Completed
+
+Errors:
+  🚫 Configuration Error: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

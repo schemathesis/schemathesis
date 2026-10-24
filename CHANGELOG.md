@@ -27,6 +27,7 @@
 - Missing dynamic auth config suggestion for login bodies behind `$ref` with nested references.
 - Multipart parts serialized with another multipart media type's schema and `encoding`.
 - Serialization error for negative cases of `multipart/form-data` file arrays with `encoding.contentType`.
+- Internal error in `st fuzz` for unknown checks in the configuration file.
 
 ## [4.32.4](https://github.com/schemathesis/schemathesis/compare/v4.32.3...v4.32.4) - 2026-10-22
 

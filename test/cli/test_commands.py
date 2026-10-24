@@ -204,9 +204,11 @@ def test_piped_output_has_no_blank_line_runs_or_trailing_whitespace(ctx, cli, ar
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_runtime_config_error_exit_code(ctx, cli, snapshot_cli):
+@pytest.mark.parametrize("args", [["run"], ["fuzz", "--max-time=1"]], ids=["run", "fuzz"])
+def test_runtime_config_error_exit_code(ctx, cli, snapshot_cli, args):
     api = ctx.openapi.apps.success()
-    result = cli.run(api.schema_url, config={"checks": {"no_such_check": {"threshold": 1}}})
+    command, *options = args
+    result = cli.main(command, api.schema_url, *options, config={"checks": {"no_such_check": {"threshold": 1}}})
     assert result.exit_code == 2, result.stdout
     assert result == snapshot_cli
 
