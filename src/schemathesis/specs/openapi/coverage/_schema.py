@@ -1989,7 +1989,7 @@ def _fold_pattern_properties_into_declared(schema: JsonSchemaObject) -> JsonSche
 
 
 def _cover_positive_for_type(
-    ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
+    ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None
 ) -> Generator[GeneratedValue, None, None]:
     # In negative-only mode this function never yields values.
     # Avoid expensive template generation in that case.
@@ -2030,7 +2030,7 @@ def _cover_positive_for_type(
         # The inner-violation alone doesn't guarantee the value satisfies the outer's
         # other constraints (type, properties, etc.); validate before yielding.
         nctx = ctx.with_negative()
-        for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen)):
+        for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"])):
             if flipped.generation_mode == GenerationMode.POSITIVE and not _is_valid_with_formats(
                 flipped.value, schema, ctx
             ):

@@ -3,8 +3,20 @@ import pytest
 from schemathesis.specs.openapi.adapter.formdata import prepare_multipart_v3
 
 
-def test_content_type_for_undefined_single_property(ctx):
-    # When encoding specifies contentType for a field NOT in schema properties
+@pytest.mark.parametrize(
+    ("encoding", "form_data", "expected"),
+    [
+        ({"field": {"contentType": "text/plain"}}, {"field": "value"}, [("field", (None, "value", "text/plain"))]),
+        (
+            {"items": {"contentType": "image/jpeg"}},
+            {"items": ["data1", "data2"]},
+            [("items", (None, "data1", "image/jpeg")), ("items", (None, "data2", "image/jpeg"))],
+        ),
+    ],
+    ids=["single", "array"],
+)
+def test_content_type_for_undefined_property(ctx, encoding, form_data, expected):
+    # Encoding declares contentType for a field missing from the schema properties.
     operation = ctx.openapi.load_operation(
         "POST /upload",
         {
@@ -12,7 +24,7 @@ def test_content_type_for_undefined_single_property(ctx):
                 "content": {
                     "multipart/form-data": {
                         "schema": {"type": "object", "properties": {}},
-                        "encoding": {"field": {"contentType": "text/plain"}},
+                        "encoding": encoding,
                     }
                 },
             },
@@ -20,38 +32,10 @@ def test_content_type_for_undefined_single_property(ctx):
         },
         version="3.0.0",
     )
-    form_data = {"field": "value"}
 
-    files, data = prepare_multipart_v3(operation, form_data, "multipart/form-data")
+    files, _ = prepare_multipart_v3(operation, form_data, "multipart/form-data")
 
-    assert files == [("field", (None, "value", "text/plain"))]
-
-
-def test_content_type_for_undefined_array_property(ctx):
-    # When encoding specifies contentType for an array field NOT in schema properties
-    operation = ctx.openapi.load_operation(
-        "POST /upload",
-        {
-            "requestBody": {
-                "content": {
-                    "multipart/form-data": {
-                        "schema": {"type": "object", "properties": {}},
-                        "encoding": {"items": {"contentType": "image/jpeg"}},
-                    }
-                },
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        version="3.0.0",
-    )
-    form_data = {"items": ["data1", "data2"]}
-
-    files, data = prepare_multipart_v3(operation, form_data, "multipart/form-data")
-
-    assert files == [
-        ("items", (None, "data1", "image/jpeg")),
-        ("items", (None, "data2", "image/jpeg")),
-    ]
+    assert files == expected
 
 
 def make_multipart_operation(ctx, property_schema, *, version):

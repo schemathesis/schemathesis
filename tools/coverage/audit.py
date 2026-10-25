@@ -21,7 +21,7 @@ from schemathesis.core.jsonschema import bundle, is_valid
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.result import Ok
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, encode_pointer
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -260,8 +260,7 @@ def _is_response_keyword(entry: dict[str, Any]) -> bool:
 
 def _operation_pointer_prefix(method: str, path: str) -> str:
     """JSON-pointer prefix that all schema paths under (METHOD, path) start with."""
-    encoded = path.replace("~", "~0").replace("/", "~1")
-    return f"/paths/{encoded}/{method.lower()}/"
+    return f"/paths/{encode_pointer(path)}/{method.lower()}/"
 
 
 def _errored_operation_keys(errors: list[AuditError]) -> set[tuple[str, str]]:

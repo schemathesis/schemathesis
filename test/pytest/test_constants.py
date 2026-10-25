@@ -3,59 +3,41 @@ import pytest
 pytestmark = pytest.mark.usefixtures("clean_constants_registry")
 
 
-def test_constants_extraction_warning_in_pytest_mode(testdir):
-    testdir.makepyfile(
+@pytest.mark.parametrize(
+    "schema_definition",
+    [
+        "schema = schemathesis.openapi.from_dict(raw_schema)",
         """
-import pytest
-import schemathesis
-from hypothesis import settings, Phase
-
-raw_schema = {
-    "openapi": "3.0.0",
-    "info": {"title": "Test API", "version": "1.0.0"},
-    "paths": {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
-}
-
-@schemathesis.python.constants
-def broken_source():
-    raise RuntimeError("boom in source")
-
-schema = schemathesis.openapi.from_dict(raw_schema)
-
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    pass
-"""
-    )
-    result = testdir.runpytest("-W", "always")
-    result.stdout.re_match_lines([r".*broken_source.*"])
-
-
-def test_constants_extraction_warning_in_lazy_pytest_mode(testdir):
-    testdir.makepyfile(
-        """
-import pytest
-import schemathesis
-from hypothesis import settings, Phase
-
-raw_schema = {
-    "openapi": "3.0.0",
-    "info": {"title": "Test API", "version": "1.0.0"},
-    "paths": {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
-}
-
-@schemathesis.python.constants
-def broken_source():
-    raise RuntimeError("boom in source")
-
 @pytest.fixture
 def api_schema():
     return schemathesis.openapi.from_dict(raw_schema)
 
-lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+schema = schemathesis.pytest.from_fixture("api_schema")
+""",
+    ],
+    ids=["eager", "lazy"],
+)
+def test_constants_extraction_warning_in_pytest_mode(testdir, schema_definition):
+    testdir.makepyfile(
+        """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
 
-@lazy_schema.parametrize()
+raw_schema = {
+    "openapi": "3.0.0",
+    "info": {"title": "Test API", "version": "1.0.0"},
+    "paths": {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
+}
+
+@schemathesis.python.constants
+def broken_source():
+    raise RuntimeError("boom in source")
+"""
+        + schema_definition
+        + """
+
+@schema.parametrize()
 @settings(max_examples=1, phases=[Phase.generate])
 def test_api(case):
     pass

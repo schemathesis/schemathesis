@@ -141,6 +141,8 @@ class WarningBlock:
     entity: str
     # Completes the sentence that starts with the count, e.g. " returned only 401/403 responses".
     suffix: str
+    # Terse form of `suffix` for the one-line summary entry, e.g. "returned only 401/403 responses".
+    short_suffix: str
     groups: list[WarningGroup]
     # Whether the results may not mean what the verdict says, e.g. every response was 401.
     affects_verdict: bool = False
@@ -235,6 +237,7 @@ class SummaryData:
         baseline_recorded: int | None = None,
         baseline_pruned: list[str] | None = None,
         baseline_write_error: str | None = None,
+        error_phases: tuple[PhaseName, ...] | None = TESTING_PHASES,
     ) -> SummaryData:
         return cls(
             operations=_reduce_operations(
@@ -244,6 +247,7 @@ class SummaryData:
                 phases=phases,
                 skip_reasons=skip_reasons,
                 stop_reason=stop_reason,
+                error_phases=error_phases,
             )
             if api_statistic is not None
             else None,
@@ -267,7 +271,7 @@ def _reduce_operations(
     phases: PhaseStatuses,
     skip_reasons: dict[str, set[str]],
     stop_reason: StopReason,
-    error_phases: tuple[PhaseName, ...] | None = TESTING_PHASES,
+    error_phases: tuple[PhaseName, ...] | None,
 ) -> OperationsSummary:
     errored = len(
         statistic.errored_operations - statistic.tested_operations
@@ -302,28 +306,6 @@ def _reduce_operations(
         errored=errored,
         skipped=skipped,
         skip_reasons=sorted(reasons),
-    )
-
-
-def build_operations(
-    *,
-    api_statistic: ApiStatistic | None,
-    statistic: Statistic,
-    errors: set[events.NonFatalError],
-    skip_reasons: dict[str, set[str]],
-    stop_reason: StopReason,
-) -> OperationsSummary | None:
-    """Operation counts without phase context; `st run` uses `SummaryData.from_run` instead."""
-    if api_statistic is None:
-        return None
-    return _reduce_operations(
-        api_statistic=api_statistic,
-        statistic=statistic,
-        errors=errors,
-        phases={},
-        skip_reasons=skip_reasons,
-        stop_reason=stop_reason,
-        error_phases=None,
     )
 
 

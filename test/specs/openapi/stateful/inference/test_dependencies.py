@@ -6427,9 +6427,7 @@ def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.flaky(reruns=4)
-def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
+def _customer_order_app(ctx, create_customer_body, create_order):
     order_response_schema = {
         "type": "object",
         "properties": {
@@ -6440,7 +6438,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
         "required": ["id", "customer_id", "total"],
     }
 
-    app, schema = ctx.openapi.make_flask_app(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/customers": {
                 "post": {
@@ -6494,14 +6492,22 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
         if not isinstance(request.get_json() or {}, dict):
             return {"error": "Invalid input"}
         customers.add("customer-1")
-        return jsonify({"id": "customer-1"}), 201
+        return jsonify(create_customer_body), 201
 
     @app.route("/orders", methods=["POST"])
-    def create_order():
+    def orders():
         data = request.get_json() or {}
         if not isinstance(data, dict):
             return {"error": "Invalid input"}
-        customer_id = data.get("customer_id")
+        return create_order(data.get("customer_id"), customers)
+
+    return app
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.flaky(reruns=4)
+def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
+    def create_order(customer_id, customers):
         if not isinstance(customer_id, (str, int)):
             return jsonify({"detail": "Invalid customer_id"}), 400
         if customer_id in customers:
@@ -6509,6 +6515,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
             return jsonify({"id": "order-1", "customer_id": customer_id, "total": "0"}), 201
         return jsonify({"detail": "Customer does not exist"}), 404
 
+    app = _customer_order_app(ctx, {"id": "customer-1"}, create_order)
     assert (
         cli.run_openapi_app(
             app,
@@ -6523,83 +6530,13 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.flaky(reruns=4)
 def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
-    order_response_schema = {
-        "type": "object",
-        "properties": {
-            "id": {"type": "string"},
-            "customer_id": {"type": "string"},
-            "total": {"type": "number"},
-        },
-        "required": ["id", "customer_id", "total"],
-    }
-
-    app, schema = ctx.openapi.make_flask_app(
-        {
-            "/customers": {
-                "post": {
-                    "operationId": "createCustomer",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Customer created",
-                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
-                        }
-                    },
-                }
-            },
-            "/orders": {
-                "post": {
-                    "operationId": "createOrder",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": ORDER_REQUEST_WITH_CUSTOMER,
-                            }
-                        },
-                        "required": True,
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Order created",
-                            "content": {"application/json": {"schema": order_response_schema}},
-                        }
-                    },
-                }
-            },
-        }
-    )
-
-    customers: set[str] = set()
-
-    @app.route("/customers", methods=["POST"])
-    def create_customer():
-        if not isinstance(request.get_json() or {}, dict):
-            return {"error": "Invalid input"}
-        customers.add("customer-1")
-        return jsonify({"id": "customer-1"}), 201
-
-    @app.route("/orders", methods=["POST"])
-    def create_order():
-        data = request.get_json() or {}
-        if not isinstance(data, dict):
-            return {"error": "Invalid input"}
-        customer_id = data.get("customer_id")
+    def create_order(customer_id, customers):
         if customer_id not in customers:
             # Bug: response missing required `customer_id` field.
             return jsonify({"id": "order-1", "total": 0}), 201
         return jsonify({"id": "order-1", "customer_id": customer_id, "total": 0}), 201
 
+    app = _customer_order_app(ctx, {"id": "customer-1"}, create_order)
     assert (
         cli.run_openapi_app(
             app,
@@ -6717,84 +6654,14 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cli, snapshot_cli, ctx):
-    order_response_schema = {
-        "type": "object",
-        "properties": {
-            "id": {"type": "string"},
-            "customer_id": {"type": "string"},
-            "total": {"type": "number"},
-        },
-        "required": ["id", "customer_id", "total"],
-    }
-
-    app, schema = ctx.openapi.make_flask_app(
-        {
-            "/customers": {
-                "post": {
-                    "operationId": "createCustomer",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Customer created",
-                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
-                        }
-                    },
-                }
-            },
-            "/orders": {
-                "post": {
-                    "operationId": "createOrder",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": ORDER_REQUEST_WITH_CUSTOMER,
-                            }
-                        },
-                        "required": True,
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Order created",
-                            "content": {"application/json": {"schema": order_response_schema}},
-                        }
-                    },
-                }
-            },
-        }
-    )
-
-    customers: set[str] = set()
-
-    @app.route("/customers", methods=["POST"])
-    def create_customer():
-        if not isinstance(request.get_json() or {}, dict):
-            return {"error": "Invalid input"}
-        customers.add("customer-1")
-        return jsonify({}), 201
-
-    @app.route("/orders", methods=["POST"])
-    def create_order():
-        data = request.get_json() or {}
-        if not isinstance(data, dict):
-            return {"error": "Invalid input"}
-        customer_id = data.get("customer_id")
+    def create_order(customer_id, customers):
         if not isinstance(customer_id, str):
             return {"error": "Invalid input"}
         if customer_id in customers:
             return jsonify({"id": "order-1", "customer_id": customer_id, "total": "0"}), 201
         return jsonify({"detail": "Customer does not exist"}), 404
 
+    app = _customer_order_app(ctx, {}, create_order)
     assert (
         cli.run_openapi_app(
             app,

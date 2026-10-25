@@ -24,13 +24,18 @@ from schemathesis.cli.output import (
     display_section_name,
     display_summary_counts,
     display_summary_footer,
+    display_warning_blocks,
     duration_phrase,
     format_duration,
+    get_status_icon,
     issue_parts,
+    list_block,
     make_console,
     make_progress_bar,
     print_lines,
     style,
+    unmatched_filter_block,
+    warning_items,
 )
 from schemathesis.config import ProjectConfig
 from schemathesis.core import SpecificationFeature
@@ -58,7 +63,6 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
-UNMATCHED_FILTER_TIP = "Check the filter for a typo, or update it if the operation was renamed"
 DICTIONARY_MISMATCH_REASON = "with entries that mostly fail the bound parameter's schema"
 
 
@@ -130,20 +134,6 @@ def format_phase_stats(
     if server_unavailable:
         parts.append("🚫 server stopped responding")
     return parts
-
-
-def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: str = "🕛") -> str:
-    if is_interrupted:
-        return "⚡"
-    if stats[Status.ERROR] > 0:
-        return "🚫"
-    if stats[Status.FAILURE] > 0:
-        return "❌"
-    if stats[Status.SUCCESS] > 0:
-        return "✅"
-    if stats[Status.SKIP] > 0:
-        return "⏭ "
-    return default
 
 
 def phase_status_icon(status: Status, stats: dict[Status, int]) -> str | None:
@@ -253,30 +243,9 @@ def _missing_test_data_advice(
     )
 
 
-def _items(values: set[str], *, operations: bool = True) -> list[WarningItem]:
-    return [WarningItem(text=value, operation=value if operations else None) for value in sorted(values)]
-
-
-def _list_block(
-    title: str,
-    values: set[str],
-    suffix: str,
-    tips: list[str],
-    entity: str = "operation",
-    *,
-    affects_verdict: bool = False,
+def _detailed_block(
+    title: str, warnings: dict[str, set[str]], suffix: str, tip: str, *, short_suffix: str
 ) -> WarningBlock:
-    return WarningBlock(
-        title=title,
-        count=len(values),
-        entity=entity,
-        suffix=suffix,
-        groups=[WarningGroup(items=_items(values, operations=entity == "operation"), tips=tips)],
-        affects_verdict=affects_verdict,
-    )
-
-
-def _detailed_block(title: str, warnings: dict[str, set[str]], suffix: str, tip: str) -> WarningBlock:
     items = [
         WarningItem(text=label, details=sorted(messages), operation=label)
         for label, messages in sorted(warnings.items())
@@ -286,6 +255,7 @@ def _detailed_block(title: str, warnings: dict[str, set[str]], suffix: str, tip:
         count=len(warnings),
         entity="operation",
         suffix=suffix,
+        short_suffix=short_suffix,
         groups=[WarningGroup(items=items, tips=[tip])],
     )
 
@@ -296,7 +266,7 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
         WarningGroup(
             heading=f"{status_code} {'Unauthorized' if status_code == 401 else 'Forbidden'} "
             f"({pluralize(len(labels), 'operation')})",
-            items=_items(labels),
+            items=warning_items(labels),
         )
         for status_code, labels in missing_auth.items()
     ]
@@ -308,6 +278,7 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
         count=sum(len(labels) for labels in missing_auth.values()),
         entity="operation",
         suffix=" returned only 401/403 responses",
+        short_suffix="returned only 401/403 responses",
         groups=groups,
         affects_verdict=True,
     )
@@ -331,6 +302,7 @@ def _missing_deserializer_block(ctx: ExecutionContext) -> WarningBlock:
         count=len({label for operations in warnings.values() for label in operations}),
         entity="operation",
         suffix=f" cannot validate {_unvalidated_responses(warnings)} due to missing deserializers",
+        short_suffix=f"cannot validate {_unvalidated_responses(warnings)}",
         groups=groups,
     )
 
@@ -339,11 +311,12 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
     """Operations nothing ever served, grouped by what would make them reachable."""
     missing = ctx.warnings.missing_test_data
     if _status_codes_are_uninformative(ctx):
-        return _list_block(
+        return list_block(
             "Missing test data",
             missing,
             " never returned data, preventing tests from reaching your API's core logic",
             ["Supply argument values via a fuzz dictionary so queries can return data"],
+            short_suffix="never returned data",
             affects_verdict=True,
         )
     linked = ctx.warnings.linked_operations or set()
@@ -361,13 +334,13 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
         labels_by_advice.setdefault(advice, set()).add(label)
     if len(labels_by_advice) == 1:
         (_, _, tip), labels = next(iter(labels_by_advice.items()))
-        groups = [WarningGroup(items=_items(labels), tips=[tip])]
+        groups = [WarningGroup(items=warning_items(labels), tips=[tip])]
     else:
         groups = [
             # The list that follows says how many there are when there is more than one.
             WarningGroup(
                 heading=one if len(labels) == 1 else f"{many} ({len(labels)} operations)",
-                items=_items(labels),
+                items=warning_items(labels),
                 tips=[tip],
             )
             for (one, many, tip), labels in sorted(labels_by_advice.items())
@@ -377,6 +350,7 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
         count=len(missing),
         entity="operation",
         suffix=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
+        short_suffix="repeatedly returned 404 responses",
         groups=groups,
         affects_verdict=True,
     )
@@ -421,14 +395,9 @@ def _low_valid_rate_block(ctx: ExecutionContext) -> WarningBlock:
         count=len(reported),
         entity="operation",
         suffix=" accepted few of the requests sent to it, leaving the logic behind them untested",
+        short_suffix="accepted few of the requests sent to it",
         groups=[WarningGroup(items=items, tips=[tip])],
         affects_verdict=True,
-    )
-
-
-def unmatched_filter_block(filters: set[str]) -> WarningBlock:
-    return _list_block(
-        "Unmatched filters", filters, " matched no API operations", [UNMATCHED_FILTER_TIP], entity="filter"
     )
 
 
@@ -440,21 +409,23 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
         blocks.append(_missing_auth_block(ctx))
     if warnings.rate_limited:
         blocks.append(
-            _list_block(
+            list_block(
                 "Rate limited",
                 warnings.rate_limited,
                 " mostly returned 429 Too Many Requests, leaving the logic behind them untested",
                 ["Send requests no faster than the API allows with `--rate-limit`, e.g. `--rate-limit=100/m`"],
+                short_suffix="mostly returned 429 responses",
                 affects_verdict=True,
             )
         )
     if warnings.base_url_mismatch:
         blocks.append(
-            _list_block(
+            list_block(
                 "Base URL may be missing a path",
                 warnings.base_url_mismatch,
                 " returned only 404 Not Found",
                 [f"The schema declares a base path; try `--url {warnings.base_url_suggestion}`"],
+                short_suffix="returned only 404 responses",
                 affects_verdict=True,
             )
         )
@@ -462,12 +433,13 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
         blocks.append(_missing_test_data_block(ctx))
     if warnings.validation_mismatch:
         blocks.append(
-            _list_block(
+            list_block(
                 "Schema validation mismatch",
                 warnings.validation_mismatch,
                 " mostly rejected generated data due to validation errors, "
                 "indicating schema constraints don't match API validation",
                 ["Check your schema constraints - API validation may be stricter than documented"],
+                short_suffix="mostly rejected generated data",
                 affects_verdict=True,
             )
         )
@@ -475,33 +447,36 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
         blocks.append(_missing_deserializer_block(ctx))
     if warnings.unused_openapi_auth:
         blocks.append(
-            _list_block(
+            list_block(
                 "Unused OpenAPI auth",
                 warnings.unused_openapi_auth,
                 " not defined in the schema",
                 [],
                 entity="configured auth scheme",
+                short_suffix="not used in the schema",
             )
         )
     if warnings.dictionary_mismatch:
         blocks.append(
-            _list_block(
+            list_block(
                 "Dictionary mismatch",
                 warnings.dictionary_mismatch,
                 f" {DICTIONARY_MISMATCH_REASON}",
                 ["Fix the entries, or bind the dictionary to a parameter whose schema they match"],
                 entity="dictionary binding",
+                short_suffix=DICTIONARY_MISMATCH_REASON,
             )
         )
     if warnings.unmatched_filter:
         blocks.append(unmatched_filter_block(warnings.unmatched_filter))
     if warnings.method_not_allowed:
         blocks.append(
-            _list_block(
+            list_block(
                 "Method Not Allowed",
                 warnings.method_not_allowed,
                 " consistently returned `405 Method Not Allowed`, skipped from later phases",
                 ["Verify the server actually accepts these methods, or remove them from the schema if unsupported"],
+                short_suffix="skipped after consistent 405 responses",
                 affects_verdict=True,
             )
         )
@@ -512,6 +487,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 warnings.unsupported_regex,
                 " with regex patterns Schemathesis cannot use as written",
                 "Supply examples for these operations, or narrow the pattern",
+                short_suffix="had unusable regex patterns",
             )
         )
     if warnings.low_valid_rate_reported:
@@ -523,42 +499,21 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 warnings.unresolvable_reference,
                 " skipped parts of the schema",
                 "Resolve these references so the skipped parts get tested",
+                short_suffix="had parts of the schema skipped",
             )
         )
     if warnings.constants_extraction:
         blocks.append(
-            _list_block(
+            list_block(
                 "Constant reuse skipped",
                 warnings.constants_extraction,
                 " could not be scanned for constant reuse",
                 ["Check that each `@schemathesis.python.constants` source returns your app or modules"],
                 entity="registered source",
+                short_suffix="could not be scanned",
             )
         )
     return blocks
-
-
-def display_warning_blocks(blocks: list[WarningBlock]) -> None:
-    display_section_name("WARNINGS")
-    click.echo()
-    for block in blocks:
-        click.echo(style(f"{block.title}: {block.summary}\n", fg="yellow"))
-        for group in block.groups:
-            if group.heading is not None:
-                click.echo(style(f"{group.heading}:", fg="yellow"))
-            for index, item in enumerate(group.items):
-                click.echo(style(f"  - {item.text}", fg="yellow"))
-                for detail in item.details:
-                    click.echo(style(f"    {detail}", fg="yellow"))
-                # Items with details read as separate paragraphs.
-                if item.details and index < len(group.items) - 1:
-                    click.echo()
-            if group.tips is not None:
-                click.echo()
-                for tip in group.tips:
-                    click.echo(style(f"💡 {tip}", fg="yellow"))
-                if group.tips:
-                    click.echo()
 
 
 def extraction_failure_reason(failure: ExtractionFailure) -> list[str]:
@@ -1559,100 +1514,10 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
     def display_warnings_summary(self, ctx: ExecutionContext) -> None:
         click.echo(style("Warnings:", bold=True))
-        missing_deserializer = {
-            label for operations in ctx.warnings.missing_deserializer.values() for label in operations
-        }
-        entries = (
-            (
-                sum(len(operations) for operations in ctx.warnings.missing_auth.values()),
-                "Authentication failed",
-                "operation",
-                "returned only 401/403 responses",
-            ),
-            (
-                len(ctx.warnings.rate_limited),
-                "Rate limited",
-                "operation",
-                "mostly returned 429 responses",
-            ),
-            (
-                len(ctx.warnings.base_url_mismatch),
-                "Base URL may be missing a path",
-                "operation",
-                "returned only 404 responses",
-            ),
-            (
-                len(ctx.warnings.missing_test_data),
-                "Missing test data",
-                "operation",
-                "never returned data" if _status_codes_are_uninformative(ctx) else "repeatedly returned 404 responses",
-            ),
-            (
-                len(ctx.warnings.validation_mismatch),
-                "Schema validation mismatch",
-                "operation",
-                "mostly rejected generated data",
-            ),
-            (
-                len(missing_deserializer),
-                "Schema validation skipped",
-                "operation",
-                f"cannot validate {_unvalidated_responses(ctx.warnings.missing_deserializer)}",
-            ),
-            (
-                len(ctx.warnings.unused_openapi_auth),
-                "Unused OpenAPI auth",
-                "configured auth scheme",
-                "not used in the schema",
-            ),
-            (
-                len(ctx.warnings.unsupported_regex),
-                "Unsupported regex",
-                "operation",
-                "had unusable regex patterns",
-            ),
-            (
-                len(ctx.warnings.dictionary_mismatch),
-                "Dictionary mismatch",
-                "dictionary binding",
-                DICTIONARY_MISMATCH_REASON,
-            ),
-            (
-                len(ctx.warnings.unmatched_filter),
-                "Unmatched filters",
-                "filter",
-                "matched no API operations",
-            ),
-            (
-                len(ctx.warnings.method_not_allowed),
-                "Method Not Allowed",
-                "operation",
-                "skipped after consistent 405 responses",
-            ),
-            (
-                len(ctx.warnings.constants_extraction),
-                "Constant reuse skipped",
-                "registered source",
-                "could not be scanned",
-            ),
-            (
-                len(ctx.warnings.unresolvable_reference),
-                "Unresolvable references",
-                "operation",
-                "had parts of the schema skipped",
-            ),
-            (
-                len(ctx.warnings.low_valid_rate_reported),
-                "Low valid-input rate",
-                "operation",
-                "accepted few of the requests sent to it",
-            ),
-        )
-        for count, title, entity_name, suffix_text in entries:
-            if not count:
-                continue
-            plural = "" if count == 1 else "s"
-            click.echo(style(f"  ⚠️ {title}: {bold(str(count))} {entity_name}{plural} {suffix_text}", fg="yellow"))
+        for block in warning_blocks(ctx):
+            plural = "" if block.count == 1 else "s"
+            entry = f"{block.title}: {bold(str(block.count))} {block.entity}{plural} {block.short_suffix}"
+            click.echo(style(f"  ⚠️ {entry}", fg="yellow"))
         click.echo()
 
     def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:

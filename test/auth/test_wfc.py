@@ -75,40 +75,6 @@ def _run_wfc(cli, api, path, *args, max_examples=5, **wfc):
     )
 
 
-def test_wfc_user_from_cli_flag(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.wfc_login()
-    auth = _write(
-        tmp_path,
-        {
-            "auth": [
-                {"name": "alice", "fixedHeaders": [{"name": "X-Api-Key", "value": "alice-key"}]},
-                {"name": "bob", "fixedHeaders": [{"name": "X-Api-Key", "value": "bob-key"}]},
-            ]
-        },
-    )
-
-    result = cli.run(api.schema_url, "--max-examples=5", f"--auth-wfc={auth}", "--auth-wfc-user=bob")
-    assert result.exit_code == 0
-    assert all(_header(c, "X-Api-Key") == "bob-key" for c in _protected_calls(api))
-
-
-def test_wfc_user_flag_selects_within_a_configured_file(cli, ctx, tmp_path):
-    # The file comes from the config, the user from the CLI.
-    api = ctx.openapi.apps.wfc_login()
-    auth = _write(
-        tmp_path,
-        {
-            "auth": [
-                {"name": "alice", "fixedHeaders": [{"name": "X-Api-Key", "value": "alice-key"}]},
-                {"name": "bob", "fixedHeaders": [{"name": "X-Api-Key", "value": "bob-key"}]},
-            ]
-        },
-    )
-
-    assert _run_wfc(cli, api, auth, "--auth-wfc-user=bob").exit_code == 0
-    assert all(_header(c, "X-Api-Key") == "bob-key" for c in _protected_calls(api))
-
-
 def test_wfc_user_requires_path(cli, tmp_path):
     schema = _write(
         tmp_path,
@@ -237,7 +203,16 @@ def test_wfc_external_endpoint_url(cli, ctx, tmp_path):
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
-def test_wfc_selects_named_user(cli, ctx, tmp_path):
+@pytest.mark.parametrize(
+    ("cli_args", "wfc_config"),
+    [
+        (["--auth-wfc={path}", "--auth-wfc-user=bob"], None),
+        (["--auth-wfc-user=bob"], {}),
+        ([], {"user": "bob"}),
+    ],
+    ids=["cli-path-and-user", "config-path-cli-user", "config-path-and-user"],
+)
+def test_wfc_selects_named_user(cli, ctx, tmp_path, cli_args, wfc_config):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(
         tmp_path,
@@ -248,8 +223,10 @@ def test_wfc_selects_named_user(cli, ctx, tmp_path):
             ]
         },
     )
+    config = None if wfc_config is None else {"auth": {"wfc": {"path": auth, **wfc_config}}}
 
-    assert _run_wfc(cli, api, auth, user="bob").exit_code == 0
+    result = cli.run(api.schema_url, "--max-examples=5", *(arg.format(path=auth) for arg in cli_args), config=config)
+    assert result.exit_code == 0
     assert all(_header(c, "X-Api-Key") == "bob-key" for c in _protected_calls(api))
 
 

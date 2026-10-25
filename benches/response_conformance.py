@@ -186,60 +186,50 @@ RESPONSE_CONFORMANCE_SCHEMA = {
 CONFIG = schemathesis.Config()
 CONFORMANCE_TEST_SCHEMA = schemathesis.openapi.from_dict(RESPONSE_CONFORMANCE_SCHEMA, config=CONFIG)
 
+
+def _response(path, content, headers=None):
+    return schemathesis.Response(
+        status_code=200,
+        headers={"Content-Type": ["application/json"], **(headers or {})},
+        content=content,
+        request=requests.Request(method="GET", url=f"http://127.0.0.1{path}").prepare(),
+        elapsed=0.1,
+        verify=False,
+    )
+
+
 SIMPLE_CASE = CONFORMANCE_TEST_SCHEMA["/simple"]["get"].Case()
-SIMPLE_RESPONSE = schemathesis.Response(
-    status_code=200,
-    headers={"Content-Type": ["application/json"]},
-    content=b'{"id": 12345, "message": "Operation successful"}',
-    request=requests.Request(method="GET", url="http://127.0.0.1/simple").prepare(),
-    elapsed=0.1,
-    verify=False,
-)
+SIMPLE_RESPONSE = _response("/simple", b'{"id": 12345, "message": "Operation successful"}')
 
 MEDIUM_CASE = CONFORMANCE_TEST_SCHEMA["/medium"]["get"].Case()
-MEDIUM_RESPONSE = schemathesis.Response(
-    status_code=200,
-    headers={"Content-Type": ["application/json"]},
-    content=b"""{"id": 12345, "user": {"name": "John Doe", "email": "john@example.com"}, "timestamp": "2023-12-01T10:30:00Z"}""",
-    request=requests.Request(method="GET", url="http://127.0.0.1/medium").prepare(),
-    elapsed=0.1,
-    verify=False,
+MEDIUM_RESPONSE = _response(
+    "/medium",
+    b"""{"id": 12345, "user": {"name": "John Doe", "email": "john@example.com"}, "timestamp": "2023-12-01T10:30:00Z"}""",
 )
 
 COMPLEX_CASE = CONFORMANCE_TEST_SCHEMA["/complex"]["get"].Case()
-COMPLEX_RESPONSE = schemathesis.Response(
-    status_code=200,
-    headers={"Content-Type": ["application/json"]},
-    content=b"""{"id": 12345, "user": {"name": "John Doe", "email": "john@example.com"}, "address": {"street": "123 Main St", "city": "San Francisco", "country": "US"}, "preferences": {"theme": "dark", "notifications": true, "language": "en"}, "metadata": {"source": "api", "version": "1.2.3", "tags": ["important", "user-data"]}, "status": "active", "created_at": "2023-01-15T09:00:00Z", "updated_at": "2023-12-01T10:30:00Z"}""",
-    request=requests.Request(method="GET", url="http://127.0.0.1/complex").prepare(),
-    elapsed=0.1,
-    verify=False,
+COMPLEX_RESPONSE = _response(
+    "/complex",
+    b"""{"id": 12345, "user": {"name": "John Doe", "email": "john@example.com"}, "address": {"street": "123 Main St", "city": "San Francisco", "country": "US"}, "preferences": {"theme": "dark", "notifications": true, "language": "en"}, "metadata": {"source": "api", "version": "1.2.3", "tags": ["important", "user-data"]}, "status": "active", "created_at": "2023-01-15T09:00:00Z", "updated_at": "2023-12-01T10:30:00Z"}""",
 )
 SIMPLE_HEADERS_CASE = CONFORMANCE_TEST_SCHEMA["/simple-headers"]["get"].Case()
-SIMPLE_HEADERS_RESPONSE = schemathesis.Response(
-    status_code=200,
-    headers={"Content-Type": ["application/json"], "X-Request-ID": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890"]},
-    content=b'{"status": "success"}',
-    request=requests.Request(method="GET", url="http://127.0.0.1/simple-headers").prepare(),
-    elapsed=0.1,
-    verify=False,
+SIMPLE_HEADERS_RESPONSE = _response(
+    "/simple-headers",
+    b'{"status": "success"}',
+    headers={"X-Request-ID": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890"]},
 )
 
 COMPLEX_HEADERS_CASE = CONFORMANCE_TEST_SCHEMA["/complex-headers"]["get"].Case()
-COMPLEX_HEADERS_RESPONSE = schemathesis.Response(
-    status_code=200,
+COMPLEX_HEADERS_RESPONSE = _response(
+    "/complex-headers",
+    b'{"status": "success"}',
     headers={
-        "Content-Type": ["application/json"],
         "X-Request-ID": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890"],
         "X-Rate-Limit-Remaining": ["9500"],
         "X-API-Version": ["v2"],
         "X-Response-Time": ["0.125"],
         "X-Cache-Status": ["hit"],
     },
-    content=b'{"status": "success"}',
-    request=requests.Request(method="GET", url="http://127.0.0.1/complex-headers").prepare(),
-    elapsed=0.1,
-    verify=False,
 )
 
 CTX = CheckContext(

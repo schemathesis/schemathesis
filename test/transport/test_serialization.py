@@ -1454,7 +1454,7 @@ def test_unknown_multipart_fields_openapi3(ctx):
 @pytest.mark.parametrize(
     "encoding,expected_filename",
     [
-        # No encoding: field name is used as filename for binary parts
+        # No encoding: field name is used as filename for binary parts and list items
         (None, "attachment"),
         # encoding.headers.Content-Disposition.schema.example provides filename
         (
@@ -1488,13 +1488,16 @@ def test_unknown_multipart_fields_openapi3(ctx):
     ],
     ids=["field-name-fallback", "schema-example", "header-example"],
 )
-def test_multipart_binary_field_filename(ctx, encoding, expected_filename):
-    content: dict = {
-        "schema": {
-            "type": "object",
-            "properties": {"attachment": {"type": "string", "format": "binary"}},
-        }
-    }
+@pytest.mark.parametrize(
+    "property_schema, value, sent",
+    [
+        ({"type": "string", "format": "binary"}, b"\x92\x42", [b"\x92B"]),
+        ({"type": "array", "items": {"type": "string", "format": "binary"}}, [b"\x01", b"\x02"], [b"\x01", b"\x02"]),
+    ],
+    ids=["single", "list"],
+)
+def test_multipart_binary_part_filename(ctx, encoding, expected_filename, property_schema, value, sent):
+    content: dict = {"schema": {"type": "object", "properties": {"attachment": property_schema}}}
     if encoding is not None:
         content["encoding"] = encoding
     operation = ctx.openapi.load_operation(
@@ -1507,9 +1510,10 @@ def test_multipart_binary_field_filename(ctx, encoding, expected_filename):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    case = operation.Case(body={"attachment": b"\x92\x42"}, media_type="multipart/form-data")
-    serialized = REQUESTS_TRANSPORT.serialize_case(case)
-    assert serialized["files"] == [("attachment", (expected_filename, b"\x92B"))]
+    case = operation.Case(body={"attachment": value}, media_type="multipart/form-data")
+    assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == [
+        ("attachment", (expected_filename, part)) for part in sent
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1584,70 +1588,6 @@ def test_multipart_binary_property_filename_behind_ref(ctx, body_is_ref, propert
     )
     case = operation.Case(body={"file": value}, media_type="multipart/form-data")
     assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == expected
-
-
-@pytest.mark.parametrize(
-    "encoding,expected_filename",
-    [
-        # No encoding: field name is used as filename for binary list items
-        (None, "files"),
-        # encoding.headers.Content-Disposition.schema.example provides filename
-        (
-            {
-                "files": {
-                    "headers": {
-                        "Content-Disposition": {
-                            "schema": {
-                                "type": "string",
-                                "example": 'form-data; name="files"; filename="upload.bin"',
-                            }
-                        }
-                    }
-                }
-            },
-            "upload.bin",
-        ),
-        # encoding.headers.Content-Disposition.example (no schema wrapping)
-        (
-            {
-                "files": {
-                    "headers": {
-                        "Content-Disposition": {
-                            "example": 'form-data; name="files"; filename="data.bin"',
-                        }
-                    }
-                }
-            },
-            "data.bin",
-        ),
-    ],
-    ids=["field-name-fallback", "schema-example", "header-example"],
-)
-def test_multipart_binary_list_filename(ctx, encoding, expected_filename):
-    content: dict = {
-        "schema": {
-            "type": "object",
-            "properties": {"files": {"type": "array", "items": {"type": "string", "format": "binary"}}},
-        }
-    }
-    if encoding is not None:
-        content["encoding"] = encoding
-    operation = ctx.openapi.load_operation(
-        "POST /test",
-        {
-            "requestBody": {
-                "required": True,
-                "content": {"multipart/form-data": content},
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-    )
-    case = operation.Case(body={"files": [b"\x01", b"\x02"]}, media_type="multipart/form-data")
-    serialized = REQUESTS_TRANSPORT.serialize_case(case)
-    assert serialized["files"] == [
-        ("files", (expected_filename, b"\x01")),
-        ("files", (expected_filename, b"\x02")),
-    ]
 
 
 @pytest.mark.parametrize("transport", ["wsgi", "http"])

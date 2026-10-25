@@ -10,7 +10,6 @@ from schemathesis.generation import overrides
 from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
-    from schemathesis.checks import ResponseChecks
     from schemathesis.core.failures import Failure
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.recorder import ScenarioRecorder
@@ -37,12 +36,7 @@ class CheckContextData:
     transport_kwargs: dict[str, Any]
 
     def to_check_context(
-        self,
-        *,
-        recorder: ScenarioRecorder,
-        response_checks: ResponseChecks,
-        phase: PhaseName | None,
-        auth_enforced_operations: set[str],
+        self, ctx: EngineContext, *, recorder: ScenarioRecorder, phase: PhaseName | None
     ) -> CheckContext:
         return CheckContext(
             override=self.override,
@@ -51,9 +45,9 @@ class CheckContextData:
             config=self.config,
             transport_kwargs=self.transport_kwargs,
             recorder=recorder,
-            response_checks=response_checks,
+            response_checks=ctx.checks.for_responses(),
             phase=phase,
-            auth_enforced_operations=auth_enforced_operations,
+            auth_enforced_operations=ctx.auth_enforced_operations,
         )
 
 

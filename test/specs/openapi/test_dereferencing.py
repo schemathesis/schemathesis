@@ -20,7 +20,7 @@ from schemathesis.core.transforms import get_template_fields
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.stateful import dependencies
-from test.utils import get_schema_path, integer, run_given
+from test.utils import integer, run_given
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
 ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo": {"type": "integer"}}}
@@ -847,8 +847,9 @@ def test_iter_when_ref_resolves_to_none_in_body(ctx):
         pass
 
 
-def test_resolve_large_schema(ctx):
-    path = get_schema_path("openapi3.json")
+def test_resolve_large_schema(ctx, tmp_path):
+    path = tmp_path / "openapi3.json"
+    path.write_text(json.dumps(OPENAPI_30))
     schema = ctx.openapi.load_schema(
         {
             "/": {
@@ -860,7 +861,7 @@ def test_resolve_large_schema(ctx):
                             "content": {
                                 "application/openapi+json": {
                                     "schema": {
-                                        "$ref": Path(path).as_uri(),
+                                        "$ref": path.as_uri(),
                                     }
                                 }
                             },

@@ -3,7 +3,7 @@ from __future__ import annotations
 import graphql
 import pytest
 
-from schemathesis.specs.graphql.stateful._bundles import collect_id_typed_object_types
+from schemathesis.specs.graphql.bundles import collect_id_typed_object_types
 
 
 @pytest.mark.parametrize(

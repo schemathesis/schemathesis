@@ -28,7 +28,7 @@ from schemathesis.engine.events import EngineFinished
 from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.statistic import Statistic
-from schemathesis.engine.summary import build_operations
+from schemathesis.engine.summary import SummaryData, WarningData
 from test.apps.fragments import handlers
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import linked_users, null_name_response, null_name_responses
@@ -124,13 +124,16 @@ def test_fuzz_operations_summary_unanswered_step_is_skipped_by_failure_limit(ctx
     api_statistic = ApiStatistic()
     api_statistic.operations.total = api_statistic.operations.selected = 2
 
-    operations = build_operations(
+    operations = SummaryData.from_run(
         api_statistic=api_statistic,
         statistic=statistic,
         errors=set(),
+        phases={},
         skip_reasons={},
         stop_reason=StopReason.FAILURE_LIMIT,
-    )
+        warnings=WarningData(),
+        error_phases=None,
+    ).operations
 
     assert (operations.tested, operations.skipped, operations.skip_reasons) == (1, 1, ["Failure limit reached"])
 

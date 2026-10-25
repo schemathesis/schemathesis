@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     import hypothesis
     from hypothesis.strategies import DrawFn
 
-    from schemathesis.checks import ResponseChecks
     from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
@@ -393,7 +392,6 @@ def _validate_scenario(
     recorder: ScenarioRecorder,
     *,
     rate_limited_by_case: dict[str, list[Response]],
-    response_checks: ResponseChecks,
     check_context_cache: CheckContextCache,
     continue_on_failure_by_label: dict[str, bool],
 ) -> Status:
@@ -406,10 +404,7 @@ def _validate_scenario(
             continue
         case = node.value
         check_ctx = check_context_cache.get_or_create(operation=case.operation, ctx=ctx, phase=None).to_check_context(
-            recorder=recorder,
-            response_checks=response_checks,
-            phase=None,
-            auth_enforced_operations=ctx.auth_enforced_operations,
+            ctx, recorder=recorder, phase=None
         )
         try:
             validate_case(
@@ -627,13 +622,11 @@ def _run_forever_thread(
         active = scenario_cell.value
         assert active is not None
         status = Status.SUCCESS
-        response_checks = ctx.checks.for_responses()
         try:
             status = _validate_scenario(
                 ctx,
                 recorder,
                 rate_limited_by_case=rate_limited_by_case,
-                response_checks=response_checks,
                 check_context_cache=check_context_cache,
                 continue_on_failure_by_label=continue_on_failure_by_label,
             )

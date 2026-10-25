@@ -7,11 +7,6 @@ from typing import TYPE_CHECKING
 import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
-from schemathesis.cli.commands.run.handlers.output import (
-    display_warning_blocks,
-    get_status_icon,
-    unmatched_filter_block,
-)
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     Indent,
@@ -23,10 +18,13 @@ from schemathesis.cli.output import (
     display_section_name,
     display_summary_counts,
     display_summary_footer,
+    display_warning_blocks,
     duration_phrase,
+    get_status_icon,
     issue_parts,
     make_console,
     print_lines,
+    unmatched_filter_block,
 )
 from schemathesis.core.output import pluralize
 from schemathesis.core.timing import Instant

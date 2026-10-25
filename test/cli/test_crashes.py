@@ -13,9 +13,10 @@ from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.metrics import METRICS
+from test.utils import profile_max_examples
 
 # Each example is a full CLI run; the scheduled `CI` Hypothesis profile keeps its own, larger budget.
-MAX_EXAMPLES = 20 if settings().max_examples == 100 else settings().max_examples
+MAX_EXAMPLES = profile_max_examples() or 20
 
 
 @pytest.fixture(scope="module")

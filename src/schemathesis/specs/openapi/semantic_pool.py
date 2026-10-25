@@ -331,7 +331,6 @@ def iter_ingestion_leaves(
     excluded_names: frozenset[str] = frozenset(),
     max_depth: int = DEFAULT_MAX_DEPTH,
     max_nodes: int = DEFAULT_MAX_NODES,
-    root: JsonSchemaObject | None = None,
 ) -> Iterator[IngestionLeaf]:
     """Yield pool-eligible leaves from a 2xx response body, optionally guided by its schema.
 
@@ -340,8 +339,7 @@ def iter_ingestion_leaves(
     not recursed.
     """
     budget = _WalkBudget(nodes_left=max_nodes)
-    effective_root = root if root is not None else schema
-    if isinstance(schema, dict) and effective_root is not None:
+    if isinstance(schema, dict):
         yield from _walk_ingestion(
             schema,
             body,
@@ -350,7 +348,7 @@ def iter_ingestion_leaves(
             excluded=excluded_names,
             budget=budget,
             max_depth=max_depth,
-            root=effective_root,
+            root=schema,
         )
         return
     # Match the schema-aware path's one-node entry cost so budgets are comparable either way.

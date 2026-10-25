@@ -11,11 +11,10 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from time import monotonic, sleep, time
+from time import monotonic, sleep
 from typing import TYPE_CHECKING, Any
 
 import pytest
-import requests
 import trustme
 import uvicorn
 from werkzeug.serving import BaseWSGIServer, make_server
@@ -120,29 +119,15 @@ class SubprocessRunner:
         self._processes.append(process)
 
         if wait_for_server:
-            self._wait_for_server(port, timeout)
+            try:
+                wait_for_port(port, timeout=timeout)
+            except RuntimeError:
+                if process.poll() is None:
+                    raise
+                stdout, stderr = process.communicate()
+                raise RuntimeError(f"Server process exited early. Stdout: {stdout}, Stderr: {stderr}") from None
 
         return port
-
-    def _wait_for_server(self, port: int, timeout: float) -> None:
-        """Wait for server to be ready to accept connections."""
-        start_time = time()
-        while time() - start_time < timeout:
-            try:
-                requests.get(f"http://127.0.0.1:{port}/", timeout=1)
-                return
-            except requests.exceptions.RequestException:
-                if time() - start_time >= timeout:
-                    raise
-                sleep(0.1)
-
-        if self._processes:
-            process = self._processes[-1]
-            if process.poll() is not None:
-                stdout, stderr = process.communicate()
-                raise RuntimeError(f"Server process exited early. Stdout: {stdout}, Stderr: {stderr}")
-
-        raise RuntimeError(f"Server on port {port} failed to start within {timeout}s")
 
     def cleanup(self) -> None:
         """Cleanup all subprocess resources."""

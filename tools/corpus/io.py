@@ -90,7 +90,8 @@ def get_schema_version(schema: dict[str, Any]) -> str:
 
 def load_from_corpus(file_name: str, corpus: tarfile.TarFile | str) -> dict[str, Any]:
     if isinstance(corpus, str):
-        corpus = read_corpus_file(corpus)
+        with read_corpus_file(corpus) as tar:
+            return load_from_corpus(file_name, tar)
     extracted = corpus.extractfile(file_name)
     if extracted is not None:
         return json_loads(extracted.read())

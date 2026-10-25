@@ -34,6 +34,7 @@ from schemathesis.specs.graphql.inference import (
     classify_operation,
     extract_entity,
 )
+from schemathesis.specs.graphql.schemas import graphql_cases
 from schemathesis.specs.graphql.stateful._extract import iter_handle_values
 from schemathesis.specs.graphql.substitution import candidate_handle, substitute_bundle_values
 
@@ -280,7 +281,6 @@ def _make_producer_rule(
 
     def body(self: Any, data: st.DataObject) -> Any:
         operation = self.schema[root_label][field_name]
-        from schemathesis.specs.graphql.schemas import graphql_cases
 
         case = data.draw(graphql_cases(operation=operation, hooks=self.schema.hooks, phase=TestPhase.STATEFUL))
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
@@ -368,7 +368,6 @@ def _make_handle_producer_rule(
 
     def body(self: Any, data: st.DataObject) -> Any:
         operation = self.schema[root_label][field_name]
-        from schemathesis.specs.graphql.schemas import graphql_cases
 
         case = data.draw(
             graphql_cases(
@@ -417,7 +416,6 @@ def _make_consumer_rule(
         feeding_producers.extend(producers_by_handle.get(handle, []))
 
     def body(self: Any, data: st.DataObject, **bundle_args: Any) -> None:
-        from schemathesis.specs.graphql.schemas import graphql_cases
 
         operation = self.schema[root_label][field_name]
         case = data.draw(
@@ -490,7 +488,6 @@ def _make_lifecycle_rule(
         bundle_kwargs[argument_name] = attrs[bundle_name(handle)]
 
     def body(self: Any, data: st.DataObject, **bundle_args: Any) -> Any:
-        from schemathesis.specs.graphql.schemas import graphql_cases
 
         operation = self.schema[root_label][field_name]
         case = data.draw(

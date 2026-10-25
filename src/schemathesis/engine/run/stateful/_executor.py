@@ -436,12 +436,7 @@ def _validate_step_response(
     _feed_error_feedback(engine, case, response, observations=observations, recorder=recorder)
     check_ctx = check_context_cache.get_or_create(
         operation=case.operation, ctx=engine, phase="stateful"
-    ).to_check_context(
-        recorder=recorder,
-        response_checks=engine.checks.for_responses(),
-        phase=PhaseName.STATEFUL_TESTING,
-        auth_enforced_operations=engine.auth_enforced_operations,
-    )
+    ).to_check_context(engine, recorder=recorder, phase=PhaseName.STATEFUL_TESTING)
     validate_response(
         response=response,
         case=case,

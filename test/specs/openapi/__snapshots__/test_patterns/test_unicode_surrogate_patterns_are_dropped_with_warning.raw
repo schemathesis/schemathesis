@@ -69,7 +69,7 @@ Failures:
 For more information, run `st explain ST201`.
 
 Warnings:
-  ⚠️ Unsupported regex: 2 operations had unusable regex patterns
+  ⚠️ Unsupported regex patterns: 2 operations had unusable regex patterns
 
 Test cases:
   N generated, N found N unique failures

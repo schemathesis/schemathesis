@@ -65,16 +65,6 @@ def _iter_inputs(args: argparse.Namespace) -> Iterator[CorpusEntry]:
     yield from iter_corpus_streaming(corpus=args.corpus, only=args.only, limit=args.limit)
 
 
-def _iter_refs(args: argparse.Namespace) -> Iterator[_Ref]:
-    yield from iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit)
-
-
-def _count_inputs(args: argparse.Namespace) -> int:
-    if args.spec is not None:
-        return 1
-    return sum(1 for _ in iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit))
-
-
 class _WorkerKwargs(TypedDict):
     out_dir: Path
     html_out: Path
@@ -260,7 +250,7 @@ def _run_pool(
 
 
 def _run_parallel(
-    refs: Iterator[_Ref],
+    refs: list[_Ref],
     *,
     max_workers: int,
     worker_kwargs: _WorkerKwargs,
@@ -642,7 +632,8 @@ def main(argv: list[str] | None = None) -> int:
         fuzzing_max_examples=args.max_examples,
     )
 
-    total = _count_inputs(args)
+    refs = [] if args.spec is not None else list(iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit))
+    total = 1 if args.spec is not None else len(refs)
 
     try:
         with _Reporter(total=total) as reporter:
@@ -654,7 +645,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 # `spawn` avoids fork-after-threads deadlocks from hypothesis/tracecov import-time threads.
                 _run_parallel(
-                    _iter_refs(args),
+                    refs,
                     max_workers=args.workers,
                     worker_kwargs=worker_kwargs,
                     results=results,
