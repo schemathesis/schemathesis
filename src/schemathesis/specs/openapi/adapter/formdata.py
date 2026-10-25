@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.file_samples import file_extension
-from schemathesis.core.jsonschema import resolve_bundled_root, resolve_with_root_bundle
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -23,9 +22,9 @@ def prepare_multipart_v2(
 
     known_fields: dict[str, dict[str, Any]] = {}
     for parameter in operation.body:
-        schema = parameter.definition.get("schema")
-        if isinstance(schema, dict):
-            known_fields.update(resolve_bundled_root(schema).get("properties", {}))
+        schema = parameter.resolved_schema
+        if schema is not None:
+            known_fields.update(schema.get("properties", {}))
 
     def add_part(name: str, value: Any, is_file: bool) -> None:
         content_type = selected.get(name)
@@ -69,19 +68,6 @@ def _filename(name: str, value: object) -> str:
     return f"{name}.{extension}" if extension else name
 
 
-def _resolved_properties(schema: dict[str, Any]) -> dict[str, Any]:
-    """Body properties and their `items` with `$ref` resolved, so file parts behind a reference keep a filename."""
-    resolved = {}
-    for name, property_schema in schema.get("properties", {}).items():
-        if isinstance(property_schema, dict):
-            property_schema = resolve_with_root_bundle(property_schema, schema)
-            items = property_schema.get("items")
-            if isinstance(items, dict):
-                property_schema = {**property_schema, "items": resolve_with_root_bundle(items, schema)}
-        resolved[name] = property_schema
-    return resolved
-
-
 def prepare_multipart_v3(
     operation: APIOperation,
     form_data: dict[str, Any],
@@ -90,10 +76,7 @@ def prepare_multipart_v3(
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
     body_param = operation.get_body_for_media_type(media_type)
-    schema_node = body_param.definition.get("schema") if body_param is not None else None
-    schema: dict[str, Any] = resolve_bundled_root(schema_node) if isinstance(schema_node, dict) else {}
-
-    properties = _resolved_properties(schema)
+    properties = body_param.form_properties if body_param is not None else {}
     for name, value in form_data.items():
         property_schema = properties.get(name)
         # Use the selected content type if available, otherwise check encoding definition

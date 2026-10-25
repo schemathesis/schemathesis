@@ -20,7 +20,7 @@ from urllib3.filepost import encode_multipart_formdata
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
 from schemathesis.core.file_samples import MEDIA_TYPE_FILE_SAMPLES
-from schemathesis.core.jsonschema import get_type, resolve_bundled_root, resolve_with_root_bundle
+from schemathesis.core.jsonschema import get_type, resolve_with_root_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -510,9 +510,8 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
         if content_type is not None:
             result[name] = content_type
     # Default nested-object / array form-parts to JSON so the wire payload is parsable.
-    schema_node = body.definition.get("schema")
-    if isinstance(schema_node, dict):
-        schema_node = resolve_bundled_root(schema_node)
+    schema_node = body.resolved_schema
+    if schema_node is not None:
         properties = schema_node.get("properties")
         if isinstance(properties, dict):
             for name, prop in properties.items():
@@ -538,8 +537,8 @@ def _property_schema(ctx: SerializationContext, name: str) -> dict[str, Any]:
     """Return the schema of a multipart property, with `$ref` resolved."""
     body = ctx.case.operation.get_body_for_media_type(ctx.case.media_type or "multipart/form-data")
     assert body is not None
-    schema_node = body.definition.get("schema")
-    properties = resolve_bundled_root(schema_node).get("properties", {}) if isinstance(schema_node, dict) else {}
+    schema_node = body.resolved_schema or {}
+    properties = schema_node.get("properties", {})
     if isinstance(properties.get(name), dict):
         return resolve_with_root_bundle(properties[name], schema_node)
     return {}
