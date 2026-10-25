@@ -261,23 +261,55 @@ def test_fuzz_reports_once_when_generation_fails_after_preflight(ctx, app_runner
     assert [(type(event.value), event.label) for event in errors] == [(UnicodeEncodeError, "GET /search")]
 
 
-def test_fuzz_preflight_all_operations_excluded(ctx):
-    api = ctx.openapi.apps.success_and_failure()
+def _reject(case):
+    assume(False)
+
+
+def _fail_generation(case):
+    raise RuntimeError("generation error")
+
+
+@pytest.mark.parametrize(
+    ("app", "transform", "expected"),
+    [
+        (
+            "success_and_failure",
+            _reject,
+            [
+                events.NonFatalError(error=Unsatisfiable(), phase=None, label=label, related_to_operation=True)
+                for label in ("GET /api/failure", "GET /api/success")
+            ],
+        ),
+        (
+            "path_variable",
+            _fail_generation,
+            [
+                events.NonFatalError(
+                    error=RuntimeError("generation error"),
+                    phase=None,
+                    label="GET /api/path_variable/{key}",
+                    related_to_operation=True,
+                )
+            ],
+        ),
+    ],
+    ids=["unsatisfiable", "generation-error"],
+)
+def test_fuzz_preflight_excludes_all_operations(ctx, app, transform, expected):
+    api = getattr(ctx.openapi.apps, app)()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     @schema.hook
     def before_generate_case(context, strategy):
-        def reject(case):
-            assume(False)
-
-        return strategy.map(reject)
+        return strategy.map(transform)
 
     collected = _fuzz_events(schema, FuzzConfig())
 
     _assert_engine_started_and_finished(collected)
     assert not any(isinstance(event, events.FuzzScenarioStarted) for event in collected)
     assert not _finished_scenarios(collected)
-    assert _non_fatal_errors(collected)
+    assert _non_fatal_errors(collected) == expected
+    assert collected[-1].stop_reason == StopReason.COMPLETED
 
 
 def test_fuzz_finds_failure_with_continue_on_failure(ctx):
@@ -461,24 +493,6 @@ def test_fuzz_graphql_schema(ctx):
     assert len(finished_ids) >= 3
 
 
-def test_fuzz_unsatisfied_assumption_preflight_excludes_operation(ctx):
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-
-    @schema.hook
-    def before_generate_case(context, strategy):
-        def reject(case):
-            assume(False)
-
-        return strategy.map(reject)
-
-    collected = _fuzz_events(schema, FuzzConfig())
-    errors = _non_fatal_errors(collected)
-    assert errors == [
-        events.NonFatalError(error=Unsatisfiable(), phase=None, label="GET /api/success", related_to_operation=True)
-    ]
-
-
 def test_fuzz_clears_global_auth_when_config_auth_is_defined(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -495,29 +509,6 @@ def test_fuzz_clears_global_auth_when_config_auth_is_defined(ctx):
     schema.config.auth.update(basic=("user", "pass"))
     next(iter(from_schema(schema).fuzz(FuzzConfig())))
     assert not schemathesis.auths.GLOBAL_AUTH_STORAGE.is_defined
-
-
-def test_fuzz_generation_exception_excludes_operation(ctx):
-    api = ctx.openapi.apps.path_variable()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-
-    @schema.hook
-    def before_generate_case(context, strategy):
-        def fail_generation(case):
-            raise RuntimeError("generation error")
-
-        return strategy.map(fail_generation)
-
-    collected = _fuzz_events(schema, FuzzConfig())
-    errors = _non_fatal_errors(collected)
-    assert errors == [
-        events.NonFatalError(
-            error=RuntimeError("generation error"),
-            phase=None,
-            label="GET /api/path_variable/{key}",
-            related_to_operation=True,
-        )
-    ]
 
 
 def test_fuzz_preflight_excludes_hook_broken_operation_but_keeps_survivors(ctx):
@@ -592,63 +583,6 @@ def test_fuzz_network_error_emits_non_fatal_error(ctx):
         for interaction in interactions
     )
     _assert_engine_started_and_finished(collected)
-
-
-def test_fuzz_finishes_cleanly_when_preflight_excludes_all_operations(ctx):
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-
-    @schema.hook
-    def before_generate_case(context, strategy):
-        def fail_generation(case):
-            raise RuntimeError("generation error")
-
-        return strategy.map(fail_generation)
-
-    collected = _fuzz_events(schema, FuzzConfig())
-    _assert_engine_started_and_finished(collected)
-
-
-def test_fuzz_emits_no_scenario_pairs_when_preflight_excludes_only_operation(ctx):
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    # When preflight excludes the only operation before any scenario starts,
-    # there should be no unmatched fuzz scenario events.
-
-    @schema.hook
-    def before_generate_case(context, strategy):
-        def fail_generation(case):
-            raise RuntimeError("generation error")
-
-        return strategy.map(fail_generation)
-
-    collected = _fuzz_events(schema, FuzzConfig())
-    started_ids = set()
-    finished_ids = set()
-    for event in collected:
-        if isinstance(event, events.FuzzScenarioStarted):
-            started_ids.add(event.id)
-        elif isinstance(event, events.FuzzScenarioFinished):
-            finished_ids.add(event.id)
-    assert started_ids == finished_ids
-
-
-def test_fuzz_completed_stop_reason_when_preflight_excludes_all_operations(ctx):
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    # When preflight excludes all operations due to generation errors, the engine should finish
-    # with COMPLETED (natural end), not INTERRUPTED (which implies external stop).
-
-    @schema.hook
-    def before_generate_case(context, strategy):
-        def fail_generation(case):
-            raise RuntimeError("generation error")
-
-        return strategy.map(fail_generation)
-
-    collected = _fuzz_events(schema, FuzzConfig())
-    finished = next(e for e in collected if isinstance(e, events.EngineFinished))
-    assert finished.stop_reason == StopReason.COMPLETED
 
 
 def test_fuzz_interrupted_by_keyboard_interrupt(ctx):

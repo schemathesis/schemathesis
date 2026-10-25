@@ -165,7 +165,6 @@ class CoverageGenerator:
         auth_context = auths.AuthContext(operation=operation, app=operation.app)
         extra_data_source = self._feedback.extra_data_source
         error_feedback = self._feedback.error_feedback
-        overrides = self._override.as_strategy_kwargs()
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -189,12 +188,7 @@ class CoverageGenerator:
                     continue
                 adjust_urlencoded_payload(case)
                 auths.set_on_generated_case(case, auth_context, self._auth_storage)
-                for container_name, value in overrides.items():
-                    container = getattr(case, container_name)
-                    if container is None:
-                        setattr(case, container_name, value)
-                    else:
-                        container.update(value)
+                self._override.apply_to(case)
                 case._record_starting_state()
                 processed = _apply_filter_and_map_hooks(case, dispatchers, hook_context)
                 if processed is None:

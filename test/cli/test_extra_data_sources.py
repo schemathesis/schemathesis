@@ -52,8 +52,7 @@ def _examples_response_pool_config(*, enabled):
     return {"phases": {"examples": {"extra-data-sources": {"responses": enabled}}}}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, snapshot_cli, ctx):
+def _items_app(ctx, create_item):
     item_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -88,20 +87,10 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
         }
     )
     items = {}
-    post_count = [0]
 
     @app.route("/items", methods=["POST"])
-    def create_item():
-        post_count[0] += 1
-        data = request.get_json() or {}
-        # First few requests succeed, then fail with 500
-        if post_count[0] <= 3:
-            item_id = uuid.uuid4().hex
-            item = {"id": item_id, "name": data.get("name", "Item")}
-            items[item_id] = item
-            return jsonify(item), 201
-        else:
-            abort(500)
+    def create():
+        return create_item(request.get_json() or {}, items)
 
     @app.route("/items/<item_id>", methods=["GET"])
     def get_item(item_id):
@@ -110,9 +99,30 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
         # Bug: missing required 'name' field - only discoverable with valid ID
         return jsonify({"id": items[item_id]["id"]}), 200
 
+    return app
+
+
+def _store_item(data, items):
+    item_id = uuid.uuid4().hex
+    item = {"id": item_id, "name": data.get("name", "Item")}
+    items[item_id] = item
+    return jsonify(item), 201
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, snapshot_cli, ctx):
+    post_count = [0]
+
+    def create_item(data, items):
+        post_count[0] += 1
+        # First few requests succeed, then fail with 500
+        if post_count[0] <= 3:
+            return _store_item(data, items)
+        abort(500)
+
     assert (
         cli.run_openapi_app(
-            app,
+            _items_app(ctx, create_item),
             "--phases=fuzzing",
             "--max-examples=50",
             "-c not_a_server_error",
@@ -127,63 +137,13 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("config_enabled", [False, True])
 def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config_enabled):
-    item_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/items": {
-                "post": {
-                    "operationId": "createItem",
-                    "requestBody": _json_request_body(_object_schema({"name": {"type": "string"}}, required=["name"])),
-                    "responses": {
-                        "201": _json_response(
-                            item_schema,
-                            description="Created",
-                            links={
-                                "GetItemById": {
-                                    "operationId": "getItem",
-                                    "parameters": {"id": "$response.body#/id"},
-                                }
-                            },
-                        )
-                    },
-                }
-            },
-            "/items/{id}": {
-                "get": {
-                    "operationId": "getItem",
-                    "parameters": [_path_param("id")],
-                    "responses": {
-                        "200": _json_response(item_schema, description="Success"),
-                        "404": {"description": "Not found"},
-                    },
-                }
-            },
-        }
-    )
-    items = {}
-
-    @app.route("/items", methods=["POST"])
-    def create_item():
-        data = request.get_json() or {}
-        item_id = uuid.uuid4().hex
-        item = {"id": item_id, "name": data.get("name", "Item")}
-        items[item_id] = item
-        return jsonify(item), 201
-
-    @app.route("/items/<item_id>", methods=["GET"])
-    def get_item(item_id):
-        if item_id not in items:
-            return "", 404
-        # Bug: response violates schema - missing required 'name' field
-        return jsonify({"id": items[item_id]["id"]}), 200
-
     config = (
         _response_pool_config() if config_enabled else _response_pool_config(enabled=False, operation_ordering="none")
     )
 
     assert (
         cli.run_openapi_app(
-            app,
+            _items_app(ctx, _store_item),
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--mode=positive",

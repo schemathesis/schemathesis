@@ -78,7 +78,7 @@ Errors:
   🚫 Schema Error: 2
 
 Warnings:
-  ⚠️ Unsupported regex: 3 operations had unusable regex patterns
+  ⚠️ Unsupported regex patterns: 3 operations had unusable regex patterns
 
 Test cases:
   N generated, N passed

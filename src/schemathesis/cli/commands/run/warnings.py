@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from schemathesis.cli.commands.run.filters import describe_filter
-from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.config import ProjectConfig, SchemathesisWarning
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import RefResolutionError
@@ -21,6 +20,7 @@ from schemathesis.generation.meta import REQUEST_SHAPE_PROBES, CoveragePhaseData
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
+    from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.schemas import APIOperation, BaseSchema
 
 

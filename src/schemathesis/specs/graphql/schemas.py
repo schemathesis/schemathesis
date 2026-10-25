@@ -15,7 +15,9 @@ from typing import (
 from unittest import SkipTest
 from urllib.parse import urlsplit, urlunsplit
 
+import graphql
 from hypothesis import strategies as st
+from hypothesis.errors import InvalidArgument
 from typing_extensions import override
 
 from schemathesis import auths
@@ -41,6 +43,12 @@ from schemathesis.generation.meta import (
     TestPhase,
     build_phase_data,
 )
+from schemathesis.graphql.checks import (
+    GraphQLClientError,
+    GraphQLSchemaViolation,
+    GraphQLServerError,
+    UnexpectedGraphQLResponse,
+)
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.schemas import (
     APIOperation,
@@ -54,13 +62,14 @@ from ._helpers import replace_node
 from .dictionaries import resolve_bindings, substitute_dictionaries
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
+from .ordering import compute_graphql_layers
 from .scalars import CUSTOM_SCALARS, UnknownScalar, get_extra_scalar_strategies, unsupported_scalar_name
 from .substitution import SUBSTITUTION_PROBABILITY, substitute_constants, substitute_pool_values
+from .validation import is_client_error, parse_payload, validate_graphql_response
 
 if TYPE_CHECKING:
     from random import Random
 
-    import graphql
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
@@ -246,7 +255,6 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
-        from schemathesis.specs.graphql.ordering import compute_graphql_layers
 
         layers = compute_graphql_layers(operations)
         # Single role: layering would add no information, so keep the schema order.
@@ -254,7 +262,6 @@ class GraphQLSchema(BaseSchema):
 
     @cached_property
     def client_schema(self) -> graphql.GraphQLSchema:
-        import graphql
 
         return graphql.build_client_schema(cast("graphql.IntrospectionQuery", self.raw_schema))
 
@@ -428,8 +435,6 @@ class GraphQLSchema(BaseSchema):
         A GraphQL server answers the same status whether it served the query or refused it, and an
         `errors` entry means the operation was not carried out in full.
         """
-        from schemathesis.specs.graphql.validation import parse_payload
-
         if is_uninformative_status(response.status_code):
             return CallOutcome.UNINFORMATIVE
         try:
@@ -447,7 +452,6 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def evaluate_server_error(self, case: Case, response: Response) -> None:
-        from schemathesis.graphql.checks import GraphQLServerError
 
         failure = _response_failure(case, response)
         if isinstance(failure, GraphQLServerError):
@@ -461,7 +465,6 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def evaluate_positive_data(self, case: Case, response: Response) -> None:
-        from schemathesis.graphql.checks import GraphQLClientError
 
         failure = _response_failure(case, response)
         if isinstance(failure, GraphQLClientError):
@@ -475,7 +478,6 @@ class GraphQLSchema(BaseSchema):
         *,
         case: Case | None = None,
     ) -> bool | None:
-        from schemathesis.graphql.checks import GraphQLSchemaViolation, UnexpectedGraphQLResponse
 
         failure = _response_failure(case if case is not None else operation.Case(), response)
         if isinstance(failure, (MalformedJson, UnexpectedGraphQLResponse, GraphQLSchemaViolation)):
@@ -485,9 +487,6 @@ class GraphQLSchema(BaseSchema):
 
 def _response_failure(case: Case, response: Response) -> Failure | None:
     """The failure a GraphQL response carries; each check raises the kinds it owns."""
-    from schemathesis.graphql.checks import GraphQLClientError
-    from schemathesis.specs.graphql.validation import is_client_error, parse_payload, validate_graphql_response
-
     # `not_a_server_error` reports a 5xx by its status, so its body is not judged here.
     if response.status_code >= 500:
         return None
@@ -574,8 +573,6 @@ def graphql_cases(
     feedback: FeedbackSources = NO_FEEDBACK,
     mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode] | None = None,
 ) -> Any:
-    import graphql
-    from hypothesis.errors import InvalidArgument
     from hypothesis_graphql import Mode as GqlMode
     from hypothesis_graphql import strategies as gql_st
 
@@ -742,8 +739,6 @@ def _generate_parameter(
 
 def _draw_ast(draw: Callable, strategy: SearchStrategy[graphql.DocumentNode]) -> graphql.DocumentNode:
     """Draw a query AST, reporting a scalar with no registered strategy as such."""
-    from hypothesis.errors import InvalidArgument
-
     try:
         return draw(strategy)
     except InvalidArgument as error:

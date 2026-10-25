@@ -5,12 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.config import ReportFormat
+from schemathesis.config import ConfigError, ReportFormat
+from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import StopReason, events
 from schemathesis.engine.statistic import Statistic
-from schemathesis.engine.summary import SummaryData
+from schemathesis.engine.summary import SummaryData, WarningData
 
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
@@ -35,9 +37,19 @@ class BaseExecutionContext:
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     # Reports written by extensions, as (name, path).
     reports: list[tuple[str, Path]] = field(default_factory=list)
+    errors: set[events.NonFatalError] = field(default_factory=set)
+    # Keyed by operation label - a reason only applies to the operation it came from.
+    skip_reasons: dict[str, set[str]] = field(default_factory=dict)
+    stop_reason: StopReason = StopReason.INTERRUPTED
+    warning_collector: WarningCollector = field(init=False)
 
     def __post_init__(self) -> None:
         self.statistic.baseline = self.config.load_baseline()
+        self.warning_collector = WarningCollector(config=self.config)
+
+    @property
+    def warnings(self) -> WarningData:
+        return self.warning_collector.data
 
     @property
     def base_url_is_set(self) -> bool:
@@ -81,9 +93,26 @@ class BaseExecutionContext:
             self.find_operation_by_label = event.find_operation_by_label
             self.specification = event.specification
             self.api_statistic = event.statistic
+            self.warning_collector.on_unmatched_filters(event.statistic)
         elif isinstance(event, events.Interrupted) and self.api_statistic is None:
             # Interrupted while loading the schema, so no engine run follows to settle the exit code.
             self.exit_code = ExitCode.INTERRUPTED
+        elif isinstance(event, events.EngineFinished):
+            self.stop_reason = event.stop_reason
+            # after_run failures arrive here.
+            if event.failures:
+                self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
+                self.exit_code = ExitCode.FAILURES
+            # Decided once the run is over, since a later success can withdraw a warning.
+            if self.warning_collector.fails_the_run() and self.exit_code == ExitCode.OK:
+                self.exit_code = ExitCode.FAILURES
+            self.on_engine_finished(event.stop_reason)
+        elif isinstance(event, events.NonFatalError):
+            self.errors.add(event)
+            if isinstance(event.value, ConfigError) and not event.related_to_operation:
+                self.exit_code = ExitCode.ERROR
+            else:
+                self.exit_code = ExitCode.FAILURES
 
     def on_engine_finished(self, stop_reason: StopReason) -> None:
         """Settle the exit code once the engine stops."""

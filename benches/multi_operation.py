@@ -5,12 +5,12 @@ from schemathesis.core.result import Err
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.hypothesis.examples import generate_many
-from tools.corpus.io import load_from_corpus, read_corpus_file
+from tools.corpus.io import load_from_corpus
 
 setup()
 
 # Many operations sharing component schemas via `$ref`, unlike `negative_phase.py`'s single operation.
-SAGEMAKER_SCHEMA = load_from_corpus("amazonaws.com/sagemaker/2017-07-24.json", read_corpus_file("openapi-3.0"))
+SAGEMAKER_SCHEMA = load_from_corpus("amazonaws.com/sagemaker/2017-07-24.json", "openapi-3.0")
 
 
 OPERATION_LIMIT = 20

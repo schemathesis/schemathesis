@@ -299,7 +299,12 @@ def test_dynamic_auth_token_fetch_with_request_cert(auth_operation):
     assert provider.get(auth_operation.Case(), AuthContext(operation=auth_operation, app=None)) == "test-token"
 
 
-def test_negative_data_rejection_no_false_positive_with_cookie_security_scheme(ctx, app_runner):
+@pytest.mark.parametrize(
+    "registrar",
+    [lambda schema: schema.auth, lambda schema: schemathesis.auth],
+    ids=["schema-auth", "global-auth"],
+)
+def test_negative_data_rejection_no_false_positive_with_cookie_security_scheme(ctx, app_runner, registrar):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/api/secure": {
@@ -323,49 +328,7 @@ def test_negative_data_rejection_no_false_positive_with_cookie_security_scheme(c
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
 
-    @schema.auth(refresh_interval=None)
-    class CookieAuth:
-        def get(self, case, context):
-            return "token123"
-
-        def set(self, case, data, context):
-            case.headers = case.headers or {}
-            case.headers["Cookie"] = f"session={data}"
-
-    stream = EventStream(
-        schema,
-        phases=[PhaseName.COVERAGE],
-        checks=[negative_data_rejection],
-    ).execute()
-
-    assert stream.find(ScenarioFinished, status=Status.FAILURE) is None
-
-
-def test_negative_data_rejection_no_false_positive_with_global_cookie_auth(ctx, app_runner):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/api/secure": {
-                "get": {
-                    "responses": {
-                        "200": {"description": "OK"},
-                        "401": {"description": "Unauthorized"},
-                    },
-                    "security": [{"session_cookie": []}],
-                }
-            }
-        },
-        components={"securitySchemes": {"session_cookie": {"type": "apiKey", "in": "cookie", "name": "session"}}},
-    )
-
-    @app.route("/api/secure")
-    def secure():
-        if not request.cookies.get("session"):
-            return jsonify({"error": "unauthorized"}), 401
-        return jsonify({}), 200
-
-    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-
-    @schemathesis.auth(refresh_interval=None)
+    @registrar(schema)(refresh_interval=None)
     class CookieAuth:
         def get(self, case, context):
             return "token123"

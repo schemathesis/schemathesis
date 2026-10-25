@@ -93,24 +93,18 @@ class BaseTransport(Generic[S]):
             main, sub = media_types.parse(media_type)
             # A range like `application/*+json` names a family of types, not a type that can go on the wire
             is_range = main == "*" or "*" in sub
-            checks = [
-                media_types.is_json,
-                media_types.is_xml,
-                media_types.is_plain_text,
-                media_types.is_yaml,
-            ]
             matched = False
             for registered_media_type, serializer in self._serializers.items():
                 target_main, target_sub = media_types.parse(registered_media_type)
                 # Try known variations for popular media types and fallback to comparison
-                if any(check(media_type) and check(registered_media_type) for check in checks):
+                if media_types.same_family(media_type, registered_media_type):
                     if not is_range:
                         matched = True
                         yield media_type, serializer
                     elif main in ("*", target_main):
                         matched = True
                         yield registered_media_type, serializer
-                elif main in ("*", target_main) and sub in ("*", target_sub):
+                elif media_types.matches_parts((main, sub), (target_main, target_sub)):
                     matched = True
                     yield registered_media_type, serializer
             if not matched and not is_range and main == "text":

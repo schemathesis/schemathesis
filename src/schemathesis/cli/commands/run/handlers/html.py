@@ -11,13 +11,12 @@ from urllib.parse import quote
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.output import (
-    UNMATCHED_FILTER_TIP,
     extraction_failure_reason,
     extraction_failure_steps,
     warning_blocks,
 )
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
-from schemathesis.cli.output import loader_error_tip, replay_command
+from schemathesis.cli.output import UNMATCHED_FILTER_TIP, loader_error_tip, replay_command
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
@@ -304,7 +303,7 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
         summary = ctx.summary()
         rows = self._operation_rows(ctx)
         payload = self.finished.payload if self.finished is not None else None
-        # `st fuzz` collects no warnings.
+        # The HTML report lists warnings for `st run` only; `st fuzz` shows its unmatched filters in the terminal.
         warnings = warning_blocks(ctx) if isinstance(ctx, ExecutionContext) else []
         nothing_tested = _nothing_tested(ctx.nothing_tested_reason, summary)
         if nothing_tested is not None and nothing_tested.filters:

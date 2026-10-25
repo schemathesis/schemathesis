@@ -150,12 +150,6 @@ def is_multipart(value: str | None) -> bool:
         return False
 
 
-def is_multipart_form_parts(media_type: tuple[str, str]) -> bool:
-    """Detect ``multipart/form-data`` or ``multipart/mixed`` from a parsed tuple, wildcards included."""
-    main, sub = media_type
-    return main in ("*", "multipart") and sub in ("*", "form-data", "mixed")
-
-
 def is_json_parts(media_type: tuple[str, str]) -> bool:
     """Detect variations of the ``application/json`` media type from a parsed tuple."""
     if media_type in JSON_MEDIA_TYPES:
@@ -197,6 +191,11 @@ def matches_either(first: tuple[str, str], second: tuple[str, str]) -> bool:
     main_matches = first_main == "*" or second_main == "*" or first_main == second_main
     sub_matches = first_sub == "*" or second_sub == "*" or first_sub == second_sub
     return main_matches and sub_matches
+
+
+def same_family(first: str, second: str) -> bool:
+    """Whether both media types are variations of the same well-known type, e.g. `application/json` and `+json`."""
+    return any(check(first) and check(second) for check in (is_json, is_xml, is_plain_text, is_yaml))
 
 
 def matches(expected: str, actual: str) -> bool:

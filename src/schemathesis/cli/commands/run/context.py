@@ -5,16 +5,15 @@ from datetime import date
 from pathlib import Path
 
 from schemathesis.baseline import Baseline, BaselineEntry
-from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.ext.fs import describe_path_error
-from schemathesis.config import ConfigError, SchemathesisWarning
-from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
+from schemathesis.config import SchemathesisWarning
+from schemathesis.core.failures import is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
-from schemathesis.engine.summary import PhaseStatuses, SummaryData, WarningData
+from schemathesis.engine.summary import PhaseStatuses, SummaryData
 
 # How telling each outcome is about a phase that ran several times: the summary keeps the highest.
 PHASE_STATUS_PRIORITY = {
@@ -30,12 +29,7 @@ PHASE_STATUS_PRIORITY = {
 class ExecutionContext(BaseExecutionContext):
     """Execution state for `st run`."""
 
-    errors: set[events.NonFatalError] = field(default_factory=set)
     phases: PhaseStatuses = field(default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None)))
-    # Keyed by operation label - a reason only applies to the operation it came from.
-    skip_reasons: dict[str, set[str]] = field(default_factory=dict)
-    stop_reason: StopReason = StopReason.INTERRUPTED
-    warning_collector: WarningCollector | None = None
     baseline_update: bool = False
     baseline_prune: bool = False
     # Problems with the invocation itself, shown before the schema is loaded.
@@ -47,20 +41,18 @@ class ExecutionContext(BaseExecutionContext):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self.warning_collector = WarningCollector(config=self.config)
         for kind, _ in self.startup_warnings:
             if kind is not None:
                 self.warning_collector.on_startup_warning(kind)
 
     def on_event(self, event: events.EngineEvent) -> None:
-        super().on_event(event)
         collector = self.warning_collector
-        assert collector is not None
         if isinstance(event, LoadingFinished):
+            # Unmatched filter warnings are judged against the configuration the schema was loaded with.
             self.config = event.config
             collector.config = event.config
-            collector.on_unmatched_filters(event.statistic)
-        elif isinstance(event, events.SchemaAnalysisWarnings):
+        super().on_event(event)
+        if isinstance(event, events.SchemaAnalysisWarnings):
             collector.on_schema_warnings(event)
         elif isinstance(event, events.PhaseFinished):
             # A phase repeats under a time budget; a later pass that ran out of budget or was cut short
@@ -68,6 +60,13 @@ class ExecutionContext(BaseExecutionContext):
             current, _ = self.phases[event.phase.name]
             if PHASE_STATUS_PRIORITY[event.status] >= PHASE_STATUS_PRIORITY[current]:
                 self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
+            if (
+                event.phase.is_enabled
+                and event.status in (Status.FAILURE, Status.ERROR)
+                # A failed sign-up leaves the run unauthenticated; the missing-auth warning reports its effect.
+                and event.phase.name is not PhaseName.AUTH_BOOTSTRAP
+            ):
+                self.exit_code = ExitCode.FAILURES
         elif isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
             self.statistic.on_scenario_finished(event.recorder)
             collector.on_scenario_finished(self, event)
@@ -79,30 +78,7 @@ class ExecutionContext(BaseExecutionContext):
             ):
                 self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
         elif isinstance(event, events.EngineFinished):
-            self.stop_reason = event.stop_reason
-            # after_run failures arrive here.
-            if event.failures:
-                self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
-                self.exit_code = ExitCode.FAILURES
-            # Decided once the run is over, since a later success can withdraw a warning.
-            if collector.fails_the_run() and self.exit_code == ExitCode.OK:
-                self.exit_code = ExitCode.FAILURES
-            self.on_engine_finished(event.stop_reason)
             self._write_baseline()
-        if isinstance(event, events.NonFatalError):
-            self.errors.add(event)
-            if isinstance(event.value, ConfigError) and not event.related_to_operation:
-                self.exit_code = ExitCode.ERROR
-            else:
-                self.exit_code = ExitCode.FAILURES
-        elif (
-            isinstance(event, events.PhaseFinished)
-            and event.phase.is_enabled
-            and event.status in (Status.FAILURE, Status.ERROR)
-            # A failed sign-up leaves the run unauthenticated; the missing-auth warning reports its effect.
-            and event.phase.name is not PhaseName.AUTH_BOOTSTRAP
-        ):
-            self.exit_code = ExitCode.FAILURES
 
     def all_skipped_reason(self) -> str:
         unit_phases_off = all(
@@ -160,10 +136,6 @@ class ExecutionContext(BaseExecutionContext):
             self.baseline_recorded = None
             self.baseline_pruned = None
             self.exit_code = ExitCode.ERROR
-
-    @property
-    def warnings(self) -> WarningData:
-        return self.warning_collector.data if self.warning_collector is not None else WarningData()
 
     def summary(self) -> SummaryData:
         return SummaryData.from_run(

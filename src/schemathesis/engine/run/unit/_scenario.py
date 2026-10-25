@@ -74,12 +74,7 @@ def start_scenario(
         started_at=started_at,
         recorder=recorder,
         state=TestingState(),
-        check_ctx=check_data.to_check_context(
-            recorder=recorder,
-            response_checks=ctx.checks.for_responses(),
-            phase=phase,
-            auth_enforced_operations=ctx.auth_enforced_operations,
-        ),
+        check_ctx=check_data.to_check_context(ctx, recorder=recorder, phase=phase),
         generation=ctx.config.generation_for(operation=operation, phase=phase.value),
         transport_kwargs=check_data.transport_kwargs,
         continue_on_failure=ctx.config.continue_on_failure_for(operation=operation),

@@ -41,7 +41,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Unsupported regex: 1 operation had unusable regex patterns
+  ⚠️ Unsupported regex patterns: 1 operation had unusable regex patterns
 
 Test cases:
   N generated, N passed

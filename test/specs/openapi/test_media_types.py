@@ -6,8 +6,10 @@ from flask import jsonify
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core import NOT_SET
 from schemathesis.core.file_samples import file_extension
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
+from schemathesis.generation import GenerationMode
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
@@ -317,38 +319,44 @@ def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
         assert case.multipart_content_types["attachment"] == "application/pdf"
 
 
-def test_custom_media_type_strategy_in_coverage_phase(ctx, testdir):
-    # Regression test for GH-3345
-    api = ctx.openapi.apps.success()
-    testdir.make_test(
-        f"""
-schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.phases.examples.enabled = False
-schema.config.phases.fuzzing.enabled = False
+PDF_MULTIPART = {
+    "multipart/form-data": {
+        "schema": {
+            "type": "object",
+            "properties": {"file": {"type": "string", "format": "binary"}},
+            "required": ["file"],
+        },
+        "encoding": {"file": {"contentType": "application/pdf"}},
+    },
+}
 
-@schema.include(path_regex="upload").parametrize()
-def test(case):
-    # Coverage also omits the required body entirely, which carries no payload to check.
-    assert case.body is NOT_SET or case.body == b"%PDF-1.4", f"Expected PDF bytes, got: {{case.body!r}}"
-""",
-        paths={
+
+def _pdf_upload_coverage_cases(ctx, content, parameters, modes):
+    schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+    schema = ctx.openapi.load_schema(
+        {
             "/upload": {
                 "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/pdf": {"schema": {"type": "string", "format": "binary"}},
-                        },
-                        "required": True,
-                    },
+                    "parameters": parameters,
+                    "requestBody": {"content": content, "required": True},
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        },
-        schema_name="simple_openapi.yaml",
+        }
     )
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1)
+    return list(
+        schema.iter_coverage_cases(
+            schema["/upload"]["POST"], generation_modes=modes, generation_config=schema.config.generation
+        )
+    )
+
+
+def test_custom_media_type_strategy_in_coverage_phase(ctx):
+    # GH-3345
+    content = {"application/pdf": {"schema": {"type": "string", "format": "binary"}}}
+    cases = _pdf_upload_coverage_cases(ctx, content, [], list(GenerationMode))
+    # Coverage also omits the required body entirely, which carries no payload to check.
+    assert {case.body for case in cases} - {NOT_SET} == {b"%PDF-1.4"}
 
 
 def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
@@ -382,96 +390,20 @@ def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
             assert case.body["file"] == b"%PDF-1.4"
 
 
-def test_multipart_encoding_with_custom_strategy_parametrize(ctx, testdir):
-    # Regression test for GH-3345 - positive mode cases should have consistent PDF bytes
-    api = ctx.openapi.apps.success()
-    testdir.make_test(
-        f"""
-schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
-schema.config.update(base_url="{api.base_url}/api")
-
-@schema.include(path_regex="upload").parametrize()
-def test(case):
-    # Negative mode generates intentionally invalid data
-    if case.meta.generation.mode == GenerationMode.POSITIVE:
-        if case.body is not None and isinstance(case.body, dict) and "file" in case.body:
-            assert case.body["file"] == b"%PDF-1.4", f"Expected PDF bytes, got: {{case.body['file']!r}}"
-""",
-        paths={
-            "/upload": {
-                "post": {
-                    "parameters": [{"name": "tag", "in": "query", "required": False, "schema": {"type": "string"}}],
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"file": {"type": "string", "format": "binary"}},
-                                    "required": ["file"],
-                                },
-                                "encoding": {"file": {"contentType": "application/pdf"}},
-                            },
-                        },
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        schema_name="simple_openapi.yaml",
-    )
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1)
+def test_multipart_encoding_with_custom_strategy_in_coverage_phase(ctx):
+    # GH-3345: negative mode generates intentionally invalid data, so only positive cases are checked.
+    tag = {"name": "tag", "in": "query", "required": False, "schema": {"type": "string"}}
+    cases = _pdf_upload_coverage_cases(ctx, PDF_MULTIPART, [tag], [GenerationMode.POSITIVE])
+    assert {case.body["file"] for case in cases} == {b"%PDF-1.4"}
 
 
-def test_multipart_encoding_required_body_parameter_coverage(ctx, testdir):
-    # Regression test for GH-3345 - parameter coverage should still be generated
-    api = ctx.openapi.apps.success()
-    testdir.make_test(
-        f"""
-schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
-schema.config.update(base_url="{api.base_url}/api")
-schema.config.phases.fuzzing.enabled = False
-
-param_values_seen = set()
-
-@schema.include(path_regex="upload").parametrize()
-def test(case):
-    if case.query:
-        param_values_seen.add(str(case.query.get("count")))
-
-def test_parameter_coverage_generated():
-    assert len(param_values_seen) > 0, f"No parameter coverage generated. Values seen: {{param_values_seen}}"
-""",
-        paths={
-            "/upload": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "count",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "integer", "minimum": 1, "maximum": 10},
-                        }
-                    ],
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"file": {"type": "string", "format": "binary"}},
-                                    "required": ["file"],
-                                },
-                                "encoding": {"file": {"contentType": "application/pdf"}},
-                            },
-                        },
-                        "required": True,
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        schema_name="simple_openapi.yaml",
-    )
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=2)
+def test_multipart_encoding_required_body_parameter_coverage(ctx):
+    # GH-3345: a custom body strategy must not suppress parameter coverage.
+    count = {
+        "name": "count",
+        "in": "query",
+        "required": True,
+        "schema": {"type": "integer", "minimum": 1, "maximum": 10},
+    }
+    cases = _pdf_upload_coverage_cases(ctx, PDF_MULTIPART, [count], [GenerationMode.POSITIVE])
+    assert {case.query["count"] for case in cases} == {"1", "2", "9", "10"}

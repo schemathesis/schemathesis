@@ -80,6 +80,18 @@ if TYPE_CHECKING:
 BODY_KEYS = ("body", "media_type", "multipart_content_types")
 
 
+def _is_content_type_header(location: ParameterLocation, name: str) -> bool:
+    return location == ParameterLocation.HEADER and name.lower() == "content-type"
+
+
+def _without_content_type(headers: dict[str, Any]) -> dict[str, Any]:
+    return {name: value for name, value in headers.items() if name.lower() != "content-type"}
+
+
+def _without_body(kwargs: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in kwargs.items() if key not in BODY_KEYS}
+
+
 def _set_multipart_content_types(kwargs: dict[str, Any], content_types: dict[str, str] | None) -> None:
     if content_types:
         kwargs["multipart_content_types"] = content_types
@@ -233,11 +245,11 @@ class Template:
 
     def without_body(self) -> TemplateValue:
         # A `Content-Type` describing a body that is not there is a different oddity than sending no body at all.
-        raw = {key: value for key, value in self._template.items() if key not in BODY_KEYS}
+        raw = _without_body(self._template)
         components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.NEGATIVE)}
         headers = raw.get("headers")
         if isinstance(headers, dict):
-            headers = {name: value for name, value in headers.items() if name.lower() != "content-type"}
+            headers = _without_content_type(headers)
             raw["headers"] = headers
             components[ParameterLocation.HEADER] = ComponentInfo(mode=self._mode_for(ParameterLocation.HEADER, headers))
         kwargs = self._serialize(raw, components)
@@ -866,7 +878,7 @@ def _seed_parameters(run: CoverageRun) -> None:
         # Pin the template's Content-Type to the body media type when CT is declared as an explicit
         # header parameter — otherwise body cases inherit a fuzzed CT (often empty) and ship bodies
         # that downstream tools can't dispatch. CT-mutation variants still flow through the iterator.
-        if location == ParameterLocation.HEADER and name.lower() == "content-type" and operation.body:
+        if _is_content_type_header(location, name) and operation.body:
             admitted = [
                 alternative.media_type
                 for alternative in operation.body
@@ -1143,7 +1155,7 @@ def _parameter_mutations(run: CoverageRun) -> Generator[Case, None, None]:
         iterator = iter(gen)
         # CT-mutation cases test Content-Type validation, not body validation; carrying the
         # template's body would conflate the two sweeps (matches the missing-CT special-case below).
-        is_content_type_mutation = location == ParameterLocation.HEADER and name.lower() == "content-type"
+        is_content_type_mutation = _is_content_type_header(location, name)
         while True:
             instant = Instant()
             try:
@@ -1155,8 +1167,8 @@ def _parameter_mutations(run: CoverageRun) -> Generator[Case, None, None]:
             kwargs = data.kwargs
             raw = data.raw
             if is_content_type_mutation:
-                kwargs = {k: v for k, v in kwargs.items() if k not in BODY_KEYS}
-                raw = {k: v for k, v in raw.items() if k not in BODY_KEYS}
+                kwargs = _without_body(kwargs)
+                raw = _without_body(raw)
 
             if value.generation_mode == GenerationMode.NEGATIVE:
                 if not template.can_emit(GenerationMode.NEGATIVE):
@@ -1288,22 +1300,18 @@ def _content_type_probes(run: CoverageRun) -> Generator[Case, None, None]:
     ):
         if scenario == CoverageScenario.UNSUPPORTED_CONTENT_TYPE and not run.operation.body:
             continue
-        headers = {
-            name: value for name, value in data.kwargs.get("headers", {}).items() if name.lower() != "content-type"
-        }
+        headers = _without_content_type(data.kwargs.get("headers", {}))
         headers["Content-Type"] = content_type
         kwargs = {**data.kwargs, "headers": headers}
-        raw_headers = {
-            name: value for name, value in data.raw.get("headers", {}).items() if name.lower() != "content-type"
-        }
+        raw_headers = _without_content_type(data.raw.get("headers", {}))
         raw_headers["Content-Type"] = content_type
         raw = {**data.raw, "headers": raw_headers}
         if (
             scenario == CoverageScenario.MALFORMED_CONTENT_TYPE
             and data.kwargs.get("media_type") == "multipart/form-data"
         ):
-            kwargs = {key: value for key, value in kwargs.items() if key not in BODY_KEYS}
-            raw = {key: value for key, value in raw.items() if key not in BODY_KEYS}
+            kwargs = _without_body(kwargs)
+            raw = _without_body(raw)
         yield emitter.build(
             data,
             mode=GenerationMode.NEGATIVE,
@@ -1372,9 +1380,9 @@ def _missing_required(run: CoverageRun) -> Generator[Case, None, None]:
             kwargs = data.kwargs
             raw = data.raw
             # For missing Content-Type header test, don't send body
-            if location == ParameterLocation.HEADER and name.lower() == "content-type":
-                kwargs = {k: v for k, v in kwargs.items() if k not in BODY_KEYS}
-                raw = {k: v for k, v in raw.items() if k not in BODY_KEYS}
+            if _is_content_type_header(location, name):
+                kwargs = _without_body(kwargs)
+                raw = _without_body(raw)
 
             case = emitter.emit(
                 data,

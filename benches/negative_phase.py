@@ -4,13 +4,13 @@ import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.hypothesis.examples import generate_many
-from tools.corpus.io import load_from_corpus, read_corpus_file
+from tools.corpus.io import load_from_corpus
 
 setup()
 
 
 def _load_op(corpus_name, schema_file, path, method):
-    schema_dict = load_from_corpus(schema_file, read_corpus_file(corpus_name))
+    schema_dict = load_from_corpus(schema_file, corpus_name)
     schema = schemathesis.openapi.from_dict(schema_dict)
     schema.config.phases.update(phases=["fuzzing"])
     return schema[path][method]

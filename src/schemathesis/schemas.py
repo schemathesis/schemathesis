@@ -1035,10 +1035,9 @@ class APIOperation(Generic[P, R, S, SchemaT]):
         return next(self.get_bodies_for_media_type(media_type), None)
 
     def get_bodies_for_media_type(self, media_type: str) -> Iterator[P]:
-        main_target, sub_target = media_types.parse(media_type)
+        target = media_types.parse(media_type)
         for body in self.body:
-            main, sub = media_types.parse(body.media_type)
-            if main in ("*", main_target) and sub in ("*", sub_target):
+            if media_types.matches_parts(media_types.parse(body.media_type), target):
                 yield body
 
     def as_strategy(

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import graphql
 
 from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type
+from schemathesis.specs.graphql.bundles import collect_id_typed_object_types
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
-from schemathesis.specs.graphql.stateful._bundles import collect_id_typed_object_types
 from schemathesis.specs.graphql.substitution import candidate_handle
 
 if TYPE_CHECKING:
