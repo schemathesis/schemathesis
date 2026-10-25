@@ -1702,6 +1702,28 @@ class OpenApiBody(OpenApiComponent):
         """Return default type if body is a form type."""
         return "object" if self.media_type in FORM_MEDIA_TYPES else None
 
+    @property
+    def resolved_schema(self) -> dict[str, Any] | None:
+        """The declared schema with a root `$ref` into the bundle followed, or `None` for a boolean or missing one."""
+        schema = self.definition.get("schema")
+        return resolve_bundled_root(schema) if isinstance(schema, dict) else None
+
+    @property
+    def form_properties(self) -> dict[str, Any]:
+        """Body properties and their `items` with `$ref` resolved, so file parts behind a reference keep a filename."""
+        schema = self.resolved_schema
+        if schema is None:
+            return {}
+        resolved = {}
+        for name, property_schema in schema.get("properties", {}).items():
+            if isinstance(property_schema, dict):
+                property_schema = resolve_with_root_bundle(property_schema, schema)
+                items = property_schema.get("items")
+                if isinstance(items, dict):
+                    property_schema = {**property_schema, "items": resolve_with_root_bundle(items, schema)}
+            resolved[name] = property_schema
+        return resolved
+
     def get_property_content_types(self, property_name: str) -> list[str]:
         """Get media types a form property declares via `encoding.contentType`."""
         encoding = self.definition.get("encoding", {})

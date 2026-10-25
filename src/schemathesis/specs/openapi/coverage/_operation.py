@@ -22,8 +22,6 @@ from schemathesis.core.jsonschema import (
     BUNDLE_STORAGE_KEY,
     make_validator,
     resolve_bundled_ref,
-    resolve_bundled_root,
-    resolve_with_root_bundle,
     schema_with_bundle,
 )
 from schemathesis.core.jsonschema.patterns import update_quantifier
@@ -636,9 +634,8 @@ def _generate_multipart_body_from_custom_strategies(
     if body.media_type not in FORM_MEDIA_TYPES:
         return None
 
-    schema = resolve_bundled_root(as_object_schema(body.definition.get("schema", {})))
-    properties = schema.get("properties", {})
-    required = schema.get("required", [])
+    properties = body.form_properties
+    required = (body.resolved_schema or {}).get("required", [])
 
     result: dict[str, Any] = {}
     content_types: dict[str, str] = {}
@@ -653,7 +650,7 @@ def _generate_multipart_body_from_custom_strategies(
 
     for prop_name in required:
         if prop_name not in result:
-            prop_schema = resolve_with_root_bundle(properties.get(prop_name, {}), schema)
+            prop_schema = properties.get(prop_name, {})
             result[prop_name] = b"" if prop_schema.get("format") == "binary" else ""
 
     return (result, content_types) if content_types else None
