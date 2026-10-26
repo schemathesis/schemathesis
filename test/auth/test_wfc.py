@@ -7,7 +7,7 @@ from xml.etree import ElementTree
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from flask import Flask, Response, jsonify, redirect, request
+from flask import Flask, jsonify, redirect, request
 
 import schemathesis
 from schemathesis.auths import AuthContext
@@ -522,14 +522,22 @@ def test_wfc_external_login_redirect_back_to_login_is_rejected(ctx, app_runner):
         provider.get(operation.Case(), context)
 
 
-def test_wfc_login_redirect_without_location_yields_cookies(ctx):
+@pytest.mark.parametrize("location", [None, "http://a]b/x"], ids=["no-location", "malformed-location"])
+def test_wfc_login_redirect_without_location_yields_cookies(ctx, location):
     app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    inner = app.wsgi_app
 
-    @app.route("/api/login", methods=["POST"])
-    def login() -> object:
-        response = Response(status=302)
-        response.set_cookie("JSESSIONID", WFC_SESSION)
-        return response
+    # Werkzeug refuses to emit a Location that URL parsing rejects, so the login answer is written raw.
+    def wsgi_app(environ, start_response):
+        if environ["PATH_INFO"] != "/api/login":
+            return inner(environ, start_response)
+        headers = [("Set-Cookie", f"JSESSIONID={WFC_SESSION}; Path=/")]
+        if location is not None:
+            headers.append(("Location", location))
+        start_response("302 Found", headers)
+        return [b""]
+
+    app.wsgi_app = wsgi_app
 
     operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/api/protected"]["GET"]
     provider = _provider_for(_login(expectCookies=True))
@@ -630,15 +638,29 @@ def test_wfc_unreadable_file(cli, ctx, tmp_path):
     assert "failed to read" in result.stdout.lower()
 
 
-def test_wfc_login_connection_error(cli, ctx, tmp_path):
+@pytest.mark.parametrize(
+    "login",
+    [
+        {
+            "verb": "POST",
+            "externalEndpointURL": "http://127.0.0.1:1/api/login",
+            "contentType": "application/json",
+            "payloadUserPwd": CREDENTIALS,
+            "token": _token(),
+        },
+        {
+            "verb": "POST",
+            "externalEndpointURL": "http://[::1/api/login",
+            "contentType": "application/json",
+            "payloadUserPwd": CREDENTIALS,
+            "token": _token(),
+        },
+        _login(token=_token(), headers=[{"name": "X-Tenant", "value": "Zürich€"}]),
+    ],
+    ids=["connection-refused", "malformed-url", "non-latin1-header"],
+)
+def test_wfc_login_connection_error(cli, ctx, tmp_path, login):
     api = ctx.openapi.apps.wfc_login()
-    login = {
-        "verb": "POST",
-        "externalEndpointURL": "http://127.0.0.1:1/api/login",
-        "contentType": "application/json",
-        "payloadUserPwd": CREDENTIALS,
-        "token": _token(),
-    }
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
     result = _run_wfc(cli, api, auth, max_examples=1)
