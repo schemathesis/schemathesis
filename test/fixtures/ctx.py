@@ -514,6 +514,9 @@ class GraphQLApps:
     ) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.from_schema(schema, endpoint=endpoint, framework=framework))
 
+    def canned_response(self, payload: object, *, status_code: int = 200) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.canned_response(payload, status_code=status_code))
+
     def use_after_create(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.use_after_create())
 

@@ -2607,6 +2607,19 @@ def test_graphql_schema_violation(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--max-examples=5", "--mode=positive", "--continue-on-failure") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_graphql_data_mismatch(ctx, cli, tmp_path, snapshot_cli):
+    # The same defect on every list item and in every case is one finding with one line.
+    sdl = tmp_path / "schema.graphql"
+    sdl.write_text("type Book { title: String! } type Query { books: [Book!]! }")
+    api = ctx.graphql.apps.canned_response({"data": {"books": [{"title": None}, {"title": None}]}})
+
+    assert (
+        cli.run(str(sdl), f"--url={api.base_url}", "--max-examples=5", "--mode=positive", "--continue-on-failure")
+        == snapshot_cli
+    )
+
+
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, cli, location, snapshot_cli):
     # When an Open API 3 parameter is missing `schema` & `content`

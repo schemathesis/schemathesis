@@ -11,4 +11,4 @@ Errors raised by your `@schemathesis.deserializer` functions are reported here
 too.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109,
-ST111, ST114, ST115.
+ST111, ST114, ST115, ST116.

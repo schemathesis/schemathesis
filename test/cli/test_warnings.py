@@ -923,6 +923,7 @@ type Mutation {{
 """
 
 
+# The canned responses ignore the selection set.
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_for_graphql_survives_stateful(cli, app_runner, tmp_path, snapshot_cli):
     # The mutation is served, so the stateful phase reaches the query - but it still returns no data.
@@ -940,7 +941,14 @@ def test_missing_test_data_for_graphql_survives_stateful(cli, app_runner, tmp_pa
     port = app_runner.run_flask_app(app)
 
     assert (
-        cli.run(str(sdl), f"--url=http://127.0.0.1:{port}/graphql", "--max-examples=5", "-m", "positive")
+        cli.run(
+            str(sdl),
+            f"--url=http://127.0.0.1:{port}/graphql",
+            "--max-examples=5",
+            "-m",
+            "positive",
+            "--exclude-checks=response_schema_conformance",
+        )
         == snapshot_cli
     )
 

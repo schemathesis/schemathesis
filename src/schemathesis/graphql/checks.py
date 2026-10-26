@@ -121,6 +121,33 @@ class GraphQLSchemaViolation(Failure):
         return self._unique_key_cache
 
 
+class GraphQLDataMismatch(Failure):
+    """GraphQL `data` that does not match the query and the schema the server publishes."""
+
+    code = "ST116"
+    checks = ("response_schema_conformance",)
+    kind_title = "GraphQL data does not match the query"
+
+    __slots__ = ("locations",)
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        message: str,
+        locations: list[str],
+        title: str | None = None,
+        case_id: str | None = None,
+    ) -> None:
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.HIGH)
+        # Each mismatch kind with its path, list indices dropped, so the same defect on another item is one failure.
+        self.locations = locations
+
+    @property
+    def _unique_key(self) -> str:
+        return "\n".join(sorted(self.locations))
+
+
 def _group_graphql_errors(errors: list[GraphQLFormattedError]) -> str:
     entries = []
     for error in errors:

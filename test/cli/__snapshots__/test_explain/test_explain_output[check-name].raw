@@ -9,5 +9,6 @@ Stdout:
   ST111  Unknown discriminator value
   ST114  Null in non-nullable GraphQL field
   ST115  Unexpected GraphQL response
+  ST116  GraphQL data does not match the query
 
 Run `st explain <code>` for details.

@@ -11,6 +11,7 @@ from schemathesis.core.failures import (
 )
 from schemathesis.graphql.checks import (
     GraphQLClientError,
+    GraphQLDataMismatch,
     GraphQLSchemaViolation,
     GraphQLServerError,
     UnexpectedGraphQLResponse,
@@ -51,6 +52,7 @@ FAILURE_CLASSES: tuple[type[Failure], ...] = (
     GraphQLServerError,
     GraphQLSchemaViolation,
     UnexpectedGraphQLResponse,
+    GraphQLDataMismatch,
     AcceptedNegativeData,
     RejectedPositiveData,
     MissingHeaderNotRejected,

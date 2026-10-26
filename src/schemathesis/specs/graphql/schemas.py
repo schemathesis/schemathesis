@@ -66,7 +66,7 @@ from .inference import RootType
 from .ordering import compute_graphql_layers
 from .scalars import UnknownScalar, scalar_strategies, unsupported_scalar_name
 from .substitution import SUBSTITUTION_PROBABILITY, substitute_constants, substitute_pool_values
-from .validation import is_client_error, parse_payload, validate_graphql_response
+from .validation import is_client_error, parse_payload, validate_data, validate_graphql_response
 
 if TYPE_CHECKING:
     from random import Random
@@ -463,9 +463,12 @@ class GraphQLSchema(BaseSchema):
         case: Case | None = None,
     ) -> bool | None:
 
-        failure = _response_failure(case if case is not None else operation.Case(), response)
+        case = case if case is not None else operation.Case()
+        failure = _response_failure(case, response)
         if isinstance(failure, (MalformedJson, UnexpectedGraphQLResponse, GraphQLSchemaViolation)):
             raise failure
+        # Only this check reports `data` mismatches, so the walk over `data` runs once per response.
+        validate_data(case, response)
         return None
 
 

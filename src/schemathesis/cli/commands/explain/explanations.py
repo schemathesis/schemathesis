@@ -110,6 +110,14 @@ EXPLANATIONS: dict[str, Explanation] = {
     "ST115": Explanation(
         summary="GraphQL response that is not a JSON object, such as a list, a string or null.",
     ),
+    "ST116": Explanation(
+        summary="GraphQL `data` that does not match the query, such as a missing field or a value of the wrong type.",
+        notes="""
+            Checked only for successful responses without `errors`, whose `data` must be an object or `null`. Every
+            requested field must be present under its alias, with no unrequested fields, a value of its declared type,
+            and no `null` for a non-nullable field.
+        """,
+    ),
     "ST201": Explanation(
         summary="Schema-violating request accepted.",
         notes="""
