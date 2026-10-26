@@ -126,6 +126,19 @@ def _discover(sdl: str) -> set[Handle]:
             Handle("CloneSession", "id"),
             True,
         ),
+        (
+            """
+            type Project { id: ID! fullPath: String! }
+            type CreateProjectPayload { project: Project, clientMutationId: String }
+            type Query { _: Boolean }
+            type Mutation {
+                createProject(name: String!): CreateProjectPayload
+                moveIssue(projectPath: String!, title: String!): Boolean
+            }
+            """,
+            Handle("Project", "fullPath"),
+            True,
+        ),
     ],
     ids=[
         "seedable-via-token-arg",
@@ -140,6 +153,7 @@ def _discover(sdl: str) -> set[Handle]:
         "seedable-with-unrelated-producer-argument",
         "dropped-mutation-result-envelope",
         "verb-prefixed-resource-kept",
+        "seedable-via-mutation-payload",
     ],
 )
 def test_discover_handles(sdl, handle, present):

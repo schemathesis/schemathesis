@@ -25,7 +25,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE
-from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type, replace_node, replace_selections
+from schemathesis.specs.graphql._helpers import _unwrap, replace_node, replace_selections, resource_type
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.inference import (
     CLEANUP_PREFIXES,
@@ -52,10 +52,10 @@ class _OperationSummary:
     consumed: dict[str, Handle]
     field_name: str
     root_type: RootType
-    # Object return type name (the Relay node type for connections); drives non-id producers.
+    # Object return type name (the node type for Relay connections, the record type for mutation payloads).
     unwrapped_return_name: str | None
-    # Whether the return is a Relay connection, so capture/injection go through `edges { node }`.
-    returns_connection: bool
+    # Selection path from the operation field to the returned records, used for capture and field injection.
+    record_path: tuple[str, ...]
 
 
 @dataclass(slots=True)
@@ -85,11 +85,9 @@ def iter_operation_summaries(
         field_name = definition.field_name
         root_type = definition.root_type
         role = classify_operation(field_name=field_name, root_type=root_type)
-        unwrapped_return = _unwrap(field_def.type)
-        node = relay_node_type(unwrapped_return)
-        return_object = node if node is not None else unwrapped_return
+        return_object, record_path = resource_type(_unwrap(field_def.type))
         unwrapped_return_name = return_object.name if isinstance(return_object, graphql.GraphQLObjectType) else None
-        return_type_name: str | None = unwrapped_return.name if unwrapped_return.name in id_types else None
+        return_type_name: str | None = return_object.name if return_object.name in id_types else None
 
         cleanup_entity: str | None = None
         if role == OperationRole.CLEANUP:
@@ -125,7 +123,7 @@ def iter_operation_summaries(
             field_name=field_name,
             root_type=root_type,
             unwrapped_return_name=unwrapped_return_name,
-            returns_connection=node is not None,
+            record_path=record_path,
         )
 
 
@@ -183,6 +181,7 @@ def generate_rules_for(
                 return_type_name=summary.return_type_name,
                 root_label=root_label,
                 attrs=attrs,
+                record_path=summary.record_path,
             )
             generated.append(entry)
             producer_names.append(entry[0])
@@ -237,7 +236,7 @@ def generate_rules_for(
                 handle=handle,
                 root_label=label.split(".", 1)[0],
                 attrs=attrs,
-                via_edges=summary.returns_connection,
+                record_path=summary.record_path,
             )
             generated.append(entry)
             producer_names.append(entry[0])
@@ -274,6 +273,7 @@ def _make_producer_rule(
     return_type_name: str,
     root_label: str,
     attrs: dict[str, Any],
+    record_path: tuple[str, ...],
 ) -> tuple[str, Callable]:
     rule_name = f"{root_label}_{field_name}"
     producer_label = f"{root_label}.{field_name}"
@@ -282,12 +282,19 @@ def _make_producer_rule(
     def body(self: Any, data: st.DataObject) -> Any:
         operation = self.schema[root_label][field_name]
 
-        case = data.draw(graphql_cases(operation=operation, hooks=self.schema.hooks, phase=TestPhase.STATEFUL))
+        case = data.draw(
+            graphql_cases(
+                operation=operation,
+                hooks=self.schema.hooks,
+                phase=TestPhase.STATEFUL,
+                mutate_ast=_inject_field(field_name, (*record_path, "id")),
+            )
+        )
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
         values = [
             value
             for _field, value in iter_handle_values(
-                output.response.content, field_name=field_name, handle_fields=frozenset({"id"})
+                output.response.content, field_name=field_name, handle_fields=frozenset({"id"}), path=record_path
             )
         ]
         if not values:
@@ -307,13 +314,12 @@ def _make_producer_rule(
 
 
 def _inject_field(
-    field_name: str, handle_field: str, *, via_edges: bool
+    field_name: str, path: tuple[str, ...]
 ) -> Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode]:
-    """Ensure `handle_field` is selected inside the producing field, so its value can be captured.
+    """Ensure the field at `path` is selected inside the producing field, so its value can be captured.
 
-    For Relay connections the field is nested under `edges { node { ... } }`.
+    For Relay connections the path goes through `edges { node { ... } }`, for mutation payloads through the record field.
     """
-    path = ["edges", "node", handle_field] if via_edges else [handle_field]
 
     def mutate(operation_node: graphql.OperationDefinitionNode, _random: Random) -> graphql.OperationDefinitionNode:
         selections = list(operation_node.selection_set.selections)
@@ -332,7 +338,7 @@ def _inject_field(
     return mutate
 
 
-def _ensure_selection_path(selection_set: graphql.SelectionSetNode, path: list[str]) -> graphql.SelectionSetNode:
+def _ensure_selection_path(selection_set: graphql.SelectionSetNode, path: tuple[str, ...]) -> graphql.SelectionSetNode:
     name, rest = path[0], path[1:]
     selections = list(selection_set.selections)
     index = next(
@@ -361,7 +367,7 @@ def _make_handle_producer_rule(
     handle: Handle,
     root_label: str,
     attrs: dict[str, Any],
-    via_edges: bool,
+    record_path: tuple[str, ...],
 ) -> tuple[str, Callable]:
     rule_name = f"{root_label}_{field_name}__{handle.field_name}"
     target_bundle = attrs[bundle_name(handle)]
@@ -374,14 +380,17 @@ def _make_handle_producer_rule(
                 operation=operation,
                 hooks=self.schema.hooks,
                 phase=TestPhase.STATEFUL,
-                mutate_ast=_inject_field(field_name, handle.field_name, via_edges=via_edges),
+                mutate_ast=_inject_field(field_name, (*record_path, handle.field_name)),
             )
         )
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
         values = [
             value
             for _field, value in iter_handle_values(
-                output.response.content, field_name=field_name, handle_fields=frozenset({handle.field_name})
+                output.response.content,
+                field_name=field_name,
+                handle_fields=frozenset({handle.field_name}),
+                path=record_path,
             )
         ]
         if not values:

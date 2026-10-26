@@ -27,6 +27,7 @@ from schemathesis.specs.graphql._helpers import (
     replace_field,
     replace_node,
     replace_selections,
+    resource_type,
 )
 from schemathesis.specs.graphql.handles import HANDLE_SCALARS, Handle, SchemaIndex
 
@@ -321,9 +322,8 @@ def _walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        enclosing_field_type = (
-            unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
-        )
+        record_type, _ = resource_type(unwrapped_return)
+        enclosing_field_type = record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
         arguments = list(selection.arguments or ())
         for position, argument in enumerate(selection.arguments or ()):
             argument_definition = field_def.args.get(argument.name.value)
@@ -529,9 +529,8 @@ def _iter_walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        enclosing_field_type = (
-            unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
-        )
+        record_type, _ = resource_type(unwrapped_return)
+        enclosing_field_type = record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
         for argument in selection.arguments or ():
             argument_definition = field_def.args.get(argument.name.value)
             if argument_definition is None:

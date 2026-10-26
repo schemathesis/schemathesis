@@ -122,3 +122,68 @@ def test_stateful_consumers_mostly_target_created_resources(ctx, cli):
         "not_a_server_error",
     )
     assert updates["existing"] / (updates["existing"] + updates["unknown"]) > 0.7, updates
+
+
+def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):
+    created: set[str] = set()
+    received: dict[str, set[str]] = {"note": set(), "updateNote": set()}
+
+    @strawberry.type
+    class Note:
+        id: strawberry.ID
+        title: str | None
+
+    @strawberry.type
+    class CreateNotePayload:
+        note: Note | None
+        client_mutation_id: str | None
+
+    @strawberry.type
+    class UpdateNotePayload:
+        note: Note | None
+
+    @strawberry.type
+    class DeleteNotePayload:
+        deleted_note_id: strawberry.ID | None
+        client_mutation_id: str | None
+
+    @strawberry.input
+    class NoteInput:
+        title: str | None = None
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def note(self, id: strawberry.ID) -> Note | None:
+            received["note"].add(id)
+            return None
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def createNote(self, input: NoteInput | None = None) -> CreateNotePayload:
+            note_id = strawberry.ID(f"note-{len(created)}")
+            created.add(note_id)
+            return CreateNotePayload(note=Note(id=note_id, title=None), client_mutation_id=None)
+
+        @strawberry.mutation
+        def updateNote(self, id: strawberry.ID, input: NoteInput | None = None) -> UpdateNotePayload:
+            received["updateNote"].add(id)
+            return UpdateNotePayload(note=None)
+
+        @strawberry.mutation
+        def deleteNote(self, id: strawberry.ID) -> DeleteNotePayload:
+            return DeleteNotePayload(deleted_note_id=id, client_mutation_id=None)
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query, Mutation))
+    cli.run_and_assert(
+        api.schema_url,
+        "--max-examples=30",
+        "--seed=1",
+        "--phases=stateful",
+        "-m",
+        "positive",
+        "-c",
+        "not_a_server_error",
+    )
+    assert {name: bool(ids & created) for name, ids in received.items()} == {"note": True, "updateNote": True}
