@@ -31,6 +31,7 @@ from schemathesis.core.jsonschema import (
     make_validator,
     make_validator_for,
     matches_pattern,
+    pattern_matcher,
 )
 from schemathesis.core.jsonschema.patterns import (
     anchor_end_of_string,
@@ -1818,7 +1819,16 @@ def _format_source(
 # exactly; a name without a checker behind it passes everything, like the validator itself.
 @lru_cache(maxsize=512)
 def _facet_check(keyword: str, value: str) -> Callable[[JsonValue], bool]:
-    is_valid = make_validator_for({"type": "string", keyword: value}).is_valid
+    matcher = pattern_matcher(value) if keyword == "pattern" else None
+    is_valid: Callable[[JsonValue], bool]
+    if matcher is not None:
+        # Shares the compiled pattern with every other check of it instead of compiling another validator.
+        def matches(drawn: JsonValue) -> bool:
+            return isinstance(drawn, str) and matcher(drawn)
+
+        is_valid = matches
+    else:
+        is_valid = make_validator_for({"type": "string", keyword: value}).is_valid
 
     def check(drawn: JsonValue) -> bool:
         # A binary payload carries bytes rather than a JSON string, so the facet has no say over it.

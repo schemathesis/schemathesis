@@ -16,7 +16,6 @@ def clear_all() -> None:
     """Empty every process-wide cache that generation fills per schema."""
     DEFAULT_GENERATION_SESSION.close()
     patterns.normalize_regex.cache_clear()
-    patterns.is_valid_jsonschema_rs_regex.cache_clear()
     patterns._parse_regex.cache_clear()
     patterns.pattern_length_bounds.cache_clear()
     patterns.matches_every_string.cache_clear()
@@ -28,7 +27,7 @@ def clear_all() -> None:
     patterns.pin_pattern_length.cache_clear()
     resolver._resolve_reference_uri_with_document.cache_clear()
     bundler._UNBUNDLED_COMPONENTS_CACHE.clear()
-    jsonschema.matches_pattern.cache_clear()
+    jsonschema.pattern_matcher.cache_clear()
     jsonschema.validator_cache.clear()
     jsonschema._validator_failure_cache.clear()
     jsonschema._seeded_validator_cache.clear()
