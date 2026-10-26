@@ -49,6 +49,29 @@ _READABLE_VERB_PREFIXED_RESOURCE = """
     type Mutation { startImportJob(source: String!): ImportJob }
 """
 
+_MULTI_WORD_RESOURCE = """
+    type Cover { id: ID! }
+    type BookCover { id: ID! }
+    type DeleteBookCover { id: ID! ok: Boolean }
+    type Query { _: Boolean }
+    type Mutation {
+        addCover(url: String!): Cover!
+        addBookCover(url: String!): BookCover!
+        deleteBookCover(id: ID!): Boolean
+        bookCoverDelete(id: ID!): Boolean
+        removeBookCover(id: ID!): DeleteBookCover
+    }
+"""
+
+_QUALIFIED_CLEANUP = """
+    type Session { id: ID! }
+    type Query { _: Boolean }
+    type Mutation {
+        addSession(name: String!): Session!
+        deleteUserSession(id: ID!): Boolean
+    }
+"""
+
 _NO_PRODUCER = """
     type Book { id: ID! }
     type Query { book(id: ID!): Book }
@@ -70,6 +93,15 @@ _NO_PRODUCER = """
             [("Mutation.createNote", "Query.note"), ("Mutation.createNote", "Mutation.removeNote")],
         ),
         (_VERB_PREFIXED_RESOURCE, [("Mutation.addCloneSession", "Query.cloneSession")]),
+        (
+            _MULTI_WORD_RESOURCE,
+            [
+                ("Mutation.addBookCover", "Mutation.deleteBookCover"),
+                ("Mutation.addBookCover", "Mutation.bookCoverDelete"),
+                ("Mutation.addBookCover", "Mutation.removeBookCover"),
+            ],
+        ),
+        (_QUALIFIED_CLEANUP, [("Mutation.addSession", "Mutation.deleteUserSession")]),
         (_NO_PRODUCER, []),
     ],
     ids=[
@@ -78,6 +110,8 @@ _NO_PRODUCER = """
         "cleanup-is-not-producer",
         "envelope-result-binds-to-resource",
         "verb-prefixed-resource-unaffected",
+        "multi-word-resource-name",
+        "qualified-cleanup-falls-back-to-head-noun",
         "no-producer-no-edges",
     ],
 )

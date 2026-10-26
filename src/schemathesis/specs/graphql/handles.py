@@ -5,7 +5,7 @@ from typing import NamedTuple
 import graphql
 
 from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type
-from schemathesis.specs.graphql.inference import CLEANUP_PREFIXES, PRODUCER_PREFIXES, extract_entity
+from schemathesis.specs.graphql.inference import CLEANUP_PREFIXES, PRODUCER_PREFIXES, entity_candidates
 
 # Scalar names whose values substitution can emit as a StringValueNode.
 HANDLE_SCALARS = ("String", "ID")
@@ -69,9 +69,10 @@ def _collect_envelopes(schema: graphql.GraphQLSchema, object_types: dict[str, fr
             name = _unwrap(field_def.type).name
             if name in readable:
                 continue
-            entity = extract_entity(name, prefixes=PRODUCER_PREFIXES | CLEANUP_PREFIXES)
-            if entity is not None and entity in object_types:
-                envelopes[name] = entity
+            for entity in entity_candidates(name, prefixes=PRODUCER_PREFIXES | CLEANUP_PREFIXES):
+                if entity in object_types:
+                    envelopes[name] = entity
+                    break
     return envelopes
 
 

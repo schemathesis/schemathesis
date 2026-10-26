@@ -83,7 +83,7 @@ def iter_operation_summaries(
         unwrapped_return_name = return_object.name if isinstance(return_object, graphql.GraphQLObjectType) else None
         return_type_name: str | None = return_object.name if return_object.name in id_types else None
 
-        owner = argument_owner(field_name, field_def, is_mutation=root_type == RootType.MUTATION)
+        owner = argument_owner(field_name, field_def, is_mutation=root_type == RootType.MUTATION, index=index)
         consumed: dict[str, Handle] = {}
         for argument_name, argument in field_def.args.items():
             handle = candidate_handle(
