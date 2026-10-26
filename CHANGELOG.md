@@ -7,7 +7,7 @@
 - Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.
 - False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
 - Python traceback printed for WFC login failures, such as a dropped connection.
-- GraphQL stateful testing treating mutation result types like `DeleteNote` as separate resources.
+- GraphQL stateful testing treating mutation result types like `DeleteNote` or `UpdateNote` as separate resources.
 - GraphQL stateful testing skipping mutations that wrap results in payload types, such as `CreateNotePayload`.
 - GraphQL stateful testing sending random ids to delete mutations returning `Boolean` or payloads.
 - GraphQL stateful testing linking multi-word deletes like `deleteBookCover` to the wrong resource.

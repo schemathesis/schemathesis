@@ -10,6 +10,7 @@ PRODUCER_PREFIXES: Final = frozenset(
     {"create", "add", "register", "new", "insert", "make", "clone", "duplicate", "import", "upload"}
 )
 CLEANUP_PREFIXES: Final = frozenset({"delete", "remove", "destroy", "purge", "clear", "revoke"})
+UPDATE_PREFIXES: Final = frozenset({"update", "edit", "modify"})
 
 # Camel-case tokenizers: extract the leading and trailing word tokens so the
 # vocabularies can match verb-first (createBook) and verb-last (productCreate)

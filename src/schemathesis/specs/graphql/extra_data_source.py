@@ -12,7 +12,7 @@ import graphql
 from schemathesis.resources import PoolPick
 from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
 from schemathesis.specs.graphql.bundles import collect_id_typed_object_types
-from schemathesis.specs.graphql.handles import Handle
+from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.inference import OperationRole, classify_operation
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values
 
@@ -40,6 +40,16 @@ def _parse_response_data(body: bytes) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def _operation_node(case: Case) -> graphql.OperationDefinitionNode | None:
+    if not isinstance(case.body, str):
+        return None
+    try:
+        document = graphql.parse(case.body)
+    except graphql.GraphQLSyntaxError:
+        return None
+    return next((d for d in document.definitions if isinstance(d, graphql.OperationDefinitionNode)), None)
+
+
 def _is_cleanup(operation: APIOperation) -> bool:
     definition = cast("GraphQLOperationDefinition", operation.definition)
     return classify_operation(field_name=definition.field_name, root_type=definition.root_type) == OperationRole.CLEANUP
@@ -48,16 +58,18 @@ def _is_cleanup(operation: APIOperation) -> bool:
 class GraphQLResourcePool:
     """Cross-test-case pool of GraphQL identifier values."""
 
-    __slots__ = ("_capture_fields", "_data", "_lock", "_max_per_key", "_schema", "_tombstoned")
+    __slots__ = ("_capture_fields", "_data", "_index", "_lock", "_max_per_key", "_schema", "_tombstoned")
 
     def __init__(
         self,
         *,
         client_schema: graphql.GraphQLSchema,
         max_per_key: int = DEFAULT_MAX_PER_KEY,
+        index: SchemaIndex,
         handles: set[Handle] | None = None,
     ) -> None:
         self._schema = client_schema
+        self._index = index
         self._max_per_key = max_per_key
         self._data: dict[Handle, deque[str]] = {}
         self._tombstoned: set[tuple[Handle, str]] = set()
@@ -82,32 +94,28 @@ class GraphQLResourcePool:
         case: Case,
     ) -> None:
         body = response.content
-        if not body or not isinstance(case.body, str):
+        if not body:
             return
-        try:
-            document = graphql.parse(case.body)
-        except graphql.GraphQLSyntaxError:
-            return
-        operation_node = next(
-            (d for d in document.definitions if isinstance(d, graphql.OperationDefinitionNode)),
-            None,
-        )
+        operation_node = _operation_node(case)
         if operation_node is None:
             return
         data = _parse_response_data(body)
         if data is None:
             return
         self.capture(operation_node=operation_node, response_data=data)
-        if _is_cleanup(operation):
-            for handle, value in iter_operation_pool_values(operation_node, self._schema):
-                self.tombstone(handle=handle, value=value)
 
     def record_request(self, *, operation: APIOperation, case: Case, status_code: int) -> None:
         return None  # pragma: no cover
 
     def record_successful_delete(self, *, operation: APIOperation, case: Case) -> None:
-        # Tombstoning runs from `record_response`; this engine hook has no extra work for GraphQL.
-        return None  # pragma: no cover
+        # Runs right after the call, so later cases of the same operation stop drawing the deleted ids.
+        if not _is_cleanup(operation):
+            return
+        operation_node = _operation_node(case)
+        if operation_node is None:
+            return
+        for handle, value in iter_operation_pool_values(operation_node, self._schema, self._index):
+            self.tombstone(handle=handle, value=value)
 
     def pick_correlated_values(
         self,

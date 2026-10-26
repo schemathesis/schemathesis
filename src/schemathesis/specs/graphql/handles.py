@@ -5,7 +5,7 @@ from typing import NamedTuple
 import graphql
 
 from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type
-from schemathesis.specs.graphql.inference import CLEANUP_PREFIXES, PRODUCER_PREFIXES, entity_candidates
+from schemathesis.specs.graphql.inference import CLEANUP_PREFIXES, PRODUCER_PREFIXES, UPDATE_PREFIXES, entity_candidates
 
 # Scalar names whose values substitution can emit as a StringValueNode.
 HANDLE_SCALARS = ("String", "ID")
@@ -69,7 +69,12 @@ def _collect_envelopes(schema: graphql.GraphQLSchema, object_types: dict[str, fr
             name = _unwrap(field_def.type).name
             if name in readable:
                 continue
-            for entity in entity_candidates(name, prefixes=PRODUCER_PREFIXES | CLEANUP_PREFIXES):
+            # An update result names only its full remainder (`UpdateNote` -> `Note`), never a head noun.
+            candidates = (
+                entity_candidates(name, prefixes=PRODUCER_PREFIXES | CLEANUP_PREFIXES)
+                or entity_candidates(name, prefixes=UPDATE_PREFIXES)[:1]
+            )
+            for entity in candidates:
                 if entity in object_types:
                     envelopes[name] = entity
                     break

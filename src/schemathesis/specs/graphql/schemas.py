@@ -217,7 +217,9 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def create_extra_data_source(self) -> GraphQLResourcePool:
-        return GraphQLResourcePool(client_schema=self.client_schema, handles=self.analysis.handles)
+        return GraphQLResourcePool(
+            client_schema=self.client_schema, handles=self.analysis.handles, index=self.analysis.schema_index
+        )
 
     @override
     def build_request_url(self, case: Case, base_url: str) -> str:
