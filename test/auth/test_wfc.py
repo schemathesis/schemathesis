@@ -618,6 +618,7 @@ def test_wfc_login_connection_error(cli, ctx, tmp_path):
     result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "login endpoint call failed" in result.stdout.lower()
+    assert "Traceback" not in result.stdout
 
 
 def test_wfc_multiple_users_without_selection(cli, ctx, tmp_path):

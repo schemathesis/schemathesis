@@ -18,7 +18,7 @@ from typing import (
 )
 
 from schemathesis.config._auth import DEFAULT_RETRY_ON
-from schemathesis.core.errors import AuthenticationError, IncorrectUsage
+from schemathesis.core.errors import AuthenticationError, IncorrectUsage, SchemathesisError
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, attach_filter_chain
@@ -174,7 +174,11 @@ class CachingAuthProvider(Generic[Auth]):
                     self._note_fetch_failure(key)
                     provider_name = self.provider.__class__.__name__
                     raise AuthenticationError(
-                        provider_name, "get", str(exc), show_traceback=True, include_provider_context=True
+                        provider_name,
+                        "get",
+                        str(exc),
+                        show_traceback=_has_useful_traceback(exc),
+                        include_provider_context=True,
                     ) from exc
                 self._fetch_failures.pop(key, None)
                 self._set_cache_entry(data, case, context)
@@ -282,6 +286,11 @@ class FilterableRequestsAuth(_FilterChain, Protocol):
     """Protocol that adds filters to the return value of `set_from_requests`."""
 
 
+def _has_useful_traceback(exc: Exception) -> bool:
+    # Built-in providers raise Schemathesis errors whose message already names the cause.
+    return not isinstance(exc, SchemathesisError)
+
+
 @dataclass
 class SelectiveAuthProvider(Generic[Auth]):
     """Applies auth depending on the configured filters."""
@@ -305,7 +314,11 @@ class SelectiveAuthProvider(Generic[Auth]):
                     provider = provider.provider
                 provider_name = provider.__class__.__name__
                 raise AuthenticationError(
-                    provider_name, "get", str(exc), show_traceback=True, include_provider_context=True
+                    provider_name,
+                    "get",
+                    str(exc),
+                    show_traceback=_has_useful_traceback(exc),
+                    include_provider_context=True,
                 ) from exc
         return None
 
