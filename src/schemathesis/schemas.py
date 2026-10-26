@@ -1201,13 +1201,11 @@ class APIOperation(Generic[P, R, S, SchemaT]):
             multipart_content_types: Selected content types for multipart form properties.
 
         """
-        from requests.structures import CaseInsensitiveDict
-
         return self.schema.make_case(
             operation=self,
             method=method,
             path_parameters=path_parameters or {},
-            headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
+            headers=headers,
             cookies=cookies or {},
             query=query or {},
             body=body,

@@ -176,6 +176,8 @@ class CoverageGenerator:
             dispatchers = case_hook_dispatchers(operation, self._hooks)
 
             unserializable = self._controller.unserializable_media_types
+            # Matching a media type against every registered serializer is costly and the answer never changes here.
+            serializable: set[str] = set()
             for case in operation.schema.iter_coverage_cases(
                 operation,
                 generation_modes=self._generation_modes,
@@ -184,8 +186,11 @@ class CoverageGenerator:
                 error_feedback=error_feedback,
                 session=self._session,
             ):
-                if without_unserializable_payload(case, operation.schema.transport, unserializable) is None:
-                    continue
+                if case.media_type not in serializable:
+                    if without_unserializable_payload(case, operation.schema.transport, unserializable) is None:
+                        continue
+                    if case.media_type:
+                        serializable.add(case.media_type)
                 adjust_urlencoded_payload(case)
                 auths.set_on_generated_case(case, auth_context, self._auth_storage)
                 self._override.apply_to(case)
