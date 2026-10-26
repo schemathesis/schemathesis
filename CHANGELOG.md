@@ -10,6 +10,7 @@
 - GraphQL stateful testing treating mutation result types like `DeleteNote` as separate resources.
 - GraphQL stateful testing skipping mutations that wrap results in payload types, such as `CreateNotePayload`.
 - GraphQL stateful testing sending random ids to delete mutations returning `Boolean` or payloads.
+- GraphQL stateful testing linking multi-word deletes like `deleteBookCover` to the wrong resource.
 
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 

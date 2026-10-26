@@ -6,7 +6,7 @@ import graphql
 import pytest
 
 from schemathesis.specs.graphql.handles import Handle
-from schemathesis.specs.graphql.inference import CLEANUP_PREFIXES, OperationRole, RootType, extract_entity
+from schemathesis.specs.graphql.inference import CLEANUP_PREFIXES, OperationRole, RootType, entity_candidates
 from schemathesis.specs.graphql.stateful._rules import _inject_field, _OperationSummary
 
 
@@ -113,23 +113,27 @@ def test_operation_summaries_unwrap_mutation_payloads(ctx):
 @pytest.mark.parametrize(
     ("field_name", "expected"),
     [
-        ("deleteBook", "Book"),
-        ("bookDelete", "Book"),
-        ("removePost", "Post"),
-        ("postRemove", "Post"),
-        ("book", None),
-        ("addBook", None),
-        ("delete", None),
+        ("deleteBook", ("Book",)),
+        ("bookDelete", ("Book",)),
+        ("removePost", ("Post",)),
+        ("postRemove", ("Post",)),
+        ("deleteBookCover", ("BookCover", "Cover")),
+        ("bookCoverDelete", ("BookCover", "Cover")),
+        ("book", ()),
+        ("addBook", ()),
+        ("delete", ()),
     ],
     ids=[
         "verb-first-camel",
         "verb-last-camel",
         "verb-first-camel-alt",
         "verb-last-camel-alt",
+        "multi-word-verb-first",
+        "multi-word-verb-last",
         "single-token",
         "non-cleanup-prefix",
         "verb-only",
     ],
 )
-def test_extract_entity(field_name, expected):
-    assert extract_entity(field_name, prefixes=CLEANUP_PREFIXES) == expected
+def test_entity_candidates(field_name, expected):
+    assert entity_candidates(field_name, prefixes=CLEANUP_PREFIXES) == expected

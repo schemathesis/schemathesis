@@ -36,7 +36,7 @@ from schemathesis.specs.graphql.inference import (
     OperationRole,
     RootType,
     classify_operation,
-    extract_entity,
+    entity_candidates,
 )
 
 if TYPE_CHECKING:
@@ -333,7 +333,7 @@ def _walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation)
+        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation, index=index)
         arguments = list(selection.arguments or ())
         for position, argument in enumerate(selection.arguments or ()):
             argument_definition = field_def.args.get(argument.name.value)
@@ -433,16 +433,18 @@ BARE_IDENTIFIER_NAMES: Final = frozenset(
 )
 
 
-def argument_owner(field_name: str, field_def: graphql.GraphQLField, *, is_mutation: bool) -> str | None:
+def argument_owner(
+    field_name: str, field_def: graphql.GraphQLField, *, is_mutation: bool, index: SchemaIndex | None
+) -> str | None:
     """Name the object type that a root field's bare identifier arguments refer to."""
     record_type, _ = resource_type(_unwrap(field_def.type))
     if isinstance(record_type, graphql.GraphQLObjectType) and "id" in record_type.fields:
         return record_type.name
     # Cleanup mutations typically return `Boolean` or a payload without the record (`deleteBook` -> `Book`).
     if is_mutation and classify_operation(field_name=field_name, root_type=RootType.MUTATION) == OperationRole.CLEANUP:
-        entity = extract_entity(field_name, prefixes=CLEANUP_PREFIXES)
-        if entity is not None:
-            return entity
+        for entity in entity_candidates(field_name, prefixes=CLEANUP_PREFIXES):
+            if index is None or index.has_object_type(entity):
+                return entity
     return record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
 
 
@@ -555,7 +557,7 @@ def _iter_walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation)
+        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation, index=None)
         for argument in selection.arguments or ():
             argument_definition = field_def.args.get(argument.name.value)
             if argument_definition is None:

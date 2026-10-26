@@ -37,23 +37,29 @@ class OperationRole(enum.IntEnum):
     CLEANUP = 3
 
 
-def extract_entity(field_name: str, *, prefixes: frozenset[str]) -> str | None:
-    """Strip a leading or trailing verb token and return the remaining name capitalized.
+def entity_candidates(field_name: str, *, prefixes: frozenset[str]) -> tuple[str, ...]:
+    """Strip a leading or trailing verb token and name the entity the rest refers to, most specific first.
 
-    `deleteBook` with `prefixes=CLEANUP_PREFIXES` -> `Book`; `bookDelete` -> `Book`.
-    Returns `None` when no matching verb is found or only one token is present.
+    With `prefixes=CLEANUP_PREFIXES`: `deleteBook` -> `("Book",)`; `deleteBookCover` and `bookCoverDelete`
+    -> `("BookCover", "Cover")`, falling back to the head noun for qualified names (`deleteUserSession`).
+    Returns an empty tuple when no matching verb is found or nothing remains after it.
     """
     leading = _LEADING_TOKEN_RE.match(field_name)
     trailing = _TRAILING_TOKEN_RE.search(field_name)
-    if leading is None or trailing is None or leading.group(0) == trailing.group(0):
-        return None
+    if leading is None or trailing is None:
+        return ()
     if leading.group(0).lower() in prefixes:
-        token = trailing.group(0)
+        rest = field_name[leading.end() :]
     elif trailing.group(0).lower() in prefixes:
-        token = leading.group(0)
+        rest = field_name[: trailing.start()]
     else:
-        return None
-    return token[:1].upper() + token[1:]
+        return ()
+    head = _TRAILING_TOKEN_RE.search(rest)
+    if head is None:
+        return ()
+    entity = rest[:1].upper() + rest[1:]
+    head_noun = head.group(0)[:1].upper() + head.group(0)[1:]
+    return (entity,) if head_noun == entity else (entity, head_noun)
 
 
 def classify_operation(*, field_name: str, root_type: RootType) -> OperationRole:
