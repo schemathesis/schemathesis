@@ -2625,15 +2625,15 @@ def cover_schema_iter(
     if leaves is not None:
         allow_negative_fallback = GenerationMode.NEGATIVE in ctx.generation_modes
         with _ignore_unfixable():
-            yield from _filter_against_not(
+            yield from _filter_against_conditionals(
                 _positive_for_leaves(ctx.with_positive(), schema, leaves, allow_negative_fallback), schema, ctx
             )
     elif not types:
         with _ignore_unfixable():
-            yield from _filter_against_not(_cover_positive_for_type(ctx, schema, None), schema, ctx)
+            yield from _filter_against_conditionals(_cover_positive_for_type(ctx, schema, None), schema, ctx)
     for ty in types if leaves is None else []:
         with _ignore_unfixable():
-            yield from _filter_against_not(_cover_positive_for_type(ctx, schema, ty), schema, ctx)
+            yield from _filter_against_conditionals(_cover_positive_for_type(ctx, schema, ty), schema, ctx)
     if GenerationMode.NEGATIVE in ctx.generation_modes:
         template = None
         baseline_emitted = False
@@ -2828,15 +2828,15 @@ def _drop_invalid_for_location(
             yield case
 
 
-def _filter_against_not(
+def _filter_against_conditionals(
     cases: Generator[GeneratedValue, None, None], schema: JsonSchema, ctx: CoverageContext
 ) -> Generator[GeneratedValue, None, None]:
-    """Drop values that a sibling `not` rules out.
+    """Drop values that a sibling `not` or `if` rules out.
 
     Values are built from the describing keywords alone (bounds, `items`, `properties`, ...), so a
-    `not` beside them can still reject what those keywords allow.
+    `not` or a conditional beside them can still reject what those keywords allow.
     """
-    if not isinstance(schema, dict) or not isinstance(schema.get("not"), (dict, bool)):
+    if not isinstance(schema, dict) or not (isinstance(schema.get("not"), (dict, bool)) or "if" in schema):
         yield from cases
         return
     for case in cases:
