@@ -716,12 +716,12 @@ def _scoped_remote_schema(testdir):
 @pytest.mark.parametrize(
     ("setup", "check"),
     [
-        (_remote_schema, lambda v: isinstance(v, int)),
-        (_nested_remote_schema, lambda v: isinstance(v, int)),
-        (_deep_nested_remote_schema, lambda v: isinstance(v["a"], int)),
-        (_colliding_remote_schema, lambda v: isinstance(v["a"], int) and isinstance(v["b"], str)),
-        (_back_reference_remote_schema, lambda v: isinstance(v, int)),
-        (_scoped_remote_schema, lambda v: isinstance(v, int)),
+        (_remote_schema, lambda query: isinstance(query["key"], int)),
+        (_nested_remote_schema, lambda query: isinstance(query["key"], int)),
+        (_deep_nested_remote_schema, lambda query: isinstance(query["a"], int)),
+        (_colliding_remote_schema, lambda query: isinstance(query["a"], int) and isinstance(query["b"], str)),
+        (_back_reference_remote_schema, lambda query: isinstance(query["key"], int)),
+        (_scoped_remote_schema, lambda query: isinstance(query["key"], int)),
     ],
 )
 def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
@@ -738,7 +738,7 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     @run_given(schema["/data"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         # Then the referenced schema should be resolved and the right value generated
-        assert check(case.query["key"])
+        assert check(case.query)
 
     # And the original schema is not mutated
     assert jsonschema_rs.canonical.json.to_string(deeply_nested_schema) == original

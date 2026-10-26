@@ -350,12 +350,26 @@ def resolve_with_root_bundle(schema: dict[str, Any], root_schema: dict[str, Any]
 
 
 def resolve_bundled_ref(schema: dict[str, Any], bundled: object) -> dict[str, Any]:
-    """Follow `$ref` into the `bundled` map; return `schema` as-is when it does not point into it."""
+    """Follow `$ref` chains into the `bundled` map; return `schema` as-is when it does not point into it."""
     ref = schema.get("$ref")
     if not isinstance(ref, str) or not isinstance(bundled, dict):
         return schema
     target = bundled.get(ref.rsplit("/", 1)[-1])
-    return target if isinstance(target, dict) else schema
+    if not isinstance(target, dict):
+        return schema
+    ref = target.get("$ref")
+    if not isinstance(ref, str):
+        return target
+    # Alias components chain `$ref`s; the hop bound stops reference cycles.
+    for _ in range(len(bundled)):
+        next_target = bundled.get(ref.rsplit("/", 1)[-1])
+        if not isinstance(next_target, dict):
+            return target
+        target = next_target
+        ref = target.get("$ref")
+        if not isinstance(ref, str):
+            return target
+    return target
 
 
 def is_unsatisfiable(schema: object) -> bool:

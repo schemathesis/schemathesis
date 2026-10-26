@@ -531,7 +531,8 @@ def _resolve_bundled(
                 if siblings:
                     resolved_schema = {**resolved_schema, **siblings}
 
-            return resolved_schema, new_path, next_resolver
+            # An alias component is itself a `$ref`, so follow the chain to the schema it names.
+            return _resolve_bundled(resolved_schema, next_resolver, new_path, merge_ref_siblings=merge_ref_siblings)
 
     return schema, reference_path, resolver
 
