@@ -611,7 +611,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String`
 
-    Custom path for a pytest file with one test per reported failure. Each test sends the recorded requests with `requests` and asserts the status codes the run observed, so it passes while the bug exists and fails once the behavior changes. Stateful failures replay the whole chain with the recorded values. The default file name, `test_schemathesis_<timestamp>.py`, matches pytest's test discovery. Sensitive values are masked unless `--output-sanitize false` is set. Not applicable to the pytest plugin.
+    Custom path for a pytest file with one test per reported failure. Each test sends the recorded requests with `requests` and asserts the status codes the run observed, so it passes while the bug exists and the server holds the data the run saw, and fails once the behavior changes. Stateful failures replay the whole chain with the recorded values. The default file name, `test_schemathesis_<timestamp>.py`, matches pytest's test discovery. Sensitive values are masked unless `--output-sanitize false` is set. Not applicable to the pytest plugin.
 
     ```console
     $ st run openapi.yaml --report-pytest-path ./test_regressions.py

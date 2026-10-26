@@ -206,7 +206,7 @@ To add the failures to your API's own test suite, write them as a pytest file th
 uvx schemathesis run http://localhost:8000/openapi.json --report-pytest-path ./test_regressions.py
 ```
 
-Each test sends the recorded requests and asserts what the run saw: the status code of every response and, on the last response, the symptoms of its failures that plain Python can check - a missing or undocumented `Content-Type`, missing headers, the value that violates the response schema, a body that is not valid JSON, or a response slower than the limit. The test passes while the bug exists and fails once the fix changes the response. Stateful chains replay the recorded values as-is, so a server that issues a new ID per creation breaks the chain. Masked credentials need to be filled in before running.
+Each test sends the recorded requests and asserts what the run saw: the status code of every response and, on the last response, the symptoms of its failures that plain Python can check - a missing or undocumented `Content-Type`, missing headers, the value that violates the response schema, a body that is not valid JSON, or a response slower than the limit. The test passes while the bug exists and the server holds the data the run saw, and fails once the fix changes the response. Requests reuse IDs from responses the test does not repeat; a comment above them names the request that returned each one. Stateful chains replay the recorded values as-is, so a server that issues a new ID per creation breaks the chain. Masked credentials need to be filled in before running; a comment above each request names the user it was sent as when the failure involves several users.
 
 ## Exit codes
 

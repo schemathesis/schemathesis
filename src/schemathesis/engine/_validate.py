@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from schemathesis.checks import run_checks
 from schemathesis.core.failures import FailureGroup
 from schemathesis.engine._baseline import is_known
-from schemathesis.engine.recorder import ReproductionStep
 
 if TYPE_CHECKING:
     from schemathesis.baseline import Baseline
@@ -31,14 +30,17 @@ def validate_response(
         collected.add(failure)
         checked_by.setdefault(failure, name)
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
-        step = ReproductionStep.from_case(
-            failure_data.case,
-            headers=failure_data.headers,
+        steps = recorder.reproduction_steps(
+            recorder.iter_failure_cases(case_id=failure_data.case.id, failure=failure),
+            failure=failure,
             verify=failure_data.verify,
-            roles=failure.identity_roles(),
         )
         recorder.record_check_failure(
-            name=name, case_id=failure_data.case.id, code_sample=step.curl, failure=failure, steps=[step]
+            name=name,
+            case_id=failure_data.case.id,
+            code_sample="\n".join(step.curl for step in steps),
+            failure=failure,
+            steps=steps,
         )
 
     def on_success(name: str, _case: Case) -> None:

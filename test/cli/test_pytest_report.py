@@ -1,3 +1,4 @@
+import json
 import re
 import time
 
@@ -380,6 +381,48 @@ def test_run_level_failures_are_left_out(ctx, cli, ensure_reachability_module, t
         hooks=ensure_reachability_module,
     )
     assert "def test_" not in path.read_text(encoding="utf-8")
+
+
+PEERS = [
+    {"name": "alice", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey alice"}]},
+    {"name": "bob", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey bob"}]},
+]
+
+
+@pytest.mark.parametrize(
+    ("phases", "comments", "statuses"),
+    [
+        (
+            "fuzzing",
+            [
+                "# Needs the `Order` that `POST /api/orders` returned to `alice`",
+                "# as alice (owner)",
+                "# as bob (peer)",
+            ],
+            ["200", "200"],
+        ),
+        ("stateful", ["# as alice (owner)", "# as alice (owner)", "# as bob (peer)"], ["201", "200", "200"]),
+    ],
+)
+def test_object_level_authorization_replays_each_identity(ctx, cli, tmp_path, pytester, phases, comments, statuses):
+    api = ctx.openapi.apps.wfc_owned_orders("vulnerable")
+    auth = tmp_path / "auth.json"
+    auth.write_text(json.dumps({"auth": PEERS}))
+    path = tmp_path / "test_regressions.py"
+    cli.run(
+        api.schema_url,
+        f"--report-pytest-path={path}",
+        "--max-examples=10",
+        f"--phases={phases}",
+        "--checks=object_level_authorization",
+        config={"auth": {"wfc": {"path": str(auth), "peers": ["alice", "bob"]}}},
+    )
+
+    content = path.read_text(encoding="utf-8")
+    assert re.findall(r"^    (#.*)$", content, flags=re.MULTILINE) == comments
+    assert re.findall(r"assert response.status_code == (\d+)", content) == statuses
+    pytester.makepyfile(test_regressions=content)
+    pytester.runpytest().assert_outcomes(passed=1)
 
 
 def test_fuzz_failure_becomes_passing_test(ctx, cli, tmp_path, pytester):
