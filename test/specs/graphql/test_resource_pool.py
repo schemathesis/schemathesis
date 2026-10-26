@@ -40,7 +40,7 @@ def rng():
 
 @pytest.fixture
 def pool(gql_schema):
-    return GraphQLResourcePool(client_schema=gql_schema)
+    return GraphQLResourcePool(client_schema=gql_schema, index=SchemaIndex(gql_schema))
 
 
 def _parse(query: str) -> graphql.OperationDefinitionNode:
@@ -52,7 +52,7 @@ def _parse(query: str) -> graphql.OperationDefinitionNode:
 
 def _schema_and_pool(sdl, **kwargs):
     schema = graphql.build_schema(sdl)
-    return schema, GraphQLResourcePool(client_schema=schema, **kwargs)
+    return schema, GraphQLResourcePool(client_schema=schema, index=SchemaIndex(schema), **kwargs)
 
 
 def _capture_book(pool, book_id="captured-id"):
@@ -105,7 +105,7 @@ _CREATED_BOOK = json.dumps({"data": {"addBook": {"id": "b-1", "__typename": "Boo
 def test_record_response_ignores_unusable_payloads(ctx, response_factory, rng, query, content):
     schema = ctx.graphql.load_sdl(_RECORD_SDL)
     operation = schema["Mutation"]["addBook"]
-    pool = GraphQLResourcePool(client_schema=schema.client_schema)
+    pool = GraphQLResourcePool(client_schema=schema.client_schema, index=schema.analysis.schema_index)
     response = Response.from_requests(response_factory.requests(content=content), True)
     pool.record_response(operation=operation, response=response, case=operation.Case(body=query))
     assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
@@ -114,7 +114,7 @@ def test_record_response_ignores_unusable_payloads(ctx, response_factory, rng, q
 def test_record_response_skips_typename_selection(ctx, response_factory, rng):
     schema = ctx.graphql.load_sdl(_RECORD_SDL)
     operation = schema["Mutation"]["addBook"]
-    pool = GraphQLResourcePool(client_schema=schema.client_schema)
+    pool = GraphQLResourcePool(client_schema=schema.client_schema, index=schema.analysis.schema_index)
     response = Response.from_requests(response_factory.requests(content=_CREATED_BOOK), True)
     pool.record_response(
         operation=operation,
@@ -139,7 +139,7 @@ def test_capture_uses_real_field_name_for_aliased_selections(pool, rng):
 
 
 def test_per_key_cap_evicts_oldest(gql_schema, rng):
-    pool = GraphQLResourcePool(client_schema=gql_schema, max_per_key=3)
+    pool = GraphQLResourcePool(client_schema=gql_schema, index=SchemaIndex(gql_schema), max_per_key=3)
     operation = _parse("query { authors { id } }")
     for chunk in [["1", "2"], ["3", "4"], ["5"]]:
         pool.capture(operation_node=operation, response_data={"authors": [{"id": v} for v in chunk]})
@@ -508,7 +508,7 @@ def test_iter_operation_pool_values_skips_nodes_unknown_to_the_schema():
     operation = _parse(
         'query { __typename book(id: "abc", extra: "keep") books(filter: {id: "def", unknown: "x"}) { id } }'
     )
-    assert list(iter_operation_pool_values(operation, schema)) == [
+    assert list(iter_operation_pool_values(operation, schema, SchemaIndex(schema))) == [
         (Handle("Book", "id"), "abc"),
         (Handle("Book", "id"), "def"),
     ]
@@ -667,7 +667,7 @@ type Subscription { event(id: ID!): String! }
 def test_iter_operation_pool_values(sdl, query, expected):
     schema = graphql.build_schema(sdl)
     operation = _parse(query)
-    assert list(iter_operation_pool_values(operation, schema)) == expected
+    assert list(iter_operation_pool_values(operation, schema, SchemaIndex(schema))) == expected
 
 
 def test_capture_and_draw_non_id_handle(rng):
@@ -676,7 +676,7 @@ def test_capture_and_draw_non_id_handle(rng):
         " type Query { projects: [Project!]! }"
         " type Mutation { moveIssue(projectPath: String!, title: String!): Boolean }"
     )
-    pool = GraphQLResourcePool(client_schema=schema, handles={Handle("Project", "fullPath")})
+    pool = GraphQLResourcePool(client_schema=schema, index=SchemaIndex(schema), handles={Handle("Project", "fullPath")})
     pool.capture(
         operation_node=_parse("query { projects { id fullPath } }"),
         response_data={"projects": [{"id": "1", "fullPath": "acme/web"}]},
@@ -692,7 +692,7 @@ def test_pool_substitutes_non_id_argument(rng):
         " type Query { projects: [Project!]! }"
         " type Mutation { moveIssue(projectPath: String!, title: String!): Boolean }"
     )
-    pool = GraphQLResourcePool(client_schema=schema, handles={Handle("Project", "fullPath")})
+    pool = GraphQLResourcePool(client_schema=schema, index=SchemaIndex(schema), handles={Handle("Project", "fullPath")})
     pool.capture(
         operation_node=_parse("query { projects { id fullPath } }"),
         response_data={"projects": [{"id": "1", "fullPath": "acme/web"}]},
@@ -710,7 +710,7 @@ _POOL_MODE_SDL = (
 
 
 def _pool_with_captured_book(schema):
-    pool = GraphQLResourcePool(client_schema=schema.client_schema)
+    pool = GraphQLResourcePool(client_schema=schema.client_schema, index=schema.analysis.schema_index)
     pool.capture(
         operation_node=_parse("query { book { id author { id } } }"),
         response_data={"book": {"id": "captured-book", "author": {"id": "captured-author"}}},
@@ -742,3 +742,34 @@ def test_positive_case_uses_pool_values(ctx):
     bodies = [case.body for case in generate_many(strategy, 10)]
 
     assert any('id: "captured-book"' in body and 'authorId: "captured-author"' in body for body in bodies)
+
+
+_NOTE_DELETE_SDL = """
+type Note {{ id: ID! title: String }}
+type DeleteNote {{ id: ID! ok: Boolean }}
+type Query {{ note(id: ID!): Note }}
+type Mutation {{ createNote(title: String): Note deleteNote(id: ID!): {} }}
+"""
+
+
+@pytest.mark.parametrize(
+    ("result_type", "selection"),
+    [("DeleteNote", " { ok }"), ("Boolean", "")],
+    ids=["envelope", "boolean"],
+)
+def test_successful_delete_evicts_id_before_its_response_is_recorded(
+    ctx, response_factory, rng, result_type, selection
+):
+    schema = ctx.graphql.load_sdl(_NOTE_DELETE_SDL.format(result_type))
+    pool = GraphQLResourcePool(client_schema=schema.client_schema, index=schema.analysis.schema_index)
+    create = schema["Mutation"]["createNote"]
+    pool.record_response(
+        operation=create,
+        response=response_factory.core(content=b'{"data": {"createNote": {"id": "note-1"}}}'),
+        case=create.Case(body='mutation { createNote(title: "x") { id } }'),
+    )
+    delete = schema["Mutation"]["deleteNote"]
+    pool.record_successful_delete(
+        operation=delete, case=delete.Case(body=f'mutation {{ deleteNote(id: "note-1"){selection} }}')
+    )
+    assert pool.draw(handle=Handle("Note", "id"), random=rng) is None

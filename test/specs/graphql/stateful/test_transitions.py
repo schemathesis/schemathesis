@@ -72,6 +72,44 @@ _QUALIFIED_CLEANUP = """
     }
 """
 
+_DELETE_PAYLOAD_WITH_RELATED_RECORD = """
+    type Post { id: ID! }
+    type Comment { id: ID! }
+    type User { id: ID! }
+    type DeleteCommentPayload { deletedCommentId: ID, post: Post }
+    type RemoveCommentPayload { ok: Boolean, viewer: User }
+    type Query { _: Boolean }
+    type Mutation {
+        addPost(title: String!): Post!
+        addComment(text: String!): Comment!
+        addUser(name: String!): User!
+        deleteComment(id: ID!): DeleteCommentPayload
+        removeComment(id: ID!): RemoveCommentPayload
+    }
+"""
+
+_MULTI_WORD_ENVELOPE = """
+    type Comment { id: ID! }
+    type BlogComment { id: ID! }
+    type DeleteBlogComment { id: ID! ok: Boolean }
+    type Query { _: Boolean }
+    type Mutation {
+        addComment(text: String!): Comment!
+        addBlogComment(text: String!): BlogComment!
+        deleteBlogComment(id: ID!): DeleteBlogComment
+    }
+"""
+
+_UPDATE_ENVELOPE = """
+    type Note { id: ID! title: String }
+    type UpdateNote { id: ID! ok: Boolean }
+    type Query { note(id: ID!): Note }
+    type Mutation {
+        createNote(title: String): Note
+        updateNote(id: ID!, title: String): UpdateNote
+    }
+"""
+
 _NO_PRODUCER = """
     type Book { id: ID! }
     type Query { book(id: ID!): Book }
@@ -102,6 +140,15 @@ _NO_PRODUCER = """
             ],
         ),
         (_QUALIFIED_CLEANUP, [("Mutation.addSession", "Mutation.deleteUserSession")]),
+        (
+            _DELETE_PAYLOAD_WITH_RELATED_RECORD,
+            [("Mutation.addComment", "Mutation.deleteComment"), ("Mutation.addComment", "Mutation.removeComment")],
+        ),
+        (_MULTI_WORD_ENVELOPE, [("Mutation.addBlogComment", "Mutation.deleteBlogComment")]),
+        (
+            _UPDATE_ENVELOPE,
+            [("Mutation.createNote", "Query.note"), ("Mutation.createNote", "Mutation.updateNote")],
+        ),
         (_NO_PRODUCER, []),
     ],
     ids=[
@@ -112,6 +159,9 @@ _NO_PRODUCER = """
         "verb-prefixed-resource-unaffected",
         "multi-word-resource-name",
         "qualified-cleanup-falls-back-to-head-noun",
+        "delete-payload-with-related-record",
+        "multi-word-envelope",
+        "update-envelope-binds-to-resource",
         "no-producer-no-edges",
     ],
 )

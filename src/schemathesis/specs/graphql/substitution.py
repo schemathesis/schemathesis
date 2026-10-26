@@ -437,15 +437,45 @@ def argument_owner(
     field_name: str, field_def: graphql.GraphQLField, *, is_mutation: bool, index: SchemaIndex | None
 ) -> str | None:
     """Name the object type that a root field's bare identifier arguments refer to."""
-    record_type, _ = resource_type(_unwrap(field_def.type))
+    deleted = _deleted_entities(field_name) if is_mutation else ()
+    owner = _record_owner(_unwrap(field_def.type), deleted, index)
+    return _resource_named_by(owner, index)
+
+
+def _deleted_entities(field_name: str) -> tuple[str, ...]:
+    if classify_operation(field_name=field_name, root_type=RootType.MUTATION) != OperationRole.CLEANUP:
+        return ()
+    return entity_candidates(field_name, prefixes=CLEANUP_PREFIXES)
+
+
+def _record_owner(
+    return_type: graphql.GraphQLNamedType, deleted: tuple[str, ...], index: SchemaIndex | None
+) -> str | None:
+    record_type, record_path = resource_type(return_type)
+    if record_path and deleted and record_type.name not in deleted:
+        # A delete payload's related record (`deleteComment { post }`) is not the record being deleted.
+        record_type = return_type
     if isinstance(record_type, graphql.GraphQLObjectType) and "id" in record_type.fields:
         return record_type.name
     # Cleanup mutations typically return `Boolean` or a payload without the record (`deleteBook` -> `Book`).
-    if is_mutation and classify_operation(field_name=field_name, root_type=RootType.MUTATION) == OperationRole.CLEANUP:
-        for entity in entity_candidates(field_name, prefixes=CLEANUP_PREFIXES):
-            if index is None or index.has_object_type(entity):
-                return entity
+    known = _first_known_entity(deleted, index)
+    if known is not None:
+        return known
     return record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
+
+
+def _first_known_entity(entities: tuple[str, ...], index: SchemaIndex | None) -> str | None:
+    for entity in entities:
+        if index is None or index.has_object_type(entity):
+            return entity
+    return None
+
+
+def _resource_named_by(owner: str | None, index: SchemaIndex | None) -> str | None:
+    # A mutation result envelope stands for the resource it names (`DeleteNote` -> `Note`).
+    if owner is None or index is None:
+        return owner
+    return index.envelope_resource(owner) or owner
 
 
 def candidate_handle(
@@ -465,8 +495,7 @@ def candidate_handle(
         if stripped is not None:
             return Handle(stripped[:1].upper() + stripped[1:], "id")
         if argument_name in ("id", "ids") and enclosing_field_type is not None:
-            resource = index.envelope_resource(enclosing_field_type) if index is not None else None
-            return Handle(resource or enclosing_field_type, "id")
+            return Handle(enclosing_field_type, "id")
     if index is None or scalar_name not in HANDLE_SCALARS:
         return None
     if enclosing_field_type is not None and argument_name.lower() in BARE_IDENTIFIER_NAMES:
@@ -533,18 +562,20 @@ def _field_rank(field: str, cue: str) -> int | None:
 def iter_operation_pool_values(
     operation_node: graphql.OperationDefinitionNode,
     client_schema: graphql.GraphQLSchema,
+    index: SchemaIndex,
 ) -> Iterator[tuple[Handle, str]]:
     """Yield `(handle, value)` tuples for id-typed scalar literals in an operation's arguments."""
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return
     is_mutation = operation_node.operation == graphql.OperationType.MUTATION
-    yield from _iter_walk(operation_node.selection_set, root, is_mutation=is_mutation)
+    yield from _iter_walk(operation_node.selection_set, root, index, is_mutation=is_mutation)
 
 
 def _iter_walk(
     selection_set: graphql.SelectionSetNode | None,
     parent_type: graphql.GraphQLObjectType,
+    index: SchemaIndex,
     *,
     is_mutation: bool = False,
 ) -> Iterator[tuple[Handle, str]]:
@@ -557,14 +588,14 @@ def _iter_walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation, index=None)
+        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation, index=index)
         for argument in selection.arguments or ():
             argument_definition = field_def.args.get(argument.name.value)
             if argument_definition is None:
                 continue
             yield from _iter_value(argument.value, argument_definition.type, argument.name.value, enclosing_field_type)
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            yield from _iter_walk(selection.selection_set, unwrapped_return)
+            yield from _iter_walk(selection.selection_set, unwrapped_return, index)
 
 
 def _iter_value(
