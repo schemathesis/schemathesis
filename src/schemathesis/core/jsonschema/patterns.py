@@ -253,6 +253,8 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
     out: list[str] = []
     i = 0
     in_class = False
+    # Length of `out` once the atom closing a range around a class escape is written; a hyphen right after it is literal.
+    range_end = -1
     n = len(pattern)
     while i < n:
         ch = pattern[i]
@@ -299,9 +301,10 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
                 out.append(f"\\u{code:04x}" if code <= 0xFFFF else f"\\U{code:08x}")
                 i = end + 1
                 continue
-            # Other escapes (`\[`, `\]`, `\\`, unknown `\p{Greek}`) pass through unchanged.
-            out.append(pattern[i : i + 2])
-            i += 2
+            # Other escapes (`\[`, `\]`, `\\`, unknown `\p{Greek}`) pass through unchanged, each as one atom.
+            width = 4 if next_ch == "x" else 6 if next_ch == "u" else 2
+            out.append(pattern[i : i + width])
+            i += width
             continue
         # These doubled characters are literals in ECMA classes, but Python warns that they may
         # become set operators. Escaping each member preserves the class while keeping compilation quiet.
@@ -330,8 +333,12 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
             in_class
             and ch == "-"
             and pattern[i + 1 : i + 2] != "]"
-            and ((out and out[-1] in _CLASS_ESCAPES) or pattern[i + 1 : i + 3] in _CLASS_ESCAPES)
+            and (
+                (out and out[-1] in _CLASS_ESCAPES) or len(out) == range_end or pattern[i + 1 : i + 3] in _CLASS_ESCAPES
+            )
         ):
+            if len(out) != range_end:
+                range_end = len(out) + 2
             out.append(r"\-")
             i += 1
             continue
