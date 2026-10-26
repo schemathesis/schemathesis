@@ -48,4 +48,4 @@ jobs:
 
       - run: uvx --from=".[tests]" pytest test/config/test_doc_examples.py -q
 
-      - run: uvx --from=".[docs]" mkdocs build --strict
+      - run: uvx --from zensical --with ".[docs]" zensical build --strict

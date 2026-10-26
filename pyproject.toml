@@ -74,7 +74,7 @@ allure = ["allure-python-commons>=2.13.0"]
 # coverage 7.13.3+ can drop modules other threads are importing: coveragepy#2247
 cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3,<7.13.3"]
 bench = ["pytest-asyncio>=1.0,<2.0", "pytest-codspeed==5.0.3", "pytest-timeout>=2.3,<3.0"]
-docs = ["mkdocs-material", "mkdocstrings[python]", "pymdown-extensions<12.2"]
+docs = ["zensical>=0.0.73,<0.1", "mkdocstrings[python]", "pymdown-extensions<12.2"]
 profiling = ["pyinstrument>=5.1"]
 scripts = ["tracecov>=0.21", "seaborn>=0.13"]
 dev = ["schemathesis[tests,cov,bench,docs,scripts]"]

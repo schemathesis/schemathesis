@@ -8,6 +8,9 @@ build:
     post_install:
       - pip install uv
       - UV_PROJECT_ENVIRONMENT=$READTHEDOCS_VIRTUALENV_PATH uv sync --extra docs --link-mode=copy
-
-mkdocs:
-  configuration: mkdocs.yml
+    # Read the Docs has no native Zensical support, so the HTML build is run by hand
+    build:
+      html:
+        - $READTHEDOCS_VIRTUALENV_PATH/bin/zensical build
+        - mkdir -p $READTHEDOCS_OUTPUT/html/
+        - cp -r site/. $READTHEDOCS_OUTPUT/html/
