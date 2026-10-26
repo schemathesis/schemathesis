@@ -26,6 +26,7 @@ def clear_all() -> None:
     patterns._pattern_lengths.cache_clear()
     patterns.pattern_length_is_unreachable.cache_clear()
     patterns.pin_pattern_length.cache_clear()
+    patterns.character_rules.cache_clear()
     resolver._resolve_reference_uri_with_document.cache_clear()
     bundler._UNBUNDLED_COMPONENTS_CACHE.clear()
     jsonschema.matches_pattern.cache_clear()

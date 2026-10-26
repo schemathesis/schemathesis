@@ -66,6 +66,8 @@ from schemathesis.core import (
 from schemathesis.core.cache import MISSING
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.patterns import (
+    CharacterRules,
+    character_rules,
     compile_ecma_pattern,
     matches_every_string,
     pattern_length_bounds,
@@ -405,6 +407,28 @@ def _keeps_length_within(pattern: str, min_length: int | None, max_length: int |
     return max_length is None or (pattern_max is not None and pattern_max <= max_length)
 
 
+def _character_rules_strategy(rules: CharacterRules) -> st.SearchStrategy[str]:
+    # Lookaheads only filter what the rest of the pattern draws, and a random string rarely holds a
+    # character of every required class; placing one of each first leaves nothing to chance.
+    forbidden = [re.compile(text, re.ASCII) for text in rules.forbidden]
+    body = re.compile(rules.body, re.ASCII)
+
+    def is_allowed(char: str) -> bool:
+        return body.fullmatch(char) is not None and not any(pattern.fullmatch(char) for pattern in forbidden)
+
+    def characters(text: str) -> st.SearchStrategy[str]:
+        return st.from_regex(re.compile(text, re.ASCII), fullmatch=True).filter(is_allowed)
+
+    required = st.tuples(*(characters(text) for text in rules.required))
+    count = len(rules.required)
+    rest = st.lists(
+        characters(rules.body),
+        min_size=max(rules.min_size - count, 0),
+        max_size=None if rules.max_size is None else max(rules.max_size - count, 0),
+    )
+    return st.tuples(required, rest).flatmap(lambda parts: st.permutations([*parts[0], *parts[1]])).map("".join)
+
+
 def _pattern_strategy(
     session: GenerationSession, pattern: str, min_length: int | None, max_length: int | None, fmt: str | None
 ) -> st.SearchStrategy | None:
@@ -419,7 +443,12 @@ def _pattern_strategy(
     if compiled is None:
         session.pattern_strategies[key] = None
         return None
-    strategy = st.from_regex(compiled, fullmatch=True).filter(matches_pattern(pattern))
+    rules = character_rules(compiled.pattern)
+    if rules is None:
+        strategy = st.from_regex(compiled, fullmatch=True)
+    else:
+        strategy = _character_rules_strategy(rules)
+    strategy = strategy.filter(matches_pattern(pattern))
     if min_length is not None and max_length is not None:
         strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
     elif min_length is not None:

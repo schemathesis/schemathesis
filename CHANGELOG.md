@@ -15,6 +15,10 @@
 - Schema examples, multipart filenames and query serialization lost for `$ref` alias components or `$ref` siblings.
 - Serialization error for XML multipart parts with arrays of `$ref` items.
 
+### :wrench: Changed
+
+- Coverage phase covers boundary lengths of password-style patterns like `^(?=.*\d)[a-z\d]*$`.
+
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 
 ### :rocket: Added
