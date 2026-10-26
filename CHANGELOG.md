@@ -25,6 +25,10 @@
 - Captured values dropped from request bodies missing required fields in the examples phase with `fill-missing`.
 - Object-level authorization failures replaying only the peer's request in `--report pytest` and cURL output.
 
+### :wrench: Changed
+
+- Coverage phase covers boundary lengths of password-style patterns like `^(?=.*\d)[a-z\d]*$`.
+
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 
 ### :rocket: Added

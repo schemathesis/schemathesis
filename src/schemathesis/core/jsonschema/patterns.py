@@ -5,6 +5,7 @@ import string
 import sys
 import warnings
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Literal, TypeAlias, TypeGuard
 
@@ -1891,3 +1892,98 @@ def pin_pattern_length(pattern: str, min_length: int | None, max_length: int | N
         return updated
     except (re.error, InternalError):
         return pattern
+
+
+_CATEGORY_TEXT = {
+    sre.CATEGORY_DIGIT: r"\d",
+    sre.CATEGORY_NOT_DIGIT: r"\D",
+    sre.CATEGORY_SPACE: r"\s",
+    sre.CATEGORY_NOT_SPACE: r"\S",
+    sre.CATEGORY_WORD: r"\w",
+    sre.CATEGORY_NOT_WORD: r"\W",
+}
+
+
+def _single_char_text(node: _Node) -> str | None:
+    """Regex text for a node that matches exactly one character, or `None` for any other node."""
+    op, value = node
+    if op == LITERAL:
+        return re.escape(chr(value))
+    if op == NOT_LITERAL:
+        return f"[^{re.escape(chr(value))}]"
+    if op != IN:
+        return None
+    parts = []
+    for item_op, item in value:
+        if item_op == sre.NEGATE:
+            parts.append("^")
+        elif item_op == LITERAL:
+            parts.append(re.escape(chr(item)))
+        elif item_op == sre.RANGE:
+            parts.append(f"{re.escape(chr(item[0]))}-{re.escape(chr(item[1]))}")
+        else:
+            # ASCII patterns without flags hold only these four item kinds inside a class.
+            parts.append(_CATEGORY_TEXT[item])
+    return f"[{''.join(parts)}]"
+
+
+def _anywhere_char_text(assertion: _Node) -> str | None:
+    """The character class of a `(?=.*X)` / `(?!.*X)` body, or `None` for any other lookaround."""
+    direction, subpattern = assertion
+    nodes = list(subpattern)
+    if direction != 1 or len(nodes) != 2:
+        return None
+    (repeat_op, repeat), char = nodes
+    if repeat_op not in (sre.MIN_REPEAT, sre.MAX_REPEAT) or repeat[:2] != (0, MAXREPEAT):
+        return None
+    if list(repeat[2]) != [(sre.ANY, None)]:
+        return None
+    return _single_char_text(char)
+
+
+@dataclass(frozen=True)
+class CharacterRules:
+    """A pattern of the `^(?=.*[a-z])(?!.*[@])[a-zA-Z0-9]{m,n}$` shape, split into the characters it asks for."""
+
+    # Classes each match must hold at least one character of.
+    required: tuple[str, ...]
+    # Classes no character of a match may belong to.
+    forbidden: tuple[str, ...]
+    # The class every character comes from.
+    body: str
+    min_size: int
+    max_size: int | None
+
+
+@lru_cache(maxsize=256)
+def character_rules(pattern: str) -> CharacterRules | None:
+    """Split `pattern` into per-character rules, or `None` when it is not one class repeated behind lookaheads."""
+    nodes = _parse_regex(pattern) or []
+    if nodes and nodes[0] in ((sre.AT, sre.AT_BEGINNING), (sre.AT, sre.AT_BEGINNING_STRING)):
+        nodes = nodes[1:]
+    if nodes and nodes[-1] == (sre.AT, sre.AT_END_STRING):
+        nodes = nodes[:-1]
+    if len(nodes) < 2:
+        return None
+    *lookarounds, last = nodes
+    required: list[str] = []
+    forbidden: list[str] = []
+    for op, assertion in lookarounds:
+        text = _anywhere_char_text(assertion) if op in (sre.ASSERT, sre.ASSERT_NOT) else None
+        if text is None:
+            return None
+        (required if op == sre.ASSERT else forbidden).append(text)
+    op, value = last
+    if op not in (sre.MIN_REPEAT, sre.MAX_REPEAT) or len(value[2]) != 1:
+        return None
+    min_size, max_size, (char,) = value
+    body = _single_char_text(char)
+    if body is None:
+        return None
+    return CharacterRules(
+        required=tuple(required),
+        forbidden=tuple(forbidden),
+        body=body,
+        min_size=min_size,
+        max_size=None if max_size == MAXREPEAT else max_size,
+    )

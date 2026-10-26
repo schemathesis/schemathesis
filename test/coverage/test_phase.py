@@ -901,6 +901,59 @@ def test_positive_arrays_reach_max_items_for_patterned_strings_with_min_length(c
 
 
 @pytest.mark.parametrize(
+    "pattern",
+    [
+        r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?!.*[@'\\\"/])[a-zA-Z0-9\S]*$",
+        r"^(?=.*!)(?=.*\?)(?=.*\d)[a-z\d!?]*$",
+        r"^(?=.*[A-Z])(?=.*\d)(?=.*_)[^@]+$",
+        r"^(?=.*[^a-z\d])(?=.*[A-Z])(?=.*\d)[^@#]*$",
+    ],
+    ids=["classes", "literals", "negated-character", "negated-classes"],
+)
+def test_negative_strings_just_outside_length_bounds_match_lookahead_patterns(ctx, pattern):
+    # Password rules: random strings of the boundary length almost never hold every required character class.
+    body = {"type": "string", "pattern": pattern, "minLength": 8, "maxLength": 32}
+
+    lengths = {
+        len(case.body)
+        for case in collect_coverage_cases(ctx, body)
+        if isinstance(case.body, str) and re.search(pattern, case.body)
+    }
+
+    assert {7, 33} <= lengths
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"^(?=.*\d).*$",
+        r"^(?=\d)[a-z\d]*$",
+        r"^(?=.+\d)[a-z\d]*$",
+        r"^(?=[a-z]*\d)[a-z\d]*$",
+        r"^(?=.*\d)[a-z\d]*[a-z]$",
+        r"^(?=.*\d)(?:[a-z\d][a-z\d])+$",
+        r"^[a-z\d]*$",
+    ],
+    ids=[
+        "any-character",
+        "anchored-lookahead",
+        "non-empty-prefix",
+        "class-prefix",
+        "trailing-class",
+        "group",
+        "no-lookahead",
+    ],
+)
+def test_positive_strings_match_lookahead_patterns_of_other_shapes(ctx, pattern):
+    body = {"type": "string", "pattern": pattern, "minLength": 8, "maxLength": 32}
+
+    lengths = {len(case.body) for case in collect_coverage_cases(ctx, body, positive=True)}
+
+    assert lengths
+    assert all(8 <= length <= 32 for length in lengths)
+
+
+@pytest.mark.parametrize(
     "body",
     [
         {
