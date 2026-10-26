@@ -1723,7 +1723,8 @@ class OpenApiBody(OpenApiComponent):
             if isinstance(property_schema, dict):
                 property_schema = resolve_with_root_bundle(property_schema, schema)
                 items = property_schema.get("items")
-                if isinstance(items, dict):
+                # Empty `items` stay empty, so an unconstrained array does not look like one with an item schema.
+                if isinstance(items, dict) and items:
                     property_schema = {**property_schema, "items": resolve_with_root_bundle(items, schema)}
             resolved[name] = property_schema
         return resolved
