@@ -2,6 +2,13 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.5...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Lower memory use for patterns like `^.{0,102400}$`.
+- Faster positive coverage phase on large nested request bodies.
+- Faster coverage phase startup in negative mode for path parameters declared with `content`.
+- Lower coverage phase memory on large `$ref`-heavy schemas.
+
 ### :bug: Fixed
 
 - WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.

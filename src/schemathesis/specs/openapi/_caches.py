@@ -5,7 +5,7 @@ from hypothesis.stateful import RuleBasedStateMachine, RuleStrategy
 
 from schemathesis.core import jsonschema
 from schemathesis.core.jsonschema import bundler, patterns, resolver
-from schemathesis.generation import hypothesis
+from schemathesis.generation import _cache, hypothesis
 from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION
 from schemathesis.generation.jsonschema import context, strategy
 from schemathesis.specs.openapi import negative
@@ -36,6 +36,7 @@ def clear_all() -> None:
     hypothesis.custom_formats_cache.clear()
     hypothesis.canonical_strategy_cache.clear()
     hypothesis.canonical_form_cache.clear()
+    _cache.bundle_text_cache.clear()
     hypothesis._first_param_cache.clear()
     context._sampled.cache_clear()
     strategy._covers.cache_clear()
