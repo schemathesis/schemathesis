@@ -662,16 +662,13 @@ def _generate_multipart_body_from_custom_strategies(
 
 def _first_positive_body(run: CoverageRun, body: OpenApiBody) -> object:
     """The first body the positive coverage walk yields, or None when the schema admits none."""
-    schema = as_object_schema(body.unoptimized_schema)
-    context = _coverage_context(
+    value = _first_positive_value(
         run,
-        schema,
+        as_object_schema(body.unoptimized_schema),
         ParameterLocation.BODY,
-        [GenerationMode.POSITIVE],
         is_required=body.is_required,
         media_type=media_types.parse(body.media_type),
     )
-    value = next(cover_schema_iter(context, schema), None)
     return None if value is None else value.value
 
 
@@ -793,15 +790,19 @@ def _json_media_type(parameter: OpenApiParameter) -> tuple[str, str] | None:
     return None
 
 
-def _positive_fallback(run: CoverageRun, parameter: OpenApiParameter, schema: dict[str, Any]) -> GeneratedValue | None:
-    """The value a positive run would seed for this parameter, if any."""
-    generator = cover_schema_iter(
-        _coverage_context(
-            run, schema, parameter.location, [GenerationMode.POSITIVE], is_required=parameter.is_required
-        ),
-        schema,
+def _first_positive_value(
+    run: CoverageRun,
+    schema: dict[str, Any],
+    location: ParameterLocation,
+    *,
+    is_required: bool,
+    media_type: tuple[str, str] | None = None,
+) -> GeneratedValue | None:
+    """The first value the positive coverage walk yields, or None when the schema admits none."""
+    context = _coverage_context(
+        run, schema, location, [GenerationMode.POSITIVE], is_required=is_required, media_type=media_type
     )
-    return next(generator, None)
+    return next(cover_schema_iter(context, schema), None)
 
 
 def _reject_malformed_definition(
@@ -917,7 +918,7 @@ def _seed_parameters(run: CoverageRun) -> None:
                 schema.setdefault("minLength", 1)
             # Dropping a required parameter would leave it out of every case built off this template, so
             # those cases would fail on the omission instead of the mutation they target.
-            fallback = _positive_fallback(run, parameter, schema)
+            fallback = _first_positive_value(run, schema, parameter.location, is_required=parameter.is_required)
             if fallback is None and location == ParameterLocation.PATH:
                 fallback = GeneratedValue(
                     "value",
@@ -1095,19 +1096,10 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                 # invalidate the one thing being tested.  If the first body value is
                 # a negative mutation (NEGATIVE-only mode), generate a positive value
                 # separately and prefer it for the template.
-                pos_gen = cover_schema_iter(
-                    _coverage_context(
-                        run,
-                        schema,
-                        ParameterLocation.BODY,
-                        [GenerationMode.POSITIVE],
-                        is_required=body.is_required,
-                        media_type=media_type,
-                    ),
-                    schema,
+                first_positive = _first_positive_value(
+                    run, schema, ParameterLocation.BODY, is_required=body.is_required, media_type=media_type
                 )
-                first_positive = next(pos_gen, NOT_SET)
-                if isinstance(first_positive, NotSet):
+                if first_positive is None:
                     template.body_is_fallback_negative = True
                     template.set_body(value, body.media_type)
                 else:
