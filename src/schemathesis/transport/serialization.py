@@ -44,6 +44,8 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from schemathesis.generation.case import Case
 
 
@@ -69,17 +71,33 @@ class Binary(str):
         return f"Binary(data={self.data!r})"
 
 
+# Leaf types that can never hold a binary payload; matched by exact type so subclasses take the full checks.
+_SCALAR_TYPES = frozenset({str, int, float, bool, type(None)})
+
+
 def contains_binary(value: object) -> bool:
     """Check if the value contains any binary payload jsonschema-rs cannot validate."""
+    if type(value) in _SCALAR_TYPES:
+        return False
     stack = [value]
     while stack:
         item = stack.pop()
-        if isinstance(item, (Binary, bytes)):
-            return True
+        children: Iterable[object]
         if isinstance(item, dict):
-            stack.extend(item.values())
+            children = item.values()
         elif isinstance(item, list):
-            stack.extend(item)
+            children = item
+        else:
+            if isinstance(item, (Binary, bytes)):
+                return True
+            continue
+        for child in children:
+            if type(child) in _SCALAR_TYPES:
+                continue
+            if isinstance(child, (dict, list)):
+                stack.append(child)
+            elif isinstance(child, (Binary, bytes)):
+                return True
     return False
 
 
