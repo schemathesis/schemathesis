@@ -27,16 +27,10 @@ from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE
 from schemathesis.specs.graphql._helpers import _unwrap, replace_node, replace_selections, resource_type
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex, bundle_name, deleted_bundle_name
-from schemathesis.specs.graphql.inference import (
-    CLEANUP_PREFIXES,
-    OperationRole,
-    RootType,
-    classify_operation,
-    extract_entity,
-)
+from schemathesis.specs.graphql.inference import OperationRole, RootType, classify_operation
 from schemathesis.specs.graphql.schemas import graphql_cases
 from schemathesis.specs.graphql.stateful._extract import iter_handle_values
-from schemathesis.specs.graphql.substitution import candidate_handle, substitute_bundle_values
+from schemathesis.specs.graphql.substitution import argument_owner, candidate_handle, substitute_bundle_values
 
 if TYPE_CHECKING:
     from random import Random
@@ -89,31 +83,17 @@ def iter_operation_summaries(
         unwrapped_return_name = return_object.name if isinstance(return_object, graphql.GraphQLObjectType) else None
         return_type_name: str | None = return_object.name if return_object.name in id_types else None
 
-        cleanup_entity: str | None = None
-        if role == OperationRole.CLEANUP:
-            cleanup_entity = extract_entity(field_name, prefixes=CLEANUP_PREFIXES)
-
+        owner = argument_owner(field_name, field_def, is_mutation=root_type == RootType.MUTATION)
         consumed: dict[str, Handle] = {}
         for argument_name, argument in field_def.args.items():
-            scalar_name = _unwrap(argument.type).name
             handle = candidate_handle(
-                scalar_name=scalar_name,
+                scalar_name=_unwrap(argument.type).name,
                 argument_name=argument_name,
-                enclosing_field_type=unwrapped_return_name,
+                enclosing_field_type=owner,
                 index=index,
             )
-            if handle is None or handle not in handles:
-                # Fallback: cleanup ops typically return Boolean, so the entity
-                # name has to come from the field name itself (`deleteBook` -> `Book`).
-                if (
-                    cleanup_entity is not None
-                    and scalar_name == "ID"
-                    and argument_name in ("id", "ids")
-                    and Handle(cleanup_entity, "id") in handles
-                ):
-                    consumed[argument_name] = Handle(cleanup_entity, "id")
-                continue
-            consumed[argument_name] = handle
+            if handle is not None and handle in handles:
+                consumed[argument_name] = handle
 
         yield _OperationSummary(
             label=operation.label,

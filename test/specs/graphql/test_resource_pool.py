@@ -260,6 +260,25 @@ def test_substitution_type_match(sdl, captured, should_substitute, rng):
             'query { author { books(bookId: "placeholder") } }',
             id="nested-object-selection",
         ),
+        pytest.param(
+            """
+    type Book { id: ID! }
+    type Query { book(id: ID!): Book }
+    type Mutation { addBook(title: String!): Book! deleteBook(id: ID!): Boolean }
+    """,
+            'mutation { deleteBook(id: "placeholder") }',
+            id="cleanup-returning-scalar",
+        ),
+        pytest.param(
+            """
+    type Book { id: ID! }
+    type DeleteBookPayload { deletedBookId: ID }
+    type Query { book(id: ID!): Book }
+    type Mutation { addBook(title: String!): Book! bookDelete(id: ID!): DeleteBookPayload }
+    """,
+            'mutation { bookDelete(id: "placeholder") { deletedBookId } }',
+            id="cleanup-returning-payload-without-record",
+        ),
     ],
 )
 def test_substitution_replaces(sdl, query, rng):
