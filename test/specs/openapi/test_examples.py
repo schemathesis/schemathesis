@@ -2057,6 +2057,60 @@ def test_schema_level_body_example_drawn_behind_ref(ctx, name):
     assert {"name": "marker"} in [case.body for case in cases]
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+@pytest.mark.parametrize(
+    "name", [{"type": "string"}, {"$ref": "#/components/schemas/Name"}], ids=["flat", "nested-ref"]
+)
+def test_schema_level_body_example_beside_root_ref_drawn(ctx, version, name):
+    operation = _json_body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/User", "example": {"name": "marker"}},
+        version=version,
+        components={"schemas": {"Name": {"type": "string"}, "User": {"type": "object", "properties": {"name": name}}}},
+    )
+
+    cases = examples.generate_many(operation.as_strategy(), 60)
+
+    assert {"name": "marker"} in [case.body for case in cases]
+
+
+def _alias_body_operation(ctx, version):
+    return _json_body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/User"},
+        version=version,
+        components={
+            "schemas": {
+                "Name": {"type": "string"},
+                "UserBase": {
+                    "type": "object",
+                    "properties": {"name": {"$ref": "#/components/schemas/Name"}},
+                    "example": {"name": "marker"},
+                },
+                "User": {"$ref": "#/components/schemas/UserBase"},
+            }
+        },
+    )
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_schema_level_body_example_drawn_behind_alias_ref(ctx, version):
+    operation = _alias_body_operation(ctx, version)
+
+    cases = examples.generate_many(operation.as_strategy(), 60)
+
+    assert {"name": "marker"} in [case.body for case in cases]
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_schema_level_body_example_behind_alias_ref_in_examples_phase(ctx, version):
+    operation = _alias_body_operation(ctx, version)
+
+    strategies = get_strategies_from_examples(operation)
+
+    assert [examples.generate_one(strategy).body for strategy in strategies] == [{"name": "marker"}]
+
+
 def test_schema_level_body_example_completed_at_nested_level(ctx):
     # The missing required field sits under a property the example does supply, so the merge has to go deep.
     operation = _json_body_operation(

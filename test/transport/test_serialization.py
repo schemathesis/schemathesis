@@ -1358,6 +1358,36 @@ def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field
     assert _multipart_content_type(serialized, field) == expected
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_multipart_binary_filename_behind_alias_body_ref(ctx, version):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"multipart/form-data": {"schema": {"$ref": "#/components/schemas/Upload"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+        components={
+            "schemas": {
+                "Meta": {"type": "string"},
+                "UploadBase": {
+                    "type": "object",
+                    "properties": {
+                        "file": {"type": "string", "format": "binary"},
+                        "meta": {"$ref": "#/components/schemas/Meta"},
+                    },
+                },
+                "Upload": {"$ref": "#/components/schemas/UploadBase"},
+            }
+        },
+    )
+    case = operation.Case(body={"file": b"abc"}, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [("file", ("file", b"abc"))]
+
+
 @pytest.mark.parametrize(
     ("items", "encoding", "tags", "expected"),
     [

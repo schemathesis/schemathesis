@@ -23,6 +23,7 @@ from schemathesis.core.jsonschema import (
     BundleError,
     Bundler,
     make_validator,
+    maybe_resolve_bundled,
     resolve_bundled_root,
     resolve_with_root_bundle,
     schema_with_bundle,
@@ -1411,13 +1412,16 @@ class OpenApiComponent(ABC):
         if example is not NOT_SET:
             yield example
         raw_schema = self.raw_schema
-        if isinstance(raw_schema, dict):
-            raw_schema = resolve_bundled_root(raw_schema)
-            schema_example = raw_schema.get(self.adapter.example_keyword, NOT_SET)
+        if not isinstance(raw_schema, dict):
+            return
+        target = maybe_resolve_bundled(raw_schema)
+        # Examples may sit beside a root `$ref` as well as on its target.
+        for node in (raw_schema,) if target is raw_schema else (raw_schema, target):
+            schema_example = node.get(self.adapter.example_keyword, NOT_SET)
             if schema_example is not NOT_SET:
                 yield schema_example
             # JSON Schema supports 'examples' as an array
-            schema_examples = raw_schema.get("examples")
+            schema_examples = node.get("examples")
             if isinstance(schema_examples, list):
                 yield from schema_examples
 

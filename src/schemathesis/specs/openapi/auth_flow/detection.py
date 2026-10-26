@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from schemathesis import auths
-from schemathesis.core.jsonschema import resolve_bundled_root
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.security import get_security_requirements
@@ -35,10 +34,9 @@ class _Body:
 def _credential_body(operation: APIOperation) -> _Body | None:
     # Multi-media-type bodies repeat the same schema; inspect the first one with properties.
     for body in operation.body:
-        schema = body.raw_schema
-        if not isinstance(schema, dict):
+        schema = body.resolved_schema
+        if schema is None:
             continue
-        schema = resolve_bundled_root(schema)
         if isinstance(schema.get("properties"), dict):
             names = frozenset(name for name in schema["properties"] if is_credential(name))
             return _Body(media_type=body.media_type, credentials=names)
