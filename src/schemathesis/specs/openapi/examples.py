@@ -106,8 +106,6 @@ def _combo_dedup_key(combo: Any) -> str:
 def _get_pool_combos(
     operation: APIOperation,
     extra_data_source: OpenApiExtraDataSource,
-    *,
-    complete_bodies: bool = True,
 ) -> list[dict[str, Any]]:
     """Return pool variants as parameter dicts, merging all locations into each slot."""
     per_location: list[list[dict[str, Any]]] = []
@@ -140,14 +138,11 @@ def _get_pool_combos(
             schema=body_schema,
         )
         if variants:
-            required_fields = set(body_schema.get("required", [])) if complete_bodies else set()
             # Overlays for array items carry single fields, never a complete array body.
-            complete_variants = [
-                v for v in variants if isinstance(v.overlay, dict) and all(f in v.overlay for f in required_fields)
-            ]
-            if complete_variants:
+            object_variants = [v for v in variants if isinstance(v.overlay, dict)]
+            if object_variants:
                 per_location.append(
-                    [{"body": variant.overlay, "media_type": body.media_type} for variant in complete_variants]
+                    [{"body": variant.overlay, "media_type": body.media_type} for variant in object_variants]
                 )
 
     if not per_location:
@@ -223,11 +218,9 @@ def get_strategies_from_examples(
     schema_combos = list(produce_combinations(schema_examples))
 
     extra_data_source = feedback.extra_data_source
-    # An example can supply the fields a captured body leaves out; the merged body is checked instead.
+    # An example or a drawn body supplies the fields a captured body leaves out; the merged body is checked.
     pool_combos = (
-        _get_pool_combos(operation, extra_data_source, complete_bodies=not schema_combos)
-        if isinstance(extra_data_source, OpenApiExtraDataSource)
-        else []
+        _get_pool_combos(operation, extra_data_source) if isinstance(extra_data_source, OpenApiExtraDataSource) else []
     )
 
     if schema_combos and pool_combos:

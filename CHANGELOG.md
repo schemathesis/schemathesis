@@ -15,6 +15,7 @@
 - GraphQL stateful testing linking multi-word deletes like `deleteBookCover` to the wrong resource.
 - Schema examples, multipart filenames and query serialization lost for `$ref` alias components or `$ref` siblings.
 - Serialization error for XML multipart parts with arrays of `$ref` items.
+- Captured values dropped from request bodies missing required fields in the examples phase with `fill-missing`.
 
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 
