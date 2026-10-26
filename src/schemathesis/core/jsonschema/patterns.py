@@ -245,6 +245,7 @@ def _serialize_range(low: int, high: int) -> str:
 
 
 _BRACE_HEX_DIGITS = re.compile(r"[0-9A-Fa-f]{1,6}\Z")
+_CLASS_ESCAPES = frozenset({r"\d", r"\D", r"\w", r"\W", r"\s", r"\S"})
 
 
 def _inline_unicode_in_classes(pattern: str) -> str | None:
@@ -324,6 +325,16 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
                 out.append(raw)
                 i = end + 2
                 continue
+        # ECMA reads a hyphen beside a class escape like `\w` as a literal, while Python refuses the range.
+        if (
+            in_class
+            and ch == "-"
+            and pattern[i + 1 : i + 2] != "]"
+            and ((out and out[-1] in _CLASS_ESCAPES) or pattern[i + 1 : i + 3] in _CLASS_ESCAPES)
+        ):
+            out.append(r"\-")
+            i += 1
+            continue
         if in_class and ch == "[":
             out.append(r"\[")
             i += 1
