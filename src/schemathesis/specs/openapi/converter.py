@@ -324,7 +324,12 @@ def _pin_discriminator_property(
     if not property_name:
         return
     explicit_mapping: dict[str, str] = discriminator.get("mapping") or {}
-    ref_to_value = {ref: value for value, ref in explicit_mapping.items()}
+    # Several discriminator values may map to the same schema; an empty value carries no tag
+    ref_to_values: dict[str, list[str]] = {}
+    for value, target in explicit_mapping.items():
+        values = ref_to_values.setdefault(target, [])
+        if value:
+            values.append(value)
 
     for keyword in ("anyOf", "oneOf"):
         items = schema.get(keyword)
@@ -347,10 +352,15 @@ def _pin_discriminator_property(
                     # A whole-file reference is named after its file: `cat.json` -> `cat`.
                     resolved_ref = get_implicit_discriminator_value(original_uri)
             allowed = _branch_tag_values(ref, property_name, bundle)
+            disc_values = ref_to_values.get(resolved_ref)
+            if disc_values is not None:
+                if disc_values:
+                    items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": disc_values}}}]}
+                continue
             # Without an explicit mapping, prefer the branch's own const/enum so the literal
             # tag (`"function"`) wins over the schema name (`FunctionTool`).
-            disc_value = ref_to_value.get(resolved_ref)
-            if disc_value is None and allowed is not None and len(allowed) == 1:
+            disc_value = None
+            if allowed is not None and len(allowed) == 1:
                 disc_value = next(iter(allowed))
             if disc_value is None:
                 # Fall back to schema name -- unless the target is itself polymorphic,

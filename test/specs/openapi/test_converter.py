@@ -756,6 +756,47 @@ def test_nested_object_required_array_not_duplicated():
         ),
         pytest.param(
             {
+                "oneOf": [
+                    {"$ref": "#/components/schemas/Comparison"},
+                    {"$ref": "#/components/schemas/In"},
+                ],
+                "discriminator": {
+                    "propertyName": "operator",
+                    "mapping": {
+                        "eq": "#/components/schemas/Comparison",
+                        "gte": "#/components/schemas/Comparison",
+                        "in": "#/components/schemas/In",
+                    },
+                },
+            },
+            {
+                "oneOf": [
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Comparison"},
+                            {"properties": {"operator": {"enum": ["eq", "gte"]}}},
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/In"},
+                            {"properties": {"operator": {"enum": ["in"]}}},
+                        ]
+                    },
+                ],
+                "discriminator": {
+                    "propertyName": "operator",
+                    "mapping": {
+                        "eq": "#/components/schemas/Comparison",
+                        "gte": "#/components/schemas/Comparison",
+                        "in": "#/components/schemas/In",
+                    },
+                },
+            },
+            id="many-to-one-mapping",
+        ),
+        pytest.param(
+            {
                 "oneOf": [{"$ref": "#/components/schemas/Cat"}],
                 "discriminator": {},
             },
