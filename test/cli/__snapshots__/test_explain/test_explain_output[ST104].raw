@@ -11,4 +11,4 @@ For a response with no body, such as `204`, remove `content` from it in the
 schema.
 
 `--exclude-checks content_type_conformance,response_schema_conformance` turns it
-off, along with ST105, ST106, ST109, ST110, ST111, ST114, ST115.
+off, along with ST105, ST106, ST109, ST110, ST111, ST114, ST115, ST116.

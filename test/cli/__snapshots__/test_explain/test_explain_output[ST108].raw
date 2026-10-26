@@ -14,4 +14,4 @@ structural ones:
   validate-formats = false
 
 `--exclude-checks response_schema_conformance,response_headers_conformance`
-turns it off, along with ST107, ST109, ST110, ST111, ST114, ST115.
+turns it off, along with ST107, ST109, ST110, ST111, ST114, ST115, ST116.

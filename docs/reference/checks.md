@@ -143,7 +143,7 @@ Header values are coerced into appropriate JSON Schema types before validation, 
 
 ### `response_schema_conformance`
 
-Failure codes: [ST104](failures.md#st104), [ST108](failures.md#st108), [ST109](failures.md#st109), [ST110](failures.md#st110), [ST111](failures.md#st111), [ST114](failures.md#st114), [ST115](failures.md#st115).
+Failure codes: [ST104](failures.md#st104), [ST108](failures.md#st108), [ST109](failures.md#st109), [ST110](failures.md#st110), [ST111](failures.md#st111), [ST114](failures.md#st114), [ST115](failures.md#st115), [ST116](failures.md#st116).
 
 Validates the response body against its JSON Schema definition. Catches format mismatches, missing required properties, type errors, and more.
 
@@ -179,7 +179,7 @@ For schema examples, polymorphic events, and current limitations, see [Testing S
 
 #### GraphQL
 
-For GraphQL APIs, this check fails on a body that is not JSON, a JSON value that is not an object, and a `null` returned for a non-nullable field.
+For GraphQL APIs, this check fails on a body that is not JSON, a JSON value that is not an object, a `null` returned for a non-nullable field, and `data` that is missing or does not match the query: a missing or unrequested field, or a value of the wrong type.
 
 ---
 

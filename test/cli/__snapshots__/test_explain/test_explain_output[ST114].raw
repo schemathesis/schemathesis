@@ -7,4 +7,4 @@ checks response_schema_conformance
 Null for a field the GraphQL schema declares non-nullable.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109,
-ST110, ST111, ST115.
+ST110, ST111, ST115, ST116.

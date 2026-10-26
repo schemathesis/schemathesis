@@ -541,6 +541,17 @@ def from_schema(
     return _wrap(schema, endpoint, framework)
 
 
+def canned_response(payload: object, *, status_code: int = 200, endpoint: str = "/graphql") -> GraphQLApp:
+    # Answers every query with `payload`, which lets a test send data no conforming server would.
+    app = Flask("test_app")
+
+    @app.route(endpoint, methods=["POST"])
+    def graphql() -> tuple[str, int, dict[str, str]]:
+        return json.dumps(payload), status_code, {"Content-Type": "application/json"}
+
+    return GraphQLApp(server=app, kind="flask", endpoint=endpoint)
+
+
 def use_after_create(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_use_after_create(), endpoint, "flask")
 
