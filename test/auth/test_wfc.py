@@ -427,6 +427,32 @@ def test_wfc_asgi_login_redirect_yields_cookies():
     assert case.cookies == {"JSESSIONID": WFC_SESSION}
 
 
+@pytest.mark.parametrize(
+    ("set_cookie", "expected"),
+    [
+        ("user[id]=1; Path=/", {"user[id]": "1"}),
+        ("a@b=1; Path=/", {"a@b": "1"}),
+        ("sid=1; Path=/; Priority=High", {"sid": "1"}),
+    ],
+    ids=["brackets-in-name", "at-sign-in-name", "unknown-attribute"],
+)
+def test_wfc_wsgi_cookie_login_reads_set_cookie_like_http(ctx, set_cookie, expected):
+    app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> object:
+        response = jsonify({})
+        response.headers.add("Set-Cookie", set_cookie)
+        return response
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=app)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.cookies == expected
+
+
 def test_wfc_login_endpoint_is_resolved_against_the_server_root(ctx, app_runner):
     app, _ = ctx.openapi.make_flask_app(
         {"/protected": {"get": {"responses": {"200": {"description": "OK"}}}}},

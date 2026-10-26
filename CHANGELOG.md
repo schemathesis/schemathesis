@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.
 - Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.
 - False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
 - Python traceback printed for WFC login failures, such as a dropped connection.

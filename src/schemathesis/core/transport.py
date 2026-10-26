@@ -152,6 +152,18 @@ def load_json_lossy(content: bytes, encoding: str | None) -> Any:
         return json.loads(decode_lossy(content, encoding))
 
 
+def parse_set_cookie(headers: Iterable[str]) -> dict[str, str]:
+    """Cookie names and values from `Set-Cookie` headers, read as leniently as an HTTP client's cookie jar."""
+    cookies: dict[str, str] = {}
+    for header in headers:
+        # Attributes after the first `;` describe the cookie and are never cookies themselves.
+        name, separator, value = header.split(";", 1)[0].partition("=")
+        name = name.strip()
+        if separator and name:
+            cookies[name] = value.strip()
+    return cookies
+
+
 def prepare_urlencoded(data: Any) -> Any:
     if isinstance(data, list):
         output = []

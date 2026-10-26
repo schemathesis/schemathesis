@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 import textwrap
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -17,7 +16,7 @@ from schemathesis.core.failures import reason_phrase
 from schemathesis.core.media_types import is_form_urlencoded, is_json
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
-from schemathesis.core.transport import AUTH_REJECTION_STATUSES, decode_lossy, load_json_lossy
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES, decode_lossy, load_json_lossy, parse_set_cookie
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
@@ -26,13 +25,6 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext
     from schemathesis.config import OutputConfig
     from schemathesis.generation.case import Case
-
-
-def _parse_set_cookie(headers: Iterable[str]) -> dict[str, str]:
-    jar = SimpleCookie()
-    for header in headers:
-        jar.load(header)
-    return {name: morsel.value for name, morsel in jar.items()}
 
 
 def _response_block(status_code: int, text: str, config: OutputConfig) -> str:
@@ -208,7 +200,7 @@ class DynamicTokenAuthProvider:
             text=response.get_data(as_text=True),
             get_json=lambda: response.get_json(force=True, silent=False),
             headers=response.headers,
-            cookies=_parse_set_cookie(response.headers.getlist("Set-Cookie")),
+            cookies=parse_set_cookie(response.headers.getlist("Set-Cookie")),
             output_config=ctx.operation.schema.config.output,
         )
 

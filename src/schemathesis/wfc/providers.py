@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlsplit
 
 import requests
 
-from schemathesis.core.transport import decode_lossy, load_json_lossy
+from schemathesis.core.transport import decode_lossy, load_json_lossy, parse_set_cookie
 from schemathesis.python import asgi, wsgi
 from schemathesis.transport import is_asgi_app
 
@@ -150,7 +149,7 @@ class LoginEndpointAuthProvider:
             text=response.get_data(as_text=True),
             get_json=lambda: response.get_json(force=True, silent=False),
             headers=response.headers,
-            cookies=_parse_set_cookie(response.headers.get_all("Set-Cookie")),
+            cookies=parse_set_cookie(response.headers.get_all("Set-Cookie")),
         )
 
     def _fetch_asgi(self, app: Any, context: AuthContext) -> _LoginResponse:
@@ -211,13 +210,3 @@ class LoginEndpointAuthProvider:
         else:
             raw = extract_token_from_header(response.headers, token_config.extract_selector)
         return format_token(raw, token_config.send_template)
-
-
-def _parse_set_cookie(headers: list[str]) -> dict[str, str]:
-    jar: dict[str, str] = {}
-    for header in headers:
-        cookie: SimpleCookie = SimpleCookie()
-        cookie.load(header)
-        for key, morsel in cookie.items():
-            jar[key] = morsel.value
-    return jar
