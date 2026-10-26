@@ -7,6 +7,7 @@
 - Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.
 - False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
 - Python traceback printed for WFC login failures, such as a dropped connection.
+- GraphQL stateful testing treating mutation result types like `DeleteNote` as separate resources.
 
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 

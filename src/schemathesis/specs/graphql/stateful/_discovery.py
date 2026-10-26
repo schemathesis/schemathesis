@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 
 def discover_handles(schema: graphql.GraphQLSchema, index: SchemaIndex) -> set[Handle]:
     """Active producer-consumer handles: all id handles plus wanted, producible, seedable non-id handles."""
-    id_handles = {Handle(name, "id") for name in collect_id_typed_object_types(schema)}
+    id_handles = {
+        Handle(name, "id") for name in collect_id_typed_object_types(schema) if index.envelope_resource(name) is None
+    }
 
     wanted: set[Handle] = set()
     for field_def, enclosing in _root_fields(schema):

@@ -4,7 +4,8 @@ Match priority for a scalar argument: (1) bespoke `<Type>ID` scalar names
 the parent type directly; (2) for generic `ID!` arguments, the argument
 name's `<entity>Id`/`<entity>Ids`/`<entity>_id`/`<entity>_ids` token names
 the parent; (3) a bare `id`/`ids` argument falls back to the enclosing
-field's return type. The same rules apply recursively to fields of
+field's return type, or to the resource a mutation result envelope names
+(`DeleteNote` -> `Note`). The same rules apply recursively to fields of
 input-object arguments and to elements of list-typed arguments.
 """
 
@@ -439,7 +440,8 @@ def candidate_handle(
         if stripped is not None:
             return Handle(stripped[:1].upper() + stripped[1:], "id")
         if argument_name in ("id", "ids") and enclosing_field_type is not None:
-            return Handle(enclosing_field_type, "id")
+            resource = index.envelope_resource(enclosing_field_type) if index is not None else None
+            return Handle(resource or enclosing_field_type, "id")
     if index is None or scalar_name not in HANDLE_SCALARS:
         return None
     if enclosing_field_type is not None and argument_name.lower() in BARE_IDENTIFIER_NAMES:
