@@ -289,10 +289,12 @@ class Dedup(Enum):
 
 
 def _dedup_key_and_hashes(
-    kwargs: dict[str, Any],
+    kwargs: dict[str, Any], body_canonical: str | None = None
 ) -> tuple[dict[str, Any], tuple, dict[ParameterLocation, int]]:
     request = _dedup_key(kwargs)
-    key, hashes = _to_hashable_key_with_json_parts(request)
+    key, hashes = _to_hashable_key_with_json_parts(
+        request, {"body": body_canonical} if body_canonical is not None else None
+    )
     initial_hashes = {
         location: hashes[name]
         for name, location in CONTAINER_TO_LOCATION.items()
@@ -312,9 +314,11 @@ class CaseEmitter:
     seen_positive: HashSet
     seen_negative: HashSet
 
-    def is_new_request(self, kwargs: dict[str, Any], mode: GenerationMode) -> tuple[bool, dict[ParameterLocation, int]]:
+    def is_new_request(
+        self, kwargs: dict[str, Any], mode: GenerationMode, body_canonical: str | None = None
+    ) -> tuple[bool, dict[ParameterLocation, int]]:
         # Repeating a request already sent tests nothing, whichever mode sent it first.
-        request, key, initial_hashes = _dedup_key_and_hashes(kwargs)
+        request, key, initial_hashes = _dedup_key_and_hashes(kwargs, body_canonical)
         if mode == GenerationMode.POSITIVE:
             is_new = self.seen_positive.insert(request, key=key)
         else:
@@ -404,11 +408,12 @@ class CaseEmitter:
         kwargs: dict[str, Any] | None = None,
         raw: dict[str, Any] | None = None,
         dedup: Dedup = Dedup.REQUEST,
+        body_canonical: str | None = None,
     ) -> Case | None:
         checked_kwargs = data.kwargs if kwargs is None else kwargs
         initial_hashes: dict[ParameterLocation, int] = {}
         if dedup is Dedup.REQUEST:
-            is_new, initial_hashes = self.is_new_request(checked_kwargs, mode)
+            is_new, initial_hashes = self.is_new_request(checked_kwargs, mode, body_canonical)
             if not is_new:
                 return None
         if dedup is Dedup.NEGATIVE_SET:
@@ -1125,8 +1130,11 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
 
 
 def _emit_body_case(run: CoverageRun, value: GeneratedValue, media_type: str, elapsed: float) -> Case | None:
+    data = run.template.with_body(value=value, media_type=media_type)
+    # The known spelling describes the generated value, not one the wire serialization replaced.
+    body_canonical = value.canonical if data.kwargs.get("body") is value.value else None
     return run.emitter.emit(
-        run.template.with_body(value=value, media_type=media_type),
+        data,
         mode=value.generation_mode,
         elapsed=elapsed,
         scenario=value.scenario,
@@ -1134,6 +1142,7 @@ def _emit_body_case(run: CoverageRun, value: GeneratedValue, media_type: str, el
         location=value.location,
         parameter=media_type,
         parameter_location=ParameterLocation.BODY,
+        body_canonical=body_canonical,
     )
 
 

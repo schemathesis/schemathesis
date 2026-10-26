@@ -343,10 +343,18 @@ class GeneratedValue:
     parameter: str | None
     location: str | None
     deduplication_key: tuple | None = None
+    # Canonical JSON of `value` at yield time, so enclosing values can spell themselves without serializing it again.
+    canonical: str | None = None
 
     @classmethod
     def with_positive(
-        cls, value: Any, *, scenario: CoverageScenario, description: str, deduplication_key: tuple | None = None
+        cls,
+        value: Any,
+        *,
+        scenario: CoverageScenario,
+        description: str,
+        deduplication_key: tuple | None = None,
+        canonical: str | None = None,
     ) -> GeneratedValue:
         return cls(
             value=value,
@@ -356,6 +364,7 @@ class GeneratedValue:
             location=None,
             parameter=None,
             deduplication_key=deduplication_key,
+            canonical=canonical,
         )
 
     @classmethod
@@ -1361,11 +1370,76 @@ def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str |
     return type(value), value
 
 
-def _to_hashable_key_with_json_parts(value: dict[str, Any]) -> tuple[tuple, dict[str, int]]:
+def _canonical_json(value: object) -> str | None:
+    try:
+        return jsonschema_rs.canonical.json.to_string(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _key_from_canonical(value: object, canonical: str | None) -> tuple:
+    """The `_to_hashable_key` of `value`, reusing its already known canonical JSON."""
+    if canonical is not None and (type(value) is dict or type(value) is list):
+        return type(value), _digest(canonical)
+    return _to_hashable_key(value)
+
+
+def _serialized_entries(value: dict) -> list[tuple[str, str]] | None:
+    """The `"key":value` spellings of a string-keyed object, in canonical JSON order."""
+    if not all(type(key) is str for key in value):
+        return None
+    try:
+        # Canonical JSON orders keys by code point, which is how Python sorts strings.
+        return [
+            (key, f"{jsonschema_rs.canonical.json.to_string(key)}:{jsonschema_rs.canonical.json.to_string(item)}")
+            for key, item in sorted(value.items())
+        ]
+    except (TypeError, ValueError):
+        return None
+
+
+class _ObjectSpelling:
+    """Canonical JSON of a template object with one entry replaced, built from pre-serialized entries."""
+
+    __slots__ = ("_template", "_entries", "_serialized", "_name", "_frame")
+
+    def __init__(self, template: dict) -> None:
+        self._template = template
+        self._entries: list[tuple[str, str]] | None = None
+        self._serialized = False
+        # The spelling before and after the value of the entry named last; callers vary one entry at a time.
+        self._name: str | None = None
+        self._frame = ("", "")
+
+    def with_entry(self, name: str, canonical: str | None) -> str | None:
+        if canonical is None or type(name) is not str:
+            return None
+        if name != self._name:
+            if not self._serialized:
+                self._serialized = True
+                self._entries = _serialized_entries(self._template)
+            if self._entries is None:
+                return None
+            before = ",".join(entry for key, entry in self._entries if key < name)
+            after = ",".join(entry for key, entry in self._entries if key > name)
+            head = f"{{{before}{',' if before else ''}{jsonschema_rs.canonical.json.to_string(name)}:"
+            self._name = name
+            self._frame = (head, f"{',' if after else ''}{after}}}")
+        head, tail = self._frame
+        return f"{head}{canonical}{tail}"
+
+
+def _to_hashable_key_with_json_parts(
+    value: dict[str, Any], known: dict[str, str] | None = None
+) -> tuple[tuple, dict[str, int]]:
+    """Key `value`, taking the canonical JSON of the entries in `known` as given."""
     serialized_parts: dict[str, str] = {}
     try:
         for name, item in value.items():
-            serialized_parts[name] = jsonschema_rs.canonical.json.to_string(item)
+            if known is not None and name in known:
+                serialized_parts[name] = known[name]
+            else:
+                serialized_parts[name] = jsonschema_rs.canonical.json.to_string(item)
     except (TypeError, ValueError):
         return _to_hashable_key(value), {}
     serialized = (
@@ -1397,10 +1471,6 @@ class HashSet:
 
     def insert(self, value: Any, *, key: tuple | None = None) -> bool:
         return self._insert_key(_to_hashable_key(value) if key is None else key)
-
-    def insert_with_key(self, value: Any) -> tuple | None:
-        key = _to_hashable_key(value)
-        return key if self._insert_key(key) else None
 
     def insert_unless_in(self, other: HashSet, value: Any, *, key: tuple | None = None) -> bool:
         """Insert the value unless `other` already holds it; the key is built once for both sets."""
@@ -3583,15 +3653,21 @@ def _positive_array(
         # Single-item arrays exercise each items-schema branch individually.
         # `maxItems`-sized boundary arrays (above) repeat one shape and miss multi-branch coverage.
         sub_schema = schema["items"]
+        prefix_parts = _canonical_json(prefix_values)
         for item in cover_schema_iter(ctx, sub_schema):
             candidate = [*prefix_values, item.value]
-            deduplication_key = seen.insert_with_key(candidate)
-            if deduplication_key is not None:
+            item_canonical = item.canonical if item.canonical is not None else _canonical_json(item.value)
+            canonical = None
+            if prefix_parts is not None and item_canonical is not None:
+                canonical = f"[{item_canonical}]" if prefix_parts == "[]" else f"{prefix_parts[:-1]},{item_canonical}]"
+            deduplication_key = _key_from_canonical(candidate, canonical)
+            if seen.insert(candidate, key=deduplication_key):
                 yield PositiveValue(
                     candidate,
                     scenario=CoverageScenario.VALID_ARRAY,
                     description=f"Single-item array: {item.description}",
                     deduplication_key=deduplication_key,
+                    canonical=canonical,
                 )
 
 
@@ -3697,6 +3773,7 @@ def _iter_positive_object(
                 description="Object with only required properties",
             )
     seen = HashSet()
+    spelling = _ObjectSpelling(template)
     max_properties = schema.get("maxProperties")
     for name, sub_schema in properties.items():
         # A property the template left out adds a key, which the size window may not have room for.
@@ -3709,11 +3786,14 @@ def _iter_positive_object(
         if name in template:
             seen.insert(template[name])
         for new in cover_schema_iter(ctx, sub_schema):
-            if seen.insert(new.value, key=new.deduplication_key):
+            canonical = new.canonical if new.canonical is not None else _canonical_json(new.value)
+            key = new.deduplication_key or _key_from_canonical(new.value, canonical)
+            if seen.insert(new.value, key=key):
                 yield PositiveValue(
                     {**template, name: new.value},
                     scenario=CoverageScenario.VALID_OBJECT,
                     description=f"Object with valid '{name}' value: {new.description}",
+                    canonical=spelling.with_entry(name, canonical),
                 )
         seen.clear()
     # Handle additionalProperties with schema
@@ -3726,11 +3806,14 @@ def _iter_positive_object(
         if additional_key is None:
             return
         for new in cover_schema_iter(ctx, additional_properties):
-            if seen.insert(new.value, key=new.deduplication_key):
+            canonical = new.canonical if new.canonical is not None else _canonical_json(new.value)
+            key = new.deduplication_key or _key_from_canonical(new.value, canonical)
+            if seen.insert(new.value, key=key):
                 yield PositiveValue(
                     {**template, additional_key: new.value},
                     scenario=CoverageScenario.OBJECT_ADDITIONAL_PROPERTY,
                     description=f"Object with additional property: {new.description}",
+                    canonical=spelling.with_entry(additional_key, canonical),
                 )
 
 
