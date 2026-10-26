@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Valid examples dropped when several `discriminator.mapping` values point to the same schema. [#5631](https://github.com/schemathesis/schemathesis/issues/5631)
 - WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.
 - Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.
 - False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
