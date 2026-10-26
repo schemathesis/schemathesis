@@ -4471,7 +4471,8 @@ def _negative_type(
         for ty in ("integer", "number", "string"):
             if ty in strategies:
                 restrict(ty, _is_not_boolean_coercible)
-    if ctx.wire.url_part():
+    # An object's text always carries `{`, which no path segment may hold, so the path filter rejects every one.
+    if ctx.wire.url_part() or ctx.location == ParameterLocation.PATH:
         strategies.pop("object", None)
     # Form-urlencoded property-level mutations with null/array/object serialize to empty
     if ctx.wire.urlencoded_body():
