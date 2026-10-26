@@ -78,7 +78,7 @@ clean: clean-cov
     find . -type f -name "*.pyc" -delete
 
 docs:
-    mkdocs serve
+    zensical serve
 
 install:
     uv pip install -e ".[dev]"

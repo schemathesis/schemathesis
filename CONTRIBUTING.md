@@ -68,10 +68,10 @@ I review pull requests within a few days. If you hear nothing, comment on the pu
 
 ## Contributing to Documentation
 
-The docs live in `docs/` and build with MkDocs. Follow steps 1-3 of [Submitting Pull Requests](#submitting-pull-requests), then run:
+The docs live in `docs/` and build with Zensical. Follow steps 1-3 of [Submitting Pull Requests](#submitting-pull-requests), then run:
 
 ```bash
-mkdocs serve
+zensical serve
 ```
 
 Open the URL from the terminal output (usually `http://127.0.0.1:8000/`) to preview your changes.

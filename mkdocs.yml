@@ -66,6 +66,8 @@ exclude_docs: |
 
 theme:
   name: material
+  # The "modern" variant renders dark header text on the custom green primary color
+  variant: classic
   icon:
     repo: fontawesome/brands/github
   palette:
