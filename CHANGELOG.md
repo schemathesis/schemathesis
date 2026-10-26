@@ -2,6 +2,13 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.5...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Lower memory use for patterns like `^.{0,102400}$`.
+- Faster positive coverage phase on large nested request bodies.
+- Faster coverage phase startup in negative mode for path parameters declared with `content`.
+- Lower coverage phase memory on large `$ref`-heavy schemas.
+
 ### :bug: Fixed
 
 - Valid examples dropped when several `discriminator.mapping` values point to the same schema. [#5631](https://github.com/schemathesis/schemathesis/issues/5631)
