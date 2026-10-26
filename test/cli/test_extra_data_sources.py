@@ -1506,6 +1506,46 @@ def test_examples_phase_fills_captured_id_into_example_that_supplies_required_fi
     assert [body for body in sent if body["groupId"] == "G-REAL"] == expected
 
 
+def test_examples_phase_completes_captured_body_missing_required_fields(cli, ctx):
+    # The captured path value yields a case, so the examples phase does not fall back to one generated case.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/groups": {
+                "post": {
+                    "responses": {
+                        "201": _json_response(
+                            _object_schema({"groupId": {"type": "string"}}, required=["groupId"]),
+                            description="",
+                        )
+                    }
+                }
+            },
+            "/groups/{groupId}/items": {
+                "post": {
+                    "parameters": [{"name": "groupId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": _json_request_body(_ITEM_SCHEMA),
+                    "responses": {"201": {"description": ""}},
+                }
+            },
+        },
+    )
+    sent = []
+
+    @app.route("/groups", methods=["POST"])
+    def create_group():
+        return jsonify({"groupId": "G-REAL"}), 201
+
+    @app.route("/groups/<group_id>/items", methods=["POST"])
+    def create_group_item(group_id):
+        sent.append(request.get_json())
+        return "", 201
+
+    cli.run_openapi_app(app, "--phases=examples", "--mode=positive", config=_examples_fill_missing_config())
+
+    assert [body["groupId"] for body in sent] == ["G-REAL"]
+    assert all(body["name"] for body in sent), sent
+
+
 def test_examples_phase_discards_completed_pool_body_that_violates_schema(cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
