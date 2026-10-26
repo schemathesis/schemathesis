@@ -625,7 +625,7 @@ def _generate_raw_body_coverage_values(body: OpenApiBody) -> list[tuple[str, Gen
 
 
 def _generate_multipart_body_from_custom_strategies(
-    body: OpenApiBody,
+    run: CoverageRun, body: OpenApiBody
 ) -> tuple[dict[str, Any], dict[str, str]] | None:
     """Generate a body dict for multipart forms using custom encoding strategies, with each part's content type.
 
@@ -648,12 +648,31 @@ def _generate_multipart_body_from_custom_strategies(
                 result[prop_name] = examples.generate_one(strategy)
                 break
 
-    for prop_name in required:
-        if prop_name not in result:
-            prop_schema = properties.get(prop_name, {})
-            result[prop_name] = b"" if prop_schema.get("format") == "binary" else ""
+    if not content_types:
+        return None
+    missing = [name for name in required if name not in result]
+    if missing:
+        # Other required parts take their values from the first valid body.
+        valid = _first_positive_body(run, body)
+        if not isinstance(valid, dict):
+            return None
+        result.update({name: valid[name] for name in missing if name in valid})
+    return result, content_types
 
-    return (result, content_types) if content_types else None
+
+def _first_positive_body(run: CoverageRun, body: OpenApiBody) -> object:
+    """The first body the positive coverage walk yields, or None when the schema admits none."""
+    schema = as_object_schema(body.unoptimized_schema)
+    context = _coverage_context(
+        run,
+        schema,
+        ParameterLocation.BODY,
+        [GenerationMode.POSITIVE],
+        is_required=body.is_required,
+        media_type=media_types.parse(body.media_type),
+    )
+    value = next(cover_schema_iter(context, schema), None)
+    return None if value is None else value.value
 
 
 def _filter_draws_for_case(
@@ -979,7 +998,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
     for body in operation.body:
         instant = Instant()
 
-        multipart = _generate_multipart_body_from_custom_strategies(body)
+        multipart = _generate_multipart_body_from_custom_strategies(run, body)
         custom_values: list[tuple[str, dict[str, str] | None, GeneratedValue]]
         if multipart is not None:
             multipart_body, part_content_types = multipart

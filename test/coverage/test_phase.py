@@ -24,7 +24,7 @@ from schemathesis.core.error_feedback.store import (
 )
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, ContentTypeServerError, FailureGroup
-from schemathesis.core.file_samples import file_extension
+from schemathesis.core.file_samples import FILE_SAMPLES, file_extension
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
@@ -32,6 +32,7 @@ from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.serialization import Binary
 from test.coverage.helpers import (
     DEFAULT_RESPONSES,
     assert_bodies,
@@ -8091,7 +8092,7 @@ def test_body_example_is_dropped_when_an_inferred_bound_contradicts_it(ctx, mini
 @pytest.mark.parametrize("declared", ["inline", "ref"])
 def test_multipart_template_body_built_from_custom_property_encodings(ctx, declared):
     # A property with a registered `encoding.contentType` draws from that strategy; other required
-    # properties get plain fillers so the multipart template stays complete.
+    # properties get values valid against their own schemas.
     schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
     upload = {
         "type": "object",
@@ -8101,8 +8102,11 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
             "note": {"$ref": "#/components/schemas/Note"},
             "name": {"type": "string"},
             "avatar": {"$ref": "#/components/schemas/Bin"},
+            "count": {"type": "integer", "minimum": 3},
+            "kind": {"enum": ["x"]},
+            "attachments": {"type": "array", "items": {"$ref": "#/components/schemas/Bin"}, "minItems": 1},
         },
-        "required": ["file", "name", "avatar"],
+        "required": ["file", "name", "avatar", "count", "kind", "attachments"],
     }
     operation = load_schema(
         ctx,
@@ -8121,7 +8125,9 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
         },
     )["/foo"]["post"]
     bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
-    assert {"file": b"\x89PNG", "name": "", "avatar": b""} in bodies, bodies[:5]
+    sample = Binary(FILE_SAMPLES["png"])
+    expected = {"file": b"\x89PNG", "name": "", "avatar": sample, "count": 3, "kind": "x", "attachments": [sample]}
+    assert expected in bodies, bodies[:5]
 
 
 def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ctx):

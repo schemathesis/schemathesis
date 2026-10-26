@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.5...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
+
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 
 ### :rocket: Added
