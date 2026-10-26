@@ -37,6 +37,8 @@ __________________________ GET /api/orders/{order_id} __________________________
 
 Reproduce with:
 
+    # as alice (owner)
+    curl -X GET -H 'Authorization: [Filtered]' http://127.0.0.1/api/orders/1
     # as bob (peer)
     curl -X GET -H 'Authorization: [Filtered]' http://127.0.0.1/api/orders/1
 

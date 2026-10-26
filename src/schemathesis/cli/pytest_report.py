@@ -26,8 +26,9 @@ if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine import events
-    from schemathesis.engine.recorder import Interaction
+    from schemathesis.engine.recorder import Interaction, ReproductionStep
     from schemathesis.engine.statistic import Statistic
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 
@@ -104,10 +105,38 @@ def _comment(text: str) -> list[str]:
     return [f"# {line}" if line else "#" for line in text.splitlines()]
 
 
+def _preconditions(case: Case, replayed: set[str]) -> list[str]:
+    """Objects `case` takes from earlier responses whose requests the test does not send."""
+    lines: list[str] = []
+    for draw in case.meta.pool_draws if case.meta is not None else ():
+        if draw.source_operation not in replayed:
+            text = f"Needs the `{draw.resource_name}` that `{draw.source_operation}` returned"
+            if draw.source_identity is not None:
+                text += f" to `{draw.source_identity}`"
+            lines.extend(f"    {line}" for line in _comment(text))
+    return lines
+
+
+def _render_steps(
+    steps: list[ReproductionStep], interactions: dict[str, Interaction], cases: dict[str, Case], config: OutputConfig
+) -> list[str]:
+    lines: list[str] = []
+    replayed: set[str] = set()
+    for step in steps:
+        case = cases[step.case_id]
+        lines.extend(line for line in _preconditions(case, replayed) if line not in lines)
+        # Credentials are masked, so the identity tells which ones each request needs.
+        if step.sender is not None:
+            lines.extend(f"    {line}" for line in _comment(f"as {step.sender}"))
+        lines.extend(_render_request(interactions[step.case_id], case.operation, config))
+        replayed.add(step.operation)
+    return lines
+
+
 def render(
     statistic: Statistic,
     interactions: dict[str, Interaction],
-    operations: dict[str, APIOperation],
+    cases: dict[str, Case],
     config: OutputConfig,
     location: str | None,
 ) -> str:
@@ -125,7 +154,7 @@ def render(
         for index, group in enumerate(statistic.failures[label].values(), 1):
             if group.case_id is None:
                 continue
-            chain = [step.case_id for step in group.steps if step.case_id in interactions]
+            steps = [step for step in group.steps if step.case_id in interactions]
             explanation = group.format(index=index, curl=None, config=config)
             # Non-ASCII word characters are not always valid in identifiers.
             slug = re.sub(r"\W+", "_", group.steps[-1].operation, flags=re.ASCII).strip("_").lower()
@@ -134,9 +163,8 @@ def render(
             lines.extend(_comment(label))
             lines.extend(_comment(explanation))
             lines.append(f"def test_{slug}_{group.case_id}():")
-            for case_id in chain:
-                lines.extend(_render_request(interactions[case_id], operations[case_id], config))
-            response = interactions[chain[-1]].response
+            lines.extend(_render_steps(steps, interactions, cases, config))
+            response = interactions[steps[-1].case_id].response
             assert response is not None
             symptoms: list[str] = []
             for failure in group.failures:
@@ -152,13 +180,13 @@ def render(
 class PytestReportHandler(EventHandler["BaseExecutionContext"]):
     """Keep the requests of failing scenarios and write them as pytest tests at shutdown."""
 
-    __slots__ = ("output", "location", "interactions", "operations")
+    __slots__ = ("output", "location", "interactions", "cases")
 
     def __init__(self, output: Path) -> None:
         self.output = output
         self.location: str | None = None
         self.interactions: dict[str, Interaction] = {}
-        self.operations: dict[str, APIOperation] = {}
+        self.cases: dict[str, Case] = {}
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
@@ -171,11 +199,11 @@ class PytestReportHandler(EventHandler["BaseExecutionContext"]):
                         continue
                     for step in check.failure_info.steps:
                         self.interactions[step.case_id] = recorder.interactions[step.case_id]
-                        self.operations[step.case_id] = recorder.cases[step.case_id].value.operation
+                        self.cases[step.case_id] = recorder.cases[step.case_id].value
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.output.parent.mkdir(parents=True, exist_ok=True)
         self.output.write_text(
-            render(ctx.statistic, self.interactions, self.operations, ctx.config.output, self.location),
+            render(ctx.statistic, self.interactions, self.cases, ctx.config.output, self.location),
             encoding="utf-8",
         )

@@ -16,6 +16,7 @@
 - Schema examples, multipart filenames and query serialization lost for `$ref` alias components or `$ref` siblings.
 - Serialization error for XML multipart parts with arrays of `$ref` items.
 - Captured values dropped from request bodies missing required fields in the examples phase with `fill-missing`.
+- Object-level authorization failures replaying only the peer's request in `--report pytest` and cURL output.
 
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 

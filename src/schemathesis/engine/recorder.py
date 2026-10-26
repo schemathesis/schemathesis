@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import time
 from collections import defaultdict
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -215,6 +215,23 @@ class ScenarioRecorder:
         """Retrieve the headers a given test case actually sent."""
         return _flatten_headers(self.interactions[case_id].request.headers)
 
+    def reproduction_steps(self, cases: Iterable[Case], *, failure: Failure, verify: bool) -> list[ReproductionStep]:
+        """`cases` as the requests that reproduce `failure`, each with the headers it sent."""
+        roles = failure.identity_roles()
+        return [
+            ReproductionStep.from_case(
+                case, headers=self.find_request_headers(case_id=case.id), verify=verify, roles=roles
+            )
+            for case in cases
+        ]
+
+    def iter_failure_cases(self, *, case_id: str, failure: Failure) -> Iterator[Case]:
+        """The failing case and the cases `failure` references, such as the owner's read for an authorization bypass."""
+        wanted = {case_id, *failure.related_case_ids()}
+        for node_id, node in self.cases.items():
+            if node_id in wanted:
+                yield node.value
+
     def find_parent(self, *, case_id: str) -> Case | None:
         """Find the parent case of a given test case, if it exists."""
         case = self.cases.get(case_id)
@@ -328,6 +345,8 @@ class ReproductionStep:
     # Path with parameters filled in.
     path: str
     curl: str
+    # Identity and its role in the failure, e.g. `alice (owner)`, when the request's identity matters.
+    sender: str | None = None
 
     @classmethod
     def from_case(
@@ -336,14 +355,16 @@ class ReproductionStep:
         curl = case.as_curl_command(headers=headers, verify=verify)
         # Requests sent as different identities look alike once credentials are masked.
         role = roles.get(case.auth_identity) if case.auth_identity is not None else None
-        if role is not None:
-            curl = f"# as {case.auth_identity} ({role})\n{curl}"
+        sender = f"{case.auth_identity} ({role})" if role is not None else None
+        if sender is not None:
+            curl = f"# as {sender}\n{curl}"
         return cls(
             case_id=case.id,
             operation=case.operation.label,
             method=case.method,
             path=case.formatted_path,
             curl=curl,
+            sender=sender,
         )
 
 
