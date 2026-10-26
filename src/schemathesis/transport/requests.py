@@ -20,7 +20,7 @@ from urllib3.filepost import encode_multipart_formdata
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
 from schemathesis.core.file_samples import MEDIA_TYPE_FILE_SAMPLES
-from schemathesis.core.jsonschema import get_type, resolve_with_root_bundle
+from schemathesis.core.jsonschema import get_type
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
@@ -479,12 +479,12 @@ def encode_non_object_multipart(value: Any) -> tuple[bytes, str]:
     return _encode_multipart(value, boundary), f"multipart/form-data; boundary={boundary}"
 
 
-def _is_structured_schema(schema: dict[str, Any], root_schema: dict[str, Any]) -> bool:
+def _part_schema(schema: dict[str, Any]) -> dict[str, Any]:
     # An array part takes the default of its items: JSON for nested structures, plain text for primitives and files.
     items = schema.get("items")
     if isinstance(items, dict) and items:
-        return _declares_structure(resolve_with_root_bundle(items, root_schema))
-    return _declares_structure(schema)
+        return items
+    return schema
 
 
 def _declares_structure(schema: dict[str, Any]) -> bool:
@@ -510,17 +510,9 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
         if content_type is not None:
             result[name] = content_type
     # Default nested-object / array form-parts to JSON so the wire payload is parsable.
-    schema_node = body.resolved_schema
-    if schema_node is not None:
-        properties = schema_node.get("properties")
-        if isinstance(properties, dict):
-            for name, prop in properties.items():
-                if name in result or not isinstance(prop, dict):
-                    continue
-                # Resolve a property-level `$ref` against the body schema's bundle so
-                # a referent like `{type: string}` is left alone and `{type: object}` triggers JSON.
-                if _is_structured_schema(resolve_with_root_bundle(prop, schema_node), schema_node):
-                    result[name] = "application/json"
+    for name, prop in body.form_properties.items():
+        if name not in result and isinstance(prop, dict) and _declares_structure(_part_schema(prop)):
+            result[name] = "application/json"
     return result
 
 
@@ -537,11 +529,8 @@ def _property_schema(ctx: SerializationContext, name: str) -> dict[str, Any]:
     """Return the schema of a multipart property, with `$ref` resolved."""
     body = ctx.case.operation.get_body_for_media_type(ctx.case.media_type or "multipart/form-data")
     assert body is not None
-    schema_node = body.resolved_schema or {}
-    properties = schema_node.get("properties", {})
-    if isinstance(properties.get(name), dict):
-        return resolve_with_root_bundle(properties[name], schema_node)
-    return {}
+    schema = body.form_properties.get(name)
+    return schema if isinstance(schema, dict) else {}
 
 
 def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, content_type: str) -> tuple[object, str]:

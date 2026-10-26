@@ -1042,8 +1042,26 @@ def test_multipart_ref_to_scalar_is_not_json_encoded(ctx, case_factory):
             {"doc": {"x": "1"}, "kind": "a"},
             [("doc", (None, b"<item><x>1</x></item>", "application/xml")), ("kind", (None, "a"))],
         ),
+        (
+            {"tags": {"$ref": "#/components/schemas/Tags"}},
+            {"tags": {"contentType": "application/xml"}},
+            {"tags": [{"n": 1}], "kind": "a"},
+            [("tags", (None, b"<tags><tag><n>1</n></tag></tags>", "application/xml")), ("kind", (None, "a"))],
+        ),
+        (
+            {"tags": {"type": "array", "items": {}}},
+            {},
+            {"tags": [1, "x"], "kind": "a"},
+            [("tags", (None, b'[1, "x"]', "application/json")), ("kind", (None, "a"))],
+        ),
+        (
+            {"tags": {"type": "array", "items": {"$ref": "#/components/schemas/Any"}}},
+            {},
+            {"tags": [1, "x"], "kind": "a"},
+            [("tags", (None, b'[1, "x"]', "application/json")), ("kind", (None, "a"))],
+        ),
     ],
-    ids=["file", "file-array", "object", "xml"],
+    ids=["file", "file-array", "object", "xml", "xml-array-of-refs", "untyped-items", "untyped-items-ref"],
 )
 @pytest.mark.parametrize("declared", ["inline", "ref"])
 def test_multipart_parts_of_body_behind_ref(ctx, declared, properties, encoding, body, expected):
@@ -1063,7 +1081,15 @@ def test_multipart_parts_of_body_behind_ref(ctx, declared, properties, encoding,
             },
             "responses": {"200": {"description": "OK"}},
         },
-        components={"schemas": {"Upload": upload, "Kind": {"type": "string", "enum": ["a"]}}},
+        components={
+            "schemas": {
+                "Upload": upload,
+                "Kind": {"type": "string", "enum": ["a"]},
+                "Any": {},
+                "Tags": {"type": "array", "xml": {"wrapped": True}, "items": {"$ref": "#/components/schemas/Tag"}},
+                "Tag": {"type": "object", "xml": {"name": "tag"}, "properties": {"n": {"type": "integer"}}},
+            }
+        },
     )
     case = operation.Case(body=body, media_type="multipart/form-data")
     assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == expected
