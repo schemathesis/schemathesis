@@ -130,6 +130,28 @@ def test_get_raises_on_error(auth_operation, path, extract_from, extract_selecto
         provider.get(auth_operation.Case(), ctx)
 
 
+@pytest.mark.parametrize("name", ["user[id]", "a@b"], ids=["brackets-in-name", "at-sign-in-name"])
+def test_get_extracts_cookie_over_wsgi(ctx, name):
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth():
+        response = jsonify({})
+        response.headers.add("Set-Cookie", f"{name}=s3ss10nt0k3n; Path=/; Priority=High")
+        return response
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/data"]["GET"]
+    provider = DynamicTokenAuthProvider(
+        path="/api/auth",
+        method="post",
+        payload=None,
+        extract_from="cookie",
+        extract_selector=name,
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    assert provider.get(operation.Case(), AuthContext(operation=operation, app=app)) == "s3ss10nt0k3n"
+
+
 def test_authentication_error_provider_context():
     assert str(AuthenticationError("DynamicTokenAuthProvider", "get", "boom", include_common_causes=False)) == "boom"
     assert (
