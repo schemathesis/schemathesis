@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import graphql
 
-from schemathesis.specs.graphql._helpers import _unwrap, relay_node_type
+from schemathesis.specs.graphql._helpers import _unwrap, resource_type
 from schemathesis.specs.graphql.bundles import collect_id_typed_object_types
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.substitution import candidate_handle
@@ -45,10 +45,7 @@ def _root_fields(schema: graphql.GraphQLSchema) -> Iterator[tuple[graphql.GraphQ
 
 
 def _return_object_name(field_def: graphql.GraphQLField) -> str | None:
-    return_type = _unwrap(field_def.type)
-    node = relay_node_type(return_type)
-    if node is not None:
-        return node.name
+    return_type, _ = resource_type(_unwrap(field_def.type))
     return return_type.name if isinstance(return_type, graphql.GraphQLObjectType) else None
 
 

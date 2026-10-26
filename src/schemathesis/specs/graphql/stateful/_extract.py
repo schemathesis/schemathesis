@@ -5,11 +5,11 @@ from collections.abc import Iterator
 
 
 def iter_handle_values(
-    response_body: bytes, *, field_name: str, handle_fields: frozenset[str]
+    response_body: bytes, *, field_name: str, handle_fields: frozenset[str], path: tuple[str, ...] = ()
 ) -> Iterator[tuple[str, str]]:
-    """Yield `(handle_field, value)` pairs found at `data[field_name]` in a GraphQL response.
+    """Yield `(handle_field, value)` pairs of records found at `data[field_name]` and then `path` in a GraphQL response.
 
-    Handles single-object, list, and Relay connection (`edges { node }`) shapes.
+    Lists at any step are flattened, so `path=("edges", "node")` reads Relay connections.
     Yields nothing if the body is malformed, contains errors, or the path is missing.
     """
     try:
@@ -21,23 +21,19 @@ def iter_handle_values(
     data = payload.get("data")
     if not isinstance(data, dict):
         return
-    for record in _records(data.get(field_name)):
+    for record in _records(data.get(field_name), path):
         for handle_field in handle_fields:
             candidate = record.get(handle_field)
             if isinstance(candidate, str):
                 yield handle_field, candidate
 
 
-def _records(field_value: object) -> Iterator[dict]:
-    if isinstance(field_value, dict):
-        edges = field_value.get("edges")
-        if isinstance(edges, list):
-            for edge in edges:
-                if isinstance(edge, dict) and isinstance(edge.get("node"), dict):
-                    yield edge["node"]
+def _records(value: object, path: tuple[str, ...]) -> Iterator[dict]:
+    if isinstance(value, list):
+        for item in value:
+            yield from _records(item, path)
+    elif isinstance(value, dict):
+        if path:
+            yield from _records(value.get(path[0]), path[1:])
         else:
-            yield field_value
-    elif isinstance(field_value, list):
-        for item in field_value:
-            if isinstance(item, dict):
-                yield item
+            yield value
