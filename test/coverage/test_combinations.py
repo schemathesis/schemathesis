@@ -3807,6 +3807,27 @@ def test_negative_format_around_a_conditional_the_engine_cannot_follow(ctx_facto
     assert CoverageScenario.INVALID_FORMAT in scenarios, scenarios
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"if": {"type": "string"}, "else": {"type": "integer"}},
+        {"if": {"enum": []}, "else": {"type": "string"}},
+        {"if": {"type": "string"}, "then": {"minLength": 2}, "else": False},
+    ],
+    ids=["else-type", "else-always", "else-false"],
+)
+def test_positive_body_without_type_respects_a_conditional(ctx_factory, schema):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = [generated.value for generated in cover_schema_iter(ctx, schema)]
+    assert values
+    assert [value for value in values if not validator.is_valid(value)] == []
+
+
 @pytest.mark.parametrize("hint", ["example", "default"], ids=["example", "default"])
 def test_property_hint_pinned_under_draft4(ctx_factory, hint):
     # Draft 4 has no `const`, so pinning a hint with one leaves the property free to draw anything.
