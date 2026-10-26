@@ -97,7 +97,12 @@ class LoginEndpointAuthProvider:
             return None
         path = self._path()
         # Relative targets resolve against the login path, so both sides end up comparable.
-        return location if urlsplit(urljoin(path, location)).path == path else None
+        try:
+            target = urlsplit(urljoin(path, location)).path
+        except ValueError:
+            # A target that does not parse cannot lead back to the login endpoint.
+            return None
+        return location if target == path else None
 
     def _body_and_headers(self) -> tuple[str | bytes | None, dict[str, str]]:
         try:
@@ -129,6 +134,9 @@ class LoginEndpointAuthProvider:
             )
         except requests.exceptions.RequestException as exc:
             raise WFCLoginError(f"Login endpoint call failed: {exc}") from exc
+        # Header values outside latin-1 and unparsable URLs fail before anything is sent.
+        except ValueError as exc:
+            raise WFCLoginError(f"Login endpoint call failed for {url}: {exc}") from exc
         return _LoginResponse(
             status_code=response.status_code,
             text=decode_lossy(response.content, response.encoding),
