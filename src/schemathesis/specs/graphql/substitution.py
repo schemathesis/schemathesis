@@ -4,8 +4,9 @@ Match priority for a scalar argument: (1) bespoke `<Type>ID` scalar names
 the parent type directly; (2) for generic `ID!` arguments, the argument
 name's `<entity>Id`/`<entity>Ids`/`<entity>_id`/`<entity>_ids` token names
 the parent; (3) a bare `id`/`ids` argument falls back to the enclosing
-field's return type, or to the resource a mutation result envelope names
-(`DeleteNote` -> `Note`). The same rules apply recursively to fields of
+field's return type, to the resource a mutation result envelope names
+(`DeleteNote` -> `Note`), or, for a cleanup mutation that returns no record, to the
+entity its name carries (`deleteNote` -> `Note`). The same rules apply recursively to fields of
 input-object arguments and to elements of list-typed arguments.
 """
 
@@ -30,6 +31,13 @@ from schemathesis.specs.graphql._helpers import (
     resource_type,
 )
 from schemathesis.specs.graphql.handles import HANDLE_SCALARS, Handle, SchemaIndex
+from schemathesis.specs.graphql.inference import (
+    CLEANUP_PREFIXES,
+    OperationRole,
+    RootType,
+    classify_operation,
+    extract_entity,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -299,7 +307,8 @@ def _substitute(
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return operation_node
-    selection_set = _walk(operation_node.selection_set, root, provider, random, index)
+    is_mutation = operation_node.operation == graphql.OperationType.MUTATION
+    selection_set = _walk(operation_node.selection_set, root, provider, random, index, is_mutation=is_mutation)
     if selection_set is operation_node.selection_set:
         return operation_node
     return replace_node(operation_node, selection_set=selection_set)
@@ -311,6 +320,8 @@ def _walk(
     provider: ValueProvider,
     random: Random,
     index: SchemaIndex | None,
+    *,
+    is_mutation: bool = False,
 ) -> graphql.SelectionSetNode | None:
     if selection_set is None:
         return None
@@ -322,8 +333,7 @@ def _walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        record_type, _ = resource_type(unwrapped_return)
-        enclosing_field_type = record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
+        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation)
         arguments = list(selection.arguments or ())
         for position, argument in enumerate(selection.arguments or ()):
             argument_definition = field_def.args.get(argument.name.value)
@@ -423,6 +433,19 @@ BARE_IDENTIFIER_NAMES: Final = frozenset(
 )
 
 
+def argument_owner(field_name: str, field_def: graphql.GraphQLField, *, is_mutation: bool) -> str | None:
+    """Name the object type that a root field's bare identifier arguments refer to."""
+    record_type, _ = resource_type(_unwrap(field_def.type))
+    if isinstance(record_type, graphql.GraphQLObjectType) and "id" in record_type.fields:
+        return record_type.name
+    # Cleanup mutations typically return `Boolean` or a payload without the record (`deleteBook` -> `Book`).
+    if is_mutation and classify_operation(field_name=field_name, root_type=RootType.MUTATION) == OperationRole.CLEANUP:
+        entity = extract_entity(field_name, prefixes=CLEANUP_PREFIXES)
+        if entity is not None:
+            return entity
+    return record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
+
+
 def candidate_handle(
     *,
     scalar_name: str,
@@ -513,12 +536,15 @@ def iter_operation_pool_values(
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return
-    yield from _iter_walk(operation_node.selection_set, root)
+    is_mutation = operation_node.operation == graphql.OperationType.MUTATION
+    yield from _iter_walk(operation_node.selection_set, root, is_mutation=is_mutation)
 
 
 def _iter_walk(
     selection_set: graphql.SelectionSetNode | None,
     parent_type: graphql.GraphQLObjectType,
+    *,
+    is_mutation: bool = False,
 ) -> Iterator[tuple[Handle, str]]:
     if selection_set is None:
         return
@@ -529,8 +555,7 @@ def _iter_walk(
         if field_def is None:
             continue
         unwrapped_return = _unwrap(field_def.type)
-        record_type, _ = resource_type(unwrapped_return)
-        enclosing_field_type = record_type.name if isinstance(record_type, graphql.GraphQLObjectType) else None
+        enclosing_field_type = argument_owner(selection.name.value, field_def, is_mutation=is_mutation)
         for argument in selection.arguments or ():
             argument_definition = field_def.args.get(argument.name.value)
             if argument_definition is None:

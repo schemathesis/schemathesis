@@ -126,7 +126,7 @@ def test_stateful_consumers_mostly_target_created_resources(ctx, cli):
 
 def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):
     created: set[str] = set()
-    received: dict[str, set[str]] = {"note": set(), "updateNote": set()}
+    received: dict[str, set[str]] = {"note": set(), "updateNote": set(), "deleteNote": set()}
 
     @strawberry.type
     class Note:
@@ -173,6 +173,7 @@ def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):
 
         @strawberry.mutation
         def deleteNote(self, id: strawberry.ID) -> DeleteNotePayload:
+            received["deleteNote"].add(id)
             return DeleteNotePayload(deleted_note_id=id, client_mutation_id=None)
 
     api = ctx.graphql.apps.from_schema(strawberry.Schema(Query, Mutation))
@@ -186,4 +187,8 @@ def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):
         "-c",
         "not_a_server_error",
     )
-    assert {name: bool(ids & created) for name, ids in received.items()} == {"note": True, "updateNote": True}
+    assert {name: bool(ids & created) for name, ids in received.items()} == {
+        "note": True,
+        "updateNote": True,
+        "deleteNote": True,
+    }
