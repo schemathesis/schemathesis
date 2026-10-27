@@ -4682,6 +4682,50 @@ def test_camelcase_nested_fk_produces_input_slot(ctx):
     assert (nested_slot.resource.name, nested_slot.resource_field) == ("Location", "id")
 
 
+@pytest.mark.parametrize(
+    ("consumer", "parameter", "expected"),
+    [
+        ("/events", {"name": "client_name", "in": "query", "required": True, "schema": {"type": "string"}}, []),
+        ("/clients/{client_name}/events", path_param("client_name"), []),
+        ("/clients/{username}", path_param("username"), []),
+        (
+            "/events",
+            {"name": "client_id", "in": "query", "required": True, "schema": {"type": "integer"}},
+            [
+                [
+                    "#/paths/~1clients/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1events/get",
+                        "x-schemathesis": {"is_inferred": True},
+                        "parameters": {"query.client_id": "$response.body#/*/id"},
+                    },
+                ]
+            ],
+        ),
+    ],
+    ids=["query-name", "path-name", "path-concatenated-name", "query-identifier"],
+)
+def test_name_parameter_does_not_take_identifier(ctx, consumer, parameter, expected):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation(
+                "get",
+                "/clients",
+                "200",
+                {
+                    "type": "array",
+                    "items": {"type": "object", "properties": {"id": {"type": "integer"}, "mac": {"type": "string"}}},
+                },
+            ),
+            **operation("get", consumer, "200", parameters=[parameter]),
+        },
+    )
+
+    assert inferred_links(graph) == expected
+
+
 def test_body_name_suffix_without_path_or_schema_backing_is_dropped(ctx):
     # `_name` body fields are attributes, not FKs, when nothing in the spec backs the name.
     _, graph = analyze_dependencies(
