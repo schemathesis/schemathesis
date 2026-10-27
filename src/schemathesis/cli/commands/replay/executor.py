@@ -344,7 +344,9 @@ def _replay_sequence(
         recorder.record_response(case_id=case.id, response=response)
 
         # Built from the headers this step actually sent, the same way a run reports its failures.
-        curl = case.as_curl_command(headers=recorder.find_request_headers(case_id=case.id), verify=response.verify)
+        curl = case.as_reproduction_command(
+            headers=recorder.find_request_headers(case_id=case.id), verify=response.verify
+        )
         step_outcomes.append(
             StepOutcome(status_code=response.status_code, body=response.text_lossy(), curl=curl, links=links)
         )

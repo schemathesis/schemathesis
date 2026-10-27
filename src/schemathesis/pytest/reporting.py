@@ -174,7 +174,7 @@ class PytestReportDispatcher:
         assert recorder is not None, "after_validate fired without a prior after_call for the same operation"
         for result in check_results:
             if result.failure is not None:
-                code_sample = case.as_curl_command(
+                code_sample = case.as_reproduction_command(
                     headers=dict(response.request.headers),
                     verify=response.verify,
                 )

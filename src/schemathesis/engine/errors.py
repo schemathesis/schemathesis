@@ -516,7 +516,7 @@ def build_code_sample(
         headers = dict(request.headers)
     else:
         headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
-    return case.as_curl_command(headers=headers, verify=transport_kwargs.get("verify", True))
+    return case.as_reproduction_command(headers=headers, verify=transport_kwargs.get("verify", True))
 
 
 class ServerUnavailable(Exception):
