@@ -108,7 +108,7 @@ def referenced_values(
 
 
 @lru_cache(maxsize=2048)
-def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> str | None:
+def from_parameter(parameter: str, path: str, *, body_field: bool = False, query: bool = False) -> str | None:
     parameter = parameter.strip()
     lower = parameter.lower()
 
@@ -127,6 +127,10 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
                 if prefix.lower() in GENERIC_PREFIXES and f"{{{parameter}}}" in path:
                     return from_path(path, parameter_name=parameter)
                 return to_pascal_case(prefix)
+
+    # Query `projectName` -> `Project`. Path parameters and body fields keep the rules below.
+    if query and parameter.endswith("Name") and len(parameter) >= 6:
+        return to_pascal_case(parameter[:-4])
 
     # Snake_case (case-insensitive is fine here)
     # Composite suffixes first (longer patterns match before shorter ones)

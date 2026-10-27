@@ -14,7 +14,22 @@
       ]
     },
     "GET /coaches": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "firstName",
+          "resource": "First",
+          "resource_field": "firstName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "lastName",
+          "resource": "Last",
+          "resource_field": "lastName"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -1199,6 +1214,12 @@
         ]
       }
     },
+    "First": {
+      "fields": [
+        "firstName"
+      ],
+      "types": {}
+    },
     "Game": {
       "fields": [
         "attendance",
@@ -1612,6 +1633,12 @@
           "number"
         ]
       }
+    },
+    "Last": {
+      "fields": [
+        "lastName"
+      ],
+      "types": {}
     },
     "LivePlayByPlay": {
       "fields": [

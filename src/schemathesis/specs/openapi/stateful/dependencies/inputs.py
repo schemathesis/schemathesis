@@ -144,7 +144,9 @@ def _resolve_parameter_dependency(
     3. Try discovering from operation's response schemas
     4. Fall back to creating placeholder with a single field
     """
-    resource_name = naming.from_parameter(parameter=parameter_name, path=operation.path)
+    resource_name = naming.from_parameter(
+        parameter=parameter_name, path=operation.path, query=parameter_location == ParameterLocation.QUERY
+    )
 
     if resource_name is None:
         return None

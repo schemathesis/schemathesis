@@ -511,7 +511,15 @@
       "outputs": []
     },
     "GET /2010-04-01/Accounts.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -539,6 +547,20 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "CustomerName",
+          "resource": "Customer",
+          "resource_field": "CustomerName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -625,6 +647,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -1227,6 +1256,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -1462,6 +1498,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -1491,6 +1534,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -1520,6 +1570,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -1549,6 +1606,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -1955,6 +2019,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -2994,6 +3065,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "FriendlyName",
+          "resource": "Friendly",
+          "resource_field": "FriendlyName"
         }
       ],
       "outputs": [
@@ -5988,6 +6066,12 @@
         ]
       }
     },
+    "Customer": {
+      "fields": [
+        "CustomerName"
+      ],
+      "types": {}
+    },
     "Daily.json": {
       "fields": [
         "end",
@@ -6215,6 +6299,12 @@
           "string"
         ]
       }
+    },
+    "Friendly": {
+      "fields": [
+        "FriendlyName"
+      ],
+      "types": {}
     },
     "Healthcheck": {
       "fields": [

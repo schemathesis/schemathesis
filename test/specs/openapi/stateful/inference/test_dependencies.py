@@ -5068,6 +5068,78 @@ def test_name_query_parameter_does_not_take_reference_to_another_resource(
     assert inferred_links(graph) == expected
 
 
+@pytest.mark.parametrize("parameter", ["project_name", "projectName", "ProjectName"])
+def test_name_suffixed_query_parameter_links_to_resource_name(ctx, parameter):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation(
+                "get",
+                "/projects/",
+                "200",
+                {"type": "array", "items": component_ref("Project")},
+                operation_id="listProjects",
+            ),
+            **operation(
+                "get",
+                "/reports/",
+                "200",
+                parameters=[{"name": parameter, "in": "query", "required": True, "schema": {"type": "string"}}],
+                operation_id="getReports",
+            ),
+        },
+        version="3.0.3",
+        components={
+            "schemas": {
+                "Project": {
+                    "type": "object",
+                    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                }
+            }
+        },
+    )
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1projects~1/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1reports~1/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {f"query.{parameter}": "$response.body#/*/name"},
+            },
+        ]
+    ]
+
+
+def test_name_suffixed_path_parameter_keeps_create_body_forward(ctx):
+    # `{domainName}` under `/domainnames` names a `DomainName`, not a `Domain`.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation_with_body(
+                "post",
+                "/domainnames",
+                "200",
+                {"type": "object", "properties": {"domainName": {"type": "string"}}, "required": ["domainName"]},
+            ),
+            **operation("get", "/domainnames/{domainName}", "200", parameters=[path_param("domainName")]),
+        },
+    )
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1domainnames/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1domainnames~1{domainName}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.domainName": "$request.body#/domainName"},
+            },
+        ]
+    ]
+
+
 def test_body_name_suffix_without_path_or_schema_backing_is_dropped(ctx):
     # `_name` body fields are attributes, not FKs, when nothing in the spec backs the name.
     _, graph = analyze_dependencies(
