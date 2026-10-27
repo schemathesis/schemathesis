@@ -216,13 +216,10 @@ def test_dicts_always_invalid_as_path_parameters(value):
     ids=["query", "header", "body"],
 )
 def test_negative_type_string_for_integer_is_non_empty(ctx_factory, location):
-    # `_negative_type` draws `st.text()` for the string-type negative on a non-string
-    # parameter; Hypothesis shrinks to "" and `_is_not_numeric_string` passes it through.
-    # `?param=` / empty header / empty body collapse to absent on the wire, so the
-    # negative can't demonstrate a type violation against the declared `integer` type.
+    # A blank value may read as absent, so the string-type negative must carry text of its own.
     ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], location=location)
     values = cover_schema(ctx, {"type": "integer", "format": "int32"})
-    assert "" not in values, f"{location}: empty string emitted as string-type negative; got {values!r}"
+    assert "AAA" in values, f"{location}: no non-empty string-type negative; got {values!r}"
 
 
 @pytest.mark.parametrize("location", [ParameterLocation.QUERY, ParameterLocation.BODY], ids=["query", "body"])
@@ -1561,7 +1558,11 @@ def test_type_violations_break_the_schema_once_stringified(nctx, schema):
         (ParameterLocation.QUERY, {"type": "string", "pattern": "[0-9]"}, ["true", "null", ["null", "null"]]),
         (ParameterLocation.QUERY, {"type": "string", "minLength": 5}, [0, 0.5, "true", "null", ["null", "null"]]),
         (ParameterLocation.QUERY, {"type": "string", "enum": ["alpha"]}, [0, 0.5, "true", "null", ["null", "null"]]),
-        (ParameterLocation.QUERY, {"type": "integer", "minimum": 5}, [0.5, "true", "null", "AAA", ["null", "null"]]),
+        (
+            ParameterLocation.QUERY,
+            {"type": "integer", "minimum": 5},
+            [0.5, "true", "null", "AAA", ["null", "null"], ""],
+        ),
         (ParameterLocation.QUERY, {"type": "boolean"}, [2, 0.5, "null", "AAA", ["null", "null"]]),
         (ParameterLocation.PATH, {"type": "string", "pattern": "[0-9]"}, ["true", "null", "null,null"]),
         (ParameterLocation.HEADER, {"type": "string", "pattern": "[0-9]"}, [True, None, [None, None], {}]),
@@ -2263,7 +2264,7 @@ def test_positive_bundled_schema_refs(pctx, schema, expected):
         # Basic $ref negative case
         (
             {"$defs": {"PositiveInt": {"type": "integer", "minimum": 1}}, "$ref": "#/$defs/PositiveInt"},
-            [0.5, "true", "null", "AAA", ["null", "null"], 0],
+            [0.5, "true", "null", "AAA", ["null", "null"], "", 0],
         ),
         # $ref in object properties - missing required property
         (

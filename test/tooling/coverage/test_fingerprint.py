@@ -100,7 +100,7 @@ def test_fingerprint_keeps_negative_cases_outside_an_unserializable_body(ctx):
     )
     rows = fingerprint_schema(raw, generation_modes=[GenerationMode.NEGATIVE]).rows
     assert [row[1:6] for row in rows if row[0] == "POST /u"] == [
-        *[("incorrect_type", "negative", "query", "q", "/type")] * 4,
+        *[("incorrect_type", "negative", "query", "q", "/type")] * 5,
         ("missing_parameter", "negative", "body", "", ""),
         ("missing_parameter", "negative", "query", "q", ""),
     ]

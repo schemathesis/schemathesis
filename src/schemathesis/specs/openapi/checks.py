@@ -742,7 +742,11 @@ def _sent_query_values(response: Response, case: Case) -> dict[str, list[str]] |
 
 
 def _query_as_sent(
-    response: Response, case: Case, query: Mapping[str, object], properties: dict[str, JsonSchema]
+    response: Response,
+    case: Case,
+    query: Mapping[str, object],
+    properties: dict[str, JsonSchema],
+    required: list[str],
 ) -> dict[str, object] | None:
     """Replace generated query values with the text actually sent wherever the server reads that text as is."""
     sent_values = _sent_query_values(response, case)
@@ -757,7 +761,11 @@ def _query_as_sent(
         texts = sent_values[name]
         # Other types keep their generated value, as the server parses the text back into it.
         schema = properties.get(name, {})
-        if texts == [""] or _declares_type(schema, "string"):
+        is_string = _declares_type(schema, "string")
+        # Frameworks read a blank non-string value as an absent one, which an optional parameter allows.
+        if texts == [""] and not is_string and name not in required:
+            continue
+        if texts == [""] or is_string:
             sent[name] = texts[0] if len(texts) == 1 else texts
         elif len(texts) == 1 and _declares_type(schema, "boolean"):
             sent[name] = string_to_boolean(texts[0])
@@ -803,7 +811,9 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
         if not container:
             continue
         if location == ParameterLocation.QUERY:
-            sent = _query_as_sent(response, case, value, container.schema.get("properties", {}))
+            sent = _query_as_sent(
+                response, case, value, container.schema.get("properties", {}), container.schema.get("required", [])
+            )
             if sent is not None:
                 value = sent
         v = dict(value) if location == ParameterLocation.HEADER else value
