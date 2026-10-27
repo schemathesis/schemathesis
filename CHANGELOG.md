@@ -9,33 +9,50 @@
 - Faster coverage phase startup in negative mode for path parameters declared with `content`.
 - Lower coverage phase memory on large `$ref`-heavy schemas.
 
-### :bug: Fixed
-
-- Operations left untested when a malformed request body media type sits beside a valid one.
-- Inferred stateful links passing resource ids into name parameters like `{username}`.
-- Inferred stateful links filling `*_name` query filters with an unrelated `name` field.
-- Inferred stateful links filling name parameters with a bare value an unrelated `POST` returns.
-- Inferred stateful links filling `*_name` query filters with a field naming another resource.
-- Missing inferred stateful links for camelCase query parameters like `projectName`. [#5641](https://github.com/schemathesis/schemathesis/issues/5641)
-- Valid examples dropped when several `discriminator.mapping` values point to the same schema. [#5631](https://github.com/schemathesis/schemathesis/issues/5631)
-- WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.
-- Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.
-- False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
-- Python traceback printed for WFC login failures, such as a dropped connection.
-- GraphQL stateful testing treating mutation result types like `DeleteNote` or `UpdateNote` as separate resources.
-- GraphQL stateful testing skipping mutations that wrap results in payload types, such as `CreateNotePayload`.
-- GraphQL stateful testing sending random ids to delete mutations returning `Boolean` or payloads.
-- GraphQL stateful testing linking multi-word deletes like `deleteBookCover` to the wrong resource.
-- Schema examples, multipart filenames and query serialization lost for `$ref` alias components or `$ref` siblings.
-- Serialization error for XML multipart parts with arrays of `$ref` items.
-- Captured values dropped from request bodies missing required fields in the examples phase with `fill-missing`.
-- Object-level authorization failures replaying only the peer's request in `--report pytest` and cURL output.
-- `--max-time` overrun by a request that is still waiting for a response.
-- Operations unreached under `--max-time` missing the `Time limit reached` skip reason.
-
 ### :wrench: Changed
 
 - Coverage phase covers boundary lengths of password-style patterns like `^(?=.*\d)[a-z\d]*$`.
+
+### :bug: Fixed
+
+#### Inferred stateful links
+
+- Links passing resource ids into name parameters like `{username}`.
+- Links filling `*_name` query filters with an unrelated `name` field.
+- Links filling name parameters with a bare value an unrelated `POST` returns.
+- Links filling `*_name` query filters with a field naming another resource.
+- Missing links for camelCase query parameters like `projectName`. [#5641](https://github.com/schemathesis/schemathesis/issues/5641)
+
+#### GraphQL stateful testing
+
+- Mutation result types like `DeleteNote` or `UpdateNote` treated as separate resources.
+- Mutations skipped when they wrap results in payload types, such as `CreateNotePayload`.
+- Random ids sent to delete mutations returning `Boolean` or payloads.
+- Multi-word deletes like `deleteBookCover` linked to the wrong resource.
+
+#### Data generation
+
+- Valid examples dropped when several `discriminator.mapping` values point to the same schema. [#5631](https://github.com/schemathesis/schemathesis/issues/5631)
+- Schema examples, multipart filenames and query serialization lost for `$ref` alias components or `$ref` siblings.
+- Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.
+- Captured values dropped from request bodies missing required fields in the examples phase with `fill-missing`.
+
+#### Authentication
+
+- WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.
+- Python traceback printed for WFC login failures, such as a dropped connection.
+
+#### `--max-time`
+
+- Overrun by a request that is still waiting for a response.
+- Operations unreached under `--max-time` missing the `Time limit reached` skip reason.
+
+#### Others
+
+- Operations left untested when a malformed request body media type sits beside a valid one.
+- False positive `positive_data_acceptance` in coverage for multipart bodies with custom `encoding.contentType` strategies.
+- Serialization error for XML multipart parts with arrays of `$ref` items.
+- Object-level authorization failures replaying only the peer's request in `--report pytest` and cURL output.
 
 ## [4.32.5](https://github.com/schemathesis/schemathesis/compare/v4.32.4...v4.32.5) - 2026-10-26
 
