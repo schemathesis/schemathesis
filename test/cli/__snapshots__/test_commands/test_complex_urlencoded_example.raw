@@ -17,7 +17,7 @@ Schemathesis dev
 
  🚫  Examples (in 0.00s)
 
-     🚫 1 error
+     ✅ 1 passed
 
 ==================================== ERRORS ====================================
 __________________________________ POST /test __________________________________
@@ -30,6 +30,14 @@ Location:
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== WARNINGS ===================================
+
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - POST /test
+
+💡 Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file
 
 =================================== SUMMARY ====================================
 
@@ -46,9 +54,12 @@ Test Phases:
 Errors:
   🚫 Schema Error: 1
 
+Warnings:
+  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
+
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+========================= 1 error, 1 warning in 1.00s ==========================

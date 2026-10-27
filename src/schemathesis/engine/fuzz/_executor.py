@@ -186,8 +186,11 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
     operations = []
     for result in ctx.schema.get_all_operations():
         if isinstance(result, Ok):
-            if not result.ok().has_skipped_required_body:
-                operations.append(result.ok())
+            operation = result.ok()
+            if not operation.has_skipped_required_body:
+                operations.append(operation)
+            for error in operation.schema_errors:
+                yield events.NonFatalError(error=error, phase=None, label=operation.label, related_to_operation=True)
             continue
         error = result.err()
         yield events.NonFatalError(

@@ -11,6 +11,7 @@
 
 ### :bug: Fixed
 
+- Operations left untested when a malformed request body media type sits beside a valid one.
 - Inferred stateful links passing resource ids into name parameters like `{username}`.
 - Valid examples dropped when several `discriminator.mapping` values point to the same schema. [#5631](https://github.com/schemathesis/schemathesis/issues/5631)
 - WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.

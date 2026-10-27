@@ -310,6 +310,10 @@ def _run_operation(
 ) -> None:
     """Test one operation in this phase, or report why it is skipped."""
     ctx.take_operation_slice()
+    for error in operation.schema_errors:
+        events_queue.put(
+            events.NonFatalError(error=error, phase=phase, label=operation.label, related_to_operation=True)
+        )
     verdict = _scheduling_verdict(ctx, operation, phase)
     if verdict.directive is SchedulingDirective.SKIP:
         events.put_skipped_scenario(

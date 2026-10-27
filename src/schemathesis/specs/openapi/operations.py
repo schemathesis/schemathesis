@@ -9,12 +9,13 @@ from urllib.parse import unquote
 import jsonschema_rs
 from packaging import version
 
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, media_types
 from schemathesis.core.adapter import OperationParameter, ParsedParameters
 from schemathesis.core.errors import (
     SCHEMA_ERROR_SUGGESTION,
     HookExecutionError,
     InvalidSchema,
+    MalformedMediaType,
     OperationNotFound,
     RefResolutionError,
     SchemaLocation,
@@ -74,6 +75,28 @@ def parse_operation_reference(reference: str) -> tuple[str, str]:
     encoded_path, method = suffix.rsplit("/", maxsplit=1)
     # A URI fragment is percent-decoded before its JSON Pointer escapes (RFC 6901, section 6).
     return decode_pointer(unquote(encoded_path)), method
+
+
+def _drop_malformed_media_types(
+    items: list[OperationParameter], path: str, method: str
+) -> tuple[list[OperationParameter], list[InvalidSchema]]:
+    """Leave out request bodies with malformed media types while another body is still usable."""
+    kept: list[OperationParameter] = []
+    errors: list[InvalidSchema] = []
+    has_usable_body = False
+    for item in items:
+        if isinstance(item, OpenApiBody):
+            try:
+                media_types.parse(item.media_type)
+            except MalformedMediaType as exc:
+                errors.append(InvalidSchema.from_malformed_media_type(exc, item.media_type, path=path, method=method))
+                continue
+            has_usable_body = True
+        kept.append(item)
+    if not has_usable_body:
+        # Without a usable body the operation fails to load with the same error.
+        return items, []
+    return kept, errors
 
 
 def _named_after_placeholder(parameters: list[OperationParameter], path: str) -> list[OperationParameter]:
@@ -499,6 +522,7 @@ class OperationLoader:
             )
         responses = self._parse_responses(definition, scope, resolver=resolver)
         security = self._parse_security(definition)
+        items, schema_errors = _drop_malformed_media_types(parameters.items, path, method)
         operation: APIOperation[OperationParameter, ResponsesContainer, OpenApiSecurityParameters, OpenApiSchema] = (
             APIOperation(
                 path=path,
@@ -514,9 +538,10 @@ class OperationLoader:
                 headers=OpenApiParameterSet(ParameterLocation.HEADER, adapter=schema.adapter),
                 cookies=OpenApiParameterSet(ParameterLocation.COOKIE, adapter=schema.adapter),
                 skipped_parameters=parameters.skipped,
+                schema_errors=schema_errors,
             )
         )
-        for parameter in _named_after_placeholder(parameters.items, path):
+        for parameter in _named_after_placeholder(items, path):
             operation.add_parameter(parameter)
         declared_parameter_names = {parameter.name for parameter in operation.path_parameters}
         for name in get_template_fields(operation.path):
