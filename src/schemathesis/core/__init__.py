@@ -42,6 +42,8 @@ class SpecificationFeature(enum.StrEnum):
     AUTH_BOOTSTRAP = "auth_bootstrap"
     # Telling served requests from refused ones by the response status code.
     STATUS_CODE_ANALYSIS = "status_code_analysis"
+    # Probing how the server handles HTTP edge cases (null bytes in headers, encoded path separators).
+    HTTP_PROBES = "http_probes"
 
 
 @dataclass(slots=True)
@@ -87,9 +89,10 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.EXAMPLES,
             SpecificationFeature.AUTH_BOOTSTRAP,
             SpecificationFeature.STATUS_CODE_ANALYSIS,
+            SpecificationFeature.HTTP_PROBES,
         }
     ),
-    SpecificationKind.GRAPHQL: frozenset({SpecificationFeature.STATEFUL_TESTING}),
+    SpecificationKind.GRAPHQL: frozenset({SpecificationFeature.STATEFUL_TESTING, SpecificationFeature.HTTP_PROBES}),
 }
 
 
