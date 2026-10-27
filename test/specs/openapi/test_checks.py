@@ -1144,6 +1144,31 @@ def test_negative_data_rejection_validates_serialized_query(ctx, response_factor
     assert negative_data_rejection(check_context(), response, case) is None
 
 
+@pytest.mark.parametrize("declared_type", ["integer", "number"])
+@pytest.mark.parametrize("required", [True, False], ids=["required", "optional"])
+def test_negative_data_rejection_blank_numeric_query(ctx, response_factory, declared_type, required):
+    # Frameworks read a blank optional value as an absent one.
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"in": "query", "name": "year", "required": required, "schema": {"type": declared_type}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        query={"year": ""},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    if required:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
+
+
 def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_value(ctx, response_factory):
     operation = ctx.openapi.load_operation(
         "GET /items",

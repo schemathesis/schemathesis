@@ -640,7 +640,7 @@ def test_(request, case):
     # And the ones that can be negated should be negated
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
 
 
 def test_trimmed_output(testdir, ctx):

@@ -97,6 +97,7 @@ NEGATIVE_CASES = [
     {"query": {"q1": ["0.5", "0.5"], "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q1": "0.5", "q2": "00"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
+    {"query": {"q1": "", "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["null", "null"], "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q1": "AAA", "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
@@ -141,6 +142,7 @@ MIXED_CASES = [
     {"query": {"q1": "5", "q2": "0"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "4", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": "", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["null", "null"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "AAA", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "null", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -1564,6 +1566,7 @@ def test_array_in_header_path_query(ctx):
                 "path_parameters": {"bar": "true"},
                 "query": {"key": ["true", "true"]},
             },
+            {"headers": {"X-API-Key-1": "true"}, "path_parameters": {"bar": "true"}, "query": {"key": ""}},
             {
                 "headers": {"X-API-Key-1": "true"},
                 "path_parameters": {"bar": "true"},
@@ -1575,6 +1578,7 @@ def test_array_in_header_path_query(ctx):
             {"headers": {"X-API-Key-1": "null,null"}, "path_parameters": {"bar": "true"}, "query": {"key": "true"}},
             {"headers": {"X-API-Key-1": "AAA"}, "path_parameters": {"bar": "true"}, "query": {"key": "true"}},
             {"headers": {"X-API-Key-1": "null"}, "path_parameters": {"bar": "true"}, "query": {"key": "true"}},
+            {"headers": {"X-API-Key-1": "true"}, "path_parameters": {"bar": "%20"}, "query": {"key": "true"}},
             {"headers": {"X-API-Key-1": "true"}, "path_parameters": {"bar": "null%2Cnull"}, "query": {"key": "true"}},
             {"headers": {"X-API-Key-1": "true"}, "path_parameters": {"bar": "AAA"}, "query": {"key": "true"}},
             {"headers": {"X-API-Key-1": "true"}, "path_parameters": {"bar": "null"}, "query": {"key": "true"}},
@@ -1748,6 +1752,12 @@ def test_path_parameter_dots(ctx):
                 {"path_parameters": {"name": ANY}},
             ],
             [
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": ANY}},
+                {"path_parameters": {"name": "null"}},
+            ],
+            [
+                {"path_parameters": {"name": "%20"}},
                 {"path_parameters": {"name": "null%2Cnull"}},
                 {"path_parameters": {"name": ANY}},
                 {"path_parameters": {"name": "null"}},
@@ -2484,6 +2494,7 @@ def foo_id(value):
                 "type": "integer",
             },
             [
+                foo_id("%20"),
                 foo_id("null%2Cnull"),
                 foo_id("AAA"),
                 foo_id("null"),
@@ -2731,6 +2742,7 @@ def test_negative_null_query_parameter_is_sent(ctx):
         {"limit": "null"},
         {"limit": "AAA"},
         {"limit": ["null", "null"]},
+        {"limit": ""},
     ]
 
 
@@ -8879,6 +8891,43 @@ def test_numeric_bounds_on_string_parameter_are_not_negated(ctx, parameter, vers
     ] == expected
 
 
+@pytest.mark.parametrize("declared_type", ["integer", "number"])
+@pytest.mark.parametrize(
+    ("location", "path", "required", "blank"),
+    [
+        ("path", "/foo/{x}", True, "%20"),
+        ("query", "/foo", True, ""),
+        ("query", "/foo", False, ""),
+    ],
+    ids=["path", "required-query", "optional-query"],
+)
+def test_numeric_parameter_is_sent_blank(ctx, declared_type, location, path, required, blank):
+    # Spring reads a blank numeric value as null, which handlers often dereference.
+    operation = load_schema(
+        ctx,
+        parameters=[{"in": location, "name": "x", "required": required, "schema": {"type": declared_type}}],
+        path=path,
+        method="get",
+    )[path]["GET"]
+    container = LOCATION_TO_CONTAINER[ParameterLocation(location)]
+
+    assert [
+        case.meta.phase.data.scenario
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "x" and getattr(case, container).get("x") == blank
+    ] == [CoverageScenario.INCORRECT_TYPE]
+
+
+def test_nullable_numeric_query_parameter_is_not_sent_blank(ctx):
+    operation = load_schema(
+        ctx,
+        parameters=[{"in": "query", "name": "x", "required": True, "schema": {"type": "integer", "nullable": True}}],
+        method="get",
+    )["/foo"]["GET"]
+
+    assert all(case.query.get("x") != "" for case in collect_cases(operation, GenerationMode.NEGATIVE))
+
+
 SECOND_REQUIRED_QUERY_PARAMETER = {"in": "query", "name": "kind", "required": True, "schema": {"type": "string"}}
 OPTIONAL_QUERY_PARAMETER = {"in": "query", "name": "extra", "schema": {"type": "string"}}
 # An exploded empty array leaves the wire request identical to one that omits the parameter.
@@ -10567,7 +10616,13 @@ def test_negative_query_value_for_a_type_union(ctx):
         method="get",
         version="3.1.0",
     )["/foo"]["GET"]
-    assert targeted_values(operation, GenerationMode.NEGATIVE, "query", "q") == [None, ["null", "null"], "AAA", "null"]
+    assert targeted_values(operation, GenerationMode.NEGATIVE, "query", "q") == [
+        None,
+        "",
+        ["null", "null"],
+        "AAA",
+        "null",
+    ]
 
 
 def test_form_body_with_a_false_any_of_branch(ctx):
@@ -10647,6 +10702,7 @@ def test_positive_query_values_for_a_parameter_accepting_anything(ctx):
         {"a": "null", "b": "0"},
     ]
     assert targeted_values(operation, GenerationMode.NEGATIVE, "query", "b") == [
+        "",
         ["null", "null"],
         "AAA",
         "null",

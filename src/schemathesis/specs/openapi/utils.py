@@ -91,8 +91,8 @@ def numeric_wire_value_is_valid(coerced: int | float | list[int | float], is_val
 
 
 def reads_as_null(text: str, is_valid: Callable[[object], bool]) -> bool:
-    """Frameworks read the text `null` into a nullable parameter as null."""
-    return text.lower() == "null" and is_valid(None)
+    """Frameworks read the text `null` or a blank one into a nullable parameter as null."""
+    return (text.lower() == "null" or not text.strip()) and is_valid(None)
 
 
 def sent_text_is_valid(text: str, is_valid: Callable[[object], bool], expected_types: list[str]) -> bool:

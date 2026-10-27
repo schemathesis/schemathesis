@@ -4700,6 +4700,16 @@ def _negative_type(
                 generated_values.append(ctx.generate_from(strategy))
             except Unsatisfiable:
                 break
+    # Spring reads a blank numeric parameter as null; a path segment stays non-empty with a single space.
+    if (
+        ctx.wire.url_part()
+        and ctx.path == ["type"]
+        and {"integer", "number"} & set(types)
+        and {"string", "null"} <= strategies.keys()
+    ):
+        blank = ctx.wire.rendered(" " if ctx.location == ParameterLocation.PATH else "")
+        if not apply_validation or _does_not_match_the_original_schema(blank):
+            generated_values.append(blank)
     if cache_key is not None:
         ctx.session.values[cache_key] = generated_values
     for value in generated_values:
