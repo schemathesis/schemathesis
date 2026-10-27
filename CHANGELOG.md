@@ -12,6 +12,7 @@
 ### :bug: Fixed
 
 - Inferred stateful links passing resource ids into name parameters like `{username}`.
+- Inferred stateful links filling `*_name` query filters with an unrelated `name` field.
 - Valid examples dropped when several `discriminator.mapping` values point to the same schema. [#5631](https://github.com/schemathesis/schemathesis/issues/5631)
 - WFC and dynamic cookie auth over WSGI failing for cookie names like `user[id]` or `a@b`.
 - Patterns dropped for a hyphen beside a class escape, such as `[\w-/]`.

@@ -4726,6 +4726,131 @@ def test_name_parameter_does_not_take_identifier(ctx, consumer, parameter, expec
     assert inferred_links(graph) == expected
 
 
+@pytest.mark.parametrize(
+    ("item_fields", "parameters"),
+    [
+        (["id", "name"], {"path.fileId": "$response.body#/id"}),
+        (
+            ["id", "track_name"],
+            {"path.fileId": "$response.body#/id", "query.track_name": "$response.body#/track_name"},
+        ),
+    ],
+    ids=["other-name-field", "own-name-field"],
+)
+def test_name_query_parameter_takes_only_field_of_same_name(ctx, item_fields, parameters):
+    item = {"type": "object", "properties": {field: {"type": "string"} for field in item_fields}}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/files", "200", item),
+            **operation(
+                "patch",
+                "/files/{fileId}",
+                "200",
+                parameters=[
+                    path_param("fileId"),
+                    {"name": "track_name", "in": "query", "required": False, "schema": {"type": "string"}},
+                ],
+            ),
+        },
+    )
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1files/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1files~1{fileId}/patch",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": parameters,
+            },
+        ]
+    ]
+
+
+def test_name_query_parameter_takes_name_of_resource_it_abbreviates(ctx):
+    run = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/check-runs", "201", run),
+            **operation(
+                "get",
+                "/commits/{ref}/check-runs",
+                "200",
+                parameters=[
+                    path_param("ref"),
+                    {"name": "check_name", "in": "query", "required": False, "schema": {"type": "string"}},
+                ],
+            ),
+        },
+    )
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1check-runs/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1commits~1{ref}~1check-runs/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"query.check_name": "$response.body#/name"},
+            },
+        ]
+    ]
+
+
+def test_name_parameter_takes_name_of_role_it_names(ctx):
+    owned = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "orderer": component_ref("Contact"),
+            "contact": component_ref("Contact"),
+        },
+    }
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/tasks", "200", owned),
+            **operation(
+                "patch",
+                "/tasks/{id}",
+                "200",
+                parameters=[
+                    path_param("id"),
+                    {"name": "order__orderer__name", "in": "query", "required": False, "schema": {"type": "string"}},
+                ],
+            ),
+        },
+        components={
+            "schemas": {
+                "Contact": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+            }
+        },
+    )
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1tasks/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1tasks~1{id}/patch",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.id": "$response.body#/id"},
+            },
+        ],
+        [
+            "#/paths/~1tasks/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1tasks~1{id}/patch",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"query.order__orderer__name": "$response.body#/orderer/name"},
+            },
+        ],
+    ]
+
+
 def test_body_name_suffix_without_path_or_schema_backing_is_dropped(ctx):
     # `_name` body fields are attributes, not FKs, when nothing in the spec backs the name.
     _, graph = analyze_dependencies(

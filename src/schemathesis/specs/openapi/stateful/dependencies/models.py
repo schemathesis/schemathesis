@@ -25,6 +25,7 @@ from schemathesis.specs.openapi.stateful.dependencies.naming import (
     from_path,
     key_kind,
     normalize_for_matching,
+    parameter_names_source,
     strip_version_prefix,
 )
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
@@ -193,6 +194,19 @@ class DependencyGraph:
                                 pointer = pointer.rstrip("/") + "/*"
                             value_expr = f"$response.body#{pointer}"
                         elif input_slot.resource_field is not None:
+                            # A name filter's prefix says whose name it takes (`owner_name`); other names are wrong.
+                            if (
+                                input_slot.parameter_location == ParameterLocation.QUERY
+                                and isinstance(input_slot.parameter_name, str)
+                                and key_kind(input_slot.parameter_name) == KeyKind.NAME
+                                and not parameter_names_source(
+                                    parameter=input_slot.parameter_name,
+                                    field=input_slot.resource_field,
+                                    resource=output_slot.resource.name,
+                                    pointer=output_slot.pointer,
+                                )
+                            ):
+                                continue
                             # A pointer to an undeclared response field always resolves to nothing.
                             declared: Collection[str] = (
                                 output_slot.resource.fields
