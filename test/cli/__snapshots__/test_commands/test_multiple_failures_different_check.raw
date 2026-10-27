@@ -35,6 +35,29 @@ __________________________ GET /api/multiple_failures __________________________
 
 - ST103 Undocumented status code
 
+    Received: 504
+    Documented: 200
+
+[504] Gateway Timeout:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>504 Gateway Timeout</title>
+    <h1>Gateway Timeout</h1>
+    <p>The connection to an upstream server timed out.</p>`
+
+Reproduce with:
+
+    curl -X GET 'http://127.0.0.1/api/multiple_failures?id=9223372036854775808'
+
+    st replay <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+- ST103 Undocumented status code
+
     Received: 500
     Documented: 200
 
@@ -61,8 +84,8 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ ST101 Server error: 1
-  ❌ ST103 Undocumented status code: 1
+  ❌ ST101 Server error: 2
+  ❌ ST103 Undocumented status code: 2
 
 For more information, run `st explain <code>` for ST101, ST103.
 
@@ -71,4 +94,4 @@ Test cases:
 
 Seed: not used in the deterministic mode
 
-============================= 2 failures in 1.00s ==============================
+============================= 4 failures in 1.00s ==============================

@@ -89,7 +89,7 @@ def test_(request, case):
         ]
     )
     # 100 for /valid, 1 for /users; /invalid yields no positive case (required `id` has no valid value)
-    hypothesis_calls = (hypothesis_max_examples or 100) + 3
+    hypothesis_calls = (hypothesis_max_examples or 100) + 4
     result.stdout.re_match_lines([rf"Hypothesis calls: {hypothesis_calls}$"])
 
 
@@ -579,7 +579,7 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
-    assert "[500] Internal Server Error" in stdout
+    assert "[504] Gateway Timeout" in stdout
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
 

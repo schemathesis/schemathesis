@@ -636,7 +636,7 @@ def test_coverage_pool_overlay_reaches_field_under_digit_named_property(ctx, nam
     data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
 
     cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
-    assert [case.body for case in cases] == [{name: {"location_id": 7340001}}]
+    assert [case.body for case in cases] == [{name: {"location_id": 7340001}}, {name: {"location_id": 2**63}}]
 
 
 def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(ctx):
@@ -655,7 +655,12 @@ def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(
     )
 
     cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
-    assert [case.body for case in cases] == [{"address_id": {"location_id": 5550001}}, {}, {"address_id": {}}]
+    assert [case.body for case in cases] == [
+        {"address_id": {"location_id": 5550001}},
+        {},
+        {"address_id": {}},
+        {"address_id": {"location_id": 2**63}},
+    ]
 
 
 @pytest.mark.parametrize(
@@ -667,7 +672,7 @@ def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(
                 "type": "object",
                 "properties": {"shipping": {"$ref": "#/components/schemas/Shipping", "type": "object"}},
             },
-            [{"shipping": {"location_id": 0}}, {}, {"shipping": {}}],
+            [{"shipping": {"location_id": 0}}, {}, {"shipping": {}}, {"shipping": {"location_id": 2**63}}],
         ),
         (
             "3.0.2",
@@ -677,7 +682,7 @@ def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(
                     "shipping": {"type": "object", "properties": {"location_id": {"type": "integer", "example": 42}}}
                 },
             },
-            [{"shipping": {"location_id": 42}}, {}, {"shipping": {}}],
+            [{"shipping": {"location_id": 42}}, {}, {"shipping": {}}, {"shipping": {"location_id": 2**63}}],
         ),
         (
             "3.0.2",
@@ -706,6 +711,7 @@ def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(
                 {"shipping": {}},
                 {"shipping": {"parts": [{}, {}]}},
                 {"shipping": {"parts": [{}]}},
+                {"shipping": {"parts": [{"location_id": 2**63}]}},
             ],
         ),
     ],
@@ -745,7 +751,7 @@ def test_coverage_pool_overlay_reaches_top_level_field_of_ref_body(ctx):
     data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
 
     cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
-    assert [case.body["location_id"] for case in cases] == [7340001, 7340001, 7340001]
+    assert [case.body["location_id"] for case in cases] == [7340001, 7340001, 2**63, 7340001]
 
 
 def test_coverage_pool_draws_multi_slot_correlated(ctx):
@@ -1128,6 +1134,11 @@ def test_coverage_pool_overlay_reaches_every_item_of_whole_drawn_arrays(ctx):
             "Object with valid 'data' value: Single-item array: Object with valid 'location_id' value: "
             "Near-boundary number",
             [2],
+        ),
+        (
+            "Object with valid 'data' value: Single-item array: Object with valid 'location_id' value: "
+            "Number beyond common integer widths",
+            [2**63],
         ),
         (
             "Object with valid 'data' value: Single-item array: Object with valid 'name' value: "

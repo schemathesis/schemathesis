@@ -70,4 +70,4 @@ async def test_(request, case):
     result = testdir.runpytest(*args)
     result.assert_outcomes(passed=2)
     # Then it should be executed as any other test
-    result.stdout.re_match_lines([r"Hypothesis calls: 12$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 14$"])
