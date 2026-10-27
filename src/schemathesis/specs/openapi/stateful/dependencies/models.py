@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.stateful.dependencies.naming import (
     normalize_for_matching,
     parameter_names_source,
     strip_version_prefix,
+    trailing_path_parameter,
 )
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
@@ -187,6 +188,17 @@ class DependencyGraph:
                                 and field is not None
                                 and field not in identifiers
                                 and key_kind(field) != KeyKind.IDENTIFIER
+                            ):
+                                continue
+                            # A single created value fills a name only as the key of the created item: `/tags/{tagName}`.
+                            if (
+                                output_slot.cardinality == Cardinality.ONE
+                                and isinstance(input_slot.parameter_name, str)
+                                and key_kind(input_slot.parameter_name) == KeyKind.NAME
+                                and (
+                                    f"/{{{input_slot.parameter_name}}}" not in consumer.path
+                                    or trailing_path_parameter(producer.path) is not None
+                                )
                             ):
                                 continue
                             pointer = output_slot.pointer
