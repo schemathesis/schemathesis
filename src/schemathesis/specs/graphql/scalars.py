@@ -91,6 +91,11 @@ def unsupported_scalar_name(error: Exception) -> str | None:
     return match.group(1) if match is not None else None
 
 
+def scalar_strategies() -> dict[str, st.SearchStrategy[graphql.ValueNode]]:
+    """Strategies for every non-built-in scalar Schemathesis can generate, user-registered ones taking precedence."""
+    return {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
+
+
 @lru_cache
 def get_extra_scalar_strategies() -> dict[str, st.SearchStrategy]:
     """Get all extra GraphQL strategies."""
