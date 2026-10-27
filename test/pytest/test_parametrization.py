@@ -563,6 +563,41 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET /invalid\] FAILED"])
 
 
+def test_malformed_media_type_beside_valid_one(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+""",
+        schema_name="simple_openapi.yaml",
+        paths={
+            "/payload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application.json": {"schema": {"type": "object"}},
+                            "application/json": {"schema": {"type": "object"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-rf")
+    result.assert_outcomes(passed=2, failed=1)
+    result.stdout.re_match_lines(
+        [
+            r".*::test_\[POST /payload\] PASSED",
+            r".*::test_\[POST /payload\]\[schema-error\] FAILED",
+            r".*Malformed media type: `application.json`",
+        ]
+    )
+
+
 def test_no_base_path(testdir):
     # When the given schema has no "basePath"
     testdir.make_test(

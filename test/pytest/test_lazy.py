@@ -93,6 +93,37 @@ def test_(request, case):
     result.stdout.re_match_lines([rf"Hypothesis calls: {hypothesis_calls}$"])
 
 
+def test_malformed_media_type_beside_valid_one(testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+""",
+        schema_name="simple_openapi.yaml",
+        paths={
+            "/payload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application.json": {"schema": {"type": "object"}},
+                            "application/json": {"schema": {"type": "object"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-rf")
+    result.assert_outcomes(passed=1, failed=1)
+    result.stdout.re_match_lines([r".*Malformed media type: `application.json`"])
+
+
 def test_with_fixtures(testdir):
     # When the test uses custom arguments for pytest fixtures
     testdir.make_test(

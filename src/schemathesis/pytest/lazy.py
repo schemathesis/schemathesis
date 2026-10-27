@@ -67,6 +67,8 @@ def get_all_tests(
                 yield Err(exc)
                 continue
             yield Ok((operation, test))
+            for schema_error in operation.schema_errors:
+                yield Err(schema_error)
         else:
             yield result
 

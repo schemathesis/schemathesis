@@ -217,6 +217,11 @@ class SchemathesisCase(PyCollector):
             operation_tags = None
 
         yield from self._make_items(funcobj, name, operation_label, operation_tags)
+        if isinstance(result, Ok):
+            for schema_error in result.ok().schema_errors:
+                yield from self._make_items(
+                    schema_error.as_failing_test_function(), f"{name}[schema-error]", operation_label, operation_tags
+                )
 
     def _make_items(
         self,
