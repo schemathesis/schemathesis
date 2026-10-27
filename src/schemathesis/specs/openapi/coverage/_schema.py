@@ -3223,6 +3223,7 @@ OVERSIZED_STRING_LENGTH = 2**16 + 1
 OVERSIZED_STRING = "a" * OVERSIZED_STRING_LENGTH
 # Deduplication spelling; not valid JSON, so it matches no other value and keeps every enclosing key short.
 OVERSIZED_STRING_SPELLING = "<oversized>"
+LARGE_NUMBER = 2**63
 
 
 def _spec_hint_values(
@@ -3553,6 +3554,18 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         if smaller is not None and _within_adjusted_bounds(smaller) and seen.insert(smaller):
             yield PositiveValue(
                 smaller, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
+            )
+    else:
+        # Past both 32- and 64-bit integer ranges, so a narrower server-side type overflows.
+        large = LARGE_NUMBER if multiple_of is None else closest_multiple_greater_than(LARGE_NUMBER, multiple_of)
+        if (
+            large is not None
+            and _within_adjusted_bounds(large)
+            and _is_valid_with_formats(large, schema, ctx)
+            and seen.insert(large)
+        ):
+            yield PositiveValue(
+                large, scenario=CoverageScenario.LARGE_NUMBER, description="Number beyond common integer widths"
             )
 
 

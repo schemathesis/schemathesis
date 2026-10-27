@@ -34,7 +34,7 @@ __________________________________ PUT /cart ___________________________________
 
 [400] Bad Request:
 
-    `{"description":"uri=/cart","entityName":"cartItemDTO","fieldErrors":[{"field":"productId","message":"Value shall be a positive number"},{"field":"quantity","message":"Value shall be a positive number"},{"field":"warehouseId","message":"Value shall be a positive number"}],"message":"Argument validation error"}`
+    `{"description":"uri=/cart","entityName":"cartItemDTO","fieldErrors":[{"field":"productId","message":"Value shall be a positive number"},{"field":"quantity","message":"Value shall be a positive number"}],"message":"Argument validation error"}`
 
 Reproduce with:
 

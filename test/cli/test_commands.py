@@ -937,7 +937,7 @@ def test_multiple_failures_single_check(ctx, cli, snapshot_cli):
 def test_continue_on_failure(ctx, cli):
     api = ctx.openapi.apps.multiple_failures()
     result = cli.run_and_assert(api.schema_url, "--continue-on-failure", exit_code=ExitCode.TESTS_FAILED)
-    assert "116 generated" in result.stdout
+    assert "117 generated" in result.stdout
 
 
 def test_multiple_failures_different_check(ctx, cli, snapshot_cli):

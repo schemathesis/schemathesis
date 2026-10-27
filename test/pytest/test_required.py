@@ -35,7 +35,7 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 21$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 22$"])
 
 
 def test_not_required_parameters(testdir):
