@@ -102,7 +102,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=9)
+    testdir.assert_petstore(tests_num=11)
 
 
 def test_delete_pet(testdir):
@@ -197,7 +197,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=29)
+    testdir.assert_petstore(tests_num=35)
 
 
 def test_create_multiple_users(testdir):
@@ -211,7 +211,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(2, 60)
+    testdir.assert_petstore(2, 72)
 
 
 def test_login(testdir):
@@ -271,7 +271,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=29)
+    testdir.assert_petstore(tests_num=35)
 
 
 def test_delete_user(testdir):

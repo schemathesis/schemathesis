@@ -3218,6 +3218,11 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
 
 
 _SPEC_HINT_KEYS = frozenset({"example", "examples", "default"})
+# Past 16-bit length prefixes and TEXT-sized columns, which servers often assume without declaring `maxLength`.
+OVERSIZED_STRING_LENGTH = 2**16 + 1
+OVERSIZED_STRING = "a" * OVERSIZED_STRING_LENGTH
+# Deduplication spelling; not valid JSON, so it matches no other value and keeps every enclosing key short.
+OVERSIZED_STRING_SPELLING = "<oversized>"
 
 
 def _spec_hint_values(
@@ -3351,6 +3356,26 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         with _ignore_unfixable():
             value = ctx.generate_from_schema(schema)
             yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
+
+    # Only bodies: proxies and servers reject long URLs and headers before the application sees them.
+    if (
+        max_length is None
+        and ctx.location == ParameterLocation.BODY
+        and "pattern" not in schema
+        and "format" not in schema
+        and "enum" not in schema
+        and "const" not in schema
+        and (
+            all(key == "type" or key in ANNOTATION_KEYWORDS for key in declared)
+            or _is_valid_with_formats(OVERSIZED_STRING, declared, ctx)
+        )
+    ):
+        yield PositiveValue(
+            OVERSIZED_STRING,
+            scenario=CoverageScenario.OVERSIZED_STRING,
+            description="String longer than common implicit limits",
+            canonical=OVERSIZED_STRING_SPELLING,
+        )
 
 
 def _rational(value: int | float) -> Fraction:
@@ -3693,11 +3718,16 @@ def _positive_array(
             if seen.insert(candidate, key=deduplication_key):
                 yield PositiveValue(
                     candidate,
-                    scenario=CoverageScenario.VALID_ARRAY,
+                    scenario=_nested_scenario(item, CoverageScenario.VALID_ARRAY),
                     description=f"Single-item array: {item.description}",
                     deduplication_key=deduplication_key,
                     canonical=canonical,
                 )
+
+
+def _nested_scenario(nested: GeneratedValue, container: CoverageScenario) -> CoverageScenario:
+    # Keep oversized strings recognizable once wrapped, so their cases stay out of the resource pool.
+    return nested.scenario if nested.scenario is CoverageScenario.OVERSIZED_STRING else container
 
 
 def _positive_object(
@@ -3820,7 +3850,7 @@ def _iter_positive_object(
             if seen.insert(new.value, key=key):
                 yield PositiveValue(
                     {**template, name: new.value},
-                    scenario=CoverageScenario.VALID_OBJECT,
+                    scenario=_nested_scenario(new, CoverageScenario.VALID_OBJECT),
                     description=f"Object with valid '{name}' value: {new.description}",
                     canonical=spelling.with_entry(name, canonical),
                 )

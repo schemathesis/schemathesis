@@ -27,14 +27,11 @@ Schemathesis dev
 ____________________ POST /v3/clusters/{cluster_id}/topics _____________________
 1. Test Case ID: <PLACEHOLDER>
 
-- ST202 Schema-valid request rejected
+- ST101 Server error
 
-    Valid data should have been accepted
-    Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
+[500] Internal Server Error:
 
-[400] Bad Request:
-
-    `{"error_code":40002,"message":"Topic name is invalid: '' contains one or more characters other than ASCII alphanumerics, '.', '_' and '-'"}`
+    <EMPTY>
 
 Reproduce with:
 
@@ -44,11 +41,14 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- ST101 Server error
+- ST202 Schema-valid request rejected
 
-[500] Internal Server Error:
+    Valid data should have been accepted
+    Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
 
-    <EMPTY>
+[400] Bad Request:
+
+    `{"error_code":40002,"message":"Topic name is invalid: '' contains one or more characters other than ASCII alphanumerics, '.', '_' and '-'"}`
 
 Reproduce with:
 

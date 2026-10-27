@@ -29,6 +29,7 @@ from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocatio
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
+from schemathesis.specs.openapi.coverage._schema import OVERSIZED_STRING_LENGTH
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
@@ -57,6 +58,8 @@ from test.coverage.helpers import (
 )
 from test.utils import assert_requests_call, check_context
 
+OVERSIZED = "a" * OVERSIZED_STRING_LENGTH
+
 
 class AnyNumber:
     def __eq__(self, value: object, /) -> bool:
@@ -76,6 +79,7 @@ POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "6", "q2": "000"}, "body": {"j-prop": 0}},
     {"headers": {"h1": "5", "h2": "00"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
     {"headers": {"h1": "4", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"x-prop": OVERSIZED}},
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"x-prop": Pattern(".+")}},
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"x-prop": Pattern(".+")}},
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
@@ -159,6 +163,7 @@ MIXED_CASES = [
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": True},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0.5},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0},
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": OVERSIZED}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": "00"}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": "0"}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {}},
@@ -522,7 +527,23 @@ def test_with_examples_openapi_3_request_body(ctx):
                     "name": "John Doe",
                     "age": 30,
                     "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St", "city": OVERSIZED},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["developer", "python"],
                     "address": {"street": "123 Main St", "city": "Somewhere"},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["developer", "python"],
+                    "address": {"street": OVERSIZED, "city": "Anytown"},
                 }
             },
             {
@@ -555,6 +576,14 @@ def test_with_examples_openapi_3_request_body(ctx):
                 "body": {
                     "name": "John Doe",
                     "age": 30,
+                    "tags": [OVERSIZED],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
                     "tags": [""],
                     "address": {"street": "123 Main St", "city": "Anytown"},
                 }
@@ -571,6 +600,14 @@ def test_with_examples_openapi_3_request_body(ctx):
                 "body": {
                     "name": "John Doe",
                     "age": 25,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
+            },
+            {
+                "body": {
+                    "name": OVERSIZED,
+                    "age": 30,
                     "tags": ["developer", "python"],
                     "address": {"street": "123 Main St", "city": "Anytown"},
                 }
@@ -898,6 +935,49 @@ def test_positive_arrays_reach_max_items_for_patterned_strings_with_min_length(c
     }
 
     assert {len(case.body) for case in collect_coverage_cases(ctx, body, positive=True)} >= {49, 50}
+
+
+def test_positive_oversized_strings_only_for_unbounded_body_strings(ctx):
+    body = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "code": {"type": "string", "maxLength": 5},
+            "id": {"type": "string", "format": "uuid"},
+            "slug": {"type": "string", "pattern": "^[a-z]+$"},
+            "kind": {"type": "string", "enum": ["a", "b"]},
+        },
+    }
+
+    oversized = {
+        key
+        for case in collect_coverage_cases(ctx, body, positive=True)
+        if isinstance(case.body, dict)
+        for key, value in case.body.items()
+        if isinstance(value, str) and len(value) > 65535
+    }
+
+    assert oversized == {"name"}
+
+
+def test_positive_oversized_strings_skip_parameters(ctx):
+    # Servers reject long URLs and headers before the application sees them, whatever the schema says.
+    operation = ctx.openapi.load_schema(
+        {
+            "/foo/{id}": {
+                "get": {
+                    "parameters": [
+                        {"name": location, "in": location, "required": True, "schema": {"type": "string"}}
+                        for location in ("query", "header", "cookie")
+                    ]
+                    + [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/foo/{id}"]["GET"]
+
+    assert not scenario_cases(collect_cases(operation, GenerationMode.POSITIVE), CoverageScenario.OVERSIZED_STRING)
 
 
 @pytest.mark.parametrize(
@@ -4235,6 +4315,7 @@ def test_negative_body_for_any_of_with_only_a_false_branch(ctx, app_runner):
         ("Value is not allowed", {}),
         ("Value is not allowed", [None, None]),
         ("Value is not allowed", 0),
+        ("Value is not allowed", OVERSIZED),
         ("Value is not allowed", ""),
         ("Value is not allowed", False),
         ("Value is not allowed", True),
@@ -4257,6 +4338,7 @@ def test_negative_bodies_when_a_required_property_admits_nothing(ctx, app_runner
         ("a: Value is not allowed", {"b": "", "a": {}}),
         ("a: Value is not allowed", {"b": "", "a": [None, None]}),
         ("a: Value is not allowed", {"b": "", "a": 0}),
+        ("a: Value is not allowed", {"b": "", "a": OVERSIZED}),
         ("a: Value is not allowed", {"b": "", "a": ""}),
         ("a: Value is not allowed", {"b": "", "a": False}),
         ("a: Value is not allowed", {"b": "", "a": True}),
@@ -5318,7 +5400,7 @@ def test_positive_body_descends_past_a_second_use_of_a_shared_base(ctx):
         tuple(case.body["inner"]["leaf"]["tags"])
         for case in iter_cases(operation, GenerationMode.POSITIVE)
         if isinstance(case.body, dict) and "tags" in case.body.get("inner", {}).get("leaf", {})
-    } == {(), ("",)}
+    } == {(), ("",), (OVERSIZED,)}
 
 
 def test_positive_body_descends_past_a_third_use_of_a_shared_base(ctx):
@@ -5343,7 +5425,7 @@ def test_positive_body_descends_past_a_third_use_of_a_shared_base(ctx):
         json.dumps(case.body["inner"]["pools"])
         for case in iter_cases(operation, GenerationMode.POSITIVE)
         if isinstance(case.body, dict) and "pools" in case.body.get("inner", {})
-    } == {"[]", '[{"id": ""}]', "[{}]"}
+    } == {"[]", '[{"id": ""}]', "[{}]", json.dumps([{"id": OVERSIZED}])}
 
 
 def test_negative_only_mode_emits_required_and_optional_combinations(ctx):
@@ -7997,6 +8079,7 @@ def test_body_and_parameter_cases_yield_no_duplicate_requests(ctx):
     )
     assert [(dict(case.headers), case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
         ({"X-Key": ""}, {"name": "app"}),
+        ({"X-Key": ""}, {"name": OVERSIZED}),
         ({"X-Key": "null"}, {"name": "app"}),
     ]
 
@@ -8022,6 +8105,7 @@ def test_unbuildable_optional_property_does_not_erase_positive_cases(ctx):
     )
     assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
         {"name": ""},
+        {"name": OVERSIZED},
         {"name": "", "token": ""},
     ]
 
@@ -8837,7 +8921,9 @@ def test_positive_body_merges_ref_sibling_properties_into_the_target(ctx):
         },
     )
     assert assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases) == [
+        OVERSIZED,
         "",
+        {"name": OVERSIZED, "extra": 0},
         {"name": "", "extra": 0},
     ]
 
@@ -9779,11 +9865,15 @@ def test_no_positive_case_when_the_pattern_needs_characters_the_location_cannot_
     [
         (
             {"type": "string", "enum": ["text/plain"]},
-            [("text/plain", "text/plain"), ("text/plain", "application/json")],
+            [("text/plain", "text/plain"), ("text/plain", "text/plain"), ("text/plain", "application/json")],
         ),
         (
             {"type": "string", "enum": ["application/xml"]},
-            [("application/xml", "text/plain"), ("application/xml", "application/json")],
+            [
+                ("application/xml", "text/plain"),
+                ("application/xml", "text/plain"),
+                ("application/xml", "application/json"),
+            ],
         ),
     ],
     ids=["pinned-to-the-media-type-the-header-admits", "declared-value-kept"],
@@ -10122,6 +10212,7 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
                 {"a": 2.5890419884777833e-42},
                 {"a": {}},
                 {"a": [None, None]},
+                {"a": OVERSIZED},
                 {"a": ""},
                 {"a": False},
                 {"a": True},
@@ -10302,7 +10393,7 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
             [[]],
             [{}, "AAA", None, False, 0],
         ),
-        ("3.0.2", {"type": "string", "multipleOf": 2}, None, [""], [{}, [None, None], None, False, 0]),
+        ("3.0.2", {"type": "string", "multipleOf": 2}, None, [OVERSIZED, ""], [{}, [None, None], None, False, 0]),
         ("3.0.2", {"type": "array", "uniqueItems": False}, None, [[]], [{}, "AAA", None, False, 0]),
         (
             "3.0.2",
@@ -10323,7 +10414,7 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
             "3.0.2",
             {"type": "string", "minLength": 2, "not": {"maxLength": 1}},
             None,
-            ["000", "00"],
+            [OVERSIZED, "000", "00"],
             [[], "0", True, {}, [None, None], None, False, 0],
         ),
         ("3.0.2", {"type": "array", "maxItems": 40000}, None, [[]], [{}, "AAA", None, False, 0]),
@@ -10339,14 +10430,14 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
             {"type": "array", "maxItems": 1, "items": {"not": {}}},
             None,
             [[]],
-            [[{}], [[None, None]], [0], [""], [False], [True], [None], {}, "AAA", None, False, 0],
+            [[{}], [[None, None]], [0], [OVERSIZED], [""], [False], [True], [None], {}, "AAA", None, False, 0],
         ),
         (
             "3.0.2",
             {"type": "array", "maxItems": 1, "uniqueItems": True, "items": {"not": {}}},
             None,
             [[]],
-            [[{}], [[None, None]], [0], [""], [False], [True], [None], {}, "AAA", None, False, 0],
+            [[{}], [[None, None]], [0], [OVERSIZED], [""], [False], [True], [None], {}, "AAA", None, False, 0],
         ),
         ("3.0.2", {"type": "object", "minProperties": 0}, None, [{}], BODY_TYPE_VIOLATIONS),
         # Draft 4 does not know `contains`, so a malformed one is ignored, as fuzzing does.

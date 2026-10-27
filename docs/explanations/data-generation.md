@@ -46,6 +46,8 @@ Aims to exhaustively cover boundary values for every constraint defined in the s
 # Produces: strings of length 1, 2, 3, 9, 10, 11
 ```
 
+Request body strings without `maxLength` also get one 65,537-character value. It exceeds limits servers often enforce without declaring them, such as database column sizes or 16-bit length prefixes.
+
 ### Fuzzing Phase
 
 Generates random data based on the schema constraints.

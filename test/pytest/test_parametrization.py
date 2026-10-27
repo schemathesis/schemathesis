@@ -170,7 +170,7 @@ def test_(request, case):
     # Then it should be correctly used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_specified_example_body(testdir):
@@ -183,7 +183,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.body in ({"name": "John"}, {"name": ""})
+    assert case.body in ({"name": "John"}, {"name": ""}, {"name": "a" * 65537})
 """,
         paths={
             "/users": {
@@ -214,8 +214,8 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    # 3 calls = 1 explicit example + 2 coverage cases (example value + per-property variant).
-    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
+    # 4 calls = 1 explicit example + 3 coverage cases (example value + per-property variants).
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 @pytest.mark.parametrize(
@@ -332,7 +332,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.body in ({"name": "John1"}, {"name": "John2"})
+    assert case.body in ({"name": "John1"}, {"name": "John2"}, {"name": "a" * 65537})
     if not hasattr(case.meta.phase.data, "description"):
         assert case.query == {"age": 35}
 """,
@@ -367,8 +367,8 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used in tests as a part of a single request, i.e. combined
     result.assert_outcomes(passed=1)
-    # 4 calls = 2 examples (from body schema & Media Type Object) + 2 coverage cases
-    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
+    # 5 calls = 2 examples (from body schema & Media Type Object) + 3 coverage cases
+    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
 
 
 def test_multiple_examples_same_location(testdir):
