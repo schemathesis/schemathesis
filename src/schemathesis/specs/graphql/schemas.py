@@ -63,7 +63,7 @@ from .dictionaries import resolve_bindings, substitute_dictionaries
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
 from .ordering import compute_graphql_layers
-from .scalars import CUSTOM_SCALARS, UnknownScalar, get_extra_scalar_strategies, unsupported_scalar_name
+from .scalars import UnknownScalar, scalar_strategies, unsupported_scalar_name
 from .substitution import SUBSTITUTION_PROBABILITY, substitute_constants, substitute_pool_values
 from .validation import is_client_error, parse_payload, validate_graphql_response
 
@@ -585,7 +585,7 @@ def graphql_cases(
         RootType.MUTATION: gql_st.mutations,
     }[definition.root_type]
     hook_context = HookContext(operation=operation)
-    custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
+    custom_scalars = scalar_strategies()
     generation = operation.schema.config.generation_for(operation=operation, phase=phase.value)
     gql_mode = GqlMode.NEGATIVE if generation_mode == GenerationMode.NEGATIVE else GqlMode.POSITIVE
     effective_mode = generation_mode
