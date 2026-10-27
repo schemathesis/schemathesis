@@ -8,7 +8,6 @@ from urllib.parse import urlsplit
 import jsonschema_rs
 from jsonschema_rs import Validator
 
-from schemathesis import transport
 from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import (
     CheckContext,
@@ -479,10 +478,7 @@ class Case(Generic[OperationT]):
 
         if self.operation.app is not None:
             kwargs.setdefault("app", self.operation.app)
-        if "app" in kwargs:
-            transport_ = transport.get(kwargs["app"])
-        else:
-            transport_ = self.operation.schema.transport
+        transport_ = self.operation.schema.get_transport(kwargs.get("app", self.operation.schema.app))
         try:
             response = transport_.send(
                 self,
