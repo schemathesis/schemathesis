@@ -13,6 +13,7 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.core import SpecificationFeature
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.engine import Status, events
@@ -54,6 +55,8 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
 
 def run(ctx: EngineContext) -> list[ProbeRun]:
     """Run all probes against the given schema."""
+    if not ctx.schema.specification.supports_feature(SpecificationFeature.HTTP_PROBES):
+        return []
     return [send(probe(), ctx) for probe in PROBES]
 
 

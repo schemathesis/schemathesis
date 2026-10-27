@@ -103,13 +103,13 @@ def test_decode_response_text(response_factory, content, charset, expected):
     assert decode_response_text(Response.from_requests(raw, verify=False)) == expected
 
 
-def test_response_payload_uses_the_transport_renderer(response_factory):
+@pytest.mark.parametrize(
+    ("render_content", "expected"),
+    [(bytes.hex, "fffe"), (None, BINARY_PAYLOAD)],
+    ids=["renderer", "no-renderer"],
+)
+def test_format_response_payload_with_renderer(response_factory, render_content, expected):
     response = response_factory.core(
-        content=b"\x08\x01", content_type="application/octet-stream", render_content=lambda content: '{"id": 1}'
+        content=b"\xff\xfe", content_type="application/octet-stream", render_content=render_content
     )
-    assert format_response_payload(response, config=OutputConfig()) == '{"id": 1}'
-
-
-def test_response_payload_without_renderer_stays_binary(response_factory):
-    response = response_factory.core(content=b"\xff\xfe", content_type="application/octet-stream")
-    assert format_response_payload(response, config=OutputConfig()) == BINARY_PAYLOAD
+    assert format_response_payload(response, config=OutputConfig()) == expected
