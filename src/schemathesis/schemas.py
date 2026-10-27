@@ -135,9 +135,13 @@ class BaseSchema(Mapping):
     def title(self) -> str | None:
         return None
 
+    def get_transport(self, app: object) -> transport.BaseTransport:
+        """Transport that sends this schema's cases to `app`, or over the network when `app` is `None`."""
+        return transport.get(app)
+
     @property
     def transport(self) -> transport.BaseTransport:
-        return transport.get(self.app)
+        return self.get_transport(self.app)
 
     def is_security_param_negated(self, case: Case) -> bool:
         return False
