@@ -252,8 +252,9 @@ class GraphQLSchema(BaseSchema):
         error_feedback: ErrorFeedbackStore | None = None,
         session: GenerationSession | None = None,
     ) -> Iterator[Case]:
-        # GraphQL has no coverage phase yet; the schema-level case enumerator is empty.
-        return iter(())
+        from schemathesis.specs.graphql import coverage
+
+        return coverage.iter_coverage_cases(operation, self.client_schema, generation_modes)
 
     @override
     def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
