@@ -642,8 +642,8 @@ def _match_field(parameter_name: str, resource_name: str, fields: list[str]) -> 
     matched = naming.find_matching_field(parameter=parameter_name, resource=resource_name, fields=fields)
     if matched is not None:
         return matched
-    if "id" in fields:
-        # Conventional fallback: `<resource>Id` parameters point at the resource's `id` field.
+    # Conventional fallback: `<resource>Id` parameters point at the resource's `id` field. A name is never an `id`.
+    if "id" in fields and naming.key_kind(parameter_name) != naming.KeyKind.NAME:
         return "id"
     # Without an `id` field, use the parameter name so peer captures reach this slot.
     return parameter_name
