@@ -25,6 +25,7 @@
 - Serialization error for XML multipart parts with arrays of `$ref` items.
 - Captured values dropped from request bodies missing required fields in the examples phase with `fill-missing`.
 - Object-level authorization failures replaying only the peer's request in `--report pytest` and cURL output.
+- `--max-time` overrun by a request that is still waiting for a response.
 
 ### :wrench: Changed
 

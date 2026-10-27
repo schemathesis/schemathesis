@@ -11,11 +11,9 @@ from schemathesis.core.control import SkipTest
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine.context import EngineContext
+from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.run import TESTING_PHASES, PhaseName
-from schemathesis.engine.run.unit._case import (
-    BudgetExpired,
-    ServerWentAway,
-)
+from schemathesis.engine.run.unit._case import ServerWentAway
 from schemathesis.engine.run.unit._errors import classify_test_exception
 from schemathesis.engine.run.unit._scenario import Scenario, iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis.builder import MissingPathParameters

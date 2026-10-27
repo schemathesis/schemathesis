@@ -13,8 +13,10 @@ from schemathesis.core.rate_limit import (
     RATE_LIMIT_AUTO_REPORT_THRESHOLD,
     parse_retry_after,
 )
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.engine import events
 from schemathesis.engine._validate import validate_response
+from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.errors import is_unrecoverable_network_error
 
 if TYPE_CHECKING:
@@ -71,25 +73,43 @@ def _call_with_retry(
     return rate_limited, response
 
 
+def _within_time_budget(ctx: EngineContext, transport_kwargs: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Shorten the request timeout to the time the run has left; also tells whether it was shortened."""
+    remaining = ctx.control.remaining_time
+    # A budget spent before the first request still lets it through, under the usual timeout.
+    if remaining is None or remaining <= 0:
+        return transport_kwargs, False
+    timeout = transport_kwargs.get("timeout", DEFAULT_RESPONSE_TIMEOUT)
+    if timeout is not None and timeout <= remaining:
+        return transport_kwargs, False
+    return {**transport_kwargs, "timeout": remaining}, True
+
+
 def send_tracked(
     ctx: EngineContext,
     case: Case,
     *,
     transport_kwargs: dict[str, Any],
     emit: Callable[[events.EngineEvent], None],
-    send: Callable[[], Response] | None = None,
+    send: Callable[[dict[str, Any]], Response] | None = None,
     after_response: Callable[[Response], None] | None = None,
 ) -> tuple[list[Response], Response]:
     """Send a request the outage tracker remembers, waiting out rate limits when configured.
 
-    `send` defaults to `case.call(**transport_kwargs)`; `after_response` runs on every answered attempt,
-    including each retried 429.
+    `send` defaults to `case.call(**kwargs)`; `after_response` runs on every answered attempt,
+    including each retried 429. A request still waiting when the time budget runs out raises `BudgetExpired`.
     Returns (rate_limited_responses, final_response).
     """
-    call = send or (lambda: case.call(**transport_kwargs))
+    call = send or (lambda kwargs: case.call(**kwargs))
 
     def call_fn() -> Response:
-        response = ctx.server.track(case, call, transport_kwargs=transport_kwargs)
+        kwargs, is_shortened = _within_time_budget(ctx, transport_kwargs)
+        try:
+            response = ctx.server.track(case, lambda: call(kwargs), transport_kwargs=kwargs)
+        except requests.Timeout:
+            if is_shortened:
+                raise BudgetExpired from None
+            raise
         if after_response is not None:
             after_response(response)
         return response

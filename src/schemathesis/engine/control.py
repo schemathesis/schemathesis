@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     from schemathesis.engine import StopReason
 
 
+class BudgetExpired(KeyboardInterrupt):
+    """Raised when the run's time budget is out, either for this operation's share or overall."""
+
+
 @dataclass(slots=True)
 class ExecutionControl:
     """Controls engine execution flow and tracks failures."""
