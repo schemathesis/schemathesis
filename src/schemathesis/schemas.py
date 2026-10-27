@@ -945,6 +945,8 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     filter_case_tracker: FilterCaseTracker | None = field(default=None, repr=False, compare=False)
     # Optional parameters left out because their schemas could not be parsed.
     skipped_parameters: list[SkippedParameter] = field(default_factory=list, repr=False, compare=False)
+    # Schema errors in parts left out of an otherwise testable operation, reported while the rest is tested.
+    schema_errors: list[InvalidSchema] = field(default_factory=list, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not self.label:

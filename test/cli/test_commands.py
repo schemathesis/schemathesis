@@ -35,7 +35,7 @@ from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.fragments import handlers
-from test.apps.fragments.schemas import linked_users
+from test.apps.fragments.schemas import PAYLOAD_SCHEMA, linked_users
 from test.fixtures.app_runner import accept_connections, wait_for_port
 from test.utils import HERE, SIMPLE_PATH, refusing_url
 
@@ -1719,23 +1719,31 @@ def test_no_schema_in_media_type(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--max-examples=1", "--checks=not_a_server_error") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        {"application.json": {"schema": {"type": "object"}}},
+        {"": {"schema": {"type": "object"}}, "application/json": {"schema": PAYLOAD_SCHEMA}},
+    ],
+    ids=["only-malformed", "valid-sibling"],
+)
 @pytest.mark.filterwarnings("error")
-def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.success()
+def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli, content):
+    api = ctx.openapi.apps.payload()
     schema_path = ctx.openapi.write_schema(
         {
-            "/data": {
+            "/payload": {
                 "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application.json": {"schema": {"type": "object"}}},
-                    },
+                    "requestBody": {"required": True, "content": content},
                     "responses": {"200": {"description": "OK"}},
                 }
             }
         }
     )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1") == snapshot_cli
+    assert (
+        cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1", "--checks=not_a_server_error")
+        == snapshot_cli
+    )
 
 
 MALFORMED_KEYWORD_OPERATIONS = {

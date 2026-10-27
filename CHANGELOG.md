@@ -11,6 +11,7 @@
 
 ### :bug: Fixed
 
+- Operations left untested when a malformed request body media type sits beside a valid one.
 - Inferred stateful links passing resource ids into name parameters like `{username}`.
 - Inferred stateful links filling `*_name` query filters with an unrelated `name` field.
 - Inferred stateful links filling name parameters with a bare value an unrelated `POST` returns.
