@@ -72,6 +72,8 @@ def decode_response_text(response: Response) -> str | None:
     Returns `None` when the body is binary (undecodable under its own or the default encoding);
     a response declaring an unknown or broken charset is decoded lossily instead of raising.
     """
+    if response.render_content is not None:
+        return response.render_content(response.content)
     try:
         return response.text
     except UnicodeDecodeError:

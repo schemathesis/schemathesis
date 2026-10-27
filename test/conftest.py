@@ -490,6 +490,7 @@ def response_factory():
         verify: bool = False,
         message: str = "",
         encoding: str | None = None,
+        render_content: Callable[[bytes], str] | None = None,
     ) -> Response:
         headers = dict(headers or {})
         if content_type:
@@ -503,6 +504,7 @@ def response_factory():
             verify=verify,
             message=message,
             encoding=encoding,
+            render_content=render_content,
         )
 
     return ResponseFactory(

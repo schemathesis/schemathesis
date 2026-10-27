@@ -6,7 +6,7 @@ import json
 import re
 import string
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from functools import lru_cache
 from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
@@ -230,6 +230,8 @@ class Response:
     stream_cut_short: bool
     """Whether an event stream was read only up to `max-stream-events` or the request timeout."""
     _override: Override | None
+    # Turns `content` into display text for failure output, for bodies that are not text.
+    render_content: Callable[[bytes], str] | None
 
     __slots__ = (
         "status_code",
@@ -246,6 +248,7 @@ class Response:
         "stream_cut_short",
         "_encoded_body",
         "_override",
+        "render_content",
     )
 
     def __init__(
@@ -262,6 +265,7 @@ class Response:
         content_size: int | None = None,
         stream_cut_short: bool = False,
         _override: Override | None = None,
+        render_content: Callable[[bytes], str] | None = None,
     ):
         self.status_code = status_code
         self.headers = {key.lower(): value for key, value in headers.items()}
@@ -278,6 +282,7 @@ class Response:
         self.encoding = encoding
         self.stream_cut_short = stream_cut_short
         self._override = _override
+        self.render_content = render_content
 
     @overload
     @classmethod
