@@ -686,33 +686,19 @@ def graphql_cases(
     query_ = _generate_parameter(ParameterLocation.QUERY, query, draw, operation, hook_context, hooks)
 
     description = "Positive test case" if effective_mode == GenerationMode.POSITIVE else "Negative test case"
-    instance = operation.Case(
+    instance = build_case(
+        operation,
+        body=body,
+        mode=effective_mode,
+        phase=PhaseInfo(name=phase, data=build_phase_data(phase, description)),
+        generation_time=started_at.elapsed,
         path_parameters=path_parameters_,
         headers=headers_,
         cookies=cookies_,
         query=query_,
-        body=body,
-        _meta=CaseMetadata(
-            generation=GenerationInfo(
-                time=started_at.elapsed,
-                mode=effective_mode,
-            ),
-            phase=PhaseInfo(name=phase, data=build_phase_data(phase, description)),
-            components={
-                kind: ComponentInfo(mode=effective_mode)
-                for kind, value in [
-                    (ParameterLocation.QUERY, query_),
-                    (ParameterLocation.PATH, path_parameters_),
-                    (ParameterLocation.HEADER, headers_),
-                    (ParameterLocation.COOKIE, cookies_),
-                    (ParameterLocation.BODY, body),
-                ]
-                if value is not NOT_SET
-            },
-            constants_draws=constants_draws,
-            dictionary_draws=dictionary_draws,
-        ),
-        media_type=media_type or "application/json",
+        media_type=media_type,
+        constants_draws=constants_draws,
+        dictionary_draws=dictionary_draws,
     )
     context = auths.AuthContext(
         operation=operation,
@@ -720,6 +706,48 @@ def graphql_cases(
     )
     auths.set_on_case(instance, context, auth_storage)
     return instance
+
+
+def build_case(
+    operation: APIOperation,
+    *,
+    body: str,
+    mode: GenerationMode,
+    phase: PhaseInfo,
+    generation_time: float,
+    path_parameters: dict[str, Any] | None = None,
+    headers: dict[str, Any] | None = None,
+    cookies: dict[str, Any] | None = None,
+    query: dict[str, Any] | None = None,
+    media_type: str | None = None,
+    constants_draws: tuple[ConstantDraw, ...] = (),
+    dictionary_draws: tuple[DictionaryDraw, ...] = (),
+) -> Case:
+    """Wrap a printed GraphQL document into a case with its generation metadata."""
+    return operation.Case(
+        path_parameters=path_parameters,
+        headers=headers,
+        cookies=cookies,
+        query=query,
+        body=body,
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=generation_time, mode=mode),
+            phase=phase,
+            components={
+                kind: ComponentInfo(mode=mode)
+                for kind in (
+                    ParameterLocation.QUERY,
+                    ParameterLocation.PATH,
+                    ParameterLocation.HEADER,
+                    ParameterLocation.COOKIE,
+                    ParameterLocation.BODY,
+                )
+            },
+            constants_draws=constants_draws,
+            dictionary_draws=dictionary_draws,
+        ),
+        media_type=media_type or "application/json",
+    )
 
 
 def _generate_parameter(
