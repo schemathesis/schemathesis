@@ -683,6 +683,40 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
     assert result == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_max_time_reports_unreached_operations(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/a/slow": {"get": {"responses": {"200": {"description": "OK"}}}},
+            **{
+                f"/b/fast{index}": {
+                    "get": {
+                        "parameters": [{"name": "q", "in": "query", "schema": {"type": "integer"}}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+                for index in range(3)
+            },
+        }
+    )
+
+    @app.route("/a/slow")
+    def slow():
+        time.sleep(2)
+        return jsonify({})
+
+    @app.route("/b/fast<int:index>")
+    def fast(index):
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app, "--max-time=1", "--phases=examples,coverage,fuzzing", "--checks=not_a_server_error", "--workers=1"
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.fixture
 def raw_http_server(ctx):
     # Serves the schema, then answers every other request with `reply`, for responses no framework would send.

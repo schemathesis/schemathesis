@@ -243,21 +243,32 @@ def put_skipped_scenario(
     skip_warning: SchemathesisWarning | None = None,
 ) -> None:
     """Report an operation that is not tested in this phase as a scenario that started and was skipped."""
+    for event in iter_skipped_scenario(label, phase, suite_id, skip_reason=skip_reason, skip_warning=skip_warning):
+        events_queue.put(event)
+
+
+def iter_skipped_scenario(
+    label: str,
+    phase: PhaseName,
+    suite_id: uuid.UUID,
+    *,
+    skip_reason: str | None,
+    skip_warning: SchemathesisWarning | None = None,
+) -> EventGenerator:
+    """Events of an operation that is not tested in this phase: a scenario that started and was skipped."""
     started = ScenarioStarted(label=label, phase=phase, suite_id=suite_id)
-    events_queue.put(started)
-    events_queue.put(
-        ScenarioFinished(
-            id=started.id,
-            suite_id=suite_id,
-            phase=phase,
-            label=label,
-            status=Status.SKIP,
-            recorder=ScenarioRecorder(label=label),
-            elapsed_time=0.0,
-            skip_reason=skip_reason,
-            skip_warning=skip_warning,
-            is_final=True,
-        )
+    yield started
+    yield ScenarioFinished(
+        id=started.id,
+        suite_id=suite_id,
+        phase=phase,
+        label=label,
+        status=Status.SKIP,
+        recorder=ScenarioRecorder(label=label),
+        elapsed_time=0.0,
+        skip_reason=skip_reason,
+        skip_warning=skip_warning,
+        is_final=True,
     )
 
 

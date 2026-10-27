@@ -21,7 +21,7 @@ Schemathesis dev
 
  ✅  Coverage (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 1 passed  ⏭  3 skipped
 
  🕛  Fuzzing (in 0.00s)
 
@@ -34,6 +34,7 @@ API Operations:
   Tested: 1
   Skipped: 3
     - No examples in schema
+    - Time limit reached
 
 Test Phases:
   ⏭  Examples
