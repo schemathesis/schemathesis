@@ -4988,6 +4988,86 @@ def test_created_bare_value_does_not_fill_name_key_of_another_item(ctx):
     assert inferred_links(graph) == []
 
 
+def name_filter_link(producer, target, parameter, field):
+    return [
+        f"#/paths/{producer}/get",
+        "200",
+        {
+            "operationRef": f"#/paths/{target}/get",
+            "x-schemathesis": {"is_inferred": True},
+            "parameters": {f"query.{parameter}": f"$response.body#/{field}"},
+        },
+    ]
+
+
+NAME_FILTER_PRODUCER = "~1shipment-templates~1{id}"
+
+
+@pytest.mark.parametrize(
+    ("component", "fields", "parameter", "path", "listed", "expected"),
+    [
+        ("ShipmentTemplate", ["Id", "Name", "TemplateName"], "template_name", "/events", False, []),
+        (
+            "ShipmentTemplate",
+            ["Id", "TemplateName"],
+            "template_name",
+            "/events",
+            False,
+            [name_filter_link(NAME_FILTER_PRODUCER, "~1events", "template_name", "TemplateName")],
+        ),
+        (
+            "ShipmentTemplate",
+            ["Id", "Name", "TemplateName"],
+            "template_name",
+            "/shipment-templates",
+            True,
+            [
+                name_filter_link(NAME_FILTER_PRODUCER, "~1shipment-templates", "template_name", "TemplateName"),
+                [
+                    "#/paths/~1shipment-templates/get",
+                    "200",
+                    {
+                        "operationRef": f"#/paths/{NAME_FILTER_PRODUCER}/get",
+                        "x-schemathesis": {"is_inferred": True},
+                        "parameters": {"path.id": "$response.body#/*/Id"},
+                    },
+                ],
+            ],
+        ),
+        (
+            "EnvironmentDescription",
+            ["EnvironmentId", "Name", "EnvironmentName"],
+            "environment_name",
+            "/events",
+            False,
+            [name_filter_link(NAME_FILTER_PRODUCER, "~1events", "environment_name", "EnvironmentName")],
+        ),
+    ],
+    ids=["own-name", "no-own-name", "own-collection", "field-names-resource"],
+)
+def test_name_query_parameter_does_not_take_reference_to_another_resource(
+    ctx, component, fields, parameter, path, listed, expected
+):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("get", "/shipment-templates/{id}", "200", component_ref(component), [path_param("id")]),
+            **operation(
+                "get",
+                path,
+                "200",
+                {"type": "array", "items": component_ref(component)} if listed else None,
+                parameters=[{"name": parameter, "in": "query", "schema": {"type": "string"}}],
+            ),
+        },
+        components={
+            "schemas": {component: {"type": "object", "properties": {field: {"type": "string"} for field in fields}}}
+        },
+    )
+
+    assert inferred_links(graph) == expected
+
+
 def test_body_name_suffix_without_path_or_schema_backing_is_dropped(ctx):
     # `_name` body fields are attributes, not FKs, when nothing in the spec backs the name.
     _, graph = analyze_dependencies(

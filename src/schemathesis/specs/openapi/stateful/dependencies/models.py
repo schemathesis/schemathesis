@@ -211,11 +211,23 @@ class DependencyGraph:
                                 input_slot.parameter_location == ParameterLocation.QUERY
                                 and isinstance(input_slot.parameter_name, str)
                                 and key_kind(input_slot.parameter_name) == KeyKind.NAME
-                                and not parameter_names_source(
-                                    parameter=input_slot.parameter_name,
-                                    field=input_slot.resource_field,
-                                    resource=output_slot.resource.name,
-                                    pointer=output_slot.pointer,
+                                and (
+                                    not parameter_names_source(
+                                        parameter=input_slot.parameter_name,
+                                        field=input_slot.resource_field,
+                                        resource=output_slot.resource.name,
+                                        pointer=output_slot.pointer,
+                                    )
+                                    # `Rule.TemplateName` beside `Rule.Name` names a template, not the rule.
+                                    or (
+                                        any(normalize_for_matching(f) == "name" for f in output_slot.resource.fields)
+                                        and all(
+                                            output.resource is not output_slot.resource for output in consumer.outputs
+                                        )
+                                        and not normalize_for_matching(output_slot.resource.name).startswith(
+                                            normalize_for_matching(input_slot.resource_field).removesuffix("name")
+                                        )
+                                    )
                                 )
                             ):
                                 continue
