@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.6...HEAD) - TBD
 
+### :bug: Fixed
+
+- Compatibility with pytest 9.2.
+
 ## [4.32.6](https://github.com/schemathesis/schemathesis/compare/v4.32.5...v4.32.6) - 2026-10-27
 
 ### :racing_car: Performance
