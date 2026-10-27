@@ -211,7 +211,7 @@ class LazySchema:
                 else:
                     fixtures = get_fixtures(test_func, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
-                node_id = request.node._nodeid
+                node_id = request.node.nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
 
                 tests = list(
@@ -231,14 +231,14 @@ class LazySchema:
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
-                        request.node._nodeid = f"{node_id}[{operation.method.upper()} {operation.path}]"
+                        _set_node_id(request.node, f"{node_id}[{operation.method.upper()} {operation.path}]")
                         with report_subtest(request.node, schema, operation.label, operation.tags):
                             run_subtest(operation, fixtures, sub_test, subtests)
                     else:
                         error = result.err()
                         with report_subtest(request.node, schema, error.label, None):
                             _schema_error(subtests, error, node_id, request.node)
-                request.node._nodeid = node_id
+                _set_node_id(request.node, node_id)
 
             sig = signature(test_func)
             if "self" in sig.parameters:
@@ -292,6 +292,16 @@ def run_subtest(
 SEPARATOR = "\n===================="
 
 
+def _set_node_id(node: pytest.Function, node_id: str) -> None:
+    # pytest has no public API for renaming a node. Subtests are reported and counted under this id, so a failing
+    # operation does not also fail the parent test.
+    if hasattr(node, "_id"):
+        # pytest >= 9.2 keeps a structured id
+        node._id = node._id.parse(node_id)
+    else:
+        node._nodeid = node_id  # type: ignore[attr-defined]
+
+
 def _schema_error(subtests: pytest.Subtests, error: InvalidSchema, node_id: str, node: pytest.Function) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
@@ -299,7 +309,7 @@ def _schema_error(subtests: pytest.Subtests, error: InvalidSchema, node_id: str,
     if error.method:
         kwargs["method"] = error.method.upper()
     kwargs["path"] = error.path
-    node._nodeid = f"{node_id}{schema_error_suffix(error)}"
+    _set_node_id(node, f"{node_id}{schema_error_suffix(error)}")
     __tracebackhide__ = True
     with subtests.test(**kwargs):
         sub_test()

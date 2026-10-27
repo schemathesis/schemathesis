@@ -250,7 +250,7 @@ class SchemathesisCase(PyCollector):
                 callobj=funcobj,
                 fixtureinfo=fixtureinfo,
                 test_func=self.test_function,
-                originalname=self.name,
+                originalname=name,
                 operation_label=operation_label,
                 operation_tags=operation_tags,
             )
