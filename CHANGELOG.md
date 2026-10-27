@@ -12,6 +12,7 @@
 ### :wrench: Changed
 
 - Coverage phase covers boundary lengths of password-style patterns like `^(?=.*\d)[a-z\d]*$`.
+- Coverage phase sends 65,537-character strings to request body fields without `maxLength`.
 
 ### :bug: Fixed
 

@@ -34,7 +34,7 @@ _________________________________ POST /users __________________________________
 
 [400] Bad Request:
 
-    `{"errors":[{"field":"Username","kind":"string","namespace":"Body.Username","param":"3","tag":"min","type":"string","value":""},{"field":"Title","kind":"string","namespace":"Body.Title","param":"5","tag":"min","type":"string","value":""},{"field":"Description","kind":"string","namespace":"Body.Description","param":"10","tag":"min","type":"string","value":""}]}`
+    `{"errors":[{"field":"Username","kind":"string","namespace":"Body.Username","param":"30","tag":"max","type":"string","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa // Output truncated...`
 
 Reproduce with:
 

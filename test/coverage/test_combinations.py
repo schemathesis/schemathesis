@@ -24,6 +24,7 @@ from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.coverage import _schema
 from schemathesis.specs.openapi.coverage._schema import (
     MAX_DRAWN_ARRAY_ITEMS,
+    OVERSIZED_STRING_LENGTH,
     CoverageContext,
     CoverageScenario,
     GeneratedValue,
@@ -36,6 +37,7 @@ from schemathesis.specs.openapi.coverage._schema import (
 from test.coverage.helpers import scenario_values
 from test.utils import to_float32
 
+OVERSIZED = "a" * OVERSIZED_STRING_LENGTH
 UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
 PATTERN = "^\\d+$"
@@ -2796,6 +2798,7 @@ def test_no_property_nesting_with_ref_oneof(ctx_factory):
     assert covered == [
         {"config": {"value": 0}},
         {"config": {"name": ""}},
+        {"config": {"name": OVERSIZED}},
     ]
 
 
@@ -2830,6 +2833,7 @@ def test_ref_with_sibling_keywords_does_not_inherit_parent_properties(ctx_factor
     assert covered == [
         {"config": {"value": 0}, "extra": ""},
         {"config": {"value": 0}},
+        {"config": {"value": 0}, "extra": OVERSIZED},
     ]
 
 
@@ -2860,7 +2864,9 @@ def test_ref_to_additive_schema_inherits_parent_properties(ctx_factory):
     assert covered == [
         {"name": "", "id": 0},
         {"name": ""},
+        {"name": OVERSIZED, "id": 0},
         {"name": "", "id": 0},
+        {"name": OVERSIZED, "id": 0},
     ]
 
 
@@ -2903,7 +2909,13 @@ def test_oneof_branch_honors_sibling_items(ctx_factory):
     }
     covered = cover_schema(pctx, schema)
     assert_conform(covered, schema)
-    assert covered == [{"entrypoint": ""}, {"entrypoint": [""]}, {"entrypoint": []}]
+    assert covered == [
+        {"entrypoint": ""},
+        {"entrypoint": [""]},
+        {"entrypoint": []},
+        {"entrypoint": [OVERSIZED]},
+        {"entrypoint": OVERSIZED},
+    ]
 
 
 IF_THEN_ELSE_SCHEMA = {
@@ -4146,10 +4158,13 @@ REF_TARGET_BUNDLE = {"base": {"type": "object", "properties": {"name": {"type": 
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
-        ({**REF_WITH_SIBLINGS, "x-bundled": REF_TARGET_BUNDLE}, [{"name": "", "extra": 0}]),
+        (
+            {**REF_WITH_SIBLINGS, "x-bundled": REF_TARGET_BUNDLE},
+            [{"name": "", "extra": 0}, {"name": OVERSIZED, "extra": 0}],
+        ),
         (
             {"oneOf": [REF_WITH_SIBLINGS, {"type": "string"}], "x-bundled": REF_TARGET_BUNDLE},
-            [{"name": "", "extra": 0}, ""],
+            [{"name": "", "extra": 0}, {"name": OVERSIZED, "extra": 0}, "", OVERSIZED],
         ),
     ],
     ids=["bare", "inside-branch"],

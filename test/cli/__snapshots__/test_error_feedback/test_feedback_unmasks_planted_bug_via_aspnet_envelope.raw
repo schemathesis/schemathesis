@@ -34,7 +34,7 @@ _________________________________ POST /users __________________________________
 
 [400] Bad Request:
 
-    `{"errors":{"Description":["The field Description must be a string or array type with a minimum length of '10'."],"Title":["The field Title must be a string or array type with a minimum length of '5'."],"Username":["The field Username must be a string or array type with a minimum length of '3'."]},"status":400,"title":"One or more validation errors occurred.","type":"https://tools.ietf.org/html/rfc9110#section-15.5.1"}`
+    `{"errors":{"Description":["The field Description must be a string or array type with a minimum length of '10'."],"Title":["The field Title must be a string or array type with a minimum length of '5'."],"Username":["The field Username must be a string or array type with a maximum length of '30'."]},"status":400,"title":"One or more validation errors occurred.","type":"https://tools.ietf.org/html/rfc9110#section-15.5.1"}`
 
 Reproduce with:
 

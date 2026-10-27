@@ -15,6 +15,7 @@ from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transforms import UNRESOLVABLE, format_body_key, resolve_path, split_body_key
 from schemathesis.core.transport import response_content_type
+from schemathesis.generation.meta import CoverageScenario, coverage_scenario
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.error_feedback import _walk_to_property
@@ -726,7 +727,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
     ) -> None:
         """Capture path-parameter and body-field values from a successful request."""
         slots = [*self.inputs_by_label.get(operation.label, ()), *self.created_keys_by_label.get(operation.label, ())]
-        if not slots:
+        # A server accepting an oversized string says nothing about it being usable as an identifier elsewhere.
+        if not slots or coverage_scenario(case) == CoverageScenario.OVERSIZED_STRING:
             return
         if case.meta is not None:
             slots = [slot for slot in slots if not case.meta.is_negative_at(slot.parameter_location)]
@@ -756,6 +758,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
         Handles deserialization and extraction of response data internally.
         """
+        # An echoed oversized string would reach later requests as an identifier.
+        if coverage_scenario(case) == CoverageScenario.OVERSIZED_STRING:
+            return
         # Decide eligibility before deserializing so semantic-only operations don't pay the
         # deserialization cost (or risk a custom-deserializer exception) for non-2xx responses
         # that the pool would discard anyway.

@@ -34,7 +34,7 @@ _________________________________ POST /users __________________________________
 
 [400] Bad Request:
 
-    `{"errors":{"description":"'' is shorter than 10 characters","title":"'' is shorter than 5 characters","username":"'' is shorter than 3 characters"},"message":"Input payload validation failed"}`
+    `{"errors":{"description":"'' is shorter than 10 characters","title":"'' is shorter than 5 characters","username":"'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa // Output truncated...`
 
 Reproduce with:
 

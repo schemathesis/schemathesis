@@ -6,10 +6,13 @@ from flask import jsonify, request
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import PoolDraw
+from schemathesis.specs.openapi.coverage._schema import OVERSIZED_STRING_LENGTH
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import null_name_responses
 from test.coverage.helpers import iter_cases, make_request_body
 from test.utils import objects_at
+
+OVERSIZED = "a" * OVERSIZED_STRING_LENGTH
 
 
 def _path_parameter(name, schema=None):
@@ -545,6 +548,7 @@ def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
         {},
         {"address_id": {"city": "London"}},
         {"address_id": {}},
+        {"address_id": {"city": OVERSIZED, "country": "UK"}},
     ]
 
 
@@ -741,7 +745,7 @@ def test_coverage_pool_overlay_reaches_top_level_field_of_ref_body(ctx):
     data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": 7340001})
 
     cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
-    assert [case.body["location_id"] for case in cases] == [7340001, 7340001]
+    assert [case.body["location_id"] for case in cases] == [7340001, 7340001, 7340001]
 
 
 def test_coverage_pool_draws_multi_slot_correlated(ctx):
@@ -1130,6 +1134,11 @@ def test_coverage_pool_overlay_reaches_every_item_of_whole_drawn_arrays(ctx):
             "Near-boundary length string",
             [7340001],
         ),
+        (
+            "Object with valid 'data' value: Single-item array: Object with valid 'name' value: "
+            "String longer than common implicit limits",
+            [7340001],
+        ),
     ]
 
 
@@ -1161,3 +1170,44 @@ def test_coverage_pool_falls_back_when_pinning_breaks_unique_items(ctx):
             {"data": [{"location_id": 0}, {"location_id": 1}, {"location_id": -1}]},
         ),
     ]
+
+
+def test_coverage_pool_skips_oversized_values_echoed_in_responses(cli, ctx):
+    # Servers reject a URL carrying the echoed oversized value before the handler sees it.
+    product = {"type": "object", "required": ["productId"], "properties": {"productId": {"type": "string"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/products": {
+                "post": {
+                    "operationId": "createProduct",
+                    "requestBody": _id_body("productId", {"type": "string"}),
+                    "responses": {
+                        "201": {"description": "Created", "content": {"application/json": {"schema": product}}}
+                    },
+                }
+            },
+            "/products/{productId}": {
+                "get": {
+                    "operationId": "getProduct",
+                    "parameters": [_path_parameter("productId")],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    fetched: list[str] = []
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        product_id = _json_string_field("productId")
+        if product_id is None:
+            return "", 400
+        return jsonify({"productId": product_id}), 201
+
+    @app.route("/products/<product_id>", methods=["GET"])
+    def get_product(product_id):
+        fetched.append(product_id)
+        return "", 404
+
+    cli.run_openapi_app(app, "--phases=coverage", "-c not_a_server_error")
+    assert fetched

@@ -34,7 +34,7 @@ _________________________________ POST /users __________________________________
 
 [422] Unprocessable Content:
 
-    `{"errors":{"description":["is too short (minimum is 10 characters)"],"title":["is too short (minimum is 5 characters)"],"username":["is too short (minimum is 3 characters)"]}}`
+    `{"errors":{"description":["is too short (minimum is 10 characters)"],"title":["is too short (minimum is 5 characters)"],"username":["is too long (maximum is 30 characters)"]}}`
 
 Reproduce with:
 
