@@ -17,18 +17,10 @@ Schemathesis dev
 
  🚫  Fuzzing (in 0.00s)
 
-     🚫 2 errors
+     🚫 1 error  ⏭  1 skipped
 
 ==================================== ERRORS ====================================
 __________________________________ GET /first __________________________________
-Network Error
-
-Read timed out after 2.0 seconds
-
-Reproduce with:
-
-    <PLACEHOLDER>
-_________________________________ GET /second __________________________________
 Network Error
 
 Read timed out after 2.0 seconds
@@ -45,7 +37,9 @@ Need more help?
 API Operations:
   Selected: 2/2
   Tested: 0
-  Errored: 2
+  Errored: 1
+  Skipped: 1
+    - Time limit reached
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -54,11 +48,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Errors:
-  🚫 Network Error: 2
+  🚫 Network Error: 1
 
 Test cases:
-  2 generated, 2 errored
+  1 generated, 1 errored
 
 Seed: 42
 
-============================== 2 errors in 1.00s ===============================
+=============================== 1 error in 1.00s ===============================

@@ -24,6 +24,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._rate_limit_retry import TRANSPORT_ERRORS, send_tracked, validate_case
+from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.errors import build_code_sample, is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
@@ -372,6 +373,10 @@ def _send_step(
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
         return send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=event_queue.put)
+    except BudgetExpired:
+        # Cut off by the time limit, the request says nothing about the operation.
+        recorder.forget_case(case_id=case.id)
+        return None
     except TRANSPORT_ERRORS as exc:
         if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.

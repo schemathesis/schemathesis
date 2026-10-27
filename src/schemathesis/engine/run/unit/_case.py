@@ -15,6 +15,7 @@ from schemathesis.engine._rate_limit_retry import (
     send_tracked,
     validate_case,
 )
+from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.errors import (
     UnexpectedError,
     UnrecoverableNetworkError,
@@ -43,10 +44,6 @@ def _is_ordinary_request(case: Case) -> bool:
     attributed to the operation.
     """
     return case.method.lower() == case.operation.method.lower() and coverage_scenario(case) not in CONTENT_TYPE_PROBES
-
-
-class BudgetExpired(KeyboardInterrupt):
-    """Raised when the run's time budget is out, either for this operation's share or overall."""
 
 
 class ServerWentAway(KeyboardInterrupt):
@@ -209,6 +206,10 @@ def _call_with_reauth(
             retried, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
         except TRANSPORT_ERRORS as error:
             recorder.record_network_error(case_id=case.id, error=error)
+            raise
+        except BudgetExpired:
+            # Cut off by the time limit, the request says nothing about the operation.
+            recorder.forget_case(case_id=case.id)
             raise
         rate_limited.extend(retried)
         return response

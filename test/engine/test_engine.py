@@ -1911,6 +1911,7 @@ def test_max_time_stops_reserving_for_a_phase_that_only_skips(ctx):
     assert [event.status for event in stateful].count(Status.SKIP) <= 1, len(stateful)
 
 
+@pytest.mark.usefixtures("restore_checks")
 def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runner):
     # Workers finish moments apart; the one that lands after the deadline is still work that happened.
     app, _ = ctx.openapi.make_flask_app(
@@ -1922,16 +1923,19 @@ def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runne
 
     @app.route("/first")
     def first():
-        time.sleep(3.2)
         return "", 200
 
     @app.route("/second")
     def second():
-        time.sleep(3.6)
         return "", 500
 
+    @schemathesis.check
+    def slow_check(ctx, response, case):
+        time.sleep(3.6 if response.status_code == 500 else 3.2)
+        assert response.status_code < 500
+
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    stream = execute(schema, max_time=3, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
+    stream = execute(schema, checks=(slow_check,), max_time=3, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
 
     assert {(event.label, event.status) for event in stream.find_all(events.ScenarioFinished)} == {
         ("GET /first", Status.SUCCESS),
@@ -2288,6 +2292,7 @@ def test_max_time_stops_reserving_once_stateful_proves_idle(ctx, app_runner):
     assert len(fuzzing) <= 3, len(fuzzing)
 
 
+@pytest.mark.usefixtures("restore_checks")
 def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner):
     # A retry that starts with the budget already gone issues no request, so it vouches for nothing.
     app, _ = ctx.openapi.make_flask_app(linked_users())
@@ -2295,13 +2300,19 @@ def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
-        # Outlasts the budget, so the retry the failure schedules starts with nothing left to spend.
-        time.sleep(2.5)
         return "", 500
+
+    @schemathesis.check
+    def slow_check(ctx, response, case):
+        if response.status_code == 500:
+            # Outlasts the budget, so the retry the failure schedules starts with nothing left to spend.
+            time.sleep(2.5)
+            raise AssertionError("Server error")
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     stream = execute(
         schema,
+        checks=(slow_check,),
         max_time=2,
         max_examples=100_000,
         modes=[GenerationMode.POSITIVE],

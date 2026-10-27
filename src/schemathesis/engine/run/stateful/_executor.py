@@ -34,7 +34,8 @@ from schemathesis.engine.errors import (
     is_inconsistent_replay,
 )
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.run.unit._case import BudgetExpired, ServerWentAway
+from schemathesis.engine.control import BudgetExpired
+from schemathesis.engine.run.unit._case import ServerWentAway
 from schemathesis.engine._baseline import is_known
 from schemathesis.engine._rate_limit_retry import (
     TRANSPORT_ERRORS,
@@ -298,7 +299,7 @@ def _send_step(
         case,
         transport_kwargs=kwargs,
         emit=event_queue.put,
-        send=lambda: machine.call(case, **kwargs),
+        send=lambda request_kwargs: machine.call(case, **request_kwargs),
         after_response=lambda response: machine.after_call(response, case),
     )
     return validate_with_rate_limited(
@@ -529,7 +530,10 @@ def _run_step(
         if outage:
             raise ServerWentAway from None
         raise
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as exc:
+        if isinstance(exc, BudgetExpired):
+            # Cut off by the time limit, the request says nothing about the operation.
+            machine.recorder.forget_case(case_id=case.id)
         ctx.step_interrupted()
         raise
     except BaseException as exc:

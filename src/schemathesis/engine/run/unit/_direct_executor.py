@@ -7,10 +7,10 @@ from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
+from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.errors import UnexpectedError
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import (
-    BudgetExpired,
     ServerWentAway,
     raise_if_stopped,
     run_one_case,
@@ -157,4 +157,6 @@ def _settle_status(
         return Status.ERROR, None
     if server_went_away and not recorder.has_responses():
         return Status.SKIP, StopReason.SERVER_UNAVAILABLE.skip_explanation
+    if budget_expired and not recorder.has_responses():
+        return Status.SKIP, StopReason.MAX_TIME.skip_explanation
     return status, None

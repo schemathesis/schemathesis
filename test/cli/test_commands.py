@@ -609,7 +609,7 @@ def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
 def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
-    # Each request times out after its operation's share of `--max-time` has run out.
+    # The first request times out on its own; the second one is still waiting when `--max-time` runs out.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/first": {"get": {"responses": {"200": {"description": "OK"}}}},
@@ -638,6 +638,48 @@ def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
         )
     finally:
         release.set()
+    assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/a/hanging": {"get": {"responses": {"200": {"description": "OK"}}}},
+            **{
+                f"/b/fast{index}": {
+                    "get": {
+                        "parameters": [{"name": "q", "in": "query", "schema": {"type": "integer"}}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+                for index in range(3)
+            },
+        }
+    )
+    release = threading.Event()
+
+    @app.route("/a/hanging")
+    def hanging():
+        release.wait()
+        return jsonify({})
+
+    @app.route("/b/fast<int:index>")
+    def fast(index):
+        return jsonify({})
+
+    started = time.monotonic()
+    try:
+        result = cli.run_openapi_app(
+            app,
+            "--max-time=2",
+            "--request-timeout=30",
+            "--phases=examples,coverage,fuzzing",
+            "--checks=not_a_server_error",
+        )
+    finally:
+        release.set()
+    assert time.monotonic() - started < 15
     assert result == snapshot_cli
 
 
