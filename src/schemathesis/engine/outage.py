@@ -51,7 +51,7 @@ class SentRequest:
     # A reset reaches whatever accepted the connection, which may be a proxy; only a response proves the server ran.
     answered: bool = False
 
-    def as_curl_command(self) -> str:
+    def as_reproduction_command(self) -> str:
         return build_code_sample(self.case, self.request, self.transport_kwargs)
 
 
@@ -174,7 +174,7 @@ class ServerMonitor:
 def _render_outage(url: str, candidates: list[SentRequest]) -> str:
     parts = urlsplit(url)
     noun = "request" if len(candidates) == 1 else "requests"
-    commands = "\n\n".join(textwrap.indent(item.as_curl_command(), "    ") for item in candidates)
+    commands = "\n\n".join(textwrap.indent(item.as_reproduction_command(), "    ") for item in candidates)
     return f"{parts.scheme}://{parts.netloc} stopped responding. Last {noun} before it went away:\n\n{commands}"
 
 

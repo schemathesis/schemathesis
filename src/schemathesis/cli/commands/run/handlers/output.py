@@ -535,7 +535,10 @@ def extraction_failure_reason(failure: ExtractionFailure) -> list[str]:
 def extraction_failure_steps(failure: ExtractionFailure) -> list[tuple[int, str]]:
     """Requests that led to the response, oldest first, as (status code, curl command)."""
     return [
-        (response.status_code, case.as_curl_command(headers=dict(response.request.headers), verify=response.verify))
+        (
+            response.status_code,
+            case.as_reproduction_command(headers=dict(response.request.headers), verify=response.verify),
+        )
         for case, response in reversed(failure.history)
     ]
 

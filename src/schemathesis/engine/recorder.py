@@ -352,7 +352,7 @@ class ReproductionStep:
     def from_case(
         cls, case: Case, *, headers: dict[str, Any] | None, verify: bool, roles: Mapping[str, str]
     ) -> ReproductionStep:
-        curl = case.as_curl_command(headers=headers, verify=verify)
+        curl = case.as_reproduction_command(headers=headers, verify=verify)
         # Requests sent as different identities look alike once credentials are masked.
         role = roles.get(case.auth_identity) if case.auth_identity is not None else None
         sender = f"{case.auth_identity} ({role})" if role is not None else None

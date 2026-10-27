@@ -436,6 +436,12 @@ class Case(Generic[OperationT]):
             return f"{result.command}\n\n{warnings_text}"
         return result.command
 
+    def as_reproduction_command(
+        self, headers: Mapping[str, Any] | None = None, verify: bool = True, *, base_url: str | None = None
+    ) -> str:
+        """Command that reproduces this test case in the schema's own tooling, e.g. curl for HTTP APIs."""
+        return self.operation.schema.as_reproduction_command(self, headers=headers, verify=verify, base_url=base_url)
+
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)
 
@@ -496,7 +502,7 @@ class Case(Generic[OperationT]):
             # Add reproduction code for check failures and app errors (e.g., ASGI/WSGI internal errors)
             verify = kwargs.get("verify", True)
             try:
-                curl = self.as_curl_command(headers=headers, verify=verify)
+                curl = self.as_reproduction_command(headers=headers, verify=verify)
                 exc.add_note(f"\nReproduce with:\n\n    {curl}")
             except Exception:
                 # Curl generation can fail for the same reason as the original error
@@ -624,7 +630,7 @@ class Case(Generic[OperationT]):
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"
-            curl = self.as_curl_command(
+            curl = self.as_reproduction_command(
                 headers=dict(response.request.headers), verify=response.verify, base_url=sent_base_url
             )
             message += format_failures(

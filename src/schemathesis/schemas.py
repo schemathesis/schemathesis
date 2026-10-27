@@ -143,6 +143,12 @@ class BaseSchema(Mapping):
     def transport(self) -> transport.BaseTransport:
         return self.get_transport(self.app)
 
+    def as_reproduction_command(
+        self, case: Case, *, headers: Mapping[str, Any] | None, verify: bool, base_url: str | None = None
+    ) -> str:
+        """Command that reproduces `case` outside Schemathesis."""
+        return case.as_curl_command(headers, verify, base_url=base_url)
+
     def is_security_param_negated(self, case: Case) -> bool:
         return False
 

@@ -315,7 +315,7 @@ class APIStateMachine(RuleBasedStateMachine):
                             ) -> None:
                                 for result in results:
                                     if result.failure is not None:
-                                        code_sample = case.as_curl_command(
+                                        code_sample = case.as_reproduction_command(
                                             headers=dict(response.request.headers),
                                             verify=response.verify,
                                         )
