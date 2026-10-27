@@ -589,6 +589,18 @@ def parameter_names_resource_field(*, parameter: str, field: str, resource: str)
     return any("".join(words[start:]) == hint for start in range(len(words)))
 
 
+def parameter_names_source(*, parameter: str, field: str, resource: str, pointer: str) -> bool:
+    """Whether the part of `parameter` before `field` names `resource` or the response field holding the value."""
+    hint = normalize_for_matching(parameter).removesuffix(normalize_for_matching(field))
+    resource_normalized = normalize_for_matching(resource)
+    # `check_name` takes `CheckRun.name`, `tunnel_name` takes `VpnTunnel.name`.
+    if not hint or resource_normalized.startswith(hint) or resource_normalized.endswith(hint):
+        return True
+    # `order__orderer__name` takes `/orderer/name`, not `/contact/name`, though both hold a `Contact`.
+    segments = [segment for segment in pointer.split("/") if segment and segment != "*"]
+    return bool(segments) and hint.endswith(normalize_for_matching(segments[-1]))
+
+
 def _field_normalized_as(fields: list[str], expected: str) -> str | None:
     for field in fields:
         if normalize_for_matching(field) == expected:
