@@ -2124,17 +2124,16 @@ def _cover_positive_for_type(
     elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
         yield from _positive_for_describing_keywords(ctx, schema, ty, template)
     if "not" in schema and isinstance(schema["not"], (dict, bool)):
-        # For 'not' schemas: generate negative cases of inner schema (violations)
-        # These violations are positive for the outer schema, so flip the mode.
-        # The inner-violation alone doesn't guarantee the value satisfies the outer's
-        # other constraints (type, properties, etc.); validate before yielding.
+        # Values invalid for the inner schema are valid for the outer one only if they also satisfy
+        # its other constraints (type, properties, etc.).
         nctx = ctx.with_negative()
-        for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"])):
-            if flipped.generation_mode == GenerationMode.POSITIVE and not _is_valid_with_formats(
-                flipped.value, schema, ctx
-            ):
-                continue
-            yield flipped
+        for generated in cover_schema_iter(nctx, schema["not"]):
+            if _is_valid_with_formats(generated.value, schema, ctx):
+                yield PositiveValue(
+                    generated.value,
+                    scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
+                    description="Value not matching the 'not' schema",
+                )
 
 
 def _inline_allof_refs(
@@ -2626,13 +2625,18 @@ def _negative_not(
 ) -> Generator[GeneratedValue, None, None]:
     if not isinstance(value, (dict, bool)):
         return
-    # For 'not' schemas: generate positive cases of inner schema (valid values)
-    # These valid values are negative for the outer schema, so flip the mode
+    # Values valid for the inner schema are invalid for the outer one, and are reported by the `not` they violate.
     pctx = ctx.with_positive()
     # Nothing satisfies the schema around a `not` that admits everything, so what a value is
     # says nothing about why it is rejected.
-    description = "Value is not allowed" if value == {} or value is True else None
-    yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen), description=description)
+    description = "Value is not allowed" if value == {} or value is True else "Value matches the 'not' schema"
+    for generated in cover_schema_iter(pctx, value, seen):
+        yield NegativeValue(
+            generated.value,
+            scenario=CoverageScenario.MATCHES_NOT_SCHEMA,
+            description=description,
+            location=ctx.current_path,
+        )
 
 
 _ALL_TYPES = ("null", "boolean", "string", "number", "array", "object")
@@ -4716,31 +4720,6 @@ def _negative_type(
             yield NegativeValue(
                 value, scenario=CoverageScenario.INCORRECT_TYPE, description="Incorrect type", location=ctx.current_path
             )
-
-
-def _flip_generation_mode_for_not(
-    values: Generator[GeneratedValue, None, None],
-    description: str | None = None,
-) -> Generator[GeneratedValue, None, None]:
-    """Flip generation mode for values from 'not' schemas.
-
-    For 'not' schemas, the semantic is inverted:
-    - Positive values for the inner schema are negative for the outer schema
-    - Negative values for the inner schema are positive for the outer schema
-    """
-    for value in values:
-        flipped_mode = (
-            GenerationMode.NEGATIVE if value.generation_mode == GenerationMode.POSITIVE else GenerationMode.POSITIVE
-        )
-        yield GeneratedValue(
-            value=value.value,
-            generation_mode=flipped_mode,
-            scenario=value.scenario,
-            description=description or value.description,
-            location=value.location,
-            parameter=value.parameter,
-            deduplication_key=value.deduplication_key,
-        )
 
 
 def push_examples_to_properties(schema: JsonSchemaObject) -> JsonSchemaObject:

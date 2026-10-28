@@ -94,6 +94,7 @@ class CoverageScenario(StrEnum):
     NOT_MULTIPLE_OF = "not_multiple_of"
     NON_UNIQUE_ITEMS = "non_unique_items"
     UNIQUE_ITEMS_ARRAY = "unique_items_array"
+    MATCHES_NOT_SCHEMA = "matches_not_schema"
 
     # Negative scenarios - Missing parameters
     MISSING_PARAMETER = "missing_parameter"

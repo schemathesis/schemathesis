@@ -1299,6 +1299,55 @@ def test_negative_forbidden_schema_description(nctx, schema, expected):
     ("schema", "expected"),
     [
         (
+            {"not": {"type": "string"}},
+            {(CoverageScenario.MATCHES_NOT_SCHEMA, "Value matches the 'not' schema", "/not")},
+        ),
+        (
+            {"properties": {"name": {"not": {"type": "string"}}}},
+            {(CoverageScenario.MATCHES_NOT_SCHEMA, "name: Value matches the 'not' schema", "/properties/name/not")},
+        ),
+    ],
+    ids=["root", "property"],
+)
+def test_negative_not_metadata(nctx, schema, expected):
+    assert {
+        (value.scenario, value.description, value.location) for value in cover_schema_iter(nctx, schema)
+    } == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"not": {"type": "string"}},
+            {(CoverageScenario.DEFAULT_POSITIVE_TEST, "Value not matching the 'not' schema", None)},
+        ),
+        (
+            {"properties": {"name": {"not": {"type": "string"}}}},
+            {
+                (CoverageScenario.OBJECT_ONLY_REQUIRED, "Object with only required properties", None),
+                (CoverageScenario.VALID_OBJECT, "Valid object", None),
+                (
+                    CoverageScenario.VALID_OBJECT,
+                    "Object with valid 'name' value: Value not matching the 'not' schema",
+                    None,
+                ),
+            },
+        ),
+    ],
+    ids=["root", "property"],
+)
+def test_positive_not_metadata(ctx_factory, schema, expected):
+    pctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    assert {
+        (value.scenario, value.description, value.location) for value in cover_schema_iter(pctx, schema)
+    } == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
             {"type": "object", "propertyNames": {"maxLength": 3}},
             [0, 0.5, "true", "null", "AAA", ["null", "null"], {"0000": ""}],
         ),
