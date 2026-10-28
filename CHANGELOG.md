@@ -38,6 +38,8 @@
 #### Others
 
 - Generic "Schema Error" message hiding why an operation failed to load.
+- Runs with `--max-time` continuing after a request times out at the time limit.
+- Token fetch cooldown failure reported twice in stateful testing.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 
