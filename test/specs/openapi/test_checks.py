@@ -366,6 +366,130 @@ def test_has_only_additional_properties_mutations_aware(sample_schema, kwargs, e
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
 
 
+def _coverage_negative_metadata(parameter, location):
+    return CaseMetadata(
+        generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+        components={location: ComponentInfo(mode=GenerationMode.NEGATIVE)},
+        phase=PhaseInfo(
+            name=TestPhase.COVERAGE,
+            data=CoveragePhaseData(
+                scenario=CoverageScenario.INCORRECT_TYPE,
+                description="Incorrect type",
+                location=location.value,
+                parameter=parameter,
+                parameter_location=location,
+            ),
+        ),
+    )
+
+
+_TAG_AND_LIMIT_PARAMETERS = [
+    {"in": "query", "name": "tag", "schema": {"type": "array", "items": {"type": "string"}}},
+    {"in": "query", "name": "limit", "schema": {"type": "integer"}},
+    {"in": "header", "name": "X-Limit", "schema": {"type": "integer"}},
+]
+
+
+@pytest.mark.parametrize(
+    ("parameters", "kwargs", "expected"),
+    [
+        pytest.param(
+            _TAG_AND_LIMIT_PARAMETERS,
+            {
+                "query": {"tag": ["a"], "limit": "abc"},
+                "_meta": _coverage_negative_metadata("limit", ParameterLocation.QUERY),
+            },
+            False,
+            id="coverage-scalar-beside-array",
+        ),
+        pytest.param(
+            _TAG_AND_LIMIT_PARAMETERS,
+            {
+                "query": {"tag": "abc", "limit": 1},
+                "_meta": _coverage_negative_metadata("tag", ParameterLocation.QUERY),
+            },
+            True,
+            id="coverage-array",
+        ),
+        pytest.param(
+            _TAG_AND_LIMIT_PARAMETERS,
+            {
+                "query": {"tag": ["a"], "unknown": "x"},
+                "headers": {"X-Limit": "abc"},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    headers=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    mutations=(
+                        _ADDITIONAL_PROPERTIES_MUTATION,
+                        _mutation(OperatorKind.CHANGE_TYPE, ("type",), "X-Limit", ParameterLocation.HEADER),
+                    ),
+                ),
+            },
+            False,
+            id="invalid-header-after-array-query",
+        ),
+        pytest.param(
+            [{"in": "query", "name": "title", "schema": {"type": "string"}}],
+            {
+                "query": {"title": "null", "unknown": "x"},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    mutations=(_ADDITIONAL_PROPERTIES_MUTATION,),
+                ),
+            },
+            True,
+            id="null-text-for-string",
+        ),
+        pytest.param(
+            [{"in": "query", "name": "page", "schema": {"type": "integer", "nullable": True}}],
+            {
+                "query": {"page": "null", "unknown": "x"},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    mutations=(_ADDITIONAL_PROPERTIES_MUTATION,),
+                ),
+            },
+            True,
+            id="null-text-for-nullable-integer",
+        ),
+        pytest.param(
+            _TAG_AND_LIMIT_PARAMETERS,
+            {
+                "query": {"tag": []},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    mutations=(_mutation(OperatorKind.NEGATE_CONSTRAINTS, ("required",), "tag"),),
+                ),
+            },
+            True,
+            id="required-array-sent-as-nothing",
+        ),
+        pytest.param(
+            [{"in": "query", "name": "filter", "schema": {"type": "object"}}],
+            {
+                "query": {"filter": "abc"},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    mutations=(_mutation(OperatorKind.CHANGE_TYPE, ("type",), "filter"),),
+                ),
+            },
+            True,
+            id="object-type-mutation",
+        ),
+    ],
+)
+def test_has_only_additional_properties_reads_parameters_as_sent(ctx, parameters, kwargs, expected):
+    operation = ctx.openapi.load_operation(
+        "GET /tags", {"parameters": parameters, "responses": {"200": {"description": "OK"}}}
+    )
+    assert has_only_additional_properties_in_non_body_parameters(operation.Case(**kwargs)) is expected
+
+
 def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     # Patterns with large quantifiers require pattern_options with sufficient size_limit
     operation = ctx.openapi.load_operation(
@@ -534,6 +658,57 @@ def _opaque_rejection(response_factory):
 
 
 @pytest.mark.parametrize(
+    ("body", "summary"),
+    [
+        ({"a": "x", "e1": 1}, "1 additional property not defined in the schema (`e1`)"),
+        ({"e1": 1, "e2": 1, "e3": 1}, "3 additional properties not defined in the schema (`e1`, `e2`, `e3`)"),
+        (
+            {"e1": 1, "e2": 1, "e3": 1, "e4": 1},
+            "4 additional properties not defined in the schema (`e1`, `e2`, `e3` and 1 more)",
+        ),
+        (
+            {"e1": 1, "e2": 1, "e3": 1, "e4": 1, "e5": 1},
+            "5 additional properties not defined in the schema (`e1`, `e2`, `e3` and 2 more)",
+        ),
+        ({"data": b"\x89PNG", "e1": 1}, None),
+        ({"a": "x\x00", "e1": 1}, None),
+        ({"tags": ["ok", "bad\x00"], "e1": 1}, None),
+    ],
+    ids=["one", "three", "four", "five", "binary-field", "nul-in-value", "nul-in-nested-list"],
+)
+def test_additional_properties_hint_names_extras(ctx, response_factory, body, summary):
+    operation = ctx.openapi.load_operation(
+        "POST /foo",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "a": {"type": "string"},
+                                "tags": {"type": "array", "items": {"type": "string"}},
+                                "data": {"type": "string", "format": "binary"},
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(body=body, media_type="application/json")
+    expected = None
+    if summary is not None:
+        expected = (
+            f"\nHint: The request body contains {summary}. The server appears to reject properties the schema allows. "
+            "Declare `additionalProperties: false` if extras are not accepted, or make the server ignore unknown fields."
+        )
+    assert _additional_properties_hint(case, _opaque_rejection(response_factory)) == expected
+
+
+@pytest.mark.parametrize(
     ("body", "expected_hint"),
     [
         pytest.param({"a": 1, "b": {"x": "q"}}, None, id="declared-keys-only"),
@@ -626,6 +801,47 @@ def test_additional_properties_hint_with_composed_properties(ctx, response_facto
     else:
         assert hint is not None and expected_hint in hint, f"Expected mention of {expected_hint} in {hint!r}"
         assert "`a`" not in hint and "`b`" not in hint, f"Declared keys reported as extras: {hint!r}"
+
+
+def test_additional_properties_hint_with_one_of_behind_chained_refs(ctx, response_factory):
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "X", "version": "1"},
+            "paths": {
+                "/foo": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "oneOf": [
+                                            {"$ref": "#/components/schemas/Alias"},
+                                            {
+                                                "type": "object",
+                                                "properties": {"a": {"type": "string"}},
+                                                "required": ["a"],
+                                            },
+                                        ]
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "Alias": {"$ref": "#/components/schemas/Base"},
+                    "Base": {"type": "object", "properties": {"b": {"type": "string"}}, "required": ["b"]},
+                }
+            },
+        }
+    )
+    case = schema["/foo"]["POST"].Case(body={"a": "x", "extra": "yes"}, media_type="application/json")
+    assert _additional_properties_hint(case, _opaque_rejection(response_factory)) == _EXTRA_PROPERTY_HINT
 
 
 def test_additional_properties_hint_skipped_when_branch_forbids_extras(ctx, response_factory):
@@ -1167,6 +1383,127 @@ def test_negative_data_rejection_blank_numeric_query(ctx, response_factory, decl
             negative_data_rejection(check_context(), response, case)
     else:
         assert negative_data_rejection(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("query", "headers", "accepted"),
+    [
+        ({"title": 5}, {"X-Mode": " 3 "}, True),
+        ({"limit": "", "title": 5}, {"X-Mode": " 3 "}, True),
+        ({"title": "a", "flag": "true"}, {"X-Mode": " 3 "}, True),
+        ({"title": "a", "limit": 5}, {"X-Mode": " 3 "}, True),
+        ({"flag": None, "title": 5}, {"X-Mode": " 3 "}, True),
+        ({"title": ["a", "b"]}, {"X-Mode": " 3 "}, False),
+        ({"title": 5}, {"X-Mode": "bad"}, False),
+    ],
+    ids=[
+        "integer-sent-as-string",
+        "blank-optional-before-sent",
+        "boolean-spelling",
+        "valid-integer",
+        "unsent-before-sent",
+        "repeated",
+        "bad-header",
+    ],
+)
+def test_negative_data_rejection_validates_query_and_headers_as_sent(ctx, response_factory, query, headers, accepted):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"in": "query", "name": "flag", "schema": {"type": "boolean"}},
+                {"in": "query", "name": "title", "required": True, "schema": {"type": "string"}},
+                {"in": "query", "name": "limit", "schema": {"type": "integer"}},
+                {"in": "header", "name": "X-Mode", "schema": {"type": "string", "maxLength": 2}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE, headers=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]
+        ),
+        query=query,
+        headers=headers,
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    if accepted:
+        assert negative_data_rejection(check_context(), response, case) is None
+    else:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+
+
+def test_negative_data_rejection_reports_invalid_query_beside_negated_path(ctx, response_factory):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"in": "query", "name": "limit", "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+        ),
+        query={"limit": "abc"},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response, case)
+
+
+@pytest.mark.parametrize(
+    ("query", "transport_kwargs", "reported"),
+    [
+        ({}, {"json": {"name": "valid"}}, False),
+        ({}, None, True),
+        ({"limit": "abc"}, {"json": {"name": "valid"}}, True),
+        ({"limit": 1}, None, True),
+    ],
+    ids=["body-replaced", "body-sent", "body-replaced-beside-invalid-query", "body-sent-beside-valid-query"],
+)
+def test_negative_data_rejection_skips_body_replaced_by_caller(
+    ctx, response_factory, query, transport_kwargs, reported
+):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "parameters": [{"in": "query", "name": "limit", "schema": {"type": "integer"}}],
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE if query else None,
+            body=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+        ),
+        query=query,
+        body={"name": 5},
+        media_type="application/json",
+    )
+    context = check_context(transport_kwargs=transport_kwargs)
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(context, response, case)
+    else:
+        assert negative_data_rejection(context, response, case) is None
 
 
 def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_value(ctx, response_factory):
@@ -2087,6 +2424,44 @@ def test_body_negation_becomes_valid_after_serialization(
     assert _body_negation_becomes_valid_after_serialization(response_factory.requests(), case) is expected
 
 
+@pytest.mark.parametrize(
+    ("query", "headers", "expected"),
+    [
+        ({"flag": "true"}, None, True),
+        ({"flag": "true"}, {"X-Mode": "bad"}, False),
+        ({"flag": "maybe"}, None, False),
+    ],
+    ids=["boolean-spelling", "invalid-header-after-valid-query", "invalid-boolean"],
+)
+def test_body_negation_becomes_valid_after_serialization_reads_other_locations_as_sent(
+    ctx, response_factory, query, headers, expected
+):
+    operation = ctx.openapi.load_operation(
+        "PUT /endpoint",
+        {
+            "parameters": [
+                {"in": "query", "name": "flag", "schema": {"type": "boolean"}},
+                {"in": "header", "name": "X-Mode", "schema": {"type": "string", "maxLength": 2}},
+            ],
+            "requestBody": {"required": True, "content": {"text/plain": {"schema": {"type": "string"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(
+            body=GenerationMode.NEGATIVE,
+            query=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE if headers else None,
+            generation_modes=[GenerationMode.NEGATIVE],
+        ),
+        query=query,
+        headers=headers or {},
+        body=5,
+        media_type="text/plain",
+    )
+    assert _body_negation_becomes_valid_after_serialization(response_factory.requests(), case) is expected
+
+
 MULTIPART = "multipart/form-data"
 URLENCODED = "application/x-www-form-urlencoded"
 
@@ -2236,6 +2611,15 @@ def test_negative_data_rejection_accepts_optional_form_fields_not_sent(ctx, app_
             {'na"me': True},
             None,
         ),
+        (URLENCODED, {"count": {"type": "string", "minLength": 1}}, None, "3.0.2", {"count": ""}, None),
+        (
+            MULTIPART,
+            {"description": {"type": "string", "maxLength": 3, "nullable": True}},
+            None,
+            "3.0.2",
+            {"description": True},
+            None,
+        ),
     ],
     ids=[
         "max-length",
@@ -2253,6 +2637,8 @@ def test_negative_data_rejection_accepts_optional_form_fields_not_sent(ctx, app_
         "urlencoded-required-field-omitted",
         "binary-content-cannot-be-validated",
         "escaped-name-typed-part",
+        "urlencoded-blank-field",
+        "nullable-max-length",
     ],
 )
 def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
@@ -2609,6 +2995,54 @@ def test_method_not_allowed(ctx, cli, snapshot_cli, path, method):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    ("query", "mutated", "reported"),
+    [
+        ({"tag": ["a"], "page": ["2"]}, ("page",), False),
+        ({"extra": "x", "page": ["2"]}, ("page",), False),
+        ({"q": [], "page": ["2"]}, ("q", "page"), False),
+        ({"page": ["5"]}, ("page",), True),
+        ({"tag": [["a"]]}, ("tag",), True),
+    ],
+    ids=["after-array-parameter", "after-extra-key", "after-unsent-parameter", "invalid-element", "nested-array"],
+)
+def test_negative_data_rejection_single_element_array_beside_other_parameters(
+    ctx, response_factory, query, mutated, reported
+):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"in": "query", "name": "tag", "schema": {"type": "array", "items": {"type": "string"}}},
+                {"in": "query", "name": "page", "schema": {"type": "integer", "maximum": 3}},
+                {"in": "query", "name": "q", "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=tuple(
+                _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("items",), name)
+                if name == "tag"
+                else _mutation(OperatorKind.CHANGE_TYPE, ("type",), name)
+                for name in mutated
+            ),
+        ),
+        query=query,
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
 
 
 def test_negative_data_rejection_single_element_array_serialization(ctx, response_factory):
@@ -3012,6 +3446,48 @@ def test_negative_data_rejection_path_array_negated_to_scalar(ctx, response_fact
             ),
         ),
         path_parameters={"ids": value},
+    )
+    response = response_factory.requests(status_code=200)
+
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("style", "path_parameters", "reported"),
+    [
+        ("simple", {"kind": 5, "ids": EncodedPath("a,b")}, False),
+        ("simple", {"kind": EncodedPath("x"), "ids": EncodedPath("a,b")}, False),
+        ("simple", {"kind": EncodedPath("x"), "ids": EncodedPath("a,b,c")}, True),
+        ("label", {"kind": EncodedPath("x"), "ids": EncodedPath("a,b")}, True),
+    ],
+    ids=["after-non-string-value", "after-scalar-parameter", "too-many-items", "label-style"],
+)
+def test_negative_data_rejection_path_array_beside_other_path_parameter(
+    ctx, response_factory, style, path_parameters, reported
+):
+    operation = ctx.openapi.load_operation(
+        "GET /api/items/{kind}/{ids}",
+        {
+            "parameters": [
+                {"name": "kind", "in": "path", "required": True, "schema": {"type": "string"}},
+                {
+                    "name": "ids",
+                    "in": "path",
+                    "required": True,
+                    "style": style,
+                    "schema": {"type": "array", "items": {"type": "string"}, "maxItems": 2},
+                },
+            ],
+            "responses": {"200": {"description": "Success"}},
+        },
+    )
+    case = operation.Case(
+        _meta=build_metadata(path_parameters=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        path_parameters=path_parameters,
     )
     response = response_factory.requests(status_code=200)
 
@@ -4007,11 +4483,12 @@ def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
     [
         ({"Age": "75430"}, "\n\nThe response came from a cache (`Age: 75430`) and may be stale"),
         ({"X-Cache": "MISS, HIT"}, "\n\nThe response came from a cache (`X-Cache: MISS, HIT`) and may be stale"),
+        ({"Age": "1"}, "\n\nThe response came from a cache (`Age: 1`) and may be stale"),
         ({"Age": "0", "X-Cache": "MISS"}, ""),
         ({"Age": "\u00b2"}, ""),
         (None, ""),
     ],
-    ids=["age", "x-cache-hit", "fresh", "non-ascii-digit-age", "no-cache-headers"],
+    ids=["age", "x-cache-hit", "one-second-age", "fresh", "non-ascii-digit-age", "no-cache-headers"],
 )
 def test_use_after_free_hints_at_cached_response(ctx, response_factory, headers, hint):
     context, get_case, get_response = _build_user_profile_chain(
@@ -4073,6 +4550,74 @@ def test_use_after_free_skips_recreation_via_put(ctx, response_factory, put_stat
     recorder.record_response(case_id=put_case.id, response=put_response)
 
     assert use_after_free(check_context(recorder=recorder), put_response, put_case) is None
+
+
+_RECREATION_SCHEMA = {
+    **_USER_PROFILE_SCHEMA,
+    "/users/{userId}": {
+        **_USER_PROFILE_SCHEMA["/users/{userId}"],
+        "put": {
+            "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "Replaced"}},
+        },
+    },
+    "/orders": {"post": {"responses": {"201": {"description": "Created"}}}},
+}
+
+
+@pytest.mark.parametrize(
+    ("label", "path_parameters", "status_code", "order", "raises"),
+    [
+        ("POST /users", None, 201, ("other", "read"), False),
+        ("POST /users", None, 200, ("other", "read"), False),
+        ("PUT /users/{userId}", {"userId": "alice"}, 200, ("other", "read"), False),
+        ("POST /users", None, 300, ("other", "read"), True),
+        ("POST /users", None, 400, ("other", "read"), True),
+        ("POST /users", None, None, ("other", "read"), True),
+        ("POST /users", None, 201, ("read", "other"), True),
+        ("DELETE /users/{userId}", {"userId": "alice"}, 204, ("other", "read"), True),
+        ("POST /orders", None, 201, ("other", "read"), True),
+    ],
+    ids=[
+        "created",
+        "created-200",
+        "replaced-at-own-path",
+        "redirected",
+        "creation-rejected",
+        "no-response",
+        "after-read",
+        "delete",
+        "unrelated-path",
+    ],
+)
+def test_use_after_free_skips_resource_recreated_between_delete_and_read(
+    ctx, response_factory, label, path_parameters, status_code, order, raises
+):
+    schema = ctx.openapi.load_schema(_RECREATION_SCHEMA)
+    delete_case = schema["/users/{userId}"]["DELETE"].Case(path_parameters={"userId": "alice"})
+    get_case = schema["/users/{userId}/profile"]["GET"].Case(path_parameters={"userId": "alice"})
+    method, path = label.split(" ")
+    other_case = schema[path][method].Case(path_parameters=path_parameters)
+    get_response = Response.from_requests(response_factory.requests(status_code=200), True)
+
+    recorder = ScenarioRecorder(label="use-after-free-recreation")
+    post_case = schema["/users"]["POST"].Case(body={"name": "alice"})
+    recorder.record_case(parent_id=None, case=post_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=post_case.id, response=response_factory.core(status_code=201))
+    recorder.record_case(parent_id=post_case.id, case=delete_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=delete_case.id, response=response_factory.core(status_code=204))
+    other_response = response_factory.core(status_code=status_code) if status_code is not None else None
+    steps = {"other": (None, other_case, other_response), "read": (delete_case.id, get_case, get_response)}
+    for parent_id, case, response in (steps[name] for name in order):
+        recorder.record_case(parent_id=parent_id, case=case, transition=None, is_transition_applied=False)
+        if response is not None:
+            recorder.record_response(case_id=case.id, response=response)
+
+    if raises:
+        with pytest.raises(UseAfterFree):
+            use_after_free(check_context(recorder=recorder), get_response, get_case)
+    else:
+        assert use_after_free(check_context(recorder=recorder), get_response, get_case) is None
 
 
 @pytest.mark.parametrize(
@@ -4335,8 +4880,16 @@ def test_positive_data_acceptance_token_endpoint(ctx, response_factory, token_ur
         assert positive_data_acceptance(check_context(), response, case) is None
 
 
-def test_positive_data_acceptance_configured_dynamic_auth_path(ctx, response_factory):
-    schema = ctx.openapi.load_schema(_token_endpoint_paths())
+@pytest.mark.parametrize(
+    "components",
+    [
+        {},
+        {"securitySchemes": {"oauth2": {"type": "oauth2", "flows": {"password": {"tokenUrl": "", "scopes": {}}}}}},
+    ],
+    ids=["no-schemes", "after-empty-token-url"],
+)
+def test_positive_data_acceptance_configured_dynamic_auth_path(ctx, response_factory, components):
+    schema = ctx.openapi.load_schema(_token_endpoint_paths(), components=components)
     schema.config.auth.dynamic.schemes["oauth2"] = DynamicTokenAuthConfig(
         path="/token", extract_from="body", extract_selector="/access_token"
     )

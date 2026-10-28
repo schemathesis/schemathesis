@@ -7,9 +7,10 @@ import pytest
 
 import schemathesis.checks
 from schemathesis import Case
-from schemathesis.checks import not_a_server_error
+from schemathesis.checks import max_response_time, not_a_server_error, run_checks
+from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.failures import CustomFailure, Failure, FailureGroup, ResponseTimeExceeded, ServerError
 from schemathesis.core.transport import Response
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -191,7 +192,17 @@ def test_malformed_content_type(ctx, schema_media_type, response_media_type, res
     }
     # Then it should raise an assertion error, rather than an internal one
     schema = ctx.openapi.from_full_schema(raw_schema)
-    assert_content_type_conformance(response_factory, schema, response_media_type, True, "Malformed media type")
+    location = "Schema" if schema_media_type == "application:json" else "Response"
+    response = Response.from_requests(response_factory.requests(content_type=response_media_type), True)
+    with pytest.raises(MalformedMediaType) as exc_info:
+        content_type_conformance(check_context(), response, schema["/users"]["GET"].Case())
+    failure = exc_info.value
+    assert (failure.operation, failure.message, failure.actual, failure.defined) == (
+        "GET /users",
+        f"Media type for {location} is incorrect\n\nReceived: application:json\nDocumented: {schema_media_type}",
+        "application:json",
+        schema_media_type,
+    )
 
 
 def test_content_type_conformance_another_status_code(ctx, response_factory):
@@ -244,6 +255,76 @@ def assert_content_type_conformance(response_factory, schema, content_type, is_e
     else:
         with pytest.raises(AssertionError, match=match):
             content_type_conformance(check_context(), response, case)
+
+
+@pytest.mark.parametrize(
+    ("limit", "elapsed", "expected"),
+    [
+        (None, 10.0, None),
+        (None, 10.5, ("GET /path", "Actual: 10500.00ms\nLimit: 10000.00ms", 10.5, 10.0)),
+        (0.25, 0.25, None),
+        (0.25, 0.3, ("GET /path", "Actual: 300.00ms\nLimit: 250.00ms", 0.3, 0.25)),
+    ],
+    ids=["default-limit-reached", "default-limit-exceeded", "limit-reached", "limit-exceeded"],
+)
+def test_max_response_time(ctx, swagger_20, response_factory, limit, elapsed, expected):
+    config = ChecksConfig.from_dict({} if limit is None else {"max_response_time": limit})
+    response = response_factory.core(elapsed=elapsed)
+    case = make_case(ctx, swagger_20, {})
+    if expected is None:
+        assert max_response_time(check_context(config), response, case) is None
+    else:
+        with pytest.raises(ResponseTimeExceeded) as exc_info:
+            max_response_time(check_context(config), response, case)
+        failure = exc_info.value
+        assert (failure.operation, failure.message, failure.elapsed, failure.deadline) == expected
+
+
+def test_run_checks_reports_kept_failures_and_custom_assertions(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @schema.hooks.hook
+    def filter_failure(context, failure, case, response):
+        return not (isinstance(failure, ServerError) and failure.status_code == 502)
+
+    def server_errors(ctx, response, case):
+        raise FailureGroup(
+            [ServerError(operation="GET /foo", status_code=502), ServerError(operation="GET /foo", status_code=503)]
+        )
+
+    def dropped(ctx, response, case):
+        raise ServerError(operation="GET /foo", status_code=502)
+
+    def custom(ctx, response, case):
+        raise AssertionError("broken")
+
+    def passing(ctx, response, case):
+        return None
+
+    case = schema["/foo"]["GET"].Case()
+    recorder = ScenarioRecorder(label="run-checks")
+    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+    failures = []
+    successes = []
+    run_checks(
+        case=case,
+        response=response_factory.core(),
+        ctx=check_context(recorder=recorder),
+        checks=[server_errors, dropped, custom, passing],
+        on_failure=lambda name, collected, failure: failures.append((name, failure)),
+        on_success=lambda name, case: successes.append((name, case.id)),
+    )
+
+    (server_errors_name, server_error), (custom_name, custom) = failures
+    assert (
+        (server_errors_name, type(server_error), server_error.operation, server_error.status_code),
+        (custom_name, type(custom), custom.operation, custom.title, custom.message),
+    ) == (
+        ("server_errors", ServerError, "GET /foo", 503),
+        ("custom", CustomFailure, "GET /foo", "Custom check failed: `custom`", "broken"),
+    )
+    assert successes == [("dropped", case.id), ("passing", case.id)]
+    assert recorder.filtered_failures == {case.id: 2}
 
 
 @pytest.mark.parametrize("value", [500, 502])
@@ -1199,48 +1280,63 @@ The following required headers are missing from the response:
 
 
 @pytest.mark.parametrize(
-    ("value", "schema", "expected"),
+    ("value", "schema", "explode", "expected"),
     [
         # String type
-        ("test", {"type": "string"}, "test"),
-        ("123", {"type": "string"}, "123"),
+        ("test", {"type": "string"}, False, "test"),
+        ("123", {"type": "string"}, False, "123"),
         # Integer type
-        ("123", {"type": "integer"}, 123),
-        ("-456", {"type": "integer"}, -456),
-        ("12.34", {"type": "integer"}, "12.34"),  # Non-integer string
-        ("abc", {"type": "integer"}, "abc"),  # Non-numeric string
+        ("123", {"type": "integer"}, False, 123),
+        ("-456", {"type": "integer"}, False, -456),
+        ("12.34", {"type": "integer"}, False, "12.34"),  # Non-integer string
+        ("abc", {"type": "integer"}, False, "abc"),  # Non-numeric string
         # Number type
-        ("123.45", {"type": "number"}, 123.45),
-        ("-67.89", {"type": "number"}, -67.89),
-        ("123", {"type": "number"}, 123.0),
-        ("abc", {"type": "number"}, "abc"),  # Non-numeric string
+        ("123.45", {"type": "number"}, False, 123.45),
+        ("-67.89", {"type": "number"}, False, -67.89),
+        ("123", {"type": "number"}, False, 123.0),
+        ("abc", {"type": "number"}, False, "abc"),  # Non-numeric string
         # Null type
-        ("null", {"type": "null"}, None),
-        ("NULL", {"type": "null"}, None),
-        ("Null", {"type": "null"}, None),
-        ("not null", {"type": "null"}, "not null"),
+        ("null", {"type": "null"}, False, None),
+        ("NULL", {"type": "null"}, False, None),
+        ("Null", {"type": "null"}, False, None),
+        ("not null", {"type": "null"}, False, "not null"),
         # Boolean type
-        ("true", {"type": "boolean"}, True),
-        ("false", {"type": "boolean"}, False),
-        ("1", {"type": "boolean"}, True),
-        ("0", {"type": "boolean"}, False),
+        ("true", {"type": "boolean"}, False, True),
+        ("false", {"type": "boolean"}, False, False),
+        ("1", {"type": "boolean"}, False, True),
+        ("0", {"type": "boolean"}, False, False),
         # Array type — Swagger 2.0 collectionFormat splits the wire value into items.
-        ("a,b,c", {"type": "array", "items": {"type": "string"}}, ["a", "b", "c"]),
+        ("a,b,c", {"type": "array", "items": {"type": "string"}}, False, ["a", "b", "c"]),
         (
             "1,2,3",
             {"type": "array", "items": {"type": "integer"}, "collectionFormat": "csv"},
+            False,
             [1, 2, 3],
         ),
-        ("a b c", {"type": "array", "items": {"type": "string"}, "collectionFormat": "ssv"}, ["a", "b", "c"]),
-        ("a,b", {"type": "array", "items": {"type": "string"}, "collectionFormat": "multi"}, "a,b"),
+        ("a b c", {"type": "array", "items": {"type": "string"}, "collectionFormat": "ssv"}, False, ["a", "b", "c"]),
+        ("a,b", {"type": "array", "items": {"type": "string"}, "collectionFormat": "multi"}, False, "a,b"),
+        ("123", {"type": ["string", "integer"]}, False, "123"),
+        ("a,1,b,2", {"type": "object", "properties": {"a": {"type": "integer"}}}, False, {"a": 1, "b": "2"}),
+        (
+            "a,1,b,2",
+            {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "integer"}},
+            False,
+            {"a": 1, "b": 2},
+        ),
         # Unsupported type
-        ("test", {"type": "object"}, "test"),
+        ("test", {"type": "object"}, False, "test"),
         # No type specified
-        ("test", {}, "test"),
+        ("test", {}, False, "test"),
+        (
+            "a=1,b=x=y",
+            {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}},
+            True,
+            {"a": 1, "b": "x=y"},
+        ),
     ],
 )
-def test_coerce_header_value(value, schema, expected):
-    assert _coerce_header_value(value, schema) == expected
+def test_coerce_header_value(value, schema, explode, expected):
+    assert _coerce_header_value(value, schema, explode=explode) == expected
 
 
 def test_module_access():

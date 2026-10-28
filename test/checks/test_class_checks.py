@@ -1,4 +1,5 @@
 import datetime
+import re
 
 import pytest
 
@@ -65,6 +66,49 @@ def test_after_run_failures_are_distinct_per_check(ctx, restore_checks):
     assert len(set(failures)) == 2
 
 
+@pytest.mark.parametrize(
+    ("headers", "expected_headers"),
+    [({"X-Token": "secret"}, {"x-token": "secret"}), (None, None)],
+    ids=["headers-configured", "no-headers"],
+)
+def test_after_run_receives_run_settings(ctx, restore_checks, headers, expected_headers):
+    received = []
+
+    @schemathesis.check
+    class Recorder:
+        def after_run(self, ctx):
+            internals = ctx.internals
+            received.append((internals.auth, internals.headers, internals.transport_kwargs))
+
+    schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema.config.update(headers=headers, basic_auth=("user", "pass"))
+    run_checks = RunChecks.from_registry(schema.config.checks_config_for())
+
+    assert collect_after_run_failures(schema.config, run_checks.for_run(), transport_kwargs={"timeout": 5}) == []
+    assert received == [(("user", "pass"), expected_headers, {"timeout": 5})]
+
+
+def test_after_run_errors_become_failures(ctx, restore_checks):
+    @schemathesis.check
+    class Broken:
+        def after_run(self, ctx):
+            raise ValueError("boom")
+
+    @schemathesis.check
+    class Asserting:
+        def after_run(self, ctx):
+            raise AssertionError("never reached")
+
+    schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    run_checks = RunChecks.from_registry(schema.config.checks_config_for())
+    failures = collect_after_run_failures(schema.config, run_checks.for_run())
+
+    assert [(failure.operation, failure.title, failure.message, type(failure.exception)) for failure in failures] == [
+        (None, "Check `Broken` raised an unexpected error", "ValueError: boom", ValueError),
+        (None, "Custom check failed: `Asserting`", "never reached", AssertionError),
+    ]
+
+
 def test_reregistering_check_from_same_module_is_allowed(restore_checks):
     schemathesis.check(type("Dup", (), {"__module__": "pkg_a", "after_run": lambda self, ctx: None}))
     schemathesis.check(type("Dup", (), {"__module__": "pkg_a", "after_run": lambda self, ctx: None}))
@@ -99,15 +143,39 @@ def test_function_check_is_not_instantiated(restore_checks):
 @pytest.mark.parametrize(
     ("methods", "match"),
     [
-        ({"after_response_extra": _after_response}, "after_response_extra"),
-        ({"helper": lambda self: None}, "at least one"),
-        ({"after_response": lambda self, ctx: None}, "after_response"),
+        (
+            {"after_response_extra": _after_response},
+            "`Invalid` defines an unknown check method `after_response_extra`. "
+            "Available check methods are: `after_response`, `after_run`.",
+        ),
+        (
+            {"helper": lambda self: None},
+            "`Invalid` does not implement any check method. Define at least one of: `after_response`, `after_run`.",
+        ),
+        (
+            {"after_response": lambda self, ctx: None},
+            "`Invalid.after_response` must accept 3 arguments (ctx, response, case) but takes 1.",
+        ),
     ],
     ids=["unknown-method", "no-method", "wrong-arity"],
 )
 def test_invalid_class_is_rejected(restore_checks, methods, match):
-    with pytest.raises(IncorrectUsage, match=match):
+    with pytest.raises(IncorrectUsage, match=re.escape(match)):
         _register("Invalid", methods)
+
+
+@pytest.mark.parametrize(
+    "methods",
+    [
+        {"after_run": lambda self, ctx, *args: None},
+        {"after_run": lambda self, ctx, **kwargs: None},
+        {"after_run": _after_run, "after_seconds": 5},
+    ],
+    ids=["var-positional", "var-keyword", "non-callable-after-attribute"],
+)
+def test_valid_class_is_accepted(restore_checks, methods):
+    _register("Valid", methods)
+    assert "Valid" in RunChecks.from_registry(_EMPTY_CONFIG).instances
 
 
 def test_check_receives_config_kwargs(restore_checks):
@@ -166,8 +234,14 @@ def test_check_init_unknown_kwargs_raise_error(restore_checks):
         def after_run(self, ctx):
             pass
 
-    config = ChecksConfig.from_dict({"NoKwargs": {"irrelevant": 42}})
-    with pytest.raises(ConfigError, match="irrelevant"):
+    config = ChecksConfig.from_dict({"NoKwargs": {"irrelevant": 42, "other": 1}})
+    with pytest.raises(
+        ConfigError,
+        match=re.escape(
+            "Check 'NoKwargs' does not accept config key(s): irrelevant, other. "
+            "'NoKwargs' defines no configurable __init__ parameters."
+        ),
+    ):
         RunChecks.from_registry(config=config)
 
 
