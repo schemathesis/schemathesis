@@ -197,3 +197,24 @@ def test_fuzzing_mixes_in_examples_of_boolean_schema_query_parameter(ctx):
     values = [case.query["q"] for case in generate_many(operation.as_strategy(), 50)]
 
     assert "picked" in values
+
+
+@pytest.mark.parametrize(
+    ("version", "parameter"),
+    [
+        ("2.0", {"type": "string", "x-example": "a", "x-examples": {"other": {"value": "b"}}}),
+        ("3.0.2", {"schema": {"type": "string"}, "example": "a", "examples": {"other": {"value": "b"}}}),
+    ],
+    ids=["swagger-2.0", "openapi-3.0"],
+)
+def test_parameter_lists_each_declared_example_once(ctx, version, parameter):
+    operation = ctx.openapi.load_operation(
+        "GET /users",
+        {
+            "parameters": [{"name": "q", "in": "query", "required": True, **parameter}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version=version,
+    )
+
+    assert operation.query.get("q").examples == ["b", "a"]

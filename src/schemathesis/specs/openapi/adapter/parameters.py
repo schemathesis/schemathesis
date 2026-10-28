@@ -1988,7 +1988,7 @@ class OpenApiBody(OpenApiComponent):
         return _mix_negative_into_positive(positive_strategy, negative_strategy)
 
 
-OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "description"])
+OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "description", "x-example"])
 
 
 def extract_parameter_schema_v2(parameter: Mapping[str, Any]) -> JsonSchemaObject:
