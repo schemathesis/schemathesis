@@ -10,7 +10,9 @@ from hypothesis.errors import NoSuchExample
 
 import schemathesis
 from schemathesis.config import GenerationConfig, SchemathesisConfig
+from schemathesis.core.mutations import MutationMetadata
 from schemathesis.generation.body_overrides import build_body_override_overlay_strategy
+from schemathesis.generation.dictionaries import DictionaryDraw
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import CaseMetadata, CoverageScenario, GenerationInfo, PhaseInfo
@@ -20,10 +22,12 @@ from schemathesis.python._constants.adapters import default_adapters
 from schemathesis.python._constants.orchestrator import extract_all, extract_registered
 from schemathesis.python._constants.pool import ConstantDraw, ConstantEntry, ConstantsPool, Origin
 from schemathesis.python._constants.registry import SourceRegistry
+from schemathesis.resources import PoolDraw, SemanticDraw
 from schemathesis.specs.graphql.substitution import substitute_constants
 from schemathesis.specs.openapi._hypothesis import _build_form_strategy_with_encoding
 from schemathesis.specs.openapi.adapter.parameters import build_constants_overlay_strategy
 from schemathesis.specs.openapi.negative import (
+    wrap_filter_hook_for_generated_value,
     wrap_flatmap_hook_for_generated_value,
     wrap_map_hook_for_generated_value,
 )
@@ -792,6 +796,47 @@ def test_noop_map_and_flatmap_hooks_keep_constant_draws():
 
     assert mapped.constants_draws == (draw,)
     assert flatmapped.constants_draws == (draw,)
+
+
+NO_MUTATIONS = MutationMetadata(())
+
+
+def _with_provenance(value):
+    return GeneratedValue(
+        value=value,
+        meta=NO_MUTATIONS,
+        pool_draws=(PoolDraw("query", "id", "User", "id", "POST /users", 201),),
+        semantic_draws=(SemanticDraw(("id",), "string", None, None, "id", "u1", "POST /users"),),
+        dictionary_draws=(DictionaryDraw("words", "file", None, 0, "GET /items", "query", "q", "w", True),),
+        constants_draws=(_constant_draw("code", "C"),),
+    )
+
+
+def test_hook_wrappers_keep_every_provenance_field():
+    def hook(value):
+        return {**value, "extra": 1}
+
+    generated = _with_provenance({"code": "C"})
+    expected = _with_provenance({"code": "C", "extra": 1})
+    assert [
+        wrap_map_hook_for_generated_value(hook)(generated),
+        wrap_map_hook_for_generated_value(hook, prune_constants=False)(generated),
+        find(wrap_flatmap_hook_for_generated_value(lambda value: st.just(hook(value)))(generated), lambda value: True),
+        wrap_filter_hook_for_generated_value(lambda value: value == {"code": "C"})(generated),
+    ] == [expected, expected, expected, True]
+
+
+def test_hook_wrappers_pass_plain_values_through():
+    def hook(value):
+        return {**value, "extra": 1}
+
+    assert [
+        wrap_map_hook_for_generated_value(hook)({"code": "C"}),
+        find(
+            wrap_flatmap_hook_for_generated_value(lambda value: st.just(hook(value)))({"code": "C"}), lambda value: True
+        ),
+        wrap_filter_hook_for_generated_value(lambda value: value == {"code": "C"})({"code": "C"}),
+    ] == [{"code": "C", "extra": 1}, {"code": "C", "extra": 1}, True]
 
 
 def _draw(data, source, *, schema_properties, container_schema=None):

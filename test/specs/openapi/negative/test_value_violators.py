@@ -6,6 +6,7 @@ import jsonschema_rs
 import pytest
 
 from schemathesis.specs.openapi.negative.value_channel import (
+    _NEGATIVE_MAX_LENGTH_CAP,
     violate_date,
     violate_date_time,
     violate_email,
@@ -21,8 +22,7 @@ from schemathesis.specs.openapi.negative.value_channel import (
 
 
 def test_violate_uuid_keeps_shape_breaks_validity():
-    original = "08fadcc5-ce2b-2f6f-a0cd-faaa313ba470"
-    violated = violate_uuid(original)
+    violated = violate_uuid("12345678-ce2b-2f6f-a0cd-faaa313ba470")
     assert len(violated) == 36
     assert violated.count("-") == 4
     with pytest.raises(ValueError):
@@ -49,12 +49,17 @@ def test_violate_pattern_breaks_match():
     assert not re.match("^[a-z]+$", violate_pattern("abc", "^[a-z]+$"))
 
 
-def test_violate_min_length_below():
-    assert len(violate_min_length("hello", min_length=4)) < 4
+@pytest.mark.parametrize(("min_length", "expected"), [(4, "hel"), (1, ""), (0, "")])
+def test_violate_min_length_below(min_length, expected):
+    assert violate_min_length("hello", min_length=min_length) == expected
 
 
 def test_violate_max_length_above():
-    assert len(violate_max_length("hello", max_length=5)) > 5
+    assert violate_max_length("hello", max_length=5) == "hello*"
+
+
+def test_violate_max_length_expands_up_to_the_cap():
+    assert len(violate_max_length("", max_length=_NEGATIVE_MAX_LENGTH_CAP)) == _NEGATIVE_MAX_LENGTH_CAP + 1
 
 
 def test_violate_minimum_below():

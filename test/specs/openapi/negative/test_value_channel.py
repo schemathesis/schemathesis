@@ -19,6 +19,7 @@ from schemathesis.specs.openapi.negative.value_channel import (
     collect_value_targets,
     violate_max_length,
 )
+from schemathesis.transport.serialization import Binary
 
 _SUPPRESSED = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
 
@@ -53,8 +54,134 @@ def test_collect_value_targets_walks_additional_properties_only_for_uncovered_ke
         "properties": {"declared": {"type": "string", "pattern": "^a$"}},
         "additionalProperties": {"type": "string", "pattern": "^b$"},
     }
-    targets = collect_value_targets({"declared": "x", "extra": "y"}, schema)
-    assert {path: keyword for path, _, _, keyword, _ in targets} == {("declared",): "pattern", ("extra",): "pattern"}
+    assert collect_value_targets({"declared": "x", "extra": "y"}, schema) == [
+        (("declared",), "/properties/declared", "x", "pattern", {"type": "string", "pattern": "^a$"}),
+        (("extra",), "/additionalProperties", "y", "pattern", {"type": "string", "pattern": "^b$"}),
+    ]
+
+
+STRING_LEAF = {"type": "string", "pattern": "^a", "minLength": 1, "maxLength": 3, "enum": ["ab"], "format": "uuid"}
+NUMBER_LEAF = {"type": "number", "minimum": 0, "maximum": 9, "multipleOf": 0.5, "enum": [1.5]}
+BUNDLED_LEAF = {"type": "string", "format": "email"}
+BUNDLED_ROOT = {
+    "type": "object",
+    "properties": {"list": {"type": "array", "items": {"$ref": "#/x-bundled/Email"}}},
+    "additionalProperties": {"$ref": "#/x-bundled/Email"},
+}
+NESTED_OBJECT = {
+    "type": "object",
+    "properties": {"inner": {"type": "string", "format": "date"}, "absent": {"type": "string", "minLength": 1}},
+    "required": ["inner"],
+}
+
+
+@pytest.mark.parametrize(
+    ("body", "schema", "expected"),
+    [
+        (
+            "ab",
+            STRING_LEAF,
+            [
+                ((), "", "ab", "pattern", STRING_LEAF),
+                ((), "", "ab", "minLength", STRING_LEAF),
+                ((), "", "ab", "maxLength", STRING_LEAF),
+                ((), "", "ab", "enum", STRING_LEAF),
+                ((), "", "ab", "format:uuid", STRING_LEAF),
+            ],
+        ),
+        (
+            1.5,
+            NUMBER_LEAF,
+            [
+                ((), "", 1.5, "minimum", NUMBER_LEAF),
+                ((), "", 1.5, "maximum", NUMBER_LEAF),
+                ((), "", 1.5, "multipleOf", NUMBER_LEAF),
+                ((), "", 1.5, "enum", NUMBER_LEAF),
+            ],
+        ),
+        (True, {"enum": [True], "minimum": 0}, []),
+        ("x", {"type": "string", "format": "ipv4"}, []),
+        (
+            {"node": {"inner": "2024-01-01"}, "extra": 3, "skipped": "x"},
+            {
+                "type": "object",
+                "properties": {"node": NESTED_OBJECT, "skipped": True},
+                "additionalProperties": {"type": "integer", "maximum": 5},
+                "required": [],
+            },
+            [
+                (
+                    ("node", "inner"),
+                    "/properties/node/properties/inner",
+                    "2024-01-01",
+                    "format:date",
+                    NESTED_OBJECT["properties"]["inner"],
+                ),
+                (("node",), "/properties/node", {"inner": "2024-01-01"}, "required", NESTED_OBJECT),
+                (("extra",), "/additionalProperties", 3, "maximum", {"type": "integer", "maximum": 5}),
+            ],
+        ),
+        (
+            ["a", "b"],
+            {"type": "array", "items": {"type": "string", "format": "date-time"}},
+            [
+                ((0,), "/items", "a", "format:date-time", {"type": "string", "format": "date-time"}),
+                ((1,), "/items", "b", "format:date-time", {"type": "string", "format": "date-time"}),
+            ],
+        ),
+        (
+            {"a": "u@example.com"},
+            {
+                "type": "object",
+                "properties": {"a": {"$ref": "#/x-bundled/Email"}},
+                BUNDLE_STORAGE_KEY: {"Email": BUNDLED_LEAF},
+            },
+            [(("a",), "/properties/a/$ref/Email", "u@example.com", "format:email", BUNDLED_LEAF)],
+        ),
+        (
+            {"list": ["u@example.com"], "extra": "v@example.com"},
+            {"$ref": "#/x-bundled/Root", BUNDLE_STORAGE_KEY: {"Root": BUNDLED_ROOT, "Email": BUNDLED_LEAF}},
+            [
+                (
+                    ("list", 0),
+                    "/$ref/Root/properties/list/items/$ref/Email",
+                    "u@example.com",
+                    "format:email",
+                    BUNDLED_LEAF,
+                ),
+                (
+                    ("extra",),
+                    "/$ref/Root/additionalProperties/$ref/Email",
+                    "v@example.com",
+                    "format:email",
+                    BUNDLED_LEAF,
+                ),
+            ],
+        ),
+        (
+            "x",
+            {"$ref": "#/components/schemas/Email", "format": "email"},
+            [((), "", "x", "format:email", {"$ref": "#/components/schemas/Email", "format": "email"})],
+        ),
+    ],
+    ids=[
+        "string-leaf",
+        "number-leaf",
+        "boolean-is-not-a-number",
+        "unchecked-format",
+        "object",
+        "array",
+        "bundled-ref",
+        "nested-bundled-refs",
+        "external-ref",
+    ],
+)
+def test_collect_value_targets(body, schema, expected):
+    assert collect_value_targets(body, schema) == expected
+
+
+def test_strip_binary_replaces_nested_binary_values():
+    assert _strip_binary({"a": [Binary(b"x"), 1], "b": Binary(b"y"), "c": "z"}) == {"a": ["", 1], "b": "", "c": "z"}
 
 
 def test_apply_value_channel_required_with_empty_list_is_noop():
@@ -71,15 +198,60 @@ def test_apply_value_channel_required_with_empty_list_is_noop():
     [
         ("2024-01-01", "format:date", {"type": "string", "format": "date"}),
         ("2024-01-01T00:00:00Z", "format:date-time", {"type": "string", "format": "date-time"}),
+        ("u@example.com", "format:email", {"type": "string", "format": "email"}),
+        ("not-a-uuid", "format:uuid", {"type": "string", "format": "uuid"}),
+        ("abc", "pattern", {"type": "string", "pattern": "^[a-z]+$"}),
+        ("abcd", "minLength", {"type": "string", "minLength": 3}),
         ("abc", "maxLength", {"type": "string", "maxLength": 3}),
+        (5, "minimum", {"type": "integer", "minimum": 3}),
+        (5, "maximum", {"type": "integer", "maximum": 7}),
+        ("a", "enum", {"enum": ["a"]}),
+        (4, "multipleOf", {"type": "integer", "multipleOf": 2}),
     ],
-    ids=["format-date", "format-date-time", "maxLength"],
+    ids=[
+        "format-date",
+        "format-date-time",
+        "format-email",
+        "format-uuid",
+        "pattern",
+        "minLength",
+        "maxLength",
+        "minimum",
+        "maximum",
+        "enum",
+        "multipleOf",
+    ],
 )
 def test_apply_value_channel_dispatches_keyword(value, keyword, schema):
     new_body, original, new_value = apply_value_channel(value, (), keyword, schema)
-    assert original == value
-    assert new_value != original
-    assert new_body == new_value
+    assert (new_body, original) == (new_value, value)
+    assert not jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid(new_value)
+
+
+def test_apply_value_channel_replaces_nested_leaf():
+    body = {"items": [{"name": "ab"}]}
+    assert apply_value_channel(body, ("items", 0, "name"), "maxLength", {"type": "string", "maxLength": 2}) == (
+        {"items": [{"name": "ab*"}]},
+        "ab",
+        "ab*",
+    )
+
+
+def test_apply_value_channel_required_key_already_absent():
+    assert apply_value_channel({"b": 2}, (), "required", {"type": "object", "required": ["a"]}) == (
+        {"b": 2},
+        None,
+        {"b": 2},
+    )
+
+
+def test_apply_value_channel_drops_first_required_key_of_nested_object():
+    body = {"outer": {"a": 1, "b": 2}}
+    assert apply_value_channel(body, ("outer",), "required", {"type": "object", "required": ["a", "b"]}) == (
+        {"outer": {"b": 2}},
+        1,
+        {"b": 2},
+    )
 
 
 @given(data=st.data())

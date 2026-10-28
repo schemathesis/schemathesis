@@ -1,10 +1,11 @@
 import pytest
-from hypothesis import given, settings
+from hypothesis import Phase, find, given, settings
 from hypothesis.database import InMemoryExampleDatabase
 
 from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from test.utils import run_given
 
 
 def _mutation(
@@ -197,3 +198,79 @@ def test_mutations_cover_every_negated_location(ctx):
         assert "X-Token" in description, description
 
     test()
+
+
+NESTED_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "a": {
+            "type": "object",
+            "patternProperties": {
+                "^x": {
+                    "type": "array",
+                    "items": {"type": "object", "properties": {"b": {"minimum": 1}}, "required": ["b"]},
+                },
+            },
+        }
+    },
+}
+
+
+def _resolve(schema, pointer):
+    assert pointer == "" or pointer.startswith("/"), pointer
+    node = schema
+    for segment in pointer.split("/")[1:]:
+        node = node[segment]
+    return node
+
+
+def _check_reported_location(mutation):
+    # Raises when the pointer names no node of the declared schema.
+    _resolve(NESTED_SCHEMA, mutation.schema_pointer)
+    segments = mutation.schema_pointer.split("/")[1:]
+    names = tuple(segments[index + 1] for index, segment in enumerate(segments[:-1]) if segment == "properties")
+    # A removed property is named in the pointer but is not part of the path to the changed object.
+    path = names[:-1] if mutation.operator == OperatorKind.REMOVE_REQUIRED_PROPERTY else names
+    assert (mutation.parameter_location, mutation.path) == (ParameterLocation.BODY, path)
+    if "required" not in mutation.keywords or mutation.operator == OperatorKind.REMOVE_REQUIRED_PROPERTY:
+        assert mutation.parameter == (names[-1] if names else None)
+    if mutation.operator == OperatorKind.CHANGE_TYPE:
+        assert mutation.new_value in {"string", "integer", "number", "object", "array", "boolean", "null"}
+
+
+def _schema_mutations(case):
+    return [
+        mutation
+        for mutation in case.meta.phase.data.mutations
+        if mutation.channel == MutationChannel.SCHEMA and mutation.operator != OperatorKind.SYNTAX_FUZZING
+    ]
+
+
+def test_mutations_are_reported_from_the_body_schema_root(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {"application/json": {"schema": NESTED_SCHEMA}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
+
+    @run_given(strategy, max_examples=10)
+    def check(case):
+        for mutation in _schema_mutations(case):
+            _check_reported_location(mutation)
+
+    # Removing a property and changing the root type are reported differently from other mutations.
+    for is_wanted in (
+        lambda mutation: mutation.operator == OperatorKind.REMOVE_REQUIRED_PROPERTY,
+        lambda mutation: mutation.operator == OperatorKind.CHANGE_TYPE and mutation.path == (),
+    ):
+        found = find(
+            strategy,
+            lambda case, is_wanted=is_wanted: any(is_wanted(mutation) for mutation in _schema_mutations(case)),
+            # About one case in twelve removes a property; any match will do, so skip shrinking.
+            settings=settings(max_examples=500, database=None, phases=[Phase.generate]),
+        )
+        for mutation in _schema_mutations(found):
+            _check_reported_location(mutation)

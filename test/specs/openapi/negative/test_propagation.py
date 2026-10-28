@@ -208,3 +208,70 @@ def test_propagation_allof_branch_keeps_siblings(materialize_targets):
             {"type": "object"},
         ],
     }
+
+
+@pytest.mark.parametrize(
+    ("schema", "target_pointer", "expected"),
+    [
+        (
+            {"type": "array", "items": [{"type": "string"}, {"type": "integer", "minimum": 1}]},
+            ("items", 1),
+            {"type": "array", "items": [{"type": "string"}, {"type": "integer", "minimum": 1}], "minItems": 2},
+        ),
+        (
+            {"type": "array", "minItems": 5, "items": {"type": "integer", "minimum": 1}},
+            ("items",),
+            {"type": "array", "minItems": 5, "items": {"type": "integer", "minimum": 1}},
+        ),
+        (
+            {"anyOf": [{"type": "string"}, {"type": "integer", "minimum": 1}]},
+            ("anyOf", 1),
+            {"anyOf": [{"type": "integer", "minimum": 1}]},
+        ),
+        (
+            {"type": "object", "patternProperties": {r"^\d{5}$": {"properties": {"x": {"minimum": 1}}}}},
+            ("patternProperties", r"^\d{5}$", "properties", "x"),
+            {
+                "type": "object",
+                "patternProperties": {r"^\d{5}$": {"properties": {"x": {"minimum": 1}}, "required": ["x"]}},
+            },
+        ),
+        (
+            {"type": "object", "properties": {"k": {}}, "additionalProperties": {"minimum": 1}},
+            ("additionalProperties",),
+            {
+                "type": "object",
+                "properties": {"k": {}, "k0": {"minimum": 1}},
+                "additionalProperties": {"minimum": 1},
+                "required": ["k0"],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"k": {}, "k0": {}, "k1": {}}, "additionalProperties": {"minimum": 1}},
+            ("additionalProperties",),
+            {
+                "type": "object",
+                "properties": {"k": {}, "k0": {}, "k1": {}, "k2": {"minimum": 1}},
+                "additionalProperties": {"minimum": 1},
+                "required": ["k2"],
+            },
+        ),
+    ],
+    ids=[
+        "tuple-items",
+        "larger-min-items",
+        "any-of",
+        "after-unsynthesizable-pattern",
+        "first-numbered-name",
+        "next-free-numbered-name",
+    ],
+)
+def test_propagation_result(schema, target_pointer, expected, materialize_targets):
+    schema = deepclone(schema)
+    target_schema = schema
+    for segment in target_pointer:
+        target_schema = target_schema[segment]
+    targets = materialize_targets(schema, compute_mutation_targets(schema))
+    target = next(s for s in targets if s.schema is target_schema)
+    _propagate_required_path(target.path)
+    assert schema == expected
