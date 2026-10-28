@@ -4,6 +4,7 @@ import json
 
 import jsonschema_rs
 import pytest
+from flask import Flask, Response
 
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema.resolver import (
@@ -31,9 +32,11 @@ def test_build_registry_and_root_resolver_for_in_memory_schema():
     assert next_resolver.base_uri == IN_MEMORY_BASE_URI
 
 
-def test_build_registry_uses_file_retrieval_for_relative_references(tmp_path):
-    root = tmp_path / "root.json"
-    defs = tmp_path / "defs.json"
+@pytest.mark.parametrize("directory", ["schemas", "my schemas"], ids=["plain", "percent-encoded"])
+def test_build_registry_uses_file_retrieval_for_relative_references(tmp_path, directory):
+    (tmp_path / directory).mkdir()
+    root = tmp_path / directory / "root.json"
+    defs = tmp_path / directory / "defs.json"
 
     root_schema = {"$ref": "defs.json#/$defs/name"}
     defs_schema = {"$defs": {"name": {"type": "string"}}}
@@ -87,6 +90,92 @@ def test_resolve_reference_uri(base_uri, reference, expected):
     assert resolve_reference_uri(base_uri, reference) == expected
 
 
+def test_in_memory_schema_keeps_a_urn_location():
+    assert make_root_resolver({}, location="urn:example:root").base_uri == "urn:example:root"
+
+
+@pytest.mark.parametrize(
+    ("reference", "message"),
+    [
+        ("#/definitions/missing", "^Pointer '/definitions/missing' does not exist\n"),
+        # The OS spells this one: "byte" on POSIX, "character" on Windows.
+        ("file\x00.json", "^embedded null (byte|character)\n"),
+    ],
+    ids=["missing-pointer", "null-byte"],
+)
+def test_unresolvable_reference_error_message(reference, message):
+    with pytest.raises(RefResolutionError, match=message) as exc:
+        resolve_reference(make_root_resolver({"type": "object"}), reference)
+    assert exc.value.__notes__ == [reference]
+
+
+def test_reference_without_leading_slash_resolves_as_a_pointer():
+    resolver = make_root_resolver({"definitions": {"A": {"type": "string"}}})
+    assert resolve_reference(resolver, "#definitions/A")[1] == {"type": "string"}
+
+
+LEGACY_ANCHOR = {"a": {"id": "#foo", "type": "string"}}
+
+
+@pytest.mark.parametrize(
+    ("definitions", "location"),
+    [(LEGACY_ANCHOR, None), ({**LEGACY_ANCHOR, "b": {"$ref": "other.json"}}, "root.json")],
+    ids=["in-memory", "file"],
+)
+def test_legacy_id_anchor_resolves_through_the_registry(tmp_path, definitions, location):
+    (tmp_path / "other.json").write_text(json.dumps({"type": "integer"}))
+    uri = None if location is None else (tmp_path / location).as_uri()
+    resolver = make_root_resolver({"definitions": definitions}, location=uri, draft=jsonschema_rs.Draft4)
+    target_resolver, target = resolve_reference(resolver, "#foo")
+    assert (target, resolve_reference(target_resolver, "#")[1]) == (
+        {"id": "#foo", "type": "string"},
+        {"id": "#foo", "type": "string"},
+    )
+
+
+NAMED_DOCUMENTS = {
+    "definitions": {
+        "Text": {
+            "$id": "https://example.invalid/text.json",
+            "properties": {"other": {"$ref": "https://example.invalid/other.json"}},
+        },
+        "Other": {"$id": "https://example.invalid/other.json", "type": "string"},
+    }
+}
+
+
+def test_named_subschema_references_another_named_subschema():
+    text_resolver, _ = resolve_reference(make_root_resolver(NAMED_DOCUMENTS), "https://example.invalid/text.json")
+    assert resolve_reference(text_resolver, "https://example.invalid/other.json")[1] == {
+        "$id": "https://example.invalid/other.json",
+        "type": "string",
+    }
+
+
+def test_missing_fragment_in_named_subschema_names_the_full_target():
+    reference = "https://example.invalid/text.json#/missing"
+    with pytest.raises(RefResolutionError) as exc:
+        resolve_reference(make_root_resolver(NAMED_DOCUMENTS), reference)
+    assert (str(exc.value), exc.value.__notes__) == ("Pointer '/missing' does not exist", [reference])
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body"),
+    [("text/html", b"<p>Not found</p>"), ("application/json", b"\n  <!DOCTYPE html><html></html>")],
+    ids=["content-type", "body"],
+)
+def test_remote_html_document_is_a_resolution_error(app_runner, content_type, body):
+    app = Flask(__name__)
+
+    @app.route("/schema.json")
+    def schema():
+        return Response(body, content_type=content_type)
+
+    url = app_runner.openapi_url(app, path="/schema.json")
+    with pytest.raises(RefResolutionError, match="^Expected YAML/JSON, got HTML"):
+        resolve_reference(make_root_resolver({}), url)
+
+
 def test_resolve_reference_translates_missing_references_to_ref_resolution_error():
     resolver = make_root_resolver({"type": "object"})
 
@@ -131,6 +220,20 @@ def _find(schema, memo=None):
         ({"allOf": [{"type": "string"}, {"type": "object"}]}, None),
         (True, None),
         (False, None),
+        (
+            {
+                "properties": {"x": {"$ref": "#/$defs/a"}},
+                "$defs": {"a": {"properties": {"y": {"$ref": "#/$defs/b"}}}, "b": {"type": "string"}},
+            },
+            None,
+        ),
+        (
+            {
+                "properties": {"x": {"$ref": "#/$defs/b", "items": {"$ref": "#/$defs/missing"}}},
+                "$defs": {"b": {"type": "string"}},
+            },
+            "#/$defs/missing",
+        ),
     ],
     ids=[
         "broken-target",
@@ -143,6 +246,8 @@ def _find(schema, memo=None):
         "resolvable-items",
         "boolean-true",
         "boolean-false",
+        "reference-chain",
+        "broken-beside-reference",
     ],
 )
 def test_find_unresolvable_reference(schema, expected):
@@ -188,7 +293,8 @@ def test_find_unresolvable_reference_memoizes_every_reference_in_a_cycle():
     }
 
 
-def test_unreachable_remote_reference_is_a_resolution_error():
+@pytest.mark.parametrize("scheme", ["http", "https"])
+def test_unreachable_remote_reference_is_a_resolution_error(scheme):
     resolver = make_root_resolver({})
     with pytest.raises(RefResolutionError):
-        resolve_reference(resolver, "http://127.0.0.1:1/schema.json#/definitions/User")
+        resolve_reference(resolver, f"{scheme}://127.0.0.1:1/schema.json#/definitions/User")

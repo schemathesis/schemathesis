@@ -1,8 +1,14 @@
 import pytest
 
 from schemathesis.core.errors import RefResolutionError
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler
-from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
+from schemathesis.core.jsonschema import (
+    BUNDLE_STORAGE_KEY,
+    Bundler,
+    resolve_bundled_root,
+    resolve_with_root_bundle,
+    schema_with_bundle,
+)
+from schemathesis.core.jsonschema.bundler import BundleError, bundle, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 
 USER = {"type": "string"}
@@ -350,6 +356,59 @@ DEFINITIONS = {
                 },
             },
         ),
+        (
+            {"$ref": "", "properties": {"x": {"$ref": "#/definitions/User"}}},
+            DEFINITIONS,
+            {"properties": {"x": {"$ref": "#/x-bundled/schema000001"}}, BUNDLE_STORAGE_KEY: {"schema000001": USER}},
+        ),
+        (
+            {
+                "allOf": [
+                    {"$ref": "#/definitions/User"},
+                    {"$ref": "#/definitions/User", "not": {"$ref": "#/definitions/Company"}},
+                ]
+            },
+            DEFINITIONS,
+            {
+                "allOf": [
+                    {"$ref": "#/x-bundled/schema000001"},
+                    {"$ref": "#/x-bundled/schema000001", "not": {"$ref": "#/x-bundled/schema000002"}},
+                ],
+                BUNDLE_STORAGE_KEY: {"schema000001": USER, "schema000002": COMPANY},
+            },
+        ),
+        (
+            {"$ref": "#/definitions/Node"},
+            {
+                "definitions": {
+                    "User": USER,
+                    "Node": {
+                        "properties": {
+                            "next": {
+                                "$ref": "#/definitions/Node",
+                                "description": "next",
+                                "not": {"$ref": "#/definitions/User"},
+                            }
+                        }
+                    },
+                }
+            },
+            {
+                "$ref": "#/x-bundled/schema000001",
+                BUNDLE_STORAGE_KEY: {
+                    "schema000001": {
+                        "properties": {
+                            "next": {
+                                "$ref": "#/x-bundled/schema000001",
+                                "description": "next",
+                                "not": {"$ref": "#/x-bundled/schema000002"},
+                            }
+                        }
+                    },
+                    "schema000002": USER,
+                },
+            },
+        ),
     ],
     ids=[
         "true-schema",
@@ -369,6 +428,9 @@ DEFINITIONS = {
         "preserves-existing-definitions",
         "patternproperties-with-recursive-ref",
         "query-expression-deep-recursion",
+        "empty-ref-beside-ref",
+        "repeated-ref-with-nested-ref",
+        "recursive-ref-with-nested-ref",
     ],
 )
 def test_bundle(schema, store, expected):
@@ -382,11 +444,14 @@ def test_unresolvable_pointer():
         Bundler().bundle({"$ref": "#/definitions/NonExistent"}, resolver)
 
 
-def test_bundle_ref_resolves_to_none_error_message():
-    resolver = make_root_resolver({"definitions": {"User": None}})
+@pytest.mark.parametrize(("value", "type_name"), [(None, "null"), (5, "integer")], ids=["null", "integer"])
+def test_bundle_ref_resolves_to_non_schema_error_message(value, type_name):
+    resolver = make_root_resolver({"definitions": {"User": value}})
     with pytest.raises(BundleError) as exc:
         Bundler().bundle({"$ref": "#/definitions/User"}, resolver)
-    assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"
+    assert str(exc.value) == (
+        f"Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got {type_name}"
+    )
 
 
 def test_bundle_non_recursive_inlined():
@@ -621,6 +686,96 @@ def test_unbundle_decodes_pointer_escaping_in_definition_names():
     assert result["components"]["schemas"] == {"User/Profile": {"type": "object"}}
 
 
+UNBUNDLE_NAMES = {
+    "schema000001": "#/components/schemas/User",
+    "schema000002": "#/definitions/Pet",
+    "schema000003": "file:///tmp/pet.json",
+}
+UNBUNDLE_DEFINITIONS = {"schema000001": {"type": "object"}, "schema000002": {"type": "integer"}, "schema000003": {}}
+
+
+UNBUNDLE_SOURCE = {
+    "anyOf": [{"$ref": f"#/{BUNDLE_STORAGE_KEY}/{name}"} for name in [*UNBUNDLE_NAMES, "unknown"]],
+    "properties": {"$ref": {"type": "string"}},
+    BUNDLE_STORAGE_KEY: UNBUNDLE_DEFINITIONS,
+}
+UNBUNDLE_EXPECTED = {
+    "anyOf": [
+        {"$ref": "#/components/schemas/User"},
+        {"$ref": "#/components/schemas/Pet"},
+        {"$ref": "#/components/schemas/schema000003"},
+        {"$ref": f"#/{BUNDLE_STORAGE_KEY}/unknown"},
+    ],
+    "properties": {"$ref": {"type": "string"}},
+    "components": {"schemas": {"User": {"type": "object"}, "Pet": {"type": "integer"}, "schema000003": {}}},
+}
+
+
+# Expanded definitions are shared between calls, so repeated and overlapping inputs must not mix.
+@pytest.mark.parametrize(
+    ("second", "expected"),
+    [
+        (None, None),
+        ((UNBUNDLE_SOURCE, UNBUNDLE_NAMES), UNBUNDLE_EXPECTED),
+        (
+            ({BUNDLE_STORAGE_KEY: {"schema000001": {"type": "null"}}}, UNBUNDLE_NAMES),
+            {"components": {"schemas": {"User": {"type": "null"}}}},
+        ),
+        (
+            ({BUNDLE_STORAGE_KEY: UNBUNDLE_DEFINITIONS}, {"schema000001": "#/definitions/Other"}),
+            {
+                "components": {
+                    "schemas": {"Other": {"type": "object"}, "schema000002": {"type": "integer"}, "schema000003": {}}
+                }
+            },
+        ),
+    ],
+    ids=["single", "repeated", "other-bundle-same-names", "same-bundle-other-names"],
+)
+def test_unbundle_restores_original_references(second, expected):
+    assert unbundle(UNBUNDLE_SOURCE, UNBUNDLE_NAMES) == UNBUNDLE_EXPECTED
+    if second is not None:
+        assert unbundle(*second) == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ([BUNDLE_STORAGE_KEY, "schema000003", "type"], ["pet.json", "type"]),
+        ([BUNDLE_STORAGE_KEY, "unknown", "type"], [BUNDLE_STORAGE_KEY, "unknown", "type"]),
+        (
+            [BUNDLE_STORAGE_KEY, "schema000001", "properties", "schema000002"],
+            ["components", "schemas", "User", "properties", "schema000002"],
+        ),
+    ],
+    ids=["whole-file", "unknown-name", "property-named-like-a-definition"],
+)
+def test_unbundle_path(path, expected):
+    assert unbundle_path(path, UNBUNDLE_NAMES) == expected
+
+
+@pytest.mark.parametrize(
+    ("uri", "expected"),
+    [
+        ("file:///dir/pet.json", "pet.json"),
+        ("https://example.com/schemas/", "schemas"),
+        ("urn:pet", "pet"),
+        ("https://example.com", "https://example.com"),
+    ],
+    ids=["file", "trailing-slash", "no-slash", "no-path"],
+)
+def test_unbundle_path_names_the_referenced_document(uri, expected):
+    assert unbundle_path([BUNDLE_STORAGE_KEY, "schema000001"], {"schema000001": uri}) == [expected]
+
+
+def test_bundle_spells_out_a_root_reference_beside_its_siblings():
+    resolver = make_root_resolver(DEFINITIONS)
+    assert bundle({"$ref": "#/definitions/User", "description": "A user"}, resolver).schema == {
+        "description": "A user",
+        "type": "string",
+    }
+
+
 def test_unbundle_path_decodes_pointer_escaping():
     # Path segments reconstructed from a URI fragment must be JSON-Pointer-decoded.
     name_to_uri = {"schema000001": "#/definitions/User~1Profile"}
@@ -632,17 +787,21 @@ def test_unbundle_path_decodes_pointer_escaping():
     ]
 
 
-def test_bundle_resolves_reference_by_declared_id():
+@pytest.mark.parametrize(
+    ("keyword", "name"),
+    [("$id", "https://example.invalid/text.json"), ("id", "https://example.invalid/text.json"), ("$id", "urn:text")],
+    ids=["id", "legacy-id", "urn"],
+)
+def test_bundle_resolves_reference_by_declared_id(keyword, name):
     # A subschema that names itself is reachable by that name in-document, with nothing fetched.
-    resolver = make_root_resolver(
-        {"definitions": {"Text": {"$id": "https://example.invalid/text.json", "type": "string"}}}
-    )
-    assert Bundler().bundle({"$ref": "https://example.invalid/text.json"}, resolver).schema == {"type": "string"}
+    resolver = make_root_resolver({"definitions": {"Text": {keyword: name, "type": "string"}}})
+    assert Bundler().bundle({"$ref": name}, resolver).schema == {"type": "string"}
 
 
-def test_bundle_drops_id_from_bundled_definitions():
+@pytest.mark.parametrize("keyword", ["$id", "id"])
+def test_bundle_drops_id_from_bundled_definitions(keyword):
     # A legacy fragment-only `$id` sets a base URI that later `#/x-bundled/...` lookups cannot resolve against.
-    resolver = make_root_resolver({"definitions": {"Text": {"$id": "#/definitions/text", "type": "string"}}})
+    resolver = make_root_resolver({"definitions": {"Text": {keyword: "#/definitions/text", "type": "string"}}})
     schema = {
         "type": "object",
         "properties": {"a": {"$ref": "#/definitions/Text"}, "b": {"$ref": "#/definitions/Text"}},
@@ -673,3 +832,34 @@ def test_bundle_names_sort_in_creation_order(already_bundled):
     names = list(bundler.bundle({"$ref": "#/definitions/D0"}, resolver).schema[BUNDLE_STORAGE_KEY])
 
     assert sorted(names) == sorted(names, key=lambda name: int(name.removeprefix("schema")))
+
+
+def test_reference_into_the_root_bundle_resolves_to_its_target():
+    root = {BUNDLE_STORAGE_KEY: {"schema000001": {"type": "string"}}}
+    assert resolve_with_root_bundle({"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"}, root) == {"type": "string"}
+
+
+STORED = {"schema000001": {"type": "string"}}
+
+
+@pytest.mark.parametrize(
+    ("schema", "root", "expected"),
+    [
+        ({"type": "object"}, {BUNDLE_STORAGE_KEY: STORED}, {"type": "object", BUNDLE_STORAGE_KEY: STORED}),
+        (True, {BUNDLE_STORAGE_KEY: STORED}, True),
+        ({"type": "object"}, {"type": "object"}, {"type": "object"}),
+        ({BUNDLE_STORAGE_KEY: {}}, {BUNDLE_STORAGE_KEY: STORED}, {BUNDLE_STORAGE_KEY: {}}),
+    ],
+    ids=["spliced", "boolean-schema", "root-without-bundle", "own-bundle-kept"],
+)
+def test_schema_with_bundle(schema, root, expected):
+    assert schema_with_bundle(schema, root) == expected
+
+
+def test_bundled_root_reference_keeps_the_bundle_for_nested_references():
+    stored = {
+        "schema000001": {"properties": {"name": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000002"}}},
+        "schema000002": {"type": "string"},
+    }
+    schema = {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001", BUNDLE_STORAGE_KEY: stored}
+    assert resolve_bundled_root(schema) == {**stored["schema000001"], BUNDLE_STORAGE_KEY: stored}

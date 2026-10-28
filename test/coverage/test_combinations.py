@@ -436,6 +436,11 @@ def test_negative_maxlength_above_buffer(nctx, max_length):
         ({"type": "integer", "exclusiveMinimum": 5}, [6, 7, 2**63], [6, 8, 2**63]),
         ({"type": "integer", "exclusiveMaximum": 10}, [9, 8], [8, 6]),
         ({"type": "integer", "exclusiveMinimum": 5, "exclusiveMaximum": 10}, [6, 7, 9, 8], [6, 8]),
+        (
+            {"type": "integer", "minimum": 5, "exclusiveMinimum": 0, "maximum": 10, "exclusiveMaximum": 20},
+            [5, 6, 10, 9],
+            [6, 8, 10],
+        ),
     ],
 )
 def test_positive_number(ctx_factory, schema, multiple_of, values, with_multiple_of):

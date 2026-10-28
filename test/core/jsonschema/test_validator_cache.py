@@ -3,7 +3,7 @@ import socket
 import jsonschema_rs
 import pytest
 
-from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, is_valid, make_validator, make_validator_with_seed
 
 
 def test_failed_build_is_cached_and_reraised():
@@ -36,3 +36,34 @@ def test_meta_schema_url_is_not_fetched():
         # A pending connection means the validator build tried to fetch the meta-schema.
         with pytest.raises(BlockingIOError):
             listener.accept()
+
+
+def test_bundles_with_the_same_definition_names_stay_apart():
+    string = {"$ref": f"#/{BUNDLE_STORAGE_KEY}/s", BUNDLE_STORAGE_KEY: {"s": {"type": "string"}}}
+    integer = {"$ref": f"#/{BUNDLE_STORAGE_KEY}/s", BUNDLE_STORAGE_KEY: {"s": {"type": "integer"}}}
+    validators = [make_validator(schema, jsonschema_rs.Draft7Validator) for schema in (string, integer)]
+    assert [(validator.is_valid("a"), validator.is_valid(1)) for validator in validators] == [
+        (True, False),
+        (False, True),
+    ]
+
+
+def test_property_named_ref_is_not_a_reference():
+    schema = {
+        "properties": {"$ref": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/s"}},
+        BUNDLE_STORAGE_KEY: {"s": {"type": "string"}},
+    }
+    validator = make_validator(schema, jsonschema_rs.Draft7Validator)
+    assert (validator.is_valid({"$ref": "a"}), validator.is_valid({"$ref": 1})) == (True, False)
+
+
+def test_seeded_validator_is_cached_per_seed():
+    string = make_validator_with_seed(lambda: {"type": "string"}, jsonschema_rs.Draft7Validator, ("seeded", "string"))
+    integer = make_validator_with_seed(lambda: {"type": "integer"}, jsonschema_rs.Draft7Validator, ("seeded", "int"))
+    again = make_validator_with_seed(lambda: {"type": "integer"}, jsonschema_rs.Draft7Validator, ("seeded", "string"))
+    assert again is string
+    assert [string.is_valid("a"), integer.is_valid(1), integer.is_valid("a")] == [True, True, False]
+
+
+def test_value_passes_when_the_schema_cannot_be_compiled():
+    assert is_valid(1, {"type": "string", "pattern": "("})

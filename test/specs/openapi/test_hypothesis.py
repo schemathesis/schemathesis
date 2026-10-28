@@ -1417,6 +1417,40 @@ def test_float_format_snapping_number_integer_union():
     assert schema["minimum"] > 0
 
 
+FLOAT32_MAX = 3.4028234663852886e38
+
+
+@pytest.mark.parametrize(
+    ("bounds", "expected"),
+    [
+        ({"exclusiveMinimum": 0}, {"minimum": 1.401298464324817e-45}),
+        ({"exclusiveMaximum": 0}, {"maximum": -1.401298464324817e-45}),
+        ({"exclusiveMinimum": -0.5}, {"minimum": -0.4999999701976776}),
+        ({"exclusiveMaximum": 0.5}, {"maximum": 0.4999999701976776}),
+        ({"exclusiveMaximum": 0.7}, {"maximum": 0.699999988079071}),
+        ({"exclusiveMaximum": FLOAT32_MAX}, {"maximum": 3.4028232635611926e38}),
+        ({"exclusiveMinimum": -FLOAT32_MAX}, {"minimum": -3.4028232635611926e38}),
+        ({"exclusiveMinimum": -1e39}, {"minimum": -FLOAT32_MAX}),
+        ({"exclusiveMaximum": 1e39}, {"maximum": FLOAT32_MAX}),
+    ],
+    ids=[
+        "above-zero",
+        "below-zero",
+        "above-negative",
+        "below-positive",
+        "below-rounds-down",
+        "below-largest",
+        "above-lowest",
+        "above-out-of-range",
+        "below-out-of-range",
+    ],
+)
+def test_float_format_snapping_steps_to_the_adjacent_single(bounds, expected):
+    schema = {"type": "number", "format": "float", **bounds}
+    _hypothesis.snap_float32_bounds(schema)
+    assert schema == {"type": "number", "format": "float", **expected}
+
+
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize(
     ("schema", "sign"),
@@ -1533,30 +1567,29 @@ def test_float_format_snapping_skips_conditional_but_not_branches():
 
 
 @pytest.mark.parametrize(
-    "schema",
-    [
-        {"type": "number", "format": "float", "exclusiveMinimum": 10**1000},
-        {"type": "number", "format": "float", "exclusiveMaximum": -(10**1000)},
-    ],
-    ids=["minimum", "maximum"],
+    "bound",
+    [{"exclusiveMinimum": 10**1000}, {"exclusiveMaximum": -(10**1000)}, {"exclusiveMaximum": -1e39}],
+    ids=["minimum", "maximum", "maximum-float"],
 )
-def test_float_format_snapping_unsatisfiable_bound(schema):
+def test_float_format_snapping_unsatisfiable_bound(bound):
     # No finite float32 lies past the bound, so the node must become unsatisfiable, not gain an infinite bound.
+    schema = {"type": "number", "format": "float", **bound}
     _hypothesis.snap_float32_bounds(schema)
     assert schema == {"not": {}}
 
 
 @pytest.mark.parametrize(
-    ("schema", "valid", "invalid"),
+    ("siblings", "valid", "invalid"),
     [
-        ({"type": ["number", "null"], "format": "float", "exclusiveMinimum": 10**1000}, [None], [5.0]),
-        ({"format": "float", "exclusiveMinimum": 10**1000}, ["text"], [5.0]),
-        ({"format": "float", "exclusiveMinimum": 10**1000, "enum": ["ok"]}, ["ok"], [None, 5.0]),
+        ({"type": ["number", "null"]}, [None], [5.0]),
+        ({}, ["text"], [5.0]),
+        ({"enum": ["ok"]}, ["ok"], [None, 5.0]),
     ],
     ids=["union", "typeless", "typeless-enum"],
 )
-def test_float_format_unsatisfiable_bound_keeps_non_numeric(schema, valid, invalid):
+def test_float_format_unsatisfiable_bound_keeps_non_numeric(siblings, valid, invalid):
     # Forbidding the empty numeric branch keeps non-numeric values and sibling constraints (e.g. `enum`) valid.
+    schema = {"format": "float", "exclusiveMinimum": 10**1000, **siblings}
     _hypothesis.snap_float32_bounds(schema)
     for value in valid:
         assert jsonschema_rs.is_valid(schema, value), value

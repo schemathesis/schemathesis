@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.core.jsonschema.types import ANY_TYPE, get_type, to_json_type_name
+from schemathesis.core.jsonschema.types import ANY_TYPE, as_object_schema, get_type, to_json_type_name
 
 
 @pytest.mark.parametrize(
@@ -34,3 +34,12 @@ def test_get_type(schema, expected):
 )
 def test_to_json_type_name(value, expected):
     assert to_json_type_name(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [(True, {}), (False, {"not": {}}), ({"type": "string"}, {"type": "string"})],
+    ids=["true", "false", "object"],
+)
+def test_as_object_schema(schema, expected):
+    assert as_object_schema(schema) == expected
