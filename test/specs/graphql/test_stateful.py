@@ -1,5 +1,8 @@
+import hypothesis
 import pytest
 import strawberry
+
+import schemathesis
 
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
@@ -192,3 +195,51 @@ def test_stateful_feeds_ids_captured_through_mutation_payloads(ctx, cli):
         "updateNote": True,
         "deleteNote": True,
     }
+
+
+def test_hooks_apply_once_to_stateful_cases(ctx):
+    @strawberry.type
+    class Book:
+        id: strawberry.ID
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def book(self, id: strawberry.ID) -> Book | None:
+            return None
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def addBook(self, title: str) -> Book:
+            return Book(id=strawberry.ID("1"))
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query, Mutation))
+    schema = schemathesis.graphql.from_url(api.schema_url)
+    seen = set()
+
+    def increment(name):
+        def hook(context, headers):
+            headers = headers or {}
+            headers[name] = str(int(headers.get(name, "0")) + 1)
+            return headers
+
+        return hook
+
+    def before_call(context, case, kwargs):
+        seen.add((case.headers["X-Global"], case.headers["X-Schema"]))
+
+    with ctx.restore_hooks():
+        schemathesis.hook(before_call)
+        schemathesis.hook("map_headers")(increment("X-Global"))
+        schema.hook("map_headers")(increment("X-Schema"))
+        schema.as_state_machine().run(
+            settings=hypothesis.settings(
+                max_examples=5,
+                deadline=None,
+                database=None,
+                phases=[hypothesis.Phase.generate],
+                suppress_health_check=list(hypothesis.HealthCheck),
+            )
+        )
+    assert seen == {("1", "1")}
