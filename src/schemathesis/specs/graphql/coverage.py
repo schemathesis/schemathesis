@@ -105,6 +105,15 @@ def default_value(
         return graphql.EnumValueNode(value=next(iter(type_.values)))
     assert isinstance(type_, graphql.GraphQLInputObjectType)
     inner_path = (*path, type_)
+    # graphql-core 3.2.7+ marks `@oneOf` inputs, which take exactly one non-null field
+    if getattr(type_, "is_one_of", False):
+        for name, input_field in type_.fields.items():
+            if not isinstance(input_field.type, graphql.GraphQLList) and input_field.type in inner_path:
+                continue
+            value = default_value(input_field.type, inner_path, scalars)
+            if value is not None:
+                return _object_value([(name, value)])
+        return None
     fields = []
     for name, input_field in type_.fields.items():
         if not graphql.is_required_input_field(input_field):
