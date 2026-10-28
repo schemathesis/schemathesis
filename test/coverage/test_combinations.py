@@ -1298,6 +1298,21 @@ def test_negative_forbidden_schema_description(nctx, schema, expected):
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
+        ({"type": "null"}, ["Valid null value"]),
+        (
+            {"type": "object", "additionalProperties": {"type": "null"}},
+            ["Valid object", "Object with additional property: Valid null value"],
+        ),
+    ],
+    ids=["root", "additional-property"],
+)
+def test_positive_null_description(pctx, schema, expected):
+    assert [value.description for value in cover_schema_iter(pctx, schema)] == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
         (
             {"type": "object", "propertyNames": {"maxLength": 3}},
             [0, 0.5, "true", "null", "AAA", ["null", "null"], {"0000": ""}],
