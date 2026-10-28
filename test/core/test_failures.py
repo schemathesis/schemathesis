@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from schemathesis.core.failures import Failure, Severity, get_origin
+import pytest
+
+from schemathesis.config import OutputConfig
+from schemathesis.core.failures import Failure, ServerError, Severity, format_failures, get_origin
 
 
 def origin_of_assertion_at(path: Path) -> tuple:
@@ -30,3 +33,25 @@ def test_failure_repr_shows_its_fields():
     assert repr(failure) == (
         "Failure(operation='GET /x', title='Title', message='Message', case_id='abc', severity=<Severity.HIGH: 'high'>)"
     )
+
+
+@pytest.mark.parametrize(
+    ("status_line", "expected"),
+    [
+        (None, "\n- ST101 Server error\n\n[500] Internal Server Error:\n\n    <EMPTY>"),
+        ("CUSTOM: went wrong", "\n- ST101 Server error\n\nCUSTOM: went wrong:\n\n    <EMPTY>"),
+    ],
+    ids=["default", "custom"],
+)
+def test_status_line_from_response(response_factory, status_line, expected):
+    response = response_factory.core(status_code=500, content=b"", content_type=None, status_line=status_line)
+    failures = [ServerError(operation="GET /x", status_code=500)]
+    assert (
+        format_failures(case_id=None, response=response, failures=failures, curl=None, config=OutputConfig())
+        == expected
+    )
+
+
+def test_truncated_response_keeps_status_line(response_factory):
+    response = response_factory.core(content=b"0123456789", status_line="CUSTOM: went wrong")
+    assert response.truncated(4).status_line == "CUSTOM: went wrong"
