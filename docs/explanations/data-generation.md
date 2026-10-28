@@ -48,6 +48,15 @@ Aims to exhaustively cover boundary values for every constraint defined in the s
 
 Request body strings without `maxLength` also get one 65,537-character value. It exceeds limits servers often enforce without declaring them, such as database column sizes or 16-bit length prefixes.
 
+For GraphQL, each case changes one argument or input field of a fixed valid query, or adds one field to its selection, up to three levels deep:
+
+```graphql
+# Schema: enum Genre { DRAMA COMEDY }  type Query { books(limit: Int!, genre: Genre): [Book] }
+
+# Valid:   books(limit: 0), books(limit: -2147483648), books(limit: 0, genre: null), books(limit: 0, genre: DRAMA)
+# Invalid: books, books(limit: "a"), books(limit: 2147483648), books(limit: 0, genre: invalid)
+```
+
 ### Fuzzing Phase
 
 Generates random data based on the schema constraints.

@@ -780,6 +780,12 @@ def test_ignored_checks(ctx, check):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_phase_cli(ctx, cli, snapshot_cli):
+    api = ctx.graphql.apps.coverage_inputs()
+    assert cli.run(api.schema_url, "--phases=coverage", "--checks=all") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_negative_mode_cli(ctx, cli, snapshot_cli):
     # Test that negative mode generates invalid queries for mutations with required arguments
     api = ctx.graphql.apps.books()

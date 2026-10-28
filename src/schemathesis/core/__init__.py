@@ -92,7 +92,9 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.HTTP_PROBES,
         }
     ),
-    SpecificationKind.GRAPHQL: frozenset({SpecificationFeature.STATEFUL_TESTING, SpecificationFeature.HTTP_PROBES}),
+    SpecificationKind.GRAPHQL: frozenset(
+        {SpecificationFeature.STATEFUL_TESTING, SpecificationFeature.COVERAGE, SpecificationFeature.HTTP_PROBES}
+    ),
 }
 
 

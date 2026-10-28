@@ -223,7 +223,7 @@ Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
 
 By default, `expected-statuses` includes `3xx/401/403/404/409/429/5xx` to account for redirects (e.g., to a sign-in page or an OAuth provider), authentication requirements, missing resources, conflicts (e.g., duplicate entries), rate limiting, and downstream failures.
 
-For GraphQL APIs, the check fails when the server rejects a valid query with a validation error.
+For GraphQL APIs, the check fails when the server rejects a valid query with a validation error. Rejections for exceeding the server's depth, cost, alias, directive or token limits do not count.
 
 !!! note "Test mode"
     Requires `--mode positive` or `--mode all` (default)

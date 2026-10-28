@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Coverage phase for GraphQL schemas.
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
 
 ### :bug: Fixed
