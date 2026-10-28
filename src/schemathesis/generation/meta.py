@@ -67,6 +67,9 @@ class CoverageScenario(StrEnum):
     # Positive scenarios - Default test case
     DEFAULT_POSITIVE_TEST = "default_positive_test"
 
+    # Positive scenarios - GraphQL field selection
+    FIELD_SELECTION = "field_selection"
+
     # Negative scenarios - Boundary violations for numbers
     VALUE_ABOVE_MAXIMUM = "value_above_maximum"
     VALUE_BELOW_MINIMUM = "value_below_minimum"

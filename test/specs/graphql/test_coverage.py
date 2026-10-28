@@ -9,7 +9,11 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo
 from schemathesis.graphql import nodes
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
-from schemathesis.specs.openapi.checks import negative_data_rejection, positive_data_acceptance
+from schemathesis.specs.openapi.checks import (
+    negative_data_rejection,
+    positive_data_acceptance,
+    response_schema_conformance,
+)
 
 DEFAULT = CoverageScenario.DEFAULT_POSITIVE_TEST
 MISSING = CoverageScenario.MISSING_PARAMETER
@@ -31,6 +35,7 @@ VALID_NUMBER = CoverageScenario.VALID_NUMBER
 VALID_STRING = CoverageScenario.VALID_STRING
 VALID_BOOLEAN = CoverageScenario.VALID_BOOLEAN
 VALID_ARRAY = CoverageScenario.VALID_ARRAY
+SELECT = CoverageScenario.FIELD_SELECTION
 VALID_KINDS = (VALID_NUMBER, VALID_STRING, VALID_BOOLEAN, VALID_ARRAY, CoverageScenario.VALID_OBJECT)
 OBJECTS_SCHEMA = (
     "input A { zip: String! invalid: Int } input F { a: A! n: Int! } input P @oneOf { id: ID, name: String } "
@@ -47,8 +52,12 @@ ORACLE_SCHEMAS = [
     "scalar Money input M { m: Money! } type Query { f(m: Money!, l: [Money!]!, o: [[Money]], i: M!): Int }",
     OBJECTS_SCHEMA,
     RECURSIVE_SCHEMA,
+    "scalar Money interface Named { name: String item: Item } "
+    "type Author implements Named { name: String! item: Item born: Int books(first: Int!): [Book] } "
+    "type Book { title: String author: Author price(currency: Money!): Int } union Item = Author | Book "
+    "type Query { f(id: ID!): Named }",
 ]
-ORACLE_IDS = ["builtin", "custom-scalar", "objects", "recursive"]
+ORACLE_IDS = ["builtin", "custom-scalar", "objects", "recursive", "selection"]
 
 
 @pytest.fixture(autouse=True)
@@ -162,18 +171,20 @@ def test_no_cases_for_required_input_cycle(ctx):
     raw = graphql.introspection_from_schema(
         graphql.build_schema(
             "input C { c: C! } input W { w: C! } input O @oneOf { o: O, c: C } "
-            "type Query { f(c: C!): Int g(w: W!): Int h(o: O!): Int ping: Int }",
+            "type Box { id: ID take(c: C!): Box } "
+            "type Query { f(c: C!): Int g(w: W!): Int h(o: O!): Int ping: Int box: Box }",
             assume_valid=True,
         )
     )
     # Another schema library in the process can make graphql-core report `isOneOf: false`.
     next(type_ for type_ in raw["__schema"]["types"] if type_["name"] == "O")["isOneOf"] = True
     schema = ctx.graphql.load_introspection(raw)
-    assert [bodies(schema, label) for label in ("Query.f", "Query.g", "Query.h", "Query.ping")] == [
+    assert [bodies(schema, label) for label in ("Query.f", "Query.g", "Query.h", "Query.ping", "Query.box")] == [
         [],
         [],
         [],
         [(DEFAULT, doc("{ ping }"))],
+        [(DEFAULT, doc("{ box { id } }"))],
     ]
 
 
@@ -588,6 +599,100 @@ def test_positive_case_metadata(ctx):
     ]
 
 
+def selections(schema, label):
+    return [
+        (case.meta.phase.data.location, case.meta.phase.data.description, case.body)
+        for case in iter_cases(schema, label)
+        if case.meta.phase.data.scenario == SELECT
+    ]
+
+
+@pytest.mark.parametrize(
+    ("sdl", "label", "expected"),
+    [
+        pytest.param(
+            "type User { id: ID! name: String posts: [Post] friends: [User] } "
+            "type Post { title: String author: User comments: [Comment] } "
+            "type Comment { text: String post: Post reply: Comment like: Like } "
+            "type Like { by: String extra: Extra } type Extra { x: Int } type Query { user: User }",
+            "Query.user",
+            [
+                ("User.posts", "{ user { id name posts { title } } }"),
+                ("User.friends", "{ user { id name friends { id name } } }"),
+                ("Post.author", "{ user { id name posts { author { id name } } } }"),
+                ("Post.comments", "{ user { id name posts { comments { text } } } }"),
+                ("Comment.post", "{ user { id name posts { comments { post { title } } } } }"),
+                ("Comment.reply", "{ user { id name posts { comments { reply { text } } } } }"),
+                ("Comment.like", "{ user { id name posts { comments { like { by } } } } }"),
+            ],
+            id="depth-three",
+        ),
+        pytest.param(
+            "scalar FooBar type Post { title: String } "
+            "type User { id: ID! posts(first: Int!): [Post] avatar(size: Int!): String odd(x: FooBar!): String } "
+            "type Query { user(id: ID!): User }",
+            "Query.user",
+            [
+                ("User.posts", "{ user(id: 1) { id posts(first: 0) { title } } }"),
+                ("User.avatar", "{ user(id: 1) { id avatar(size: 0) } }"),
+            ],
+            id="required-arguments",
+        ),
+        pytest.param(
+            "interface Named { name: String } type Author implements Named { name: String! born: Int } "
+            "type Ghost implements Named { name: String } type Query { named: Named }",
+            "Query.named",
+            [
+                ("Author", "{ named { name ... on Author { born } } }"),
+                ("Ghost", "{ named { name ... on Ghost { __typename } } }"),
+            ],
+            id="interface",
+        ),
+        pytest.param(
+            "interface Named { name: String item: Item } "
+            "type Author implements Named { name: String! item: Item born: Int books(first: Int!): [Book] } "
+            "type Book { title: String author: Author } union Item = Author | Book type Query { f(id: ID!): Named }",
+            "Query.f",
+            [
+                ("Named.item", "{ f(id: 1) { name item { __typename } } }"),
+                ("Author", "{ f(id: 1) { name ... on Author { born } } }"),
+                ("Book", "{ f(id: 1) { name item { ... on Book { title } } } }"),
+                ("Author.books", "{ f(id: 1) { name ... on Author { books(first: 0) { title } } } }"),
+                ("Book.author", "{ f(id: 1) { name item { ... on Book { author { name born } } } } }"),
+            ],
+            id="union-member-reached-earlier",
+        ),
+        pytest.param(
+            "type A { u: U } union U = C type C { d: D } type D { e: E } type E { x: Int } type Query { a: A }",
+            "Query.a",
+            [
+                ("A.u", "{ a { __typename u { __typename } } }"),
+                ("C", "{ a { __typename u { ... on C { __typename } } } }"),
+                ("C.d", "{ a { __typename u { ... on C { d { __typename } } } } }"),
+                ("D.e", "{ a { __typename u { ... on C { d { e { x } } } } } }"),
+            ],
+            id="fragment-adds-no-depth",
+        ),
+        pytest.param(
+            "type Book { title: String } type Shelf { books: [Book] } type Empty { shelf: Shelf } "
+            "union Item = Book | Empty type Query { item: Item }",
+            "Query.item",
+            [
+                ("Book", "{ item { __typename ... on Book { title } } }"),
+                ("Empty", "{ item { __typename ... on Empty { __typename } } }"),
+                ("Empty.shelf", "{ item { __typename ... on Empty { shelf { __typename } } } }"),
+                ("Shelf.books", "{ item { __typename ... on Empty { shelf { books { title } } } } }"),
+            ],
+            id="union",
+        ),
+        pytest.param("type Query { f(n: Int!): [String] }", "Query.f", [], id="leaf-return"),
+    ],
+)
+def test_field_selection(ctx, sdl, label, expected):
+    schema = ctx.graphql.load_sdl(sdl)
+    assert selections(schema, label) == [(location, f"Select `{location}`", doc(body)) for location, body in expected]
+
+
 @pytest.mark.parametrize("sdl", ORACLE_SCHEMAS, ids=ORACLE_IDS)
 def test_negative_cases_are_invalid(ctx, sdl):
     schemathesis.graphql.scalar("Money", st.just('a"b\\c é').map(nodes.String))
@@ -618,7 +723,9 @@ def run_against(server):
         ):
             data = case.meta.phase.data
             try:
-                case.call_and_validate(checks=[negative_data_rejection, positive_data_acceptance])
+                case.call_and_validate(
+                    checks=[negative_data_rejection, positive_data_acceptance, response_schema_conformance]
+                )
                 failure = None
             except FailureGroup as exc:
                 failure = tuple(type(inner).__name__ for inner in exc.exceptions)
@@ -626,8 +733,9 @@ def run_against(server):
     return results
 
 
-def test_conforming_server_has_no_false_positives(ctx):
-    results = run_against(ctx.graphql.apps.coverage_inputs())
+@pytest.mark.parametrize("app", ["coverage_inputs", "books"])
+def test_conforming_server_has_no_false_positives(ctx, app):
+    results = run_against(getattr(ctx.graphql.apps, app)())
     assert len(results) > 1
     assert [result for result in results if result[3] is not None] == []
 

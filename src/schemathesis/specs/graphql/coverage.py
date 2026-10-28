@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+from collections import deque
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
@@ -24,6 +25,9 @@ BUILTIN_SCALAR_VALUES: dict[str, object] = {"Int": 0, "Float": 0.0, "String": ""
 
 InputPath = tuple[graphql.GraphQLInputObjectType, ...]
 ValuePath = tuple[str | int, ...]
+# Fields with their arguments, and type names of inline fragments, from the operation field to a selected field
+SelectionPath = tuple[tuple[str, list[graphql.ArgumentNode]] | str, ...]
+MAX_SELECTION_DEPTH = 3
 # Name, type and whether the argument or input field is required
 FieldSpec = tuple[str, graphql.GraphQLInputType, bool]
 
@@ -136,6 +140,20 @@ def iter_coverage_cases(
                     parameter=element.parameter,
                     generation_time=instant.elapsed,
                 )
+    if GenerationMode.POSITIVE in modes and selection is not None:
+        instant = Instant()
+        for location, added in iter_field_selections(field.type, schema, scalars):
+            yield _make_case(
+                operation,
+                body=render(definition, defaults, graphql.SelectionSetNode(selections=(*selection.selections, added))),
+                mode=GenerationMode.POSITIVE,
+                scenario=CoverageScenario.FIELD_SELECTION,
+                description=f"Select `{location}`",
+                location=location,
+                parameter=None,
+                generation_time=instant.elapsed,
+            )
+            instant = Instant()
     if GenerationMode.NEGATIVE in modes:
         instant = Instant()
         name = unused_name(field.args)
@@ -433,6 +451,83 @@ def default_selection(type_: graphql.GraphQLOutputType) -> graphql.SelectionSetN
             and not any(graphql.is_required_argument(argument) for argument in field.args.values())
         ]
     return graphql.SelectionSetNode(selections=tuple(_field_node(name) for name in names or ["__typename"]))
+
+
+def iter_field_selections(
+    type_: graphql.GraphQLOutputType, schema: graphql.GraphQLSchema, scalars: ScalarLiterals
+) -> Iterator[tuple[str, graphql.SelectionNode]]:
+    """Each field reachable within a few levels, and each possible type, once, with the selection that reaches it.
+
+    The selection extends the default one of `type_`.
+    """
+    root = graphql.get_named_type(type_)
+    # Fields that an earlier selection already holds
+    selected = {(root.name, name) for name in _selection_names(default_selection(type_))}
+    expanded = {root}
+    queue: deque[tuple[graphql.GraphQLNamedType, SelectionPath, int, frozenset[str]]] = deque(
+        [(root, (), 1, frozenset())]
+    )
+    while queue:
+        named, path, depth, inherited = queue.popleft()
+        if isinstance(named, (graphql.GraphQLObjectType, graphql.GraphQLInterfaceType)):
+            for name, field in named.fields.items():
+                if name in inherited or (named.name, name) in selected:
+                    continue
+                try:
+                    arguments = with_value(field, (), None, scalars)
+                except UnknownScalar:
+                    continue
+                if arguments is None:
+                    continue
+                target = graphql.get_named_type(field.type)
+                field_selection = default_selection(field.type)
+                selected.add((named.name, name))
+                selected.update((target.name, inner) for inner in _selection_names(field_selection))
+                yield f"{named.name}.{name}", _nest(path, _field_node(name, arguments, field_selection))
+                if depth < MAX_SELECTION_DEPTH and target not in expanded and graphql.is_composite_type(target):
+                    expanded.add(target)
+                    queue.append((target, (*path, (name, arguments)), depth + 1, frozenset()))
+        if isinstance(named, (graphql.GraphQLInterfaceType, graphql.GraphQLUnionType)):
+            # Fields the interface declares belong to the interface, and a fragment repeating one may conflict with it
+            declared = frozenset(named.fields) if isinstance(named, graphql.GraphQLInterfaceType) else frozenset()
+            for possible in schema.get_possible_types(named):
+                if possible in expanded:
+                    continue
+                expanded.add(possible)
+                names = [name for name in _selection_names(default_selection(possible)) if name not in declared]
+                names = names or ["__typename"]
+                selected.update((possible.name, name) for name in names)
+                fragment = _fragment_node(
+                    possible.name, graphql.SelectionSetNode(selections=tuple(_field_node(name) for name in names))
+                )
+                yield possible.name, _nest(path, fragment)
+                queue.append((possible, (*path, possible.name), depth, declared))
+
+
+def _selection_names(selection: graphql.SelectionSetNode | None) -> list[str]:
+    if selection is None:
+        return []
+    return [cast(graphql.FieldNode, node).name.value for node in selection.selections]
+
+
+def _nest(path: SelectionPath, node: graphql.SelectionNode) -> graphql.SelectionNode:
+    """Wrap `node` in the fields and fragments of `path`, each holding only the next step."""
+    for step in reversed(path):
+        inner = graphql.SelectionSetNode(selections=(node,))
+        if isinstance(step, str):
+            node = _fragment_node(step, inner)
+        else:
+            name, arguments = step
+            node = _field_node(name, arguments, inner)
+    return node
+
+
+def _fragment_node(type_name: str, selection: graphql.SelectionSetNode) -> graphql.InlineFragmentNode:
+    return graphql.InlineFragmentNode(
+        type_condition=graphql.NamedTypeNode(name=graphql.NameNode(value=type_name)),
+        directives=(),
+        selection_set=selection,
+    )
 
 
 def _field_node(
