@@ -20,6 +20,18 @@ INVALID_ENUM = CoverageScenario.INVALID_ENUM_VALUE
 UNKNOWN = CoverageScenario.UNKNOWN_ARGUMENT
 MISSING_FIELD = CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY
 UNEXPECTED_FIELD = CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES
+ENUM = CoverageScenario.ENUM_VALUE
+ONLY_REQUIRED = CoverageScenario.OBJECT_ONLY_REQUIRED
+ALL_FIELDS = CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL
+NULL = CoverageScenario.NULL_VALUE
+MINIMUM = CoverageScenario.MINIMUM_VALUE
+MAXIMUM = CoverageScenario.MAXIMUM_VALUE
+EMPTY_STRING = CoverageScenario.MINIMUM_LENGTH_STRING
+VALID_NUMBER = CoverageScenario.VALID_NUMBER
+VALID_STRING = CoverageScenario.VALID_STRING
+VALID_BOOLEAN = CoverageScenario.VALID_BOOLEAN
+VALID_ARRAY = CoverageScenario.VALID_ARRAY
+VALID_KINDS = (VALID_NUMBER, VALID_STRING, VALID_BOOLEAN, VALID_ARRAY, CoverageScenario.VALID_OBJECT)
 OBJECTS_SCHEMA = (
     "input A { zip: String! invalid: Int } input F { a: A! n: Int! } input P @oneOf { id: ID, name: String } "
     "type Query { f(filter: F, p: P!): Int }"
@@ -134,7 +146,7 @@ def bodies(schema, label, **kwargs):
 )
 def test_default_case(ctx, sdl, label, expected):
     schema = ctx.graphql.load_sdl(sdl)
-    assert bodies(schema, label) == [(DEFAULT, doc(expected))]
+    assert positive(schema, label, DEFAULT) == [(DEFAULT, None, doc(expected))]
 
 
 def test_no_cases_for_required_input_cycle(ctx):
@@ -193,12 +205,20 @@ def test_no_positive_cases_in_negative_mode(ctx):
     ] == [GenerationMode.NEGATIVE]
 
 
-def negative(schema, label, *scenarios):
+def select(schema, label, mode, scenarios):
     return [
         (case.meta.phase.data.scenario, case.meta.phase.data.parameter, case.body)
-        for case in iter_cases(schema, label, modes=(GenerationMode.NEGATIVE,))
+        for case in iter_cases(schema, label, modes=(mode,))
         if not scenarios or case.meta.phase.data.scenario in scenarios
     ]
+
+
+def negative(schema, label, *scenarios):
+    return select(schema, label, GenerationMode.NEGATIVE, scenarios)
+
+
+def positive(schema, label, *scenarios):
+    return select(schema, label, GenerationMode.POSITIVE, scenarios)
 
 
 def test_missing_required_argument(ctx):
@@ -297,7 +317,7 @@ def test_negative_cases_skip_unknown_scalars_outside_required_arguments(ctx):
     ]
 
 
-def test_negative_cases_skip_elements_without_a_finite_value(ctx):
+def test_cases_skip_elements_without_a_finite_value(ctx):
     raw = graphql.introspection_from_schema(
         graphql.build_schema(
             "input C { c: C! } input G { c: C! x: Int } input H { g: G } type Query { f(h: H, l: [G]): Int }",
@@ -317,6 +337,15 @@ def test_negative_cases_skip_elements_without_a_finite_value(ctx):
         (INCORRECT, "l.0.c"),
         (INCORRECT, "l.0.c"),
         (UNKNOWN, "invalid"),
+    ]
+    assert positive(schema, "Query.f") == [
+        (DEFAULT, None, doc("{ f }")),
+        (NULL, "h", doc("{ f(h: null) }")),
+        (ONLY_REQUIRED, "h", doc("{ f(h: {}) }")),
+        (NULL, "h.g", doc("{ f(h: {g: null}) }")),
+        (NULL, "l", doc("{ f(l: null) }")),
+        (VALID_ARRAY, "l", doc("{ f(l: []) }")),
+        (NULL, "l.0", doc("{ f(l: [null]) }")),
     ]
 
 
@@ -392,6 +421,146 @@ def test_recursive_input_negative_cases(ctx):
     assert [list(dict.fromkeys(parameter for _, parameter, _ in cases)), [b for _, _, b in cases if "_not" in b]] == [
         ["f", "f.x", "f.req", "b", "b.id", "invalid"],
         [],
+    ]
+
+
+def test_enum_values(ctx):
+    schema = ctx.graphql.load_sdl("enum E { A B } input I { e: E! } type Query { f(e: E, i: I!): Int }")
+    assert positive(schema, "Query.f", ENUM) == [
+        (ENUM, "e", doc("{ f(e: A, i: {e: A}) }")),
+        (ENUM, "e", doc("{ f(e: B, i: {e: A}) }")),
+        (ENUM, "i.e", doc("{ f(i: {e: B}) }")),
+    ]
+
+
+def test_object_cases(ctx):
+    schema = ctx.graphql.load_sdl(
+        "input A { zip: String! n: Int } input F { a: A! n: Int k: F } input P @oneOf { id: ID, name: String } "
+        "type Query { f(filter: F, p: P!): Int }"
+    )
+    assert positive(schema, "Query.f") == [
+        (DEFAULT, None, doc("{ f(p: {id: 1}) }")),
+        (NULL, "filter", doc("{ f(filter: null, p: {id: 1}) }")),
+        (ONLY_REQUIRED, "filter", doc('{ f(filter: {a: {zip: ""}}, p: {id: 1}) }')),
+        (ALL_FIELDS, "filter", doc('{ f(filter: {a: {zip: ""}, n: 0}, p: {id: 1}) }')),
+        (ALL_FIELDS, "filter.a", doc('{ f(filter: {a: {zip: "", n: 0}}, p: {id: 1}) }')),
+        (NULL, "filter.a.n", doc('{ f(filter: {a: {zip: "", n: null}}, p: {id: 1}) }')),
+        (MINIMUM, "filter.a.n", doc('{ f(filter: {a: {zip: "", n: -2147483648}}, p: {id: 1}) }')),
+        (MAXIMUM, "filter.a.n", doc('{ f(filter: {a: {zip: "", n: 2147483647}}, p: {id: 1}) }')),
+        (NULL, "filter.n", doc('{ f(filter: {a: {zip: ""}, n: null}, p: {id: 1}) }')),
+        (MINIMUM, "filter.n", doc('{ f(filter: {a: {zip: ""}, n: -2147483648}, p: {id: 1}) }')),
+        (MAXIMUM, "filter.n", doc('{ f(filter: {a: {zip: ""}, n: 2147483647}, p: {id: 1}) }')),
+        (EMPTY_STRING, "p.name", doc('{ f(p: {name: ""}) }')),
+    ]
+
+
+def test_valid_literal_kinds(ctx):
+    schemathesis.graphql.scalar("Money", st.just("10.5").map(nodes.String))
+    schemathesis.graphql.scalar("Count", st.just(5).map(nodes.Int))
+    schema = ctx.graphql.load_sdl(
+        "scalar Money scalar Count enum E { A } input I { x: Boolean } "
+        "type Query { f(i: Int, fl: Float, s: String, id: ID, b: Boolean, o: I, l: [Int], m: Money, c: Count, e: E): Int }"
+    )
+    assert positive(schema, "Query.f", *VALID_KINDS) == [
+        (VALID_NUMBER, "i", doc("{ f(i: 0) }")),
+        (VALID_NUMBER, "fl", doc("{ f(fl: 0) }")),
+        (VALID_STRING, "id", doc("{ f(id: 1) }")),
+        (VALID_BOOLEAN, "b", doc("{ f(b: true) }")),
+        (VALID_ARRAY, "l", doc("{ f(l: []) }")),
+        (VALID_ARRAY, "l", doc("{ f(l: [0]) }")),
+        (VALID_STRING, "m", doc('{ f(m: "10.5") }')),
+        (VALID_NUMBER, "c", doc("{ f(c: 5) }")),
+    ]
+
+
+def test_null_values(ctx):
+    schema = ctx.graphql.load_sdl(
+        "input P @oneOf { id: ID, n: Int } input I { x: Int, y: Int! } "
+        "type Query { f(a: Int, b: Int! = 10, c: Int!, i: I, p: P, l: [Int]): Int }"
+    )
+    assert positive(schema, "Query.f", NULL) == [
+        (NULL, "a", doc("{ f(a: null, c: 0) }")),
+        (NULL, "i", doc("{ f(c: 0, i: null) }")),
+        (NULL, "i.x", doc("{ f(c: 0, i: {x: null, y: 0}) }")),
+        (NULL, "p", doc("{ f(c: 0, p: null) }")),
+        (NULL, "l", doc("{ f(c: 0, l: null) }")),
+        (NULL, "l.0", doc("{ f(c: 0, l: [null]) }")),
+    ]
+
+
+def test_int_boundaries(ctx):
+    schema = ctx.graphql.load_sdl("type Query { f(n: Int!): Int }")
+    assert positive(schema, "Query.f", MINIMUM, MAXIMUM) == [
+        (MINIMUM, "n", doc("{ f(n: -2147483648) }")),
+        (MAXIMUM, "n", doc("{ f(n: 2147483647) }")),
+    ]
+
+
+def test_minimum_length_string(ctx):
+    schema = ctx.graphql.load_sdl("type Query { f(s: String, id: ID): Int }")
+    assert positive(schema, "Query.f", EMPTY_STRING) == [(EMPTY_STRING, "s", doc('{ f(s: "") }'))]
+
+
+def test_valid_array_sizes(ctx):
+    schema = ctx.graphql.load_sdl("type Query { f(l: [Int!]): Int }")
+    assert positive(schema, "Query.f", VALID_ARRAY) == [
+        (VALID_ARRAY, "l", doc("{ f(l: []) }")),
+        (VALID_ARRAY, "l", doc("{ f(l: [0]) }")),
+    ]
+
+
+def test_dedup_keeps_specific_label(ctx):
+    schema = ctx.graphql.load_sdl("type Query { f(s: String, r: String!): Int }")
+    assert positive(schema, "Query.f") == [
+        (DEFAULT, None, doc('{ f(r: "") }')),
+        (NULL, "s", doc('{ f(s: null, r: "") }')),
+        (EMPTY_STRING, "s", doc('{ f(s: "", r: "") }')),
+    ]
+
+
+def test_positive_cases_skip_unknown_scalars(ctx):
+    schema = ctx.graphql.load_sdl(
+        "scalar FooBar input F { x: FooBar! y: Boolean! } type Query { f(a: F, u: FooBar, n: Boolean!): Int }"
+    )
+    assert positive(schema, "Query.f") == [
+        (DEFAULT, None, doc("{ f(n: true) }")),
+        (NULL, "a", doc("{ f(a: null, n: true) }")),
+        (NULL, "u", doc("{ f(u: null, n: true) }")),
+    ]
+
+
+def test_positive_case_metadata(ctx):
+    schema = ctx.graphql.load_sdl(
+        "enum E { A } input I { x: Int } type Query { f(n: Int, s: String, e: E, i: I, l: [ID]): Int }"
+    )
+    assert [
+        (
+            case.meta.generation.mode,
+            case.meta.phase.data.scenario,
+            case.meta.phase.data.location,
+            case.meta.phase.data.description,
+        )
+        for case in iter_cases(schema, "Query.f")
+    ] == [
+        (GenerationMode.POSITIVE, DEFAULT, "Query.f", "Default positive test case"),
+        (GenerationMode.POSITIVE, NULL, "Query.f(n:)", "Explicit null for `n`"),
+        (GenerationMode.POSITIVE, MINIMUM, "Query.f(n:)", "Minimum value for `n`"),
+        (GenerationMode.POSITIVE, MAXIMUM, "Query.f(n:)", "Maximum value for `n`"),
+        (GenerationMode.POSITIVE, VALID_NUMBER, "Query.f(n:)", "Valid value for `n`"),
+        (GenerationMode.POSITIVE, NULL, "Query.f(s:)", "Explicit null for `s`"),
+        (GenerationMode.POSITIVE, EMPTY_STRING, "Query.f(s:)", "Empty string for `s`"),
+        (GenerationMode.POSITIVE, NULL, "Query.f(e:)", "Explicit null for `e`"),
+        (GenerationMode.POSITIVE, ENUM, "Query.f(e:)", "Enum value for `e`"),
+        (GenerationMode.POSITIVE, NULL, "Query.f(i:)", "Explicit null for `i`"),
+        (GenerationMode.POSITIVE, ONLY_REQUIRED, "Query.f(i:)", "Required fields of `i`"),
+        (GenerationMode.POSITIVE, ALL_FIELDS, "Query.f(i:)", "All fields of `i`"),
+        (GenerationMode.POSITIVE, NULL, "I.x", "Explicit null for `i.x`"),
+        (GenerationMode.POSITIVE, MINIMUM, "I.x", "Minimum value for `i.x`"),
+        (GenerationMode.POSITIVE, MAXIMUM, "I.x", "Maximum value for `i.x`"),
+        (GenerationMode.POSITIVE, NULL, "Query.f(l:)", "Explicit null for `l`"),
+        (GenerationMode.POSITIVE, VALID_ARRAY, "Query.f(l:)", "Empty list for `l`"),
+        (GenerationMode.POSITIVE, VALID_ARRAY, "Query.f(l:)", "Valid value for `l`"),
+        (GenerationMode.POSITIVE, NULL, "Query.f(l:)", "Explicit null for `l.0`"),
     ]
 
 
