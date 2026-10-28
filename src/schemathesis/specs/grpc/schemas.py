@@ -219,13 +219,11 @@ class GrpcSchema(BaseSchema):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(slots=True)
 class MethodMap(Mapping):
     _parent: APIOperationMap
     _service: ServiceDescriptor
     _unary: dict[str, MethodDescriptor]
-
-    __slots__ = ("_parent", "_service", "_unary")
 
     def __len__(self) -> int:
         return len(self._unary)

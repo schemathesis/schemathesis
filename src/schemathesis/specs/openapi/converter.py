@@ -5,7 +5,7 @@ from typing import Any, TypeGuard, overload
 
 from schemathesis.core.jsonschema import DRAFT_03_DIALECT, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
-from schemathesis.core.jsonschema.numeric import is_numeric_bound
+from schemathesis.core.jsonschema.numeric import INT32_RANGE, INT64_RANGE, is_numeric_bound
 from schemathesis.core.jsonschema.patterns import (
     enforced_pattern,
     is_valid_jsonschema_rs_regex,
@@ -525,10 +525,7 @@ def _rewrite_if_then_else(schema: dict[str, Any]) -> None:
         schema["anyOf"] = new_anyof
 
 
-INTEGER_FORMAT_BOUNDS = {
-    "int32": (-(2**31), 2**31 - 1),
-    "int64": (-(2**63), 2**63 - 1),
-}
+INTEGER_FORMAT_BOUNDS = {"int32": INT32_RANGE, "int64": INT64_RANGE}
 
 # Bounds the schema declares outside the width its integer `format` implies. Values are drawn inside the
 # format range, but a request has to step past the bound the schema itself declares to violate it.
