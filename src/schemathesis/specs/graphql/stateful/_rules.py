@@ -265,7 +265,6 @@ def _make_producer_rule(
         case = data.draw(
             graphql_cases(
                 operation=operation,
-                hooks=self.schema.hooks,
                 phase=TestPhase.STATEFUL,
                 mutate_ast=_inject_field(field_name, (*record_path, "id")),
             )
@@ -358,7 +357,6 @@ def _make_handle_producer_rule(
         case = data.draw(
             graphql_cases(
                 operation=operation,
-                hooks=self.schema.hooks,
                 phase=TestPhase.STATEFUL,
                 mutate_ast=_inject_field(field_name, (*record_path, handle.field_name)),
             )
@@ -410,7 +408,6 @@ def _make_consumer_rule(
         case = data.draw(
             graphql_cases(
                 operation=operation,
-                hooks=self.schema.hooks,
                 phase=TestPhase.STATEFUL,
                 mutate_ast=_bundle_substituter(
                     self.schema, consumed, bundle_args, exploration_rate=BASE_EXPLORATION_RATE
@@ -482,7 +479,6 @@ def _make_lifecycle_rule(
         case = data.draw(
             graphql_cases(
                 operation=operation,
-                hooks=self.schema.hooks,
                 phase=TestPhase.STATEFUL,
                 mutate_ast=_bundle_substituter(self.schema, consumed, bundle_args, exploration_rate=0.0),
             )
