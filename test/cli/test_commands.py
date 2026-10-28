@@ -797,7 +797,13 @@ def test_invalid_type_with_ref(cli, ctx, snapshot_cli):
                     ],
                     "responses": {"default": {"description": "Ok"}},
                 }
-            }
+            },
+            "/ref-to-non-schema": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "q", "schema": {"$ref": "#/info/title"}}],
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            },
         },
         # Open API 3.0 ignores keywords next to `$ref`, so only 3.1 reads the invalid `type`.
         version="3.1.0",

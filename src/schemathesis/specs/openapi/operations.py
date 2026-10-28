@@ -601,4 +601,8 @@ class OperationLoader:
                 config=schema.config.output,
                 location=SchemaLocation.maybe_from_error_path(exc.instance_path, schema.specification.version),
             ) from None
+        if isinstance(error, InvalidSchema):
+            error.path = error.path or path
+            error.method = error.method or method
+            raise error
         raise InvalidSchema(SCHEMA_ERROR_SUGGESTION, path=path, method=method) from error

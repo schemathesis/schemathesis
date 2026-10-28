@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.1.0
-     Operations:       1 selected / 1 total
+     Operations:       2 selected / 2 total
 
  ✅  API capabilities:
 
@@ -17,9 +17,13 @@ Schemathesis dev
 
  🚫  Fuzzing (in 0.00s)
 
-     🚫 1 error
+     🚫 2 errors
 
 ==================================== ERRORS ====================================
+____________________________ GET /ref-to-non-schema ____________________________
+Schema Error
+
+Can not generate data for query parameter `q`! Cannot bundle `#/info/title`: expected JSON Schema (object or boolean), got string
 __________________________________ POST /test __________________________________
 Schema Error
 
@@ -42,9 +46,9 @@ Need more help?
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
+  Selected: 2/2
   Tested: 0
-  Errored: 1
+  Errored: 2
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -53,11 +57,11 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Errors:
-  🚫 Schema Error: 1
+  🚫 Schema Error: 2
 
 Test cases:
   No test cases were generated
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+============================== 2 errors in 1.00s ===============================
