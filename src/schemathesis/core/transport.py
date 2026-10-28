@@ -232,6 +232,8 @@ class Response:
     _override: Override | None
     # Turns `content` into display text for failure output, for bodies that are not text.
     render_content: Callable[[bytes], str] | None
+    # Replaces "[<code>] <reason>" in failure output, for responses whose status is not an HTTP status.
+    status_line: str | None
 
     __slots__ = (
         "status_code",
@@ -249,6 +251,7 @@ class Response:
         "_encoded_body",
         "_override",
         "render_content",
+        "status_line",
     )
 
     def __init__(
@@ -266,6 +269,7 @@ class Response:
         stream_cut_short: bool = False,
         _override: Override | None = None,
         render_content: Callable[[bytes], str] | None = None,
+        status_line: str | None = None,
     ):
         self.status_code = status_code
         self.headers = {key.lower(): value for key, value in headers.items()}
@@ -283,6 +287,7 @@ class Response:
         self.stream_cut_short = stream_cut_short
         self._override = _override
         self.render_content = render_content
+        self.status_line = status_line
 
     @overload
     @classmethod
@@ -452,6 +457,7 @@ class Response:
             content_size=self.content_size,
             stream_cut_short=self.stream_cut_short,
             _override=self._override,
+            status_line=self.status_line,
         )
 
     @property

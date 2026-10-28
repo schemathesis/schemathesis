@@ -444,8 +444,8 @@ def format_failures(
 
     # Response status
     if isinstance(response, Response):
-        reason = reason_phrase(response.status_code)
-        output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
+        status_line = response.status_line or f"[{response.status_code}] {reason_phrase(response.status_code)}"
+        output += formatter(MessageBlock.STATUS, f"\n{status_line}:\n")
         payload = format_response_payload(response, config=config)
         if payload in (EMPTY_PAYLOAD, BINARY_PAYLOAD):
             output += f"\n    {payload}"
