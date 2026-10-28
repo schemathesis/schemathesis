@@ -5,9 +5,11 @@ from io import StringIO
 
 import graphql
 import pytest
-from flask import Flask, Response
+import strawberry
+from flask import Flask, Response, jsonify, request
 
 from schemathesis.core.errors import LoaderError
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.graphql import loaders
 from schemathesis.transport.prepare import normalize_base_url
 from test.utils import run_given
@@ -116,3 +118,81 @@ def test_from_url_survives_bad_charset(app_runner, charset):
         return Response(payload, content_type=f"application/json; charset={charset}")
 
     assert_schema(loaders.from_url(app_runner.openapi_url(app, path="/graphql")))
+
+
+ONE_OF_SCHEMA = "input Pick @oneOf { id: ID, name: String } type Query { find(pick: Pick!): Int }"
+
+
+@strawberry.input(one_of=True)
+class Pick:
+    id: strawberry.ID | None = strawberry.UNSET
+    name: str | None = strawberry.UNSET
+
+
+@strawberry.type(name="Query")
+class OneOfQuery:
+    @strawberry.field
+    def find(self, pick: Pick) -> int | None:
+        return None
+
+
+def invalid_documents(schema):
+    target = graphql.build_schema(ONE_OF_SCHEMA)
+    documents = [case.body for case in generate_many(schema["Query"]["find"].as_strategy(), 30)]
+    return [document for document in documents if graphql.validate(target, graphql.parse(document))]
+
+
+# A Strawberry schema in the same process makes graphql-core report `isOneOf: false` for any other schema.
+@pytest.mark.parametrize("loader", ["file", "url", "wsgi", "asgi"])
+def test_one_of_inputs_get_one_field(ctx, loader):
+    strawberry_schema = strawberry.Schema(query=OneOfQuery)
+    if loader == "file":
+        schema = loaders.from_file(ONE_OF_SCHEMA)
+    elif loader == "url":
+        schema = loaders.from_url(ctx.graphql.apps.from_schema(strawberry_schema).schema_url)
+    elif loader == "wsgi":
+        schema = loaders.from_wsgi("/graphql", ctx.graphql.apps.from_schema(strawberry_schema).wsgi_app)
+    else:
+        api = ctx.graphql.apps.from_schema(strawberry_schema, framework="fastapi")
+        schema = loaders.from_asgi("/graphql", api.wsgi_app)
+    assert invalid_documents(schema) == []
+
+
+def introspection_app(queries, status):
+    # Answers like a server predating `@oneOf`, which rejects the field in the introspection query.
+    schema = graphql.build_schema(ONE_OF_SCHEMA)
+    app = Flask(__name__)
+
+    @app.route("/graphql", methods=["POST"])
+    def graphql_endpoint():
+        query = request.json["query"]
+        queries.append(query)
+        if "isOneOf" in query:
+            return jsonify(errors=[{"message": 'Cannot query field "isOneOf" on type "__Type".'}]), status
+        return jsonify(data=graphql.graphql_sync(schema, query).data)
+
+    return app
+
+
+@pytest.mark.parametrize("status", [200, 400])
+def test_introspection_without_one_of_support(app_runner, status):
+    queries = []
+    schema = loaders.from_url(app_runner.openapi_url(introspection_app(queries, status), path="/graphql"))
+    assert defines_type(schema.raw_schema, "Pick")
+    assert ["isOneOf" in query for query in queries] == [True, False]
+
+
+def test_introspection_server_error_is_not_retried(app_runner):
+    queries = []
+    with pytest.raises(LoaderError, match="HTTP 500"):
+        loaders.from_url(app_runner.openapi_url(introspection_app(queries, 500), path="/graphql"))
+    assert len(queries) == 1
+
+
+def test_custom_introspection_query_is_sent_once(app_runner):
+    queries = []
+    url = app_runner.openapi_url(introspection_app(queries, 400), path="/graphql")
+    query = loaders.get_introspection_query(one_of=False)
+    schema = loaders.from_url(url, json={"query": query})
+    assert defines_type(schema.raw_schema, "Pick")
+    assert queries == [query]
