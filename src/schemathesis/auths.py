@@ -154,13 +154,13 @@ class CachingAuthProvider(Generic[Auth]):
                 key = self._fetch_key(case, context)
                 disabled_until = self._fetch_disabled_until.get(key)
                 if disabled_until is not None:
-                    remaining = disabled_until - self.timer()
-                    if remaining > 0:
+                    # The message stays constant during the cooldown, so replays report one failure, not one per second.
+                    if self.timer() < disabled_until:
                         raise AuthenticationError(
                             self.provider.__class__.__name__,
                             "get",
                             f"Token fetch failed {TOKEN_FETCH_BREAKER_THRESHOLD} times in a row; "
-                            f"retrying in {remaining:.0f}s",
+                            f"retrying after a {TOKEN_FETCH_BREAKER_COOLDOWN:.0f}s cooldown",
                         )
                     # The cooldown elapsed, so a transient outage gets one probe.
                     del self._fetch_disabled_until[key]

@@ -44,6 +44,30 @@ def test_repeated_fetch_failures_stop_hammering_login(auth_operation):
     assert attempts["n"] == TOKEN_FETCH_BREAKER_THRESHOLD
 
 
+# Replays of one run hit the breaker at different moments; each must report the same failure.
+def test_fetch_breaker_message_does_not_change_during_cooldown(auth_operation):
+    clock = {"value": 0.0}
+
+    class AlwaysLocked(DynamicTokenAuthProvider):
+        def get(self, case, ctx):
+            raise AuthenticationError("AlwaysLocked", "get", "account locked")
+
+    provider = _dynamic_provider(AlwaysLocked)
+    provider.timer = lambda: clock["value"]
+    ctx = AuthContext(operation=auth_operation, app=None)
+    case = auth_operation.Case()
+    for _ in range(TOKEN_FETCH_BREAKER_THRESHOLD):
+        with pytest.raises(AuthenticationError):
+            provider.get(case, ctx)
+    messages = []
+    for elapsed in (0.4, 0.6, 12.0):
+        clock["value"] = elapsed
+        with pytest.raises(AuthenticationError) as exc:
+            provider.get(case, ctx)
+        messages.append(str(exc.value).splitlines()[0])
+    assert messages == ["Token fetch failed 3 times in a row; retrying after a 30s cooldown"] * 3
+
+
 def test_successful_fetch_resets_failure_counter(auth_operation):
     attempts = {"n": 0}
     schedule = [False, False, True, False, False, False]
