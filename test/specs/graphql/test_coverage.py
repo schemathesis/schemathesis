@@ -6,6 +6,7 @@ import schemathesis
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo
 from schemathesis.graphql import nodes
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
@@ -71,12 +72,13 @@ def register_scalars():
     schemathesis.graphql.scalar("Count", st.just(5).map(nodes.Int))
 
 
-def iter_cases(schema, label, *, modes=(GenerationMode.POSITIVE,)):
+def iter_cases(schema, label, *, modes=(GenerationMode.POSITIVE,), session=None):
     return list(
         schema.iter_coverage_cases(
             schema.find_operation_by_label(label),
             generation_modes=list(modes),
             generation_config=schema.config.generation,
+            session=session,
         )
     )
 
@@ -382,9 +384,6 @@ def test_cases_skip_elements_without_a_finite_value(ctx):
         (INCORRECT, "h.g.c"),
         (INCORRECT, "h.g.c"),
         (INCORRECT, "l.0"),
-        (MISSING_FIELD, "l.0.c"),
-        (INCORRECT, "l.0.c"),
-        (INCORRECT, "l.0.c"),
         (UNKNOWN, "invalid"),
     ]
     assert positive(schema, "Query.f") == [
@@ -454,7 +453,7 @@ def test_recursive_input_negative_cases(ctx):
 
 
 def walked_parameters(schema):
-    return list(dict.fromkeys(parameter for _, parameter, _ in negative(schema, "Query.f")))
+    return list(dict.fromkeys(parameter for _, parameter, _ in positive(schema, "Query.f") if parameter is not None))
 
 
 def test_input_walk_stops_at_depth_three(ctx):
@@ -479,13 +478,12 @@ def test_input_walk_stops_at_depth_three(ctx):
         "a.t3.t2",
         "a.t3.x",
         "a.x",
-        "invalid",
     ]
 
 
 def test_input_type_fields_are_walked_once_per_argument(ctx):
     schema = ctx.graphql.load_sdl("input P { lo: Int } input R { a: P b: P } type Query { f(r: R, s: P): Int }")
-    assert walked_parameters(schema) == ["r", "r.a", "r.a.lo", "r.b", "s", "s.lo", "invalid"]
+    assert walked_parameters(schema) == ["r", "r.a", "r.a.lo", "r.b", "s", "s.lo"]
 
 
 @pytest.mark.parametrize(
@@ -726,6 +724,54 @@ def selections(schema, label):
 def test_field_selection(ctx, sdl, label, expected):
     schema = ctx.graphql.load_sdl(sdl)
     assert selections(schema, label) == [(location, f"Select `{location}`", doc(body)) for location, body in expected]
+
+
+SHARED_TYPES_SCHEMA = (
+    "input Address { zip: String! } type Author { name: String } type Book { id: ID title: String author: Author } "
+    "type Query { a(address: Address): Book b(address: Address): Book }"
+)
+
+
+def case_summary(cases):
+    return [(case.meta.phase.data.scenario, case.meta.phase.data.parameter, case.body) for case in cases]
+
+
+# Nested input fields fail validation and nested fields resolve the same way whichever operation reaches them.
+@pytest.mark.parametrize("session", [None, GenerationSession()], ids=["without-session", "with-session"])
+def test_cases_shared_by_operations_run_once(ctx, session):
+    schema = ctx.graphql.load_sdl(SHARED_TYPES_SCHEMA)
+    modes = list(GenerationMode)
+    first = case_summary(iter_cases(schema, "Query.a", modes=modes, session=session))
+    second = case_summary(iter_cases(schema, "Query.b", modes=modes, session=session))
+    assert [(scenario, parameter) for scenario, parameter, _ in first] == [
+        (DEFAULT, None),
+        (NULL, "address"),
+        (ONLY_REQUIRED, "address"),
+        (INCORRECT, "address"),
+        (UNEXPECTED_FIELD, "address"),
+        (MISSING_FIELD, "address.zip"),
+        (INCORRECT, "address.zip"),
+        (INCORRECT, "address.zip"),
+        (INCORRECT, "address.zip"),
+        (SELECT, None),
+        (UNKNOWN, "invalid"),
+    ]
+    assert second == [
+        (DEFAULT, None, doc("{ b { id title } }")),
+        (NULL, "address", doc("{ b(address: null) { id title } }")),
+        (ONLY_REQUIRED, "address", doc('{ b(address: {zip: ""}) { id title } }')),
+        (INCORRECT, "address", doc("{ b(address: 1) { id title } }")),
+        (UNEXPECTED_FIELD, "address", doc('{ b(address: {zip: "", invalid: 0}) { id title } }')),
+        (UNKNOWN, "invalid", doc("{ b(invalid: 0) { id title } }")),
+    ]
+
+
+def test_shared_cases_keep_list_and_item_apart(ctx):
+    schema = ctx.graphql.load_sdl("input Address { tags: [Int!]! } type Query { f(address: Address): Int }")
+    assert [(parameter, body) for _, parameter, body in negative(schema, "Query.f", INCORRECT) if "null" in body] == [
+        ("address.tags", doc("{ f(address: {tags: null}) }")),
+        ("address.tags.0", doc("{ f(address: {tags: [null]}) }")),
+    ]
 
 
 @pytest.mark.parametrize("sdl", ORACLE_SCHEMAS, ids=ORACLE_IDS)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Generator, Iterator, Mapping
+from collections.abc import Callable, Generator, Hashable, Iterator, Mapping
 from dataclasses import dataclass
 from difflib import get_close_matches
 from functools import cached_property
@@ -121,6 +121,8 @@ class GraphQLSchema(BaseSchema):
         from schemathesis.specs.graphql.analysis import GraphQLAnalysis
 
         self.analysis = GraphQLAnalysis(self)
+        # Coverage cases shared by operations, for callers that pass no run-scoped session.
+        self.coverage_shared_targets_seen: set[Hashable] = set()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -243,7 +245,8 @@ class GraphQLSchema(BaseSchema):
     ) -> Iterator[Case]:
         from schemathesis.specs.graphql import coverage
 
-        return coverage.iter_coverage_cases(operation, self.client_schema, generation_modes)
+        shared = session.shared_targets_seen if session is not None else self.coverage_shared_targets_seen
+        return coverage.iter_coverage_cases(operation, self.client_schema, generation_modes, shared)
 
     @override
     def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
