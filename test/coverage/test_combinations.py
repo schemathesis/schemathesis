@@ -4412,6 +4412,10 @@ def test_generation_session_bounds_pins_and_drops_dependent_values():
         session.token_for(registry)
     assert len(session._pinned) == MAX_PINNED_REGISTRIES
     assert session.values.get(("k", first_token)) is MISSING
+    newest_token = session.token_for(registries[-1])
+    session.values[("k", newest_token)] = "cached"
+    assert session.token_for(registries[-1]) == newest_token
+    assert session.values.get(("k", newest_token)) == "cached"
 
 
 # An array item must keep the names its schema requires, declared under `properties` or not.

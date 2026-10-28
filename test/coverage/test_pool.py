@@ -645,7 +645,7 @@ def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(
         {
             **_id_producer("/locations", "Location", {"type": "integer"}),
             **_id_producer("/addresses", "Address", address),
-            **_body_consumer({"type": "object", "properties": {"address_id": address}}),
+            **_body_consumer({"type": "object", "properties": {"address_id": address, "billing": address}}),
         }
     )
     data_source = schema.create_extra_data_source()
@@ -655,11 +655,16 @@ def test_coverage_pool_overlay_prefers_captured_object_over_its_captured_fields(
     )
 
     cases = iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE, extra_data_source=data_source)
+    billing = {"location_id": 7340001}
     assert [case.body for case in cases] == [
+        {"address_id": {"location_id": 5550001}, "billing": billing},
         {"address_id": {"location_id": 5550001}},
+        {"billing": billing},
         {},
-        {"address_id": {}},
-        {"address_id": {"location_id": 2**63}},
+        {"address_id": {}, "billing": billing},
+        {"address_id": {"location_id": 2**63}, "billing": billing},
+        {"address_id": {"location_id": 5550001}, "billing": {}},
+        {"address_id": {"location_id": 5550001}, "billing": {"location_id": 2**63}},
     ]
 
 
@@ -940,32 +945,34 @@ def _album_schema(ctx, parameter_schema):
 
 
 # A declared value is often a placeholder the API does not know; the captured id is what reaches real logic.
-@pytest.mark.parametrize("keyword", ["example", "default"])
-def test_coverage_prefers_captured_value_over_declared_value(ctx, keyword):
-    schema = _album_schema(ctx, {"type": "string", keyword: "album-1"})
+@pytest.mark.parametrize(
+    "declared",
+    [{"example": "album-1"}, {"default": "album-1"}, {"examples": ["album-1", "alb-42"]}],
+    ids=["example", "default", "examples"],
+)
+def test_coverage_prefers_captured_value_over_declared_value(ctx, declared):
+    schema = _album_schema(ctx, {"type": "string", **declared})
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation="POST /albums", status_code=201, payload={"id": "alb-42"})
 
     cases = iter_cases(schema["/albums/{albumId}"]["GET"], GenerationMode.POSITIVE, extra_data_source=data_source)
 
-    values = [case.path_parameters["albumId"] for case in cases]
-    assert values[0] == "alb-42"
-    assert "album-1" in values
+    assert [case.path_parameters["albumId"] for case in cases] == ["alb-42", "album-1"]
 
 
 @pytest.mark.parametrize(
     ("captured", "expected"),
-    [("b", "b"), ("not-listed", "a")],
+    [("b", ["b", "a", "c"]), ("not-listed", ["a", "b", "c"])],
     ids=["allowed", "outside-enum"],
 )
 def test_coverage_uses_captured_value_only_when_schema_allows_it(ctx, captured, expected):
-    schema = _album_schema(ctx, {"type": "string", "enum": ["a", "b"]})
+    schema = _album_schema(ctx, {"type": "string", "enum": ["a", "b", "c"]})
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation="POST /albums", status_code=201, payload={"id": captured})
 
     cases = iter_cases(schema["/albums/{albumId}"]["GET"], GenerationMode.POSITIVE, extra_data_source=data_source)
 
-    assert cases[0].path_parameters["albumId"] == expected
+    assert [case.path_parameters["albumId"] for case in cases] == expected
 
 
 def _album_with_response_example(ctx):
