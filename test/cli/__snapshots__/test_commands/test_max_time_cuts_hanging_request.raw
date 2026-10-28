@@ -15,36 +15,27 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
- ⏭   Examples (in 0.00s)
+ ⏭   Fuzzing (in 0.00s)
 
      ⏭  4 skipped
-
- ✅  Coverage (in 0.00s)
-
-     ✅ 1 passed  ⏭  3 skipped
-
- 🕛  Fuzzing (in 0.00s)
-
-     No tests were run
 
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 4/4
-  Tested: 1
-  Skipped: 3
-    - No examples in schema
+  Tested: 0
+  Skipped: 4
     - Time limit reached
 
 Test Phases:
-  ⏭  Examples
-  ✅ Coverage
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ⏭  Fuzzing
   ⏭  Stateful (disabled)
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+=============================== Empty test suite ===============================

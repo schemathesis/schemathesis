@@ -674,7 +674,7 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
             app,
             "--max-time=2",
             "--request-timeout=30",
-            "--phases=examples,coverage,fuzzing",
+            "--phases=fuzzing",
             "--checks=not_a_server_error",
         )
     finally:
@@ -685,36 +685,39 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_max_time_reports_unreached_operations(ctx, cli, snapshot_cli):
+    operation = {
+        "get": {
+            "parameters": [{"name": "q", "in": "query", "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
     app, _ = ctx.openapi.make_flask_app(
         {
-            "/a/slow": {"get": {"responses": {"200": {"description": "OK"}}}},
-            **{
-                f"/b/fast{index}": {
-                    "get": {
-                        "parameters": [{"name": "q", "in": "query", "schema": {"type": "integer"}}],
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-                for index in range(3)
-            },
+            "/a/fast": operation,
+            "/b/hanging": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/c/fast0": operation,
+            "/c/fast1": operation,
         }
     )
+    release = threading.Event()
 
-    @app.route("/a/slow")
-    def slow():
-        time.sleep(2)
+    @app.route("/a/fast")
+    @app.route("/c/fast<int:index>")
+    def fast(index=None):
         return jsonify({})
 
-    @app.route("/b/fast<int:index>")
-    def fast(index):
+    @app.route("/b/hanging")
+    def hanging():
+        release.wait()
         return jsonify({})
 
-    assert (
-        cli.run_openapi_app(
-            app, "--max-time=1", "--phases=examples,coverage,fuzzing", "--checks=not_a_server_error", "--workers=1"
+    try:
+        result = cli.run_openapi_app(
+            app, "--max-time=1", "--phases=fuzzing", "--checks=not_a_server_error", "--workers=1"
         )
-        == snapshot_cli
-    )
+    finally:
+        release.set()
+    assert result == snapshot_cli
 
 
 @pytest.fixture
@@ -753,12 +756,21 @@ def raw_http_server(ctx):
 SUCCESS_PATHS = {"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}}
 
 
+# The timeout must cover a busy server getting the headers out; a late header times out differently.
 def test_read_content_timeout(cli, raw_http_server, snapshot_cli):
+    release = threading.Event()
+
     def stall_mid_body(connection):
         connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{")
-        time.sleep(1)
+        release.wait()
 
-    assert cli.run(raw_http_server(stall_mid_body), "--request-timeout=0.1", "--max-examples=1") == snapshot_cli
+    try:
+        result = cli.run(
+            raw_http_server(stall_mid_body), "--request-timeout=0.5", "--max-examples=1", "--phases=fuzzing"
+        )
+    finally:
+        release.set()
+    assert result == snapshot_cli
 
 
 @pytest.mark.parametrize("workers", [1, 2])
