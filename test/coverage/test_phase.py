@@ -3397,6 +3397,46 @@ def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx):
     ] == []
 
 
+@pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
+def test_body_examples_do_not_leak_into_property_schemas(ctx, mode):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "a": {
+                                            "type": "object",
+                                            "properties": {"b": {"type": "integer"}},
+                                            "examples": [{"b": 5}],
+                                        }
+                                    },
+                                },
+                                "example": {"a": {"b": 3}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/items"]["POST"]
+    list(schema.iter_coverage_cases(operation, generation_modes=[mode], generation_config=schema.config.generation))
+    assert operation.body[0].unoptimized_schema == {
+        "type": "object",
+        "properties": {
+            "a": {"type": "object", "properties": {"b": {"type": "integer"}}, "examples": [{"b": 5}]},
+        },
+    }
+
+
 def test_missing_authorization(ctx, cli, snapshot_cli):
     # The reproduction code should not contain auth if it is explicitly specified
     api = ctx.openapi.apps.failure()

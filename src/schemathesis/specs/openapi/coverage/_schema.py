@@ -2717,7 +2717,7 @@ def cover_schema_iter(
         types = list(_ALL_TYPES)
     else:
         types = schema.get("type", [])
-    push_examples_to_properties(schema)
+    schema = push_examples_to_properties(schema)
     if not isinstance(types, list):
         types = [types]  # type: ignore[unreachable]
     leaves = _fold(schema, ctx) if GenerationMode.POSITIVE in ctx.generation_modes else None
@@ -2738,8 +2738,7 @@ def cover_schema_iter(
         baseline_emitted = False
         if not ctx.wire.can_be_negated(schema):
             return
-        # Snapshot: walking a keyword can push examples down into a schema shared with this one,
-        # and a key landing here mid-walk is not one this pass was meant to cover anyway.
+        # Snapshot: a key landing here mid-walk is not one this pass was meant to cover.
         for key, value in list(schema.items()):
             with _ignore_unfixable(), ctx.at(key):
                 if _negation_ignored_by_dialect(ctx, key):
@@ -4744,18 +4743,28 @@ def _flip_generation_mode_for_not(
         )
 
 
-def push_examples_to_properties(schema: JsonSchemaObject) -> None:
-    """Push examples from the top-level 'examples' field to the corresponding properties."""
-    if "examples" in schema and "properties" in schema:
-        properties = schema["properties"]
-        for example in schema["examples"]:
-            if isinstance(example, dict):
-                for prop, value in example.items():
-                    if prop in properties and isinstance(properties[prop], dict):
-                        if "examples" not in properties[prop]:
-                            properties[prop]["examples"] = []
-                        if value not in properties[prop]["examples"]:
-                            properties[prop]["examples"].append(value)
+def push_examples_to_properties(schema: JsonSchemaObject) -> JsonSchemaObject:
+    """`schema` with its top-level `examples` values also listed on the matching properties; never modifies the input."""
+    if "examples" not in schema or "properties" not in schema:
+        return schema
+    properties = schema["properties"]
+    pushed: dict[str, list[JsonValue]] = {}
+    for example in schema["examples"]:
+        if isinstance(example, dict):
+            for prop, value in example.items():
+                if prop in properties and isinstance(properties[prop], dict):
+                    values = pushed.setdefault(prop, list(properties[prop].get("examples", [])))
+                    if value not in values:
+                        values.append(value)
+    if not pushed:
+        return schema
+    return {
+        **schema,
+        "properties": {
+            **properties,
+            **{prop: {**properties[prop], "examples": values} for prop, values in pushed.items()},
+        },
+    }
 
 
 # Negative handlers for keywords that need no shared object template; the template-bound

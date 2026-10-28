@@ -146,5 +146,4 @@ from schemathesis.specs.openapi.coverage._schema import push_examples_to_propert
     ],
 )
 def test_push_examples_to_properties(schema, expected):
-    push_examples_to_properties(schema)
-    assert schema == expected
+    assert push_examples_to_properties(schema) == expected
