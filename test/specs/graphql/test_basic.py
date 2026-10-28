@@ -1,4 +1,6 @@
+import gc
 import json
+import weakref
 from unittest import SkipTest
 from unittest.mock import ANY
 
@@ -90,6 +92,15 @@ def test_exclude_deprecated_fields():
     schema = schemathesis.graphql.from_file('type Query { active: Int  legacy: Int @deprecated(reason: "old") }')
     operations = schema.exclude(deprecated=True).get_all_operations()
     assert [result.ok().label for result in operations] == ["Query.active"]
+
+
+def test_filtering_does_not_keep_operations_alive():
+    schema = schemathesis.graphql.from_file("type Query { active: Int }")
+    operation = next(schema.get_all_operations()).ok()
+    reference = weakref.ref(operation)
+    del operation
+    gc.collect()
+    assert reference() is None
 
 
 def test_no_strategies_from_examples(ctx):

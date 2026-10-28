@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from functools import cached_property, lru_cache, wraps
 from inspect import iscoroutinefunction
 from itertools import chain
+from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -318,6 +319,10 @@ class BaseSchema(Mapping):
 
     def get_full_path(self, path: str) -> str:
         return get_full_path(self.base_path, path)
+
+    def _should_skip(self, operation: APIOperation) -> bool:
+        """Whether the schema's filters leave `operation` out."""
+        return not self.filter_set.match(SimpleNamespace(operation=operation))
 
     @property
     def base_path(self) -> str:

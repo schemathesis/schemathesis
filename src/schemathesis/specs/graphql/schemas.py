@@ -340,14 +340,6 @@ class GraphQLSchema(BaseSchema):
             and not self.filter_set.is_explicitly_included(operation)
         )
 
-    def _should_skip(
-        self,
-        operation: APIOperation,
-        _ctx_cache: SimpleNamespace = SimpleNamespace(operation=None),
-    ) -> bool:
-        _ctx_cache.operation = operation
-        return not self.filter_set.match(_ctx_cache)
-
     def _build_operation(
         self,
         root_type: RootType,
