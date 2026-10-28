@@ -57,6 +57,11 @@ def clear_custom_scalars():
     CUSTOM_SCALARS.clear()
 
 
+def register_scalars():
+    schemathesis.graphql.scalar("Money", st.just("10.5").map(nodes.String))
+    schemathesis.graphql.scalar("Count", st.just(5).map(nodes.Int))
+
+
 def iter_cases(schema, label, *, modes=(GenerationMode.POSITIVE,)):
     return list(
         schema.iter_coverage_cases(
@@ -128,6 +133,7 @@ def bodies(schema, label, **kwargs):
             "Query.f",
             "{ f { name id } }",
         ),
+        ("scalar Money type Query { f(m: Money!): Int }", "Query.f", '{ f(m: "10.5") }'),
     ],
     ids=[
         "scalar-arguments",
@@ -142,9 +148,11 @@ def bodies(schema, label, **kwargs):
         "object-without-scalar-fields",
         "union",
         "interface",
+        "custom-scalar",
     ],
 )
 def test_default_case(ctx, sdl, label, expected):
+    register_scalars()
     schema = ctx.graphql.load_sdl(sdl)
     assert positive(schema, label, DEFAULT) == [(DEFAULT, None, doc(expected))]
 
@@ -158,7 +166,7 @@ def test_no_cases_for_required_input_cycle(ctx):
             assume_valid=True,
         )
     )
-    # A Strawberry schema elsewhere in the process makes graphql-core report `isOneOf: false`.
+    # Another schema library in the process can make graphql-core report `isOneOf: false`.
     next(type_ for type_ in raw["__schema"]["types"] if type_["name"] == "O")["isOneOf"] = True
     schema = ctx.graphql.load_introspection(raw)
     assert [bodies(schema, label) for label in ("Query.f", "Query.g", "Query.h", "Query.ping")] == [
@@ -167,12 +175,6 @@ def test_no_cases_for_required_input_cycle(ctx):
         [],
         [(DEFAULT, doc("{ ping }"))],
     ]
-
-
-def test_custom_scalar_literal(ctx):
-    schemathesis.graphql.scalar("Money", st.just("10.5").map(nodes.String))
-    schema = ctx.graphql.load_sdl("scalar Money type Query { f(m: Money!): Int }")
-    assert bodies(schema, "Query.f") == [(DEFAULT, doc('{ f(m: "10.5") }'))]
 
 
 def test_custom_scalar_literal_is_stable_across_runs(ctx):
@@ -221,9 +223,82 @@ def positive(schema, label, *scenarios):
     return select(schema, label, GenerationMode.POSITIVE, scenarios)
 
 
-def test_missing_required_argument(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(a: Int!, b: Int, c: Int! = 1): Int }")
-    assert negative(schema, "Query.f", MISSING) == [(MISSING, "a", doc("{ f }"))]
+@pytest.mark.parametrize(
+    ("sdl", "scenarios", "expected"),
+    [
+        pytest.param(
+            "type Query { f(a: Int!, b: Int, c: Int! = 1): Int }",
+            [MISSING],
+            [(MISSING, "a", "{ f }")],
+            id="missing-required-argument",
+        ),
+        pytest.param(
+            "type Query { f(n: Int!): Int }",
+            [ABOVE, BELOW],
+            [(ABOVE, "n", "{ f(n: 2147483648) }"), (BELOW, "n", "{ f(n: -2147483649) }")],
+            id="int-bounds",
+        ),
+        pytest.param(
+            "enum E { invalid X } type Query { f(e: E!, l: [E!]): Int }",
+            [INVALID_ENUM],
+            [(INVALID_ENUM, "e", "{ f(e: invalid_1) }"), (INVALID_ENUM, "l.0", "{ f(e: invalid, l: [invalid_1]) }")],
+            id="invalid-enum-value",
+        ),
+        pytest.param(
+            "type Query { f(invalid: Int!): Int }",
+            [UNKNOWN],
+            [(UNKNOWN, "invalid_1", "{ f(invalid: 0, invalid_1: 0) }")],
+            id="unknown-argument-name-taken",
+        ),
+        pytest.param(
+            "type Query { f: Int }",
+            [UNKNOWN],
+            [(UNKNOWN, "invalid", "{ f(invalid: 0) }")],
+            id="unknown-argument-without-arguments",
+        ),
+        pytest.param(
+            "scalar Money type Query { f(m: Money!, l: [Money!]!): Int }",
+            [],
+            [
+                (MISSING, "m", '{ f(l: ["10.5"]) }'),
+                (INCORRECT, "m", '{ f(m: null, l: ["10.5"]) }'),
+                (MISSING, "l", '{ f(m: "10.5") }'),
+                (INCORRECT, "l", '{ f(m: "10.5", l: null) }'),
+                (INCORRECT, "l.0", '{ f(m: "10.5", l: [null]) }'),
+                (UNKNOWN, "invalid", '{ f(m: "10.5", l: ["10.5"], invalid: 0) }'),
+            ],
+            id="custom-scalar",
+        ),
+        pytest.param(
+            OBJECTS_SCHEMA,
+            [MISSING_FIELD],
+            [
+                (MISSING_FIELD, "filter.a", "{ f(filter: {n: 0}, p: {id: 1}) }"),
+                (MISSING_FIELD, "filter.a.zip", "{ f(filter: {a: {}, n: 0}, p: {id: 1}) }"),
+                (MISSING_FIELD, "filter.n", '{ f(filter: {a: {zip: ""}}, p: {id: 1}) }'),
+                (MISSING_FIELD, "p", "{ f(p: {}) }"),
+            ],
+            id="object-missing-required-property",
+        ),
+        pytest.param(
+            OBJECTS_SCHEMA,
+            [UNEXPECTED_FIELD],
+            [
+                (UNEXPECTED_FIELD, "filter", '{ f(filter: {a: {zip: ""}, n: 0, invalid: 0}, p: {id: 1}) }'),
+                (UNEXPECTED_FIELD, "filter.a", '{ f(filter: {a: {zip: "", invalid_1: 0}, n: 0}, p: {id: 1}) }'),
+                (UNEXPECTED_FIELD, "p", "{ f(p: {invalid: 0}) }"),
+                (UNEXPECTED_FIELD, "p", '{ f(p: {id: 1, name: ""}) }'),
+            ],
+            id="object-unexpected-properties",
+        ),
+    ],
+)
+def test_negative_cases(ctx, sdl, scenarios, expected):
+    register_scalars()
+    schema = ctx.graphql.load_sdl(sdl)
+    assert negative(schema, "Query.f", *scenarios) == [
+        (scenario, parameter, doc(body)) for scenario, parameter, body in expected
+    ]
 
 
 @pytest.mark.parametrize(
@@ -260,43 +335,6 @@ def test_incorrect_type_null(ctx):
         ("p", doc("{ f(a: 0, ids: [1], p: null) }")),
         ("p.id", doc("{ f(a: 0, ids: [1], p: {id: null}) }")),
         ("p.name", doc("{ f(a: 0, ids: [1], p: {name: null}) }")),
-    ]
-
-
-def test_int_bounds(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(n: Int!): Int }")
-    assert negative(schema, "Query.f", ABOVE, BELOW) == [
-        (ABOVE, "n", doc("{ f(n: 2147483648) }")),
-        (BELOW, "n", doc("{ f(n: -2147483649) }")),
-    ]
-
-
-def test_invalid_enum_value(ctx):
-    schema = ctx.graphql.load_sdl("enum E { invalid X } type Query { f(e: E!, l: [E!]): Int }")
-    assert negative(schema, "Query.f", INVALID_ENUM) == [
-        (INVALID_ENUM, "e", doc("{ f(e: invalid_1) }")),
-        (INVALID_ENUM, "l.0", doc("{ f(e: invalid, l: [invalid_1]) }")),
-    ]
-
-
-def test_unknown_argument(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(invalid: Int!): Int g: Int }")
-    assert [negative(schema, label, UNKNOWN) for label in ("Query.f", "Query.g")] == [
-        [(UNKNOWN, "invalid_1", doc("{ f(invalid: 0, invalid_1: 0) }"))],
-        [(UNKNOWN, "invalid", doc("{ g(invalid: 0) }"))],
-    ]
-
-
-def test_custom_scalar_negative_cases(ctx):
-    schemathesis.graphql.scalar("Money", st.just("10.5").map(nodes.String))
-    schema = ctx.graphql.load_sdl("scalar Money type Query { f(m: Money!, l: [Money!]!): Int }")
-    assert negative(schema, "Query.f") == [
-        (MISSING, "m", doc('{ f(l: ["10.5"]) }')),
-        (INCORRECT, "m", doc('{ f(m: null, l: ["10.5"]) }')),
-        (MISSING, "l", doc('{ f(m: "10.5") }')),
-        (INCORRECT, "l", doc('{ f(m: "10.5", l: null) }')),
-        (INCORRECT, "l.0", doc('{ f(m: "10.5", l: [null]) }')),
-        (UNKNOWN, "invalid", doc('{ f(m: "10.5", l: ["10.5"], invalid: 0) }')),
     ]
 
 
@@ -369,26 +407,6 @@ def test_negative_case_metadata(ctx):
     ]
 
 
-def test_object_missing_required_property(ctx):
-    schema = ctx.graphql.load_sdl(OBJECTS_SCHEMA)
-    assert negative(schema, "Query.f", MISSING_FIELD) == [
-        (MISSING_FIELD, "filter.a", doc("{ f(filter: {n: 0}, p: {id: 1}) }")),
-        (MISSING_FIELD, "filter.a.zip", doc("{ f(filter: {a: {}, n: 0}, p: {id: 1}) }")),
-        (MISSING_FIELD, "filter.n", doc('{ f(filter: {a: {zip: ""}}, p: {id: 1}) }')),
-        (MISSING_FIELD, "p", doc("{ f(p: {}) }")),
-    ]
-
-
-def test_object_unexpected_properties(ctx):
-    schema = ctx.graphql.load_sdl(OBJECTS_SCHEMA)
-    assert negative(schema, "Query.f", UNEXPECTED_FIELD) == [
-        (UNEXPECTED_FIELD, "filter", doc('{ f(filter: {a: {zip: ""}, n: 0, invalid: 0}, p: {id: 1}) }')),
-        (UNEXPECTED_FIELD, "filter.a", doc('{ f(filter: {a: {zip: "", invalid_1: 0}, n: 0}, p: {id: 1}) }')),
-        (UNEXPECTED_FIELD, "p", doc("{ f(p: {invalid: 0}) }")),
-        (UNEXPECTED_FIELD, "p", doc('{ f(p: {id: 1, name: ""}) }')),
-    ]
-
-
 def test_object_case_metadata(ctx):
     schema = ctx.graphql.load_sdl(OBJECTS_SCHEMA)
     assert [
@@ -424,108 +442,114 @@ def test_recursive_input_negative_cases(ctx):
     ]
 
 
-def test_enum_values(ctx):
-    schema = ctx.graphql.load_sdl("enum E { A B } input I { e: E! } type Query { f(e: E, i: I!): Int }")
-    assert positive(schema, "Query.f", ENUM) == [
-        (ENUM, "e", doc("{ f(e: A, i: {e: A}) }")),
-        (ENUM, "e", doc("{ f(e: B, i: {e: A}) }")),
-        (ENUM, "i.e", doc("{ f(i: {e: B}) }")),
-    ]
-
-
-def test_object_cases(ctx):
-    schema = ctx.graphql.load_sdl(
-        "input A { zip: String! n: Int } input F { a: A! n: Int k: F } input P @oneOf { id: ID, name: String } "
-        "type Query { f(filter: F, p: P!): Int }"
-    )
-    assert positive(schema, "Query.f") == [
-        (DEFAULT, None, doc("{ f(p: {id: 1}) }")),
-        (NULL, "filter", doc("{ f(filter: null, p: {id: 1}) }")),
-        (ONLY_REQUIRED, "filter", doc('{ f(filter: {a: {zip: ""}}, p: {id: 1}) }')),
-        (ALL_FIELDS, "filter", doc('{ f(filter: {a: {zip: ""}, n: 0}, p: {id: 1}) }')),
-        (ALL_FIELDS, "filter.a", doc('{ f(filter: {a: {zip: "", n: 0}}, p: {id: 1}) }')),
-        (NULL, "filter.a.n", doc('{ f(filter: {a: {zip: "", n: null}}, p: {id: 1}) }')),
-        (MINIMUM, "filter.a.n", doc('{ f(filter: {a: {zip: "", n: -2147483648}}, p: {id: 1}) }')),
-        (MAXIMUM, "filter.a.n", doc('{ f(filter: {a: {zip: "", n: 2147483647}}, p: {id: 1}) }')),
-        (NULL, "filter.n", doc('{ f(filter: {a: {zip: ""}, n: null}, p: {id: 1}) }')),
-        (MINIMUM, "filter.n", doc('{ f(filter: {a: {zip: ""}, n: -2147483648}, p: {id: 1}) }')),
-        (MAXIMUM, "filter.n", doc('{ f(filter: {a: {zip: ""}, n: 2147483647}, p: {id: 1}) }')),
-        (EMPTY_STRING, "p.name", doc('{ f(p: {name: ""}) }')),
-    ]
-
-
-def test_valid_literal_kinds(ctx):
-    schemathesis.graphql.scalar("Money", st.just("10.5").map(nodes.String))
-    schemathesis.graphql.scalar("Count", st.just(5).map(nodes.Int))
-    schema = ctx.graphql.load_sdl(
-        "scalar Money scalar Count enum E { A } input I { x: Boolean } "
-        "type Query { f(i: Int, fl: Float, s: String, id: ID, b: Boolean, o: I, l: [Int], m: Money, c: Count, e: E): Int }"
-    )
-    assert positive(schema, "Query.f", *VALID_KINDS) == [
-        (VALID_NUMBER, "i", doc("{ f(i: 0) }")),
-        (VALID_NUMBER, "fl", doc("{ f(fl: 0) }")),
-        (VALID_STRING, "id", doc("{ f(id: 1) }")),
-        (VALID_BOOLEAN, "b", doc("{ f(b: true) }")),
-        (VALID_ARRAY, "l", doc("{ f(l: []) }")),
-        (VALID_ARRAY, "l", doc("{ f(l: [0]) }")),
-        (VALID_STRING, "m", doc('{ f(m: "10.5") }')),
-        (VALID_NUMBER, "c", doc("{ f(c: 5) }")),
-    ]
-
-
-def test_null_values(ctx):
-    schema = ctx.graphql.load_sdl(
-        "input P @oneOf { id: ID, n: Int } input I { x: Int, y: Int! } "
-        "type Query { f(a: Int, b: Int! = 10, c: Int!, i: I, p: P, l: [Int]): Int }"
-    )
-    assert positive(schema, "Query.f", NULL) == [
-        (NULL, "a", doc("{ f(a: null, c: 0) }")),
-        (NULL, "i", doc("{ f(c: 0, i: null) }")),
-        (NULL, "i.x", doc("{ f(c: 0, i: {x: null, y: 0}) }")),
-        (NULL, "p", doc("{ f(c: 0, p: null) }")),
-        (NULL, "l", doc("{ f(c: 0, l: null) }")),
-        (NULL, "l.0", doc("{ f(c: 0, l: [null]) }")),
-    ]
-
-
-def test_int_boundaries(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(n: Int!): Int }")
-    assert positive(schema, "Query.f", MINIMUM, MAXIMUM) == [
-        (MINIMUM, "n", doc("{ f(n: -2147483648) }")),
-        (MAXIMUM, "n", doc("{ f(n: 2147483647) }")),
-    ]
-
-
-def test_minimum_length_string(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(s: String, id: ID): Int }")
-    assert positive(schema, "Query.f", EMPTY_STRING) == [(EMPTY_STRING, "s", doc('{ f(s: "") }'))]
-
-
-def test_valid_array_sizes(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(l: [Int!]): Int }")
-    assert positive(schema, "Query.f", VALID_ARRAY) == [
-        (VALID_ARRAY, "l", doc("{ f(l: []) }")),
-        (VALID_ARRAY, "l", doc("{ f(l: [0]) }")),
-    ]
-
-
-def test_dedup_keeps_specific_label(ctx):
-    schema = ctx.graphql.load_sdl("type Query { f(s: String, r: String!): Int }")
-    assert positive(schema, "Query.f") == [
-        (DEFAULT, None, doc('{ f(r: "") }')),
-        (NULL, "s", doc('{ f(s: null, r: "") }')),
-        (EMPTY_STRING, "s", doc('{ f(s: "", r: "") }')),
-    ]
-
-
-def test_positive_cases_skip_unknown_scalars(ctx):
-    schema = ctx.graphql.load_sdl(
-        "scalar FooBar input F { x: FooBar! y: Boolean! } type Query { f(a: F, u: FooBar, n: Boolean!): Int }"
-    )
-    assert positive(schema, "Query.f") == [
-        (DEFAULT, None, doc("{ f(n: true) }")),
-        (NULL, "a", doc("{ f(a: null, n: true) }")),
-        (NULL, "u", doc("{ f(u: null, n: true) }")),
+@pytest.mark.parametrize(
+    ("sdl", "scenarios", "expected"),
+    [
+        pytest.param(
+            "enum E { A B } input I { e: E! } type Query { f(e: E, i: I!): Int }",
+            [ENUM],
+            [
+                (ENUM, "e", "{ f(e: A, i: {e: A}) }"),
+                (ENUM, "e", "{ f(e: B, i: {e: A}) }"),
+                (ENUM, "i.e", "{ f(i: {e: B}) }"),
+            ],
+            id="enum-values",
+        ),
+        pytest.param(
+            "input A { zip: String! n: Int } input F { a: A! n: Int k: F } input P @oneOf { id: ID, name: String } "
+            "type Query { f(filter: F, p: P!): Int }",
+            [],
+            [
+                (DEFAULT, None, "{ f(p: {id: 1}) }"),
+                (NULL, "filter", "{ f(filter: null, p: {id: 1}) }"),
+                (ONLY_REQUIRED, "filter", '{ f(filter: {a: {zip: ""}}, p: {id: 1}) }'),
+                (ALL_FIELDS, "filter", '{ f(filter: {a: {zip: ""}, n: 0}, p: {id: 1}) }'),
+                (ALL_FIELDS, "filter.a", '{ f(filter: {a: {zip: "", n: 0}}, p: {id: 1}) }'),
+                (NULL, "filter.a.n", '{ f(filter: {a: {zip: "", n: null}}, p: {id: 1}) }'),
+                (MINIMUM, "filter.a.n", '{ f(filter: {a: {zip: "", n: -2147483648}}, p: {id: 1}) }'),
+                (MAXIMUM, "filter.a.n", '{ f(filter: {a: {zip: "", n: 2147483647}}, p: {id: 1}) }'),
+                (NULL, "filter.n", '{ f(filter: {a: {zip: ""}, n: null}, p: {id: 1}) }'),
+                (MINIMUM, "filter.n", '{ f(filter: {a: {zip: ""}, n: -2147483648}, p: {id: 1}) }'),
+                (MAXIMUM, "filter.n", '{ f(filter: {a: {zip: ""}, n: 2147483647}, p: {id: 1}) }'),
+                (EMPTY_STRING, "p.name", '{ f(p: {name: ""}) }'),
+            ],
+            id="input-objects",
+        ),
+        pytest.param(
+            "scalar Money scalar Count enum E { A } input I { x: Boolean } type Query { "
+            "f(i: Int, fl: Float, s: String, id: ID, b: Boolean, o: I, l: [Int], m: Money, c: Count, e: E): Int }",
+            VALID_KINDS,
+            [
+                (VALID_NUMBER, "i", "{ f(i: 0) }"),
+                (VALID_NUMBER, "fl", "{ f(fl: 0) }"),
+                (VALID_STRING, "id", "{ f(id: 1) }"),
+                (VALID_BOOLEAN, "b", "{ f(b: true) }"),
+                (VALID_ARRAY, "l", "{ f(l: []) }"),
+                (VALID_ARRAY, "l", "{ f(l: [0]) }"),
+                (VALID_STRING, "m", '{ f(m: "10.5") }'),
+                (VALID_NUMBER, "c", "{ f(c: 5) }"),
+            ],
+            id="valid-literal-kinds",
+        ),
+        pytest.param(
+            "input P @oneOf { id: ID, n: Int } input I { x: Int, y: Int! } "
+            "type Query { f(a: Int, b: Int! = 10, c: Int!, i: I, p: P, l: [Int]): Int }",
+            [NULL],
+            [
+                (NULL, "a", "{ f(a: null, c: 0) }"),
+                (NULL, "i", "{ f(c: 0, i: null) }"),
+                (NULL, "i.x", "{ f(c: 0, i: {x: null, y: 0}) }"),
+                (NULL, "p", "{ f(c: 0, p: null) }"),
+                (NULL, "l", "{ f(c: 0, l: null) }"),
+                (NULL, "l.0", "{ f(c: 0, l: [null]) }"),
+            ],
+            id="null-values",
+        ),
+        pytest.param(
+            "type Query { f(n: Int!): Int }",
+            [MINIMUM, MAXIMUM],
+            [(MINIMUM, "n", "{ f(n: -2147483648) }"), (MAXIMUM, "n", "{ f(n: 2147483647) }")],
+            id="int-boundaries",
+        ),
+        pytest.param(
+            "type Query { f(s: String, id: ID): Int }",
+            [EMPTY_STRING],
+            [(EMPTY_STRING, "s", '{ f(s: "") }')],
+            id="empty-string-not-for-id",
+        ),
+        pytest.param(
+            "type Query { f(l: [Int!]): Int }",
+            [VALID_ARRAY],
+            [(VALID_ARRAY, "l", "{ f(l: []) }"), (VALID_ARRAY, "l", "{ f(l: [0]) }")],
+            id="array-sizes",
+        ),
+        pytest.param(
+            "type Query { f(s: String, r: String!): Int }",
+            [],
+            [
+                (DEFAULT, None, '{ f(r: "") }'),
+                (NULL, "s", '{ f(s: null, r: "") }'),
+                (EMPTY_STRING, "s", '{ f(s: "", r: "") }'),
+            ],
+            id="duplicate-bodies-keep-specific-label",
+        ),
+        pytest.param(
+            "scalar FooBar input F { x: FooBar! y: Boolean! } type Query { f(a: F, u: FooBar, n: Boolean!): Int }",
+            [],
+            [
+                (DEFAULT, None, "{ f(n: true) }"),
+                (NULL, "a", "{ f(a: null, n: true) }"),
+                (NULL, "u", "{ f(u: null, n: true) }"),
+            ],
+            id="unknown-scalars-get-only-null",
+        ),
+    ],
+)
+def test_positive_cases(ctx, sdl, scenarios, expected):
+    register_scalars()
+    schema = ctx.graphql.load_sdl(sdl)
+    assert positive(schema, "Query.f", *scenarios) == [
+        (scenario, parameter, doc(body)) for scenario, parameter, body in expected
     ]
 
 

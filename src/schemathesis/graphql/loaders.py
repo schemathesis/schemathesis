@@ -214,7 +214,7 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
         #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
         # Therefore the execution result is always valid at this point and `result.data` is not `None`
         schema = cast(dict[str, Any], result.data)
-        # Strawberry replaces graphql-core's shared `isOneOf` resolver with one that knows only Strawberry types
+        # A schema library in the same process can replace graphql-core's shared `isOneOf` resolver with its own
         for type_ in schema["__schema"]["types"]:
             if type_["kind"] == "INPUT_OBJECT" and "isOneOf" in type_:
                 type_["isOneOf"] = cast(graphql.GraphQLInputObjectType, document.type_map[type_["name"]]).is_one_of

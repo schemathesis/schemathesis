@@ -9,6 +9,7 @@ import requests
 import strawberry
 from graphql import GraphQLError
 from hypothesis import HealthCheck, Phase, find, given, settings
+from strawberry.extensions import MaxAliasesLimiter, MaxTokensLimiter, QueryDepthLimiter
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -850,6 +851,14 @@ CLIENT_ERROR = {"data": None, "errors": [{"message": "Field 'addBook' argument '
 RESOLVER_ERROR = {"data": None, "errors": [{"message": "Internal error in resolver", "path": ["addBook"]}]}
 
 
+def rejection(message):
+    # Servers label limit rejections like any other validation failure
+    return {"errors": [{"message": message, "extensions": {"code": "GRAPHQL_VALIDATION_FAILED"}}]}
+
+
+DEPTH_LIMIT = rejection("Syntax Error: Query depth limit of 6 exceeded, found 7.")
+
+
 @pytest.mark.parametrize(
     ("mode", "payload", "expected"),
     [
@@ -870,6 +879,27 @@ RESOLVER_ERROR = {"data": None, "errors": [{"message": "Internal error in resolv
         (GenerationMode.POSITIVE, [], {"response_schema_conformance": UnexpectedGraphQLResponse}),
         (GenerationMode.NEGATIVE, "text", {"response_schema_conformance": UnexpectedGraphQLResponse}),
         (GenerationMode.POSITIVE, None, {"response_schema_conformance": UnexpectedGraphQLResponse}),
+        (GenerationMode.POSITIVE, DEPTH_LIMIT, {}),
+        (GenerationMode.NEGATIVE, DEPTH_LIMIT, {}),
+        (GenerationMode.POSITIVE, rejection("Syntax Error: Query Cost limit of 5000 exceeded, found 5001."), {}),
+        (GenerationMode.POSITIVE, rejection("Syntax Error: Aliases limit of 15 exceeded, found 16."), {}),
+        (GenerationMode.POSITIVE, rejection("Syntax Error: Directives limit of 50 exceeded, found 51."), {}),
+        (GenerationMode.POSITIVE, rejection("Syntax Error: Token limit of 1000 exceeded."), {}),
+        (
+            GenerationMode.POSITIVE,
+            rejection("Syntax Error: Query validation error."),
+            {"positive_data_acceptance": GraphQLClientError},
+        ),
+        (
+            GenerationMode.POSITIVE,
+            rejection('Cannot query field "x" on type "Y". [Suggestion hidden]'),
+            {"positive_data_acceptance": GraphQLClientError},
+        ),
+        (
+            GenerationMode.POSITIVE,
+            {"data": None, "errors": [*DEPTH_LIMIT["errors"], *RESOLVER_ERROR["errors"]]},
+            {"positive_data_acceptance": GraphQLClientError},
+        ),
     ],
     ids=[
         "accepted-invalid-query",
@@ -881,6 +911,15 @@ RESOLVER_ERROR = {"data": None, "errors": [{"message": "Internal error in resolv
         "list",
         "string",
         "null",
+        "depth-limit-positive",
+        "depth-limit-negative",
+        "cost-limit",
+        "aliases-limit",
+        "directives-limit",
+        "token-limit",
+        "hidden-limit",
+        "hidden-suggestion",
+        "limit-beside-resolver-error",
     ],
 )
 def test_graphql_failure_is_reported_by_its_check(ctx, response_factory, mode, payload, expected):
@@ -894,6 +933,59 @@ def test_graphql_failure_is_reported_by_its_check(ctx, response_factory, mode, p
         except Failure as exc:
             raised[check.__name__] = type(exc)
     assert raised == expected
+
+
+@strawberry.type
+class LimitedNode:
+    id: int = 1
+
+    @strawberry.field
+    def child(self) -> "LimitedNode":
+        return LimitedNode()
+
+
+@strawberry.type(name="Query")
+class LimitedQuery:
+    @strawberry.field
+    def node(self) -> LimitedNode:
+        return LimitedNode()
+
+
+@pytest.mark.parametrize(
+    ("extension", "query", "error"),
+    [
+        pytest.param(
+            lambda: QueryDepthLimiter(max_depth=2),
+            "{ node { child { child { id } } } }",
+            {
+                "message": "'anonymous' exceeds maximum operation depth of 2",
+                "locations": [{"line": 1, "column": 26}],
+            },
+            id="depth",
+        ),
+        pytest.param(
+            lambda: MaxAliasesLimiter(max_alias_count=1),
+            "{ a: node { id } b: node { id } }",
+            {"message": "2 aliases found. Allowed: 1"},
+            id="aliases",
+        ),
+        pytest.param(
+            lambda: MaxTokensLimiter(max_token_count=5),
+            "{ node { child { id } } }",
+            {
+                "message": "Syntax Error: Document contains more than 5 tokens. Parsing aborted.",
+                "locations": [{"line": 1, "column": 18}],
+            },
+            id="tokens",
+        ),
+    ],
+)
+def test_limit_rejection_of_valid_query_is_not_a_failure(ctx, extension, query, error):
+    # The limits also reject the introspection query, so the schema comes from an unlimited copy
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.from_schema(strawberry.Schema(LimitedQuery)).schema_url)
+    limited = ctx.graphql.apps.from_schema(strawberry.Schema(LimitedQuery, extensions=[extension]))
+    case = _make_graphql_case_with_mode(schema, GenerationMode.POSITIVE, operation=schema["Query"]["node"], body=query)
+    assert case.call_and_validate(base_url=limited.base_url).json() == {"data": None, "errors": [error]}
 
 
 def test_negative_mode_resolver_rejection_marked_by_extensions(ctx):
