@@ -1,6 +1,7 @@
 from unittest.mock import ANY
 
 import pytest
+import requests
 from flask import Flask, jsonify, redirect, request
 
 import schemathesis
@@ -67,6 +68,39 @@ def test_login_redirect_counts_as_enforced_auth(ctx):
     @run_given(case=schema["/me"]["GET"].as_strategy(), max_examples=1)
     def test(case):
         assert case.call_and_validate(checks=[ignored_auth]).json() == {"user": "alice"}
+
+
+def sign_request(request):
+    request.headers["X-Signature"] = f"{request.method} {request.url}"
+    return request
+
+
+@pytest.mark.parametrize("base_url", [None, "http://api.example.com/v1"], ids=["default-host", "base-url"])
+def test_session_auth_reaches_the_app(ctx, base_url):
+    app = Flask(__name__)
+
+    @app.route("/v1/items", methods=["POST"])
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify(
+            {
+                "signature": request.headers.get("X-Signature"),
+                "body": request.get_json(),
+            }
+        )
+
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    session = requests.Session()
+    session.auth = sign_request
+    response = operation.Case(body={"id": 1}).call(app=app, session=session, base_url=base_url)
+    url = f"{base_url or 'http://localhost'}/items"
+    assert response.json() == {"signature": f"POST {url}", "body": {"id": 1}}
 
 
 @pytest.mark.hypothesis_nested

@@ -45,13 +45,25 @@ def test_request_after_crash_on_same_connection(ctx):
         assert [case.call(session=session).status_code for _ in range(3)] == [500, 500, 500]
 
 
-def test_request_dropped_on_fresh_connection_is_not_resent(post_case):
+@pytest.mark.parametrize("custom_adapter", [False, True], ids=["default-adapters", "custom-adapter"])
+def test_request_dropped_on_fresh_connection_is_not_resent(post_case, custom_adapter):
     port, accepted = serve_tcp(lambda connection, listener: connection.recv(65536))
     with requests.Session() as session:
+        if custom_adapter:
+            session.mount("custom://", requests.adapters.BaseAdapter())
         for _ in range(3):
             with pytest.raises(requests.ConnectionError):
                 post_case.call(base_url=f"http://127.0.0.1:{port}", session=session)
+        session.adapters.pop("custom://", None)
     assert len(accepted) == 3
+
+
+def test_request_retries_reconnect_until_exhausted(post_case):
+    port, accepted = serve_tcp(lambda connection, listener: connection.recv(65536))
+    post_case.operation.schema.config.request_retries = 1
+    with pytest.raises(requests.ConnectionError):
+        post_case.call(base_url=f"http://127.0.0.1:{port}")
+    assert len(accepted) == 2
 
 
 def test_failed_resend_raises_the_original_error(post_case):
@@ -90,3 +102,12 @@ def test_session_with_non_http_adapter_mount_still_sends_request(ctx):
 def test_dropped_before_response(reason_type):
     error = requests.ConnectionError(ProtocolError("Connection aborted.", reason_type("Connection dropped")))
     assert _is_dropped_before_response(error)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [requests.ConnectionError(), requests.ConnectionError(ProtocolError("Response ended prematurely"))],
+    ids=["no-reason", "protocol-error-without-cause"],
+)
+def test_not_dropped_before_response(error):
+    assert not _is_dropped_before_response(error)
