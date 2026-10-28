@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from schemathesis import errors, graphql, openapi, pytest, python
+from schemathesis import errors, graphql, grpc, openapi, pytest, python
 from schemathesis.auths import AuthContext, AuthProvider, auth
 from schemathesis.checks import CheckContext, CheckFunction, CheckResult, check
 from schemathesis.config import SchemathesisConfig as Config
@@ -31,6 +31,7 @@ __all__ = [
     # Spec or usage specific namespaces
     "openapi",
     "graphql",
+    "grpc",
     "pytest",
     "python",
     # Hooks

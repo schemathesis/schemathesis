@@ -616,6 +616,9 @@ class LoaderErrorKind(enum.StrEnum):
     # GraphQL validation
     GRAPHQL_INVALID_SCHEMA = "graphql_invalid_schema"
 
+    # gRPC validation
+    GRPC_INVALID_DESCRIPTOR_SET = "grpc_invalid_descriptor_set"
+
     # Unclassified
     UNCLASSIFIED = "unclassified"
 
