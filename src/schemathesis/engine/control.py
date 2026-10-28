@@ -26,6 +26,7 @@ class ExecutionControl:
     _counted_failures: set[Hashable]
     has_reached_the_failure_limit: bool
     is_server_unavailable: bool
+    _is_time_budget_spent: bool
     _start_time: float
 
     def __init__(
@@ -41,6 +42,7 @@ class ExecutionControl:
         self._counted_failures = set()
         self.has_reached_the_failure_limit = False
         self.is_server_unavailable = False
+        self._is_time_budget_spent = False
         self._start_time = time.monotonic() if start_time is None else start_time
 
     @property
@@ -56,13 +58,19 @@ class ExecutionControl:
         deadline = self.deadline
         if deadline is None:
             return None
+        if self._is_time_budget_spent:
+            return 0.0
         return max(deadline - time.monotonic(), 0.0)
 
     @property
     def has_reached_time_limit(self) -> bool:
         if self.max_time is None:
             return False
-        return time.monotonic() - self._start_time >= self.max_time
+        return self._is_time_budget_spent or time.monotonic() - self._start_time >= self.max_time
+
+    def spend_time_budget(self) -> None:
+        """Treat the time budget as spent, e.g. when a request timed out at the deadline a little early."""
+        self._is_time_budget_spent = True
 
     @property
     def is_stopped(self) -> bool:

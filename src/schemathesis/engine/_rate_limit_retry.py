@@ -108,6 +108,8 @@ def send_tracked(
             response = ctx.server.track(case, lambda: call(kwargs), transport_kwargs=kwargs)
         except requests.Timeout:
             if is_shortened:
+                # The clock may still show a few milliseconds left; every later check must agree the run is over.
+                ctx.control.spend_time_budget()
                 raise BudgetExpired from None
             raise
         if after_response is not None:
