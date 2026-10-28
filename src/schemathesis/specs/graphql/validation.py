@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn, cast
@@ -95,6 +96,20 @@ def is_client_error(payload: dict) -> bool:
     return data is None and "path" not in errors[0]
 
 
+# Depth, cost, alias, directive and token limits; a server that hides its limits sends a generic message instead
+POLICY_REJECTION = re.compile(
+    r"Syntax Error: (Query depth|Query Cost|Aliases|Directives|Token) limit of \d+ exceeded"
+    r"|Syntax Error: Document contains more than \d+ tokens\. Parsing aborted\."
+    r"|'[^']*' exceeds maximum operation depth of \d+"
+    r"|\d+ aliases found\. Allowed: \d+"
+)
+
+
+def is_policy_rejection(errors: list[GraphQLFormattedError]) -> bool:
+    """Check whether the server refused the query only because of its own limits, which says nothing about the data."""
+    return all(isinstance(error, dict) and POLICY_REJECTION.match(error["message"]) for error in errors)
+
+
 NON_NULLABLE_FIELD_MARKERS = (
     # graphql-core & graphql-js
     "Cannot return null for non-nullable field ",
@@ -137,6 +152,8 @@ def validate_graphql_response(case: Case, payload: object) -> None:
 
     errors = cast("list[GraphQLFormattedError]", payload.get("errors"))
     if errors is not None and len(errors) > 0:
+        if is_policy_rejection(errors):
+            return
         # Check if this is a client error (query validation failed)
         if is_client_error(payload):
             raise GraphQLClientError(operation=case.operation.label, message=errors[0]["message"], errors=errors)
