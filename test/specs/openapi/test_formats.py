@@ -223,6 +223,34 @@ def test_binary_format_with_string_keywords(keywords):
         assert isinstance(value, Binary), value
 
 
+@pytest.mark.parametrize(
+    ("items", "payload"),
+    [
+        ({"type": "string", "format": "binary"}, lambda item: item.data),
+        (
+            {
+                "type": "object",
+                "properties": {"file": {"type": "string", "format": "binary"}},
+                "required": ["file"],
+                "additionalProperties": False,
+            },
+            lambda item: item["file"].data,
+        ),
+    ],
+    ids=["string", "object"],
+)
+def test_unique_binary_items_differ_by_bytes(items, payload):
+    built = _canonical_strategy(
+        {"type": "array", "items": items, "minItems": 2, "uniqueItems": True},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+
+    @run_given(built, max_examples=10)
+    def test(value):
+        assert len({payload(item) for item in value}) == len(value) >= 2, value
+
+
 @pytest.mark.parametrize("name", ["email", "idn-email", "hostname", "idn-hostname", "uri", "iri", "uri-template"])
 def test_generated_domain_carries_a_dot(name):
     # A dotless domain is well-formed, yet the stricter checkers real services run reject it.

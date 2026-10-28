@@ -8402,10 +8402,58 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx, decla
             "schemas": {"Upload": upload, "Note": {"type": "string"}, "Bin": {"type": "string", "format": "binary"}}
         },
     )["/foo"]["post"]
-    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
-    sample = Binary(FILE_SAMPLES["png"])
+    bodies = [_binary_as_bytes(case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)]
+    sample = FILE_SAMPLES["png"]
     expected = {"file": b"\x89PNG", "name": "", "avatar": sample, "count": 3, "kind": "x", "attachments": [sample]}
     assert expected in bodies, bodies[:5]
+
+
+def _binary_as_bytes(value):
+    # Every `Binary` compares equal as a `str`, so only its bytes tell two payloads apart.
+    if isinstance(value, Binary):
+        return value.data
+    if isinstance(value, dict):
+        return {key: _binary_as_bytes(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_binary_as_bytes(item) for item in value]
+    return value
+
+
+def test_multipart_unique_binary_items_differ_by_bytes(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "files": {
+                                    "type": "array",
+                                    "items": {"type": "string", "format": "binary"},
+                                    "minItems": 2,
+                                    "uniqueItems": True,
+                                }
+                            },
+                            "required": ["files"],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    files = [
+        case.body["files"]
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if isinstance(case.body, dict) and "files" in case.body
+    ]
+    assert files
+    for items in files:
+        assert len(items) >= 2, items
+        assert len({item.data for item in items}) == len(items), items
 
 
 def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ctx):
