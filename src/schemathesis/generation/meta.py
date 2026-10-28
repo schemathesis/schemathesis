@@ -98,6 +98,7 @@ class CoverageScenario(StrEnum):
     # Negative scenarios - Missing parameters
     MISSING_PARAMETER = "missing_parameter"
     DUPLICATE_PARAMETER = "duplicate_parameter"
+    UNKNOWN_ARGUMENT = "unknown_argument"
 
     # Negative scenarios: request-shape probes.
     UNSUPPORTED_PATH_PATTERN = "unsupported_path_pattern"
