@@ -27,7 +27,13 @@ from schemathesis.core.failures import AcceptedNegativeData, ContentTypeServerEr
 from schemathesis.core.file_samples import FILE_SAMPLES, file_extension
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.generation.coverage import GenerationSession
-from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
+from schemathesis.generation.meta import (
+    CONTENT_TYPE_PROBES,
+    REQUEST_SHAPE_PROBES,
+    ComponentInfo,
+    CoverageScenario,
+    TestPhase,
+)
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._schema import OVERSIZED_STRING_LENGTH
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
@@ -35,6 +41,7 @@ from schemathesis.transport.prepare import prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import Binary
 from test.coverage.helpers import (
+    ALL_MODES,
     DEFAULT_RESPONSES,
     assert_bodies,
     assert_coverage,
@@ -404,6 +411,148 @@ def test_with_optional_parameters(ctx):
             },
         ],
     )
+
+
+def test_optional_parameter_combinations_per_location(ctx):
+    parameters = [{"in": "query", "name": f"q{i}", "schema": {"type": "integer", "enum": [i]}} for i in (1, 2, 3)]
+    parameters += [
+        {"in": "header", "name": f"X-H{i}", "schema": {"type": "string", "enum": [f"h{i}"]}} for i in (1, 2, 3)
+    ]
+    operation = load_schema(ctx, parameters, method="get")["/foo"]["get"]
+    query = {"q1": "1", "q2": "2", "q3": "3"}
+    headers = {"X-H1": "h1", "X-H2": "h2", "X-H3": "h3"}
+    combination = CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL
+    in_query = ParameterLocation.QUERY
+    in_header = ParameterLocation.HEADER
+    assert [
+        (data.scenario, data.description, data.parameter_location, case.query, dict(case.headers))
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        for data in [case.meta.phase.data]
+    ] == [
+        (CoverageScenario.DEFAULT_POSITIVE_TEST, "Default positive test case", None, query, headers),
+        (combination, "All required properties and optional 'q1'", in_query, {"q1": "1"}, headers),
+        (combination, "All required properties and optional 'q2'", in_query, {"q2": "2"}, headers),
+        (combination, "All required properties and optional 'q3'", in_query, {"q3": "3"}, headers),
+        (combination, "All required and 2 optional properties", in_query, {"q1": "1", "q2": "2"}, headers),
+        (combination, "All required properties and optional 'X-H1'", in_header, query, {"X-H1": "h1"}),
+        (combination, "All required properties and optional 'X-H2'", in_header, query, {"X-H2": "h2"}),
+        (combination, "All required properties and optional 'X-H3'", in_header, query, {"X-H3": "h3"}),
+        (combination, "All required and 2 optional properties", in_header, query, {"X-H1": "h1", "X-H2": "h2"}),
+    ]
+
+
+def test_optional_parameter_without_a_positive_value_keeps_later_parameters(ctx):
+    # No header can carry a "-", so the header has no positive value and is left out.
+    parameters = [
+        {"in": "header", "name": "X-Dash", "schema": {"type": "string", "pattern": "^-$"}},
+        {"in": "query", "name": "q", "required": True, "schema": {"type": "integer", "enum": [1]}},
+    ]
+    operation = load_schema(ctx, parameters, method="get")["/foo"]["get"]
+    assert [(case.query, case.headers) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [({"q": "1"}, {})]
+
+
+def test_required_parameter_without_a_positive_value_yields_no_positive_cases(ctx):
+    parameters = [
+        {"in": "header", "name": "X-Dash", "required": True, "schema": {"type": "string", "pattern": "^-$"}},
+        *(
+            {"in": "header", "name": name, "schema": {"type": "string", "enum": ["a"]}}
+            for name in ("X-A", "X-B", "X-C")
+        ),
+    ]
+    operation = load_schema(ctx, parameters, method="get")["/foo"]["get"]
+    assert iter_cases(operation, GenerationMode.POSITIVE) == []
+
+
+def test_examples_do_not_leak_into_parameter_or_top_level_body_schemas(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo/{id}": {
+                "post": {
+                    "parameters": [
+                        {"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}, "example": 5},
+                        {"in": "query", "name": "q", "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}, "example": {"a": 3}}},
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "object"}, "example": {"q": "seen"}}},
+                        }
+                    },
+                }
+            }
+        }
+    )
+    operation = schema["/foo/{id}"]["POST"]
+    assert [
+        (case.path_parameters, case.query, case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)
+    ] == [
+        ({"id": "5"}, {"q": "seen"}, {"a": 3}),
+        ({"id": "9223372036854775808"}, {"q": "seen"}, {"a": 3}),
+    ]
+    assert [parameter.unoptimized_schema for parameter in operation.iter_parameters()] == [
+        {"type": "integer"},
+        {"type": "string"},
+    ]
+    assert [body.unoptimized_schema for body in operation.body] == [{"type": "object"}]
+
+
+def test_body_alternative_without_values_does_not_hide_the_next_one(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"not": {}}},
+                            "application/xml": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"a": {"type": "integer", "enum": [1]}},
+                                    "required": ["a"],
+                                }
+                            },
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert [(case.media_type, case.body) for case in iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE)] == [
+        ("application/xml", {"a": 1})
+    ]
+
+
+def test_negative_bodies_survive_a_required_parameter_without_positive_values(ctx):
+    operation = load_schema(
+        ctx,
+        [{"in": "header", "name": "X-Dash", "required": True, "schema": {"type": "string", "pattern": "^-$"}}],
+        body={"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+    )["/foo"]["post"]
+    assert {
+        (case.meta.generation.mode, case.meta.phase.data.description)
+        for case in iter_cases(operation, *ALL_MODES)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    } == {
+        (GenerationMode.NEGATIVE, "Incorrect type"),
+        (GenerationMode.NEGATIVE, "a: Incorrect type"),
+        (GenerationMode.NEGATIVE, "Missing required property: a"),
+        (GenerationMode.NEGATIVE, "Missing request body"),
+    }
+
+
+@pytest.mark.parametrize("media_type", ["application/x-www-form-urlencoded", "multipart/form-data"])
+def test_required_form_body_positive_cases_are_never_empty(ctx, media_type):
+    # An empty form serializes to no content, which a required body forbids.
+    operation = body_operation(
+        ctx, {"type": "object", "properties": {"a": {"type": "integer", "enum": [1]}}}, media_type=media_type
+    )
+    assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"a": 1}]
 
 
 def test_with_example_openapi_3(ctx):
@@ -3047,17 +3196,153 @@ def test_content_type_probes(ctx):
         )
     ] == [{"Content-Type": "multipart/form-data"}]
 
-    operation = body_operation(ctx, {"type": "object"})
-    malformed_cases = scenario_cases(
-        collect_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.MALFORMED_CONTENT_TYPE
+    operation = body_operation(
+        ctx,
+        {"type": "object"},
+        parameters=[{"in": "header", "name": "X-Key", "required": True, "schema": {"type": "string", "enum": ["k"]}}],
     )
-    unsupported_cases = scenario_cases(
-        collect_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.UNSUPPORTED_CONTENT_TYPE
-    )
+    probes = [
+        case
+        for case in operation.schema.iter_coverage_cases(
+            operation, generation_modes=ALL_MODES, generation_config=operation.schema.config.generation
+        )
+        if case.meta.phase.data.scenario in CONTENT_TYPE_PROBES
+    ]
+    assert [
+        (
+            data.scenario,
+            data.description,
+            data.location,
+            data.parameter,
+            data.parameter_location,
+            dict(case.headers),
+            case.meta.raw_containers,
+            case.body,
+            case.media_type,
+        )
+        for case in probes
+        for data in [case.meta.phase.data]
+    ] == [
+        (
+            CoverageScenario.MALFORMED_CONTENT_TYPE,
+            "Malformed Content-Type: multipart/form-data without boundary",
+            "/",
+            "Content-Type",
+            ParameterLocation.HEADER,
+            {"X-Key": "k", "Content-Type": "multipart/form-data"},
+            {ParameterLocation.HEADER: {"X-Key": "k", "Content-Type": "multipart/form-data"}},
+            {},
+            "application/json",
+        ),
+        (
+            CoverageScenario.UNSUPPORTED_CONTENT_TYPE,
+            "Unsupported Content-Type: text/plain",
+            "/",
+            "Content-Type",
+            ParameterLocation.HEADER,
+            {"X-Key": "k", "Content-Type": "text/plain"},
+            {ParameterLocation.HEADER: {"X-Key": "k", "Content-Type": "text/plain"}},
+            {},
+            "application/json",
+        ),
+    ]
 
-    assert [case.headers for case in malformed_cases] == [{"Content-Type": "multipart/form-data"}]
-    assert [case.headers for case in unsupported_cases] == [{"Content-Type": "text/plain"}]
-    assert all(case.body is not NOT_SET and case.media_type == "application/json" for case in unsupported_cases)
+
+@pytest.mark.parametrize(
+    ("body", "body_targets", "missing_body"),
+    [
+        (
+            {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+            {
+                (None, "application/json"),
+                ("/type", "application/json"),
+                ("/properties/a/type", "application/json"),
+                ("/required", "application/json"),
+                (None, None),
+            },
+            [(CoverageScenario.MISSING_PARAMETER, "Missing request body", None, ParameterLocation.BODY)],
+        ),
+        (None, set(), []),
+    ],
+    ids=["body", "no-body"],
+)
+def test_coverage_cases_name_what_they_target(ctx, body, body_targets, missing_body):
+    parameters = [
+        {"in": "query", "name": "q", "required": True, "schema": {"type": "integer", "enum": [1]}},
+        {"in": "query", "name": "o", "schema": {"type": "integer", "enum": [2]}},
+        {"in": "header", "name": "X-Key", "required": True, "schema": {"type": "string", "enum": ["k"]}},
+    ]
+    operation = load_schema(ctx, parameters, body=body)["/foo"]["post"]
+    operation.schema.config.phases.coverage.generate_duplicate_query_parameters = True
+    cases = list(
+        operation.schema.iter_coverage_cases(
+            operation, generation_modes=ALL_MODES, generation_config=operation.schema.config.generation
+        )
+    )
+    assert {type(case.meta.generation.time) for case in cases} == {float}
+    assert {case.media_type for case in cases if case.body is not NOT_SET} == ({"application/json"} if body else set())
+    phases = [case.meta.phase.data for case in cases]
+    assert {
+        (data.location, data.parameter) for data in phases if data.parameter_location == ParameterLocation.BODY
+    } == (body_targets)
+    assert [
+        (data.scenario, data.description, data.parameter, data.parameter_location)
+        for data in phases
+        if data.scenario in (CoverageScenario.DUPLICATE_PARAMETER, CoverageScenario.MISSING_PARAMETER)
+    ] == [
+        (CoverageScenario.DUPLICATE_PARAMETER, "Duplicate `q` query parameter", "q", ParameterLocation.QUERY),
+        (CoverageScenario.DUPLICATE_PARAMETER, "Duplicate `o` query parameter", "o", ParameterLocation.QUERY),
+        (CoverageScenario.MISSING_PARAMETER, "Missing `X-Key` at header", "X-Key", ParameterLocation.HEADER),
+        (CoverageScenario.MISSING_PARAMETER, "Missing `q` at query", "q", ParameterLocation.QUERY),
+        *missing_body,
+    ]
+
+
+def test_negative_seeds_mark_their_location_negative_in_every_case(ctx):
+    # Negative-only runs seed the template with negative values, which every case built from it carries.
+    parameters = [
+        {"in": "query", "name": "q", "required": True, "schema": {"type": "integer", "enum": [1]}},
+        {"in": "header", "name": "X-Key", "required": True, "schema": {"type": "string", "enum": ["k"]}},
+    ]
+    body = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}
+    operation = load_schema(ctx, parameters, body=body)["/foo"]["post"]
+    positive = GenerationMode.POSITIVE
+    negative = GenerationMode.NEGATIVE
+    assert [
+        (case.meta.phase.data.description, case.query, dict(case.headers), case.meta.components)
+        for case in scenario_cases(iter_cases(operation, negative), CoverageScenario.MISSING_PARAMETER)
+    ] == [
+        (
+            "Missing `X-Key` at header",
+            {"q": "0.5"},
+            {},
+            {
+                ParameterLocation.HEADER: ComponentInfo(mode=negative),
+                ParameterLocation.QUERY: ComponentInfo(mode=negative),
+                ParameterLocation.BODY: ComponentInfo(mode=positive),
+            },
+        ),
+        (
+            "Missing `q` at query",
+            {},
+            {"X-Key": "0"},
+            {
+                ParameterLocation.HEADER: ComponentInfo(mode=negative),
+                ParameterLocation.QUERY: ComponentInfo(mode=negative),
+                ParameterLocation.BODY: ComponentInfo(mode=positive),
+            },
+        ),
+        (
+            "Missing request body",
+            {"q": "0.5"},
+            {"X-Key": "0"},
+            {
+                ParameterLocation.HEADER: ComponentInfo(mode=negative),
+                ParameterLocation.QUERY: ComponentInfo(mode=negative),
+                ParameterLocation.BODY: ComponentInfo(mode=negative),
+            },
+        ),
+    ]
 
 
 def test_unsupported_content_type_uses_xml_when_text_is_declared(ctx):
@@ -3314,6 +3599,8 @@ def test_unexpected_methods_skip_methods_declared_by_templated_sibling(ctx, uid_
     schema = ctx.openapi.load_schema(
         {
             "/items/headers": {"get": {"responses": {"200": {"description": "OK"}}}},
+            # A templated path that does not match the sent URL must not stop the search.
+            "/other/{uid}": {"patch": {"responses": {"200": {"description": "OK"}}}},
             "/items/{uid}": {
                 "parameters": [{"name": "uid", "in": "path", "required": True, "schema": {"type": uid_type}}],
                 "get": {"responses": {"200": {"description": "OK"}}},
@@ -3356,11 +3643,11 @@ def test_unexpected_methods_ignore_invalid_operation_on_templated_sibling(ctx):
     schema = ctx.openapi.load_schema(
         {
             "/items/headers": {"get": {"responses": {"200": {"description": "OK"}}}},
-            "/items/{uid}": {"patch": None},
+            "/items/{uid}": {"patch": None, "put": {"responses": {"200": {"description": "OK"}}}},
         }
     )
     operation = schema["/items/headers"]["GET"]
-    schema.config.phases.coverage.unexpected_methods = {"patch"}
+    schema.config.phases.coverage.unexpected_methods = {"patch", "put"}
     assert [
         case.method
         for case in schema.iter_coverage_cases(
@@ -3372,13 +3659,24 @@ def test_unexpected_methods_ignore_invalid_operation_on_templated_sibling(ctx):
     ] == ["PATCH"]
 
 
-def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx):
+@pytest.mark.parametrize(
+    ("uid_parameters", "probed"),
+    [
+        ([], []),
+        ([{"name": "uid", "in": "path", "required": True, "schema": {"type": "integer"}}], ["PATCH"]),
+    ],
+    ids=["uid-undeclared", "later-parameter-violated"],
+)
+def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx, uid_parameters, probed):
     schema = ctx.openapi.load_schema(
         {
             "/items/headers": {"get": {"responses": {"200": {"description": "OK"}}}},
             "/items/{uid}": {
                 "patch": {
-                    "parameters": [{"name": "other", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [
+                        {"name": "other", "in": "path", "required": True, "schema": {"type": "string"}},
+                        *uid_parameters,
+                    ],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
@@ -3394,7 +3692,7 @@ def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx):
             generation_config=schema.config.generation,
         )
         if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
-    ] == []
+    ] == probed
 
 
 def test_missing_authorization(ctx, cli, snapshot_cli):
@@ -3640,8 +3938,13 @@ def test_malformed_content_type(ctx, schema):
             return
         assert_requests_call(case)
 
-    with pytest.raises(InvalidSchema):
+    with pytest.raises(InvalidSchema) as exc:
         run_test(operation, test)
+    assert (exc.value.message, exc.value.path, exc.value.method) == (
+        "Malformed media type: `invalid`\n\nLocation:\n    requestBody -> content -> invalid",
+        "/foo",
+        "post",
+    )
 
 
 def test_no_missing_header_duplication(ctx):
@@ -5144,20 +5447,27 @@ def test_xml_none_property_mutation_filtered_when_schema_accepts_empty_string(ct
     )
 
 
-def test_xml_string_leaf_has_non_empty_positive_case(ctx):
-    # Empty XML elements bypass server-side string-keyword validators on common parsers.
-    cases = collect_cases(
-        body_operation(
-            ctx,
-            {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
-            media_type="application/xml",
-        ),
-        GenerationMode.POSITIVE,
+@pytest.mark.parametrize(
+    ("name_schema", "lengths"),
+    [
+        ({"type": "string"}, [1, 2, OVERSIZED_STRING_LENGTH]),
+        ({"type": "string", "minLength": 0}, [1, 2, OVERSIZED_STRING_LENGTH]),
+        ({"type": "string", "minLength": 2}, [2, 3, OVERSIZED_STRING_LENGTH]),
+        ({"type": "string", "maxLength": 1}, [1]),
+        ({"type": "string", "maxLength": 0}, [0]),
+        ({"type": "string", "enum": ["", "a"]}, [0, 1]),
+        ({"type": "string", "const": ""}, [0]),
+    ],
+    ids=["unconstrained", "min-length-zero", "min-length-two", "max-length-one", "max-length-zero", "enum", "const"],
+)
+def test_xml_positive_string_lengths(ctx, name_schema, lengths):
+    # The empty string is only avoided where the schema still admits a non-empty one.
+    operation = body_operation(
+        ctx,
+        {"type": "object", "properties": {"name": name_schema}, "required": ["name"]},
+        media_type="application/xml",
     )
-    populated = [
-        c.body for c in cases if isinstance(c.body, dict) and isinstance(c.body.get("name"), str) and c.body["name"]
-    ]
-    assert populated, f"Expected at least one positive case with a non-empty 'name'; got: {[c.body for c in cases]}"
+    assert [len(case.body["name"]) for case in iter_cases(operation, GenerationMode.POSITIVE)] == lengths
 
 
 def test_xml_optional_ref_object_property_populated_in_positive_cases(ctx):
@@ -5988,8 +6298,9 @@ def test_coverage_boolean_property_key(ctx, location):
 @pytest.mark.parametrize("location", ["query", "body"])
 def test_coverage_boolean_property_key_malformed_keyword(ctx, location):
     operation = boolean_key_operation(ctx, location, {"type": "string", "minLength": "x"})
-    with pytest.raises(InvalidSchema):
+    with pytest.raises(InvalidSchema) as exc:
         iter_cases(operation, GenerationMode.POSITIVE)
+    assert (exc.value.path, exc.value.method) == ("/hooks", "post")
 
 
 def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
@@ -7365,6 +7676,52 @@ def test_coverage_array_items_enum_entries_violating_item_schema(cli, snapshot_c
         )
         == snapshot_cli
     )
+
+
+def test_session_caches_do_not_change_generated_cases(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": make_request_body({"$ref": "#/components/schemas/Item"}),
+                    "responses": DEFAULT_RESPONSES,
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "properties": {
+                        "tags": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Tag"},
+                            "uniqueItems": True,
+                            "minItems": 2,
+                        },
+                        "name": {"type": "string", "pattern": "^a+$"},
+                    },
+                    "required": ["tags"],
+                },
+                "Tag": {"type": "string", "enum": ["x", "y", "z"]},
+            }
+        },
+    )
+    # A session sends each undeclared-method probe once per path, so a reused session would skip them by design.
+    schema.config.phases.coverage.unexpected_methods = set()
+    operation = schema["/foo"]["POST"]
+
+    def generate(session):
+        return [
+            (case.meta.phase.data.description, case.body)
+            for case in schema.iter_coverage_cases(
+                operation, generation_modes=ALL_MODES, generation_config=schema.config.generation, session=session
+            )
+        ]
+
+    session = GenerationSession()
+    generate(session)
+    assert generate(session) == generate(None)
 
 
 def test_undeclared_method_probes_dedup_across_operations(ctx):
