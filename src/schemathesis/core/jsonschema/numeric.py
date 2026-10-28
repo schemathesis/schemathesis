@@ -7,6 +7,8 @@ from typing import Any, TypeGuard
 
 # Largest finite float32
 FLOAT32_MAX = struct.unpack("<f", struct.pack("<I", 0x7F7FFFFF))[0]
+INT32_RANGE = (-(2**31), 2**31 - 1)
+INT64_RANGE = (-(2**63), 2**63 - 1)
 
 
 def _float32_neighbor(value: float, *, going_up: bool) -> float:
