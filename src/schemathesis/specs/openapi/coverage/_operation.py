@@ -209,13 +209,21 @@ class Template:
             if container_name == "query" and isinstance(value, dict):
                 query_component = components.get(ParameterLocation.QUERY)
                 if query_component is None or query_component.mode == GenerationMode.POSITIVE:
-                    # Query strings have no rendering for a JSON null; leaving an optional parameter out is what
-                    # "no value" means there. Negative data keeps `null`, since sending it is the point of the case.
-                    value = {
-                        name: item
-                        for name, item in value.items()
-                        if item is not None or name not in self._optional_query
-                    }
+                    omittable = self._optional_query
+                else:
+                    # A negative case still carries the template's positive `null` for parameters it does not target.
+                    template_query = self._template.get("query", {})
+                    query_modes = self._parameter_modes.get(ParameterLocation.QUERY, {})
+                    omittable = frozenset(
+                        name
+                        for name in self._optional_query
+                        if name in template_query
+                        and template_query[name] is None
+                        and query_modes.get(name) == GenerationMode.POSITIVE
+                    )
+                # Query strings have no rendering for a JSON null; leaving an optional parameter out is what
+                # "no value" means there. Negative data keeps `null`, since sending it is the point of the case.
+                value = {name: item for name, item in value.items() if item is not None or name not in omittable}
                 value = stringify_value(value, container_name)
             if container_name == "path_parameters" and isinstance(value, dict):
                 # dict() copy prevents quote_all from mutating self._template
