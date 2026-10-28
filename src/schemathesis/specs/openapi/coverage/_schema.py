@@ -2889,7 +2889,7 @@ def _positive_for_describing_keywords(
 ) -> Generator[GeneratedValue, None, None]:
     """Positive values built from the describing keywords alone (type, bounds, `items`, `properties`, ...)."""
     if ty == "null":
-        yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
+        yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Valid null value")
     elif ty == "boolean":
         yield PositiveValue(True, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
         yield PositiveValue(False, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
