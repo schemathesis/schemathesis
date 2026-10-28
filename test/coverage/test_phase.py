@@ -4468,6 +4468,30 @@ def test_positive_multipart_value_for_binary_one_of_branch(ctx, app_runner):
     ]
 
 
+def test_positive_binary_length_boundaries_are_distinct_requests(ctx):
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {"f": {"type": "string", "format": "binary", "minLength": 2, "maxLength": 10}},
+            "required": ["f"],
+        },
+        media_type="multipart/form-data",
+    )
+    cases = iter_cases(operation, GenerationMode.POSITIVE)
+    assert [
+        (case.meta.phase.data.description, len(case.body["f"].data))
+        for case in cases
+        if case.meta.phase.data.scenario == CoverageScenario.VALID_OBJECT
+    ] == [
+        ("Valid object", 3),
+        ("Object with valid 'f' value: Minimum length string", 2),
+        ("Object with valid 'f' value: Near-boundary length string", 3),
+        ("Object with valid 'f' value: Maximum length string", 10),
+        ("Object with valid 'f' value: Near-boundary length string", 9),
+    ]
+
+
 def test_query_enum_intersection_with_binary_entry(ctx, app_runner):
     # YAML `!!binary` values load as bytes.
     raw_schema = build_schema(

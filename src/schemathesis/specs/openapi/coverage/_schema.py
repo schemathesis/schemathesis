@@ -98,7 +98,7 @@ from schemathesis.specs.openapi.coverage._wire import (
 )
 from schemathesis.specs.openapi.formats import format_length_bounds, format_lengths_for
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
-from schemathesis.transport.serialization import contains_binary
+from schemathesis.transport.serialization import Binary, contains_binary
 
 # A string where these alone surround `format`: nothing else can widen what the generator produces.
 _FORMAT_WITH_LENGTH_KEYS = frozenset({"format", "maxLength", "minLength", "type"})
@@ -1357,6 +1357,8 @@ def _convert_bytes_for_hashing(value: Any) -> Any:
     """Convert bytes/non-string keys to a hashable string representation for JSON encoding."""
     if isinstance(value, bytes):
         return f"__bytes__:{value.hex()}"
+    if isinstance(value, Binary):
+        return f"__binary__:{value.data.hex()}"
     if isinstance(value, dict):
         return {(k if isinstance(k, str) else str(k)): _convert_bytes_for_hashing(v) for k, v in value.items()}
     if isinstance(value, list):
