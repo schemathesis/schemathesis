@@ -264,6 +264,9 @@ from test.utils import run_given
         # Required-only siblings whose combined max can't reach the target minLength —
         # both greedy and balanced bail and the original schema is kept.
         (r"^[a-z]{1,3}_[a-z]{1,3}$", 10, 12, r"^[a-z]{1,3}_[a-z]{1,3}$"),
+        # A fixed count never drops below itself to fit the budget - the shorter strings miss the original pattern.
+        (r"^a?b{2}c{2}d?$", 2, 5, r"^a?b{2}c{2}d?$"),
+        (r"^\+[0-9]{5}$", 2, 5, r"^\+[0-9]{5}$"),
         # Nested unbounded inner (`([a-z]+)+`) — the per-tick max is unbounded so
         # the slot is pinned and only the outer count is preserved.
         (r"^([a-z]+)+$", 1, 100, r"^([a-z]{1,}){1,100}$"),

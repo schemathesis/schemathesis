@@ -1521,7 +1521,7 @@ def _balanced_distribute_range(
         elif remaining_min > 0 and rep_len_min > 0 and required_slots_left > 0:
             share_chars = -(-remaining_min // required_slots_left)
             needed_ticks = -(-share_chars // rep_len_min)
-            part_min = min(part_max, max(min_repeat, needed_ticks))
+            part_min = max(min_repeat, min(part_max, needed_ticks))
             required_slots_left -= 1
         else:
             part_min = min_repeat
