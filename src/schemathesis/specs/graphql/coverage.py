@@ -27,7 +27,8 @@ InputPath = tuple[graphql.GraphQLInputObjectType, ...]
 ValuePath = tuple[str | int, ...]
 # Fields with their arguments, and type names of inline fragments, from the operation field to a selected field
 SelectionPath = tuple[tuple[str, list[graphql.ArgumentNode]] | str, ...]
-MAX_SELECTION_DEPTH = 3
+# Nesting levels of input fields and selected fields that cases reach
+MAX_DEPTH = 3
 # Name, type and whether the argument or input field is required
 FieldSpec = tuple[str, graphql.GraphQLInputType, bool]
 
@@ -185,10 +186,13 @@ class InputElement:
 
 
 def iter_input_elements(field: graphql.GraphQLField, coordinate: str) -> Iterator[InputElement]:
-    """Arguments, the input fields reached through them and list items, depth first."""
+    """Arguments, the input fields reached through them and list items, depth first.
+
+    Each input object's fields are walked once per argument, so filters that link to each other stay finite.
+    """
     for name, argument in field.args.items():
         yield from _walk(
-            argument.type, (name,), f"{coordinate}({name}:)", graphql.is_required_argument(argument), False, ()
+            argument.type, (name,), f"{coordinate}({name}:)", graphql.is_required_argument(argument), False, (), set()
         )
 
 
@@ -199,6 +203,7 @@ def _walk(
     required: bool,
     one_of_parent: bool,
     types: InputPath,
+    expanded: set[graphql.GraphQLInputObjectType],
 ) -> Iterator[InputElement]:
     nullable = graphql.get_nullable_type(type_)
     if nullable in types:
@@ -206,8 +211,11 @@ def _walk(
         return
     yield InputElement(path=path, location=location, type_=type_, required=required, one_of_parent=one_of_parent)
     if isinstance(nullable, graphql.GraphQLList):
-        yield from _walk(nullable.of_type, (*path, 0), location, False, False, types)
-    elif isinstance(nullable, graphql.GraphQLInputObjectType):
+        yield from _walk(nullable.of_type, (*path, 0), location, False, False, types, expanded)
+    elif (
+        isinstance(nullable, graphql.GraphQLInputObjectType) and nullable not in expanded and len(types) < MAX_DEPTH - 1
+    ):
+        expanded.add(nullable)
         is_one_of = getattr(nullable, "is_one_of", False)
         for name, input_field in nullable.fields.items():
             yield from _walk(
@@ -217,6 +225,7 @@ def _walk(
                 graphql.is_required_input_field(input_field),
                 is_one_of,
                 (*types, nullable),
+                expanded,
             )
 
 
@@ -484,7 +493,7 @@ def iter_field_selections(
                 selected.add((named.name, name))
                 selected.update((target.name, inner) for inner in _selection_names(field_selection))
                 yield f"{named.name}.{name}", _nest(path, _field_node(name, arguments, field_selection))
-                if depth < MAX_SELECTION_DEPTH and target not in expanded and graphql.is_composite_type(target):
+                if depth < MAX_DEPTH and target not in expanded and graphql.is_composite_type(target):
                     expanded.add(target)
                     queue.append((target, (*path, (name, arguments)), depth + 1, frozenset()))
         if isinstance(named, (graphql.GraphQLInterfaceType, graphql.GraphQLUnionType)):

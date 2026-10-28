@@ -453,6 +453,41 @@ def test_recursive_input_negative_cases(ctx):
     ]
 
 
+def walked_parameters(schema):
+    return list(dict.fromkeys(parameter for _, parameter, _ in negative(schema, "Query.f")))
+
+
+def test_input_walk_stops_at_depth_three(ctx):
+    # Filters that link to each other's filters have exponentially many paths.
+    schema = ctx.graphql.load_sdl(
+        "input T0 { t0: T0 t1: T1 t2: T2 t3: T3 x: Int } input T1 { t0: T0 t1: T1 t2: T2 t3: T3 x: Int } "
+        "input T2 { t0: T0 t1: T1 t2: T2 t3: T3 x: Int } input T3 { t0: T0 t1: T1 t2: T2 t3: T3 x: Int } "
+        "type Query { f(a: T0): Int }"
+    )
+    assert walked_parameters(schema) == [
+        "a",
+        "a.t1",
+        "a.t1.t2",
+        "a.t1.t3",
+        "a.t1.x",
+        "a.t2",
+        "a.t2.t1",
+        "a.t2.t3",
+        "a.t2.x",
+        "a.t3",
+        "a.t3.t1",
+        "a.t3.t2",
+        "a.t3.x",
+        "a.x",
+        "invalid",
+    ]
+
+
+def test_input_type_fields_are_walked_once_per_argument(ctx):
+    schema = ctx.graphql.load_sdl("input P { lo: Int } input R { a: P b: P } type Query { f(r: R, s: P): Int }")
+    assert walked_parameters(schema) == ["r", "r.a", "r.a.lo", "r.b", "s", "s.lo", "invalid"]
+
+
 @pytest.mark.parametrize(
     ("sdl", "scenarios", "expected"),
     [
