@@ -1793,6 +1793,10 @@ def test_ignoring_unknown_formats(pctx, schema, expected):
             {"/items/pattern", "/items/type", "/type"},
         ),
         (
+            {"type": "array", "items": [{"type": "integer"}, {"type": "string", "minLength": 2}]},
+            {"/items/0/type", "/items/1/type", "/items/1/minLength", "/type"},
+        ),
+        (
             {"type": "object", "properties": {"name": {"type": "string", "minLength": 3}}},
             {"/properties/name/minLength", "/type", "/properties/name/type"},
         ),
@@ -1835,6 +1839,17 @@ def test_ignoring_unknown_formats(pctx, schema, expected):
 )
 def test_negative_value_locations(nctx, schema, expected):
     assert {v.location for v in cover_schema_iter(nctx, schema)} == expected
+
+
+def test_negative_prefix_items_locations(ctx_factory):
+    nctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
+    schema = {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string", "minLength": 2}]}
+    assert {v.location for v in cover_schema_iter(nctx, schema)} == {
+        "/prefixItems/0/type",
+        "/prefixItems/1/type",
+        "/prefixItems/1/minLength",
+        "/type",
+    }
 
 
 @pytest.mark.parametrize(
