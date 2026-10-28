@@ -503,6 +503,12 @@ class GraphQLApps:
     def federated_subgraph(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.federated_subgraph())
 
+    def coverage_inputs(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.coverage_inputs())
+
+    def lenient(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.lenient())
+
     def from_schema(
         self, schema, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask"
     ) -> GraphQLServer:
