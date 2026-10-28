@@ -8,9 +8,35 @@
 
 ### :bug: Fixed
 
+#### Coverage phase
+
+- Descriptions naming optional parameters the request does not send.
+- Request body schemas modified when they declare `examples`.
+- `null` values described as "Value null value".
+- Locations for tuple array negatives missing the item index.
+- Valid optional `null` query parameters sent as `null` in cases targeting a sibling.
+- Values generated from `not` schemas described by the inner schema's scenario.
+- Cases dropped when they differ only in their binary payload.
+
+#### Data generation
+
+- Crash when generating unique arrays of binary strings.
+- Generated strings failing `pattern` when combined with `minLength` / `maxLength`.
+- Valid strings never generated for multi-part `pattern` combined with `maxLength`.
+- Open API 2.0 parameter `x-example` drawn twice as often in fuzzing.
+
+#### Request serialization
+
+- Objects and arrays inside header and query parameter values sent as Python repr.
+
+#### GraphQL
+
 - Invalid `@oneOf` input objects in positive GraphQL tests.
-- Coverage phase descriptions naming optional parameters the request does not send.
-- Coverage phase modifying request body schemas that declare `examples`.
+- Schema hooks applied twice to GraphQL stateful cases.
+
+#### Others
+
+- Generic "Schema Error" message hiding why an operation failed to load.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 
