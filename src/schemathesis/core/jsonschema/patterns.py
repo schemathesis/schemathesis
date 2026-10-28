@@ -916,6 +916,17 @@ _AT_BEGINNING: _Node = (sre.AT, sre.AT_BEGINNING)
 _AT_END: _Node = (sre.AT, sre.AT_END)
 
 
+def _matches_empty_at_either_end(nodes: list[_Node]) -> bool:
+    """Whether the pattern matches the empty string at the start or the end of any string, so every string."""
+    if nodes and nodes[0] in (_AT_BEGINNING, (sre.AT, sre.AT_BEGINNING_STRING)):
+        body = nodes[1:]
+    elif nodes and nodes[-1] in (_AT_END, (sre.AT, sre.AT_END_STRING)):
+        body = nodes[:-1]
+    else:
+        body = nodes
+    return not _is_position_dependent(body) and _calculate_min_repetition_length(body) == 0
+
+
 def _transform(parsed: list[_Node], min_length: int | None, max_length: int | None) -> list[_Node] | None:
     """Top-level transformer. Dispatches by pattern structure."""
     nodes = list(parsed)
@@ -930,26 +941,29 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
         if transformed is None:
             return None
         return [transformed[0], *nodes[1 : 1 + lookarounds], *transformed[1:]]
+    # Narrowing a pattern that matches every string loses strings either way; widening the slots would rewrite
+    # shapes that are otherwise left alone, so they keep the narrow rewrite.
+    complete = not _matches_empty_at_either_end(nodes)
     match _classify_structure(nodes):
         # For cases without full anchoring: JSON Schema `pattern` is a substring match,
         # so `{1,50}` alone doesn't reject strings longer than 50 chars. Add the missing
         # anchor(s) whenever max_length is being encoded into the quantifier.
         case ("single", content):
-            result = _transform_node(content, min_length, max_length)
+            result = _transform_node(content, min_length, max_length, complete=complete)
             if result is None:
                 return None
             if max_length is not None:
                 return [_AT_BEGINNING, result, _AT_END]
             return [result]
         case ("leading_anchor", anchor, content):
-            result = _transform_node(content, min_length, max_length)
+            result = _transform_node(content, min_length, max_length, complete=complete)
             if result is None:
                 return None
             if max_length is not None:
                 return [anchor, result, _AT_END]
             return [anchor, result]
         case ("trailing_anchor", content, anchor):
-            result = _transform_node(content, min_length, max_length)
+            result = _transform_node(content, min_length, max_length, complete=complete)
             if result is None:
                 return None
             if max_length is not None:
@@ -963,7 +977,7 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
             return _transform_anchored_multi(leading, parts, trailing, min_length, max_length)
 
         case ("leading_anchor_multi", leading, parts):
-            distributed = _distribute_multi(parts, min_length, max_length)
+            distributed = _distribute_multi(parts, min_length, max_length, complete=complete)
             if distributed is None:
                 return None
             if max_length is not None:
@@ -971,7 +985,7 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
             return [leading, *distributed]
 
         case ("unanchored_multi", parts):
-            distributed = _distribute_multi(parts, min_length, max_length)
+            distributed = _distribute_multi(parts, min_length, max_length, complete=complete)
             if distributed is None:
                 return None
             if max_length is not None:
@@ -1017,18 +1031,20 @@ def _classify_structure(nodes: list[_Node]) -> _Structure:
             return ("unknown",)
 
 
-def _transform_node(node: _Node, min_l: int | None, max_l: int | None, *, anchored: bool = False) -> _Node | None:
+def _transform_node(
+    node: _Node, min_l: int | None, max_l: int | None, *, anchored: bool = False, complete: bool = True
+) -> _Node | None:
     """Transform a single content node; `anchored` content matches exactly one char, so the budget may only narrow it."""
     op, value = node
     if op in REPEATS:
-        return _transform_repeat(op, value, min_l, max_l)
+        return _transform_repeat(op, value, min_l, max_l, complete=complete)
     if op == sre.SUBPATTERN:
         # A group around a single item just relabels it - rewrite the item and put it back inside the group.
         group, add_flags, del_flags, inner = value
         inner_nodes = list(inner)
         if len(inner_nodes) != 1:
             return None
-        result = _transform_node(inner_nodes[0], min_l, max_l, anchored=anchored)
+        result = _transform_node(inner_nodes[0], min_l, max_l, anchored=anchored, complete=complete)
         if result is None:
             return None
         return (sre.SUBPATTERN, (group, add_flags, del_flags, [result]))
@@ -1040,7 +1056,9 @@ def _transform_node(node: _Node, min_l: int | None, max_l: int | None, *, anchor
     return None
 
 
-def _transform_repeat(op: int, value: _RepeatValue, min_l: int | None, max_l: int | None) -> _Node | None:
+def _transform_repeat(
+    op: int, value: _RepeatValue, min_l: int | None, max_l: int | None, *, complete: bool = True
+) -> _Node | None:
     """Core transform: merge length constraints into repeat bounds."""
     min_repeat, max_repeat, subpattern = value
     inner_length = _calculate_min_repetition_length(subpattern)
@@ -1056,8 +1074,12 @@ def _transform_repeat(op: int, value: _RepeatValue, min_l: int | None, max_l: in
     # Convert length constraints to repetition counts
     ext_min = None
     ext_max = None
-    if min_l is not None:
-        ext_min = -(-min_l // inner_length)  # ceil division
+    # The fewest repetitions reaching `min_l` are the longest ones.
+    inner_max_length = _calculate_max_repetition_length(subpattern) if complete else inner_length
+    if min_l is not None and inner_max_length == MAXREPEAT:
+        ext_min = min(min_l, 1)
+    elif min_l is not None:
+        ext_min = -(-min_l // inner_max_length)
     if max_l is not None:
         ext_max = max_l // inner_length  # floor division
 
@@ -1123,7 +1145,9 @@ def _transform_anchored_multi(
     return [leading] + new_parts + [trailing]
 
 
-def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) -> list[_Node] | None:
+def _distribute_multi(
+    parts: list[_Node], min_l: int | None, max_l: int | None, *, complete: bool = True
+) -> list[_Node] | None:
     """Distribute a length budget across the quantified parts; the caller adds any anchors."""
     if any(op in POSSESSIVE_REPEATS for op, _ in parts):
         # A possessive part keeps everything it took, so what follows it never gets those characters
@@ -1268,6 +1292,11 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
             return None
         distribution = full_distribution
 
+    if complete and not exact_length:
+        distribution = _cover_needed_counts(
+            distribution, quantifier_bounds, repetition_lengths, repetition_max_lengths, fixed_length, min_l, max_l
+        )
+
     for dist_idx, (new_min, new_max) in enumerate(distribution):
         if dist_idx in pinned:
             continue
@@ -1296,6 +1325,55 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
         new_parts[part_idx] = (sre.MAX_REPEAT, (new_min, new_max, subpattern))
 
     return new_parts
+
+
+def _cover_needed_counts(
+    distribution: list[tuple[int, int]],
+    bounds: list[tuple[int, int]],
+    repetition_lengths: list[int],
+    max_repetition_lengths: list[int],
+    fixed_length: int,
+    min_length: int | None,
+    max_length: int | None,
+) -> list[tuple[int, int]]:
+    """Widen each slot, within its original bounds, to every count a string within the length bounds may use."""
+    # `None` marks a part with no longest match.
+    longest_parts = [
+        0
+        if max_repeat == 0 or rep_len_max == 0
+        else None
+        if MAXREPEAT in (max_repeat, rep_len_max)
+        else max_repeat * rep_len_max
+        for (_, max_repeat), rep_len_max in zip(bounds, max_repetition_lengths, strict=True)
+    ]
+    shortest = fixed_length + sum(
+        min_repeat * rep_len for (min_repeat, _), rep_len in zip(bounds, repetition_lengths, strict=True)
+    )
+    unbounded_parts = longest_parts.count(None)
+    longest_finite = fixed_length + sum(part for part in longest_parts if part is not None)
+    widened = []
+    for (new_min, new_max), (min_repeat, max_repeat), rep_len_min, rep_len_max, longest_part in zip(
+        distribution, bounds, repetition_lengths, max_repetition_lengths, longest_parts, strict=True
+    ):
+        if rep_len_max == 0:
+            # Takes no characters, so length says nothing about how often it repeats.
+            widened.append((new_min, new_max))
+            continue
+        low = min_repeat
+        # What the other parts cannot reach on their own, this slot has to make up.
+        if min_length is not None and longest_part is not None and unbounded_parts == 0:
+            shortfall = min_length - (longest_finite - longest_part)
+            if shortfall > 0:
+                low = max(min_repeat, -(-shortfall // rep_len_max))
+        elif min_length is not None and longest_part is None and unbounded_parts == 1:
+            shortfall = min_length - longest_finite
+            if shortfall > 0:
+                low = max(min_repeat, 1 if rep_len_max == MAXREPEAT else -(-shortfall // rep_len_max))
+        high = max_repeat
+        if max_length is not None and rep_len_min > 0:
+            high = min(max_repeat, (max_length - shortest + min_repeat * rep_len_min) // rep_len_min)
+        widened.append((min(new_min, low), max(new_max, high)))
+    return widened
 
 
 def _matches_anything(value: list[_Node]) -> bool:
