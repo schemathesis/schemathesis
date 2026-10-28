@@ -2,11 +2,13 @@ import json
 import logging
 import time
 import uuid
+from enum import Enum
 from typing import Literal, NewType
 
+import graphql
 import strawberry
 from fastapi import FastAPI
-from flask import Flask
+from flask import Flask, jsonify, request
 from strawberry.fastapi import GraphQLRouter
 from strawberry.flask.views import GraphQLView
 from strawberry.schema.config import StrawberryConfig
@@ -460,6 +462,66 @@ def _make_federated_subgraph() -> strawberry.Schema:
             return [FederatedBook(id=strawberry.ID("1"), title="Kafka on the Shore")]
 
     return strawberry.federation.Schema(Query)
+
+
+def _make_coverage_inputs() -> strawberry.Schema:
+    @strawberry.enum
+    class Genre(Enum):
+        DRAMA = "DRAMA"
+        COMEDY = "COMEDY"
+
+    @strawberry.input
+    class Address:
+        zip: str
+        city: str | None = None
+
+    @strawberry.input
+    class Filter:
+        genre: Genre
+        address: Address | None = None
+        tags: list[str] | None = None
+
+    @strawberry.input(one_of=True)
+    class Pick:
+        id: strawberry.ID | None = strawberry.UNSET
+        name: str | None = strawberry.UNSET
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def books(self, limit: int, filter: Filter, pick: Pick | None = None) -> int | None:
+            return limit
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.field
+        def addBook(self, title: str, genre: Genre = Genre.DRAMA) -> int | None:
+            return len(title)
+
+    return strawberry.Schema(Query, Mutation)
+
+
+def coverage_inputs(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_coverage_inputs(), endpoint, "flask")
+
+
+def lenient(*, endpoint: str = "/graphql") -> GraphQLApp:
+    # Answers every operation with data and no errors, as a server that skips document validation would.
+    schema = _make_coverage_inputs()
+    app = Flask("test_app")
+
+    @app.route(endpoint, methods=["POST"])
+    def graphql_endpoint() -> object:
+        query = request.json["query"]
+        document = graphql.parse(query)
+        operation = next(node for node in document.definitions if isinstance(node, graphql.OperationDefinitionNode))
+        field = operation.selection_set.selections[0]
+        assert isinstance(field, graphql.FieldNode)
+        if field.name.value == "__schema":
+            return jsonify(data=schema.execute_sync(query).data)
+        return jsonify(data={field.name.value: None})
+
+    return GraphQLApp(server=app, kind="flask", endpoint=endpoint)
 
 
 def books(*, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask") -> GraphQLApp:

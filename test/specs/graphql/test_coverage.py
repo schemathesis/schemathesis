@@ -3,11 +3,13 @@ import pytest
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core.failures import FailureGroup
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo
 from schemathesis.graphql import nodes
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
+from schemathesis.specs.openapi.checks import negative_data_rejection, positive_data_acceptance
 
 DEFAULT = CoverageScenario.DEFAULT_POSITIVE_TEST
 MISSING = CoverageScenario.MISSING_PARAMETER
@@ -411,3 +413,43 @@ def test_positive_cases_are_valid(ctx, sdl):
     bodies_ = [case.body for case in iter_cases(ctx.graphql.load_sdl(sdl), "Query.f")]
     assert bodies_
     assert [body for body in bodies_ if graphql.validate(target, graphql.parse(body))] == []
+
+
+def run_against(server):
+    schema = schemathesis.graphql.from_url(server.schema_url)
+    results = []
+    for result in schema.get_all_operations():
+        operation = result.ok()
+        for case in schema.iter_coverage_cases(
+            operation, generation_modes=list(GenerationMode), generation_config=schema.config.generation
+        ):
+            data = case.meta.phase.data
+            try:
+                case.call_and_validate(checks=[negative_data_rejection, positive_data_acceptance])
+                failure = None
+            except FailureGroup as exc:
+                failure = tuple(type(inner).__name__ for inner in exc.exceptions)
+            results.append((case.meta.generation.mode, data.scenario, data.parameter, failure))
+    return results
+
+
+def test_conforming_server_has_no_false_positives(ctx):
+    results = run_against(ctx.graphql.apps.coverage_inputs())
+    assert len(results) > 1
+    assert [result for result in results if result[3] is not None] == []
+
+
+def test_lenient_server_fails_every_negative_scenario(ctx):
+    results = run_against(ctx.graphql.apps.lenient())
+    assert [result for result in results if (result[3] is not None) != (result[0] == GenerationMode.NEGATIVE)] == []
+    assert {scenario for mode, scenario, _, _ in results if mode == GenerationMode.NEGATIVE} == {
+        MISSING,
+        INCORRECT,
+        ABOVE,
+        BELOW,
+        INVALID_ENUM,
+        MISSING_FIELD,
+        UNEXPECTED_FIELD,
+        UNKNOWN,
+    }
+    assert {failure for _, _, _, failure in results} == {None, ("AcceptedNegativeData",)}
