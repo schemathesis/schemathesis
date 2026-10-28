@@ -47,10 +47,13 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     from schemathesis.python import asgi
 
     require_relative_url(path)
-    kwargs.setdefault("json", {"query": get_introspection_query()})
     with asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
-        response = load_from_url(client.post, url=path, **kwargs)
-    schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
+
+        def fetch(request_kwargs: dict[str, Any]) -> Any:
+            response = load_from_url(client.post, url=path, **request_kwargs)
+            return extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
+
+        schema = _introspect(fetch, kwargs)
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app
     loaded.location = path
@@ -78,14 +81,17 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     """
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
-    kwargs.setdefault("json", {"query": get_introspection_query()})
     client = wsgi.get_client(app)
-    response = client.post(path=path, **kwargs)
-    with django.explain_disallowed_host(app, host=wsgi.HOST):
-        raise_for_status(response)
-    schema = extract_schema_from_response(
-        response, lambda r: load_json_lossy(r.get_data(), r.mimetype_params.get("charset", "utf-8"))
-    )
+
+    def fetch(request_kwargs: dict[str, Any]) -> Any:
+        response = client.post(path=path, **request_kwargs)
+        with django.explain_disallowed_host(app, host=wsgi.HOST):
+            raise_for_status(response)
+        return extract_schema_from_response(
+            response, lambda r: load_json_lossy(r.get_data(), r.mimetype_params.get("charset", "utf-8"))
+        )
+
+    schema = _introspect(fetch, kwargs)
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app
     loaded.location = path
@@ -127,9 +133,12 @@ def from_url(
     if wait_for_schema is None:
         wait_for_schema = config.wait_for_schema
     kwargs = {**config.projects.get_default().schema_request_kwargs(), **kwargs}
-    kwargs.setdefault("json", {"query": get_introspection_query()})
-    response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **kwargs)
-    schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
+
+    def fetch(request_kwargs: dict[str, Any]) -> Any:
+        response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **request_kwargs)
+        return extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
+
+    schema = _introspect(fetch, kwargs)
     loaded = from_dict(schema, config=config)
     loaded.location = url
     return loaded
@@ -205,6 +214,10 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
         #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
         # Therefore the execution result is always valid at this point and `result.data` is not `None`
         schema = cast(dict[str, Any], result.data)
+        # Strawberry replaces graphql-core's shared `isOneOf` resolver with one that knows only Strawberry types
+        for type_ in schema["__schema"]["types"]:
+            if type_["kind"] == "INPUT_OBJECT" and "isOneOf" in type_:
+                type_["isOneOf"] = cast(graphql.GraphQLInputObjectType, document.type_map[type_["name"]]).is_one_of
     except Exception as exc:
         try:
             schema = json.loads(data)
@@ -265,11 +278,29 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
     return instance
 
 
+def _introspect(fetch: Callable[[dict[str, Any]], Any], kwargs: dict[str, Any]) -> Any:
+    if "json" in kwargs:
+        return fetch(kwargs)
+    try:
+        schema = fetch({**kwargs, "json": {"query": get_introspection_query()}})
+        if not (isinstance(schema, dict) and schema.get("errors")):
+            return schema
+    except LoaderError as exc:
+        if exc.kind != LoaderErrorKind.HTTP_CLIENT_ERROR:
+            raise
+    # Servers that predate `@oneOf` reject the `isOneOf` field
+    return fetch({**kwargs, "json": {"query": get_introspection_query(one_of=False)}})
+
+
 @lru_cache
-def get_introspection_query() -> str:
+def get_introspection_query(one_of: bool = True) -> str:
     import graphql
 
-    return graphql.get_introspection_query()
+    try:
+        return graphql.get_introspection_query(one_of=one_of)
+    except TypeError:  # pragma: no cover
+        # graphql-core < 3.2.7 has no `@oneOf` support
+        return graphql.get_introspection_query()
 
 
 @lru_cache
