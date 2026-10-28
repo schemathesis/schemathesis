@@ -233,7 +233,7 @@ from test.utils import run_given
         (r"^(ab)+(cd)+(ef)+$", 6, 6, r"^(ab){1}(cd){1}(ef){1}$"),
         (r"^(ab)+(cd)+(ef)+$", 10, 10, r"^(ab){1}(cd){1}(ef){3}$"),
         (r"^(\d{3})+(\w{2})+$", 10, 10, r"^(\d{3}){2}(\w{2}){2}$"),
-        (r"^(abc)+\d+$", 4, 10, r"^(abc){2,3}\d{1}$"),
+        (r"^(abc)+\d+$", 4, 10, r"^(abc){2,3}\d{1,4}$"),
         (r"^(abc)+(\d)+$", 7, 7, r"^(abc){1}(\d){4}$"),
         (r"^abc(\d{3})+$", 6, 12, r"^abc(\d{3}){1,3}$"),
         # Patterns containing lookahead / lookbehind assertions inside quantified groups
@@ -292,6 +292,8 @@ from test.utils import run_given
         ("^[a-z][0-9]+", 3, 6, "^[a-z][0-9]{2,5}$"),
         ("^foo[a-z]+", 4, 8, "^foo[a-z]{1,5}$"),
         ("^[a-z][0-9]+", 5, None, "^[a-z][0-9]{4,}"),
+        # A slot shorter than its maximum leaves the rest of the budget to its siblings.
+        (r"^[a-z]{1,3}[0-9]+$", None, 10, r"^[a-z]{1,3}[0-9]{1,9}$"),
         # A group is a part like any other, and its own repeat is where its share of the budget goes.
         ("arn:([a-z0-9-]+):forecast:.*:.*:.+", 20, 40, r"^arn:([a-z0-9\-]{2,23}):forecast:.{0,22}:.{0,22}:.{2,23}$"),
         ("^prefix-([a-z]+)-[0-9]+$", 12, 24, "^prefix-([a-z]{2,15})-[0-9]{2,15}$"),
@@ -401,18 +403,20 @@ def test_update_quantifier_unanchored_multi_enforces_min(pattern, min_length, ma
 
 
 @pytest.mark.parametrize(
-    ("min_length", "max_length", "value"),
+    ("pattern", "min_length", "max_length", "value"),
     [
         # Multi-slot rewrite must accept any distribution that satisfies the original
         # pattern within the length budget; per-slot caps from a balanced split would
         # reject valid lengths the original pattern allowed.
-        (1, 128, "A" + "0" * 100),
-        (1, 128, "A" + "0" * 127),
-        (1, 128, "A" * 128),
+        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 100),
+        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 127),
+        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" * 128),
+        (r"^[a-z]{1,3}[0-9]+$", None, 10, "a" + "0" * 9),
+        (r"^[a-z]{1,3}[0-9]+$", 1, 10, "a" + "0" * 9),
     ],
 )
-def test_update_quantifier_admits_uneven_slot_distributions(min_length, max_length, value):
-    rewritten = update_quantifier(r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", min_length, max_length)
+def test_update_quantifier_admits_uneven_slot_distributions(pattern, min_length, max_length, value):
+    rewritten = update_quantifier(pattern, min_length, max_length)
     assert re.match(rewritten, value), (rewritten, value)
 
 
