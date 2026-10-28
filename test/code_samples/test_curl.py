@@ -157,7 +157,7 @@ def test_as_curl_command_sanitizes_raw_query_with_empty_segments(ctx):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    case = operation.Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&&flag")})
+    case = operation.Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=se=cret&&flag")})
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&flag'"
 
 

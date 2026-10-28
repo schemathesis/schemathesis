@@ -31,6 +31,7 @@ from schemathesis.specs.openapi.serialization import (
     matrix_primitive,
     nested_object,
     serialize_openapi3_parameters,
+    serialize_swagger2_parameters,
     simple_object,
 )
 from schemathesis.transport.prepare import get_default_headers
@@ -404,6 +405,42 @@ def test_swagger2_nested_collection_format_converter(outer, inner, expected):
     assert converter(item) == {"connections": expected}
 
 
+@pytest.mark.parametrize(
+    ("definitions", "item", "expected"),
+    [
+        (
+            [{"name": "X", "in": "header", "type": "array", "items": {"type": "string"}}],
+            {"X": ["a", "b"]},
+            {"X": "a,b"},
+        ),
+        (
+            [
+                {"name": "a", "in": "query", "type": "array", "collectionFormat": "multi"},
+                {"name": "b", "in": "query", "type": "array"},
+            ],
+            {"a": [1, 2], "b": [1, 2]},
+            {"a": [1, 2], "b": "1,2"},
+        ),
+        (
+            [
+                {
+                    "name": "c",
+                    "in": "query",
+                    "type": "array",
+                    "collectionFormat": "pipes",
+                    "items": {"type": "array", "collectionFormat": "multi"},
+                }
+            ],
+            {"c": [[1, 2], [3]]},
+            {"c": "1,2|3"},
+        ),
+    ],
+    ids=["header-array", "after-multi-parameter", "unknown-inner-format-defaults-to-csv"],
+)
+def test_swagger2_parameter_serialization(definitions, item, expected):
+    assert serialize_swagger2_parameters(definitions)(dict(item)) == expected
+
+
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize(
     ("outer_format", "inner_format", "expected"),
@@ -511,9 +548,19 @@ def test_querystring_urlencoded_default_serialization(ctx, data):
 
 
 @pytest.mark.hypothesis_nested
-@given(st.data())
+@pytest.mark.parametrize(
+    ("encoding", "expected"),
+    [
+        ({"style": "pipeDelimited", "explode": False}, "1.1|1.1|1.1|1.1"),
+        ({"explode": False}, "1.1,1.1,1.1,1.1"),
+        ({"style": "spaceDelimited"}, "1.1 1.1 1.1 1.1"),
+        ({"style": "form"}, [1.1, 1.1, 1.1, 1.1]),
+    ],
+    ids=["pipe-delimited", "default-style", "default-explode-non-form", "default-explode-form"],
+)
+@given(data=st.data())
 @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
-def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
+def test_querystring_urlencoded_uses_encoding_styles(ctx, data, encoding, expected):
     operation = ctx.openapi.load_operation(
         "GET /teapot",
         {
@@ -537,7 +584,7 @@ def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
                                 "required": ["bbox"],
                                 "additionalProperties": False,
                             },
-                            "encoding": {"bbox": {"style": "pipeDelimited", "explode": False}},
+                            "encoding": {"bbox": encoding},
                         }
                     },
                 }
@@ -547,7 +594,7 @@ def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
         version="3.2.0",
     )
     case = data.draw(operation.as_strategy())
-    assert case.query == {"bbox": "1.1|1.1|1.1|1.1"}
+    assert case.query == {"bbox": expected}
 
 
 @pytest.mark.parametrize(
@@ -740,8 +787,29 @@ DELIMITED_ARRAY_SCHEMA = {"type": "array", "minItems": 2, "maxItems": 2, "items"
             "/teapot",
             "http://127.0.0.1:1/teapot?tags=a%2Cb,a%2Cb",
         ),
+        (
+            {
+                "/teapot/{tags}": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "tags",
+                                "in": "path",
+                                "required": True,
+                                "collectionFormat": "csv",
+                                **DELIMITED_ARRAY_SCHEMA,
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "2.0",
+            "/teapot/{tags}",
+            "http://127.0.0.1:1/teapot/a%2Cb,a%2Cb",
+        ),
     ],
-    ids=["openapi-form", "openapi-simple-path", "swagger-csv"],
+    ids=["openapi-form", "openapi-simple-path", "swagger-csv", "swagger-csv-path"],
 )
 def test_array_parameter_keeps_delimiter_literal(ctx, paths, version, operation_path, expected_url):
     # Items are percent-encoded but the separator stays literal, so a server can split the array back.
@@ -784,6 +852,7 @@ def prepared_path(case):
         ("label", True, STYLED_OBJECT_SCHEMA, "/teapot/.k=x%2Cy"),
         ("simple", False, STYLED_OBJECT_SCHEMA, "/teapot/k,x%2Cy"),
         ("simple", True, STYLED_OBJECT_SCHEMA, "/teapot/k=x%2Cy"),
+        ("label", False, {"type": "string", "enum": ["a/b"]}, "/teapot/.a%2Fb"),
     ],
     ids=[
         "matrix-primitive",
@@ -798,6 +867,7 @@ def prepared_path(case):
         "label-object-explode",
         "simple-object",
         "simple-object-explode",
+        "label-slash",
     ],
 )
 def test_path_style_delimiters_stay_literal(ctx, style, explode, schema, expected):
@@ -999,6 +1069,8 @@ def wire_value(case, location):
         ("cookie", {"type": ["array", "null"], "enum": [["x", "y"]]}, {}, "x,y"),
         ("path", {"type": ["object", "null"], "enum": [{"a": "x"}]}, {}, "/teapot/a,x"),
         ("path", {"type": ["array", "null"], "enum": [["x", "y"]]}, {}, "/teapot/x,y"),
+        ("query", {"type": ["array", "null"], "enum": [["x", "y"]]}, {}, "p=x&p=y"),
+        ("query", {"type": ["array", "null"], "enum": [None]}, {}, "p=null"),
     ],
     ids=[
         "query-object",
@@ -1010,6 +1082,8 @@ def wire_value(case, location):
         "cookie-array",
         "path-object",
         "path-array",
+        "query-array-form-explode",
+        "query-array-null",
     ],
 )
 def test_type_list_parameters_use_declared_style(ctx, location, schema, extra, expected):
@@ -1357,6 +1431,12 @@ _NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][p
             id="flat-object-extracted",
         ),
         pytest.param(
+            {"name": "id", "in": "query", "required": True, "schema": {"type": "object"}},
+            {"id": {"tags": ["a", "b"], "meta": {}}},
+            {"tags": ["a", "b"], "meta": {}},
+            id="flat-object-extracted-container-values",
+        ),
+        pytest.param(
             {
                 "name": "q",
                 "in": "query",
@@ -1396,6 +1476,46 @@ _NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][p
             {"page": 2},
             {"page": 2},
             id="branching-scalar-passthrough",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "style": "deepObject", "schema": _BRANCHING_SCHEMA},
+            {"page": {"number": 1}},
+            {"page[number]": 1},
+            id="branching-object-deep-object",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "schema": {"allOf": [{"type": "object"}]}},
+            {"page": {"a": 1}},
+            {"a": 1},
+            id="all-of-object-branch-extracted",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "schema": {"anyOf": [True, {"type": "object"}]}},
+            {"page": {"a": 1}},
+            {"a": 1},
+            id="boolean-branch-skipped",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "schema": {"oneOf": [{"type": "integer"}, {"type": ["object", "null"]}]}},
+            {"page": {"a": 1}},
+            {"a": 1},
+            id="type-list-object-branch-extracted",
+        ),
+        pytest.param(
+            {
+                "name": "page",
+                "in": "query",
+                "schema": {"oneOf": [{"$ref": "#/x-bundled/Page"}], "x-bundled": {"Page": {"type": "object"}}},
+            },
+            {"page": {"a": 1}},
+            {"a": 1},
+            id="bundled-ref-object-branch-extracted",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "schema": {"anyOf": [{"type": "integer"}, {"type": "string"}]}},
+            {"page": {"a": 1}},
+            {"page": {"a": 1}},
+            id="no-object-branch-passthrough",
         ),
     ],
 )
@@ -1464,6 +1584,15 @@ def test_nested_object_corner_cases(input_value, expected):
             True,
             id="implicit-object-via-properties",
         ),
+        pytest.param({"type": "object", "properties": {"x": {"type": "object"}}}, True, id="object-type"),
+        pytest.param(
+            {"type": "object", "properties": {"x": True, "y": {"type": ["object", "null"]}}},
+            True,
+            id="type-list-object-after-boolean-property",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"x": {"type": ["string", "null"]}}}, False, id="type-list-without-object"
+        ),
         pytest.param(
             {
                 "type": "object",
@@ -1503,6 +1632,16 @@ def querystring_operation(ctx, content, *, required):
             {"text/plain": {"schema": {"type": "string", "enum": ["hello world"]}}},
             {"", "hello%20world"},
             id="text-plain",
+        ),
+        pytest.param(
+            {"application/x-www-form-urlencoded": {"schema": {"type": "string", "enum": ["?X=1?"]}}},
+            {"", "X=1?"},
+            id="urlencoded-scalar-leading-question-mark",
+        ),
+        pytest.param(
+            {"text/plain": {"schema": {"type": "string", "enum": ["a/b"]}}},
+            {"", "a%2Fb"},
+            id="text-plain-slash",
         ),
     ],
 )

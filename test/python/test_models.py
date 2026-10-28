@@ -357,6 +357,36 @@ def test_asgi_call_with_and_without_explicit_base_url():
     assert case.call(base_url="http://testserver").status_code == 200
 
 
+@pytest.mark.parametrize("method", ["call", "call_and_validate"])
+@pytest.mark.parametrize(
+    ("servers", "suggestion", "path"),
+    [
+        ([], '    schema.config.update(base_url="https://api.example.com")\n', "/users"),
+        (
+            [{"url": "https://api.example.com/v1"}],
+            "Your schema declares a server at https://api.example.com/v1:\n"
+            '    schema.config.update(base_url="https://api.example.com/v1")\n',
+            "/v1/users",
+        ),
+    ],
+    ids=["no-servers", "declared-server"],
+)
+def test_call_without_base_url_error_message(ctx, method, servers, suggestion, path):
+    schema = ctx.openapi.load_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}, servers=servers
+    )
+    with pytest.raises(IncorrectUsage) as exc_info:
+        getattr(schema["/users"]["GET"].Case(), method)()
+    assert str(exc_info.value) == (
+        "The `base_url` argument is required when specifying a schema via a file, "
+        "so Schemathesis knows where to send the data.\n"
+        f"{suggestion}"
+        f"You can also pass `base_url` to `Case.{method}`.\n"
+        "If you use the ASGI integration, please supply your test client as the `session` argument to `call`.\n"
+        f"URL: {path}"
+    )
+
+
 def test_call_without_base_url_ignores_malformed_swagger_schemes():
     schema = schemathesis.openapi.from_dict(
         {
@@ -750,6 +780,28 @@ def test_call_verify_override(app_runner, echo_app, with_config):
     if with_config:
         schema.config.tls_verify = "/tmp"
     assert schema["/users"]["GET"].Case().call(verify=False).verify is False
+
+
+def test_call_uses_configured_tls_verify(app_runner, echo_app):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
+    schema.config.tls_verify = False
+    assert schema["/users"]["GET"].Case().call().verify is False
+
+
+@pytest.mark.parametrize(
+    ("setting", "value", "base_url", "error", "match"),
+    [
+        ("request_timeout", 0.05, None, requests.exceptions.ReadTimeout, "timed out"),
+        ("request_cert", "abc", "https://127.0.0.1:1", OSError, "invalid path: abc"),
+        ("proxy", "http://127.0.0.1:1", None, requests.exceptions.ProxyError, "Unable to connect to proxy"),
+    ],
+    ids=["timeout", "cert", "proxy"],
+)
+def test_call_uses_configured_transport_settings(app_runner, echo_app, setting, value, base_url, error, match):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(echo_app))
+    setattr(schema.config, setting, value)
+    with pytest.raises(error, match=match):
+        schema["/users"]["GET"].Case(query={"delay": "0.2"}).call(base_url=base_url)
 
 
 # The client certificate is loaded before connecting, so no server is needed.
