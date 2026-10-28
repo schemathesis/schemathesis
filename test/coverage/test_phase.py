@@ -2746,6 +2746,40 @@ def test_negative_null_query_parameter_is_sent(ctx):
     ]
 
 
+def test_optional_null_query_parameter_is_omitted_beside_negative_sibling(ctx):
+    # Sending the valid null as `q2=null` would give the case a second invalid value.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"in": "query", "name": "q1", "required": True, "schema": {"type": "integer", "enum": [1]}},
+            {
+                "in": "query",
+                "name": "q2",
+                "required": False,
+                "schema": {"type": "integer", "nullable": True, "enum": [None]},
+            },
+        ],
+        method="get",
+    )["/foo"]["GET"]
+    assert [(case.meta.phase.data.description, case.query) for case in iter_cases(operation, *GenerationMode)] == [
+        ("Default positive test case", {"q1": "1"}),
+        ("Incorrect type", {"q1": "0.5"}),
+        ("Incorrect type", {"q1": "true"}),
+        ("Incorrect type", {"q1": "null"}),
+        ("Incorrect type", {"q1": "AAA"}),
+        ("Incorrect type", {"q1": ["null", "null"]}),
+        ("Incorrect type", {"q1": ""}),
+        ("Invalid enum value", {"q1": "-58800"}),
+        ("Incorrect type", {"q1": "1", "q2": "0.5"}),
+        ("Incorrect type", {"q1": "1", "q2": "true"}),
+        ("Incorrect type", {"q1": "1", "q2": "AAA"}),
+        ("Invalid enum value", {"q1": "1", "q2": "-58800"}),
+        ("Incorrect type", {"q1": "1", "q2": "0"}),
+        ("Missing `q1` at query", {}),
+        ("Object with unexpected properties", {"q1": "1", "x-schemathesis-unknown-property": "42"}),
+    ]
+
+
 def test_null_inside_query_array_is_sent(ctx):
     operation = load_schema(
         ctx,
