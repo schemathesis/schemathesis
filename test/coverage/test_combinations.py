@@ -1426,7 +1426,7 @@ def test_positive_object_covers_properties_beside_ignored_property_names(ctx_fac
 
 def test_positive_pattern(pctx):
     schema = {"pattern": r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", "minLength": 7, "maxLength": 20, "type": "string"}
-    assert_covers(pctx, schema, ["0000-0000", "00-0000", "00-00000", "0000-000000000000000", "000-000000000000000"])
+    assert_covers(pctx, schema, ["00-0000", "00-00000", "0000-000000000000000", "000-000000000000000"])
 
 
 def test_positive_pattern_with_wildcard_prefix_and_digit_limit(pctx):
@@ -1446,7 +1446,7 @@ def test_positive_pattern_with_char_class_and_min_length(pctx):
     # character classes like [a-z] (IN opcode). The .filter() safety net ensures
     # generated strings still respect minLength.
     schema = {"pattern": r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$", "minLength": 3, "type": "string"}
-    assert cover_schema(pctx, schema) == ["a00", "a000"]
+    assert cover_schema(pctx, schema) == ["a-0", "a00", "a000"]
 
 
 def test_property_names_spelled_like_string_keywords(ctx_factory):

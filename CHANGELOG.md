@@ -23,7 +23,7 @@
 
 - Crash when generating unique arrays of binary strings.
 - Generated strings failing `pattern` when combined with `minLength` / `maxLength`.
-- Valid strings never generated for multi-part `pattern` combined with `maxLength`.
+- Valid strings never generated for `pattern` with optional or repeated parts combined with length bounds.
 - Open API 2.0 parameter `x-example` drawn twice as often in fuzzing.
 
 #### Request serialization

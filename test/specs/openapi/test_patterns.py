@@ -154,7 +154,7 @@ from test.utils import run_given
             r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$",
             5,
             64,
-            r"^[a-zA-Z0-9]{5,64}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0,31}$",
+            r"^[a-zA-Z0-9]{1,64}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0,63}$",
         ),
         (r"^\+[0-9]{5,}$", 6, 6, r"^\+[0-9]{5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
@@ -170,7 +170,7 @@ from test.utils import run_given
         ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,2000}$"),
         # Optional `\*?` is preserved (collapsing it to `{0}` would reject "geo:abc*"),
         # while `\w*` still tightens to use the remaining length budget.
-        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{1,195}\*{0,1}$"),
+        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{0,196}\*{0,1}$"),
         (r"^[\w\W]$", 1, 3, r"^.{1}$"),
         (r"^[\w\W]+$", 1, 3, r"^.{1,3}$"),
         (r"^[\w\W]*$", 1, 3, r"^.{1,3}$"),
@@ -228,14 +228,14 @@ from test.utils import run_given
         (r"(\d{3})+", 1, 2, r"(\d{3})+"),
         (r"(\d{3})+", 7, 7, r"(\d{3})+"),
         (r"(\d{3})+", 0, 0, r"(\d{3})+"),
-        (r"(a|bb)+", 4, 8, r"^(a|bb){4,8}$"),
+        (r"(a|bb)+", 4, 8, "^(a|bb){2,8}$"),
         # Anchored multi-part with multi-char groups
         (r"^(abc)+(def)+$", 6, 6, r"^(abc){1}(def){1}$"),
         (r"^(abc)+(def)+$", 9, 9, r"^(abc){1}(def){2}$"),
         (r"^(ab)+(cd)+(ef)+$", 6, 6, r"^(ab){1}(cd){1}(ef){1}$"),
         (r"^(ab)+(cd)+(ef)+$", 10, 10, r"^(ab){1}(cd){1}(ef){3}$"),
         (r"^(\d{3})+(\w{2})+$", 10, 10, r"^(\d{3}){2}(\w{2}){2}$"),
-        (r"^(abc)+\d+$", 4, 10, r"^(abc){2,3}\d{1,4}$"),
+        (r"^(abc)+\d+$", 4, 10, r"^(abc){1,3}\d{1,7}$"),
         (r"^(abc)+(\d)+$", 7, 7, r"^(abc){1}(\d){4}$"),
         (r"^abc(\d{3})+$", 6, 12, r"^abc(\d{3}){1,3}$"),
         # Patterns containing lookahead / lookbehind assertions inside quantified groups
@@ -243,9 +243,8 @@ from test.utils import run_given
         (r"^([a-z]+(?!\s))+$", 1, 5, r"^([a-z]{1,}(?!\s)){1,5}$"),
         (r"^([a-z]+(?<=\s))+$", 1, 5, r"^([a-z]{1,}(?<=\s)){1,5}$"),
         (r"^([a-z]+(?=\s))+$", 1, 5, r"^([a-z]{1,}(?=\s)){1,5}$"),
-        # Branch alternation with finite per-tick max (1 or 2 chars) — outer count
-        # tightens to keep total length within bounds.
-        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,49}$"),
+        # Branch alternation with 1 or 2 chars per repetition: the count leaves room for `"a" * 100`.
+        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,99}$"),
         (r"^(foo|bar)+$", 3, 12, r"^(foo|bar){1,4}$"),
         # Outer bound already finite and unchanged; inner content is variable-length
         # — maxLength cannot be encoded through the outer repetition count alone.
@@ -300,9 +299,9 @@ from test.utils import run_given
         # A slot shorter than its maximum leaves the rest of the budget to its siblings.
         (r"^[a-z]{1,3}[0-9]+$", None, 10, r"^[a-z]{1,3}[0-9]{1,9}$"),
         # A group is a part like any other, and its own repeat is where its share of the budget goes.
-        ("arn:([a-z0-9-]+):forecast:.*:.*:.+", 20, 40, r"^arn:([a-z0-9\-]{2,23}):forecast:.{0,22}:.{0,22}:.{2,23}$"),
-        ("^prefix-([a-z]+)-[0-9]+$", 12, 24, "^prefix-([a-z]{2,15})-[0-9]{2,15}$"),
-        ("^([a-z]+)-([0-9]+)$", 6, 12, "^([a-z]{3,10})-([0-9]{2,10})$"),
+        ("arn:([a-z0-9-]+):forecast:.*:.*:.+", 20, 40, r"^arn:([a-z0-9\-]{1,23}):forecast:.{0,22}:.{0,22}:.{1,23}$"),
+        ("^prefix-([a-z]+)-[0-9]+$", 12, 24, "^prefix-([a-z]{1,15})-[0-9]{1,15}$"),
+        ("^([a-z]+)-([0-9]+)$", 6, 12, "^([a-z]{1,10})-([0-9]{1,10})$"),
         # A group wrapping the whole pattern is transparent to the budget - the quantifier inside it still tightens.
         ("^([a-zA-Z0-9]*)$", 5, 5, "^([a-zA-Z0-9]{5})$"),
         ("^([a-zA-Z0-9]*)$", 1, 10, "^([a-zA-Z0-9]{1,10})$"),
@@ -338,10 +337,14 @@ from test.utils import run_given
         ("^(a?)+b+$", 0, 0, "^(a?)+b+$"),
         ("\\w+(?<!\\s)", None, 4096, "\\w+(?<!\\s)"),
         ("^(?-im:a)+$", None, 4096, "^(?-im:a){1,4096}$"),
-        ("^(x{0,2})?x+.$", None, 3, "^(x{0,2})?x+.$"),
+        ("^(x{0,2})?x+.$", None, 3, "^(x{0,2}){0,1}x{1,2}.$"),
         ("^(?:ab|abcd)+$", None, 4096, "^(?:ab(?:|cd)){1,2048}$"),
         ("^(?:.+){2}0{2}(?:.+a{1,3})+?$", 2, 5, "^(?:.+){2}0{2}(?:.+a{1,3})+?$"),
         ("^(?=a)", 1, 3, "^(?=a)"),
+        # Every slot keeps every count some string within the bounds needs, e.g. `geo:abcdef` and `a0000`.
+        (r"^geo:\w*\*?$", None, 10, r"^geo:\w{0,6}\*{0,1}$"),
+        (r"^[a-z]{1,3}[0-9]+$", 5, 10, r"^[a-z]{1,3}[0-9]{2,9}$"),
+        (r"^(a?)+b+c+$", 7, 12, r"^(a{0,1}){1,}b{1,11}c{1,11}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
@@ -365,25 +368,42 @@ def test_update_quantifier_exact_length_is_bounded(pattern, length):
     assert pattern_length_bounds(update_quantifier(pattern, length, length)) == (length, length)
 
 
+REWRITE_ENUMERATION_MAX_LENGTH = 7
+
+
 @pytest.mark.parametrize(
-    ("pattern", "min_length", "max_length"),
+    ("pattern", "min_length", "max_length", "alphabet"),
     [
-        (r"^([a-zA-Z0-9]*)$", 5, 5),
-        (r"^([a-zA-Z0-9_.-]+)$", 3, 12),
-        (r"^(?i:[a-z]*)$", 4, 4),
-        (r"^(?i:([a-z-]+))$", 2, 9),
-        (r"^([a-zA-ZÀ-ÖØ-öø-ɏ \t\n\r\f\v0-9_.:/=+\-@]*)$", 256, 256),
-        (r"a{2}-+\.{2}", 7, 12),
+        (r"^([a-zA-Z0-9]*)$", 5, 5, "a0"),
+        (r"^([a-zA-Z0-9_.-]+)$", 3, 12, "a."),
+        (r"^(?i:[a-z]*)$", 4, 4, "aB"),
+        (r"^(?i:([a-z-]+))$", 2, 9, "a-"),
+        (r"^([a-zA-ZÀ-ÖØ-öø-ɏ \t\n\r\f\v0-9_.:/=+\-@]*)$", 256, 256, "a"),
+        # Unanchored: the rewrite keeps only the strings that match end to end.
+        (r"a{2}-+\.{2}", 7, 12, None),
+        (r"^[a-z]{1,3}[0-9]+$", 5, 10, "a0"),
+        (r"^(a?)+b+c+$", 7, 12, "abc"),
+        (r"^(a|bb)+$", 4, 8, "ab"),
+        (r"^[a-z]+[0-9]+$", 4, 8, "a0"),
     ],
 )
 @settings(max_examples=30, suppress_health_check=list(HealthCheck))
 @given(data=st.data())
-def test_group_rewrite_stays_within_the_original_language(pattern, min_length, max_length, data):
-    rewritten = update_quantifier(pattern, min_length, max_length)
-    assert rewritten != pattern
-    value = data.draw(st.from_regex(rewritten, fullmatch=True, alphabet=st.characters(codec=None)))
+def test_group_rewrite_stays_within_the_original_language(pattern, min_length, max_length, alphabet, data):
+    schema = {"type": "string", "pattern": pattern, "minLength": min_length, "maxLength": max_length}
+    rewritten_schema = dict(schema)
+    update_pattern_in_schema(rewritten_schema)
+    original = jsonschema_rs.validator_for(schema, pattern_options=FANCY_REGEX_OPTIONS)
+    folded = jsonschema_rs.validator_for(rewritten_schema, pattern_options=FANCY_REGEX_OPTIONS)
+    value = data.draw(st.from_regex(rewritten_schema["pattern"], fullmatch=True, alphabet=st.characters(codec=None)))
     assert re.search(pattern, value), f"{value!r} does not match {pattern}"
-    assert min_length <= len(value) <= max_length
+    assert not folded.is_valid(value) or original.is_valid(value), f"{value!r} under {rewritten_schema}"
+    if alphabet is None:
+        return
+    for length in range(min_length, min(max_length, REWRITE_ENUMERATION_MAX_LENGTH) + 1):
+        for letters in product(alphabet, repeat=length):
+            text = "".join(letters)
+            assert original.is_valid(text) == folded.is_valid(text), f"{text!r} under {rewritten_schema}"
 
 
 def test_update_quantifier_keeps_repeat_matching_empty():
@@ -407,6 +427,8 @@ def test_update_quantifier_invalid_pattern():
         ("abc*def*", 1, 3, "abc*def*"),
         ("[bc]*[de]*", 1, 3, "[bc]*[de]*"),
         ("[bc]3", 1, 3, "[bc]3"),
+        # Either slot may carry most of the length, so `minLength` stays with the schema.
+        ("[a-z]+[0-9]+", 4, 8, "^[a-z]{1,7}[0-9]{1,7}$"),
     ],
 )
 def test_update_quantifier_unanchored_multi(pattern, min_length, max_length, expected):
@@ -419,7 +441,6 @@ def test_update_quantifier_unanchored_multi(pattern, min_length, max_length, exp
     [
         ("[A-Za-z][A-Za-z0-9_.-]*", 1, 255),
         ("[a-z0-9_][a-z0-9_-]+[a-z0-9_]", 3, 63),
-        ("[a-z]+[0-9]+", 4, 8),
         ("[a-z][0-9]*", 4, 4),
     ],
 )
