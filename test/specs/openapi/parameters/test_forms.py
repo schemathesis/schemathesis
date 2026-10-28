@@ -153,3 +153,29 @@ def test_multipart_form_open_api_3(
         # When converted, the schema corresponds the default schema defined for a User object with a file
         [user_jsonschema_with_file],
     )
+
+
+def test_swagger_form_body_requires_only_required_parameters(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "consumes": ["application/x-www-form-urlencoded"],
+            "parameters": [
+                {"name": "name", "in": "formData", "type": "string", "required": True},
+                {"name": "nickname", "in": "formData", "type": "string"},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
+    )
+    assert [(body.is_required, body.optimized_schema) for body in operation.body] == [
+        (
+            True,
+            {
+                "properties": {"name": {"type": "string"}, "nickname": {"type": "string"}},
+                "additionalProperties": False,
+                "type": "object",
+                "required": ["name"],
+            },
+        )
+    ]

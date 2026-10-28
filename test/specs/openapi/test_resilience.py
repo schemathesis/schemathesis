@@ -275,20 +275,16 @@ def test_reference_to_non_object_node_v3(ctx, operation, components, location):
     assert isinstance(valid, Ok)
 
 
-@pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
+@pytest.mark.parametrize("required", [None, False, True], ids=["unspecified", "optional", "required"])
 def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
+    body = {"in": "body", "name": "payload", "schema": {"$ref": "#/definitions/Missing"}}
+    if required is not None:
+        body["required"] = required
     schema = ctx.openapi.load_schema(
         {
             "/things": {
                 "get": {
-                    "parameters": [
-                        {
-                            "in": "body",
-                            "name": "payload",
-                            "required": required,
-                            "schema": {"$ref": "#/definitions/Missing"},
-                        }
-                    ],
+                    "parameters": [body, {"in": "query", "name": "page", "type": "integer"}],
                     "responses": {"200": {"description": "OK"}},
                 }
             }
@@ -298,8 +294,9 @@ def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     result = _first_operation(schema)
     assert isinstance(result, Ok)
     assert list(result.ok().body) == []
+    assert [parameter.name for parameter in result.ok().query] == ["page"]
     assert result.ok().skipped_parameters == [
-        SkippedParameter(location="body", name="payload", reference="#/definitions/Missing", required=required)
+        SkippedParameter(location="body", name="payload", reference="#/definitions/Missing", required=bool(required))
     ]
 
 
@@ -321,20 +318,16 @@ def test_parameter_ref_that_names_no_file_v3(ctx, reference):
     assert "Unresolvable reference" in str(result.err())
 
 
-@pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
+@pytest.mark.parametrize("required", [None, False, True], ids=["unspecified", "optional", "required"])
 def test_query_parameter_with_unresolvable_ref_v3(ctx, required):
+    parameter = {"in": "query", "name": "filter", "schema": {"$ref": "#/components/schemas/Missing"}}
+    if required is not None:
+        parameter["required"] = required
     schema = ctx.openapi.load_schema(
         {
             "/things": {
                 "get": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "filter",
-                            "required": required,
-                            "schema": {"$ref": "#/components/schemas/Missing"},
-                        }
-                    ],
+                    "parameters": [parameter, {"in": "query", "name": "page", "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 }
             }
@@ -346,7 +339,7 @@ def test_query_parameter_with_unresolvable_ref_v3(ctx, required):
         assert isinstance(result.err(), InvalidSchema)
     else:
         assert isinstance(result, Ok)
-        assert list(result.ok().query) == []
+        assert [parameter.name for parameter in result.ok().query] == ["page"]
 
 
 @pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
@@ -357,7 +350,10 @@ def test_request_body_with_unresolvable_ref_v3(ctx, required):
                 "post": {
                     "requestBody": {
                         "required": required,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                        "content": {
+                            "application/json": {"schema": {"$ref": "#/components/schemas/Missing"}},
+                            "application/xml": {"schema": {"type": "object"}},
+                        },
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -366,7 +362,7 @@ def test_request_body_with_unresolvable_ref_v3(ctx, required):
     )
     result = _first_operation(schema)
     assert isinstance(result, Ok)
-    assert list(result.ok().body) == []
+    assert [body.media_type for body in result.ok().body] == ["application/xml"]
     assert result.ok().skipped_parameters == [
         SkippedParameter(location="body", name=None, reference="#/components/schemas/Missing", required=required)
     ]

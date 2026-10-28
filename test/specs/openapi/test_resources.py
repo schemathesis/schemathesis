@@ -1716,7 +1716,7 @@ def test_negative_aware_strategy_with_captured_values(ctx):
 
     results = generate_many(strategy, 20)
 
-    assert all(isinstance(r, GeneratedValue) for r in results)
+    assert [r for r in results if not isinstance(r, GeneratedValue) or not isinstance(r.value, dict)] == []
 
 
 @pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE], ids=["positive", "negative"])

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import jsonschema_rs
 import pytest
 
 from schemathesis.config import SchemathesisConfig
@@ -266,6 +267,17 @@ def test_override_drops_stale_mutation_on_same_path(ctx):
                 saw_sibling_mutation = True
 
     assert saw_sibling_mutation, "no sibling mutation seen in any case; absence-of-token-mutation could be vacuous"
+
+
+@pytest.mark.hypothesis_nested
+def test_override_that_restores_a_valid_body_drops_its_mutations(ctx):
+    body_schema = {"type": "object", "properties": {"token": {"type": "string", "minLength": 5}}, "required": ["token"]}
+    schema = _load_schema(ctx, {"parameters": {"body.token": "valid-token-value"}}, _path_with_body(body_schema))
+    validator = jsonschema_rs.Draft4Validator(body_schema)
+    cases = generate_many(schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE), 10)
+    valid = [case for case in cases if isinstance(case.body, dict) and validator.is_valid(case.body)]
+    assert valid
+    assert [case.body for case in valid if case._meta.generation.mode.is_negative] == []
 
 
 @pytest.mark.hypothesis_nested

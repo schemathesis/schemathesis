@@ -1370,6 +1370,27 @@ def test_apply_exclusions_reachable_via_auth_supplied_required_header():
     assert out["properties"] == {}
 
 
+# HTTP header names are case-insensitive; other locations match names exactly.
+def test_exclusions_ignore_case_only_for_headers(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                {"name": "Token", "in": "query", "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    assert [
+        (schema.get("required"), list(schema["properties"]))
+        for schema in (
+            operation.headers.get_schema_with_exclusions(["x-token"]),
+            operation.query.get_schema_with_exclusions(["token"]),
+        )
+    ] == [(None, []), (["Token"], ["Token"])]
+
+
 @pytest.mark.parametrize(
     ("format", "minimum", "maximum"),
     [("int32", -(2**31), 2**31 - 1), ("int64", -(2**63), 2**63 - 1)],

@@ -12,6 +12,7 @@ import schemathesis
 from schemathesis.config import GenerationConfig, SchemathesisConfig
 from schemathesis.generation.body_overrides import build_body_override_overlay_strategy
 from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import CaseMetadata, CoverageScenario, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue, prune_overwritten_body_constants
@@ -38,6 +39,8 @@ from test.python._constants.fixtures import (
 
 # Constant substitution is probabilistic; `find` drives generation until it fires (or proves it can't).
 _FIND = settings(max_examples=200, database=None)
+# Stops at the first match; shrinking it adds seconds and nothing these tests read.
+_FIND_FIRST = settings(_FIND, phases=[Phase.generate])
 
 
 def _app_constants(source, *, name="provider"):
@@ -168,40 +171,44 @@ def test_constant_applied_to_query_parameter():
     assert case.query["code"] == draw.value
 
 
+def test_constant_rejected_by_generation_settings_does_not_hide_the_rest():
+    strategy = build_constants_overlay_strategy(
+        st.just({"code": "placeholder"}),
+        source=_source("string", "pre\x00post", "fine"),
+        schema_properties={"code": {"type": "string"}},
+        validator_cls=jsonschema_rs.Draft4Validator,
+        location="query",
+        generation_config=GenerationConfig(allow_x00=False),
+        probability=1.0,
+    )
+    assert find(strategy, lambda value: True, settings=_FIND).value == {"code": "fine"}
+
+
+def _nul_constant_strategy(ctx, allow_x00):
+    schema = _unlock_schema(ctx, _CODE_BODY)
+    schema.config.generation.update(allow_x00=allow_x00)
+    return schema["/unlock"]["POST"].as_strategy(
+        generation_mode=GenerationMode.POSITIVE,
+        feedback=FeedbackSources(constants_value_source=_source("string", "pre\x00post")),
+    )
+
+
 def test_constants_respect_allow_x00(ctx):
     # A NUL harvested from the app's source must not reach data when the user disabled `\x00`.
-    schema = ctx.openapi.load_schema(
-        {
-            "/unlock": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"code": {"type": "string"}},
-                                    "required": ["code"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    schema.config.generation.update(allow_x00=False)
-    operation = schema["/unlock"]["POST"]
     with pytest.raises(NoSuchExample):
         find(
-            operation.as_strategy(
-                generation_mode=GenerationMode.POSITIVE,
-                feedback=FeedbackSources(constants_value_source=_source("string", "pre\x00post")),
-            ),
+            _nul_constant_strategy(ctx, allow_x00=False),
             lambda case: isinstance(case.body, dict) and "\x00" in str(case.body.get("code", "")),
             settings=_FIND,
         )
+
+
+def test_constant_with_nul_is_substituted_when_allowed(ctx):
+    find(
+        _nul_constant_strategy(ctx, allow_x00=True),
+        lambda case: case.body == {"code": "pre\x00post"},
+        settings=_FIND_FIRST,
+    )
 
 
 _CODE_BODY = {
@@ -306,6 +313,71 @@ def test_constant_applied_to_integer_path_parameter():
     assert draw.value == buggy_path_app.MAGIC_ID
     # The positive-integer path bias must not rewrite a substituted (negative) literal.
     assert case.path_parameters["item_id"] == draw.value
+
+
+@pytest.mark.parametrize(("style", "sent"), [({}, "a%20b"), ({"style": "label"}, ".a%20b")], ids=["simple", "label"])
+def test_constant_keeps_its_provenance_after_path_serialization(ctx, style, sent):
+    operation = ctx.openapi.load_operation(
+        "GET /items/{name}",
+        {
+            "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}, **style}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = find(
+        operation.as_strategy(
+            generation_mode=GenerationMode.POSITIVE,
+            feedback=FeedbackSources(constants_value_source=_source("string", "a b")),
+        ),
+        lambda case: case.path_parameters["name"] == sent,
+        settings=_FIND,
+    )
+    assert [(draw.location, draw.parameter_name, draw.value) for draw in case._meta.constants_draws] == [
+        ("path", "name", "a b")
+    ]
+
+
+# Constants supplied after an operation already generated data still reach its parameters.
+def test_constants_reach_a_parameter_whose_strategy_was_built_without_them(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "code", "in": "query", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 1)
+    find(
+        operation.as_strategy(
+            generation_mode=GenerationMode.POSITIVE,
+            feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ")),
+        ),
+        lambda case: case.query["code"] == "TOKEN_XYZ",
+        settings=_FIND_FIRST,
+    )
+
+
+def test_constant_substituted_into_referenced_query_parameter(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"name": "code", "in": "query", "required": True, "schema": {"$ref": "#/components/schemas/Code"}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={
+            "schemas": {"Code": {"allOf": [{"$ref": "#/components/schemas/Text"}]}, "Text": {"type": "string"}}
+        },
+    )
+    find(
+        operation.as_strategy(
+            generation_mode=GenerationMode.POSITIVE,
+            feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ")),
+        ),
+        lambda case: case.query["code"] == "TOKEN_XYZ",
+        settings=_FIND_FIRST,
+    )
 
 
 def test_bug_stays_unfindable_without_the_feature():
@@ -746,10 +818,13 @@ def test_oversized_binary_constant_is_not_substituted(data):
     assert _draw(data, source, schema_properties={"blob": schema}) == "placeholder"
 
 
+@pytest.mark.parametrize(
+    "bounds", [{"maxLength": 4}, {"minLength": 2}, {"maxLength": 2}], ids=["shorter", "at-min", "at-max"]
+)
 @given(data=st.data())
 @settings(max_examples=5)
-def test_valid_binary_constant_is_substituted(data):
-    schema = {"type": "string", "format": "binary", "maxLength": 4}
+def test_valid_binary_constant_is_substituted(data, bounds):
+    schema = {"type": "string", "format": "binary", **bounds}
     blob = _draw(data, _source("bytes", b"OK"), schema_properties={"blob": schema})
     assert isinstance(blob, Binary)
     assert blob.data == b"OK"
@@ -774,14 +849,29 @@ def test_undersized_binary_constant_is_not_substituted(data):
     assert _draw(data, _source("bytes", b"x"), schema_properties={"blob": schema}) == "placeholder"
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"properties": {"code": {"type": "string"}}},
+        {"items": {"type": "string"}},
+        {"additionalProperties": {"type": "string"}},
+    ],
+    ids=["properties", "items", "additionalProperties"],
+)
 @given(data=st.data())
 @settings(max_examples=5)
-def test_typeless_object_property_is_not_scalar_substituted(data):
+def test_typeless_object_property_is_not_scalar_substituted(data, schema):
     # A property that is object-shaped (has `properties`) but omits an explicit `type` must not be
     # replaced by a scalar constant -- that would corrupt the body structure.
     source = _source("string", "SCALAR_CONST")
-    blob = _draw(data, source, schema_properties={"blob": {"properties": {"code": {"type": "string"}}}})
+    blob = _draw(data, source, schema_properties={"blob": schema})
     assert blob == "placeholder"
+
+
+@given(data=st.data())
+@settings(max_examples=5)
+def test_float_constant_is_substituted_into_number_property(data):
+    assert _draw(data, _source("float", 2.5), schema_properties={"blob": {"type": "number"}}) == 2.5
 
 
 @given(data=st.data())
@@ -1184,6 +1274,87 @@ def test_constant_substitution_depth_limit(ctx, depth, substituted):
     else:
         with pytest.raises(NoSuchExample):
             find(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", settings=_FIND)
+
+
+@pytest.mark.parametrize(
+    "node",
+    [
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "child": {"$ref": "#/components/schemas/Node"}},
+            "required": ["name"],
+        },
+        {
+            "type": "object",
+            "allOf": [{"properties": {"name": {"type": "string"}, "child": {"$ref": "#/components/schemas/Node"}}}],
+            "required": ["name"],
+        },
+        {
+            "type": "object",
+            "properties": {"name": {"allOf": [{"$ref": "#/components/schemas/Name"}]}},
+            "required": ["name"],
+        },
+    ],
+    ids=["properties", "all-of", "referenced-leaf"],
+)
+def test_constant_substituted_into_referencing_body(ctx, node):
+    operation = ctx.openapi.load_operation(
+        "POST /nodes",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+        components={"schemas": {"Node": node, "Name": {"type": "string"}}},
+    )
+    find(
+        operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ"))),
+        lambda case: isinstance(case.body, dict) and case.body.get("name") == "TOKEN_XYZ",
+        settings=_FIND_FIRST,
+    )
+
+
+@pytest.mark.parametrize(
+    "outer",
+    [
+        {"$ref": "#/components/schemas/Inner"},
+        {"allOf": [{"$ref": "#/components/schemas/Inner"}]},
+        {"allOf": [{"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}]},
+    ],
+    ids=["reference", "referenced-branch", "inline-branch"],
+)
+def test_constant_substituted_into_nested_body_property(ctx, outer):
+    operation = ctx.openapi.load_operation(
+        "POST /nodes",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object", "properties": {"outer": outer}, "required": ["outer"]}
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+        components={
+            "schemas": {"Inner": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}
+        },
+    )
+    find(
+        operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ"))),
+        lambda case: isinstance(case.body, dict) and _leaf(case.body) == "TOKEN_XYZ",
+        settings=_FIND_FIRST,
+    )
+
+
+def _leaf(body):
+    outer = body.get("outer")
+    return outer.get("name") if isinstance(outer, dict) else None
 
 
 def test_constant_substituted_through_boolean_all_of_branch(ctx):

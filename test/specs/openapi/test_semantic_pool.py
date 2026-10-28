@@ -720,6 +720,83 @@ def test_pooled_response_value_reaches_consumer(
     assert expected in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
 
 
+@pytest.mark.parametrize(
+    ("consumer_path", "location", "name", "field", "value", "sent", "reaches"),
+    [
+        ("/api/search", "query", "recipient", {"format": "email"}, "alice@example.com", "alice@example.com", True),
+        ("/api/users/{nickname}", "path", "nickname", {}, "alice", "alice", True),
+        (
+            "/api/mail/{recipient}",
+            "path",
+            "recipient",
+            {"format": "email"},
+            "alice@example.com",
+            "alice%40example.com",
+            False,
+        ),
+    ],
+    ids=["query-by-format", "path-by-name", "path-not-by-format"],
+)
+def test_pooled_response_value_reaches_consumer_parameter(
+    ctx, case_factory, response_factory, consumer_path, location, name, field, value, sent, reaches
+):
+    field_schema = {"type": "string", **field}
+    producer = {
+        "description": "OK",
+        "content": {"application/json": {"schema": {"type": "object", "properties": {"nickname": field_schema}}}},
+    }
+    consumer = {
+        "parameters": [{"name": name, "in": location, "required": True, "schema": field_schema}],
+        "responses": {"200": {"description": "OK"}},
+    }
+    schema, extra_data_source = _extra_data_source_for(
+        ctx, {"/api/users": {"get": {"responses": {"200": producer}}}, consumer_path: {"get": consumer}}
+    )
+    _ingest_2xx(
+        schema["/api/users"]["GET"],
+        body={"nickname": value},
+        extra_data_source=extra_data_source,
+        case_factory=case_factory,
+        response_factory=response_factory,
+    )
+    strategy = schema[consumer_path]["GET"].as_strategy(
+        generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(extra_data_source=extra_data_source)
+    )
+    cases = generate_many(strategy, 30)
+    values = {case.query[name] if location == "query" else case.path_parameters[name] for case in cases}
+    assert (sent in values) is reaches
+
+
+# A pool supplied after an operation already generated data still feeds its parameters.
+def test_parameter_strategy_follows_the_current_semantic_pool(ctx, case_factory, response_factory):
+    email = {"type": "string", "format": "email"}
+    producer = {
+        "description": "OK",
+        "content": {"application/json": {"schema": {"type": "object", "properties": {"email": email}}}},
+    }
+    consumer = {
+        "parameters": [{"name": "recipient", "in": "query", "required": True, "schema": email}],
+        "responses": {"200": {"description": "OK"}},
+    }
+    schema, extra_data_source = _extra_data_source_for(
+        ctx, {"/api/users": {"get": {"responses": {"200": producer}}}, "/api/search": {"get": consumer}}
+    )
+    _ingest_2xx(
+        schema["/api/users"]["GET"],
+        body={"email": "alice@example.com"},
+        extra_data_source=extra_data_source,
+        case_factory=case_factory,
+        response_factory=response_factory,
+    )
+    operation = schema["/api/search"]["GET"]
+
+    def drawn(feedback):
+        strategy = operation.as_strategy(generation_mode=GenerationMode.POSITIVE, feedback=feedback)
+        return "alice@example.com" in {case.query["recipient"] for case in generate_many(strategy, 30)}
+
+    assert [drawn(FeedbackSources()), drawn(FeedbackSources(extra_data_source=extra_data_source))] == [False, True]
+
+
 def test_restgym_flight_search_departure_time_cross_operation(ctx, case_factory, response_factory):
     schema, extra_data_source = _extra_data_source_for(
         ctx,
