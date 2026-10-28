@@ -334,6 +334,22 @@ def test_extract_from_schemas_without_examples_skips_shared_references(ctx):
     assert list(extract_from_schemas(operation)) == []
 
 
+@pytest.mark.parametrize(
+    ("target", "overlay", "expected"),
+    [
+        ({"owner": None, "name": "x"}, {"owner": {"id": 1}}, {"owner": {"id": 1}, "name": "x"}),
+        ({"owner": {"id": 0, "name": "x"}}, {"owner": 5}, {"owner": 5}),
+        ({"tags": ["a", "b"]}, {"tags": "c"}, {"tags": "c"}),
+        ({"items": [{"id": 0, "name": "x"}]}, {"items": [{"id": 1}]}, {"items": [{"id": 1, "name": "x"}]}),
+    ],
+    ids=["object-onto-null", "scalar-onto-object", "scalar-onto-list", "item-fields"],
+)
+def test_overlay_merges_nested_objects_and_replaces_other_values(target, overlay, expected):
+    _apply_overlay(target, overlay)
+
+    assert target == expected
+
+
 def test_non_item_list_overlay_leaves_list_unchanged():
     target = [{"name": "first"}, {"name": "second"}]
 
@@ -5241,7 +5257,18 @@ def test_examples_with_the_same_name_are_paired(ctx):
 
 
 def test_examples_with_the_same_name_are_paired_in_fuzzing(ctx):
-    schema = ctx.openapi.load_schema(CORRELATED_NAMED_EXAMPLES)
+    query = CORRELATED_NAMED_EXAMPLES["/search"]["get"]["parameters"]
+    region = {**query[0], "examples": {**query[0]["examples"], "AP": {"value": "APAC"}}}
+    page = {
+        "name": "page",
+        "in": "query",
+        "required": True,
+        "schema": {"type": "string"},
+        "examples": {"first": {"value": "1"}},
+    }
+    schema = ctx.openapi.load_schema(
+        {"/search": {"get": {"parameters": [region, query[1], page], "responses": {"200": {"description": "OK"}}}}}
+    )
     seen = []
 
     # Every expected variant must appear at least once, which takes many draws.
@@ -5253,9 +5280,12 @@ def test_examples_with_the_same_name_are_paired_in_fuzzing(ctx):
     def test(case):
         seen.append((case.query["region"], case.query["currency"]))
 
-    from_examples = {pair for pair in seen if pair[0] in ("US", "EU") and pair[1] in ("USD", "EUR")}
+    from_examples = {
+        (region, currency) for region, currency in seen if region in ("US", "EU") and currency in ("USD", "EUR")
+    }
     assert from_examples
     assert from_examples <= {("US", "USD"), ("EU", "EUR")}, f"Mismatched pairs: {from_examples}"
+    assert "APAC" in {region for region, _ in seen}
 
 
 def examples_phase_cases(ctx, app_runner, paths, **kwargs):

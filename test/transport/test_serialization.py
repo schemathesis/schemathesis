@@ -1667,8 +1667,16 @@ def test_unknown_multipart_fields_openapi3(ctx):
             },
             "doc.pdf",
         ),
+        (
+            {"attachment": {"headers": {"Content-Disposition": {"example": "form-data; filename=raw.bin"}}}},
+            "raw.bin",
+        ),
+        (
+            {"attachment": {"headers": {"Content-Disposition": {"example": 'form-data; name="attachment"'}}}},
+            "attachment",
+        ),
     ],
-    ids=["field-name-fallback", "schema-example", "header-example"],
+    ids=["field-name-fallback", "schema-example", "header-example", "unquoted-filename", "no-filename"],
 )
 @pytest.mark.parametrize(
     "property_schema, value, sent",

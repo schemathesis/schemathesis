@@ -1145,21 +1145,23 @@ def test_path_example_without_slash_does_not_allow_encoded_slash(ctx):
 
 
 @pytest.mark.hypothesis_nested
-def test_path_example_with_slash_allows_encoded_slash(ctx):
+@pytest.mark.parametrize(
+    ("version", "schema", "example"),
+    [
+        ("3.0.2", {"type": "string", "pattern": r"^[0-9.]+/[0-9]+$"}, {"example": "192.168.1.0/24"}),
+        ("3.0.2", {"type": "string", "enum": ["192.168.1.0/24"]}, {}),
+        ("3.1.0", {"type": "string", "const": "192.168.1.0/24"}, {}),
+    ],
+    ids=["example", "enum", "const"],
+)
+def test_path_example_with_slash_allows_encoded_slash(ctx, version, schema, example):
     operation = ctx.openapi.load_operation(
         "GET /blocks/{block}",
         {
-            "parameters": [
-                {
-                    "name": "block",
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": "string", "pattern": r"^[0-9.]+/[0-9]+$"},
-                    "example": "192.168.1.0/24",
-                }
-            ],
+            "parameters": [{"name": "block", "in": "path", "required": True, "schema": schema, **example}],
             "responses": {"200": {"description": "OK"}},
         },
+        version=version,
     )
     strategy = _hypothesis.get_parameters_strategy(
         operation,
@@ -1258,6 +1260,53 @@ def test_positive_bias_keeps_path_integer_schema_valid(ctx, item_schema):
         for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 20)
     ]
     assert [value for value in values if not validator.is_valid(value)] == []
+
+
+def test_positive_bias_turns_non_positive_path_integers_positive(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items/{item_id}",
+        {
+            "parameters": [
+                {"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer", "enum": [-1, 0, 1]}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    values = [
+        case.path_parameters["item_id"]
+        for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 20)
+    ]
+    assert values.count(1) > values.count(-1) + values.count(0)
+
+
+def test_positive_bias_keeps_non_integer_and_out_of_schema_path_values(ctx):
+    schemas = {
+        "id": {"type": "integer", "enum": [-3, 3]},
+        "zero": {"type": "integer", "enum": [0, 1]},
+        "flag": {"type": "boolean"},
+        "bounded": {"type": "integer", "enum": [-4, 5]},
+        "amount": {"type": "number", "maximum": -1},
+    }
+    operation = ctx.openapi.load_operation(
+        "GET /items/{id}/{zero}/{flag}/{bounded}/{amount}",
+        {
+            "parameters": [
+                {"name": name, "in": "path", "required": True, "schema": schema} for name, schema in schemas.items()
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    cases = generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 20)
+    assert {(name, value) for case in cases for name, value in case.path_parameters.items() if name != "amount"} <= {
+        ("id", -3),
+        ("id", 3),
+        ("zero", 0),
+        ("zero", 1),
+        ("flag", "false"),
+        ("flag", "true"),
+        ("bounded", -4),
+        ("bounded", 5),
+    }
 
 
 def test_custom_format_with_bytes(testdir):

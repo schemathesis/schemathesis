@@ -849,11 +849,25 @@ def test_empty_parameter_content(ctx, version, location):
         test()
 
 
-def test_non_object_parameter_media_type(ctx):
+@pytest.mark.parametrize(
+    ("parameter", "message"),
+    [
+        (
+            {"content": {"application/json": "oops"}},
+            "Media type `application/json` for query parameter `a` must be an object",
+        ),
+        (
+            {"schema": 5},
+            "Can not generate data for query parameter `a`! Its schema should be an object or boolean, got 5",
+        ),
+    ],
+    ids=["media-type", "schema"],
+)
+def test_non_object_parameter_schema(ctx, parameter, message):
     operation = ctx.openapi.load_operation(
         "GET /x",
         {
-            "parameters": [{"name": "a", "in": "query", "required": True, "content": {"application/json": "oops"}}],
+            "parameters": [{"name": "a", "in": "query", "required": True, **parameter}],
             "responses": {"200": {"description": "OK"}},
         },
     )
@@ -863,8 +877,76 @@ def test_non_object_parameter_media_type(ctx):
     def test(case):
         pass
 
-    with pytest.raises(InvalidSchema, match="Media type `application/json` for query parameter `a` must be an object"):
+    with pytest.raises(InvalidSchema, match=re.escape(message)):
         test()
+
+
+def test_content_parameter_without_schema_takes_any_value(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /x",
+        {
+            "parameters": [{"name": "a", "in": "query", "required": True, "content": {"application/json": {}}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    assert [parameter.raw_schema for parameter in operation.query] == [{}]
+
+    @run_given(case=operation.as_strategy(), max_examples=1)
+    def test(case):
+        assert "a" in case.query
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "string"}, {"type": "string", "minLength": 1}),
+        ({"type": "string", "minLength": 0}, {"type": "string", "minLength": 0}),
+        ({"type": "string", "minLength": 3}, {"type": "string", "minLength": 3}),
+    ],
+    ids=["default", "declared-zero", "declared"],
+)
+def test_path_string_minimum_length_defaults_to_one(ctx, schema, expected):
+    operation = ctx.openapi.load_operation(
+        "GET /items/{id}",
+        {
+            "parameters": [{"name": "id", "in": "path", "required": True, "schema": schema}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    assert operation.path_parameters.schema["properties"] == {"id": expected}
+
+
+@pytest.mark.parametrize(
+    ("operation_required", "path_item_required", "expected"),
+    [(True, False, True), (False, True, True), (False, False, False)],
+    ids=["operation-required", "path-item-required", "both-optional"],
+)
+def test_header_declared_twice_in_different_case_is_one_header(ctx, operation_required, path_item_required, expected):
+    header = {"in": "header", "schema": {"type": "string"}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "parameters": [{"name": "X-Token", "required": path_item_required, **header}],
+                "get": {
+                    "parameters": [
+                        {"name": "X-Trace", **header},
+                        {"name": "x-token", "required": operation_required, **header},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        }
+    )
+    operation = schema["/items"]["GET"]
+    assert [(parameter.name, parameter.is_required) for parameter in operation.headers] == [
+        ("X-Trace", False),
+        ("x-token", expected),
+    ]
+
+    @run_given(case=operation.as_strategy(), max_examples=1)
+    def test(case):
+        assert set(case.headers) <= {"X-Trace", "x-token"}
+        assert "x-token" in case.headers or not expected
 
 
 def test_ascii_codec_for_headers(ctx):
@@ -937,6 +1019,21 @@ def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
         cli.run(str(schema_path), "--max-examples=1", f"--url={api.base_url}/api", "--checks=not_a_server_error")
         == snapshot_cli
     )
+
+
+def test_path_parameter_with_boolean_true_schema(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items/{id}",
+        {
+            "parameters": [{"name": "id", "in": "path", "required": True, "schema": True}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+    )
+
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=5)
+    def test(case):
+        assert "id" in case.path_parameters
 
 
 def test_parameter_with_boolean_false_schema(ctx):
@@ -1180,6 +1277,19 @@ def test_non_string_path_parameter_name_recovered_from_template(ctx):
         assert case.formatted_path == "/foo/ALPHA"
 
 
+@pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
+def test_undeclared_path_parameter_is_a_required_non_empty_string(ctx, version):
+    operation = ctx.openapi.load_operation(
+        "GET /users/{user_id}", {"responses": {"200": {"description": "OK"}}}, version=version
+    )
+    assert [(parameter.name, parameter.is_required) for parameter in operation.path_parameters] == [("user_id", True)]
+
+    @run_given(case=operation.as_strategy(), max_examples=5)
+    def test(case):
+        assert isinstance(case.path_parameters["user_id"], str)
+        assert case.path_parameters["user_id"] != ""
+
+
 def test_non_string_path_parameter_name_kept_when_placeholders_are_ambiguous(ctx):
     operation = ctx.openapi.load_operation(
         "GET /foo/{on}/{off}",
@@ -1310,18 +1420,28 @@ def test_body_validate_rejects_violating_value(schema_with_referenced_body, valu
     assert not body.is_valid(value)
 
 
-def test_query_parameter_validate(ctx):
+@pytest.mark.parametrize(
+    ("version", "schema", "valid", "invalid"),
+    [
+        ("3.0.2", {"type": "integer", "minimum": 1}, 5, 0),
+        ("3.1.0", {"type": "array", "prefixItems": [{"type": "string"}, {"type": "integer"}]}, ["a", 1], [1, "a"]),
+        ("3.1.0", {"type": "integer", "minimum": 1, "exclusiveMinimum": True}, 2, 1),
+    ],
+    ids=["minimum", "prefix-items", "legacy-exclusive-minimum"],
+)
+def test_query_parameter_validate(ctx, version, schema, valid, invalid):
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
-            "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1}}],
+            "parameters": [{"name": "limit", "in": "query", "schema": schema}],
             "responses": {"200": {"description": "OK"}},
         },
+        version=version,
     )
     limit = operation.query[0]
-    assert limit.validate(5) is None
+    assert limit.validate(valid) is None
     with pytest.raises(jsonschema_rs.ValidationError):
-        limit.validate(0)
+        limit.validate(invalid)
 
 
 @pytest.mark.parametrize(
@@ -1418,6 +1538,45 @@ def test_validate_ignores_serialization_bounds(ctx):
     tags = operation.query[0]
     assert tags.wire_bounds == {"minItems": 1}
     assert tags.is_valid([])
+
+
+# An empty array or string drops a parameter from the query string unless the document admits nothing else.
+@pytest.mark.parametrize(
+    ("parameter", "empty"),
+    [
+        ({"required": True, "schema": {"type": "array"}}, False),
+        ({"required": True, "schema": {"type": "array", "minItems": 0}}, False),
+        ({"required": True, "schema": {"type": "array", "maxItems": 0}}, True),
+        ({"allowEmptyValue": False, "schema": {"type": "string"}}, False),
+        ({"allowEmptyValue": False, "schema": {"type": "string", "maxLength": 0}}, True),
+        ({"schema": {"type": "array"}}, True),
+    ],
+    ids=["required-array", "declared-min", "only-empty", "no-empty-string", "only-empty-string", "optional"],
+)
+def test_empty_query_values_are_generated_only_where_the_wire_keeps_them(ctx, parameter, empty):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"parameters": [{"name": "q", "in": "query", **parameter}], "responses": {"200": {"description": "OK"}}},
+    )
+    strategy = operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
+    if empty:
+        find(strategy, lambda case: case.query.get("q") in ([], ""), settings=settings(max_examples=50, database=None))
+    else:
+        assert [case.query for case in generate_many(strategy, 20) if case.query.get("q") in ([], "")] == []
+
+
+def test_malformed_array_bound_is_a_schema_error(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "array", "minItems": "1"}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    with pytest.raises(RejectedSchemaDefinition):
+        generate_many(operation.as_strategy(), 1)
 
 
 ITEM_SCHEMA = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}

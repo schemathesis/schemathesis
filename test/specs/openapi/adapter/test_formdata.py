@@ -98,3 +98,30 @@ def test_filename_only_for_binary_array_parts(ctx, version, items_schema, expect
     operation = make_multipart_operation(ctx, {"type": "array", "items": items_schema}, version=version)
 
     assert prepare_multipart_v3(operation, {"file": ["a", "b"]}, "multipart/form-data") == (expected, None)
+
+
+@pytest.mark.parametrize(
+    ("content_type", "expected"),
+    [
+        ("image/png, image/jpeg", ["image/png", "image/jpeg"]),
+        ("image/png, ", ["image/png"]),
+        (["image/png", 5, " "], ["image/png"]),
+    ],
+    ids=["comma-separated", "trailing-comma", "list"],
+)
+def test_declared_part_content_types(ctx, content_type, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /upload",
+        {
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {"type": "object", "properties": {"file": {"type": "string"}}},
+                        "encoding": {"file": {"contentType": content_type}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    assert [body.get_property_content_types("file") for body in operation.body] == [expected]
