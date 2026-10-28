@@ -95,10 +95,10 @@ def iter_coverage_cases(
         )
     if GenerationMode.NEGATIVE in modes:
         for element in iter_input_elements(field, coordinate):
-            for scenario, description, value in negative_values(element):
+            for scenario, description, path, value in negative_values(element, scalars):
                 instant = Instant()
                 try:
-                    arguments = with_value(field, element.path, value, scalars)
+                    arguments = with_value(field, path, value, scalars)
                 except UnknownScalar:
                     # Only required arguments of the operation field must have a known scalar
                     continue
@@ -159,11 +159,14 @@ def _walk(
     one_of_parent: bool,
     types: InputPath,
 ) -> Iterator[InputElement]:
+    nullable = graphql.get_nullable_type(type_)
+    if nullable in types:
+        # Visited already on this path
+        return
     yield InputElement(path=path, location=location, type_=type_, required=required, one_of_parent=one_of_parent)
-    nullable = type_.of_type if isinstance(type_, graphql.GraphQLNonNull) else type_
     if isinstance(nullable, graphql.GraphQLList):
         yield from _walk(nullable.of_type, (*path, 0), location, False, False, types)
-    elif isinstance(nullable, graphql.GraphQLInputObjectType) and nullable not in types:
+    elif isinstance(nullable, graphql.GraphQLInputObjectType):
         is_one_of = getattr(nullable, "is_one_of", False)
         for name, input_field in nullable.fields.items():
             yield from _walk(
@@ -176,15 +179,22 @@ def _walk(
             )
 
 
-def negative_values(element: InputElement) -> Iterator[tuple[CoverageScenario, str, graphql.ValueNode | None]]:
-    """Scenario, description and the value to put at the element; `None` leaves the element out."""
+def negative_values(
+    element: InputElement, scalars: ScalarLiterals
+) -> Iterator[tuple[CoverageScenario, str, ValuePath, graphql.ValueNode | None]]:
+    """Scenario, description, and the value to put at a path; `None` leaves the element at the path out."""
+    path = element.path
     parameter = element.parameter
     incorrect = f"Incorrect type for `{parameter}`"
-    if len(element.path) == 1 and element.required:
-        yield CoverageScenario.MISSING_PARAMETER, f"Missing required argument `{parameter}`", None
+    missing_field = f"Missing required field `{parameter}`"
+    if element.required:
+        if len(path) == 1:
+            yield CoverageScenario.MISSING_PARAMETER, f"Missing required argument `{parameter}`", path, None
+        else:
+            yield CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY, missing_field, path, None
     type_ = element.type_
     if isinstance(type_, graphql.GraphQLNonNull) or element.one_of_parent:
-        yield CoverageScenario.INCORRECT_TYPE, incorrect, graphql.NullValueNode()
+        yield CoverageScenario.INCORRECT_TYPE, incorrect, path, graphql.NullValueNode()
     nullable = graphql.get_nullable_type(type_)
     if isinstance(nullable, graphql.GraphQLList):
         # List items get their own cases
@@ -192,19 +202,28 @@ def negative_values(element: InputElement) -> Iterator[tuple[CoverageScenario, s
     if isinstance(nullable, graphql.GraphQLScalarType):
         # Custom scalars may accept any literal
         for literal in INCORRECT_LITERALS.get(nullable.name, ()):
-            yield CoverageScenario.INCORRECT_TYPE, incorrect, literal
+            yield CoverageScenario.INCORRECT_TYPE, incorrect, path, literal
         if nullable.name == "Int":
-            yield CoverageScenario.VALUE_ABOVE_MAXIMUM, f"Value above maximum for `{parameter}`", INT_ABOVE_MAXIMUM
-            yield CoverageScenario.VALUE_BELOW_MINIMUM, f"Value below minimum for `{parameter}`", INT_BELOW_MINIMUM
+            above, below = f"Value above maximum for `{parameter}`", f"Value below minimum for `{parameter}`"
+            yield CoverageScenario.VALUE_ABOVE_MAXIMUM, above, path, INT_ABOVE_MAXIMUM
+            yield CoverageScenario.VALUE_BELOW_MINIMUM, below, path, INT_BELOW_MINIMUM
     elif isinstance(nullable, graphql.GraphQLEnumType):
-        yield CoverageScenario.INCORRECT_TYPE, incorrect, graphql.StringValueNode(value="a")
-        yield (
-            CoverageScenario.INVALID_ENUM_VALUE,
-            f"Invalid enum value for `{parameter}`",
-            graphql.EnumValueNode(value=unused_name(nullable.values)),
-        )
+        yield CoverageScenario.INCORRECT_TYPE, incorrect, path, graphql.StringValueNode(value="a")
+        invalid = graphql.EnumValueNode(value=unused_name(nullable.values))
+        yield CoverageScenario.INVALID_ENUM_VALUE, f"Invalid enum value for `{parameter}`", path, invalid
     else:
-        yield CoverageScenario.INCORRECT_TYPE, incorrect, graphql.IntValueNode(value="1")
+        assert isinstance(nullable, graphql.GraphQLInputObjectType)
+        unexpected = f"Unexpected field in `{parameter}`"
+        yield CoverageScenario.INCORRECT_TYPE, incorrect, path, graphql.IntValueNode(value="1")
+        is_one_of = getattr(nullable, "is_one_of", False)
+        if is_one_of:
+            yield CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY, missing_field, path, _object_value([])
+        unknown_field = (*path, unused_name(nullable.fields))
+        yield CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES, unexpected, unknown_field, graphql.IntValueNode(value="0")
+        if is_one_of:
+            pair = list(itertools.islice(_one_of_fields(nullable, (nullable,), scalars), 2))
+            if len(pair) == 2:
+                yield CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES, unexpected, path, _object_value(pair)
 
 
 def unused_name(declared: Iterable[str]) -> str:
@@ -247,15 +266,26 @@ def default_value(
     inner_path = (*path, type_)
     # graphql-core 3.2.7+ marks `@oneOf` inputs, which take exactly one non-null field
     if getattr(type_, "is_one_of", False):
-        for name, input_field in type_.fields.items():
-            if not isinstance(input_field.type, graphql.GraphQLList) and input_field.type in inner_path:
-                continue
-            value = default_value(input_field.type, inner_path, scalars)
-            if value is not None:
-                return _object_value([(name, value)])
-        return None
+        first = next(_one_of_fields(type_, inner_path, scalars), None)
+        return None if first is None else _object_value([first])
     fields = _fill(_input_fields(type_), (), None, inner_path, scalars)
     return None if fields is None else _object_value(fields)
+
+
+def _one_of_fields(
+    type_: graphql.GraphQLInputObjectType, path: InputPath, scalars: ScalarLiterals
+) -> Iterator[tuple[str, graphql.ValueNode]]:
+    """`@oneOf` fields that have a fixed value, in declaration order."""
+    for name, input_field in type_.fields.items():
+        if not isinstance(input_field.type, graphql.GraphQLList) and input_field.type in path:
+            continue
+        try:
+            value = default_value(input_field.type, path, scalars)
+        except UnknownScalar:
+            # The field is optional, so another one can be chosen
+            continue
+        if value is not None:
+            yield name, value
 
 
 def _input_fields(type_: graphql.GraphQLInputObjectType) -> list[FieldSpec]:
@@ -270,6 +300,7 @@ def _fill(
     fields = []
     for name, type_, required in specs:
         if name == target:
+            target = None
             node = _replace(type_, path[1:], value, types, scalars)
             if node is None:
                 if len(path) == 1:
@@ -286,6 +317,10 @@ def _fill(
         else:
             continue
         fields.append((name, node))
+    if target is not None:
+        # A name the input does not declare
+        assert len(path) == 1 and value is not None
+        fields.append((cast(str, target), value))
     return fields
 
 

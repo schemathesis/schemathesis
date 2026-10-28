@@ -16,6 +16,25 @@ ABOVE = CoverageScenario.VALUE_ABOVE_MAXIMUM
 BELOW = CoverageScenario.VALUE_BELOW_MINIMUM
 INVALID_ENUM = CoverageScenario.INVALID_ENUM_VALUE
 UNKNOWN = CoverageScenario.UNKNOWN_ARGUMENT
+MISSING_FIELD = CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY
+UNEXPECTED_FIELD = CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES
+OBJECTS_SCHEMA = (
+    "input A { zip: String! invalid: Int } input F { a: A! n: Int! } input P @oneOf { id: ID, name: String } "
+    "type Query { f(filter: F, p: P!): Int }"
+)
+RECURSIVE_SCHEMA = (
+    "input F { and: [F!], x: Int, req: String! } input B { _not: B, _and: [B!], id: Int } "
+    "type Query { f(f: F!, b: B): Int }"
+)
+ORACLE_SCHEMAS = [
+    "enum E { A B } input A { zip: String! n: Int f: Float } input F { address: A e: E ids: [ID!] } "
+    "input P @oneOf { id: ID, name: String, f: F } "
+    'type Query { f(a: Int!, b: Boolean, s: String! = "x", ids: [ID!]!, filter: F, p: P!, e: [E]): Int }',
+    "scalar Money input M { m: Money! } type Query { f(m: Money!, l: [Money!]!, o: [[Money]], i: M!): Int }",
+    OBJECTS_SCHEMA,
+    RECURSIVE_SCHEMA,
+]
+ORACLE_IDS = ["builtin", "custom-scalar", "objects", "recursive"]
 
 
 @pytest.fixture(autouse=True)
@@ -263,6 +282,7 @@ def test_negative_cases_skip_unknown_scalars_outside_required_arguments(ctx):
     schema = ctx.graphql.load_sdl("scalar FooBar input F { x: FooBar! y: Int! } type Query { f(a: F, n: Int!): Int }")
     assert [(scenario, parameter) for scenario, parameter, _ in negative(schema, "Query.f")] == [
         (INCORRECT, "a"),
+        (MISSING_FIELD, "a.x"),
         (INCORRECT, "a.x"),
         (MISSING, "n"),
         (INCORRECT, "n"),
@@ -285,16 +305,15 @@ def test_negative_cases_skip_elements_without_a_finite_value(ctx):
     schema = ctx.graphql.load_introspection(raw)
     assert [(scenario, parameter) for scenario, parameter, _ in negative(schema, "Query.f")] == [
         (INCORRECT, "h"),
+        (UNEXPECTED_FIELD, "h"),
         (INCORRECT, "h.g"),
+        (MISSING_FIELD, "h.g.c"),
         (INCORRECT, "h.g.c"),
         (INCORRECT, "h.g.c"),
-        (INCORRECT, "h.g.c.c"),
-        (INCORRECT, "h.g.c.c"),
         (INCORRECT, "l.0"),
+        (MISSING_FIELD, "l.0.c"),
         (INCORRECT, "l.0.c"),
         (INCORRECT, "l.0.c"),
-        (INCORRECT, "l.0.c.c"),
-        (INCORRECT, "l.0.c.c"),
         (UNKNOWN, "invalid"),
     ]
 
@@ -311,27 +330,84 @@ def test_negative_case_metadata(ctx):
         (GenerationMode.NEGATIVE, "Query.users(filter:)", "Missing required argument `filter`"),
         (GenerationMode.NEGATIVE, "Query.users(filter:)", "Incorrect type for `filter`"),
         (GenerationMode.NEGATIVE, "Query.users(filter:)", "Incorrect type for `filter`"),
+        (GenerationMode.NEGATIVE, "Query.users(filter:)", "Unexpected field in `filter`"),
+        (GenerationMode.NEGATIVE, "Address.zip", "Missing required field `filter.address.zip`"),
         (GenerationMode.NEGATIVE, "Address.zip", "Incorrect type for `filter.address.zip`"),
         (GenerationMode.NEGATIVE, "Address.zip", "Incorrect type for `filter.address.zip`"),
         (GenerationMode.NEGATIVE, "Address.zip", "Incorrect type for `filter.address.zip`"),
     ]
 
 
-@pytest.mark.parametrize(
-    "sdl",
-    [
-        "enum E { A B } input A { zip: String! n: Int f: Float } input F { address: A e: E ids: [ID!] } "
-        "input P @oneOf { id: ID, name: String, f: F } "
-        'type Query { f(a: Int!, b: Boolean, s: String! = "x", ids: [ID!]!, filter: F, p: P!, e: [E]): Int }',
-        "scalar Money type Query { f(m: Money!, l: [Money!]!, o: [[Money]]): Int }",
-    ],
-    ids=["builtin", "custom-scalar"],
-)
+def test_object_missing_required_property(ctx):
+    schema = ctx.graphql.load_sdl(OBJECTS_SCHEMA)
+    assert negative(schema, "Query.f", MISSING_FIELD) == [
+        (MISSING_FIELD, "filter.a", doc("{ f(filter: {n: 0}, p: {id: 1}) }")),
+        (MISSING_FIELD, "filter.a.zip", doc("{ f(filter: {a: {}, n: 0}, p: {id: 1}) }")),
+        (MISSING_FIELD, "filter.n", doc('{ f(filter: {a: {zip: ""}}, p: {id: 1}) }')),
+        (MISSING_FIELD, "p", doc("{ f(p: {}) }")),
+    ]
+
+
+def test_object_unexpected_properties(ctx):
+    schema = ctx.graphql.load_sdl(OBJECTS_SCHEMA)
+    assert negative(schema, "Query.f", UNEXPECTED_FIELD) == [
+        (UNEXPECTED_FIELD, "filter", doc('{ f(filter: {a: {zip: ""}, n: 0, invalid: 0}, p: {id: 1}) }')),
+        (UNEXPECTED_FIELD, "filter.a", doc('{ f(filter: {a: {zip: "", invalid_1: 0}, n: 0}, p: {id: 1}) }')),
+        (UNEXPECTED_FIELD, "p", doc("{ f(p: {invalid: 0}) }")),
+        (UNEXPECTED_FIELD, "p", doc('{ f(p: {id: 1, name: ""}) }')),
+    ]
+
+
+def test_object_case_metadata(ctx):
+    schema = ctx.graphql.load_sdl(OBJECTS_SCHEMA)
+    assert [
+        (case.meta.phase.data.location, case.meta.phase.data.description)
+        for case in iter_cases(schema, "Query.f", modes=(GenerationMode.NEGATIVE,))
+        if case.meta.phase.data.scenario in (MISSING_FIELD, UNEXPECTED_FIELD)
+    ] == [
+        ("Query.f(filter:)", "Unexpected field in `filter`"),
+        ("F.a", "Missing required field `filter.a`"),
+        ("F.a", "Unexpected field in `filter.a`"),
+        ("A.zip", "Missing required field `filter.a.zip`"),
+        ("F.n", "Missing required field `filter.n`"),
+        ("Query.f(p:)", "Missing required field `p`"),
+        ("Query.f(p:)", "Unexpected field in `p`"),
+        ("Query.f(p:)", "Unexpected field in `p`"),
+    ]
+
+
+def test_one_of_fields_without_a_value_are_skipped(ctx):
+    schema = ctx.graphql.load_sdl("scalar FooBar input P @oneOf { m: FooBar, id: ID } type Query { f(p: P!): Int }")
+    assert [bodies(schema, "Query.f"), negative(schema, "Query.f", UNEXPECTED_FIELD)] == [
+        [(DEFAULT, doc("{ f(p: {id: 1}) }"))],
+        [(UNEXPECTED_FIELD, "p", doc("{ f(p: {invalid: 0}) }"))],
+    ]
+
+
+def test_recursive_input_negative_cases(ctx):
+    schema = ctx.graphql.load_sdl(RECURSIVE_SCHEMA)
+    cases = negative(schema, "Query.f")
+    assert [list(dict.fromkeys(parameter for _, parameter, _ in cases)), [b for _, _, b in cases if "_not" in b]] == [
+        ["f", "f.x", "f.req", "b", "b.id", "invalid"],
+        [],
+    ]
+
+
+@pytest.mark.parametrize("sdl", ORACLE_SCHEMAS, ids=ORACLE_IDS)
 def test_negative_cases_are_invalid(ctx, sdl):
-    schemathesis.graphql.scalar("Money", st.just("10.5").map(nodes.String))
+    schemathesis.graphql.scalar("Money", st.just('a"b\\c é').map(nodes.String))
     target = graphql.build_schema(sdl)
     cases = negative(ctx.graphql.load_sdl(sdl), "Query.f")
     assert cases
     assert [
         (parameter, body) for _, parameter, body in cases if not graphql.validate(target, graphql.parse(body))
     ] == []
+
+
+@pytest.mark.parametrize("sdl", ORACLE_SCHEMAS, ids=ORACLE_IDS)
+def test_positive_cases_are_valid(ctx, sdl):
+    schemathesis.graphql.scalar("Money", st.just('a"b\\c é').map(nodes.String))
+    target = graphql.build_schema(sdl)
+    bodies_ = [case.body for case in iter_cases(ctx.graphql.load_sdl(sdl), "Query.f")]
+    assert bodies_
+    assert [body for body in bodies_ if graphql.validate(target, graphql.parse(body))] == []
