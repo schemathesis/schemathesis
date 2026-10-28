@@ -4170,16 +4170,17 @@ def _negative_prefix_items(
     # For each position, generate negative values and yield arrays with one invalid item
     nctx = ctx.with_negative()
     for idx, item_schema in enumerate(item_schemas):
-        for neg_value in cover_schema_iter(nctx, item_schema):
-            items = valid_items.copy()
-            items[idx] = neg_value.value
-            if ctx.wire.leads_to_negative_test_case(items):
-                yield NegativeValue(
-                    items,
-                    scenario=neg_value.scenario,
-                    description=f"Array with invalid item at index {idx}: {neg_value.description}",
-                    location=nctx.current_path,
-                )
+        with nctx.at(idx):
+            for neg_value in cover_schema_iter(nctx, item_schema):
+                items = valid_items.copy()
+                items[idx] = neg_value.value
+                if ctx.wire.leads_to_negative_test_case(items):
+                    yield NegativeValue(
+                        items,
+                        scenario=neg_value.scenario,
+                        description=f"Array with invalid item at index {idx}: {neg_value.description}",
+                        location=nctx.current_path,
+                    )
 
 
 def _not_matching_pattern(value: str, pattern: re.Pattern) -> bool:
