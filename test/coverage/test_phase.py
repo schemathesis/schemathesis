@@ -3187,9 +3187,10 @@ def test_content_type_probe_server_error_via_wsgi(ctx, scenario, message):
     with pytest.raises(FailureGroup) as exc_info:
         case.call_and_validate(checks=[not_a_server_error])
 
-    assert [(type(failure), failure.message) for failure in exc_info.value.exceptions] == [
-        (ContentTypeServerError, message)
-    ]
+    assert [
+        (type(failure), failure.operation, failure.status_code, failure.message)
+        for failure in exc_info.value.exceptions
+    ] == [(ContentTypeServerError, "POST /items", 500, message)]
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

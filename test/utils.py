@@ -322,13 +322,13 @@ class EventStream:
         return self.find(EngineFinished)
 
 
-def check_context(config=None, *, recorder=None, override=None, headers=None):
+def check_context(config=None, *, recorder=None, override=None, headers=None, transport_kwargs=None):
     return CheckContext(
         override=override,
         auth=None,
         headers=headers,
         config=config or ChecksConfig(),
-        transport_kwargs=None,
+        transport_kwargs=transport_kwargs,
         recorder=recorder,
         response_checks=None,
     )
