@@ -55,6 +55,7 @@ from schemathesis.schemas import (
     APIOperationMap,
     BaseSchema,
     OperationDefinition,
+    UndeclaredResponses,
 )
 from schemathesis.transport.prepare import prepare_path
 
@@ -110,18 +111,6 @@ class GraphQLOperationDefinition(OperationDefinition):
     @property
     def is_mutation(self) -> bool:
         return self.root_type == RootType.MUTATION
-
-
-class GraphQLResponses:
-    def find_by_status_code(self, status_code: int) -> None:
-        return None  # pragma: no cover
-
-    def add(self, status_code: str, definition: dict[str, Any]) -> None:
-        return None  # pragma: no cover
-
-    @property
-    def status_codes(self) -> tuple[str, ...]:
-        return ()
 
 
 @dataclass
@@ -293,7 +282,7 @@ class GraphQLSchema(BaseSchema):
             label="",
             method="post",
             schema=self,
-            responses=GraphQLResponses(),
+            responses=UndeclaredResponses(),
             security=None,
             definition=OperationDefinition(raw={}),
         )
@@ -362,7 +351,7 @@ class GraphQLSchema(BaseSchema):
             method="post",
             app=self.app,
             schema=self,
-            responses=GraphQLResponses(),
+            responses=UndeclaredResponses(),
             security=None,
             # Parameters are not yet supported
             definition=GraphQLOperationDefinition(

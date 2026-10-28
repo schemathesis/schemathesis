@@ -911,6 +911,20 @@ S = TypeVar("S")
 SchemaT = TypeVar("SchemaT", bound="BaseSchema")
 
 
+class UndeclaredResponses:
+    """Responses of a specification that declares none per operation."""
+
+    def find_by_status_code(self, status_code: int) -> None:
+        return None
+
+    def add(self, status_code: str, definition: dict[str, Any]) -> None:
+        raise NotImplementedError
+
+    @property
+    def status_codes(self) -> tuple[str, ...]:
+        return ()
+
+
 @dataclass(repr=False)
 class OperationDefinition:
     """A wrapper to store not resolved API operation definitions.
