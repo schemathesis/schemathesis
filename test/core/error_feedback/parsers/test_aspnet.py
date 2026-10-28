@@ -127,6 +127,15 @@ def test_aspnet_parser_can_parse_recognises_envelope(body):
 
 
 @pytest.mark.parametrize(
+    "marker",
+    [{"type": "https://tools.ietf.org/html/rfc9110#section-15.5.1"}, {"title": "Bad Request"}, {"status": 400}],
+    ids=["type", "title", "status"],
+)
+def test_aspnet_parser_accepts_any_single_problem_details_marker(marker):
+    assert AspNetParser().can_parse(body={**marker, "errors": {"Email": ["The Email field is required."]}}) is True
+
+
+@pytest.mark.parametrize(
     "body",
     [
         {},
@@ -134,6 +143,7 @@ def test_aspnet_parser_can_parse_recognises_envelope(body):
         "",
         [],
         {"errors": {"Email": ["The Email field is required."]}},
+        {"title": "Bad Request", "status": 400, "errors": ["The Email field is required."]},
         {"title": "One or more validation errors occurred.", "status": 400},
         _aspnet_envelope({"email": ["Custom validator output."]}),
         {**_aspnet_envelope({}), "errors": {"Email": "The Email field is required."}},
@@ -150,6 +160,7 @@ def test_aspnet_parser_can_parse_recognises_envelope(body):
         "empty-string",
         "empty-list",
         "errors-without-problemdetails-markers",
+        "problemdetails-with-errors-list",
         "problemdetails-without-errors",
         "envelope-without-aspnet-vocabulary",
         "errors-value-not-list",

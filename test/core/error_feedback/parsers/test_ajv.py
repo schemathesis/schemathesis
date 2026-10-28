@@ -347,6 +347,7 @@ _FASTIFY_ADDITIONAL_PROPERTIES = _fastify_envelope("body must NOT have additiona
 
 
 _FASTIFY_MULTI_FIELD = _fastify_envelope(
+    "body must have required property 'name', body must NOT have additional properties, "
     'body/email must match format "email", body/username must NOT have fewer than 3 characters, '
     "body/age must be >= 0, body/role must be equal to one of the allowed values, "
     "body/tags must NOT have fewer than 1 items"
@@ -664,8 +665,9 @@ def _ajv_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
 def test_ajv_parser_parse(make_operation, body, expected, case_factory):
     operation = make_operation(method="post", path="/api/users")
     actual = AjvParser().parse(operation=operation, body=body, case=case_factory())
-    actual_signatures = tuple((o.parameter_path, o.kind, o.payload) for o in actual)
-    assert actual_signatures == expected
+    assert tuple((o.operation_label, o.location, o.parameter_path, o.kind, o.payload) for o in actual) == tuple(
+        ("POST /api/users", ParameterLocation.BODY, *item) for item in expected
+    )
 
 
 @pytest.mark.parametrize("case_body", [NOT_SET, None], ids=["omitted", "null"])
@@ -676,8 +678,8 @@ def test_ajv_parser_emits_body_required_for_root_type_error(make_operation, case
         body=_AJV_ROOT_TYPE_OBJECT,
         case=case_factory(body=case_body),
     )
-    assert tuple((o.parameter_path, o.kind, o.payload) for o in actual) == (
-        ((), ObservationKind.MUST_NOT_BE_BLANK, None),
+    assert tuple((o.operation_label, o.location, o.parameter_path, o.kind, o.payload) for o in actual) == (
+        ("POST /api/users", ParameterLocation.BODY, (), ObservationKind.MUST_NOT_BE_BLANK, None),
     )
 
 
@@ -721,6 +723,7 @@ def test_ajv_parser_fastify_parse_multi_field_clauses(make_operation, case_facto
     observations = parse_observations(AjvParser(), _FASTIFY_MULTI_FIELD, make_operation, case_factory)
     assert _ajv_signatures(observations) == sorted(
         [
+            (("name",), ObservationKind.MUST_NOT_BE_BLANK, None),
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),
             (

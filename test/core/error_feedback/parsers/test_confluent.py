@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from schemathesis.core.error_feedback import (
+    Observation,
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
@@ -151,6 +152,14 @@ def test_confluent_parser_can_parse_rejects_non_confluent_bodies(body):
 
 
 @pytest.mark.parametrize(
+    ("error_code", "expected"),
+    [(400, True), (499, True), (500, False), (40000, True), (49999, True), (50000, False)],
+)
+def test_confluent_parser_accepts_client_error_codes_only(error_code, expected):
+    assert ConfluentParser().can_parse(body={**_CONFLUENT_P5_EMPTY_BATCH, "error_code": error_code}) is expected
+
+
+@pytest.mark.parametrize(
     ("body", "case_kwargs", "expected"),
     [
         pytest.param(
@@ -198,9 +207,17 @@ def test_confluent_parser_can_parse_rejects_non_confluent_bodies(body):
 def test_confluent_parser_parse(make_operation, case_factory, body, case_kwargs, expected):
     operation = make_operation(method="post", path="/api/users")
     case = case_factory(**case_kwargs)
-    actual = ConfluentParser().parse(operation=operation, body=body, case=case)
-    actual_signatures = tuple((o.parameter_path, o.kind, o.payload) for o in actual)
-    assert actual_signatures == expected
+    assert ConfluentParser().parse(operation=operation, body=body, case=case) == tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=kind,
+            raw_message=body["message"],
+            payload=payload,
+        )
+        for path, kind, payload in expected
+    )
 
 
 @pytest.mark.parametrize(

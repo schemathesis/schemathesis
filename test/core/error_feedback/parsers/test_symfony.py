@@ -266,6 +266,8 @@ def test_symfony_parser_can_parse_recognises_envelope(body):
         {"detail": [{"loc": ["body", "email"], "msg": "field required"}]},
         {"errors": [{"keyword": "format", "instancePath": "/x", "params": {}}]},
         {"errors": [{"code": "invalid_string", "path": ["email"]}]},
+        [{"propertyPath": "email", "code": _SYMFONY_NOT_BLANK_CODE}, {"message": "no propertyPath"}],
+        {"violations": [{"propertyPath": "email", "code": _SYMFONY_NOT_BLANK_CODE}, {"message": "no propertyPath"}]},
     ],
     ids=[
         "empty-dict",
@@ -281,6 +283,8 @@ def test_symfony_parser_can_parse_recognises_envelope(body):
         "pydantic",
         "ajv-shape",
         "zod-shape",
+        "list-with-a-non-violation",
+        "violations-with-a-non-violation",
     ],
 )
 def test_symfony_parser_can_parse_rejects_non_symfony_bodies(body):
