@@ -1407,7 +1407,19 @@ def _distribute_length_range(
         )
         if balanced is not None:
             return balanced
-    return greedy
+        return greedy
+    if greedy is None or max_length is None:
+        return greedy
+    # Greedy caps each slot by what earlier slots could take; a slot may use whatever its siblings' minimums leave.
+    min_chars = sum(part_min * rep_len for (part_min, _), rep_len in zip(greedy, repetition_lengths, strict=True))
+    widened = []
+    for (part_min, part_max), (_, max_repeat), rep_len_min, rep_len_max in zip(
+        greedy, bounds, repetition_lengths, max_repetition_lengths, strict=True
+    ):
+        if part_max != MAXREPEAT and 0 < rep_len_max < MAXREPEAT:
+            part_max = min(max_repeat, (max_length - min_chars + part_min * rep_len_min) // rep_len_max)
+        widened.append((part_min, part_max))
+    return widened
 
 
 def _greedy_distribute_range(
