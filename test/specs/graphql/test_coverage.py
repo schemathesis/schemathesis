@@ -71,6 +71,11 @@ def bodies(schema, label, **kwargs):
             "Query.f",
             "{ f(filter: {n: 0}) { id } }",
         ),
+        (
+            "input R @oneOf { self: R, n: Int, s: String } input W { r: R! } type Query { f(r: R!, w: W!): Int }",
+            "Query.f",
+            "{ f(r: {n: 0}, w: {r: {n: 0}}) }",
+        ),
         ("type Query { f: String }", "Query.f", "{ f }"),
         ("type Query { f: [Genre!] } enum Genre { A }", "Query.f", "{ f }"),
         ("type Node { child: Node } type Query { f: Node }", "Query.f", "{ f { __typename } }"),
@@ -92,6 +97,7 @@ def bodies(schema, label, **kwargs):
         "input-objects",
         "recursive-inputs",
         "unknown-scalar-outside-required-arguments",
+        "one-of-input",
         "scalar-return",
         "enum-list-return",
         "object-without-scalar-fields",
@@ -108,12 +114,16 @@ def test_no_cases_for_required_input_cycle(ctx):
     # Introspection results are not validated, so a cycle the SDL loader would reject can still arrive.
     raw = graphql.introspection_from_schema(
         graphql.build_schema(
-            "input C { c: C! } input W { w: C! } type Query { f(c: C!): Int g(w: W!): Int ping: Int }",
+            "input C { c: C! } input W { w: C! } input O @oneOf { o: O, c: C } "
+            "type Query { f(c: C!): Int g(w: W!): Int h(o: O!): Int ping: Int }",
             assume_valid=True,
         )
     )
+    # A Strawberry schema elsewhere in the process makes graphql-core report `isOneOf: false`.
+    next(type_ for type_ in raw["__schema"]["types"] if type_["name"] == "O")["isOneOf"] = True
     schema = ctx.graphql.load_introspection(raw)
-    assert [bodies(schema, label) for label in ("Query.f", "Query.g", "Query.ping")] == [
+    assert [bodies(schema, label) for label in ("Query.f", "Query.g", "Query.h", "Query.ping")] == [
+        [],
         [],
         [],
         [(DEFAULT, doc("{ ping }"))],
