@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 from collections import deque
-from collections.abc import Iterable, Iterator
+from collections.abc import Hashable, Iterable, Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -89,8 +89,9 @@ class ScalarLiterals:
 
 
 def iter_coverage_cases(
-    operation: APIOperation, schema: graphql.GraphQLSchema, modes: list[GenerationMode]
+    operation: APIOperation, schema: graphql.GraphQLSchema, modes: list[GenerationMode], shared: set[Hashable]
 ) -> Iterator[Case]:
+    """Coverage cases for one operation; `shared` holds cases other operations already sent."""
     definition = cast("GraphQLOperationDefinition", operation.definition)
     field = definition.raw
     scalars = ScalarLiterals()
@@ -119,6 +120,9 @@ def iter_coverage_cases(
             continue
         for element in iter_input_elements(field, coordinate):
             for scenario, description, path, value in values(element, scalars):
+                key = _shared_key(element, value) if mode == GenerationMode.NEGATIVE else None
+                if key in shared:
+                    continue
                 instant = Instant()
                 try:
                     arguments = with_value(field, path, value, scalars)
@@ -131,6 +135,8 @@ def iter_coverage_cases(
                 if body in seen:
                     continue
                 seen.add(body)
+                if key is not None:
+                    shared.add(key)
                 yield _make_case(
                     operation,
                     body=body,
@@ -144,6 +150,10 @@ def iter_coverage_cases(
     if GenerationMode.POSITIVE in modes and selection is not None:
         instant = Instant()
         for location, added in iter_field_selections(field.type, schema, scalars):
+            # A nested field resolves the same way whichever operation reaches it
+            if ("select", location) in shared:
+                continue
+            shared.add(("select", location))
             yield _make_case(
                 operation,
                 body=render(definition, defaults, graphql.SelectionSetNode(selections=(*selection.selections, added))),
@@ -168,6 +178,19 @@ def iter_coverage_cases(
             parameter=name,
             generation_time=instant.elapsed,
         )
+
+
+def _shared_key(element: InputElement, value: graphql.ValueNode | None) -> Hashable:
+    """The same invalid value in an input field fails validation in every operation, so it needs one case.
+
+    Locations of arguments name their operation, so only input fields of shared types match across operations.
+    """
+    # List items share their field's location, so the trailing item indices tell them apart
+    items = len(element.path) - len(
+        tuple(itertools.dropwhile(lambda part: isinstance(part, int), reversed(element.path)))
+    )
+    printed = None if value is None else graphql.print_ast(value)
+    return (element.location, items, printed)
 
 
 @dataclass(slots=True)

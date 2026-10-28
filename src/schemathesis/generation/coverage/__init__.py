@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from collections import OrderedDict
+from collections.abc import Hashable
 
 import jsonschema_rs
 
@@ -24,6 +25,7 @@ class GenerationSession:
         "pattern_strategies",
         "ready_bundles",
         "removed_examples",
+        "shared_targets_seen",
         "static_bundles",
         "unexpected_methods_seen",
         "values",
@@ -40,6 +42,8 @@ class GenerationSession:
         self.static_bundles: BoundedCache = BoundedCache(maxsize=64)
         # `(path, method)` pairs already probed with an undeclared method, so each path gets one probe per method.
         self.unexpected_methods_seen: set[tuple[str, str]] = set()
+        # Cases that read the same for every operation reaching their target, so the run sends each once.
+        self.shared_targets_seen: set[Hashable] = set()
         # Pinning a registry keeps its `id` from being recycled into a colliding token.
         self._pinned: OrderedDict[int, object] = OrderedDict()
         self._lock = threading.Lock()
