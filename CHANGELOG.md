@@ -2,13 +2,15 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.32.7...HEAD) - TBD
 
-### :bug: Fixed
-
-- Invalid `@oneOf` input objects in positive GraphQL tests.
-
 ### :rocket: Added
 
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
+
+### :bug: Fixed
+
+- Invalid `@oneOf` input objects in positive GraphQL tests.
+- Coverage phase descriptions naming optional parameters the request does not send.
+- Coverage phase modifying request body schemas that declare `examples`.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 
