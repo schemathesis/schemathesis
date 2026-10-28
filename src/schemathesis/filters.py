@@ -566,7 +566,7 @@ class FilterUsage:
         self._candidates.setdefault("path", set()).add(operation.path)
         self._candidates.setdefault("method", set()).add(operation.method.upper())
         self._candidates.setdefault("tag", set()).update(operation.tags or ())
-        operation_id = operation.definition.raw.get("operationId")
+        operation_id = operation.schema.get_operation_id(operation)
         if operation_id is not None:
             self._candidates.setdefault("operation_id", set()).add(operation_id)
 
