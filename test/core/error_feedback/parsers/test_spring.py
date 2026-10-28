@@ -8,6 +8,7 @@ from schemathesis.core.error_feedback import (
     BoundDirection,
     FormatPayload,
     NumericBoundPayload,
+    Observation,
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
@@ -418,6 +419,11 @@ def test_spring_parser_ignores_non_string_field_names(make_operation, case_facto
             id="inside-errors-defaultMessage",
         ),
         pytest.param(
+            {"errors": ["junk", {"defaultMessage": "Unrecognized field: 'note'"}]},
+            [(("note",), ParameterLocation.BODY)],
+            id="after-a-non-dict-errors-item",
+        ),
+        pytest.param(
             {"message": "Unrecognized field: 'a' Unrecognized field: 'b'"},
             [(("a",), ParameterLocation.BODY), (("b",), ParameterLocation.BODY)],
             id="multiple-matches-in-one-string",
@@ -509,11 +515,11 @@ def test_spring_parser_extracts_unexpected_query_parameter(body, expected_name, 
 def test_spring_parser_extracts_missing_request_body(body, make_operation, case_factory):
     obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     blank_body_obs = [
-        (o.parameter_path, o.location, o.kind)
+        (o.operation_label, o.parameter_path, o.location, o.kind)
         for o in obs
         if o.kind == ObservationKind.MUST_NOT_BE_BLANK and o.location == ParameterLocation.BODY
     ]
-    assert blank_body_obs == [((), ParameterLocation.BODY, ObservationKind.MUST_NOT_BE_BLANK)]
+    assert blank_body_obs == [("POST /api/users", (), ParameterLocation.BODY, ObservationKind.MUST_NOT_BE_BLANK)]
 
 
 @pytest.mark.parametrize(
@@ -527,17 +533,19 @@ def test_spring_parser_extracts_pagination_type_hint(type_name, expected_bound, 
     body = {
         "error": "Bad Request",
         "status": 400,
-        "messages": [f"Parameter 'page' must be '{type_name}'"],
+        "messages": [f"Parameter 'page' must be '{type_name}'", "name - must not be blank"],
         "timestamp": "2026-05-02T21:47:10.769780Z",
     }
     obs = parse_observations(SpringParser(), body, make_operation, case_factory)
-    assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
+    assert [(o.operation_label, o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
         (
+            "POST /api/users",
             ("page",),
             ParameterLocation.QUERY,
             ObservationKind.NUMERIC_BOUND,
             NumericBoundPayload(bound=expected_bound, direction=BoundDirection.MAX, exclusive=False),
         ),
+        ("POST /api/users", ("name",), ParameterLocation.BODY, ObservationKind.MUST_NOT_BE_BLANK, None),
     ]
 
 
@@ -644,8 +652,8 @@ def test_spring_parser_recognizes_missing_request_parameter(make_operation, case
         body=_SPRING_MISSING_PARAMETER_BODY,
         case=case_factory(),
     )
-    assert [(o.parameter_path, o.kind, o.location) for o in obs] == [
-        (("lat",), ObservationKind.MUST_NOT_BE_BLANK, ParameterLocation.QUERY),
+    assert [(o.operation_label, o.parameter_path, o.kind, o.location) for o in obs] == [
+        ("GET /v1/locations/nearest", ("lat",), ObservationKind.MUST_NOT_BE_BLANK, ParameterLocation.QUERY),
     ]
 
 
@@ -894,6 +902,33 @@ def test_spring_parser_field_errors_locator_and_message_priority(entry, expected
 )
 def test_spring_parser_skips_invalid_or_unrecognized_entries(body, make_operation, case_factory):
     assert parse_observations(SpringParser(), body, make_operation, case_factory) == ()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"subErrors": ["junk", {"message": "must not be blank"}, {"field": "name", "message": "must not be blank"}]},
+        {
+            "errors": [
+                1,
+                {"defaultMessage": "must not be blank"},
+                {"field": "name", "defaultMessage": "must not be blank"},
+            ]
+        },
+        {"fieldErrors": [None, {"message": "must not be blank"}, {"property": "name", "message": "must not be blank"}]},
+    ],
+    ids=["subErrors", "errors", "fieldErrors"],
+)
+def test_spring_parser_skips_entries_without_a_field_before_valid_ones(body, make_operation, case_factory):
+    assert parse_observations(SpringParser(), body, make_operation, case_factory) == (
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("name",),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="must not be blank",
+        ),
+    )
 
 
 def test_spring_parser_mixes_valid_and_invalid_messages(make_operation, case_factory):

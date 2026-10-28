@@ -304,6 +304,22 @@ def test_jackson_parser_can_parse_rejects_non_jackson_bodies(body):
     assert JacksonParser().can_parse(body=body) is False
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        'Cannot deserialize value of type `Status` from String "x"',
+        "Cannot deserialize instance of `java.util.ArrayList` out of START_OBJECT token",
+        "Can not deserialize instance of java.util.ArrayList out of START_OBJECT token",
+        "not one of the values accepted for Enum class: [A, B]",
+        "Numeric value (99999999999) out of range of int",
+        "Text 'x' could not be parsed at index 0",
+    ],
+    ids=["value-of-type", "instance-of", "jackson-2.9-instance-of", "enum", "out-of-range", "date-parse"],
+)
+def test_jackson_parser_can_parse_recognises_envelope(message):
+    assert JacksonParser().can_parse(body={"msg": message}) is True
+
+
 def test_jackson_parser_skips_message_without_reference_chain(make_operation, case_factory):
     # Without request context, no field can be attributed; message is dropped.
     body = {"msg": 'Cannot deserialize value of type `java.time.LocalDate` from String "x"'}

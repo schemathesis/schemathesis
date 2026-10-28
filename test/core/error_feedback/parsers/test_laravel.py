@@ -165,6 +165,20 @@ def test_laravel_parser_can_parse_rejects_non_laravel_bodies(body):
     assert LaravelParser().can_parse(body=body) is False
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"type": "https://tools.ietf.org/html/rfc9110#section-15.5.1"},
+        {"title": "Bad Request"},
+        {"status": 422},
+        {"errors": ["The email field is required."]},
+    ],
+    ids=["type-marker", "title-marker", "status-marker", "errors-list"],
+)
+def test_laravel_parser_rejects_problem_details_markers_and_errors_lists(extra):
+    assert LaravelParser().can_parse(body={**_LARAVEL_REQUIRED, **extra}) is False
+
+
 def _laravel_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
     return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
 

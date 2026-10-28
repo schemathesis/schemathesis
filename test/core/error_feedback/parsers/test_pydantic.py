@@ -734,6 +734,41 @@ def test_pydantic_parser_skips_non_dict_detail_entry(make_operation, case_factor
     assert len(obs) == 1
 
 
+def _body_observation(path, kind, raw_message, payload=None):
+    return Observation(
+        operation_label="POST /api/users",
+        location=ParameterLocation.BODY,
+        parameter_path=path,
+        kind=kind,
+        raw_message=raw_message,
+        payload=payload,
+    )
+
+
+def test_pydantic_parser_keeps_usable_entries_after_skipped_ones(make_operation, case_factory):
+    body = {
+        "detail": [
+            {"type": 5, "loc": ["body", "a"], "msg": "..."},
+            {"type": "extra_forbidden", "loc": ["body", "x"], "msg": "Extra inputs are not permitted"},
+            {"type": "unknown_code", "loc": ["body", "b"], "msg": "..."},
+            {"type": "string_too_short", "loc": [], "msg": "...", "ctx": {"min_length": 3}},
+            {"type": "custom_list_check", "loc": ["body", "tags"], "msg": "Input should be a valid list"},
+            {"type": "string_too_short", "loc": ["body", "code"], "msg": "...", "ctx": None},
+            {"type": "missing", "loc": ["body", "name"], "msg": "Field required"},
+        ]
+    }
+    assert parse_observations(PydanticParser(), body, make_operation, case_factory) == (
+        _body_observation((), ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES, "Extra inputs are not permitted"),
+        _body_observation(
+            ("tags",),
+            ObservationKind.TYPE_MISMATCH,
+            "Input should be a valid list",
+            TypeMismatchPayload(type_name="array"),
+        ),
+        _body_observation(("name",), ObservationKind.MUST_NOT_BE_BLANK, "Field required"),
+    )
+
+
 def test_pydantic_parser_emits_one_observation_per_detail_entry(make_operation, case_factory):
     body = {
         "detail": [

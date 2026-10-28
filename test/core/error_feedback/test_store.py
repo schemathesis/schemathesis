@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 
 import pytest
 
@@ -90,14 +91,46 @@ def test_numeric_bound_min_and_max_remain_distinct():
     } == {BoundDirection.MIN, BoundDirection.MAX}
 
 
-def test_size_bound_min_and_max_merge_into_one_canonical():
+@pytest.mark.parametrize(
+    "payloads",
+    [
+        (SizeBoundPayload(min=3, max=None), SizeBoundPayload(min=None, max=30)),
+        (SizeBoundPayload(min=None, max=30), SizeBoundPayload(min=3, max=None)),
+    ],
+    ids=["min-first", "max-first"],
+)
+def test_size_bound_min_and_max_merge_into_one_canonical(payloads):
     # Parsers emit min and max separately; both edges must collapse into one canonical payload.
     store = ErrorFeedbackStore()
-    store.record(_make(kind=ObservationKind.SIZE_BOUND, payload=SizeBoundPayload(min=3, max=None)))
-    store.record(_make(kind=ObservationKind.SIZE_BOUND, payload=SizeBoundPayload(min=None, max=30)))
+    for payload in payloads:
+        store.record(_make(kind=ObservationKind.SIZE_BOUND, payload=payload))
     observations = store.observations(operation_label="POST /v1/foo", location=ParameterLocation.BODY)
     assert len(observations) == 1
     assert observations[0].payload == SizeBoundPayload(min=3, max=30)
+
+
+_MIN_AGE = NumericBoundPayload(bound=1, direction=BoundDirection.MIN, exclusive=False)
+_MIN_AGE_OBSERVATION = _make(kind=ObservationKind.NUMERIC_BOUND, payload=_MIN_AGE, path=("age",))
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        replace(_MIN_AGE_OBSERVATION, operation_label="POST /v1/bar"),
+        replace(_MIN_AGE_OBSERVATION, location=ParameterLocation.QUERY),
+        replace(_MIN_AGE_OBSERVATION, payload=replace(_MIN_AGE, direction=BoundDirection.MAX)),
+    ],
+    ids=["operation", "location", "direction"],
+)
+def test_fingerprints_distinguish_operation_location_and_bound_direction(other):
+    assert observation_fingerprint(_MIN_AGE_OBSERVATION) != observation_fingerprint(other)
+
+
+def test_observation_counts_sum_every_location_of_an_operation():
+    store = ErrorFeedbackStore()
+    for location in (ParameterLocation.BODY, ParameterLocation.QUERY):
+        store.record(_make(kind=ObservationKind.MUST_NOT_BE_BLANK, payload=None, location=location))
+    assert store.observation_counts() == {"POST /v1/foo": 2}
 
 
 def test_observation_counts_keep_growing_past_the_bucket_cap():
@@ -172,6 +205,7 @@ def test_store_checkpoint_bumps_generation_and_keeps_observations():
 
 def test_store_checkpoint_keeps_generation_when_nothing_new_was_learned():
     store = ErrorFeedbackStore()
+    store.checkpoint()
     store.record(_obs("email"))
     store.checkpoint()
     store.checkpoint()
