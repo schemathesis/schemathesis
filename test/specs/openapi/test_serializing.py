@@ -31,6 +31,7 @@ from schemathesis.specs.openapi.serialization import (
     matrix_primitive,
     nested_object,
     serialize_openapi3_parameters,
+    serialize_swagger2_parameters,
     simple_object,
 )
 from schemathesis.transport.prepare import get_default_headers
@@ -918,13 +919,12 @@ def test_delimited_query_items_use_json_wire_form(ctx, parameter, version, expec
         pytest.param([True, False], "true|false", id="booleans"),
         pytest.param([1, -2, 1.5], "1|-2|1.5", id="numbers"),
         pytest.param(["true", "null"], "true|null", id="strings-already-spelled"),
-        pytest.param([{"a": True}], "{'a': True}", id="object-item-keeps-text-form"),
-        pytest.param([[None]], "[None]", id="array-item-keeps-text-form"),
+        pytest.param([{"a": True}], '{"a": true}', id="object-item-as-json"),
+        pytest.param([[None]], "[null]", id="array-item-as-json"),
         pytest.param(None, "", id="whole-value-null"),
     ],
 )
 def test_delimited_encoded_item_rendering(value, expected):
-    # Only JSON scalars have a Python spelling to correct; container items keep their existing text form.
     assert delimited_encoded("color", delimiter="|")({"color": value})["color"] == expected
 
 
@@ -1038,6 +1038,46 @@ def test_type_list_parameters_use_declared_style(ctx, location, schema, extra, e
 def test_header_serialization_follows_value_shape(schema, value, expected):
     serializer = serialize_openapi3_parameters([{"name": "p", "in": "header", "explode": True, "schema": schema}])
     assert serializer({"p": value}) == {"p": expected}
+
+
+OBJECT_ITEMS = {"type": "array", "items": {"type": "object"}}
+
+
+@pytest.mark.parametrize(
+    ("serializer", "definition", "value", "expected"),
+    [
+        pytest.param(
+            serialize_openapi3_parameters,
+            {"name": "p", "in": "header", "schema": OBJECT_ITEMS},
+            [{"a": 1, "b": None}, True],
+            '{"a": 1, "b": null},true',
+            id="header-array",
+        ),
+        pytest.param(
+            serialize_openapi3_parameters,
+            {"name": "p", "in": "query", "explode": False, "schema": OBJECT_ITEMS},
+            [{"a": 1, "b": None}, True],
+            '{"a": 1, "b": null},true',
+            id="query-array",
+        ),
+        pytest.param(
+            serialize_openapi3_parameters,
+            {"name": "p", "in": "header", "schema": {"type": "object"}},
+            {"a": [1, False]},
+            "a,[1, false]",
+            id="header-object",
+        ),
+        pytest.param(
+            serialize_swagger2_parameters,
+            {"name": "p", "in": "query", "type": "object"},
+            {"a": [1, True]},
+            '{"a": [1, true]}',
+            id="swagger2-query-object",
+        ),
+    ],
+)
+def test_nested_containers_use_json_wire_form(serializer, definition, value, expected):
+    assert serializer([definition])({"p": value}) == {"p": expected}
 
 
 def make_array_schema(location, style):
