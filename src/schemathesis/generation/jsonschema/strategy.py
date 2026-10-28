@@ -984,7 +984,18 @@ def json_identity(value: JsonValue) -> object:
     # to a float would merge distinct numbers that happen to share one.
     if isinstance(value, (int, float)):
         return ("number", _spelled(value))
-    return ("json", canonical.json.to_string(value))
+    # A binary payload keeps its bytes outside the string, and every one of them compares equal as a `str`.
+    if isinstance(value, Binary):
+        return ("binary", value.data)
+    try:
+        return ("json", canonical.json.to_string(value))
+    except ValueError:
+        # Containers holding binary payloads cannot be spelled as JSON, so they are keyed member by member.
+        if isinstance(value, dict):
+            return ("object", frozenset((key, json_identity(item)) for key, item in value.items()))
+        if isinstance(value, list):
+            return ("array", tuple(json_identity(item) for item in value))
+        raise
 
 
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
