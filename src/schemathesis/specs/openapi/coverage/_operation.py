@@ -1457,6 +1457,8 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
         required = {p.name for p in parameter_set if p.is_required}
         all_params = {p.name for p in parameter_set}
         optional = sorted(all_params - required)
+        # Optional parameters without a positive value are never sent, so positive combinations leave them out.
+        sendable_optional = [name for name in optional if name in base_container]
 
         # Helper function to create and yield a case
         def make_case(
@@ -1566,10 +1568,16 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
             if combo == base_container:
                 continue
             if GenerationMode.POSITIVE in generation_modes and template.can_emit(GenerationMode.POSITIVE):
+                if opt_param in sendable_optional:
+                    scenario = CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL
+                    description = f"All required properties and optional '{opt_param}'"
+                else:
+                    scenario = CoverageScenario.OBJECT_ONLY_REQUIRED
+                    description = "Only required properties"
                 case = make_case(
                     combo,
-                    CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
-                    f"All required properties and optional '{opt_param}'",
+                    scenario,
+                    description,
                     location,
                     None,
                     GenerationMode.POSITIVE,
@@ -1584,12 +1592,12 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
         if (
-            len(optional) > 1
+            len(sendable_optional) > 1
             and GenerationMode.POSITIVE in generation_modes
             and template.can_emit(GenerationMode.POSITIVE)
         ):
-            for size in range(2, len(optional)):
-                for combination in combinations(optional, size):
+            for size in range(2, len(sendable_optional)):
+                for combination in combinations(sendable_optional, size):
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
                     if combo != base_container:
                         case = make_case(

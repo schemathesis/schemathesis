@@ -10063,6 +10063,49 @@ def test_positive_optional_query_combinations_skip_repeated_requests(ctx, parame
     assert positive_queries(operation) == expected
 
 
+UNREPRESENTABLE_HEADER = {"type": "string", "pattern": "^-$"}
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        (
+            {"X-A": {"type": "string", "enum": ["a"]}, "X-Dash": UNREPRESENTABLE_HEADER},
+            [("Only required properties", {}), ("Default positive test case", {"X-A": "a"})],
+        ),
+        (
+            {
+                "X-0": UNREPRESENTABLE_HEADER,
+                "X-A": {"type": "string", "enum": ["a"]},
+                "X-B": {"type": "string", "enum": ["b"]},
+                "X-C": {"type": "string", "enum": ["c"]},
+            },
+            [
+                ("All required and 2 optional properties", {"X-A": "a", "X-B": "b"}),
+                ("All required properties and optional 'X-C'", {"X-C": "c"}),
+                ("All required properties and optional 'X-B'", {"X-B": "b"}),
+                ("All required properties and optional 'X-A'", {"X-A": "a"}),
+                ("Only required properties", {}),
+                ("Default positive test case", {"X-A": "a", "X-B": "b", "X-C": "c"}),
+            ],
+        ),
+    ],
+    ids=["optional-without-a-value", "combination-size"],
+)
+def test_positive_optional_combinations_describe_only_sent_headers(ctx, headers, expected):
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"in": "query", "name": "q", "required": True, "schema": {"type": "string", "enum": ["q"]}},
+            *({"in": "header", "name": name, "schema": schema} for name, schema in headers.items()),
+        ],
+        method="get",
+    )["/foo"]["GET"]
+    assert [
+        (case.meta.phase.data.description, case.headers) for case in collect_cases(operation, GenerationMode.POSITIVE)
+    ] == expected
+
+
 def test_no_positive_case_when_the_required_body_admits_nothing(ctx):
     operation = load_schema(
         ctx,
