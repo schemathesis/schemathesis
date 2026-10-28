@@ -27,7 +27,7 @@ def test_(request, case):
             r"test_basic_pytest_graphql.py::test_\[Query.getAuthors] PASSED",
             r"test_basic_pytest_graphql.py::test_\[Mutation.addBook] PASSED",
             r"test_basic_pytest_graphql.py::test_\[Mutation.addAuthor] PASSED",
-            r"Hypothesis calls: 40",
+            r"Hypothesis calls: 52",
         ]
     )
 
@@ -59,6 +59,6 @@ def test_(request, case):
             r"test_from_wsgi.py::test_\[Query.getAuthors] PASSED",
             r"test_from_wsgi.py::test_\[Mutation.addBook] PASSED",
             r"test_from_wsgi.py::test_\[Mutation.addAuthor] PASSED",
-            r"Hypothesis calls: 40",
+            r"Hypothesis calls: 52",
         ]
     )

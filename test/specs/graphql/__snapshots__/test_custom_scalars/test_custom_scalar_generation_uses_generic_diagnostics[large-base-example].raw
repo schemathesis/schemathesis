@@ -44,7 +44,7 @@ API Operations:
 
 Test Phases:
   ⏭  Examples (not supported)
-  ⏭  Coverage (not supported)
+  ⏭  Coverage (disabled)
   🚫 Fuzzing
   ⏭  Stateful (disabled)
 
