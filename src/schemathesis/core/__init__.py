@@ -59,6 +59,10 @@ class Specification:
     def graphql(cls, version: str) -> Specification:
         return cls(kind=SpecificationKind.GRAPHQL, version=version)
 
+    @classmethod
+    def grpc(cls, version: str) -> Specification:
+        return cls(kind=SpecificationKind.GRPC, version=version)
+
     @property
     def name(self) -> str:
         return f"{_DISPLAY_NAMES[self.kind]} {self.version}".strip()
@@ -73,12 +77,14 @@ class SpecificationKind(enum.StrEnum):
 
     OPENAPI = "openapi"
     GRAPHQL = "graphql"
+    GRPC = "grpc"
 
 
 # Every kind needs an entry in both tables, so a new kind fails loudly instead of borrowing another's answers.
 _DISPLAY_NAMES: dict[SpecificationKind, str] = {
     SpecificationKind.OPENAPI: "Open API",
     SpecificationKind.GRAPHQL: "GraphQL",
+    SpecificationKind.GRPC: "gRPC",
 }
 _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
     SpecificationKind.OPENAPI: frozenset(
@@ -95,6 +101,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
     SpecificationKind.GRAPHQL: frozenset(
         {SpecificationFeature.STATEFUL_TESTING, SpecificationFeature.COVERAGE, SpecificationFeature.HTTP_PROBES}
     ),
+    SpecificationKind.GRPC: frozenset({SpecificationFeature.STATUS_CODE_ANALYSIS}),
 }
 
 
