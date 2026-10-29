@@ -1,3 +1,5 @@
+import contextlib
+
 import graphql
 import pytest
 from hypothesis import strategies as st
@@ -198,10 +200,43 @@ def test_custom_scalar_literal_is_stable_across_runs(ctx):
     assert first == second
 
 
-def test_unknown_scalar_on_required_argument(ctx):
-    schema = ctx.graphql.load_sdl("scalar FooBar type Query { f(x: FooBar!): Int }")
+def sent_before_unknown_scalar(schema, modes=(GenerationMode.POSITIVE, GenerationMode.NEGATIVE)):
+    sent = []
     with pytest.raises(UnknownScalar, match="Scalar 'FooBar' is not supported"):
-        iter_cases(schema, "Query.f")
+        for case in schema.iter_coverage_cases(
+            schema.find_operation_by_label("Query.f"),
+            generation_modes=list(modes),
+            generation_config=schema.config.generation,
+        ):
+            sent.append((case.meta.phase.data.scenario, case.meta.phase.data.parameter, case.body))
+    return sent
+
+
+# Leaving out or nulling a required argument fails validation whatever literals its scalar accepts.
+def test_unknown_scalar_on_required_argument_negative_cases(ctx):
+    schema = ctx.graphql.load_sdl(
+        "scalar FooBar input F { x: FooBar! } type Query { f(x: FooBar!, a: Int!, b: F!, c: FooBar): Int }"
+    )
+    assert sent_before_unknown_scalar(schema) == [
+        (MISSING, "x", doc("{ f(a: 0) }")),
+        (INCORRECT, "x", doc("{ f(x: null, a: 0) }")),
+        (INCORRECT, "b", doc("{ f(a: 0, b: null) }")),
+        (INCORRECT, "b", doc("{ f(a: 0, b: 1) }")),
+    ]
+
+
+def test_unknown_scalar_with_required_input_cycle(ctx):
+    raw = graphql.introspection_from_schema(
+        graphql.build_schema(
+            "scalar FooBar input C { c: C! } type Query { f(x: FooBar!, c: C!): Int }", assume_valid=True
+        )
+    )
+    assert sent_before_unknown_scalar(ctx.graphql.load_introspection(raw)) == []
+
+
+def test_unknown_scalar_on_required_argument_in_positive_mode(ctx):
+    schema = ctx.graphql.load_sdl("scalar FooBar type Query { f(x: FooBar!): Int }")
+    assert sent_before_unknown_scalar(schema, modes=(GenerationMode.POSITIVE,)) == []
 
 
 def test_default_case_metadata(ctx):
@@ -799,18 +834,20 @@ def run_against(server):
     results = []
     for result in schema.get_all_operations():
         operation = result.ok()
-        for case in schema.iter_coverage_cases(
+        cases = schema.iter_coverage_cases(
             operation, generation_modes=list(GenerationMode), generation_config=schema.config.generation
-        ):
-            data = case.meta.phase.data
-            try:
-                case.call_and_validate(
-                    checks=[negative_data_rejection, positive_data_acceptance, response_schema_conformance]
-                )
-                failure = None
-            except FailureGroup as exc:
-                failure = tuple(type(inner).__name__ for inner in exc.exceptions)
-            results.append((case.meta.generation.mode, data.scenario, data.parameter, failure))
+        )
+        with contextlib.suppress(UnknownScalar):
+            for case in cases:
+                data = case.meta.phase.data
+                try:
+                    case.call_and_validate(
+                        checks=[negative_data_rejection, positive_data_acceptance, response_schema_conformance]
+                    )
+                    failure = None
+                except FailureGroup as exc:
+                    failure = tuple(type(inner).__name__ for inner in exc.exceptions)
+                results.append((case.meta.generation.mode, data.scenario, data.parameter, failure))
     return results
 
 
@@ -819,6 +856,22 @@ def test_conforming_server_has_no_false_positives(ctx, app):
     results = run_against(getattr(ctx.graphql.apps, app)())
     assert len(results) > 1
     assert [result for result in results if result[3] is not None] == []
+
+
+def test_server_rejects_cases_for_arguments_with_unknown_scalars(ctx):
+    negative, positive = GenerationMode.NEGATIVE, GenerationMode.POSITIVE
+    assert run_against(ctx.graphql.apps.use_after_create()) == [
+        (negative, MISSING, "id", None),
+        (negative, INCORRECT, "id", None),
+        (positive, DEFAULT, None, None),
+        (negative, MISSING, "title", None),
+        (negative, INCORRECT, "title", None),
+        (negative, INCORRECT, "title", None),
+        (negative, INCORRECT, "title", None),
+        (negative, UNKNOWN, "invalid", None),
+        (negative, MISSING, "id", None),
+        (negative, INCORRECT, "id", None),
+    ]
 
 
 def test_lenient_server_fails_every_negative_scenario(ctx):

@@ -96,7 +96,12 @@ def iter_coverage_cases(
     field = definition.raw
     scalars = ScalarLiterals()
     instant = Instant()
-    defaults = with_value(field, (), None, scalars)
+    try:
+        defaults = with_value(field, (), None, scalars)
+    except UnknownScalar:
+        if GenerationMode.NEGATIVE in modes:
+            yield from _iter_unfilled_argument_cases(operation, definition, schema, scalars)
+        raise
     if defaults is None:
         return
     coordinate = root_coordinate(definition, schema)
@@ -178,6 +183,56 @@ def iter_coverage_cases(
             parameter=name,
             generation_time=instant.elapsed,
         )
+
+
+def _iter_unfilled_argument_cases(
+    operation: APIOperation,
+    definition: GraphQLOperationDefinition,
+    schema: graphql.GraphQLSchema,
+    scalars: ScalarLiterals,
+) -> Iterator[Case]:
+    """Required arguments with an unknown scalar have no valid value, yet leaving them out or replacing them fails."""
+    field = definition.raw
+    known: dict[str, graphql.ValueNode] = {}
+    unfilled: set[str] = set()
+    for name, argument in field.args.items():
+        if graphql.is_required_argument(argument):
+            try:
+                node = default_value(argument.type, (), scalars)
+            except UnknownScalar:
+                unfilled.add(name)
+                continue
+            if node is None:
+                return
+            known[name] = node
+    coordinate = root_coordinate(definition, schema)
+    selection = default_selection(field.type)
+    seen = set()
+    for element in iter_input_elements(field, coordinate):
+        name = str(element.path[0])
+        if name not in unfilled:
+            continue
+        for scenario, description, path, value in negative_values(element, scalars):
+            # Values inside the argument need the unknown scalar filled
+            if len(path) != 1:
+                continue
+            instant = Instant()
+            values: dict[str, graphql.ValueNode | None] = {**known, name: value}
+            arguments = [_argument_node(other, node) for other in field.args if (node := values.get(other)) is not None]
+            body = render(definition, arguments, selection)
+            if body in seen:
+                continue
+            seen.add(body)
+            yield _make_case(
+                operation,
+                body=body,
+                mode=GenerationMode.NEGATIVE,
+                scenario=scenario,
+                description=description,
+                location=element.location,
+                parameter=element.parameter,
+                generation_time=instant.elapsed,
+            )
 
 
 def _shared_key(element: InputElement, value: graphql.ValueNode | None) -> Hashable:
