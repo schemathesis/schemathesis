@@ -14,7 +14,7 @@ from requests import Request
 import schemathesis
 from schemathesis import GenerationMode
 from schemathesis.checks import not_a_server_error
-from schemathesis.config import SanitizationConfig
+from schemathesis.config import SanitizationConfig, SchemathesisConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.error_feedback.store import (
     ErrorFeedbackStore,
@@ -1644,6 +1644,22 @@ def test_negative_patterns(ctx):
             },
         ],
     )
+
+
+def test_strings_stay_within_configured_codec(ctx):
+    patterned = {"type": "string", "minLength": 3, "pattern": "^[^a]+$"}
+    operation = ctx.openapi.load_operation(
+        "POST /foo",
+        {
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": patterned}],
+            "requestBody": make_request_body({"type": "object", "properties": {"n": patterned}, "required": ["n"]}),
+            "responses": DEFAULT_RESPONSES,
+        },
+        config=SchemathesisConfig.from_dict({"generation": {"codec": "ascii"}}),
+    )
+    for case in iter_cases(operation, *ALL_MODES):
+        sent = json.dumps([case.query, case.body], ensure_ascii=False, default=str)
+        assert sent.isascii(), f"{case.meta.phase.data.description}: {sent!r}"
 
 
 @pytest.mark.parametrize(

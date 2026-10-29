@@ -39,6 +39,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -767,6 +768,7 @@ class CoverageRun:
     custom_formats: dict[str, SearchStrategy]
     validator_cls: type[jsonschema_rs.Validator]
     update_pattern: Callable[[str, int | None, int | None], str] | None
+    alphabet: Alphabet
     session: GenerationSession | None
     error_feedback: ErrorFeedbackStore | None
     responses: list[tuple[str, object]]
@@ -792,6 +794,7 @@ def _coverage_context(
         custom_formats=run.custom_formats,
         validator_cls=run.validator_cls,
         update_pattern=run.update_pattern,
+        alphabet=run.alphabet,
         allow_extra_parameters=run.generation_config.allow_extra_parameters,
     )
 
@@ -1682,6 +1685,7 @@ def iter_coverage_cases(
         custom_formats=custom_formats,
         validator_cls=validator_cls,
         update_pattern=update_pattern,
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
         session=session,
         error_feedback=error_feedback,
         responses=responses,
