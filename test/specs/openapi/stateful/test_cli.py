@@ -165,7 +165,9 @@ def test_proxy_error(ctx, cli, snapshot_cli, app_runner):
     api = ctx.openapi.apps.users_crud_with_success()
     assert (
         cli.run(
-            api.schema_url,
+            # The schema is read from a file, so the proxy fails only on API calls.
+            str(ctx.makefile(api.spec)),
+            f"--url={api.base_url}",
             # A port nothing listens on: port 80 may well be taken by a local web server, which then answers as the proxy.
             f"--proxy=http://127.0.0.1:{app_runner.unused_port()}",
             "--phases=stateful",

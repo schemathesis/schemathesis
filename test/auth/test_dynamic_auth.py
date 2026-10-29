@@ -27,7 +27,7 @@ from schemathesis.specs.openapi.auths import (
     DynamicTokenAuthProvider,
     HttpBearerAuthProvider,
 )
-from test.utils import refusing_url
+from test.utils import refusing_url, silent_url
 
 OAUTH2_SCHEME = {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}}
 
@@ -253,6 +253,41 @@ def test_get_raises_on_missing_request_cert_file(ctx, app_runner):
     )
     with pytest.raises(AuthenticationError, match="Connection to auth endpoint failed"):
         provider.get(operation.Case(), AuthContext(operation=operation, app=None))
+
+
+def _token_provider():
+    return DynamicTokenAuthProvider(
+        path="/api/auth",
+        method="post",
+        payload=None,
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+
+
+def test_fetch_http_goes_through_configured_proxy(ctx, app_runner):
+    proxy = Flask(__name__)
+
+    @proxy.route("/api/auth", methods=["POST"])
+    def auth():
+        return jsonify({"access_token": "test-token"})
+
+    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema.config.proxy = f"http://127.0.0.1:{app_runner.run_flask_app(proxy)}"
+    operation = schema["/data"]["GET"]
+    with refusing_url() as url:
+        schema.config.update(base_url=url)
+        assert _token_provider().get(operation.Case(), AuthContext(operation=operation, app=None)) == "test-token"
+
+
+def test_fetch_http_times_out_without_configured_timeout(ctx):
+    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    operation = schema["/data"]["GET"]
+    with silent_url() as url:
+        schema.config.update(base_url=url)
+        with pytest.raises(AuthenticationError, match="Read timed out"):
+            _token_provider().get(operation.Case(), AuthContext(operation=operation, app=None))
 
 
 @pytest.mark.parametrize(

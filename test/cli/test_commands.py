@@ -1087,8 +1087,16 @@ def test_server_error_closing_keep_alive_connection_is_not_a_network_error(ctx, 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
 def test_proxy_error(ctx, cli, snapshot_cli, app_runner):
     api = ctx.openapi.apps.success()
+    # The schema is read from a file, so the proxy fails only on API calls.
     # A port nothing listens on: port 80 may well be taken by a local web server, which then answers as the proxy.
-    assert cli.run(api.schema_url, f"--proxy=http://127.0.0.1:{app_runner.unused_port()}") == snapshot_cli
+    assert (
+        cli.run(
+            str(ctx.makefile(api.spec)),
+            f"--url={api.base_url}",
+            f"--proxy=http://127.0.0.1:{app_runner.unused_port()}",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.fixture

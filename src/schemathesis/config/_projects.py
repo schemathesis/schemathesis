@@ -432,6 +432,9 @@ class ProjectConfig(DiffBase):
         headers = self.headers_for()
         if headers:
             kwargs["headers"] = headers
+        proxy = self.proxy_for()
+        if proxy is not None:
+            kwargs["proxies"] = {"all": proxy}
         return kwargs
 
     def proxy_for(self, *, operation: APIOperation | None = None) -> str | None:

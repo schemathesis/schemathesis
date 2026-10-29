@@ -21,7 +21,7 @@ from schemathesis.wfc.escalation import escalating_provider, identity_assignment
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
-from test.utils import allure_results
+from test.utils import allure_results, refusing_url, silent_url
 
 CREDENTIALS = {
     "username": WFC_USERNAME,
@@ -368,6 +368,29 @@ def test_wfc_asgi_login_applies_token():
     case = operation.Case()
     provider.set(case, provider.get(case, context), context)
     assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
+def test_wfc_http_login_goes_through_configured_proxy(ctx, app_runner):
+    schema = ctx.openapi.load_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema.config.proxy = f"http://127.0.0.1:{app_runner.run_flask_app(wfc_apps.wfc_login().server)}"
+    operation = schema["/api/protected"]["GET"]
+    provider = _provider_for(_login(token=_token()))
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    with refusing_url() as url:
+        schema.config.update(base_url=url)
+        provider.set(case, provider.get(case, context), context)
+    assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
+def test_wfc_http_login_times_out_without_configured_timeout(ctx):
+    schema = ctx.openapi.load_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    operation = schema["/api/protected"]["GET"]
+    provider = _provider_for(_login(token=_token()))
+    with silent_url() as url:
+        schema.config.update(base_url=url)
+        with pytest.raises(WFCLoginError, match="Read timed out"):
+            provider.get(operation.Case(), AuthContext(operation=operation, app=None))
 
 
 def _redirect_login_app(ctx) -> Flask:

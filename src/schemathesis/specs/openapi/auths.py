@@ -16,7 +16,13 @@ from schemathesis.core.failures import reason_phrase
 from schemathesis.core.media_types import is_form_urlencoded, is_json
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
-from schemathesis.core.transport import AUTH_REJECTION_STATUSES, decode_lossy, load_json_lossy, parse_set_cookie
+from schemathesis.core.transport import (
+    AUTH_REJECTION_STATUSES,
+    DEFAULT_RESPONSE_TIMEOUT,
+    decode_lossy,
+    load_json_lossy,
+    parse_set_cookie,
+)
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
@@ -150,15 +156,18 @@ class DynamicTokenAuthProvider:
     def _fetch_http(self, ctx: AuthContext) -> str:
         url = get_full_path(ctx.operation.schema.get_base_url() + "/", self.path)
         config = ctx.operation.schema.config
-        timeout = config.request_timeout_for(operation=ctx.operation)
+        timeout = config.request_timeout_for(operation=ctx.operation) or DEFAULT_RESPONSE_TIMEOUT
         verify = config.tls_verify_for(operation=ctx.operation)
         cert = config.request_cert_for(operation=ctx.operation)
+        proxy = config.proxy_for(operation=ctx.operation)
         body, headers = self._build_body()
         kwargs: dict[str, Any] = {}
         if verify is not None:
             kwargs["verify"] = verify
         if cert is not None:
             kwargs["cert"] = cert
+        if proxy is not None:
+            kwargs["proxies"] = {"all": proxy}
         try:
             response = requests.request(self.method, url, data=body, headers=headers, timeout=timeout, **kwargs)
         except (requests.exceptions.RequestException, OSError) as exc:
