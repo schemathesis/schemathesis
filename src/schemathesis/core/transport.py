@@ -252,7 +252,7 @@ class Response:
     """Whether an event stream was read only up to `max-stream-events` or the request timeout."""
     _override: Override | None
     # Turns `content` into display text for failure output, for bodies that are not text.
-    render_content: Callable[[bytes], str] | None
+    render_content: Callable[[bytes], str | None] | None
     # Replaces "[<code>] <reason>" in failure output, for responses whose status is not an HTTP status.
     status_line: str | None
 
@@ -289,7 +289,7 @@ class Response:
         content_size: int | None = None,
         stream_cut_short: bool = False,
         _override: Override | None = None,
-        render_content: Callable[[bytes], str] | None = None,
+        render_content: Callable[[bytes], str | None] | None = None,
         status_line: str | None = None,
     ):
         self.status_code = status_code

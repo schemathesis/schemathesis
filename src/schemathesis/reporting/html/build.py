@@ -25,6 +25,7 @@ def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | 
             for title, failures in group_failures(group.failures)
         ],
         status_code=response.status_code if response is not None else None,
+        status_line=response.status_line if response is not None else None,
         body=format_response_payload(response, config=config) if response is not None else None,
         commands=_commands(group),
         replay=replay,

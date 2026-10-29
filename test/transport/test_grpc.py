@@ -8,6 +8,7 @@ import requests
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import CallOutcome
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
@@ -55,6 +56,20 @@ def test_internal_error(ctx):
         "INTERNAL: negative id",
         {"grpc-status": ["13"], "grpc-message": ["negative id"]},
         b"",
+    )
+
+
+def test_malformed_ok_body_is_reported_as_binary(ctx):
+    case = load(ctx.grpc.apps.users())["pkg.Users"]["GetUser"].Case(body={"userId": 17})
+    with pytest.raises(FailureGroup) as exc_info:
+        case.call_and_validate()
+    assert str(exc_info.value).partition("Reproduce with")[0] == (
+        "Schemathesis found 1 distinct failure\n\n"
+        "- ST117 Response does not decode as the declared message\n\n"
+        "    Cannot decode the response as `pkg.User`: Error parsing message with type 'pkg.User': "
+        "Wire format was corrupt\n\n"
+        "OK:\n\n"
+        "    <BINARY>\n\n"
     )
 
 

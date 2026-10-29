@@ -757,7 +757,9 @@ def _anchor(label: str, taken: set[str]) -> str:
     return anchor
 
 
-def _status(code: int) -> str:
+def _status(code: int, status_line: str | None = None) -> str:
+    if status_line is not None:
+        return f'<span class="status s{code // 100}xx">{esc(status_line)}</span>'
     return f'<span class="status s{code // 100}xx"><span class="status-code">{code}</span> {esc(reason_phrase(code))}</span>'
 
 
@@ -820,7 +822,7 @@ def _failing_case(case: FailingCase, owner: str = "", filters: str = "") -> str:
             f"{messages}</div>"
         )
     if case.status_code is not None and case.body is not None:
-        parts.append(_evidence("Response", _body(case.body), _status(case.status_code)))
+        parts.append(_evidence("Response", _body(case.body), _status(case.status_code, case.status_line)))
     if case.commands:
         parts.append(_reproduce(case.commands, case.replay))
     meta = ""

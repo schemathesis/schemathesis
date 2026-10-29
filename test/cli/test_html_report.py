@@ -800,6 +800,22 @@ def test_html_report_graphql(ctx, cli, report_dir, snapshot_html):
     assert run_with_report(cli, report_dir, api.schema_url) == snapshot_html
 
 
+def test_html_report_grpc_status(ctx, cli, report_dir):
+    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
+    server = ctx.grpc.apps.users()
+    cli.run_and_assert(
+        server.target,
+        "--max-examples=10",
+        "--phases=fuzzing",
+        "--seed=1",
+        f"--report-html-path={report_dir}",
+        exit_code=ExitCode.FAILURES,
+    )
+    assert re.findall(r'<span class="ev-label">Response</span>(.*?)</div>', read_report(report_dir)) == [
+        '<span class="status s5xx">INTERNAL: negative id</span>'
+    ]
+
+
 @pytest.mark.parametrize(
     ("seconds", "expected"),
     [(1.23, "1.2s"), (59.96, "1m 0s"), (125.0, "2m 5s"), (7325.0, "2h 2m")],

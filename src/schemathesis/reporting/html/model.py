@@ -81,6 +81,8 @@ class FailingCase:
     case_id: str | None
     failures: list[FailureEntry]
     status_code: int | None
+    # Shown in place of the status code and reason when the transport provides one.
+    status_line: str | None
     # The body as the terminal shows it, `<EMPTY>` and `<BINARY>` included.
     body: str | None
     # One per request the failure needs, oldest first.
