@@ -69,7 +69,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         else:
             request_message = message_factory.GetMessageClass(method.input_type)()
             # Well-known messages such as wrappers map to any JSON value, not only to objects.
-            payload = json_format.ParseDict(cast("dict[str, Any]", body), request_message).SerializeToString()
+            payload = json_format.ParseDict(
+                cast("dict[str, Any]", body), request_message, descriptor_pool=method.input_type.file.pool
+            ).SerializeToString()
         request_headers = request_metadata(case, headers)
         if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
             request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
@@ -109,7 +111,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
 
             def render_content(content: bytes) -> str | None:
                 try:
-                    return json_format.MessageToJson(output_class.FromString(content))
+                    return json_format.MessageToJson(
+                        output_class.FromString(content), descriptor_pool=method.output_type.file.pool
+                    )
                 except message.DecodeError:
                     # Shown as binary; the response checks report the malformed message.
                     return None

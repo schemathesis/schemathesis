@@ -115,7 +115,8 @@ def users(
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
-    404 is NOT_FOUND, and 17 answers with bytes that do not decode. Reflection refuses calls that carry `x-deny: 1`.
+    404 is NOT_FOUND, and 17 answers with bytes that do not decode. `pkg.Admin/Reset` answers with `u<id>` packed
+    into `response`. Reflection refuses calls that carry `x-deny: 1`.
     """
     database = descriptor_database.DescriptorDatabase()
     for file in descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file:
@@ -157,7 +158,9 @@ def users(
 
     def reset(payload: bytes, context: grpc.ServicerContext) -> bytes:
         record("Reset", context)
-        return operation_class().SerializeToString()
+        operation = operation_class()
+        operation.response.Pack(user_class(name=f"u{request_class.FromString(payload).user_id}"))
+        return operation.SerializeToString()
 
     recorder = RecordReflection()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4), interceptors=[recorder])

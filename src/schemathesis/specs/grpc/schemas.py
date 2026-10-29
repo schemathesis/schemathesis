@@ -199,7 +199,9 @@ class GrpcSchema(BaseSchema):
         input_type = operation.definition.raw.input_type
         body = {} if isinstance(case.body, NotSet) else case.body
         if isinstance(body, bytes):
-            body = json_format.MessageToDict(message_factory.GetMessageClass(input_type).FromString(body))
+            body = json_format.MessageToDict(
+                message_factory.GetMessageClass(input_type).FromString(body), descriptor_pool=input_type.file.pool
+            )
         args.extend(["-d", json.dumps(_grpcurl_json(body, input_type)), address, operation.label])
         return " ".join(shlex.quote(arg) for arg in args)
 

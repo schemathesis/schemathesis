@@ -10,6 +10,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import CallOutcome
+from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, write_descriptor_set
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -209,3 +210,22 @@ def test_calls_share_a_connection(ctx):
     operation.Case(body={"userId": 1}).call()
     operation.Case(body={"userId": 2}).call()
     assert server.calls[0].peer == server.calls[1].peer
+
+
+def test_any_field_packed_with_schema_type_is_encoded(ctx, tmp_path):
+    server = ctx.grpc.apps.users()
+    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
+    schema = schemathesis.grpc.from_path(path, config=SchemathesisConfig.from_dict({"base-url": server.target}))
+    body = {"payload": {"@type": "type.googleapis.com/types.Node", "name": "n"}}
+    response = schema["types.Types"]["Envelope"].Case(body=body).call()
+    assert (response.status_line, response.request.body) == (
+        "UNIMPLEMENTED: Method not found!",
+        b"\x12%\n\x1etype.googleapis.com/types.Node\x12\x03\n\x01n",
+    )
+
+
+def test_any_field_packed_with_schema_type_is_rendered(ctx):
+    response = load(ctx.grpc.apps.users())["pkg.Admin"]["Reset"].Case(body={"userId": 7}).call()
+    assert json.loads(response.render_content(response.content)) == {
+        "response": {"@type": "type.googleapis.com/pkg.User", "name": "u7"}
+    }

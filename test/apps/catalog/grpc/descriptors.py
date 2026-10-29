@@ -23,6 +23,8 @@ def write_descriptor_set(directory: Path, data: bytes) -> Path:
 def users_descriptor_set() -> bytes:
     timestamp = descriptor_pb2.FileDescriptorProto()
     timestamp_pb2.DESCRIPTOR.CopyToProto(timestamp)
+    any_file = descriptor_pb2.FileDescriptorProto()
+    any_pb2.DESCRIPTOR.CopyToProto(any_file)
     users = descriptor_pb2.FileDescriptorProto(
         name="users.proto",
         package="pkg",
@@ -68,16 +70,25 @@ def users_descriptor_set() -> bytes:
     )
     # Imported for its message type; its service belongs to another API.
     operations = descriptor_pb2.FileDescriptorProto(
-        name="google/longrunning/operations.proto", package="google.longrunning", syntax="proto3"
+        name="google/longrunning/operations.proto",
+        package="google.longrunning",
+        syntax="proto3",
+        dependency=["google/protobuf/any.proto"],
     )
-    operations.message_type.add(name="Operation")
+    _field(
+        operations.message_type.add(name="Operation"),
+        "response",
+        5,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".google.protobuf.Any",
+    )
     operations.message_type.add(name="GetOperationRequest")
     operations.service.add(name="Operations").method.add(
         name="GetOperation",
         input_type=".google.longrunning.GetOperationRequest",
         output_type=".google.longrunning.Operation",
     )
-    return descriptor_pb2.FileDescriptorSet(file=[timestamp, users, operations]).SerializeToString()
+    return descriptor_pb2.FileDescriptorSet(file=[timestamp, users, operations, any_file]).SerializeToString()
 
 
 def all_types_descriptor_set() -> bytes:
