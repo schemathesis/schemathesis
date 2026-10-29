@@ -2,25 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlsplit
 
 import requests
 
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, decode_lossy, load_json_lossy, parse_set_cookie
-from schemathesis.python import asgi, wsgi
-from schemathesis.transport import is_asgi_app
+from schemathesis.auths import InProcessAuthRequestError, send_auth_request
 
 from .errors import WFCLoginError
 from .payloads import format_login_payload
 from .tokens import extract_token_from_body, extract_token_from_header, format_token
 
 if TYPE_CHECKING:
-    from werkzeug.datastructures import Headers
-
-    from schemathesis.auths import AuthContext
+    from schemathesis.auths import AuthContext, AuthEndpointResponse
     from schemathesis.generation.case import Case
 
     from .auth import Header, LoginEndpoint
@@ -41,28 +36,36 @@ class FixedHeaderAuthProvider:
 
 
 @dataclass(slots=True)
-class _LoginResponse:
-    status_code: int
-    text: str
-    get_json: Callable[[], Any]
-    headers: Mapping[str, str] | Headers
-    cookies: dict[str, str]
-
-
-@dataclass(slots=True)
 class LoginEndpointAuthProvider:
     """Call a login endpoint (over the run's transport) to obtain a token or cookies for later requests."""
 
     config: LoginEndpoint
 
     def get(self, case: Case, context: AuthContext) -> dict[str, str] | str:
-        app = context.app
-        if app is None or self.config.external_endpoint_url is not None:
-            response = self._fetch_http(context)
-        elif is_asgi_app(app):
-            response = self._fetch_asgi(app, context)
-        else:
-            response = self._fetch_wsgi(app, context)
+        # An external login endpoint is reached over the network even when the API runs in-process.
+        app = context.app if self.config.external_endpoint_url is None else None
+        url = self._url(context)
+        body, headers = self._body_and_headers()
+        try:
+            response = send_auth_request(
+                app,
+                method=self.config.verb,
+                url=url,
+                # Only an in-process app is called by path, and then `endpoint` is always set.
+                path=self.config.endpoint or "",
+                body=body,
+                headers=headers,
+                settings=context.operation.schema.config.request_settings_for(operation=context.operation),
+                # A session cookie rides on the redirect itself, so following it would discard the sign-in.
+                allow_redirects=False,
+            )
+        except InProcessAuthRequestError as exc:
+            raise WFCLoginError(f"{exc.interface} login request failed: {exc.cause}") from exc.cause
+        except requests.exceptions.RequestException as exc:
+            raise WFCLoginError(f"Login endpoint call failed: {exc}") from exc
+        # Header values outside latin-1 and unparsable URLs fail before anything is sent.
+        except ValueError as exc:
+            raise WFCLoginError(f"Login endpoint call failed for {url}: {exc}") from exc
         return self._auth_data(response)
 
     def set(self, case: Case, data: dict[str, str] | str, context: AuthContext) -> None:
@@ -90,7 +93,7 @@ class LoginEndpointAuthProvider:
         assert self.config.endpoint is not None
         return "/" + self.config.endpoint.lstrip("/")
 
-    def _login_bounce(self, response: _LoginResponse) -> str | None:
+    def _login_bounce(self, response: AuthEndpointResponse) -> str | None:
         """Redirect target when a sign-in attempt is sent straight back to the login endpoint."""
         location = response.headers.get("Location")
         if location is None:
@@ -116,78 +119,7 @@ class LoginEndpointAuthProvider:
             headers[header.name] = header.value
         return body, headers
 
-    def _fetch_http(self, context: AuthContext) -> _LoginResponse:
-        url = self._url(context)
-        config = context.operation.schema.config
-        body, headers = self._body_and_headers()
-        proxy = config.proxy_for(operation=context.operation)
-        try:
-            response = requests.request(
-                self.config.verb,
-                url,
-                data=body,
-                headers=headers,
-                # A session cookie rides on the redirect itself, so following it would discard the sign-in.
-                allow_redirects=False,
-                timeout=config.request_timeout_for(operation=context.operation) or DEFAULT_RESPONSE_TIMEOUT,
-                verify=config.tls_verify_for(operation=context.operation),
-                cert=config.request_cert_for(operation=context.operation),
-                proxies={"all": proxy} if proxy is not None else None,
-            )
-        except requests.exceptions.RequestException as exc:
-            raise WFCLoginError(f"Login endpoint call failed: {exc}") from exc
-        # Header values outside latin-1 and unparsable URLs fail before anything is sent.
-        except ValueError as exc:
-            raise WFCLoginError(f"Login endpoint call failed for {url}: {exc}") from exc
-        return _LoginResponse(
-            status_code=response.status_code,
-            text=decode_lossy(response.content, response.encoding),
-            get_json=lambda: load_json_lossy(response.content, response.encoding),
-            headers=response.headers,
-            cookies=response.cookies.get_dict(),
-        )
-
-    def _fetch_wsgi(self, app: Any, context: AuthContext) -> _LoginResponse:
-        body, headers = self._body_and_headers()
-        try:
-            client = wsgi.get_client(app)
-            response = client.open(self.config.endpoint, method=self.config.verb, data=body, headers=headers)
-        except Exception as exc:
-            raise WFCLoginError(f"WSGI login request failed: {exc}") from exc
-        return _LoginResponse(
-            status_code=response.status_code,
-            text=response.get_data(as_text=True),
-            get_json=lambda: response.get_json(force=True, silent=False),
-            headers=response.headers,
-            cookies=parse_set_cookie(response.headers.get_all("Set-Cookie")),
-        )
-
-    def _fetch_asgi(self, app: Any, context: AuthContext) -> _LoginResponse:
-        timeout = context.operation.schema.config.request_timeout_for(operation=context.operation)
-        body, headers = self._body_and_headers()
-        assert self.config.endpoint is not None
-        try:
-            with asgi.get_client(app) as client:
-                response = client.request(
-                    self.config.verb,
-                    self.config.endpoint,
-                    data=body,
-                    headers=headers,
-                    # A session cookie rides on the redirect itself, so following it would discard the sign-in.
-                    allow_redirects=False,
-                    timeout=timeout,
-                )
-        except Exception as exc:
-            raise WFCLoginError(f"ASGI login request failed: {exc}") from exc
-        return _LoginResponse(
-            status_code=response.status_code,
-            text=decode_lossy(response.content, response.encoding),
-            get_json=lambda: load_json_lossy(response.content, response.encoding),
-            headers=response.headers,
-            cookies=dict(response.cookies),
-        )
-
-    def _auth_data(self, response: _LoginResponse) -> dict[str, str] | str:
+    def _auth_data(self, response: AuthEndpointResponse) -> dict[str, str] | str:
         # No token to extract means the login can only hand back a session.
         is_cookie_login = self.config.expect_cookies or self.config.token is None
         # Form-login servers commonly answer a successful sign-in with a redirect to a landing page.

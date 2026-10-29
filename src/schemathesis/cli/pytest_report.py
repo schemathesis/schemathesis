@@ -45,18 +45,16 @@ def _render_request(interaction: Interaction, operation: APIOperation, config: O
         lines.append(f"        data={request.body!r},")
     if interaction.response is not None and interaction.response.verify is not True:
         lines.append(f"        verify={interaction.response.verify!r},")
-    transport = operation.schema.config
-    cert = transport.request_cert_for(operation=operation)
-    if cert is not None:
-        lines.append(f"        cert={cert!r},")
-    proxy = transport.proxy_for(operation=operation)
+    settings = operation.schema.config.request_settings_for(operation=operation)
+    if settings.cert is not None:
+        lines.append(f"        cert={settings.cert!r},")
+    proxy = settings.proxy
     if proxy is not None:
         if config.sanitization.enabled:
             proxy = sanitize_url(proxy, config=config.sanitization)
         lines.append(f"        proxies={{'all': {proxy!r}}},")
-    timeout = transport.request_timeout_for(operation=operation)
-    if timeout is not None:
-        lines.append(f"        timeout={timeout!r},")
+    if settings.timeout is not None:
+        lines.append(f"        timeout={settings.timeout!r},")
     lines.append("    )")
     assert interaction.response is not None
     lines.append(f"    assert response.status_code == {interaction.response.status_code}")

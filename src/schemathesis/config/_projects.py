@@ -26,7 +26,7 @@ from schemathesis.config._report import ReportsConfig
 from schemathesis.config._servers import ServersConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, NOT_SET, NotSet, hooks
-from schemathesis.core.transport import DEFAULT_MAX_STREAM_EVENTS
+from schemathesis.core.transport import DEFAULT_MAX_STREAM_EVENTS, RequestSettings
 from schemathesis.core.validation import validate_base_url, validate_origin
 
 if TYPE_CHECKING:
@@ -385,7 +385,9 @@ class ProjectConfig(DiffBase):
         return DEFAULT_MAX_STREAM_EVENTS
 
     def request_timeout_for(self, *, operation: APIOperation | None = None) -> float | int | None:
-        config = self._operation_config(operation)
+        return self._request_timeout(self._operation_config(operation))
+
+    def _request_timeout(self, config: OperationConfig | None) -> float | int | None:
         if config is not None and config.request_timeout is not None:
             return config.request_timeout
         return self.request_timeout
@@ -403,13 +405,17 @@ class ProjectConfig(DiffBase):
         return bool(self.continue_on_failure)
 
     def tls_verify_for(self, *, operation: APIOperation | None = None) -> bool | str | None:
-        config = self._operation_config(operation)
+        return self._tls_verify(self._operation_config(operation))
+
+    def _tls_verify(self, config: OperationConfig | None) -> bool | str | None:
         if config is not None and config.tls_verify is not None:
             return config.tls_verify
         return self.tls_verify
 
     def request_cert_for(self, *, operation: APIOperation | None = None) -> str | tuple[str, str] | None:
-        config = self._operation_config(operation)
+        return self._request_cert(self._operation_config(operation))
+
+    def _request_cert(self, config: OperationConfig | None) -> str | tuple[str, str] | None:
         if config is not None and config.request_cert is not None:
             if config.request_cert_key:
                 return config.request_cert, config.request_cert_key
@@ -420,25 +426,36 @@ class ProjectConfig(DiffBase):
             return self.request_cert
         return None
 
+    def request_settings_for(self, *, operation: APIOperation | None = None) -> RequestSettings:
+        config = self._operation_config(operation)
+        return RequestSettings(
+            timeout=self._request_timeout(config),
+            verify=self._tls_verify(config),
+            cert=self._request_cert(config),
+            proxy=self._proxy(config),
+        )
+
     def schema_request_kwargs(self) -> dict[str, object]:
         """Keyword arguments for the HTTP request that fetches the API schema."""
-        kwargs: dict[str, object] = {"verify": self.tls_verify}
-        request_cert = self.request_cert_for()
-        if request_cert:
-            kwargs["cert"] = request_cert
+        settings = self.request_settings_for()
+        kwargs: dict[str, object] = {"verify": settings.verify}
+        if settings.cert:
+            kwargs["cert"] = settings.cert
         auth = self.auth_for()
         if auth is not None:
             kwargs["auth"] = auth
         headers = self.headers_for()
         if headers:
             kwargs["headers"] = headers
-        proxy = self.proxy_for()
-        if proxy is not None:
-            kwargs["proxies"] = {"all": proxy}
+        proxies = settings.proxies
+        if proxies is not None:
+            kwargs["proxies"] = proxies
         return kwargs
 
     def proxy_for(self, *, operation: APIOperation | None = None) -> str | None:
-        config = self._operation_config(operation)
+        return self._proxy(self._operation_config(operation))
+
+    def _proxy(self, config: OperationConfig | None) -> str | None:
         if config is not None and config.proxy is not None:
             return config.proxy
         return self.proxy
