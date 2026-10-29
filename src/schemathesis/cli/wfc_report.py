@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.statistic import Statistic
     from schemathesis.generation.case import Case
 
-SCHEMA_VERSION = "0.8.0"
+SCHEMA_VERSION = "0.10.0"
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 VALIDATION_FAILURES = (
     JsonSchemaError,
