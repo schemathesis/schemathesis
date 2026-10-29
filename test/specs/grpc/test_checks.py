@@ -89,3 +89,8 @@ def test_failures_group_by_message(operation, response_factory):
             operation.validate_response(response, case=operation.Case(body={}))
         failures.add(exc_info.value)
     assert sorted(failure.type_name for failure in failures) == ["google.rpc.Status", "pkg.User"]
+
+
+def test_unknown_fields_pass_for_descriptor_sets(operation, response_factory):
+    response = grpc_response(response_factory, status=0, content=b"\x0a\x02u7\x98\x06\x01")
+    assert operation.validate_response(response, case=operation.Case(body={})) is None

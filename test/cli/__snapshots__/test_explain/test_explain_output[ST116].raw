@@ -13,4 +13,4 @@ unrequested fields, a value of its declared type, and no `null` for a
 non-nullable field.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109,
-ST110, ST111, ST114, ST115, ST117.
+ST110, ST111, ST114, ST115, ST117, ST118.

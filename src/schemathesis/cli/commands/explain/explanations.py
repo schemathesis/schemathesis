@@ -125,6 +125,13 @@ EXPLANATIONS: dict[str, Explanation] = {
             error must decode as `google.rpc.Status`. Regenerate the descriptor set if the server's protos changed.
         """,
     ),
+    "ST118": Explanation(
+        summary="gRPC response with fields its message, as the server reflects it, does not declare.",
+        notes="""
+            Applies to schemas loaded through reflection only: the server sends fields its own reflected descriptors
+            lack, so the reflection data is stale or the response is built from a different message.
+        """,
+    ),
     "ST201": Explanation(
         summary="Schema-violating request accepted.",
         notes="""

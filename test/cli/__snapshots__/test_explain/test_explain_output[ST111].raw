@@ -10,4 +10,4 @@ One unknown value is reported per response, so rerunning after a fix can show
 the next one.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109,
-ST110, ST114, ST115, ST116, ST117.
+ST110, ST114, ST115, ST116, ST117, ST118.

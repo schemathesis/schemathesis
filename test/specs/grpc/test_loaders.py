@@ -219,9 +219,11 @@ except LoaderError as exc:
 """
 
 
-def test_missing_grpc_extra(users_path):
+@pytest.mark.parametrize("loader", ["from_path", "from_url"])
+def test_missing_grpc_extra(users_path, loader):
+    location = str(users_path) if loader == "from_path" else "grpc://127.0.0.1:1"
     result = subprocess.run(
-        [sys.executable, "-c", BLOCK_PROTOBUF_AND_LOAD, str(users_path)], capture_output=True, text=True
+        [sys.executable, "-c", BLOCK_PROTOBUF_AND_LOAD, loader, location], capture_output=True, text=True
     )
     assert result.stderr.splitlines()[-1] == (
         "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`"
@@ -232,7 +234,7 @@ BLOCK_PROTOBUF_AND_LOAD = """
 import sys
 sys.modules["google.protobuf"] = None
 import schemathesis
-schemathesis.grpc.from_path(sys.argv[1])
+getattr(schemathesis.grpc, sys.argv[1])(sys.argv[2])
 """
 
 

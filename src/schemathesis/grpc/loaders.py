@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -14,11 +16,130 @@ from schemathesis.hooks import (
 )
 
 if TYPE_CHECKING:
+    import grpc
     from google.protobuf import descriptor_pb2
 
     from schemathesis.specs.grpc.schemas import GrpcSchema
 
 BUILD_HINT = "Build one with `buf build -o api.binpb` or `protoc --include_imports --descriptor_set_out=api.binpb`"
+EXTRA_HINT = "Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`"
+# Reflection lists every service the server registers, these included.
+INFRASTRUCTURE_SERVICES = frozenset(
+    {"grpc.reflection.v1.ServerReflection", "grpc.reflection.v1alpha.ServerReflection", "grpc.health.v1.Health"}
+)
+
+
+def from_url(
+    url: str,
+    *,
+    config: SchemathesisConfig | None = None,
+    wait_for_schema: float | None = None,
+    headers: dict[str, str] | None = None,
+    verify: bool | str = True,
+    cert: str | tuple[str, str] | None = None,
+    auth: tuple[str, str] | None = None,
+    timeout: float | None = None,
+) -> GrpcSchema:
+    """Load a gRPC schema from a server through reflection.
+
+    Args:
+        url: Server address, `grpc://host:port` or `grpcs://host:port`
+        config: Custom configuration. If `None`, uses auto-discovered config
+        wait_for_schema: Seconds to wait for the server to become available
+        headers: Metadata to send with reflection calls
+        verify: Whether to verify the server certificate, or a CA bundle path
+        cert: Client certificate, or a `(certificate, key)` pair
+        auth: Basic authentication credentials
+        timeout: Seconds to wait for each reflection call
+
+    Example:
+        ```python
+        import schemathesis
+
+        schema = schemathesis.grpc.from_url("grpc://localhost:50051")
+        ```
+
+    """
+    try:
+        import grpc
+        import requests
+        from google.protobuf import descriptor_pb2
+
+        # grpcio-reflection ships no usable type information.
+        from grpc_reflection.v1alpha import reflection_pb2  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise ImportError(EXTRA_HINT) from exc
+
+    from schemathesis.specs.grpc.schemas import filter_metadata
+    from schemathesis.transport.grpc import create_channel, metadata_pairs, parse_target
+
+    address, tls = parse_target(url, verify)
+    request_headers = filter_metadata(headers or {})
+    if auth is not None:
+        request_headers.setdefault("authorization", requests.auth._basic_auth_str(*auth))
+    metadata = metadata_pairs(request_headers)
+    with create_channel(address, tls, verify, cert) as channel:
+        # Both versions exchange the same messages; some servers serve only one of them.
+        v1, v1alpha = (
+            channel.stream_stream(
+                f"/grpc.reflection.{version}.ServerReflection/ServerReflectionInfo",
+                request_serializer=reflection_pb2.ServerReflectionRequest.SerializeToString,
+                response_deserializer=reflection_pb2.ServerReflectionResponse.FromString,
+            )
+            for version in ("v1", "v1alpha")
+        )
+
+        def ask(call: grpc.StreamStreamMultiCallable, **kwargs: str) -> reflection_pb2.ServerReflectionResponse:
+            try:
+                return next(
+                    call(
+                        iter([reflection_pb2.ServerReflectionRequest(**kwargs)]),
+                        metadata=metadata,
+                        timeout=(timeout or DEFAULT_RESPONSE_TIMEOUT) + (wait_for_schema or 0),
+                        wait_for_ready=wait_for_schema is not None,
+                    )
+                )
+            except grpc.RpcError as exc:
+                raise _reflection_error(cast(grpc.Call, exc), url, address) from None
+
+        try:
+            listing = ask(v1, list_services="")
+            call = v1
+        except LoaderError as exc:
+            if exc.kind != LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE:
+                raise
+            listing = ask(v1alpha, list_services="")
+            call = v1alpha
+        names = [
+            service.name
+            for service in listing.list_services_response.service
+            if service.name not in INFRASTRUCTURE_SERVICES
+        ]
+        files: dict[str, descriptor_pb2.FileDescriptorProto] = {}
+        for name in names:
+            # Each response carries the file and everything it imports.
+            for data in ask(call, file_containing_symbol=name).file_descriptor_response.file_descriptor_proto:
+                file = descriptor_pb2.FileDescriptorProto.FromString(data)
+                files.setdefault(file.name, file)
+    data = descriptor_pb2.FileDescriptorSet(file=files.values()).SerializeToString()
+    loaded = _from_descriptor_set(data, config=config, service_names=names)
+    loaded.location = url
+    return loaded
+
+
+def _reflection_error(error: grpc.Call, url: str, address: str) -> LoaderError:
+    import grpc
+
+    code = error.code()
+    if code == grpc.StatusCode.UNIMPLEMENTED:
+        return LoaderError(
+            LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
+            "The server does not support reflection. Build a descriptor set with `buf build -o api.binpb` "
+            f"and run `schemathesis run api.binpb --url {url}`",
+        )
+    if code == grpc.StatusCode.UNAVAILABLE:
+        return LoaderError(LoaderErrorKind.CONNECTION_OTHER, f"Failed to connect to {address}: {error.details()}")
+    return LoaderError(LoaderErrorKind.UNCLASSIFIED, f"Reflection failed with {code.name}: {error.details()}")
 
 
 def from_path(path: PathLike | str, *, config: SchemathesisConfig | None = None) -> GrpcSchema:
@@ -41,12 +162,14 @@ def from_path(path: PathLike | str, *, config: SchemathesisConfig | None = None)
     return loaded
 
 
-def _from_descriptor_set(data: bytes, *, config: SchemathesisConfig | None) -> GrpcSchema:
+def _from_descriptor_set(
+    data: bytes, *, config: SchemathesisConfig | None, service_names: Sequence[str] | None = None
+) -> GrpcSchema:
     try:
         from google.protobuf import descriptor_pb2, descriptor_pool, json_format
         from google.protobuf.message import DecodeError
     except ImportError as exc:
-        raise ImportError("Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`") from exc
+        raise ImportError(EXTRA_HINT) from exc
 
     from schemathesis.specs.grpc.schemas import GrpcSchema
 
@@ -92,12 +215,15 @@ def _from_descriptor_set(data: bytes, *, config: SchemathesisConfig | None) -> G
         for file in descriptor_set.file:
             add(file)
         # The pure-Python runtime resolves names only on lookup.
-        services = {
-            service.full_name: service
-            for file in descriptor_set.file
-            for service in pool.FindFileByName(file.name).services_by_name.values()
-            if file.name not in imported
-        }
+        if service_names is not None:
+            services = {name: pool.FindServiceByName(name) for name in service_names}
+        else:
+            services = {
+                service.full_name: service
+                for file in descriptor_set.file
+                for service in pool.FindFileByName(file.name).services_by_name.values()
+                if file.name not in imported
+            }
     except TypeError as exc:
         raise _does_not_load(str(exc).removeprefix("Couldn't build proto file into descriptor pool: ")) from exc
     except KeyError as exc:

@@ -42,7 +42,7 @@ from schemathesis.generation.meta import (
     TestPhase,
     build_phase_data,
 )
-from schemathesis.grpc.checks import MalformedGrpcMessage
+from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc.converter import message_schema
@@ -155,6 +155,12 @@ class GrpcSchema(BaseSchema):
             return None
         return self._build_operation(method)
 
+    @property
+    def descriptor_set_path(self) -> str | None:
+        """File the descriptor set came from; schemas loaded through reflection have none."""
+        location = urlsplit(self.location or "")
+        return url2pathname(location.path) if location.scheme == "file" else None
+
     @override
     def declared_base_path(self) -> str:
         return ""
@@ -177,9 +183,9 @@ class GrpcSchema(BaseSchema):
         args = ["grpcurl"]
         if scheme == "grpc":
             args.append("-plaintext")
-        # Descriptor-set schemas keep the file they came from as a `file://` URI.
-        assert self.location is not None
-        args.extend(["-protoset", url2pathname(urlsplit(self.location).path)])
+        # Without a descriptor set, `grpcurl` asks the server through reflection.
+        if self.descriptor_set_path is not None:
+            args.extend(["-protoset", self.descriptor_set_path])
         if scheme == "grpcs":
             # The CA usually comes from config, as callers only know whether the response was verified.
             ca = verify if isinstance(verify, str) else self.config.tls_verify_for(operation=operation)
@@ -212,7 +218,16 @@ class GrpcSchema(BaseSchema):
     def validate_response(self, operation: APIOperation, response: Response, *, case: Case | None = None) -> None:
         if _grpc_status(response) == 0:
             output_type = operation.definition.raw.output_type
-            _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
+            decoded = _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
+            # A descriptor set can lag behind the server; reflection describes what the server runs.
+            if self.descriptor_set_path is None:
+                size = decoded.ByteSize()
+                decoded.DiscardUnknownFields()
+                if decoded.ByteSize() != size:
+                    raise UndeclaredGrpcFields(
+                        operation=operation.label,
+                        message=f"The response carries fields that `{output_type.full_name}` does not declare",
+                    )
         else:
             for details in response.headers.get("grpc-status-details-bin", []):
                 _decode(operation, status_pb2.Status, base64.b64decode(details), "status details")
@@ -355,17 +370,27 @@ def request_metadata(case: Case, headers: Mapping[str, Any] | None) -> dict[str,
     merged = {key.lower(): str(value) for key, value in (case.headers or {}).items()}
     merged.setdefault(SCHEMATHESIS_TEST_CASE_HEADER.lower(), case.id)
     merged.update((key.lower(), str(value)) for key, value in (headers or {}).items())
-    return {key: value for key, value in merged.items() if key not in EXCLUDED_METADATA and not key.startswith("grpc-")}
+    return filter_metadata(merged)
+
+
+def filter_metadata(headers: Mapping[str, Any]) -> dict[str, str]:
+    """Lowercased metadata without the keys HTTP/2 and gRPC reserve."""
+    lowered = {key.lower(): str(value) for key, value in headers.items()}
+    return {
+        key: value for key, value in lowered.items() if key not in EXCLUDED_METADATA and not key.startswith("grpc-")
+    }
 
 
 def _grpc_status(response: Response) -> int:
     return int(response.headers["grpc-status"][0])
 
 
-def _decode(operation: APIOperation, message_class: type[message.Message], content: bytes, what: str) -> None:
+def _decode(
+    operation: APIOperation, message_class: type[message.Message], content: bytes, what: str
+) -> message.Message:
     name = message_class.DESCRIPTOR.full_name
     try:
-        message_class.FromString(content)
+        return message_class.FromString(content)
     except message.DecodeError as exc:
         raise MalformedGrpcMessage(
             operation=operation.label, type_name=name, message=f"Cannot decode the {what} as `{name}`: {exc}"

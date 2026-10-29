@@ -27,3 +27,16 @@ class MalformedGrpcMessage(Failure):
     @property
     def _unique_key(self) -> str:
         return self.type_name
+
+
+class UndeclaredGrpcFields(Failure):
+    """gRPC response with fields its message, as the server reflects it, does not declare."""
+
+    code = "ST118"
+    checks = ("response_schema_conformance",)
+    kind_title = "Response carries fields the schema does not declare"
+
+    @property
+    def _unique_key(self) -> str:
+        # One finding per operation, whatever the fields.
+        return ""
