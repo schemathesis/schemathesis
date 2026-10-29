@@ -600,6 +600,62 @@ def deserialize_custom(ctx, response):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_traceback=True)
+def test_pool_reports_crashing_deserializer(cli, snapshot_cli, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/vnd.custom": {
+                                    "schema": _object_schema({"id": {"type": "string"}}, required=["id"])
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [_path_param("id")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return "packed", 201, {"Content-Type": "application/vnd.custom"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 200
+
+    hooks_module = ctx.write_pymodule("""
+@schemathesis.deserializer("application/vnd.custom")
+def deserialize_custom(ctx, response):
+    raise ZeroDivisionError("Deserializer crashed")
+""")
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--max-examples=5",
+            "-c not_a_server_error",
+            "--mode=positive",
+            hooks=hooks_module,
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_records_responses_with_unbundlable_schema(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(

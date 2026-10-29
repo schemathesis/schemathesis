@@ -356,27 +356,33 @@ def _run_scenario(
     phase: PhaseName,
     suite_id: uuid.UUID,
 ) -> None:
-    override = overrides.with_config_headers(ctx.config, operation=operation)
-    feedback = ctx.feedback_for(operation=operation, phase=phase)
     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
-    if phase in (PhaseName.COVERAGE, PhaseName.EXAMPLES):
-        generator = _build_driver_generator(operation, ctx, phase, override, feedback)
-        events_queue.put(scenario_started)
-        _put_all(
-            events_queue,
-            run_driver(generator=generator, ctx=ctx, phase=phase, suite_id=suite_id, scenario_id=scenario_started.id),
-        )
-    else:
-        _run_hypothesis_test(
-            operation,
-            events_queue=events_queue,
-            ctx=ctx,
-            mode=mode,
-            phase=phase,
-            scenario_started=scenario_started,
-            override=override,
-            feedback=feedback,
-        )
+    events_queue.put(scenario_started)
+    try:
+        override = overrides.with_config_headers(ctx.config, operation=operation)
+        feedback = ctx.feedback_for(operation=operation, phase=phase)
+        if phase in (PhaseName.COVERAGE, PhaseName.EXAMPLES):
+            generator = _build_driver_generator(operation, ctx, phase, override, feedback)
+            _put_all(
+                events_queue,
+                run_driver(
+                    generator=generator, ctx=ctx, phase=phase, suite_id=suite_id, scenario_id=scenario_started.id
+                ),
+            )
+        else:
+            _run_hypothesis_test(
+                operation,
+                events_queue=events_queue,
+                ctx=ctx,
+                mode=mode,
+                phase=phase,
+                scenario_started=scenario_started,
+                override=override,
+                feedback=feedback,
+            )
+    except Exception as exc:
+        # An unexpected crash still closes the scenario as an error, otherwise the operation reads as skipped.
+        _finish_with_error(events_queue, exc, scenario_started)
 
 
 def _build_driver_generator(
@@ -426,16 +432,8 @@ def _run_hypothesis_test(
     except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:
         if is_regex_validation_error(exc):
             exc = InvalidRegexPattern.from_jsonschema_rs_error(exc)
-        _put_error(
-            events_queue,
-            exc,
-            phase=phase,
-            suite_id=scenario_started.suite_id,
-            method=operation.method,
-            path=operation.path,
-        )
+        _finish_with_error(events_queue, exc, scenario_started)
         return
-    events_queue.put(scenario_started)
     # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will
     # continue executing. However, as we set a stop event, it will be checked before the next
     # network request. However, this is still suboptimal, as there could be slow requests and they
@@ -471,22 +469,7 @@ def _put_error(
         label = f"{method.upper()} {path}"
         scenario_started = events.ScenarioStarted(label=label, phase=phase, suite_id=suite_id)
         events_queue.put(scenario_started)
-
-        events_queue.put(events.NonFatalError(error=error, phase=phase, label=label, related_to_operation=True))
-
-        events_queue.put(
-            events.ScenarioFinished(
-                id=scenario_started.id,
-                suite_id=suite_id,
-                phase=phase,
-                label=label,
-                status=Status.ERROR,
-                recorder=ScenarioRecorder(label="Error"),
-                elapsed_time=0.0,
-                skip_reason=None,
-                is_final=True,
-            )
-        )
+        _finish_with_error(events_queue, error, scenario_started)
     else:
         events_queue.put(
             events.NonFatalError(
@@ -496,6 +479,26 @@ def _put_error(
                 related_to_operation=False,
             )
         )
+
+
+def _finish_with_error(events_queue: Queue, error: Exception, scenario_started: events.ScenarioStarted) -> None:
+    label = scenario_started.label
+    assert label is not None
+    phase = scenario_started.phase
+    events_queue.put(events.NonFatalError(error=error, phase=phase, label=label, related_to_operation=True))
+    events_queue.put(
+        events.ScenarioFinished(
+            id=scenario_started.id,
+            suite_id=scenario_started.suite_id,
+            phase=phase,
+            label=label,
+            status=Status.ERROR,
+            recorder=ScenarioRecorder(label="Error"),
+            elapsed_time=0.0,
+            skip_reason=None,
+            is_final=True,
+        )
+    )
 
 
 def _is_phase_disabled(phases: PhasesConfig, phase: PhaseName) -> bool:
