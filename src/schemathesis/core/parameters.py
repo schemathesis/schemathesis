@@ -126,6 +126,19 @@ ParameterLocation.BODY.is_in_header = False
 ParameterLocation.UNKNOWN.is_in_header = False
 
 HEADER_LOCATIONS = frozenset([ParameterLocation.HEADER, ParameterLocation.COOKIE])
+# Locations of named parameters, without the body.
+CONCRETE_LOCATIONS = (
+    ParameterLocation.PATH,
+    ParameterLocation.QUERY,
+    ParameterLocation.HEADER,
+    ParameterLocation.COOKIE,
+)
+# Every location a case carries values in.
+PARAMETER_LOCATIONS = (*CONCRETE_LOCATIONS, ParameterLocation.BODY)
+# Locations where an undeclared property reaches the server as extra data.
+EXTRA_PROPERTY_LOCATIONS = frozenset(
+    [ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE, ParameterLocation.BODY]
+)
 
 CONTAINER_TO_LOCATION: dict[ContainerName, ParameterLocation] = {
     "path_parameters": ParameterLocation.PATH,

@@ -1111,19 +1111,19 @@ def test_referenced_parameter_example_mixed_into_strategy(ctx, version):
 
 
 @pytest.mark.hypothesis_nested
-def test_path_example_without_slash_does_not_allow_encoded_slash(ctx):
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        {"schema": {"type": "string", "pattern": "^[0-9]+/[0-9]+$"}, "example": "foo"},
+        {"schema": {"type": "string", "pattern": "^[{}]$"}},
+    ],
+    ids=["example-without-slash", "encoded-braces"],
+)
+def test_path_parameter_values_needing_encoded_characters_are_filtered(ctx, parameter):
     operation = ctx.openapi.load_operation(
         "GET /blocks/{block}",
         {
-            "parameters": [
-                {
-                    "name": "block",
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": "string", "pattern": "^[0-9]+/[0-9]+$"},
-                    "example": "foo",
-                }
-            ],
+            "parameters": [{"name": "block", "in": "path", "required": True, **parameter}],
             "responses": {"200": {"description": "OK"}},
         },
     )
@@ -1174,39 +1174,6 @@ def test_path_example_with_slash_allows_encoded_slash(ctx, version, schema, exam
     @run_given(value=strategy, max_examples=10)
     def inner(value):
         assert "%2F" in value["block"]
-
-
-@pytest.mark.hypothesis_nested
-def test_path_parameters_encoded_braces_are_filtered(ctx):
-    operation = ctx.openapi.load_operation(
-        "GET /blocks/{block}",
-        {
-            "parameters": [
-                {
-                    "name": "block",
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": "string", "pattern": "^[{}]$"},
-                }
-            ],
-            "responses": {"200": {"description": "OK"}},
-        },
-    )
-    strategy = _hypothesis.get_parameters_strategy(
-        operation,
-        GenerationMode.POSITIVE,
-        ParameterLocation.PATH,
-        GenerationConfig(),
-        mix_examples=False,
-    )
-
-    @given(value=strategy)
-    @settings(max_examples=1, deadline=None)
-    def inner(value):
-        pass
-
-    with pytest.raises((FailedHealthCheck, Unsatisfiable)):
-        inner()
 
 
 @pytest.mark.hypothesis_nested
@@ -1702,7 +1669,12 @@ def test_unsatisfiable_parameter_is_the_one_the_engine_cannot_draw(ctx):
     assert found.name == "impossible"
 
 
-def test_slow_parameter_probe_survives_a_parameter_that_cannot_build(ctx):
+@pytest.mark.parametrize(
+    "probe",
+    [lambda operation: find_slow_parameter(operation, HealthCheck.too_slow), find_unsatisfiable_parameter],
+    ids=["slow-parameter", "unsatisfiable"],
+)
+def test_probe_survives_a_parameter_that_cannot_build(ctx, probe):
     # A strategy failing at build time must not escape the error-reporting probe
     operation = ctx.openapi.load_operation(
         "POST /data",
@@ -1725,36 +1697,7 @@ def test_slow_parameter_probe_survives_a_parameter_that_cannot_build(ctx):
         version="3.1.0",
     )
 
-    found = find_slow_parameter(operation, HealthCheck.too_slow)
-
-    assert found is not None
-    assert found.name == "application/json"
-
-
-def test_unsatisfiable_probe_survives_a_parameter_that_cannot_build(ctx):
-    # A strategy failing at build time must not escape the error-reporting probe
-    operation = ctx.openapi.load_operation(
-        "POST /data",
-        {
-            "requestBody": {
-                "required": True,
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "array",
-                            "items": {"type": "integer"},
-                            "contains": {"const": 7},
-                            "minContains": 5000000,
-                        }
-                    }
-                },
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        version="3.1.0",
-    )
-
-    found = find_unsatisfiable_parameter(operation)
+    found = probe(operation)
 
     assert found is not None
     assert found.name == "application/json"

@@ -14,6 +14,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
@@ -26,6 +27,7 @@ from schemathesis.resources.repository import (
     ResourceRepository,
 )
 from schemathesis.specs.openapi._hypothesis import openapi_cases
+from schemathesis.specs.openapi.examples import get_strategies_from_examples
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot, ResourceDefinition
@@ -795,10 +797,11 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
     assert variants[0].draws[0].parameter_name == "itemId"
 
 
+@pytest.mark.parametrize("phase", [TestPhase.EXAMPLES, TestPhase.FUZZING], ids=["examples", "fuzzing"])
 @pytest.mark.parametrize(
     "note", [{"type": "string"}, {"$ref": "#/components/schemas/Note"}], ids=["flat", "nested-ref"]
 )
-def test_captured_values_reach_body_behind_ref(ctx, note):
+def test_captured_values_reach_body_behind_ref(ctx, note, phase):
     item = {"type": "object", "properties": {"id": {"type": "integer"}}}
     schema = ctx.openapi.load_schema(
         {
@@ -834,12 +837,15 @@ def test_captured_values_reach_body_behind_ref(ctx, note):
     )
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 987654})
+    operation = schema["/orders"]["POST"]
+    feedback = FeedbackSources(extra_data_source=data_source)
 
-    cases = generate_many(
-        schema["/orders"]["POST"].as_strategy(feedback=FeedbackSources(extra_data_source=data_source)), 30
-    )
-
-    assert any(isinstance(case.body, dict) and case.body.get("itemId") == 987654 for case in cases)
+    if phase == TestPhase.EXAMPLES:
+        strategies = get_strategies_from_examples(operation, feedback=feedback, fill_missing=True)
+        assert [examples.generate_one(strategy).body for strategy in strategies] == [{"itemId": 987654}]
+    else:
+        cases = generate_many(operation.as_strategy(feedback=feedback), 30)
+        assert any(isinstance(case.body, dict) and case.body.get("itemId") == 987654 for case in cases)
 
 
 def test_top_level_body_requirement_takes_precedence_over_nested_requirement(ctx):

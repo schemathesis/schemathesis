@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ProjectConfig
 from schemathesis.config._dictionaries import ParameterDictionaryBinding, lookup_parameter
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import PARAMETER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import diff
 
 if TYPE_CHECKING:
@@ -143,11 +143,5 @@ def store_components(case: Case) -> dict[ParameterLocation, StoredValue]:
             value=store_original_state(case.get_container(kind)),
             is_generated=bool(case._meta and kind in case._meta.components),
         )
-        for kind in [
-            ParameterLocation.QUERY,
-            ParameterLocation.HEADER,
-            ParameterLocation.COOKIE,
-            ParameterLocation.PATH,
-            ParameterLocation.BODY,
-        ]
+        for kind in PARAMETER_LOCATIONS
     }

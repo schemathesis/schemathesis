@@ -26,7 +26,7 @@ from schemathesis.core.jsonschema import (
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema
-from schemathesis.core.parameters import ContainerName, ParameterLocation
+from schemathesis.core.parameters import CONCRETE_LOCATIONS, ContainerName, ParameterLocation
 from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
@@ -109,12 +109,7 @@ def _get_pool_combos(
 ) -> list[dict[str, Any]]:
     """Return pool variants as parameter dicts, merging all locations into each slot."""
     per_location: list[list[dict[str, Any]]] = []
-    for location in (
-        ParameterLocation.PATH,
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-    ):
+    for location in CONCRETE_LOCATIONS:
         schema = _build_location_schema(operation, location)
         if schema is None:
             continue
@@ -173,15 +168,6 @@ def _build_location_schema(
     return schema
 
 
-# Parameter locations `serialize_components` rewrites into their wire form.
-_RENDERED_LOCATIONS = (
-    ParameterLocation.PATH,
-    ParameterLocation.QUERY,
-    ParameterLocation.HEADER,
-    ParameterLocation.COOKIE,
-)
-
-
 def get_strategies_from_examples(
     operation: OpenApiOperation,
     feedback: FeedbackSources = NO_FEEDBACK,
@@ -207,7 +193,7 @@ def get_strategies_from_examples(
         if case._meta is not None:
             # Rendering a value for the wire does not change the data that was generated, and
             # re-checking the rendered form against the typed schema would call the example negative.
-            for location in _RENDERED_LOCATIONS:
+            for location in CONCRETE_LOCATIONS:
                 case._meta.clear_dirty(location)
         return case
 

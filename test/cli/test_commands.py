@@ -2634,10 +2634,9 @@ def test_graphql_schema_violation(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_graphql_data_mismatch(ctx, cli, tmp_path, snapshot_cli):
+def test_graphql_data_mismatch(ctx, cli, snapshot_cli):
     # The same defect on every list item and in every case is one finding with one line.
-    sdl = tmp_path / "schema.graphql"
-    sdl.write_text("type Book { title: String! } type Query { books: [Book!]! }")
+    sdl = ctx.graphql.write_sdl("type Book { title: String! } type Query { books: [Book!]! }")
     api = ctx.graphql.apps.canned_response({"data": {"books": [{"title": None}, {"title": None}]}})
 
     assert (

@@ -110,12 +110,10 @@ def test_json_payload(curl):
 
 
 @pytest.mark.parametrize("loader", ["from_file", "from_path"])
-def test_graphql_schema_loaded_from_file(ctx, curl, tmp_path, loader):
+def test_graphql_schema_loaded_from_file(ctx, curl, loader):
     sdl = "type Query { hello: String }"
     if loader == "from_path":
-        path = tmp_path / "schema.graphql"
-        path.write_text(sdl)
-        schema = schemathesis.graphql.from_path(path)
+        schema = schemathesis.graphql.from_path(ctx.graphql.write_sdl(sdl))
     else:
         schema = ctx.graphql.load_sdl(sdl)
     case = schema["Query"]["hello"].Case(body="{ hello }")

@@ -107,42 +107,6 @@ def test_is_xml_media_type(value, expected):
     ("expected", "actual", "should_match"),
     [
         # Exact matches
-        ("application/json", "application/json", True),
-        ("text/plain", "text/plain", True),
-        ("application/problem+json", "application/problem+json", True),
-        # Different media types
-        ("application/json", "application/xml", False),
-        ("text/plain", "text/html", False),
-        ("application/json", "text/plain", False),
-        # Wildcard main type
-        ("*/json", "application/json", True),
-        ("*/json", "text/json", True),
-        ("*/xml", "application/json", False),
-        # Wildcard subtype
-        ("application/*", "application/json", True),
-        ("application/*", "application/xml", True),
-        ("application/*", "text/plain", False),
-        ("text/*", "text/plain", True),
-        ("text/*", "application/json", False),
-        # Full wildcard
-        ("*/*", "application/json", True),
-        ("*/*", "text/plain", True),
-        ("*/*", "image/png", True),
-        # Parameters should not affect matching (handled by parse)
-        ("application/json", "application/json;charset=utf-8", True),
-        # Complex subtypes
-        ("application/vnd.api+json", "application/vnd.api+json", True),
-        ("application/*", "application/problem+json", True),
-    ],
-)
-def test_matches(expected, actual, should_match):
-    assert media_types.matches(expected, actual) == should_match
-
-
-@pytest.mark.parametrize(
-    ("expected", "actual", "should_match"),
-    [
-        # Exact matches
         (("application", "json"), ("application", "json"), True),
         (("text", "plain"), ("text", "plain"), True),
         # Different media types

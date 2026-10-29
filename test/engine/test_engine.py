@@ -2322,41 +2322,18 @@ def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner
     assert [event.status for event in stream.find_all(events.SuiteFinished)] == [Status.FAILURE, Status.SKIP]
 
 
-def test_planted_bug_behind_an_id_only_the_listing_carries(ctx):
-    # The 500 sits behind an id that generation cannot invent; only the listing response holds it.
-    api = ctx.openapi.apps.collection_with_planted_bug()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(
-        schema,
-        max_time=10,
-        # More examples than fit in the time limit, so the clock ends the run.
-        max_examples=100_000,
-        checks=(not_a_server_error,),
-        phases=[PhaseName.FUZZING],
-    )
-
-    assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
-
-
-def test_planted_bug_behind_an_undocumented_collection(ctx):
-    # The spec declares no response shape, so the listing body is the only place the tag exists.
-    api = ctx.openapi.apps.undocumented_collection_with_planted_bug()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(
-        schema,
-        max_time=10,
-        # More examples than fit in the time limit, so the clock ends the run.
-        max_examples=100_000,
-        checks=(not_a_server_error,),
-        phases=[PhaseName.FUZZING],
-    )
-
-    assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
-
-
-def test_planted_bug_behind_a_vocabulary_path_parameter(ctx):
-    # The path segment is a vocabulary value, not an identifier, and only the listing carries it.
-    api = ctx.openapi.apps.vocabulary_path_with_planted_bug()
+# Each planted 500 sits behind a value only a listing response carries, so generation cannot invent it.
+@pytest.mark.parametrize(
+    "app",
+    [
+        "collection_with_planted_bug",
+        "undocumented_collection_with_planted_bug",
+        "vocabulary_path_with_planted_bug",
+    ],
+    ids=["id-only-the-listing-carries", "undocumented-collection", "vocabulary-path-parameter"],
+)
+def test_planted_bug_behind_a_value_only_the_listing_carries(ctx, app):
+    api = getattr(ctx.openapi.apps, app)()
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(
         schema,

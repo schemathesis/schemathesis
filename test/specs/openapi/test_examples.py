@@ -4577,53 +4577,6 @@ def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
         examples.generate_one(strategy)
 
 
-@pytest.mark.parametrize(
-    "note", [{"type": "string"}, {"$ref": "#/components/schemas/Note"}], ids=["flat", "nested-ref"]
-)
-def test_pool_body_behind_ref_in_examples_phase(ctx, note):
-    item = {"type": "object", "properties": {"id": {"type": "integer"}}}
-    schema = ctx.openapi.load_schema(
-        {
-            "/items": {
-                "post": {"responses": {"201": {"description": "OK", "content": {"application/json": {"schema": item}}}}}
-            },
-            "/items/{itemId}": {
-                "get": {
-                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": item}}}},
-                }
-            },
-            "/orders": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}},
-                    },
-                    "responses": {"201": {"description": "OK"}},
-                }
-            },
-        },
-        components={
-            "schemas": {
-                "Note": {"type": "string"},
-                "Order": {
-                    "type": "object",
-                    "required": ["itemId"],
-                    "properties": {"itemId": {"type": "integer"}, "note": note},
-                },
-            }
-        },
-    )
-    data_source = schema.create_extra_data_source()
-    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 987654})
-
-    strategies = get_strategies_from_examples(
-        schema["/orders"]["POST"], feedback=FeedbackSources(extra_data_source=data_source), fill_missing=True
-    )
-
-    assert [examples.generate_one(strategy).body for strategy in strategies] == [{"itemId": 987654}]
-
-
 def test_generated_property_with_recursive_ref(ctx):
     # The generated sibling carries an unresolvable self-reference; extraction must still produce the example.
     operation = _json_body_operation(
@@ -4807,7 +4760,7 @@ def test_branches_from_both_oneof_and_anyof(ctx):
 
 
 @pytest.mark.parametrize(
-    "components",
+    ("components", "version"),
     [
         pytest.param(
             {
@@ -4837,6 +4790,7 @@ def test_branches_from_both_oneof_and_anyof(ctx):
                     },
                 }
             },
+            "3.0.2",
             id="tag-through-allof",
         ),
         pytest.param(
@@ -4860,6 +4814,7 @@ def test_branches_from_both_oneof_and_anyof(ctx):
                     },
                 }
             },
+            "3.0.2",
             id="tag-declared-inline",
         ),
         pytest.param(
@@ -4892,33 +4847,9 @@ def test_branches_from_both_oneof_and_anyof(ctx):
                     },
                 }
             },
+            "3.0.2",
             id="tag-through-recursive-allof",
         ),
-    ],
-)
-def test_discriminated_branches_with_shared_multi_value_tag(ctx, components):
-    # The schema name is not one of the values the shared tag allows, so pinning it to the name
-    # would make both branches impossible and drop their examples.
-    operation = _json_body_operation(
-        ctx,
-        {
-            "oneOf": [
-                {"$ref": "#/components/schemas/Attach"},
-                {"$ref": "#/components/schemas/Resize"},
-            ],
-            "discriminator": {"propertyName": "type"},
-        },
-        components=components,
-    )
-    assert [example.value for example in extract_from_schemas(operation)] == [
-        {"type": "attach", "droplet_id": 11111},
-        {"type": "attach", "size": "s-1vcpu-1gb"},
-    ]
-
-
-@pytest.mark.parametrize(
-    "components",
-    [
         pytest.param(
             {
                 "schemas": {
@@ -4951,6 +4882,7 @@ def test_discriminated_branches_with_shared_multi_value_tag(ctx, components):
                     },
                 }
             },
+            "3.1.0",
             id="referenced-boolean-subschema",
         ),
         pytest.param(
@@ -4983,12 +4915,14 @@ def test_discriminated_branches_with_shared_multi_value_tag(ctx, components):
                     },
                 }
             },
+            "3.1.0",
             id="inline-boolean-subschema",
         ),
     ],
 )
-def test_discriminated_branches_with_boolean_subschemas(ctx, components):
-    # A branch that composes `true` still has its tag read from the members that constrain it.
+def test_discriminated_branches_with_shared_multi_value_tag(ctx, components, version):
+    # The schema name is not one of the values the shared tag allows, so pinning it to the name
+    # would make both branches impossible and drop their examples.
     operation = _json_body_operation(
         ctx,
         {
@@ -4998,7 +4932,7 @@ def test_discriminated_branches_with_boolean_subschemas(ctx, components):
             ],
             "discriminator": {"propertyName": "type"},
         },
-        version="3.1.0",
+        version=version,
         components=components,
     )
     assert [example.value for example in extract_from_schemas(operation)] == [

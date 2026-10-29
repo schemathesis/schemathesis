@@ -168,12 +168,10 @@ def test_custom_base_url(ctx):
 
 
 @pytest.mark.parametrize("loader", ["from_file", "from_path"])
-def test_explicit_base_url_for_schema_loaded_from_file(ctx, tmp_path, loader):
+def test_explicit_base_url_for_schema_loaded_from_file(ctx, loader):
     sdl = "type Query { hello: String }"
     if loader == "from_path":
-        path = tmp_path / "schema.graphql"
-        path.write_text(sdl)
-        schema = schemathesis.graphql.from_path(path)
+        schema = schemathesis.graphql.from_path(ctx.graphql.write_sdl(sdl))
     else:
         schema = ctx.graphql.load_sdl(sdl)
     case = schema["Query"]["hello"].Case(body="{ hello }")
@@ -653,18 +651,18 @@ type Query {
         ),
     ],
 )
-def test_schema_error(ctx, testdir, cli, snapshot_cli, schema, extension):
-    schema_file = testdir.make_graphql_schema_file(schema, extension=extension)
+def test_schema_error(ctx, cli, snapshot_cli, schema, extension):
+    schema_file = ctx.graphql.write_sdl(schema.strip(), filename=f"schema{extension}")
     api = ctx.graphql.apps.books()
     assert cli.run(str(schema_file), f"--url={api.schema_url}") == snapshot_cli
 
 
-def test_disallow_null(ctx, cli, testdir, snapshot_cli):
+def test_disallow_null(ctx, cli, snapshot_cli):
     schema = """type Query {
     getValue(value: Int): Int
 }
 """
-    schema_file = testdir.make_graphql_schema_file(schema, extension=".gql")
+    schema_file = ctx.graphql.write_sdl(schema, filename="schema.gql")
     module = ctx.write_pymodule(
         """
 import schemathesis

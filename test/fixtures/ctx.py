@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any, Literal, overload
 
@@ -562,6 +563,11 @@ class GraphQLContext:
 
     def load_sdl(self, sdl: str, *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
         return schemathesis.graphql.from_file(sdl, config=config)
+
+    def write_sdl(self, sdl: str, *, filename: str = "schema.graphql") -> Path:
+        path = self.parent.request.getfixturevalue("tmp_path") / filename
+        path.write_text(sdl)
+        return path
 
     def load_introspection(
         self, raw_schema: dict[str, Any], *, config: SchemathesisConfig | None = None

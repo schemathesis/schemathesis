@@ -78,7 +78,7 @@ from schemathesis.core.jsonschema.patterns import (
 )
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type, to_json_type_name
-from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
+from schemathesis.core.parameters import EXTRA_PROPERTY_LOCATIONS, HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
@@ -2785,12 +2785,7 @@ def cover_schema_iter(
                 elif key == "additionalProperties" and schema.get("type") in ["object", None]:
                     if value is False and "pattern" not in schema:
                         # additionalProperties: false - add unexpected property
-                        if not ctx.allow_extra_parameters and ctx.location in (
-                            ParameterLocation.QUERY,
-                            ParameterLocation.HEADER,
-                            ParameterLocation.COOKIE,
-                            ParameterLocation.BODY,
-                        ):
+                        if not ctx.allow_extra_parameters and ctx.location in EXTRA_PROPERTY_LOCATIONS:
                             continue
                         template = template or _generate_template_with_deflation_fallback(
                             ctx, schema, _get_template_schema(schema, "object", ctx)
