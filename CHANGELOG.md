@@ -38,6 +38,7 @@
 
 - Invalid `@oneOf` input objects in positive GraphQL tests.
 - Schema hooks applied twice to GraphQL stateful cases.
+- All GraphQL fields sharing the `[POST ]` test id with `schemathesis.pytest.from_fixture`.
 
 #### Others
 

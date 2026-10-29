@@ -231,7 +231,7 @@ class LazySchema:
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
-                        _set_node_id(request.node, f"{node_id}[{operation.method.upper()} {operation.path}]")
+                        _set_node_id(request.node, f"{node_id}[{operation.label}]")
                         with report_subtest(request.node, schema, operation.label, operation.tags):
                             run_subtest(operation, fixtures, sub_test, subtests)
                     else:

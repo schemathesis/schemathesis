@@ -62,3 +62,32 @@ def test_(request, case):
             r"Hypothesis calls: 46",
         ]
     )
+
+
+def test_from_fixture_uses_field_labels(testdir):
+    testdir.make_test(
+        '''
+@pytest.fixture
+def api_schema():
+    return schemathesis.graphql.from_file("""
+type Query {
+  getBooks: [String]
+  getAuthors: [String]
+}
+""")
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    assert case.operation.label != "Query.getAuthors"
+''',
+    )
+    result = testdir.runpytest("-v")
+    result.stdout.re_match_lines(
+        [
+            r"test_from_fixture_uses_field_labels.py::test_api\[Query.getBooks\] SUBPASSED",
+            r"test_from_fixture_uses_field_labels.py::test_api\[Query.getAuthors\] SUBFAILED",
+        ]
+    )
