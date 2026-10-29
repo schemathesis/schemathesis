@@ -86,12 +86,13 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)
             code = outcome.code()
+            # Both errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
             if code == grpc.StatusCode.DEADLINE_EXCEEDED:
-                raise requests.exceptions.ReadTimeout(outcome.details(), request=request) from error
+                timed_out = TimeoutError(f"{base_url}: Read timed out. (read timeout={timeout})")
+                raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
             if code == grpc.StatusCode.UNAVAILABLE and not _is_ready(channel):
-                raise requests.exceptions.ConnectionError(
-                    outcome.details(), request=request
-                ) from ConnectionRefusedError(f"Failed to connect to {address}")
+                refused = ConnectionRefusedError(f"Failed to connect to {base_url}")
+                raise requests.exceptions.ConnectionError(refused, request=request) from refused
             content = b""
         elapsed = started_at.elapsed
         code = outcome.code()
