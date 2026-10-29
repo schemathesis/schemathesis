@@ -152,7 +152,7 @@ def _settle_status(
     if status != Status.SUCCESS:
         return status, None
     if not any_case_ran:
-        return Status.SKIP, "Time limit reached" if budget_expired else _NO_CASES_REASONS[phase]
+        return Status.SKIP, StopReason.MAX_TIME.skip_explanation if budget_expired else _NO_CASES_REASONS[phase]
     if any_case_errored:
         return Status.ERROR, None
     if server_went_away and not recorder.has_responses():

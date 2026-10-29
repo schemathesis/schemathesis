@@ -15,17 +15,13 @@ from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.core.transforms import stringify_keys
 from schemathesis.core.transport import decode_lossy
-from schemathesis.hooks import (
-    GLOBAL_HOOK_DISPATCHER,
-    HookContext,
-    dispatch_after_load_schema,
-    dispatch_before_load_schema,
-)
+from schemathesis.hooks import load_with_hooks
 from schemathesis.python import django, wsgi
 
 if TYPE_CHECKING:
     from werkzeug.datastructures import Headers
 
+    from schemathesis.config import ProjectConfig
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -228,44 +224,39 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
 def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, stringify: bool) -> OpenApiSchema:
     if not isinstance(schema, dict):
         raise LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
-    hook_context = HookContext()
-    dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, raw_schema=schema)
-    # Built-in loaders only produce string keys; dicts parsed elsewhere, e.g. by a YAML 1.1 parser, may not.
-    if stringify:
-        stringify_keys(schema)
 
-    if config is None:
-        config = SchemathesisConfig.discover()
-    project_config = config.projects.get(schema)
-
-    version = schema.get("openapi")
-    if version is not None and not OPENAPI_VERSION_RE.match(version):
-        raise LoaderError(
-            LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
-            f"The provided schema uses Open API {version}, which is currently not supported.",
-        )
-    if version is None and "swagger" not in schema:
-        raise LoaderError(
-            LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
-            "Unable to determine the Open API version as it's not specified in the document.",
-        )
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-    instance = OpenApiSchema(raw_schema=schema, config=project_config)
-    instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
-    if project_config.auth.wfc is not None:
-        from schemathesis.wfc.errors import WFCError
-        from schemathesis.wfc.integration import register_wfc_auth
-
-        try:
-            register_wfc_auth(instance, project_config.auth.wfc)
-        except WFCError as exc:
+    def build(project_config: ProjectConfig) -> OpenApiSchema:
+        # Built-in loaders only produce string keys; dicts parsed elsewhere, e.g. by a YAML 1.1 parser, may not.
+        if stringify:
+            stringify_keys(schema)
+        version = schema.get("openapi")
+        if version is not None and not OPENAPI_VERSION_RE.match(version):
             raise LoaderError(
-                LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
-                f"Failed to load Web Fuzzing Commons authentication: {exc}",
-            ) from exc
-    dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, schema=instance)
-    return instance
+                LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
+                f"The provided schema uses Open API {version}, which is currently not supported.",
+            )
+        if version is None and "swagger" not in schema:
+            raise LoaderError(
+                LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
+                "Unable to determine the Open API version as it's not specified in the document.",
+            )
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+        instance = OpenApiSchema(raw_schema=schema, config=project_config)
+        if project_config.auth.wfc is not None:
+            from schemathesis.wfc.errors import WFCError
+            from schemathesis.wfc.integration import register_wfc_auth
+
+            try:
+                register_wfc_auth(instance, project_config.auth.wfc)
+            except WFCError as exc:
+                raise LoaderError(
+                    LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
+                    f"Failed to load Web Fuzzing Commons authentication: {exc}",
+                ) from exc
+        return instance
+
+    return load_with_hooks(schema, config, build)
 
 
 class ContentType(enum.Enum):

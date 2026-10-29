@@ -50,14 +50,6 @@ if TYPE_CHECKING:
 SEPARATOR = " * "
 _INDENT = "    "
 
-_STOP_REASON_LABELS = {
-    StopReason.MAX_TIME: "Time limit reached",
-    StopReason.FAILURE_LIMIT: "Failure limit reached",
-    StopReason.COMPLETED: "Completed",
-    StopReason.INTERRUPTED: "Interrupted",
-    StopReason.SERVER_UNAVAILABLE: "Server stopped responding",
-}
-
 
 class _LiveText:
     """Renderable recomputed from a callback on every Rich refresh."""
@@ -279,7 +271,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
 
         # The final line says why nothing was tested; a stop reason next to it would read as a normal run.
         if ctx.nothing_tested_reason is None:
-            click.echo(f"Stop reason: {_STOP_REASON_LABELS.get(event.stop_reason, str(event.stop_reason))}")
+            click.echo(f"Stop reason: {event.stop_reason.skip_explanation or 'Completed'}")
             click.echo()
 
         display_summary_counts(summary)

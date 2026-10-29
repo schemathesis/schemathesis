@@ -313,20 +313,7 @@ class APIStateMachine(RuleBasedStateMachine):
                                 response: Response,
                                 results: list[CheckResult],
                             ) -> None:
-                                for result in results:
-                                    if result.failure is not None:
-                                        code_sample = case.as_reproduction_command(
-                                            headers=dict(response.request.headers),
-                                            verify=response.verify,
-                                        )
-                                        _recorder.record_check_failure(
-                                            name=result.name,
-                                            case_id=case.id,
-                                            code_sample=code_sample,
-                                            failure=result.failure,
-                                        )
-                                    else:
-                                        _recorder.record_check_success(name=result.name, case_id=case.id)
+                                _recorder.record_check_results(case, response, results)
 
                             self._on_after_validate = _on_after_validate
                             self.schema.hooks.register_hook_with_name(_on_after_validate, "after_validate")

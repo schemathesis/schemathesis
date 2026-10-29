@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Generator, Hashable, Iterator, Mapping
 from dataclasses import dataclass
-from difflib import get_close_matches
 from functools import cached_property
-from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,7 +20,7 @@ from typing_extensions import override
 
 from schemathesis import auths
 from schemathesis.core import NOT_SET, Body, NotSet, Specification
-from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.errors import InvalidSchema, OperationNotFound, not_found_message
 from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
@@ -30,18 +28,16 @@ from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import split_body_path
 from schemathesis.core.transport import CallOutcome, is_uninformative_status
-from schemathesis.filters import FilterUsage
+from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.meta import (
-    CaseMetadata,
-    ComponentInfo,
-    GenerationInfo,
     PhaseInfo,
     TestPhase,
     build_phase_data,
+    uniform_metadata,
 )
 from schemathesis.graphql.checks import (
     GraphQLClientError,
@@ -145,9 +141,7 @@ class GraphQLSchema(BaseSchema):
             (RootType.MUTATION, schema.mutation_type),
         ):
             if operation_type and operation_type.name == key:
-                map = APIOperationMap(self, {})
-                map._data = FieldMap(map, root_type, operation_type)
-                return map
+                return APIOperationMap(self, FieldMap(self, root_type, operation_type))
         raise KeyError(key)
 
     @override
@@ -164,11 +158,7 @@ class GraphQLSchema(BaseSchema):
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raw_schema = self.raw_schema["__schema"]
         type_names = [type_def["name"] for type_def in raw_schema.get("types", [])]
-        matches = get_close_matches(item, type_names)
-        message = f"`{item}` type not found"
-        if matches:
-            message += f". Did you mean `{matches[0]}`?"
-        raise OperationNotFound(message=message, item=item) from exc
+        raise OperationNotFound(message=not_found_message(item, "type", type_names), item=item) from exc
 
     @override
     def get_full_path(self, path: str) -> str:
@@ -305,7 +295,7 @@ class GraphQLSchema(BaseSchema):
                             if not self._should_skip(dummy_operation):
                                 statistic.operations.selected += 1
                             if usage is not None:
-                                usage.record(SimpleNamespace(operation=dummy_operation))
+                                usage.record(OperationContext(operation=dummy_operation))
         if usage is not None:
             statistic.unmatched_filters = usage.results()
         return statistic
@@ -514,11 +504,11 @@ class FieldMap(Mapping):
     Provides a more specific error message if API operation is not found.
     """
 
-    _parent: APIOperationMap
+    _schema: GraphQLSchema
     _root_type: RootType
     _operation_type: graphql.GraphQLObjectType
 
-    __slots__ = ("_parent", "_root_type", "_operation_type")
+    __slots__ = ("_schema", "_root_type", "_operation_type")
 
     def __len__(self) -> int:
         return len(self._operation_type.fields)
@@ -527,21 +517,15 @@ class FieldMap(Mapping):
         return iter(self._operation_type.fields)
 
     def _init_operation(self, field_name: str) -> APIOperation:
-        schema = cast(GraphQLSchema, self._parent._schema)
         operation_type = self._operation_type
         field_ = operation_type.fields[field_name]
-        return schema._build_operation(self._root_type, operation_type, field_name, field_)
+        return self._schema._build_operation(self._root_type, operation_type, field_name, field_)
 
     def __getitem__(self, item: str) -> APIOperation:
         try:
             return self._init_operation(item)
         except KeyError as exc:
-            field_names = list(self._operation_type.fields)
-            matches = get_close_matches(item, field_names)
-            message = f"`{item}` field not found"
-            if matches:
-                message += f". Did you mean `{matches[0]}`?"
-            raise KeyError(message) from exc
+            raise KeyError(not_found_message(item, "field", self._operation_type.fields)) from exc
 
 
 @st.composite
@@ -718,19 +702,10 @@ def build_case(
         cookies=cookies,
         query=query,
         body=body,
-        _meta=CaseMetadata(
-            generation=GenerationInfo(time=generation_time, mode=mode),
+        _meta=uniform_metadata(
+            mode=mode,
             phase=phase,
-            components={
-                kind: ComponentInfo(mode=mode)
-                for kind in (
-                    ParameterLocation.QUERY,
-                    ParameterLocation.PATH,
-                    ParameterLocation.HEADER,
-                    ParameterLocation.COOKIE,
-                    ParameterLocation.BODY,
-                )
-            },
+            generation_time=generation_time,
             constants_draws=constants_draws,
             dictionary_draws=dictionary_draws,
         ),

@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from functools import cached_property, lru_cache, wraps
 from inspect import iscoroutinefunction
 from itertools import chain
-from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -322,7 +321,7 @@ class BaseSchema(Mapping):
 
     def _should_skip(self, operation: APIOperation) -> bool:
         """Whether the schema's filters leave `operation` out."""
-        return not self.filter_set.match(SimpleNamespace(operation=operation))
+        return not self.filter_set.applies_to(operation)
 
     @property
     def base_path(self) -> str:
@@ -472,9 +471,6 @@ class BaseSchema(Mapping):
         media_type: str,
         selected_content_types: dict[str, str] | None = None,
     ) -> tuple[list | None, dict[str, Any] | None]:
-        raise NotImplementedError
-
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         raise NotImplementedError
 
     def make_case(
@@ -1151,22 +1147,6 @@ class APIOperation(Generic[P, R, S, SchemaT]):
         self, form_data: dict[str, Any], media_type: str, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:
         return self.schema.prepare_multipart(form_data, self, media_type, selected_content_types=selected_content_types)
-
-    def get_request_payload_content_types(self) -> list[str]:
-        return self.schema.get_request_payload_content_types(self)
-
-    def _get_default_media_type(self) -> str:
-        # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
-        media_types = self.get_request_payload_content_types()
-        if len(media_types) == 1:
-            # The only available option
-            return media_types[0]
-        media_types_repr = ", ".join(media_types)
-        raise IncorrectUsage(
-            "Can not detect appropriate media type. "
-            "You can either specify one of the defined media types "
-            f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
-        )
 
     def validate_response(
         self,

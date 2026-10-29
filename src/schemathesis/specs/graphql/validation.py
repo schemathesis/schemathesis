@@ -426,7 +426,7 @@ def _check_scalar(scalar: graphql.GraphQLScalarType, value: object, path: Path) 
             if not value.is_integer():
                 return [WrongScalar(path, scalar.name, to_json_type_name(value))]
             value = int(value)
-        if isinstance(value, int) and not -(2**31) <= value < 2**31:
+        if isinstance(value, int) and not graphql.GRAPHQL_MIN_INT <= value <= graphql.GRAPHQL_MAX_INT:
             return [IntOutOfRange(path, value)]
     return []
 

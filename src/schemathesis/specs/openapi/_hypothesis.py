@@ -71,11 +71,10 @@ from schemathesis.specs.openapi.formats import (
     HEADER_FORMAT,
     INVALID_HEADER_CHARS,
     STRING_FORMATS,
-    cookie_alphabet,
+    alphabet_for,
     format_lengths_for,
     get_alphabet_format_strategies,
     get_default_format_strategies,
-    header_alphabet,
     header_values,
 )
 from schemathesis.specs.openapi.headers import PLAIN_HEADER_FORMATS, get_header_format_strategies
@@ -292,7 +291,7 @@ def _ensure_explicit_body_is_serializable(operation: APIOperation, body: Any, me
     # This explicit body payload comes for a media type that has a custom strategy registered
     # Such strategies only support binary payloads, otherwise they can't be serialized
     if not isinstance(body, bytes) and media_type and find_media_type_strategy(media_type) is not None:
-        all_media_types = operation.get_request_payload_content_types()
+        all_media_types = operation.schema.get_request_payload_content_types(operation)
         raise SerializationNotPossible.from_media_types(*all_media_types)
 
 
@@ -375,7 +374,7 @@ def _draw_body_media_type(draw: st.DrawFn, operation: APIOperation, parameter: O
             exc, parameter.media_type, path=operation.path, method=operation.method
         ) from exc
     if not possible_media_types:
-        all_media_types = operation.get_request_payload_content_types()
+        all_media_types = operation.schema.get_request_payload_content_types(operation)
         if all(
             operation.schema.transport.get_first_matching_media_type(media_type) is None
             for media_type in all_media_types
@@ -1240,16 +1239,12 @@ def _canonical_strategy(
     media_type: str | None = None,
 ) -> st.SearchStrategy[JsonValue]:
     """Strategy for a fully modeled document; raises `UnsupportedSchema` when the schema is not one."""
+    # What a header may carry is a rule about characters, so it is spelled as one: every string
+    # in the container obeys it, and the length and pattern keywords around it keep working.
+    alphabet = alphabet_for(location, generation_config)
     if location is not None and location.is_in_header:
-        # What a header may carry is a rule about characters, so it is spelled as one: every string
-        # in the container obeys it, and the length and pattern keywords around it keep working.
-        if location == ParameterLocation.COOKIE:
-            alphabet = cookie_alphabet(generation_config)
-        else:
-            alphabet = header_alphabet(generation_config)
         formats = _build_header_formats(generation_config, GenerationMode.POSITIVE)
     else:
-        alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
         formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     return build(
         schema,

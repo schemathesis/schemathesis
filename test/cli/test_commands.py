@@ -219,12 +219,6 @@ def test_force_color_nocolor(ctx, cli, snapshot_cli):
 
 
 def test_certificates(cli, app_runner, tmp_path):
-    ca = trustme.CA()
-    ca_path = tmp_path / "ca.pem"
-    ca.cert_pem.write_to_path(str(ca_path))
-    client_cert = ca.issue_cert("test.org")
-    client_cert_path = tmp_path / "client.pem"
-    client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
     app = openapi_basic.success().server
     presented = {}
 
@@ -232,14 +226,13 @@ def test_certificates(cli, app_runner, tmp_path):
     def record_client_certificate():
         presented.setdefault(request.path, set()).add(ssl.PEM_cert_to_DER_cert(request.environ["SSL_CLIENT_CERT"]))
 
-    port = app_runner.run_client_cert_flask_app(app, ca)
+    server = app_runner.run_client_cert_flask_app(app, tmp_path)
     cli.run_and_assert(
-        f"https://127.0.0.1:{port}/openapi.json",
-        f"--request-cert={client_cert_path}",
-        f"--tls-verify={ca_path}",
+        f"https://127.0.0.1:{server.port}/openapi.json",
+        f"--request-cert={server.cert_path}",
+        f"--tls-verify={server.ca_path}",
     )
-    expected = {ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode())}
-    assert presented["/openapi.json"] == presented["/api/success"] == expected
+    assert presented["/openapi.json"] == presented["/api/success"] == {server.cert_der}
 
 
 def test_hypothesis_database_with_derandomize(ctx, cli, snapshot_cli):

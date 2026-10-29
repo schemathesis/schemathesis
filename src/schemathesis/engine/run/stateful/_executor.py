@@ -443,7 +443,6 @@ def _validate_step_response(
         case=case,
         stateful_ctx=ctx,
         check_ctx=check_ctx,
-        checks=check_ctx.internals.checks,
         control=engine.control,
         recorder=recorder,
         additional_checks=additional_checks,
@@ -700,7 +699,6 @@ def validate_response(
     stateful_ctx: StatefulContext,
     check_ctx: CheckContext,
     control: ExecutionControl,
-    checks: list[CheckFunction],
     recorder: ScenarioRecorder,
     additional_checks: tuple[CheckFunction, ...] = (),
     baseline: Baseline | None = None,
@@ -716,14 +714,12 @@ def validate_response(
 
         # Some failures (e.g. use-after-free) reference a prior case that may live on a
         # sibling branch; include it so the reproduce isn't missing the triggering step.
-        chain = recorder.iter_chain_cases(case_id=failure_data.case.id, related_case_ids=failure.related_case_ids())
-        steps = recorder.reproduction_steps(chain, failure=failure, verify=failure_data.verify)
-        recorder.record_check_failure(
+        recorder.record_reproducible_failure(
             name=name,
             case_id=failure_data.case.id,
-            code_sample="\n".join(step.curl for step in steps),
             failure=failure,
-            steps=steps,
+            cases=recorder.iter_chain_cases(case_id=failure_data.case.id, related_case_ids=failure.related_case_ids()),
+            verify=failure_data.verify,
         )
         # Known failures are accepted debt, so they must not spend the `--max-failures` budget.
         if not is_known(failure, name, baseline):
@@ -739,7 +735,7 @@ def validate_response(
         case=case,
         response=response,
         ctx=check_ctx,
-        checks=tuple(checks) + tuple(additional_checks),
+        checks=tuple(check_ctx.internals.checks) + tuple(additional_checks),
         on_failure=on_failure,
         on_success=on_success,
     )

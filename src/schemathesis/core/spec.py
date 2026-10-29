@@ -235,8 +235,6 @@ class ApiSchema(SchemaMetadata, Protocol):
         self, operation: APIOperation, location: str
     ) -> Callable | None: ...  # pragma: no cover
 
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]: ...  # pragma: no cover
-
     def declared_base_path(self) -> str: ...  # pragma: no cover
 
     # Adaptations the engine invokes after probes uncover server behavior.

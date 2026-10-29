@@ -164,13 +164,35 @@ def run_https_flask_app(app: Flask) -> int:
     return _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
 
 
-def run_client_cert_flask_app(app: Flask, ca: trustme.CA) -> int:
-    """Start `app` over HTTPS with a certificate from `ca`, accepting only clients presenting a certificate from it."""
+@dataclass(frozen=True)
+class ClientCertServer:
+    port: int
+    # PEM files of the CA that issued both certificates and of the client's key with its certificate chain.
+    ca_path: Path
+    cert_path: Path
+    # The client certificate as the server sees it in `SSL_CLIENT_CERT`, in DER form.
+    cert_der: bytes
+
+
+def run_client_cert_flask_app(app: Flask, directory: Path) -> ClientCertServer:
+    """Start `app` over HTTPS, accepting only clients presenting the certificate written to `directory`."""
+    ca = trustme.CA()
+    ca_path = directory / "ca.pem"
+    ca.cert_pem.write_to_path(str(ca_path))
+    client_cert = ca.issue_cert("test.org")
+    cert_path = directory / "client.pem"
+    client_cert.private_key_and_cert_chain_pem.write_to_path(str(cert_path))
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ca.issue_cert("127.0.0.1").configure_cert(context)
     ca.configure_trust(context)
     context.verify_mode = ssl.CERT_REQUIRED
-    return _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
+    port = _serve(make_server("127.0.0.1", 0, app, threaded=True, ssl_context=context))
+    return ClientCertServer(
+        port=port,
+        ca_path=ca_path,
+        cert_path=cert_path,
+        cert_der=ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode()),
+    )
 
 
 def accept_connections(listener: socket.socket, handle: Callable[[socket.socket], None]) -> None:
@@ -247,7 +269,7 @@ def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wa
 class AppRunner:
     run_flask_app: Callable[..., int]
     run_https_flask_app: Callable[[Flask], int]
-    run_client_cert_flask_app: Callable[[Flask, trustme.CA], int]
+    run_client_cert_flask_app: Callable[[Flask, Path], ClientCertServer]
     run_resetting_server: Callable[[], int]
     run_asgi_app: Callable[..., int]
     unused_port: Callable[[], int]

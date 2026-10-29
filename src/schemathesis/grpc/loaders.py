@@ -8,12 +8,7 @@ from typing import TYPE_CHECKING, cast
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.hooks import (
-    GLOBAL_HOOK_DISPATCHER,
-    HookContext,
-    dispatch_after_load_schema,
-    dispatch_before_load_schema,
-)
+from schemathesis.hooks import load_with_hooks
 
 if TYPE_CHECKING:
     import grpc
@@ -229,15 +224,11 @@ def _from_descriptor_set(
     except KeyError as exc:
         raise _does_not_load(f"couldn't resolve name {exc}") from exc
     raw_schema = json_format.MessageToDict(descriptor_set)
-    hook_context = HookContext()
-    dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, raw_schema=raw_schema)
-    if config is None:
-        config = SchemathesisConfig.discover()
-    project_config = config.projects.get(raw_schema)
-    instance = GrpcSchema(raw_schema, config=project_config, pool=pool, services=services)
-    instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
-    dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, schema=instance)
-    return instance
+    return load_with_hooks(
+        raw_schema,
+        config,
+        lambda project_config: GrpcSchema(raw_schema, config=project_config, pool=pool, services=services),
+    )
 
 
 def _does_not_load(detail: str) -> LoaderError:

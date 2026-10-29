@@ -2,7 +2,6 @@ import ssl
 import threading
 
 import pytest
-import trustme
 from django.conf import settings
 from django.core.asgi import get_asgi_application
 from django.core.wsgi import get_wsgi_application
@@ -81,10 +80,6 @@ def test_uri_loader_custom_kwargs(app_runner, app, path, loader):
     ids=["openapi", "graphql"],
 )
 def test_uri_loader_transport_from_config(app_runner, tmp_path, app, path, loader):
-    ca = trustme.CA()
-    client_cert = ca.issue_cert("test.org")
-    client_cert_path = tmp_path / "client.pem"
-    client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
     server = app().server
     received = []
     server.before_request(
@@ -96,19 +91,17 @@ def test_uri_loader_transport_from_config(app_runner, tmp_path, app, path, loade
             )
         )
     )
-    port = app_runner.run_client_cert_flask_app(server, ca)
+    running = app_runner.run_client_cert_flask_app(server, tmp_path)
     config = schemathesis.Config.from_dict(
         {
             "tls-verify": False,
-            "request-cert": str(client_cert_path),
+            "request-cert": str(running.cert_path),
             "headers": {"X-Test": "foo"},
             "auth": {"basic": {"username": "test", "password": "test"}},
         }
     )
-    loader(f"https://127.0.0.1:{port}{path}", config=config)
-    assert received == [
-        ("foo", "Basic dGVzdDp0ZXN0", ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode()))
-    ]
+    loader(f"https://127.0.0.1:{running.port}{path}", config=config)
+    assert received == [("foo", "Basic dGVzdDp0ZXN0", running.cert_der)]
 
 
 @pytest.mark.parametrize(

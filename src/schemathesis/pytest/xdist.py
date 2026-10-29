@@ -24,7 +24,7 @@ from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.failure_codes import get_failure_class
-from schemathesis.pytest.reporting import PytestReportOutcome, open_writers
+from schemathesis.pytest.reporting import PYTEST_FORMATS, PytestReportOutcome, open_writers
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
 
@@ -287,7 +287,7 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
     """Serialize the minimal writer configuration for cross-process transport."""
     reports = schema.config.reports
     paths: dict[str, str | None] = {}
-    for fmt in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT, ReportFormat.ALLURE, ReportFormat.HTML):
+    for fmt in PYTEST_FORMATS:
         report = reports.get(fmt)
         if report.enabled:
             paths[fmt.value] = str(report.path) if report.path is not None else None
