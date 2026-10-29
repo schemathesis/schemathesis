@@ -7,6 +7,10 @@
 - Coverage phase for GraphQL schemas.
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
 
+### :wrench: Changed
+
+- WFC reports declare report schema version `0.10.0`, from WFC 0.13.0.
+
 ### :bug: Fixed
 
 #### Coverage phase
