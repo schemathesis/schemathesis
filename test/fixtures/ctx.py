@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from schemathesis.openapi.loaders import OpenApiSchema
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLSchema
+    from test.apps.catalog.grpc.users import GrpcServer
 
 
 @overload
@@ -568,6 +569,28 @@ class GraphQLContext:
         return schemathesis.graphql.from_dict(raw_schema, config=config)
 
 
+@dataclass(slots=True)
+class GrpcApps:
+    parent: Context
+
+    def users(self, *, tls: bool = False, client_auth: bool = False) -> GrpcServer:
+        # grpcio has no free-threaded build, so only tests that start a server need it.
+        from test.apps.catalog.grpc import users as grpc_users
+
+        app = grpc_users.users(tls=tls, client_auth=client_auth)
+        self.parent.request.addfinalizer(lambda: app.server.stop(None))
+        return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
+
+
+@dataclass(slots=True)
+class GrpcContext:
+    parent: Context
+
+    @property
+    def apps(self) -> GrpcApps:
+        return GrpcApps(parent=self.parent)
+
+
 @dataclass
 class OpenApiContext:
     parent: Context
@@ -648,6 +671,10 @@ class Context:
     @property
     def graphql(self) -> GraphQLContext:
         return GraphQLContext(parent=self)
+
+    @property
+    def grpc(self) -> GrpcContext:
+        return GrpcContext(parent=self)
 
     @property
     def _testdir(self):

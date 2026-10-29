@@ -50,7 +50,7 @@ repos:
       - id: mypy
         name: mypy
         # Installs the project with its dependencies from `pyproject.toml`, so third-party types are checked.
-        entry: uvx --python 3.11 --with-editable=.[tests] --with=types-requests --with=types-PyYAML --with=types-protobuf mypy==2.4.0
+        entry: uvx --python 3.11 --with-editable=.[tests,grpc] --with=types-requests --with=types-PyYAML --with=types-protobuf --with=types-grpcio mypy==2.4.0
         language: system
         types_or: [python, pyi]
         require_serial: true

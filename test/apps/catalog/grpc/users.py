@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+import time
+from concurrent import futures
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import grpc
+import trustme
+from google.protobuf import descriptor_database, descriptor_pb2, descriptor_pool, message_factory
+
+from test.apps.catalog.grpc.descriptors import users_descriptor_set
+
+
+@dataclass(slots=True)
+class GrpcCall:
+    method: str
+    metadata: list[tuple[str, str | bytes]]
+    # Common names of the client certificate the server saw.
+    peer_names: list[bytes]
+    # Client address; calls over one connection share it.
+    peer: str
+
+
+@dataclass(slots=True)
+class TlsFiles:
+    ca: trustme.CA
+    server: trustme.LeafCert
+    client: trustme.LeafCert
+
+
+@dataclass(slots=True)
+class GrpcApp:
+    server: grpc.Server
+    port: int
+    calls: list[GrpcCall]
+    tls: TlsFiles | None = None
+    descriptor_set: bytes = field(default_factory=users_descriptor_set)
+
+    def make_server(self, directory: Path) -> GrpcServer:
+        descriptor_set_path = directory / "api.binpb"
+        descriptor_set_path.write_bytes(self.descriptor_set)
+        server = GrpcServer(
+            target=f"grpc://127.0.0.1:{self.port}",
+            descriptor_set_path=descriptor_set_path,
+            calls=self.calls,
+            server=self.server,
+        )
+        if self.tls is not None:
+            server.target = f"grpcs://127.0.0.1:{self.port}"
+            server.ca_path = directory / "ca.pem"
+            self.tls.ca.cert_pem.write_to_path(str(server.ca_path))
+            server.client_cert_path = directory / "client.pem"
+            self.tls.client.cert_chain_pems[0].write_to_path(str(server.client_cert_path))
+            server.client_key_path = directory / "client.key"
+            self.tls.client.private_key_pem.write_to_path(str(server.client_key_path))
+        return server
+
+
+@dataclass(slots=True)
+class GrpcServer:
+    target: str
+    descriptor_set_path: Path
+    calls: list[GrpcCall]
+    server: grpc.Server
+    ca_path: Path | None = None
+    client_cert_path: Path | None = None
+    client_key_path: Path | None = None
+
+    def stop(self) -> None:
+        self.server.stop(None).wait()
+
+
+def users(*, tls: bool = False, client_auth: bool = False) -> GrpcApp:
+    """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE."""
+    database = descriptor_database.DescriptorDatabase()
+    for file in descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file:
+        database.Add(file)
+    pool = descriptor_pool.DescriptorPool(database)
+    request_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.GetUserRequest"))
+    user_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.User"))
+    operation_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("google.longrunning.Operation"))
+    calls: list[GrpcCall] = []
+
+    def record(method: str, context: grpc.ServicerContext) -> None:
+        calls.append(
+            GrpcCall(
+                method=method,
+                metadata=[(item.key, item.value) for item in context.invocation_metadata()],
+                peer_names=list(context.auth_context().get("x509_common_name", [])),
+                peer=context.peer(),
+            )
+        )
+
+    def get_user(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        record("GetUser", context)
+        user_id = request_class.FromString(payload).user_id
+        if user_id < 0:
+            context.abort(grpc.StatusCode.INTERNAL, "negative id")
+        if user_id == 503:
+            context.abort(grpc.StatusCode.UNAVAILABLE, "")
+        if user_id == 13:
+            time.sleep(1)
+        context.send_initial_metadata((("x-served-by", "users"),))
+        context.set_trailing_metadata((("x-trace-bin", b"\x00\x01"),))
+        return user_class(name=f"u{user_id}").SerializeToString()
+
+    def reset(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        record("Reset", context)
+        return operation_class().SerializeToString()
+
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    server.add_generic_rpc_handlers(
+        (
+            grpc.method_handlers_generic_handler(
+                "pkg.Users", {"GetUser": grpc.unary_unary_rpc_method_handler(get_user)}
+            ),
+            grpc.method_handlers_generic_handler("pkg.Admin", {"Reset": grpc.unary_unary_rpc_method_handler(reset)}),
+        )
+    )
+    files = None
+    if tls:
+        ca = trustme.CA()
+        files = TlsFiles(
+            ca=ca, server=ca.issue_cert("127.0.0.1"), client=ca.issue_cert("client.example", common_name="client")
+        )
+        credentials = grpc.ssl_server_credentials(
+            [(files.server.private_key_pem.bytes(), files.server.cert_chain_pems[0].bytes())],
+            root_certificates=ca.cert_pem.bytes(),
+            require_client_auth=client_auth,
+        )
+        port = server.add_secure_port("127.0.0.1:0", credentials)
+    else:
+        port = server.add_insecure_port("127.0.0.1:0")
+    server.start()
+    return GrpcApp(server=server, port=port, calls=calls, tls=files)

@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ResourcePool
+    from schemathesis.transport.grpc import GrpcTransport
 
 
 MEDIA_TYPE = "application/grpc"
@@ -67,6 +68,7 @@ class GrpcSchema(BaseSchema):
     pool: descriptor_pool.DescriptorPool = field(default_factory=descriptor_pool.DescriptorPool)
     # Tested services by full name, in declaration order.
     services: dict[str, ServiceDescriptor] = field(default_factory=dict)
+    _transport: GrpcTransport | None = None
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -83,6 +85,19 @@ class GrpcSchema(BaseSchema):
     @override
     def specification(self) -> Specification:
         return Specification.grpc(version="")
+
+    @override
+    def get_transport(self, app: object) -> GrpcTransport:
+        if self._transport is None:
+            # grpcio has no free-threaded build, so loading a schema does not import it.
+            from schemathesis.transport.grpc import GrpcTransport
+
+            self._transport = GrpcTransport()
+        return self._transport
+
+    @override
+    def build_request_url(self, case: Case, base_url: str) -> str:
+        return f"{base_url}{case.path}"
 
     @override
     def __iter__(self) -> Iterator[str]:
