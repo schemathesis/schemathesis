@@ -237,4 +237,5 @@ def _address(url: str) -> Address | None:
     parts = urlsplit(url)
     if parts.hostname is None:
         return None
-    return parts.hostname, parts.port or (443 if parts.scheme == "https" else 80)
+    # gRPC targets without a port use 443, as gRPC clients do for both schemes.
+    return parts.hostname, parts.port or (443 if parts.scheme in ("https", "grpc", "grpcs") else 80)

@@ -6,6 +6,7 @@ import pytest
 import requests
 
 import schemathesis
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.transport import Response
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.outage import CONFIRMATION_INTERVAL, REPORTED_REQUESTS, SERVER_LABEL, ServerMonitor
@@ -174,3 +175,24 @@ def test_tracked_answers_and_timeouts_set_the_operation_timeout(operation):
             monitor.track(case, lambda: time_out(case), transport_kwargs={})
 
     assert health.timeout_override(operation.label) == 2.0
+
+
+@pytest.mark.parametrize("tls", [False, True], ids=["plaintext", "tls"])
+def test_grpc_server_that_stops_is_an_outage(ctx, tls):
+    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
+    server = ctx.grpc.apps.users(tls=tls)
+    config = {"base-url": server.target, **({"tls-verify": str(server.ca_path)} if tls else {})}
+    schema = schemathesis.grpc.from_path(server.descriptor_set_path, config=SchemathesisConfig.from_dict(config))
+    case = schema["pkg.Users"]["GetUser"].Case(body={"userId": 7})
+    monitor = ServerMonitor()
+    monitor.track(case, case.call, transport_kwargs={})
+    server.stop()
+
+    with pytest.raises(requests.ConnectionError) as exc_info:
+        monitor.track(case, case.call, transport_kwargs={})
+
+    assert monitor.is_down(exc_info.value)
+    assert monitor.take_report(PhaseName.FUZZING).info.message == (
+        f"{server.target} stopped responding. Last request before it went away:\n\n"
+        f"    {case.as_reproduction_command(headers={}, verify=True)}"
+    )
