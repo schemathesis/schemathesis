@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from schemathesis.config import SchemathesisConfig
-from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.errors import IncorrectUsage, LoaderError, LoaderErrorKind
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -39,6 +39,7 @@ def from_url(
     cert: str | tuple[str, str] | None = None,
     auth: tuple[str, str] | None = None,
     timeout: float | None = None,
+    proxies: dict[str, str] | None = None,
 ) -> GrpcSchema:
     """Load a gRPC schema from a server through reflection.
 
@@ -51,6 +52,7 @@ def from_url(
         cert: Client certificate, or a `(certificate, key)` pair
         auth: Basic authentication credentials
         timeout: Seconds to wait for each reflection call
+        proxies: Not supported; any value raises `IncorrectUsage`
 
     Example:
         ```python
@@ -73,6 +75,8 @@ def from_url(
     from schemathesis.specs.grpc.schemas import filter_metadata
     from schemathesis.transport.grpc import create_channel, metadata_pairs, parse_target
 
+    if proxies:
+        raise IncorrectUsage("Proxies are not supported for gRPC targets")
     address, tls = parse_target(url, verify)
     request_headers = filter_metadata(headers or {})
     if auth is not None:

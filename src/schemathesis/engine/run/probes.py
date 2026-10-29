@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.result import Ok, Result
+from schemathesis.core.result import Ok
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.engine import Status, events
 from schemathesis.engine.errors import never_reached_server
@@ -39,18 +39,13 @@ class ProbePayload:
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
     probes = run(ctx)
-    status = Status.SUCCESS
-    payload: Result[ProbePayload, Exception] | None = None
     for result in probes:
         if isinstance(result.probe, NullByteInHeader) and result.is_failure:
             ctx.schema.adapt_to_null_byte_in_header_failure()
         elif isinstance(result.probe, UnsafePathDecoder) and result.is_failure:
             ctx.schema.adapt_to_path_decoder_rejection()
-        payload = Ok(ProbePayload(probes=probes))
-    cache_report = ctx.cache.run()
-    if cache_report is not None:
-        payload = Ok(ProbePayload(probes=probes, cache=cache_report))
-    yield events.PhaseFinished(phase=phase, status=status, payload=payload)
+    payload = Ok(ProbePayload(probes=probes, cache=ctx.cache.run()))
+    yield events.PhaseFinished(phase=phase, status=Status.SUCCESS, payload=payload)
 
 
 def run(ctx: EngineContext) -> list[ProbeRun]:

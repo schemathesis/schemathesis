@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from schemathesis import graphql, openapi
+from schemathesis import graphql, grpc, openapi
 from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
-from schemathesis.config import ProjectConfig
-from schemathesis.core.errors import HookExecutionError, InvalidSchema, LoaderError, LoaderErrorKind
+from schemathesis.config import ProjectConfig, ReportFormat
+from schemathesis.core.errors import HookExecutionError, IncorrectUsage, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
 
@@ -28,8 +28,26 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
     from schemathesis.schemas import BaseSchema
 
+GRPC_CASSETTES_MESSAGE = "HAR and VCR reports record HTTP/1.1 exchanges and are not available for gRPC targets"
+GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
+
 
 def into_event_stream(
+    *,
+    location: str,
+    config: ProjectConfig,
+    filter_set: dict[str, Any],
+    engine_callback: Callable[[BaseSchema], Iterable[events.EngineEvent]],
+) -> EventGenerator:
+    # Checked before any report handler creates its file.
+    if is_grpc_location(location) and any(
+        config.reports.get(report_format).enabled for report_format in (ReportFormat.HAR, ReportFormat.VCR)
+    ):
+        raise click.UsageError(GRPC_CASSETTES_MESSAGE)
+    return _event_stream(location=location, config=config, filter_set=filter_set, engine_callback=engine_callback)
+
+
+def _event_stream(
     *,
     location: str,
     config: ProjectConfig,
@@ -58,6 +76,11 @@ def into_event_stream(
                 )
             raise click.UsageError(message)
         base_url = schema.get_base_url()
+    except IncorrectUsage as exc:
+        raise click.UsageError(str(exc)) from None
+    except ImportError as exc:
+        # A loader that needs an optional extra names it in the message.
+        raise click.ClickException(str(exc)) from None
     except KeyboardInterrupt:
         yield Interrupted(phase=None)
         return
@@ -85,6 +108,8 @@ def load_schema(location: str, config: ProjectConfig) -> BaseSchema:
 
 def _candidate_modules(location: str) -> tuple[ModuleType, ...]:
     """Loader modules to try for `location`, most likely first."""
+    if is_grpc_location(location):
+        return (grpc,)
     if is_openapi_file(location):
         return (openapi,)
     if is_probably_graphql(location):
@@ -165,6 +190,12 @@ def is_specific_exception(exc: Exception) -> bool:
 def is_probably_graphql(location: str) -> bool:
     """Detect whether it is likely that the given location is a GraphQL endpoint."""
     return location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
+
+
+def is_grpc_location(location: str) -> bool:
+    if location.startswith(("grpc://", "grpcs://")):
+        return True
+    return location.endswith(GRPC_DESCRIPTOR_SET_EXTENSIONS) and file_exists(location)
 
 
 def is_openapi_file(location: str) -> bool:

@@ -180,7 +180,7 @@ def _mask_generated(data: str) -> str:
 
 
 def _mask_local_ports(data: str) -> str:
-    return re.sub(r"(https?)://([^/@\s]+@)?127\.0\.0\.1:[0-9]{3,}", r"\1://\g<2>127.0.0.1", data)
+    return re.sub(r"(https?|grpcs?)://([^/@\s]+@)?127\.0\.0\.1:[0-9]{3,}", r"\1://\g<2>127.0.0.1", data)
 
 
 def _mask_config_path(data: str) -> str:
