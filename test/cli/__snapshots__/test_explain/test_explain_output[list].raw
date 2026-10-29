@@ -43,6 +43,9 @@ Response validation (ST1xx)
   ST116  GraphQL data does not match the query
          GraphQL `data` that does not match the query, such as a missing field
          or a value of the wrong type.
+  ST117  Response does not decode as the declared message
+         gRPC response or status details that do not decode as the declared
+         message.
 
 Input handling (ST2xx)
   ST201  Schema-violating request accepted

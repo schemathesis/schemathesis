@@ -118,6 +118,13 @@ EXPLANATIONS: dict[str, Explanation] = {
             and no `null` for a non-nullable field.
         """,
     ),
+    "ST117": Explanation(
+        summary="gRPC response or status details that do not decode as the declared message.",
+        notes="""
+            A successful response must decode as the method's output message, and `grpc-status-details-bin` on an
+            error must decode as `google.rpc.Status`. Regenerate the descriptor set if the server's protos changed.
+        """,
+    ),
     "ST201": Explanation(
         summary="Schema-violating request accepted.",
         notes="""

@@ -10,5 +10,6 @@ Stdout:
   ST114  Null in non-nullable GraphQL field
   ST115  Unexpected GraphQL response
   ST116  GraphQL data does not match the query
+  ST117  Response does not decode as the declared message
 
 Run `st explain <code>` for details.

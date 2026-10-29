@@ -50,7 +50,7 @@ Response without a `Content-Type` header, though the schema documents a media ty
 
 For a response with no body, such as `204`, remove `content` from it in the schema.
 
-`--exclude-checks content_type_conformance,response_schema_conformance` turns it off, along with ST105, ST106, ST109, ST110, ST111, ST114, ST115, ST116.
+`--exclude-checks content_type_conformance,response_schema_conformance` turns it off, along with ST105, ST106, ST109, ST110, ST111, ST114, ST115, ST116, ST117.
 
 ### ST105 Undocumented Content-Type {#st105}
 
@@ -96,7 +96,7 @@ If `format` alone causes most failures, skip format validation while you fix the
 validate-formats = false
 ```
 
-`--exclude-checks response_schema_conformance,response_headers_conformance` turns it off, along with ST107, ST109, ST110, ST111, ST114, ST115, ST116.
+`--exclude-checks response_schema_conformance,response_headers_conformance` turns it off, along with ST107, ST109, ST110, ST111, ST114, ST115, ST116, ST117.
 
 ### ST109 JSON deserialization error {#st109}
 
@@ -106,7 +106,7 @@ Body that is not valid JSON, under a JSON `Content-Type` or with no `Content-Typ
 
 An empty body fails too (`Expecting value: line 1 column 1`): send JSON, or remove `content` from that response in the schema.
 
-`--exclude-checks response_schema_conformance` turns it off, along with ST110, ST111, ST114, ST115, ST116.
+`--exclude-checks response_schema_conformance` turns it off, along with ST110, ST111, ST114, ST115, ST116, ST117.
 
 ### ST110 Content deserialization error {#st110}
 
@@ -116,7 +116,7 @@ Body that the parser for its `Content-Type` cannot read, other than invalid JSON
 
 Errors raised by your `@schemathesis.deserializer` functions are reported here too.
 
-`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST111, ST114, ST115, ST116.
+`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST111, ST114, ST115, ST116, ST117.
 
 ### ST111 Unknown discriminator value {#st111}
 
@@ -126,7 +126,7 @@ Discriminator value that matches no schema in the `discriminator` mapping.
 
 One unknown value is reported per response, so rerunning after a fix can show the next one.
 
-`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST114, ST115, ST116.
+`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST114, ST115, ST116, ST117.
 
 ### ST112 Response time limit exceeded {#st112}
 
@@ -161,7 +161,7 @@ Reported by [`response_schema_conformance`](checks.md#response_schema_conformanc
 
 Null for a field the GraphQL schema declares non-nullable.
 
-`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST115, ST116.
+`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST115, ST116, ST117.
 
 ### ST115 Unexpected GraphQL response {#st115}
 
@@ -169,7 +169,7 @@ Reported by [`response_schema_conformance`](checks.md#response_schema_conformanc
 
 GraphQL response that is not a JSON object, such as a list, a string or null.
 
-`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST114, ST116.
+`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST114, ST116, ST117.
 
 ### ST116 GraphQL data does not match the query {#st116}
 
@@ -179,7 +179,17 @@ GraphQL `data` that does not match the query, such as a missing field or a value
 
 Checked only for successful responses without `errors`, whose `data` must be an object or `null`. Every requested field must be present under its alias, with no unrequested fields, a value of its declared type, and no `null` for a non-nullable field.
 
-`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST114, ST115.
+`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST114, ST115, ST117.
+
+### ST117 Response does not decode as the declared message {#st117}
+
+Reported by [`response_schema_conformance`](checks.md#response_schema_conformance).
+
+gRPC response or status details that do not decode as the declared message.
+
+A successful response must decode as the method's output message, and `grpc-status-details-bin` on an error must decode as `google.rpc.Status`. Regenerate the descriptor set if the server's protos changed.
+
+`--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST114, ST115, ST116.
 
 ## Input handling (ST2xx)
 

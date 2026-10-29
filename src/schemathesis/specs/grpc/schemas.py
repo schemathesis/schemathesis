@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
 from difflib import get_close_matches
@@ -7,7 +8,10 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
 
 import jsonschema_rs
-from google.protobuf import descriptor_pool
+from google.protobuf import descriptor_pool, message, message_factory
+
+# googleapis-common-protos ships no type information.
+from google.rpc import status_pb2  # type: ignore[import-untyped]
 from hypothesis import strategies as st
 from typing_extensions import override
 
@@ -19,6 +23,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
+from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
@@ -32,10 +37,12 @@ from schemathesis.generation.meta import (
     TestPhase,
     build_phase_data,
 )
+from schemathesis.grpc.checks import MalformedGrpcMessage
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc.converter import message_schema
 from schemathesis.specs.grpc.formats import grpc_formats
+from schemathesis.specs.grpc.status import GRPC_STATUSES
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
@@ -141,6 +148,19 @@ class GrpcSchema(BaseSchema):
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         # Credentials travel as metadata, which the transport builds from the case headers.
         return False
+
+    @override
+    def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
+        return GRPC_STATUSES[_grpc_status(response)][2]
+
+    @override
+    def validate_response(self, operation: APIOperation, response: Response, *, case: Case | None = None) -> None:
+        if _grpc_status(response) == 0:
+            output_type = operation.definition.raw.output_type
+            _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
+        else:
+            for details in response.headers.get("grpc-status-details-bin", []):
+                _decode(operation, status_pb2.Status, base64.b64decode(details), "status details")
 
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
@@ -273,6 +293,20 @@ class GrpcSchema(BaseSchema):
     @override
     def create_extra_data_source(self) -> None:
         raise NotImplementedError
+
+
+def _grpc_status(response: Response) -> int:
+    return int(response.headers["grpc-status"][0])
+
+
+def _decode(operation: APIOperation, message_class: type[message.Message], content: bytes, what: str) -> None:
+    name = message_class.DESCRIPTOR.full_name
+    try:
+        message_class.FromString(content)
+    except message.DecodeError as exc:
+        raise MalformedGrpcMessage(
+            operation=operation.label, type_name=name, message=f"Cannot decode the {what} as `{name}`: {exc}"
+        ) from None
 
 
 @st.composite

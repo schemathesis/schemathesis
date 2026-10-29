@@ -12,14 +12,12 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, OperationNotFound, RejectedSchemaDefinition
 from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
 from schemathesis.engine.run.unit._errors import prefer_spec_error
-from test.apps.catalog.grpc.descriptors import users_descriptor_set
+from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
 
 
 @pytest.fixture
 def users_path(tmp_path):
-    path = tmp_path / "api.binpb"
-    path.write_bytes(users_descriptor_set())
-    return path
+    return write_descriptor_set(tmp_path, users_descriptor_set())
 
 
 @pytest.fixture
@@ -141,10 +139,8 @@ def test_rejected_definition_is_reported_as_is(schema):
 
 
 def test_invalid_descriptor_set(tmp_path):
-    path = tmp_path / "api.binpb"
-    path.write_bytes(b"not a descriptor")
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(path)
+        schemathesis.grpc.from_path(write_descriptor_set(tmp_path, b"not a descriptor"))
     assert (exc_info.value.kind, exc_info.value.message) == (
         LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
         "The file is not a serialized `FileDescriptorSet`. Build one with `buf build -o api.binpb` or "
@@ -156,10 +152,8 @@ def test_descriptor_set_without_imports(tmp_path):
     file = descriptor_pb2.FileDescriptorProto(
         name="users.proto", package="pkg", syntax="proto3", dependency=["google/protobuf/timestamp.proto"]
     )
-    path = tmp_path / "api.binpb"
-    path.write_bytes(descriptor_pb2.FileDescriptorSet(file=[file]).SerializeToString())
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(path)
+        schemathesis.grpc.from_path(write_files(tmp_path, [file]))
     assert (exc_info.value.kind, exc_info.value.message) == (
         LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
         "The descriptor set is incomplete: `users.proto` imports `google/protobuf/timestamp.proto`, which it does "
@@ -173,10 +167,8 @@ def test_filter_naming_a_streaming_method_is_not_unmatched(schema):
     assert (statistic.operations.selected, statistic.unmatched_filters) == (0, [])
 
 
-def write_descriptor_set(tmp_path, files):
-    path = tmp_path / "api.binpb"
-    path.write_bytes(descriptor_pb2.FileDescriptorSet(file=files).SerializeToString())
-    return path
+def write_files(tmp_path, files):
+    return write_descriptor_set(tmp_path, descriptor_pb2.FileDescriptorSet(file=files).SerializeToString())
 
 
 def users_files():
@@ -184,7 +176,7 @@ def users_files():
 
 
 def test_files_load_in_any_order(tmp_path):
-    schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, users_files()[::-1]))
+    schema = schemathesis.grpc.from_path(write_files(tmp_path, users_files()[::-1]))
     assert [result.ok().label for result in schema.get_all_operations()] == ["pkg.Users/GetUser", "pkg.Admin/Reset"]
 
 
@@ -205,7 +197,7 @@ def test_broken_descriptor_set(tmp_path, implementation, corrupt):
     files = users_files()
     expected = corrupt(files)
     result = subprocess.run(
-        [sys.executable, "-c", LOAD_AND_REPORT, str(write_descriptor_set(tmp_path, files))],
+        [sys.executable, "-c", LOAD_AND_REPORT, str(write_files(tmp_path, files))],
         env={**os.environ, "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": implementation},
         capture_output=True,
         text=True,
@@ -257,7 +249,7 @@ def test_before_load_schema_hook_sees_descriptor_files(users_path):
 
 def test_empty_descriptor_set(tmp_path):
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(write_descriptor_set(tmp_path, []))
+        schemathesis.grpc.from_path(write_files(tmp_path, []))
     assert (exc_info.value.kind, exc_info.value.message) == (
         LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
         "The descriptor set contains no files. Build one with `buf build -o api.binpb` or "
@@ -273,7 +265,7 @@ def test_deprecation_inherited_from_service_and_file(tmp_path, level):
         users.service[1].options.deprecated = True
     else:
         users.options.deprecated = True
-    schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, files))
+    schema = schemathesis.grpc.from_path(write_files(tmp_path, files))
     assert [result.ok().label for result in schema.exclude(deprecated=True).get_all_operations()] == []
 
 

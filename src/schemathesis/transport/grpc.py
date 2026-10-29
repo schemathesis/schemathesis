@@ -14,6 +14,7 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
+from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport
 
 if TYPE_CHECKING:
@@ -21,24 +22,6 @@ if TYPE_CHECKING:
 
     from schemathesis.generation.case import Case
 
-HTTP_STATUS_BY_GRPC_STATUS: dict[str, int] = {
-    "OK": 200,
-    "CANCELLED": 499,
-    "UNKNOWN": 500,
-    "INVALID_ARGUMENT": 400,
-    "NOT_FOUND": 404,
-    "ALREADY_EXISTS": 409,
-    "PERMISSION_DENIED": 403,
-    "RESOURCE_EXHAUSTED": 429,
-    "FAILED_PRECONDITION": 400,
-    "ABORTED": 409,
-    "OUT_OF_RANGE": 400,
-    "UNIMPLEMENTED": 501,
-    "INTERNAL": 500,
-    "UNAVAILABLE": 503,
-    "DATA_LOSS": 500,
-    "UNAUTHENTICATED": 401,
-}
 # HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
 EXCLUDED_METADATA = frozenset(
     {"connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "te", "content-type", "host"}
@@ -140,7 +123,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 return json_format.MessageToJson(output_class.FromString(content))
 
         return Response(
-            status_code=HTTP_STATUS_BY_GRPC_STATUS[code.name],
+            status_code=GRPC_STATUSES[code.value[0]][1],
             headers=response_headers,
             content=content,
             request=request,

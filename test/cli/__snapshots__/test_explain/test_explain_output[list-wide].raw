@@ -2,57 +2,60 @@ Exit code: 0
 ---
 Stdout:
 Response validation (ST1xx)
-  ST101  Server error                                     5xx status for a request the API should have handled or
-                                                          rejected with a 4xx.
-  ST102  Server error on undeclared request Content-Type  5xx for a request sent with an undeclared `Content-Type`,
-                                                          while the same request with a declared one succeeds.
-  ST103  Undocumented status code                         Status code missing from the operation's documented responses.
-  ST104  Missing Content-Type header                      Response without a `Content-Type` header, though the schema
-                                                          documents a media type for its status.
-  ST105  Undocumented Content-Type                        `Content-Type` that matches none of the documented media
-                                                          types.
-  ST106  Malformed media type                             `Content-Type` or a schema media type that is not a valid
-                                                          `type/subtype`.
-  ST107  Missing required response headers                Required response header missing for this status.
-  ST108  Response violates schema                         Response body or header value that its documented schema
-                                                          rejects.
-  ST109  JSON deserialization error                       Body that is not valid JSON, under a JSON `Content-Type` or
-                                                          with no `Content-Type`.
-  ST110  Content deserialization error                    Body that the parser for its `Content-Type` cannot read, other
-                                                          than invalid JSON (ST109).
-  ST111  Unknown discriminator value                      Discriminator value that matches no schema in the
-                                                          `discriminator` mapping.
-  ST112  Response time limit exceeded                     Response slower than the configured response time limit.
-  ST113  GraphQL server error                             GraphQL `errors` entry reporting a field that failed on the
-                                                          server.
-  ST114  Null in non-nullable GraphQL field               Null for a field the GraphQL schema declares non-nullable.
-  ST115  Unexpected GraphQL response                      GraphQL response that is not a JSON object, such as a list, a
-                                                          string or null.
-  ST116  GraphQL data does not match the query            GraphQL `data` that does not match the query, such as a
-                                                          missing field or a value of the wrong type.
+  ST101  Server error                                      5xx status for a request the API should have handled or
+                                                           rejected with a 4xx.
+  ST102  Server error on undeclared request Content-Type   5xx for a request sent with an undeclared `Content-Type`,
+                                                           while the same request with a declared one succeeds.
+  ST103  Undocumented status code                          Status code missing from the operation's documented
+                                                           responses.
+  ST104  Missing Content-Type header                       Response without a `Content-Type` header, though the schema
+                                                           documents a media type for its status.
+  ST105  Undocumented Content-Type                         `Content-Type` that matches none of the documented media
+                                                           types.
+  ST106  Malformed media type                              `Content-Type` or a schema media type that is not a valid
+                                                           `type/subtype`.
+  ST107  Missing required response headers                 Required response header missing for this status.
+  ST108  Response violates schema                          Response body or header value that its documented schema
+                                                           rejects.
+  ST109  JSON deserialization error                        Body that is not valid JSON, under a JSON `Content-Type` or
+                                                           with no `Content-Type`.
+  ST110  Content deserialization error                     Body that the parser for its `Content-Type` cannot read,
+                                                           other than invalid JSON (ST109).
+  ST111  Unknown discriminator value                       Discriminator value that matches no schema in the
+                                                           `discriminator` mapping.
+  ST112  Response time limit exceeded                      Response slower than the configured response time limit.
+  ST113  GraphQL server error                              GraphQL `errors` entry reporting a field that failed on the
+                                                           server.
+  ST114  Null in non-nullable GraphQL field                Null for a field the GraphQL schema declares non-nullable.
+  ST115  Unexpected GraphQL response                       GraphQL response that is not a JSON object, such as a list, a
+                                                           string or null.
+  ST116  GraphQL data does not match the query             GraphQL `data` that does not match the query, such as a
+                                                           missing field or a value of the wrong type.
+  ST117  Response does not decode as the declared message  gRPC response or status details that do not decode as the
+                                                           declared message.
 
 Input handling (ST2xx)
-  ST201  Schema-violating request accepted                Schema-violating request accepted.
-  ST202  Schema-valid request rejected                    Schema-valid request rejected.
-  ST203  Missing required header accepted                 Request without a required header parameter accepted.
-  ST204  Wrong response to undeclared method              Undeclared method answered with a status other than 405, or
-                                                          with 405 and no `Allow` header.
-  ST205  Allow header mismatch                            `Allow` in the `OPTIONS` response lists different methods than
-                                                          the schema declares for the path.
-  ST206  GraphQL client error                             Valid GraphQL query rejected by the server.
+  ST201  Schema-violating request accepted                 Schema-violating request accepted.
+  ST202  Schema-valid request rejected                     Schema-valid request rejected.
+  ST203  Missing required header accepted                  Request without a required header parameter accepted.
+  ST204  Wrong response to undeclared method               Undeclared method answered with a status other than 405, or
+                                                           with 405 and no `Allow` header.
+  ST205  Allow header mismatch                             `Allow` in the `OPTIONS` response lists different methods
+                                                           than the schema declares for the path.
+  ST206  GraphQL client error                              Valid GraphQL query rejected by the server.
 
 Stateful behavior (ST3xx)
-  ST301  Deleted resource still available                 Resource still served after a successful `DELETE` removed it.
-  ST302  Created resource not found                       404 for a resource that an earlier successful `POST` created.
+  ST301  Deleted resource still available                  Resource still served after a successful `DELETE` removed it.
+  ST302  Created resource not found                        404 for a resource that an earlier successful `POST` created.
 
 Security (ST4xx)
-  ST401  Authentication not enforced                      Request with missing or invalid credentials accepted on an
-                                                          operation that requires authentication.
-  ST402  Object-level authorization bypass                One user's object returned to another user who should not see
-                                                          it.
+  ST401  Authentication not enforced                       Request with missing or invalid credentials accepted on an
+                                                           operation that requires authentication.
+  ST402  Object-level authorization bypass                 One user's object returned to another user who should not see
+                                                           it.
 
 Custom checks (ST9xx)
-  ST901  Custom check failed                              Response that breaks a rule a custom `@schemathesis.check`
-                                                          enforces.
+  ST901  Custom check failed                               Response that breaks a rule a custom `@schemathesis.check`
+                                                           enforces.
 
 Run `st explain <code>` for details.

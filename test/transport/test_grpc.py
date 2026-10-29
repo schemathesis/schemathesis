@@ -8,6 +8,7 @@ import requests
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.transport import CallOutcome
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -60,6 +61,14 @@ def test_internal_error(ctx):
 def test_server_unavailable_is_a_response(ctx):
     _, response = get_user(ctx.grpc.apps.users(), 503)
     assert (response.status_code, response.status_line) == (503, "UNAVAILABLE")
+
+
+def test_status_code_agrees_with_call_outcome(ctx):
+    case, response = get_user(ctx.grpc.apps.users(), 9)
+    assert (response.status_code, case.operation.schema.classify_call_outcome(case, response)) == (
+        409,
+        CallOutcome.CONFLICT,
+    )
 
 
 def test_metadata(ctx):

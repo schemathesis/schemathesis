@@ -9,7 +9,7 @@ from schemathesis.core.control import SkipTest
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.grpc.formats import grpc_formats
-from test.apps.catalog.grpc.descriptors import all_types_descriptor_set
+from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, write_descriptor_set
 from test.utils import run_given
 
 METHODS = ["Scalars", "Maps", "WellKnown", "Node", "Envelope", "Choice", "Legacy", "Edition"]
@@ -17,9 +17,7 @@ METHODS = ["Scalars", "Maps", "WellKnown", "Node", "Envelope", "Choice", "Legacy
 
 @pytest.fixture(scope="module")
 def path(tmp_path_factory):
-    path = tmp_path_factory.mktemp("grpc") / "api.binpb"
-    path.write_bytes(all_types_descriptor_set())
-    return path
+    return write_descriptor_set(tmp_path_factory.mktemp("grpc"), all_types_descriptor_set())
 
 
 @pytest.fixture
