@@ -22,6 +22,7 @@
 - Valid optional `null` query parameters sent as `null` in cases targeting a sibling.
 - Values generated from `not` schemas described by the inner schema's scenario.
 - Cases dropped when they differ only in their binary payload.
+- Strings outside the configured `generation.codec`.
 
 #### Data generation
 

@@ -86,6 +86,7 @@ from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION, GenerationSession
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples
 from schemathesis.generation.jsonschema.builder import build
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
@@ -481,6 +482,7 @@ class CoverageContext:
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema_rs.Validator]
     update_pattern: Callable[[str, int | None, int | None], str] | None
+    alphabet: Alphabet
     _resolver: Resolver | None
     allow_extra_parameters: bool
     expanding: dict[str, int]
@@ -497,6 +499,7 @@ class CoverageContext:
         "custom_formats",
         "validator_cls",
         "update_pattern",
+        "alphabet",
         "_resolver",
         "_root_token_cell",
         "_leaf_reference_cache",
@@ -519,6 +522,7 @@ class CoverageContext:
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema_rs.Validator],
         update_pattern: Callable[[str, int | None, int | None], str] | None = None,
+        alphabet: Alphabet | None = None,
         _resolver: Resolver | None = None,
         _path_str_cache_cell: list[str | None] | None = None,
         _root_token_cell: list[object] | None = None,
@@ -543,6 +547,7 @@ class CoverageContext:
         self.custom_formats = custom_formats
         self.validator_cls = validator_cls
         self.update_pattern = update_pattern
+        self.alphabet = alphabet if alphabet is not None else Alphabet()
         self._resolver = _resolver
         # Shared like the path cell: every context over this document answers with the same token.
         self._root_token_cell: list[object] = _root_token_cell if _root_token_cell is not None else [None]
@@ -657,6 +662,7 @@ class CoverageContext:
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
             update_pattern=self.update_pattern,
+            alphabet=self.alphabet,
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
             _root_token_cell=self._root_token_cell,
@@ -678,6 +684,7 @@ class CoverageContext:
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
             update_pattern=self.update_pattern,
+            alphabet=self.alphabet,
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
             _root_token_cell=self._root_token_cell,
@@ -726,6 +733,7 @@ class CoverageContext:
                 draft=draft,
                 formats=self.custom_formats,
                 format_lengths=format_lengths_for(self.custom_formats),
+                alphabet=self.alphabet,
             )
         except InvalidSchema:
             return None
@@ -771,6 +779,7 @@ class CoverageContext:
                 self.session.token_for(self.custom_formats),
                 self.session.token_for(self.update_pattern),
                 self.validator_cls,
+                self.alphabet,
             )
         except (TypeError, ValueError):
             cache_key = None
@@ -881,6 +890,7 @@ class CoverageContext:
                 self.session.token_for(self.custom_formats),
                 self.session.token_for(self.update_pattern),
                 self.validator_cls,
+                self.alphabet,
             )
         except (TypeError, ValueError):
             cache_key = None
@@ -4210,7 +4220,7 @@ def _negative_pattern(
         return
     # The same regex recurs verbatim across operations; one Hypothesis search covers the whole audit.
     # `representable` makes the outcome location-dependent, so the location is part of the key.
-    cache_key = ("negative_pattern", pattern, min_length, max_length, ctx.location, ctx.validator_cls)
+    cache_key = ("negative_pattern", pattern, min_length, max_length, ctx.location, ctx.validator_cls, ctx.alphabet)
     value = ctx.session.values.get(cache_key)
     if value is UNSATISFIABLE_RESULT:
         raise Unsatisfiable
@@ -4223,7 +4233,7 @@ def _negative_pattern(
         except Exception:
             validator = None
         strategy = (
-            st.text(min_size=min_length or 0, max_size=max_length)
+            st.text(ctx.alphabet.as_strategy(), min_size=min_length or 0, max_size=max_length)
             .filter(partial(_not_matching_pattern, pattern=compiled))
             .filter(ctx.wire.representable)
         )
