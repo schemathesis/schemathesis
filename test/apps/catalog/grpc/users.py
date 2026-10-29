@@ -115,7 +115,7 @@ def users(
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
-    Reflection refuses calls that carry `x-deny: 1`.
+    17 answers with bytes that do not decode. Reflection refuses calls that carry `x-deny: 1`.
     """
     database = descriptor_database.DescriptorDatabase()
     for file in descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file:
@@ -147,6 +147,8 @@ def users(
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, "locked")
         if user_id == 13:
             time.sleep(1)
+        if user_id == 17:
+            return b"\xff\xff\xff"
         context.send_initial_metadata((("x-served-by", "users"),))
         context.set_trailing_metadata((("x-trace-bin", b"\x00\x01"),))
         return user_class(name=f"u{user_id}").SerializeToString()

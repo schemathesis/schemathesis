@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import grpc
 import requests
-from google.protobuf import json_format, message_factory
+from google.protobuf import json_format, message, message_factory
 from typing_extensions import override
 
 from schemathesis.core import NotSet
@@ -67,9 +67,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         if isinstance(body, bytes):
             payload = body
         else:
-            message = message_factory.GetMessageClass(method.input_type)()
+            request_message = message_factory.GetMessageClass(method.input_type)()
             # Well-known messages such as wrappers map to any JSON value, not only to objects.
-            payload = json_format.ParseDict(cast("dict[str, Any]", body), message).SerializeToString()
+            payload = json_format.ParseDict(cast("dict[str, Any]", body), request_message).SerializeToString()
         request_headers = request_metadata(case, headers)
         if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
             request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
@@ -102,12 +102,16 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             response_headers.setdefault(key, []).append(text)
         response_headers["grpc-status"] = [str(code.value[0])]
         response_headers["grpc-message"] = [details]
-        render_content: Callable[[bytes], str] | None = None
+        render_content: Callable[[bytes], str | None] | None = None
         if code == grpc.StatusCode.OK:
             output_class = message_factory.GetMessageClass(method.output_type)
 
-            def render_content(content: bytes) -> str:
-                return json_format.MessageToJson(output_class.FromString(content))
+            def render_content(content: bytes) -> str | None:
+                try:
+                    return json_format.MessageToJson(output_class.FromString(content))
+                except message.DecodeError:
+                    # Shown as binary; the response checks report the malformed message.
+                    return None
 
         return Response(
             status_code=GRPC_STATUSES[code.value[0]][1],

@@ -29,6 +29,8 @@ from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from xdist.workermanage import WorkerController
 
     from schemathesis.core.spec import SchemaMetadata
@@ -108,6 +110,11 @@ def serialize_recorder(
                     "http_version": response.http_version,
                     "encoding": response.encoding,
                     "verify": response.verify,
+                    "status_line": response.status_line,
+                    # A body only its schema can decode travels already rendered.
+                    "rendered": (
+                        response.render_content(response.content) if response.render_content is not None else None
+                    ),
                 }
                 if response is not None
                 else None
@@ -214,6 +221,8 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
                 http_version=resp_data["http_version"],
                 encoding=resp_data["encoding"],
                 verify=resp_data["verify"],
+                status_line=resp_data["status_line"],
+                render_content=_rendered(resp_data["rendered"]),
             )
         else:
             response = None
@@ -443,3 +452,9 @@ class XdistReportingPlugin:
             finally:
                 for writer in writers:
                     writer.close()
+
+
+def _rendered(text: str | None) -> Callable[[bytes], str | None] | None:
+    if text is None:
+        return None
+    return lambda _: text
