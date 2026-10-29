@@ -77,3 +77,37 @@ def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unreachable_descriptor_set_target(ctx, cli, tmp_path, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    server.stop()
+    write_descriptor_set(tmp_path, users_descriptor_set())
+    assert (
+        cli.run("api.binpb", f"--url={server.target}", "--include-name=pkg.Users/GetUser", "--max-examples=1")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_deadline_exceeded(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 13}
+        """
+    )
+    assert (
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=1",
+            "--request-timeout=0.2",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
