@@ -1662,6 +1662,29 @@ def test_strings_stay_within_configured_codec(ctx):
         assert sent.isascii(), f"{case.meta.phase.data.description}: {sent!r}"
 
 
+def test_header_and_cookie_values_avoid_excluded_characters(ctx):
+    parameters = [
+        {"name": f"X-{name}", "in": location, "required": True, "schema": schema}
+        for location in ("header", "cookie")
+        for name, schema in (
+            ("Sized", {"type": "string", "minLength": 3}),
+            ("Patterned", {"type": "string", "minLength": 3, "pattern": "^[0-9a-z]+$"}),
+        )
+    ]
+    operation = ctx.openapi.load_operation(
+        "GET /foo",
+        {"parameters": parameters, "responses": DEFAULT_RESPONSES},
+        config=SchemathesisConfig.from_dict({"generation": {"exclude-header-characters": "a0"}}),
+    )
+    for case in iter_cases(operation, *ALL_MODES):
+        # Type mutations send fixed non-string literals such as `0`.
+        if case.meta.phase.data.scenario == CoverageScenario.INCORRECT_TYPE:
+            continue
+        for container in (case.headers, case.cookies):
+            for name, value in (container or {}).items():
+                assert not set(str(value)) & {"a", "0"}, f"{case.meta.phase.data.description}: {name}={value!r}"
+
+
 @pytest.mark.parametrize(
     "modes",
     [[GenerationMode.NEGATIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],

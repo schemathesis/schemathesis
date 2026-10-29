@@ -417,7 +417,7 @@ def _keeps_length_within(pattern: str, min_length: int | None, max_length: int |
     return max_length is None or (pattern_max is not None and pattern_max <= max_length)
 
 
-def _character_rules_strategy(rules: CharacterRules) -> st.SearchStrategy[str]:
+def _character_rules_strategy(rules: CharacterRules, alphabet: Alphabet) -> st.SearchStrategy[str]:
     # Lookaheads only filter what the rest of the pattern draws, and a random string rarely holds a
     # character of every required class; placing one of each first leaves nothing to chance.
     forbidden = [re.compile(text, re.ASCII) for text in rules.forbidden]
@@ -427,7 +427,7 @@ def _character_rules_strategy(rules: CharacterRules) -> st.SearchStrategy[str]:
         return body.fullmatch(char) is not None and not any(pattern.fullmatch(char) for pattern in forbidden)
 
     def characters(text: str) -> st.SearchStrategy[str]:
-        return st.from_regex(re.compile(text, re.ASCII), fullmatch=True).filter(is_allowed)
+        return _from_regex_within(re.compile(text, re.ASCII), alphabet).filter(is_allowed)
 
     required = st.tuples(*(characters(text) for text in rules.required))
     count = len(rules.required)
@@ -439,13 +439,29 @@ def _character_rules_strategy(rules: CharacterRules) -> st.SearchStrategy[str]:
     return st.tuples(required, rest).flatmap(lambda parts: st.permutations([*parts[0], *parts[1]])).map("".join)
 
 
+def _from_regex_within(compiled: re.Pattern[str], alphabet: Alphabet) -> st.SearchStrategy[str]:
+    """Full matches drawn from the alphabet, or from any character when the alphabet bars every match."""
+    strategy = st.from_regex(compiled, fullmatch=True, alphabet=alphabet.as_strategy())
+    try:
+        strategy.validate()
+    except InvalidArgument:
+        # The schema outranks the alphabet.
+        return st.from_regex(compiled, fullmatch=True)
+    return strategy
+
+
 def _pattern_strategy(
-    session: GenerationSession, pattern: str, min_length: int | None, max_length: int | None, fmt: str | None
+    session: GenerationSession,
+    pattern: str,
+    min_length: int | None,
+    max_length: int | None,
+    fmt: str | None,
+    alphabet: Alphabet,
 ) -> st.SearchStrategy | None:
     """Strings the pattern matches within the length bounds, or `None` when Python `re` cannot read it."""
     # Memoized because `cached_draw` keys on the strategy itself: a pattern rebuilt per draw arrives as
     # a fresh object every time, so the same regex gets drawn from again instead of answering from cache.
-    key = (pattern, min_length, max_length, fmt)
+    key = (pattern, min_length, max_length, fmt, alphabet)
     cached = session.pattern_strategies.get(key)
     if cached is not MISSING:
         return cached
@@ -455,9 +471,9 @@ def _pattern_strategy(
         return None
     rules = character_rules(compiled.pattern)
     if rules is None:
-        strategy = st.from_regex(compiled, fullmatch=True)
+        strategy = _from_regex_within(compiled, alphabet)
     else:
-        strategy = _character_rules_strategy(rules)
+        strategy = _character_rules_strategy(rules, alphabet)
     strategy = strategy.filter(matches_pattern(pattern))
     if min_length is not None and max_length is not None:
         strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
@@ -1126,7 +1142,7 @@ class CoverageContext:
         # Spelling the length into the pattern fixes the shape of every match, so a format the
         # first match fails is one no redraw satisfies; checking once beats searching for it.
         strategy = _pattern_strategy(
-            self.session, pattern, min_length, max_length, None if length_is_pinned else validated
+            self.session, pattern, min_length, max_length, None if length_is_pinned else validated, self.alphabet
         )
         if strategy is None:
             raise Unsatisfiable from None
