@@ -23,6 +23,7 @@
 - Values generated from `not` schemas described by the inner schema's scenario.
 - Cases dropped when they differ only in their binary payload.
 - Strings outside the configured `generation.codec`.
+- Header and cookie values containing characters from `exclude-header-characters`.
 
 #### Data generation
 

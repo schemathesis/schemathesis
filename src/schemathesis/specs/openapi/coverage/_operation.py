@@ -59,6 +59,7 @@ from schemathesis.specs.openapi.coverage._schema import (
 )
 from schemathesis.specs.openapi.coverage._wire import stringify_value
 from schemathesis.specs.openapi.error_feedback import apply_adjustments
+from schemathesis.specs.openapi.formats import cookie_alphabet, header_alphabet
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.prepare import prepare_path
 from schemathesis.transport.serialization import Binary, quote_all
@@ -769,6 +770,8 @@ class CoverageRun:
     validator_cls: type[jsonschema_rs.Validator]
     update_pattern: Callable[[str, int | None, int | None], str] | None
     alphabet: Alphabet
+    header_alphabet: Alphabet
+    cookie_alphabet: Alphabet
     session: GenerationSession | None
     error_feedback: ErrorFeedbackStore | None
     responses: list[tuple[str, object]]
@@ -784,6 +787,12 @@ def _coverage_context(
     is_required: bool,
     media_type: tuple[str, str] | None = None,
 ) -> CoverageContext:
+    if location == ParameterLocation.COOKIE:
+        alphabet = run.cookie_alphabet
+    elif location == ParameterLocation.HEADER:
+        alphabet = run.header_alphabet
+    else:
+        alphabet = run.alphabet
     return CoverageContext(
         session=run.session,
         root_schema=schema,
@@ -794,7 +803,7 @@ def _coverage_context(
         custom_formats=run.custom_formats,
         validator_cls=run.validator_cls,
         update_pattern=run.update_pattern,
-        alphabet=run.alphabet,
+        alphabet=alphabet,
         allow_extra_parameters=run.generation_config.allow_extra_parameters,
     )
 
@@ -1686,6 +1695,8 @@ def iter_coverage_cases(
         validator_cls=validator_cls,
         update_pattern=update_pattern,
         alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
+        header_alphabet=header_alphabet(generation_config),
+        cookie_alphabet=cookie_alphabet(generation_config),
         session=session,
         error_feedback=error_feedback,
         responses=responses,
