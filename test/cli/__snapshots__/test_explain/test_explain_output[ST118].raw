@@ -1,0 +1,15 @@
+Exit code: 0
+---
+Stdout:
+ST118  Response carries fields the schema does not declare
+checks response_schema_conformance
+
+gRPC response with fields its message, as the server reflects it, does not
+declare.
+
+Applies to schemas loaded through reflection only: the server sends fields its
+own reflected descriptors lack, so the reflection data is stale or the response
+is built from a different message.
+
+`--exclude-checks response_schema_conformance` turns it off, along with ST109,
+ST110, ST111, ST114, ST115, ST116, ST117.

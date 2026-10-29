@@ -11,5 +11,6 @@ Stdout:
   ST115  Unexpected GraphQL response
   ST116  GraphQL data does not match the query
   ST117  Response does not decode as the declared message
+  ST118  Response carries fields the schema does not declare
 
 Run `st explain <code>` for details.

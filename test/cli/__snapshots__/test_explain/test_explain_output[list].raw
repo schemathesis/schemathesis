@@ -46,6 +46,9 @@ Response validation (ST1xx)
   ST117  Response does not decode as the declared message
          gRPC response or status details that do not decode as the declared
          message.
+  ST118  Response carries fields the schema does not declare
+         gRPC response with fields its message, as the server reflects it, does
+         not declare.
 
 Input handling (ST2xx)
   ST201  Schema-violating request accepted

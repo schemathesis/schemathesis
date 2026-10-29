@@ -618,6 +618,7 @@ class LoaderErrorKind(enum.StrEnum):
 
     # gRPC validation
     GRPC_INVALID_DESCRIPTOR_SET = "grpc_invalid_descriptor_set"
+    GRPC_REFLECTION_UNAVAILABLE = "grpc_reflection_unavailable"
 
     # Unclassified
     UNCLASSIFIED = "unclassified"

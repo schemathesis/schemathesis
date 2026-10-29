@@ -58,18 +58,11 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         if verify is None:
             verify = config.tls_verify_for(operation=case.operation)
             verify = True if verify is None else verify
-        if isinstance(verify, str) and Path(verify).is_dir():
-            raise IncorrectUsage(f"gRPC targets need a CA bundle file, got a directory: `{verify}`")
         cert = cert or config.request_cert_for(operation=case.operation)
         if timeout is None:
             timeout = config.request_timeout_for(operation=case.operation)
         base_url = base_url or case.operation.base_url
-        scheme, _, address = base_url.partition("://")
-        if scheme not in ("grpc", "grpcs"):
-            raise IncorrectUsage(f"gRPC targets need a `grpc://` or `grpcs://` base URL, got `{base_url}`")
-        tls = scheme == "grpcs"
-        if tls and verify is False:
-            raise IncorrectUsage("`tls-verify=false` is not supported for gRPC targets; pass a CA bundle path instead")
+        address, tls = parse_target(base_url, verify)
         method = case.operation.definition.raw
         body = {} if isinstance(case.body, NotSet) else case.body
         if isinstance(body, bytes):
@@ -83,9 +76,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
         url = case.operation.schema.build_request_url(case, base_url)
         request = requests.Request(method="POST", url=url, headers=request_headers, data=payload).prepare()
-        metadata: tuple[tuple[str, str | bytes], ...] = tuple(
-            (key, base64.b64decode(value) if key.endswith("-bin") else value) for key, value in request_headers.items()
-        )
+        metadata = metadata_pairs(request_headers)
         channel = self._channel(address, tls, verify, cert)
         # No serializers: the call sends and receives bytes.
         call: grpc.UnaryUnaryMultiCallable[bytes, bytes] = channel.unary_unary(case.path)
@@ -139,12 +130,33 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         with self._lock:
             channel = self._channels.get(key)
             if channel is None:
-                if tls:
-                    channel = grpc.secure_channel(address, _credentials(verify, cert))
-                else:
-                    channel = grpc.insecure_channel(address)
+                channel = create_channel(address, tls, verify, cert)
                 self._channels[key] = channel
             return channel
+
+
+def parse_target(url: str, verify: bool | str) -> tuple[str, bool]:
+    """Address and whether it uses TLS, for a `grpc://` or `grpcs://` URL."""
+    if isinstance(verify, str) and Path(verify).is_dir():
+        raise IncorrectUsage(f"gRPC targets need a CA bundle file, got a directory: `{verify}`")
+    scheme, _, address = url.partition("://")
+    if scheme not in ("grpc", "grpcs"):
+        raise IncorrectUsage(f"gRPC targets need a `grpc://` or `grpcs://` base URL, got `{url}`")
+    tls = scheme == "grpcs"
+    if tls and verify is False:
+        raise IncorrectUsage("`tls-verify=false` is not supported for gRPC targets; pass a CA bundle path instead")
+    return address, tls
+
+
+def metadata_pairs(headers: Mapping[str, str]) -> tuple[tuple[str, str | bytes], ...]:
+    """Metadata as gRPC sends it: values of `-bin` keys travel as bytes."""
+    return tuple((key, base64.b64decode(value) if key.endswith("-bin") else value) for key, value in headers.items())
+
+
+def create_channel(address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.Channel:
+    if tls:
+        return grpc.secure_channel(address, _credentials(verify, cert))
+    return grpc.insecure_channel(address)
 
 
 def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.ChannelCredentials:

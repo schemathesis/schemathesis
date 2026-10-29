@@ -11,4 +11,4 @@ A successful response must decode as the method's output message, and
 Regenerate the descriptor set if the server's protos changed.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109,
-ST110, ST111, ST114, ST115, ST116.
+ST110, ST111, ST114, ST115, ST116, ST118.
