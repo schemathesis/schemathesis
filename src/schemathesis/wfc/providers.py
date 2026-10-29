@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlsplit
 
 import requests
 
-from schemathesis.core.transport import decode_lossy, load_json_lossy, parse_set_cookie
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, decode_lossy, load_json_lossy, parse_set_cookie
 from schemathesis.python import asgi, wsgi
 from schemathesis.transport import is_asgi_app
 
@@ -120,6 +120,7 @@ class LoginEndpointAuthProvider:
         url = self._url(context)
         config = context.operation.schema.config
         body, headers = self._body_and_headers()
+        proxy = config.proxy_for(operation=context.operation)
         try:
             response = requests.request(
                 self.config.verb,
@@ -128,9 +129,10 @@ class LoginEndpointAuthProvider:
                 headers=headers,
                 # A session cookie rides on the redirect itself, so following it would discard the sign-in.
                 allow_redirects=False,
-                timeout=config.request_timeout_for(operation=context.operation),
+                timeout=config.request_timeout_for(operation=context.operation) or DEFAULT_RESPONSE_TIMEOUT,
                 verify=config.tls_verify_for(operation=context.operation),
                 cert=config.request_cert_for(operation=context.operation),
+                proxies={"all": proxy} if proxy is not None else None,
             )
         except requests.exceptions.RequestException as exc:
             raise WFCLoginError(f"Login endpoint call failed: {exc}") from exc

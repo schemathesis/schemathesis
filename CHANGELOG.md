@@ -46,6 +46,8 @@
 - Generic "Schema Error" message hiding why an operation failed to load.
 - Runs with `--max-time` continuing after a request times out at the time limit.
 - Token fetch cooldown failure reported twice in stateful testing.
+- Configured `proxy` skipped by dynamic auth token requests, WFC login and loading schemas from URLs.
+- Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 

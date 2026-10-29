@@ -16,7 +16,7 @@ from schemathesis.core.errors import LoaderError
 from schemathesis.core.transport import USER_AGENT
 from test.apps.catalog.graphql import bookstore
 from test.apps.catalog.openapi import basic
-from test.utils import graphql_url, openapi_url
+from test.utils import graphql_url, openapi_url, refusing_url
 
 
 @pytest.mark.parametrize(
@@ -109,6 +109,22 @@ def test_uri_loader_transport_from_config(app_runner, tmp_path, app, path, loade
     assert received == [
         ("foo", "Basic dGVzdDp0ZXN0", ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode()))
     ]
+
+
+@pytest.mark.parametrize(
+    ("app", "path", "loader"),
+    [
+        (basic.success, "/openapi.json", schemathesis.openapi.from_url),
+        (bookstore.books, "/graphql", schemathesis.graphql.from_url),
+    ],
+    ids=["openapi", "graphql"],
+)
+# The schema URL refuses connections, so loading succeeds only through the proxy, which answers as the API itself.
+def test_uri_loader_proxy_from_config(app_runner, app, path, loader):
+    proxy = f"http://127.0.0.1:{app_runner.run_flask_app(app().server)}"
+    config = schemathesis.Config.from_dict({"proxy": proxy})
+    with refusing_url() as url:
+        loader(f"{url}{path}", config=config)
 
 
 def test_uri_loader_explicit_kwargs_override_config(ctx):

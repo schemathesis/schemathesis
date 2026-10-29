@@ -420,6 +420,15 @@ def refusing_url() -> Iterator[str]:
         yield f"http://127.0.0.1:{sock.getsockname()[1]}"
 
 
+@contextmanager
+def silent_url() -> Iterator[str]:
+    # A listening socket that never accepts completes the handshake, then never answers.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen()
+        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
+
+
 def allure_results(allure_dir: str | os.PathLike) -> list[Any]:
     result_files = list(Path(allure_dir).glob("*-result.json"))
     assert result_files
