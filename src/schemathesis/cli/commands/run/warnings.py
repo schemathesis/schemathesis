@@ -195,30 +195,6 @@ def auth_flow_suggestion(schema: BaseSchema) -> str | None:
     )
 
 
-def resource_producers(schema: BaseSchema) -> dict[str, set[str]]:
-    """For every operation that consumes a resource, the operations that appear to supply it.
-
-    From the inferred graph, so it reports what was found in the schema, not what the API can do.
-    Absent means the operation consumes nothing, or there is no graph; empty means nothing supplies it.
-    """
-    if not schema.specification.supports_feature(SpecificationFeature.SCHEMA_ANALYSIS):
-        return {}
-    operations = schema.analysis.dependency_graph.operations  # type: ignore[attr-defined]
-    by_resource: dict[str, set[str]] = {}
-    for label, node in operations.items():
-        for slot in node.outputs:
-            by_resource.setdefault(slot.resource.name, set()).add(label)
-    producers: dict[str, set[str]] = {}
-    for label, node in operations.items():
-        if not node.inputs:
-            continue
-        found: set[str] = set()
-        for slot in node.inputs:
-            found |= by_resource.get(slot.resource.name, set())
-        producers[label] = found - {label}
-    return producers
-
-
 def _is_request_shape_probe(case: CaseNode) -> bool:
     return coverage_scenario(case.value) in REQUEST_SHAPE_PROBES
 
@@ -460,7 +436,7 @@ class WarningCollector:
             if self.data.linked_operations is None:
                 self.data.linked_operations = operation.schema.operations_with_incoming_links()
             if self.data.resource_producers is None:
-                self.data.resource_producers = resource_producers(operation.schema)
+                self.data.resource_producers = operation.schema.resource_producers()
             if not takes_input(operation):
                 self.data.parameterless.add(label)
         self.data.missing_test_data.add(label)

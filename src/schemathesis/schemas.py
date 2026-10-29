@@ -532,6 +532,13 @@ class BaseSchema(Mapping):
         """Labels of operations that another operation links to; empty when the spec has no links."""
         return set()
 
+    def resource_producers(self) -> dict[str, set[str]]:
+        """For every operation that consumes a resource, the operations that appear to supply it.
+
+        Absent means the operation consumes nothing, or the spec infers no resources; empty means nothing supplies it.
+        """
+        return {}
+
     @abstractmethod
     def as_state_machine(self) -> type[APIStateMachine]:
         """Create a state machine class for stateful testing of linked API operations.
