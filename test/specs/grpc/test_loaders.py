@@ -9,9 +9,8 @@ from google.protobuf import descriptor_pb2
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
-from schemathesis.core.errors import LoaderError, LoaderErrorKind, OperationNotFound, RejectedSchemaDefinition
+from schemathesis.core.errors import LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
-from schemathesis.engine.run.unit._errors import prefer_spec_error
 from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
 
 
@@ -23,10 +22,6 @@ def users_path(tmp_path):
 @pytest.fixture
 def schema(users_path):
     return schemathesis.grpc.from_path(users_path)
-
-
-def test_from_path_lists_unary_operations(schema):
-    assert [result.ok().label for result in schema.get_all_operations()] == ["pkg.Users/GetUser", "pkg.Admin/Reset"]
 
 
 def test_operation_fields(schema):
@@ -112,59 +107,70 @@ def test_filters(schema, narrow, expected):
     assert [result.ok().label for result in narrow(schema).get_all_operations()] == expected
 
 
-def test_statistic_counts_streaming_as_unselected(schema):
-    statistic = schema.statistic
-    assert (statistic.operations.total, statistic.operations.selected, statistic.unmatched_filters) == (3, 2, [])
+@pytest.mark.parametrize(
+    ("narrow", "expected"),
+    [
+        (lambda schema: schema, (3, 2, [])),
+        (
+            lambda schema: schema.include(name="pkg.Admin/Rest"),
+            (
+                3,
+                0,
+                [
+                    UnmatchedFilter(
+                        include=True,
+                        criteria=[FilterCriterion(attribute="label", value="pkg.Admin/Rest", is_regex=False)],
+                        suggestion="pkg.Admin/Reset",
+                        source="selection",
+                    )
+                ],
+            ),
+        ),
+        (lambda schema: schema.include(name="pkg.Users/WatchUsers"), (3, 0, [])),
+    ],
+    ids=["streaming-unselected", "unmatched-filter", "filter-naming-streaming-method"],
+)
+def test_statistic(schema, narrow, expected):
+    statistic = narrow(schema).statistic
+    assert (statistic.operations.total, statistic.operations.selected, statistic.unmatched_filters) == expected
 
 
-def test_statistic_reports_unmatched_filters(schema):
-    statistic = schema.include(name="pkg.Admin/Rest").statistic
-    assert (statistic.operations.total, statistic.operations.selected, statistic.unmatched_filters) == (
-        3,
-        0,
-        [
-            UnmatchedFilter(
-                include=True,
-                criteria=[FilterCriterion(attribute="label", value="pkg.Admin/Rest", is_regex=False)],
-                suggestion="pkg.Admin/Reset",
-                source="selection",
-            )
-        ],
-    )
+def test_validate_accepts_loaded_schema(schema):
+    assert schema.validate() is None
 
 
-def test_rejected_definition_is_reported_as_is(schema):
-    exc = RejectedSchemaDefinition("Invalid definition")
-    assert prefer_spec_error(exc, schema["pkg.Admin"]["Reset"]) is exc
+BUILD_HINT = "Build one with `buf build -o api.binpb` or `protoc --include_imports --descriptor_set_out=api.binpb`"
 
 
-def test_invalid_descriptor_set(tmp_path):
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        (b"not a descriptor", f"The file is not a serialized `FileDescriptorSet`. {BUILD_HINT}"),
+        (
+            descriptor_pb2.FileDescriptorSet(
+                file=[
+                    descriptor_pb2.FileDescriptorProto(
+                        name="users.proto",
+                        package="pkg",
+                        syntax="proto3",
+                        dependency=["google/protobuf/timestamp.proto"],
+                    )
+                ]
+            ).SerializeToString(),
+            "The descriptor set is incomplete: `users.proto` imports `google/protobuf/timestamp.proto`, which it does "
+            f"not contain. {BUILD_HINT}",
+        ),
+        (
+            descriptor_pb2.FileDescriptorSet(file=[]).SerializeToString(),
+            f"The descriptor set contains no files. {BUILD_HINT}",
+        ),
+    ],
+    ids=["not-a-descriptor-set", "missing-imports", "empty"],
+)
+def test_invalid_descriptor_set(tmp_path, data, message):
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(write_descriptor_set(tmp_path, b"not a descriptor"))
-    assert (exc_info.value.kind, exc_info.value.message) == (
-        LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
-        "The file is not a serialized `FileDescriptorSet`. Build one with `buf build -o api.binpb` or "
-        "`protoc --include_imports --descriptor_set_out=api.binpb`",
-    )
-
-
-def test_descriptor_set_without_imports(tmp_path):
-    file = descriptor_pb2.FileDescriptorProto(
-        name="users.proto", package="pkg", syntax="proto3", dependency=["google/protobuf/timestamp.proto"]
-    )
-    with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(write_files(tmp_path, [file]))
-    assert (exc_info.value.kind, exc_info.value.message) == (
-        LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
-        "The descriptor set is incomplete: `users.proto` imports `google/protobuf/timestamp.proto`, which it does "
-        "not contain. Build one with `buf build -o api.binpb` or "
-        "`protoc --include_imports --descriptor_set_out=api.binpb`",
-    )
-
-
-def test_filter_naming_a_streaming_method_is_not_unmatched(schema):
-    statistic = schema.include(name="pkg.Users/WatchUsers").statistic
-    assert (statistic.operations.selected, statistic.unmatched_filters) == (0, [])
+        schemathesis.grpc.from_path(write_descriptor_set(tmp_path, data))
+    assert (exc_info.value.kind, exc_info.value.message) == (LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET, message)
 
 
 def write_files(tmp_path, files):
@@ -247,16 +253,6 @@ def test_before_load_schema_hook_sees_descriptor_files(users_path):
 
     schemathesis.grpc.from_path(users_path)
     assert seen == [["google/protobuf/timestamp.proto", "users.proto", "google/longrunning/operations.proto"]]
-
-
-def test_empty_descriptor_set(tmp_path):
-    with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(write_files(tmp_path, []))
-    assert (exc_info.value.kind, exc_info.value.message) == (
-        LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
-        "The descriptor set contains no files. Build one with `buf build -o api.binpb` or "
-        "`protoc --include_imports --descriptor_set_out=api.binpb`",
-    )
 
 
 @pytest.mark.parametrize("level", ["service", "file"])

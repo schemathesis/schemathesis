@@ -56,6 +56,10 @@ _GRAPHQL_FACTORIES = {
     "non_id_pool": graphql_bookstore.non_id_pool,
     "bare_slug": graphql_bookstore.bare_slug,
     "relay_connection": graphql_bookstore.relay_connection,
+    "lenient": graphql_bookstore.lenient,
+    "coverage_inputs": graphql_bookstore.coverage_inputs,
+    # Answers every query with no data, the shape of a server that never serves the query.
+    "canned_response": partial(graphql_bookstore.canned_response, {"data": None}),
 }
 
 

@@ -44,10 +44,10 @@ INCORRECT_LITERALS: dict[str, tuple[graphql.ValueNode, ...]] = {
     "ID": (graphql.BooleanValueNode(value=True), graphql.FloatValueNode(value="1.5")),
     "Boolean": (graphql.IntValueNode(value="1"), graphql.StringValueNode(value="a")),
 }
-INT_ABOVE_MAXIMUM = graphql.IntValueNode(value=str(2**31))
-INT_BELOW_MINIMUM = graphql.IntValueNode(value=str(-(2**31) - 1))
-INT_MAXIMUM = graphql.IntValueNode(value=str(2**31 - 1))
-INT_MINIMUM = graphql.IntValueNode(value=str(-(2**31)))
+INT_ABOVE_MAXIMUM = graphql.IntValueNode(value=str(graphql.GRAPHQL_MAX_INT + 1))
+INT_BELOW_MINIMUM = graphql.IntValueNode(value=str(graphql.GRAPHQL_MIN_INT - 1))
+INT_MAXIMUM = graphql.IntValueNode(value=str(graphql.GRAPHQL_MAX_INT))
+INT_MINIMUM = graphql.IntValueNode(value=str(graphql.GRAPHQL_MIN_INT))
 # Custom scalars take the scenario of their literal kind
 LITERAL_SCENARIOS: dict[type[graphql.ValueNode], CoverageScenario] = {
     graphql.IntValueNode: CoverageScenario.VALID_NUMBER,

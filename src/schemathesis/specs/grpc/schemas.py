@@ -5,9 +5,7 @@ import json
 import shlex
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
-from difflib import get_close_matches
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
+from typing import TYPE_CHECKING, Any, NoReturn, Self
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
@@ -22,25 +20,22 @@ from typing_extensions import override
 from schemathesis import auths
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, Specification
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.errors import InvalidSchema, OperationNotFound, not_found_message
 from schemathesis.core.output.sanitization import sanitize_value
-from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import CallOutcome, Response
-from schemathesis.filters import FilterUsage
+from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import (
-    CaseMetadata,
-    ComponentInfo,
-    GenerationInfo,
     PhaseInfo,
     TestPhase,
     build_phase_data,
+    uniform_metadata,
 )
 from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
@@ -132,17 +127,13 @@ class GrpcSchema(BaseSchema):
     @override
     def _get_operation_map(self, key: str) -> APIOperationMap:
         service = self.services[key]
-        map = APIOperationMap(self, {})
-        map._data = MethodMap(map, service, {method.name: method for method in service.methods if is_unary(method)})
-        return map
+        return APIOperationMap(
+            self, MethodMap(self, service, {method.name: method for method in service.methods if is_unary(method)})
+        )
 
     @override
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
-        message = f"`{item}` service not found"
-        matches = get_close_matches(item, list(self.services))
-        if matches:
-            message += f". Did you mean `{matches[0]}`?"
-        raise OperationNotFound(message=message, item=item) from exc
+        raise OperationNotFound(message=not_found_message(item, "service", self.services), item=item) from exc
 
     @override
     def find_operation_by_label(self, label: str) -> APIOperation | None:
@@ -258,7 +249,7 @@ class GrpcSchema(BaseSchema):
                     statistic.operations.selected += 1
                 # A filter naming a streaming method matched something, even though it is not tested.
                 if usage is not None:
-                    usage.record(SimpleNamespace(operation=operation))
+                    usage.record(OperationContext(operation=operation))
         if usage is not None:
             statistic.unmatched_filters = usage.results()
         return statistic
@@ -415,24 +406,14 @@ def grpc_cases(
     hook_context = HookContext(operation=operation)
     body_ = draw(apply_to_all_dispatchers(operation, hook_context, hooks, bodies, "body"))
     headers_ = draw(apply_to_all_dispatchers(operation, hook_context, hooks, st.just(headers), "headers"))
-    mode = GenerationMode.POSITIVE
     case = operation.Case(
         headers=headers_,
         body=body_,
         media_type=MEDIA_TYPE,
-        _meta=CaseMetadata(
-            generation=GenerationInfo(time=started_at.elapsed, mode=mode),
+        _meta=uniform_metadata(
+            mode=GenerationMode.POSITIVE,
             phase=PhaseInfo(name=phase, data=build_phase_data(phase, "Positive test case")),
-            components={
-                location: ComponentInfo(mode=mode)
-                for location in (
-                    ParameterLocation.QUERY,
-                    ParameterLocation.PATH,
-                    ParameterLocation.HEADER,
-                    ParameterLocation.COOKIE,
-                    ParameterLocation.BODY,
-                )
-            },
+            generation_time=started_at.elapsed,
         ),
     )
     auths.set_on_case(case, auths.AuthContext(operation=operation, app=operation.app), auth_storage)
@@ -441,7 +422,7 @@ def grpc_cases(
 
 @dataclass(slots=True)
 class MethodMap(Mapping):
-    _parent: APIOperationMap
+    _schema: GrpcSchema
     _service: ServiceDescriptor
     _unary: dict[str, MethodDescriptor]
 
@@ -456,13 +437,8 @@ class MethodMap(Mapping):
         if method is None:
             if item in self._service.methods_by_name:
                 raise KeyError(f"`{item}` is a streaming method; only unary methods are supported")
-            message = f"`{item}` method not found"
-            matches = get_close_matches(item, list(self._unary))
-            if matches:
-                message += f". Did you mean `{matches[0]}`?"
-            raise KeyError(message)
-        schema = cast(GrpcSchema, self._parent._schema)
-        return schema._build_operation(method)
+            raise KeyError(not_found_message(item, "method", self._unary))
+        return self._schema._build_operation(method)
 
 
 if TYPE_CHECKING:

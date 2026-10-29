@@ -34,14 +34,14 @@ if TYPE_CHECKING:
 # Reports written during the run, as path -> format name, in the order they were opened.
 REPORT_LOCATIONS_KEY: pytest.StashKey[dict[Path, str]] = pytest.StashKey()
 # Listed in the order the CLI lists them.
-_PYTEST_FORMATS = (ReportFormat.JUNIT, ReportFormat.VCR, ReportFormat.HAR, ReportFormat.ALLURE, ReportFormat.HTML)
+PYTEST_FORMATS = (ReportFormat.JUNIT, ReportFormat.VCR, ReportFormat.HAR, ReportFormat.ALLURE, ReportFormat.HTML)
 
 
 def remember_report_locations(
     config: pytest.Config, reports: ReportsConfig, path_of: Callable[[ReportFormat], Path]
 ) -> None:
     locations = config.stash.setdefault(REPORT_LOCATIONS_KEY, {})
-    for format in _PYTEST_FORMATS:
+    for format in PYTEST_FORMATS:
         if reports.get(format).enabled:
             path = path_of(format)
             # Point at the page itself so it opens in one click.
@@ -172,20 +172,7 @@ class PytestReportDispatcher:
     ) -> None:
         recorder = self._recorders.get(case.operation.label)
         assert recorder is not None, "after_validate fired without a prior after_call for the same operation"
-        for result in check_results:
-            if result.failure is not None:
-                code_sample = case.as_reproduction_command(
-                    headers=dict(response.request.headers),
-                    verify=response.verify,
-                )
-                recorder.record_check_failure(
-                    name=result.name,
-                    case_id=case.id,
-                    code_sample=code_sample,
-                    failure=result.failure,
-                )
-            else:
-                recorder.record_check_success(name=result.name, case_id=case.id)
+        recorder.record_check_results(case, response, check_results)
 
     def pop_recorder(self, label: str) -> tuple[ScenarioRecorder, float] | None:
         """Remove and return the recorder and elapsed seconds for this label.

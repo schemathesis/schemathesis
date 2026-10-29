@@ -8,7 +8,6 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.errors import IncorrectUsage
@@ -22,6 +21,13 @@ if TYPE_CHECKING:
 
 
 class HasAPIOperation(Protocol):
+    operation: APIOperation
+
+
+@dataclass(slots=True)
+class OperationContext:
+    """The operation a filter is matched against."""
+
     operation: APIOperation
 
 
@@ -172,18 +178,18 @@ class FilterSet:
         )
 
     def applies_to(self, operation: APIOperation) -> bool:
-        return self.match(SimpleNamespace(operation=operation))
+        return self.match(OperationContext(operation=operation))
 
     def is_explicitly_included(self, operation: APIOperation) -> bool:
         """Whether a filter the user wrote selects this operation."""
-        ctx = SimpleNamespace(operation=operation)
+        ctx = OperationContext(operation=operation)
         if self._declared is None:
             return any(filter_.match(ctx) for filter_ in self._includes)
         return any(entry.filter.match(ctx) for entry in self._declared if entry.include)
 
     def is_explicitly_excluded(self, operation: APIOperation) -> bool:
         """Whether a filter the user wrote rejects this operation."""
-        ctx = SimpleNamespace(operation=operation)
+        ctx = OperationContext(operation=operation)
         if self._deselected is not None and self._deselected(ctx):
             return True
         if self._declared is None:

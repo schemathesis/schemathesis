@@ -3,7 +3,6 @@ import ssl
 import time
 
 import pytest
-import trustme
 from flask import jsonify, request
 
 from schemathesis.generation.modes import GenerationMode
@@ -1274,10 +1273,6 @@ def test_api(case):
 
 
 def test_transport_kwargs_from_config(ctx, testdir, app_runner, tmp_path):
-    ca = trustme.CA()
-    client_cert = ca.issue_cert("test.org")
-    client_cert_path = tmp_path / "client.pem"
-    client_cert.private_key_and_cert_chain_pem.write_to_path(str(client_cert_path))
     app, _ = ctx.openapi.make_flask_app({"/api/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
     received = []
 
@@ -1293,7 +1288,7 @@ def test_transport_kwargs_from_config(ctx, testdir, app_runner, tmp_path):
         time.sleep(1)
         return jsonify({})
 
-    port = app_runner.run_client_cert_flask_app(app, ca)
+    server = app_runner.run_client_cert_flask_app(app, tmp_path)
     testdir.make_test(
         f"""
 import requests
@@ -1302,14 +1297,14 @@ config = schemathesis.Config.from_dict({{
     "tls-verify": False,
     "headers": {{ "X-Foo": "Bar", "X-Spam": "Unknown" }},
     "request-timeout": 0.3,
-    "request-cert": {str(client_cert_path)!r},
+    "request-cert": {str(server.cert_path)!r},
     "phases": {{
         "coverage": {{
             "enabled": False,
         }}
     }}
 }})
-schema = schemathesis.openapi.from_url("https://127.0.0.1:{port}/openapi.json", config=config)
+schema = schemathesis.openapi.from_url("https://127.0.0.1:{server.port}/openapi.json", config=config)
 
 def noop(*args, **kwargs):
     pass
@@ -1323,8 +1318,7 @@ def test(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
-    expected_cert = ssl.PEM_cert_to_DER_cert(client_cert.cert_chain_pems[0].bytes().decode())
-    assert received == [({"X-Foo": "Bar", "X-Spam": "Explicit"}, expected_cert)]
+    assert received == [({"X-Foo": "Bar", "X-Spam": "Explicit"}, server.cert_der)]
 
 
 def test_config_using_headers(testdir):

@@ -31,7 +31,7 @@ from schemathesis.specs.graphql._helpers import (
     replace_node,
     replace_selections,
 )
-from schemathesis.specs.graphql.substitution import _fits_graphql_float, _fits_graphql_int, scalar_value_node
+from schemathesis.specs.graphql.substitution import fits_graphql_float, fits_graphql_int, scalar_value_node
 
 if TYPE_CHECKING:
     from random import Random
@@ -274,7 +274,7 @@ def _eligible_entries(
 ) -> list[tuple[int, EntryValue]]:
     entries = coerce_entries_for_type(dictionary.entries, type_key)
     if scalar_name == "Int":
-        return [entry for entry in entries if _fits_graphql_int(entry[1])]
+        return [entry for entry in entries if fits_graphql_int(entry[1])]
     if scalar_name == "Float":
-        return [entry for entry in entries if _fits_graphql_float(entry[1])]
+        return [entry for entry in entries if fits_graphql_float(entry[1])]
     return list(entries)

@@ -890,22 +890,15 @@ type Query {
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_missing_test_data_for_graphql(ctx, cli, app_runner, snapshot_cli):
+def test_missing_test_data_for_graphql(ctx, cli, snapshot_cli):
     # A 200 with neither `data` nor `errors` fails no check, so nothing else in the run says the query was never served.
     sdl = ctx.graphql.write_sdl(GRAPHQL_SDL)
-
-    app = Flask(__name__)
-
-    @app.route("/graphql", methods=["POST"])
-    def graphql():
-        return jsonify({"data": None})
-
-    port = app_runner.run_flask_app(app)
+    api = ctx.graphql.apps.canned_response({"data": None})
 
     assert (
         cli.run(
             str(sdl),
-            f"--url=http://127.0.0.1:{port}/graphql",
+            f"--url={api.schema_url}",
             "--max-examples=5",
             "--phases=fuzzing",
             "-m",

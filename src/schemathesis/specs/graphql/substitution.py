@@ -63,12 +63,12 @@ _SCALAR_CONSTANT_TYPES: Final[dict[str, tuple[ConstantType, ...]]] = {
 }
 
 
-def _fits_graphql_int(value: ConstantValue) -> bool:
+def fits_graphql_int(value: ConstantValue) -> bool:
     # `Int` is a signed 32-bit integer; a wider harvested literal is invalid and the server rejects it.
     return isinstance(value, int) and graphql.GRAPHQL_MIN_INT <= value <= graphql.GRAPHQL_MAX_INT
 
 
-def _fits_graphql_float(value: ConstantValue) -> bool:
+def fits_graphql_float(value: ConstantValue) -> bool:
     # A harvested integer can exceed the float range; only a finite float is a valid `Float` literal.
     if not isinstance(value, (int, float)):
         return False
@@ -268,9 +268,9 @@ def _scalar_constant_node(
     candidates: list[tuple[ConstantValue, Origin | None]] = []
     for type_ in types:
         for entry in pool.entries_for(type_):
-            if scalar_name == "Int" and not _fits_graphql_int(entry.value):
+            if scalar_name == "Int" and not fits_graphql_int(entry.value):
                 continue
-            if scalar_name == "Float" and not _fits_graphql_float(entry.value):
+            if scalar_name == "Float" and not fits_graphql_float(entry.value):
                 continue
             candidates.append((entry.value, entry.origins[0] if entry.origins else None))
     if not candidates:

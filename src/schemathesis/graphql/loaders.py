@@ -11,12 +11,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.core.transport import load_json_lossy
-from schemathesis.hooks import (
-    GLOBAL_HOOK_DISPATCHER,
-    HookContext,
-    dispatch_after_load_schema,
-    dispatch_before_load_schema,
-)
+from schemathesis.hooks import load_with_hooks
 from schemathesis.python import django, wsgi
 
 if TYPE_CHECKING:
@@ -266,16 +261,7 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
 
     if "data" in schema:
         schema = schema["data"]
-    hook_context = HookContext()
-    dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, raw_schema=schema)
-
-    if config is None:
-        config = SchemathesisConfig.discover()
-    project_config = config.projects.get(schema)
-    instance = GraphQLSchema(schema, config=project_config)
-    instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
-    dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, schema=instance)
-    return instance
+    return load_with_hooks(schema, config, lambda project_config: GraphQLSchema(schema, config=project_config))
 
 
 def _introspect(fetch: Callable[[dict[str, Any]], Any], kwargs: dict[str, Any]) -> Any:

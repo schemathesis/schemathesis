@@ -57,7 +57,9 @@ def run_test(
     except BudgetExpired:
         # The operation ran out of its share, not the whole run — keep whatever it already produced,
         # errors included: running out of time does not undo them.
-        status, skip_reason, stored = _settle_stopped(scenario, errors, skip_reason="Time limit reached")
+        status, skip_reason, stored = _settle_stopped(
+            scenario, errors, skip_reason=StopReason.MAX_TIME.skip_explanation
+        )
         if stored is not None:
             yield stored
     except ServerWentAway:

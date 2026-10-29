@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.mutations import Mutation
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import PARAMETER_LOCATIONS, ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import PoolDraw, SemanticDraw
 
@@ -498,6 +498,24 @@ class CaseMetadata:
             constants_draws=constants_draws,
             raw_containers=raw_containers,
         )
+
+
+def uniform_metadata(
+    *,
+    mode: GenerationMode,
+    phase: PhaseInfo,
+    generation_time: float,
+    constants_draws: tuple[ConstantDraw, ...] = (),
+    dictionary_draws: tuple[DictionaryDraw, ...] = (),
+) -> CaseMetadata:
+    """Metadata of a case generated in one mode for every component."""
+    return CaseMetadata(
+        generation=GenerationInfo(time=generation_time, mode=mode),
+        phase=phase,
+        components={location: ComponentInfo(mode=mode) for location in PARAMETER_LOCATIONS},
+        constants_draws=constants_draws,
+        dictionary_draws=dictionary_draws,
+    )
 
 
 def _load_mutations(raw: dict[str, Any]) -> tuple[Mutation, ...]:

@@ -5,17 +5,13 @@ import io
 import itertools
 import json
 import re
-import ssl
-import threading
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 import strawberry
-import trustme
 from flask import Response, jsonify, request
 from rich.console import Console
-from werkzeug.serving import make_server
 
 import schemathesis
 from schemathesis.cli.commands.replay.executor import (
@@ -741,18 +737,12 @@ def test_openapi_crash_url_template_keeps_path_placeholders(cli, app_runner, ctx
     assert (step["url"], step["url_template"]) == (f"{base_url}/api/items/7", f"{base_url}/api/items/{{id}}")
 
 
-def test_replay_reuses_disabled_tls_verification(cli, tmp_path):
-    server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    trustme.CA().issue_cert("127.0.0.1").configure_cert(server_context)
-    server = make_server("127.0.0.1", 0, openapi_basic.failure().server, threaded=True, ssl_context=server_context)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    try:
-        cli.run(f"https://127.0.0.1:{server.server_port}/openapi.json", "--tls-verify=false")
-        assert _list_crash_files(crash_cache_dir(tmp_path))
+def test_replay_reuses_disabled_tls_verification(cli, app_runner, tmp_path):
+    port = app_runner.run_https_flask_app(openapi_basic.failure().server)
+    cli.run(f"https://127.0.0.1:{port}/openapi.json", "--tls-verify=false")
+    assert _list_crash_files(crash_cache_dir(tmp_path))
 
-        result = cli.main("replay", "--keep")
-    finally:
-        server.shutdown()
+    result = cli.main("replay", "--keep")
 
     assert result.exit_code == 1, result.output
     assert "1 failed" in result.output

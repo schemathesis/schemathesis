@@ -790,7 +790,7 @@ class UnitTestProgressManager:
             self.live.stop()
 
     def _get_status_icon(self) -> str:
-        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default="🕛")
+        return get_status_icon(self.stats, is_interrupted=self.is_interrupted)
 
     def get_completion_message(self, icon: str | None = None, *, without_checks: bool = False) -> str:
         """Complete the phase and return status message."""
@@ -943,7 +943,7 @@ class StatefulProgressManager:
         self.stats_progress.update(self.stats_task_id, description=self._get_stats_message())
 
     def _get_status_icon(self) -> str:
-        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default="🕛")
+        return get_status_icon(self.stats, is_interrupted=self.is_interrupted)
 
     def interrupt(self) -> None:
         """Handle interruption."""

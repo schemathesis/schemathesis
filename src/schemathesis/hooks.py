@@ -7,8 +7,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar, cast
 
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import HookExecutionError
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.checks import CheckResult
+    from schemathesis.config import ProjectConfig
     from schemathesis.core.failures import Failure
     from schemathesis.core.parameters import ContainerName
     from schemathesis.core.spec import SchemaMetadata
@@ -372,6 +374,24 @@ def dispatch_before_load_schema(
 
 def dispatch_after_load_schema(*dispatchers: HookDispatcher, context: HookContext, schema: BaseSchema) -> None:
     _dispatch_to_all("after_load_schema", dispatchers, context, schema)
+
+
+SchemaT = TypeVar("SchemaT", bound="BaseSchema")
+
+
+def load_with_hooks(
+    raw_schema: JsonSchemaObject, config: SchemathesisConfig | None, build: Callable[[ProjectConfig], SchemaT]
+) -> SchemaT:
+    """Build a schema from `raw_schema` under its project config, between the global load hooks."""
+    context = HookContext()
+    dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=context, raw_schema=raw_schema)
+    if config is None:
+        config = SchemathesisConfig.discover()
+    project_config = config.projects.get(raw_schema)
+    instance = build(project_config)
+    instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
+    dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=context, schema=instance)
+    return instance
 
 
 def dispatch_before_add_examples(*dispatchers: HookDispatcher, context: HookContext, examples: list[Case]) -> None:

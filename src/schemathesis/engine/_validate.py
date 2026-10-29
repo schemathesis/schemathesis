@@ -30,17 +30,12 @@ def validate_response(
         collected.add(failure)
         checked_by.setdefault(failure, name)
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
-        steps = recorder.reproduction_steps(
-            recorder.iter_failure_cases(case_id=failure_data.case.id, failure=failure),
-            failure=failure,
-            verify=failure_data.verify,
-        )
-        recorder.record_check_failure(
+        recorder.record_reproducible_failure(
             name=name,
             case_id=failure_data.case.id,
-            code_sample="\n".join(step.curl for step in steps),
             failure=failure,
-            steps=steps,
+            cases=recorder.iter_failure_cases(case_id=failure_data.case.id, failure=failure),
+            verify=failure_data.verify,
         )
 
     def on_success(name: str, _case: Case) -> None:

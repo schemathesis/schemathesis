@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from schemathesis.config import GenerationConfig
 from schemathesis.core import MAX_STRING_LENGTH
 from schemathesis.core.file_samples import FILE_SAMPLES
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.validation import has_surrounding_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.transport.serialization import Binary
@@ -634,3 +635,12 @@ def cookie_alphabet(generation_config: GenerationConfig) -> Alphabet:
         min_name_length=1,
         name_characters="!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters,
     )
+
+
+def alphabet_for(location: ParameterLocation | None, generation_config: GenerationConfig) -> Alphabet:
+    """Characters a value sent in `location` may carry, under the caller's generation settings."""
+    if location == ParameterLocation.COOKIE:
+        return cookie_alphabet(generation_config)
+    if location == ParameterLocation.HEADER:
+        return header_alphabet(generation_config)
+    return Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)

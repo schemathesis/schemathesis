@@ -13,7 +13,7 @@ from typing_extensions import override
 from schemathesis.core import NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
+from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.schemas import request_metadata
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport
@@ -52,15 +52,14 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         **kwargs: Any,
     ) -> Response:
         # Direct calls pass nothing, so the config fills in what the caller left out.
-        config = case.operation.schema.config
-        if proxies or config.proxy_for(operation=case.operation):
+        settings = case.operation.schema.config.request_settings_for(operation=case.operation)
+        if proxies or settings.proxy:
             raise IncorrectUsage("Proxies are not supported for gRPC targets")
         if verify is None:
-            verify = config.tls_verify_for(operation=case.operation)
-            verify = True if verify is None else verify
-        cert = cert or config.request_cert_for(operation=case.operation)
+            verify = True if settings.verify is None else settings.verify
+        cert = cert or settings.cert
         if timeout is None:
-            timeout = config.request_timeout_for(operation=case.operation)
+            timeout = settings.network_timeout
         base_url = base_url or case.operation.base_url
         address, tls = parse_target(base_url, verify)
         method = case.operation.definition.raw
@@ -82,9 +81,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         call: grpc.UnaryUnaryMultiCallable[bytes, bytes] = channel.unary_unary(case.path)
         started_at = Instant()
         try:
-            content, outcome = call.with_call(
-                payload, timeout=timeout if timeout is not None else DEFAULT_RESPONSE_TIMEOUT, metadata=metadata
-            )
+            content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata)
         except grpc.RpcError as error:
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)

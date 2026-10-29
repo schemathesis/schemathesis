@@ -5,8 +5,9 @@ from __future__ import annotations
 import enum
 import re
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from difflib import get_close_matches
 from textwrap import indent
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, NoReturn, TypeGuard
@@ -571,6 +572,15 @@ class SerializationNotPossible(SerializationError):
     def for_media_type(cls, media_type: str) -> SerializationNotPossible:
         """Create error when a specific required media type isn't supported."""
         return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type), media_types=[media_type])
+
+
+def not_found_message(item: str, noun: str, candidates: Iterable[str]) -> str:
+    """Report a missing `item`, suggesting the closest of `candidates` if one is close enough."""
+    message = f"`{item}` {noun} not found" if noun else f"`{item}` not found"
+    matches = get_close_matches(item, list(candidates))
+    if matches:
+        message += f". Did you mean `{matches[0]}`?"
+    return message
 
 
 class OperationNotFound(LookupError, SchemathesisError):

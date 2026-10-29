@@ -76,7 +76,7 @@ class BaseExecutionContext:
         config = self.config.reports
         built_in = []
         for format in ReportFormat:
-            if getattr(config, format.value).enabled:
+            if config.get(format).enabled:
                 path = config.get_path(format)
                 # Point at the page itself so it opens in one click.
                 if format == ReportFormat.HTML:

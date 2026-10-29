@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Iterator, Mapping
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
-from difflib import get_close_matches
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import urljoin, urlsplit
@@ -20,9 +19,11 @@ from schemathesis.config import (
 )
 from schemathesis.core import NOT_SET, Body, NotSet, Specification, media_types
 from schemathesis.core.errors import (
+    IncorrectUsage,
     InvalidSchema,
     InvalidStateMachine,
     OperationNotFound,
+    not_found_message,
 )
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
@@ -560,9 +561,7 @@ class OpenApiSchema(BaseSchema):
             path_resolver = self.root_resolver
             scope = path_resolver.base_uri
         dispatch_before_process_path(self, HookContext(), path, path_item)
-        map = APIOperationMap(self, {})
-        map._data = MethodMap(map, path_resolver, scope, path, CaseInsensitiveDict(path_item))
-        return map
+        return APIOperationMap(self, MethodMap(self, path_resolver, scope, path, CaseInsensitiveDict(path_item)))
 
     @override
     def find_operation_by_label(self, label: str) -> APIOperation | None:
@@ -575,14 +574,10 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
-        matches = get_close_matches(item, list(self))
-        self._on_missing_operation(item, exc, matches)
+        self._on_missing_operation(item, exc, self)
 
-    def _on_missing_operation(self, item: str, exc: KeyError | None, matches: list[str]) -> NoReturn:
-        message = f"`{item}` not found"
-        if matches:
-            message += f". Did you mean `{matches[0]}`?"
-        raise OperationNotFound(message=message, item=item) from exc
+    def _on_missing_operation(self, item: str, exc: KeyError | None, candidates: Iterable[str]) -> NoReturn:
+        raise OperationNotFound(message=not_found_message(item, "", candidates), item=item) from exc
 
     @override
     def _measure_statistic(self) -> ApiStatistic:
@@ -633,9 +628,21 @@ class OpenApiSchema(BaseSchema):
         """Content types available for this API operation."""
         return self.adapter.get_response_content_types(operation, response)
 
-    @override
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         return self.adapter.get_request_payload_content_types(operation)
+
+    def _get_default_media_type(self, operation: APIOperation) -> str:
+        # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
+        media_types = self.get_request_payload_content_types(operation)
+        if len(media_types) == 1:
+            # The only available option
+            return media_types[0]
+        media_types_repr = ", ".join(media_types)
+        raise IncorrectUsage(
+            "Can not detect appropriate media type. "
+            "You can either specify one of the defined media types "
+            f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
+        )
 
     @override
     def get_strategies_from_examples(
@@ -757,7 +764,7 @@ class OpenApiSchema(BaseSchema):
     @override
     def _case_media_type(self, operation: APIOperation, body: Body, media_type: str | None) -> str | None:
         if body is not NOT_SET and media_type is None:
-            return operation._get_default_media_type()
+            return self._get_default_media_type(operation)
         return media_type
 
     @override
@@ -779,7 +786,7 @@ class MethodMap(Mapping):
     Provides a more specific error message if API operation is not found.
     """
 
-    _parent: APIOperationMap
+    _schema: OpenApiSchema
     _resolver: Resolver
     # Reference resolution scope
     _scope: str
@@ -788,7 +795,7 @@ class MethodMap(Mapping):
     # Storage for definitions
     _path_item: CaseInsensitiveDict
 
-    __slots__ = ("_parent", "_resolver", "_scope", "_path", "_path_item")
+    __slots__ = ("_schema", "_resolver", "_scope", "_path", "_path_item")
 
     def __len__(self) -> int:
         return len(self._path_item)
@@ -799,7 +806,7 @@ class MethodMap(Mapping):
     def _init_operation(self, method: str) -> APIOperation:
         method = method.lower()
         operation = self._path_item[method]
-        schema = cast(OpenApiSchema, self._parent._schema)
+        schema = self._schema
         path = self._path
         loader = schema._operations
         cached = loader.cached(self._scope, path, method)

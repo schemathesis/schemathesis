@@ -648,7 +648,7 @@ def display_fatal_error(
 UNMATCHED_FILTER_TIP = "Check the filter for a typo, or update it if the operation was renamed"
 
 
-def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: str = "🕛") -> str:
+def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool) -> str:
     if is_interrupted:
         return "⚡"
     if stats[Status.ERROR] > 0:
@@ -659,7 +659,7 @@ def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: 
         return "✅"
     if stats[Status.SKIP] > 0:
         return "⏭ "
-    return default
+    return "🕛"
 
 
 def warning_items(values: set[str], *, operations: bool = True) -> list[WarningItem]:
