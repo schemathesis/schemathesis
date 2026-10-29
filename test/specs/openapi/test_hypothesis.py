@@ -615,6 +615,25 @@ def test_cookie_values_use_cookie_octets(ctx, schema):
         assert set(case.cookies["c"]) <= COOKIE_OCTETS, repr(case.cookies["c"])
 
 
+@pytest.mark.hypothesis_nested
+def test_negative_cookie_values_use_cookie_octets(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /c",
+        {
+            "parameters": [
+                {"name": "c", "in": "cookie", "required": True, "schema": {"type": "string", "maxLength": 2}}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    # A `;` inside a value splits it on the wire, so the server may read a valid prefix.
+    @run_given(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=30)
+    def test(case):
+        for value in _strings_in(case.cookies or {}):
+            assert set(value) <= COOKIE_OCTETS, repr(value)
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [({"type": "string", "enum": ["a b"]}, "a b"), ({"type": "string", "const": 'a;"b"'}, 'a;"b"')],
