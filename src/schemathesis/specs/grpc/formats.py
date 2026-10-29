@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from base64 import urlsafe_b64encode
+from base64 import b64encode
 from datetime import datetime
 from functools import cache
 from typing import TYPE_CHECKING
@@ -19,8 +19,8 @@ def grpc_formats() -> dict[str, SearchStrategy[str]]:
 
     fraction = st.from_regex(r"(\.[0-9]{1,9})?", fullmatch=True)
     return {
-        # The JSON mapping decodes bytes with the URL-safe alphabet.
-        "byte": st.binary().map(lambda value: urlsafe_b64encode(value).decode()),
+        # The JSON mapping accepts both alphabets, command-line clients only the standard one.
+        "byte": st.binary().map(lambda value: b64encode(value).decode()),
         # `Timestamp` spans years 0001 to 9999, in UTC.
         "date-time": st.builds(
             lambda moment, digits: f"{moment.isoformat(timespec='seconds')}{digits}Z",

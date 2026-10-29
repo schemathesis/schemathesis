@@ -85,12 +85,11 @@ def test_negative_falls_back_to_positive(schema):
         assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
-def test_bytes_use_url_safe_alphabet():
+# Command-line clients reject the URL-safe alphabet in JSON bodies.
+def test_bytes_use_standard_alphabet():
     @run_given(grpc_formats()["byte"], max_examples=50)
     def test(value):
-        assert "+" not in value
-        assert "/" not in value
-        assert base64.urlsafe_b64encode(base64.urlsafe_b64decode(value)).decode() == value
+        assert base64.b64encode(base64.b64decode(value, validate=True)).decode() == value
 
 
 @pytest.mark.parametrize("method", METHODS)
