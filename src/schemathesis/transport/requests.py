@@ -25,7 +25,6 @@ from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, s
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
 from schemathesis.core.transport import (
-    DEFAULT_RESPONSE_TIMEOUT,
     STREAM_CUT_SHORT_ATTRIBUTE,
     Response,
     is_event_stream,
@@ -196,28 +195,23 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
     def _build_request_data(self, case: Case, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Merge the serialized case with transport settings from config and explicit keyword arguments."""
-        config = case.operation.schema.config
+        settings = case.operation.schema.config.request_settings_for(operation=case.operation)
         data = self.serialize_case(case, **kwargs)
 
-        verify = config.tls_verify_for(operation=case.operation)
-        if verify is not None:
-            data.setdefault("verify", verify)
-        timeout = config.request_timeout_for(operation=case.operation)
-        if timeout is not None:
-            data.setdefault("timeout", timeout)
-        cert = config.request_cert_for(operation=case.operation)
-        if cert is not None:
-            data.setdefault("cert", cert)
+        if settings.verify is not None:
+            data.setdefault("verify", settings.verify)
+        data.setdefault("timeout", settings.network_timeout)
+        if settings.cert is not None:
+            data.setdefault("cert", settings.cert)
 
         for key, value in kwargs.items():
             if key == "base_url":
                 continue
             if key not in ("headers", "cookies", "params") or key not in data:
                 data[key] = value
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
-        proxies = config.proxy_for(operation=case.operation)
+        proxies = settings.proxies
         if proxies is not None:
-            data.setdefault("proxies", {"all": proxies})
+            data.setdefault("proxies", proxies)
         return data
 
     @override

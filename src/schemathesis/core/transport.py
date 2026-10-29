@@ -7,6 +7,7 @@ import re
 import string
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from functools import lru_cache
 from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
@@ -98,6 +99,26 @@ def read_event_stream(
     except TimeoutError:
         return buffer.complete_events, True
     return bytes(buffer.content), False
+
+
+@dataclass(slots=True)
+class RequestSettings:
+    """Timeout, TLS and proxy settings for requests to the API under test."""
+
+    # `None` leaves the choice to the caller: in-process apps run without a timeout.
+    timeout: float | int | None
+    verify: bool | str | None
+    cert: str | tuple[str, str] | None
+    proxy: str | None
+
+    @property
+    def network_timeout(self) -> float | int:
+        """Timeout for requests sent over the network, where none would let a request hang forever."""
+        return DEFAULT_RESPONSE_TIMEOUT if self.timeout is None else self.timeout
+
+    @property
+    def proxies(self) -> dict[str, str] | None:
+        return None if self.proxy is None else {"all": self.proxy}
 
 
 class EventStreamBuffer:

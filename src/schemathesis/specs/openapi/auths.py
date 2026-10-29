@@ -4,31 +4,23 @@ from __future__ import annotations
 
 import json
 import textwrap
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import requests
 
+from schemathesis.auths import InProcessAuthRequestError, send_auth_request
 from schemathesis.core.errors import AuthenticationError, MalformedMediaType
 from schemathesis.core.failures import reason_phrase
 from schemathesis.core.media_types import is_form_urlencoded, is_json
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
-from schemathesis.core.transport import (
-    AUTH_REJECTION_STATUSES,
-    DEFAULT_RESPONSE_TIMEOUT,
-    decode_lossy,
-    load_json_lossy,
-    parse_set_cookie,
-)
+from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
-    from werkzeug.datastructures import Headers
-
-    from schemathesis.auths import AuthContext
+    from schemathesis.auths import AuthContext, AuthEndpointResponse
     from schemathesis.config import OutputConfig
     from schemathesis.generation.case import Case
 
@@ -118,14 +110,33 @@ class DynamicTokenAuthProvider:
     payload_content_type: str = "application/json"
 
     def get(self, case: Case, ctx: AuthContext) -> str:
-        from schemathesis.transport import is_asgi_app
-
-        app = ctx.app
-        if app is None:
-            return self._fetch_http(ctx)
-        if is_asgi_app(app):
-            return self._fetch_asgi(app, ctx)
-        return self._fetch_wsgi(app, ctx)
+        config = ctx.operation.schema.config
+        body, headers = self._build_body()
+        try:
+            response = send_auth_request(
+                ctx.app,
+                method=self.method.upper(),
+                url=get_full_path(ctx.operation.schema.get_base_url() + "/", self.path),
+                path=self.path,
+                body=body,
+                headers=headers,
+                settings=config.request_settings_for(operation=ctx.operation),
+                allow_redirects=True,
+            )
+        except InProcessAuthRequestError as exc:
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"{exc.interface} auth request failed: {exc.cause}",
+            ) from exc.cause
+        # OSError: requests surfaces TLS setup failures (e.g. a missing client certificate file) as raw OSError.
+        except (requests.exceptions.RequestException, OSError) as exc:
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"Connection to auth endpoint failed: {exc}",
+            ) from exc
+        return self._extract_token(response, config.output)
 
     def _build_body(self) -> tuple[bytes | None, dict[str, str]]:
         if self.payload is None:
@@ -153,104 +164,9 @@ class DynamicTokenAuthProvider:
             )
         return body, {"Content-Type": self.payload_content_type}
 
-    def _fetch_http(self, ctx: AuthContext) -> str:
-        url = get_full_path(ctx.operation.schema.get_base_url() + "/", self.path)
-        config = ctx.operation.schema.config
-        timeout = config.request_timeout_for(operation=ctx.operation) or DEFAULT_RESPONSE_TIMEOUT
-        verify = config.tls_verify_for(operation=ctx.operation)
-        cert = config.request_cert_for(operation=ctx.operation)
-        proxy = config.proxy_for(operation=ctx.operation)
-        body, headers = self._build_body()
-        kwargs: dict[str, Any] = {}
-        if verify is not None:
-            kwargs["verify"] = verify
-        if cert is not None:
-            kwargs["cert"] = cert
-        if proxy is not None:
-            kwargs["proxies"] = {"all": proxy}
-        try:
-            response = requests.request(self.method, url, data=body, headers=headers, timeout=timeout, **kwargs)
-        except (requests.exceptions.RequestException, OSError) as exc:
-            # OSError: requests surfaces TLS setup failures (e.g. a missing client certificate file) as raw OSError.
-            raise AuthenticationError(
-                "DynamicTokenAuthProvider",
-                "get",
-                f"Connection to auth endpoint failed: {exc}",
-            ) from exc
-        return self._extract_token(
-            status_code=response.status_code,
-            text=decode_lossy(response.content, response.encoding),
-            get_json=lambda: load_json_lossy(response.content, response.encoding),
-            headers=response.headers,
-            cookies=response.cookies.get_dict(),
-            output_config=config.output,
-        )
-
-    def _fetch_wsgi(self, app: Any, ctx: AuthContext) -> str:
-        from schemathesis.python.wsgi import get_client
-
-        body, headers = self._build_body()
-        try:
-            client = get_client(app)
-            response = client.open(
-                self.path,
-                method=self.method.upper(),
-                data=body,
-                content_type=headers.get("Content-Type"),
-            )
-        except Exception as exc:
-            raise AuthenticationError(
-                "DynamicTokenAuthProvider",
-                "get",
-                f"WSGI auth request failed: {exc}",
-            ) from exc
-        return self._extract_token(
-            status_code=response.status_code,
-            text=response.get_data(as_text=True),
-            get_json=lambda: response.get_json(force=True, silent=False),
-            headers=response.headers,
-            cookies=parse_set_cookie(response.headers.getlist("Set-Cookie")),
-            output_config=ctx.operation.schema.config.output,
-        )
-
-    def _fetch_asgi(self, app: Any, ctx: AuthContext) -> str:
-        from schemathesis.python.asgi import get_client
-
-        timeout = ctx.operation.schema.config.request_timeout_for(operation=ctx.operation)
-        body, headers = self._build_body()
-        try:
-            with get_client(app) as client:
-                response = client.request(
-                    self.method.upper(),
-                    self.path,
-                    data=body,
-                    headers=headers,
-                    timeout=timeout,
-                )
-        except Exception as exc:
-            raise AuthenticationError(
-                "DynamicTokenAuthProvider",
-                "get",
-                f"ASGI auth request failed: {exc}",
-            ) from exc
-        return self._extract_token(
-            status_code=response.status_code,
-            text=decode_lossy(response.content, response.encoding),
-            get_json=lambda: load_json_lossy(response.content, response.encoding),
-            headers=response.headers,
-            cookies=response.cookies.get_dict(),
-            output_config=ctx.operation.schema.config.output,
-        )
-
-    def _extract_token(
-        self,
-        status_code: int,
-        text: str,
-        get_json: Callable[[], Any],
-        headers: Mapping[str, str] | Headers,
-        cookies: Mapping[str, str],
-        output_config: OutputConfig,
-    ) -> str:
+    def _extract_token(self, response: AuthEndpointResponse, output_config: OutputConfig) -> str:
+        status_code = response.status_code
+        text = response.text
         if status_code in AUTH_REJECTION_STATUSES:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
@@ -267,7 +183,7 @@ class DynamicTokenAuthProvider:
             )
         if self.extract_from == "body":
             try:
-                body = get_json()
+                body = response.get_json()
             except ValueError as exc:
                 raise AuthenticationError(
                     "DynamicTokenAuthProvider",
@@ -289,17 +205,17 @@ class DynamicTokenAuthProvider:
                 )
             return raw
         if self.extract_from == "cookie":
-            value = cookies.get(self.extract_selector)
+            value = response.cookies.get(self.extract_selector)
             if value is None:
                 raise AuthenticationError(
                     "DynamicTokenAuthProvider",
                     "get",
-                    f"Cookie {self.extract_selector!r} not found in auth response. Present cookies: {list(cookies)!r}",
+                    f"Cookie {self.extract_selector!r} not found in auth response. Present cookies: {list(response.cookies)!r}",
                 )
             return value
-        result = headers.get(self.extract_selector)
+        result = response.headers.get(self.extract_selector)
         if result is None:
-            present = list(headers.keys())
+            present = list(response.headers.keys())
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",

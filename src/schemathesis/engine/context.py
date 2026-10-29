@@ -320,19 +320,19 @@ class EngineContext:
         cached = self._transport_kwargs_cache.get(key)
         if cached is None:
             config = self.config
+            settings = config.request_settings_for(operation=operation)
             cached = {
                 "headers": config.headers_for(operation=operation),
                 "max_redirects": config.max_redirects_for(operation=operation),
-                "verify": config.tls_verify_for(operation=operation),
-                "cert": config.request_cert_for(operation=operation),
+                "verify": settings.verify,
+                "cert": settings.cert,
             }
             # An explicit `None` would override the transport's default timeout and let a request hang forever.
-            timeout = config.request_timeout_for(operation=operation)
-            if timeout is not None:
-                cached["timeout"] = timeout
-            proxy = config.proxy_for(operation=operation)
-            if proxy is not None:
-                cached["proxies"] = {"all": proxy}
+            if settings.timeout is not None:
+                cached["timeout"] = settings.timeout
+            proxies = settings.proxies
+            if proxies is not None:
+                cached["proxies"] = proxies
             self._transport_kwargs_cache[key] = cached
         kwargs = cached.copy()
         # Apply the health timeout override only when it strictly tightens the configured timeout.
@@ -373,17 +373,16 @@ def make_session(config: ProjectConfig, *, operation: APIOperation | None = None
 
     session = ManagedCookiesSession()
     session.headers = {}
-    session.verify = config.tls_verify_for(operation=operation)
+    settings = config.request_settings_for(operation=operation)
+    session.verify = settings.verify
     auth = config.auth_for(operation=operation)
     if auth is not None:
         session.auth = auth
     headers = config.headers_for(operation=operation)
     if headers:
         session.headers.update(headers)
-    request_cert = config.request_cert_for(operation=operation)
-    if request_cert is not None:
-        session.cert = request_cert
-    proxy = config.proxy_for(operation=operation)
-    if proxy is not None:
-        session.proxies["all"] = proxy
+    if settings.cert is not None:
+        session.cert = settings.cert
+    if settings.proxy is not None:
+        session.proxies["all"] = settings.proxy
     return session

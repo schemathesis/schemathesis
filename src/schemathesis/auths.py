@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable, Iterator, MutableMapping
+from collections.abc import Callable, Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    Literal,
     Protocol,
     Self,
     TypeVar,
+    cast,
     overload,
     runtime_checkable,
 )
@@ -21,14 +23,18 @@ from schemathesis.config._auth import DEFAULT_RETRY_ON
 from schemathesis.core.errors import AuthenticationError, IncorrectUsage, SchemathesisError
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transport import RequestSettings, decode_lossy, load_json_lossy, parse_set_cookie
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, attach_filter_chain
 from schemathesis.generation.meta import negated_parameters
+from schemathesis.transport import is_asgi_app
 
 if TYPE_CHECKING:
     import requests.auth
+    from werkzeug.datastructures import Headers
 
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
+    from schemathesis.python.asgi import ASGIApp
     from schemathesis.schemas import APIOperation, BaseSchema
 
 DEFAULT_REFRESH_INTERVAL = 300
@@ -70,6 +76,122 @@ class AuthContext:
     """API operation currently being processed for authentication."""
     app: Any | None
     """Python application instance (ASGI/WSGI app) when using app integration, `None` otherwise."""
+
+
+@dataclass(slots=True)
+class AuthEndpointResponse:
+    """Response from an endpoint that hands out credentials."""
+
+    status_code: int
+    text: str
+    get_json: Callable[[], object]
+    headers: Mapping[str, str] | Headers
+    cookies: dict[str, str]
+
+
+class InProcessAuthRequestError(Exception):
+    """An in-process app failed to serve a request for credentials."""
+
+    def __init__(self, interface: Literal["ASGI", "WSGI"], cause: Exception) -> None:
+        super().__init__(f"{interface} request failed: {cause}")
+        self.interface = interface
+        self.cause = cause
+
+
+def send_auth_request(
+    app: object | None,
+    *,
+    method: str,
+    url: str,
+    path: str,
+    body: str | bytes | None,
+    headers: dict[str, str],
+    settings: RequestSettings,
+    allow_redirects: bool,
+) -> AuthEndpointResponse:
+    """Request credentials from `url` over the network, or from `path` of the in-process `app`.
+
+    Network failures propagate as `requests` raises them; in-process failures raise `InProcessAuthRequestError`.
+    """
+    if app is None:
+        import requests
+
+        response = requests.request(
+            method,
+            url,
+            data=body,
+            headers=headers,
+            allow_redirects=allow_redirects,
+            timeout=settings.network_timeout,
+            verify=settings.verify,
+            cert=settings.cert,
+            proxies=settings.proxies,
+        )
+        return _from_requests_response(response)
+    if is_asgi_app(app):
+        return _send_asgi_auth_request(
+            cast("ASGIApp", app),
+            method=method,
+            path=path,
+            body=body,
+            headers=headers,
+            timeout=settings.timeout,
+            allow_redirects=allow_redirects,
+        )
+    return _send_wsgi_auth_request(app, method=method, path=path, body=body, headers=headers)
+
+
+def _send_asgi_auth_request(
+    app: ASGIApp,
+    *,
+    method: str,
+    path: str,
+    body: str | bytes | None,
+    headers: dict[str, str],
+    timeout: float | int | None,
+    allow_redirects: bool,
+) -> AuthEndpointResponse:
+    from schemathesis.python import asgi
+
+    try:
+        with asgi.get_client(app) as client:
+            response = client.request(
+                method, path, data=body, headers=headers, allow_redirects=allow_redirects, timeout=timeout
+            )
+    except Exception as exc:
+        raise InProcessAuthRequestError("ASGI", exc) from exc
+    return _from_requests_response(response)
+
+
+def _send_wsgi_auth_request(
+    app: object, *, method: str, path: str, body: str | bytes | None, headers: dict[str, str]
+) -> AuthEndpointResponse:
+    from schemathesis.python import wsgi
+
+    try:
+        client = wsgi.get_client(app)
+        response = client.open(path, method=method, data=body, headers=headers)
+        # Decoding stays inside: a body that is not UTF-8 is the app's failure, not a network one.
+        text = response.get_data(as_text=True)
+    except Exception as exc:
+        raise InProcessAuthRequestError("WSGI", exc) from exc
+    return AuthEndpointResponse(
+        status_code=response.status_code,
+        text=text,
+        get_json=lambda: response.get_json(force=True, silent=False),
+        headers=response.headers,
+        cookies=parse_set_cookie(response.headers.getlist("Set-Cookie")),
+    )
+
+
+def _from_requests_response(response: requests.Response) -> AuthEndpointResponse:
+    return AuthEndpointResponse(
+        status_code=response.status_code,
+        text=decode_lossy(response.content, response.encoding),
+        get_json=lambda: load_json_lossy(response.content, response.encoding),
+        headers=response.headers,
+        cookies=response.cookies.get_dict(),
+    )
 
 
 CacheKeyFunction = Callable[["Case", "AuthContext"], str | int]
