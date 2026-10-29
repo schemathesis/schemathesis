@@ -10,10 +10,11 @@ import requests
 from google.protobuf import json_format, message_factory
 from typing_extensions import override
 
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
+from schemathesis.core import NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
+from schemathesis.specs.grpc.schemas import request_metadata
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport
 
@@ -22,10 +23,6 @@ if TYPE_CHECKING:
 
     from schemathesis.generation.case import Case
 
-# HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
-EXCLUDED_METADATA = frozenset(
-    {"connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "te", "content-type", "host"}
-)
 # How long a failed call waits for the channel to connect before blaming the network.
 READY_TIMEOUT = 0.5
 
@@ -81,7 +78,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             message = message_factory.GetMessageClass(method.input_type)()
             # Well-known messages such as wrappers map to any JSON value, not only to objects.
             payload = json_format.ParseDict(cast("dict[str, Any]", body), message).SerializeToString()
-        request_headers = _request_headers(case, headers, session)
+        request_headers = request_metadata(case, headers)
+        if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
+            request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
         url = case.operation.schema.build_request_url(case, base_url)
         request = requests.Request(method="POST", url=url, headers=request_headers, data=payload).prepare()
         metadata: tuple[tuple[str, str | bytes], ...] = tuple(
@@ -146,15 +145,6 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                     channel = grpc.insecure_channel(address)
                 self._channels[key] = channel
             return channel
-
-
-def _request_headers(case: Case, headers: Mapping[str, Any] | None, session: requests.Session | None) -> dict[str, str]:
-    merged = {key.lower(): str(value) for key, value in (case.headers or {}).items()}
-    merged.setdefault(SCHEMATHESIS_TEST_CASE_HEADER.lower(), case.id)
-    merged.update((key.lower(), str(value)) for key, value in (headers or {}).items())
-    if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
-        merged.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
-    return {key: value for key, value in merged.items() if key not in EXCLUDED_METADATA and not key.startswith("grpc-")}
 
 
 def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.ChannelCredentials:

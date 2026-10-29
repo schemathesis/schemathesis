@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import base64
+import json
+import shlex
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 import jsonschema_rs
-from google.protobuf import descriptor_pool, message, message_factory
+from google.protobuf import descriptor_pool, json_format, message, message_factory
 
 # googleapis-common-protos ships no type information.
 from google.rpc import status_pb2  # type: ignore[import-untyped]
@@ -16,9 +20,10 @@ from hypothesis import strategies as st
 from typing_extensions import override
 
 from schemathesis import auths
-from schemathesis.core import NOT_SET, Body, NotSet, Specification
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, Specification
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic
@@ -63,6 +68,20 @@ if TYPE_CHECKING:
 
 
 MEDIA_TYPE = "application/grpc"
+# HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
+EXCLUDED_METADATA = frozenset(
+    {
+        "connection",
+        "keep-alive",
+        "proxy-connection",
+        "transfer-encoding",
+        "upgrade",
+        "te",
+        "content-type",
+        "content-length",
+        "host",
+    }
+)
 
 
 def is_unary(method: MethodDescriptor) -> bool:
@@ -148,6 +167,42 @@ class GrpcSchema(BaseSchema):
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         # Credentials travel as metadata, which the transport builds from the case headers.
         return False
+
+    @override
+    def as_reproduction_command(
+        self, case: Case, *, headers: Mapping[str, Any] | None, verify: bool | str, base_url: str | None = None
+    ) -> str:
+        operation = case.operation
+        scheme, _, address = (base_url or case._base_url or operation.base_url).partition("://")
+        args = ["grpcurl"]
+        if scheme == "grpc":
+            args.append("-plaintext")
+        # Descriptor-set schemas keep the file they came from as a `file://` URI.
+        assert self.location is not None
+        args.extend(["-protoset", url2pathname(urlsplit(self.location).path)])
+        if scheme == "grpcs":
+            # The CA usually comes from config, as callers only know whether the response was verified.
+            ca = verify if isinstance(verify, str) else self.config.tls_verify_for(operation=operation)
+            if isinstance(ca, str):
+                args.extend(["-cacert", ca])
+            cert = self.config.request_cert_for(operation=operation)
+            if cert is not None:
+                # A single file holds both the certificate and the key.
+                certificate, key = (cert, cert) if isinstance(cert, str) else cert
+                args.extend(["-cert", certificate, "-key", key])
+        metadata = request_metadata(case, headers)
+        sanitization = self.config.output.sanitization
+        if sanitization.enabled:
+            sanitize_value(metadata, config=sanitization)
+        for key, value in metadata.items():
+            args.extend(["-H", f"{key}: {value}"])
+        body = {} if isinstance(case.body, NotSet) else case.body
+        if isinstance(body, bytes):
+            body = json_format.MessageToDict(
+                message_factory.GetMessageClass(operation.definition.raw.input_type).FromString(body)
+            )
+        args.extend(["-d", json.dumps(body), address, operation.label])
+        return " ".join(shlex.quote(arg) for arg in args)
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
@@ -293,6 +348,14 @@ class GrpcSchema(BaseSchema):
     @override
     def create_extra_data_source(self) -> None:
         raise NotImplementedError
+
+
+def request_metadata(case: Case, headers: Mapping[str, Any] | None) -> dict[str, str]:
+    """Metadata a call sends: case headers, the test case id, then explicit headers, without reserved keys."""
+    merged = {key.lower(): str(value) for key, value in (case.headers or {}).items()}
+    merged.setdefault(SCHEMATHESIS_TEST_CASE_HEADER.lower(), case.id)
+    merged.update((key.lower(), str(value)) for key, value in (headers or {}).items())
+    return {key: value for key, value in merged.items() if key not in EXCLUDED_METADATA and not key.startswith("grpc-")}
 
 
 def _grpc_status(response: Response) -> int:
