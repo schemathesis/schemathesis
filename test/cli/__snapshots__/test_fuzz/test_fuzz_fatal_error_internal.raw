@@ -11,7 +11,7 @@ Test Execution Error
 An internal error occurred during the test run
 
     Traceback (most recent call last):
-      File "/package-root/cli/loaders.py", line XXX, in into_event_stream
+      File "/package-root/cli/loaders.py", line XXX, in _event_stream
         yield from engine_callback(schema)
       File "/package-root/cli/commands/fuzz/executor.py", line XXX, in <lambda>
         engine_callback=lambda schema: from_schema(schema).fuzz(fuzz_config),

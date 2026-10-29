@@ -210,6 +210,7 @@ def fuzz(
         - Local file: ./openapi.json, ./schema.yaml, ./schema.graphql
         - OpenAPI URL: https://api.example.com/openapi.json
         - GraphQL URL: https://api.example.com/graphql/
+        - gRPC target: grpc://localhost:50051
     """  # noqa: D301
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)

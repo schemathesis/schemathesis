@@ -12,6 +12,7 @@ Usage: schemathesis run [OPTIONS] LOCATION
       - Local file: ./openapi.json, ./schema.yaml, ./schema.graphql
       - OpenAPI URL: https://api.example.com/openapi.json
       - GraphQL URL: https://api.example.com/graphql/
+      - gRPC target: grpc://localhost:50051
 
 Options:
   -u, --url URL                  API base URL (required for file-based schemas)

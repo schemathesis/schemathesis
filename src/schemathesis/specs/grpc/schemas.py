@@ -362,7 +362,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def create_extra_data_source(self) -> None:
-        raise NotImplementedError
+        return None
 
 
 def request_metadata(case: Case, headers: Mapping[str, Any] | None) -> dict[str, str]:

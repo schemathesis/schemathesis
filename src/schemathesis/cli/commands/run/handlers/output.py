@@ -1258,45 +1258,47 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             if event.status == Status.SUCCESS:
                 assert isinstance(event.payload, Ok)
                 payload = event.payload.ok()
-                unreachable = _server_unreachable(payload.probes)
-                if unreachable:
-                    header = Text.assemble(
-                        ("⚠️  ", Style(color="yellow")),
-                        ("API capabilities: unknown, server unreachable", Style(color="bright_white")),
-                    )
-                else:
-                    header = Text.assemble(
-                        ("✅  ", Style(color="green")),
-                        ("API capabilities:", Style(color="bright_white")),
-                    )
-                self.console.print(Indent(header))
-                self.console.print()
-
-                table = Table(
-                    show_header=False,
-                    box=None,
-                    padding=(0, 4),
-                    collapse_padding=True,
-                )
-                table.add_column("Capability", style=Style(color="bright_white", bold=True), no_wrap=True)
-                table.add_column("Status", style="cyan")
-                # Without a response, a probe measured nothing about the API.
-                for probe_run in [] if unreachable else payload.probes:
-                    icon, style = {
-                        ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
-                        ProbeOutcome.FAILURE: ("✘", Style(color="red")),
-                        ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
-                    }[probe_run.outcome]
-
-                    table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
-
                 cache_row = _format_cache_row(payload.cache)
-                if cache_row is not None:
-                    table.add_row("Cache:", cache_row)
-
-                if table.row_count:
-                    self.console.print(Indent(table))
+                # Specifications without HTTP probes have nothing to report unless the cache does.
+                if payload.probes or cache_row is not None:
+                    unreachable = _server_unreachable(payload.probes)
+                    if unreachable:
+                        header = Text.assemble(
+                            ("⚠️  ", Style(color="yellow")),
+                            ("API capabilities: unknown, server unreachable", Style(color="bright_white")),
+                        )
+                    else:
+                        header = Text.assemble(
+                            ("✅  ", Style(color="green")),
+                            ("API capabilities:", Style(color="bright_white")),
+                        )
+                    self.console.print(Indent(header))
                     self.console.print()
+
+                    table = Table(
+                        show_header=False,
+                        box=None,
+                        padding=(0, 4),
+                        collapse_padding=True,
+                    )
+                    table.add_column("Capability", style=Style(color="bright_white", bold=True), no_wrap=True)
+                    table.add_column("Status", style="cyan")
+                    # Without a response, a probe measured nothing about the API.
+                    for probe_run in [] if unreachable else payload.probes:
+                        icon, style = {
+                            ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
+                            ProbeOutcome.FAILURE: ("✘", Style(color="red")),
+                            ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
+                        }[probe_run.outcome]
+
+                        table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
+
+                    if cache_row is not None:
+                        table.add_row("Cache:", cache_row)
+
+                    if table.row_count:
+                        self.console.print(Indent(table))
+                        self.console.print()
         elif (
             isinstance(event.payload, AuthBootstrapPayload)
             and event.payload.spec is not None

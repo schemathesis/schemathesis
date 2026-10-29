@@ -1,0 +1,10 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: `tls-verify=false` is not supported for gRPC targets; pass a CA bundle path instead
