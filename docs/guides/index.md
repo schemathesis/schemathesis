@@ -54,6 +54,9 @@ Decode non-JSON or vendor-specific responses back into Python objects so schema 
 ### [Server-Sent Events](server-sent-events.md)
 Test `text/event-stream` endpoints - validate each event against `itemSchema`, handle polymorphic event types, and work with embedded JSON payloads.
 
+### [Testing gRPC Services](grpc.md)
+Fuzz unary gRPC methods through server reflection or a descriptor set, over plaintext or TLS.
+
 ### [GraphQL Custom Scalars](graphql-custom-scalars.md)
 Configure domain-specific scalar types so Schemathesis generates appropriate test data for emails, phone numbers, or custom IDs.
 

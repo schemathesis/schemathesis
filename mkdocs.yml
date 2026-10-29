@@ -28,6 +28,7 @@ nav:
       - guides/custom-serializers.md
       - guides/custom-response-deserializers.md
       - Server-Sent Events: guides/server-sent-events.md
+      - gRPC Services: guides/grpc.md
       - guides/graphql-custom-scalars.md
       - guides/extending.md
       - guides/extending-cli.md

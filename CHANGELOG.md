@@ -6,6 +6,7 @@
 
 - Coverage phase for GraphQL schemas.
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
+- Fuzzing unary gRPC methods through server reflection or descriptor sets.
 
 ### :wrench: Changed
 

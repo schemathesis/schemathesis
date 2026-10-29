@@ -18,6 +18,7 @@ Schemathesis automatically generates property-based tests from your OpenAPI or G
 |---|---|
 | OpenAPI | 2.0 (Swagger), 3.0, 3.1, 3.2 |
 | GraphQL | June 2018 and later |
+| gRPC | Unary methods, see [the gRPC guide](guides/grpc.md) |
 
 ## Why teams choose Schemathesis
 
