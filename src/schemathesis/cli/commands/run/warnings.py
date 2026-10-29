@@ -319,6 +319,12 @@ class WarningCollector:
                     warning.kind,
                     self._record_unresolvable_reference_warning(warning.operation_label, warning.message),
                 )
+            elif warning.kind is SchemathesisWarning.UNSUPPORTED_FIELD:
+                assert warning.operation_label is not None
+                self._handle_warning(
+                    warning.kind,
+                    self._record_unsupported_field_warning(warning.operation_label, warning.message),
+                )
             elif warning.kind is SchemathesisWarning.DICTIONARY_MISMATCH:
                 self._handle_warning(
                     warning.kind,
@@ -531,6 +537,14 @@ class WarningCollector:
 
         def record() -> None:
             self.data.unresolvable_reference.setdefault(operation_label, set()).add(message)
+
+        return record
+
+    def _record_unsupported_field_warning(self, operation_label: str, message: str) -> Callable[[], None]:
+        """Create a callback that records a request field Schemathesis does not generate."""
+
+        def record() -> None:
+            self.data.unsupported_field.setdefault(operation_label, set()).add(message)
 
         return record
 

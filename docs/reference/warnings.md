@@ -22,6 +22,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `rate_limited` | Most interactions returned 429 Too Many Requests | Slow requests down with `--rate-limit` |
 | `dictionary_mismatch` | Most entries of a dictionary fail the schema of the parameter they are bound to | Fix the entries, or bind the dictionary to a matching parameter |
 | `timeout_units` | `request-timeout` or `max_response_time` is 1000 seconds or more | Give the value in seconds |
+| `unsupported_field` | A gRPC request message has a `google.protobuf.Any` field | Fill the field with a `map_body` hook |
 | `low_valid_rate` (opt-in) | An operation accepted only a small share of the requests sent to it | Supply real identifiers, or align the schema with the constraints the API enforces |
 
 ## Available Warnings
@@ -239,6 +240,19 @@ Positive cases use only the entries that match the schema, so such a dictionary 
 **Trigger**: [`request-timeout`](configuration.md#request-timeout) or the `max_response_time` check limit is 1000 seconds or more. Shown right after the header, before the schema is loaded.
 
 Schemathesis 3 took these values in milliseconds, so a value this large is usually a leftover. Long timeouts are legitimate for slow or streaming endpoints; leave `timeout_units` out of `display` under `[warnings]` to silence it. This warning never fails the run, even with `fail-on`.
+
+### `unsupported_field`
+
+```
+Unsupported fields: 1 operation sent requests without some fields
+
+  - types.Types/Envelope
+    `types.Envelope.payload` - `google.protobuf.Any` is not generated
+
+💡 Fill these fields with a `map_body` hook
+```
+
+**Trigger**: A gRPC request message has a `google.protobuf.Any` field, directly or in a nested message. Schemathesis leaves the field out of every request. To send one, set it in a [`map_body`](../guides/extending.md) hook.
 
 ### `low_valid_rate`
 

@@ -58,6 +58,7 @@ class WarningData:
     constants_extraction: set[str] = field(default_factory=set)
     unmatched_filter: set[str] = field(default_factory=set)
     unresolvable_reference: dict[str, set[str]] = field(default_factory=dict)
+    unsupported_field: dict[str, set[str]] = field(default_factory=dict)
     # Operations whose acceptance rate fell below the configured threshold.
     low_valid_rate: set[str] = field(default_factory=set)
     # Operations answered mostly with `429 Too Many Requests`.
@@ -102,6 +103,7 @@ class WarningData:
             SchemathesisWarning.CONSTANTS_EXTRACTION.value: sorted(self.constants_extraction),
             SchemathesisWarning.UNMATCHED_FILTER.value: sorted(self.unmatched_filter),
             SchemathesisWarning.UNRESOLVABLE_REFERENCE.value: sorted(self.unresolvable_reference),
+            SchemathesisWarning.UNSUPPORTED_FIELD.value: sorted(self.unsupported_field),
             SchemathesisWarning.LOW_VALID_RATE.value: sorted(self.low_valid_rate_reported),
             SchemathesisWarning.RATE_LIMITED.value: sorted(self.rate_limited),
             SchemathesisWarning.DICTIONARY_MISMATCH.value: sorted(self.dictionary_mismatch),

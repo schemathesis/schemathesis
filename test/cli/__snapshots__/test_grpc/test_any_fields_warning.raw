@@ -1,0 +1,48 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from api.binpb (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 8 total
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+=================================== WARNINGS ===================================
+
+Unsupported fields: 1 operation sent requests without some fields
+
+  - types.Types/Envelope
+    `types.Envelope.extras` - `google.protobuf.Any` is not generated
+    `types.Envelope.payload` - `google.protobuf.Any` is not generated
+    `types.Meta.extra` - `google.protobuf.Any` is not generated
+
+💡 Fill these fields with a `map_body` hook
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/8
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ✅ Fuzzing
+  ⏭  Stateful (not supported)
+
+Warnings:
+  ⚠️ Unsupported fields: 1 operation had fields left out
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 1 warning in 1.00s ==============================

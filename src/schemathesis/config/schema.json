@@ -1112,7 +1112,8 @@
         "low_valid_rate",
         "rate_limited",
         "dictionary_mismatch",
-        "timeout_units"
+        "timeout_units",
+        "unsupported_field"
       ]
     },
     "WarningNameList": {
