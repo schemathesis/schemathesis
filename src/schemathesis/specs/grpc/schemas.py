@@ -26,6 +26,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import CallOutcome, Response
+from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.filters import FilterSet
@@ -255,13 +257,25 @@ class GrpcSchema(BaseSchema):
         return statistic
 
     @override
+    def iter_schema_warnings(self) -> list[SchemaWarning]:
+        return [
+            UnsupportedFieldWarning(operation_label=operation.label, field=name)
+            for operation in self._iter_operations()
+            for name in message_schema(operation.definition.raw.input_type).any_fields
+        ]
+
+    @override
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+        for operation in self._iter_operations():
+            yield Ok(operation)
+
+    def _iter_operations(self) -> Iterator[APIOperation]:
         for service in self.services.values():
             for method in service.methods:
                 if is_unary(method):
                     operation = self._build_operation(method)
                     if not self._should_skip(operation):
-                        yield Ok(operation)
+                        yield operation
 
     def _build_operation(self, method: MethodDescriptor) -> APIOperation:
         label = f"{method.containing_service.full_name}/{method.name}"
@@ -353,6 +367,26 @@ class GrpcSchema(BaseSchema):
 
     @override
     def create_extra_data_source(self) -> None:
+        return None
+
+
+@dataclass(slots=True)
+class UnsupportedFieldWarning:
+    """A request field Schemathesis leaves out of every generated message."""
+
+    operation_label: str | None
+    field: str
+
+    @property
+    def kind(self) -> SchemathesisWarning:
+        return SchemathesisWarning.UNSUPPORTED_FIELD
+
+    @property
+    def message(self) -> str:
+        return f"`{self.field}` - `google.protobuf.Any` is not generated"
+
+    @property
+    def group(self) -> str | None:
         return None
 
 

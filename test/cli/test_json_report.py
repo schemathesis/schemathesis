@@ -75,6 +75,7 @@ def test_report_shape(ctx, cli, json_path):
             "constants_extraction": [],
             "unmatched_filter": [],
             "unresolvable_reference": [],
+            "unsupported_field": [],
             "low_valid_rate": [],
             "rate_limited": [],
             "dictionary_mismatch": [],

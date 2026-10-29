@@ -502,6 +502,16 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 short_suffix="had parts of the schema skipped",
             )
         )
+    if warnings.unsupported_field:
+        blocks.append(
+            _detailed_block(
+                "Unsupported fields",
+                warnings.unsupported_field,
+                " sent requests without some fields",
+                "Fill these fields with a `map_body` hook",
+                short_suffix="had fields left out",
+            )
+        )
     if warnings.constants_extraction:
         blocks.append(
             list_block(

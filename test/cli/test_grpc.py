@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, users_descriptor_set, write_descriptor_set
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -60,4 +60,20 @@ def test_missing_grpc_extra():
     assert (result.returncode, result.stderr.splitlines()[-1]) == (
         1,
         "Error: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`",
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    write_descriptor_set(tmp_path, all_types_descriptor_set())
+    assert (
+        cli.run(
+            "api.binpb",
+            f"--url={server.target}",
+            "--include-name=types.Types/Envelope",
+            "--max-examples=1",
+            "--checks=response_schema_conformance",
+        )
+        == snapshot_cli
     )

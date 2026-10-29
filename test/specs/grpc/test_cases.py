@@ -5,6 +5,7 @@ from google.protobuf import json_format, message_factory
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
+from schemathesis.config import SchemathesisWarning
 from schemathesis.core.control import SkipTest
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -101,3 +102,18 @@ def test_every_positive_value_encodes(schema, method):
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
         json_format.ParseDict(case.body, message()).SerializeToString()
+
+
+def test_any_fields_are_reported(schema):
+    assert [
+        (warning.kind, warning.operation_label, warning.message, warning.group)
+        for warning in schema.iter_schema_warnings()
+    ] == [
+        (SchemathesisWarning.UNSUPPORTED_FIELD, label, f"`{field}` - `google.protobuf.Any` is not generated", None)
+        for label, field in [
+            ("types.Types/Envelope", "types.Envelope.payload"),
+            ("types.Types/Envelope", "types.Envelope.extras"),
+            ("types.Types/Envelope", "types.Meta.extra"),
+            ("types.Types/Legacy", "legacy.Legacy.blob"),
+        ]
+    ]

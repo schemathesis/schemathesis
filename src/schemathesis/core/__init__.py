@@ -101,7 +101,9 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
     SpecificationKind.GRAPHQL: frozenset(
         {SpecificationFeature.STATEFUL_TESTING, SpecificationFeature.COVERAGE, SpecificationFeature.HTTP_PROBES}
     ),
-    SpecificationKind.GRPC: frozenset({SpecificationFeature.STATUS_CODE_ANALYSIS}),
+    SpecificationKind.GRPC: frozenset(
+        {SpecificationFeature.STATUS_CODE_ANALYSIS, SpecificationFeature.SCHEMA_ANALYSIS}
+    ),
 }
 
 
