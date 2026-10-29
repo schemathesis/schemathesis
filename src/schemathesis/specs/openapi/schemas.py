@@ -369,6 +369,24 @@ class OpenApiSchema(BaseSchema):
         return {label for label, entry in transitions.operations.items() if entry.incoming}
 
     @override
+    def resource_producers(self) -> dict[str, set[str]]:
+        # From the inferred graph, so it reports what was found in the schema, not what the API can do.
+        operations = self.analysis.dependency_graph.operations
+        by_resource: dict[str, set[str]] = {}
+        for label, node in operations.items():
+            for output in node.outputs:
+                by_resource.setdefault(output.resource.name, set()).add(label)
+        producers: dict[str, set[str]] = {}
+        for label, node in operations.items():
+            if not node.inputs:
+                continue
+            found: set[str] = set()
+            for input_slot in node.inputs:
+                found |= by_resource.get(input_slot.resource.name, set())
+            producers[label] = found - {label}
+        return producers
+
+    @override
     def as_state_machine(self) -> type[APIStateMachine]:
         from schemathesis.python._constants.orchestrator import make_constants_value_source
 

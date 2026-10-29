@@ -111,3 +111,19 @@ def map_body(context, body):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_warning(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 404}
+        """
+    )
+    assert (
+        cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
+        == snapshot_cli
+    )
