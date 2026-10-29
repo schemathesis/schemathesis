@@ -252,7 +252,14 @@ def test_before_load_schema_hook_sees_descriptor_files(users_path):
         seen.append([file["name"] for file in raw_schema["file"]])
 
     schemathesis.grpc.from_path(users_path)
-    assert seen == [["google/protobuf/timestamp.proto", "users.proto", "google/longrunning/operations.proto"]]
+    assert seen == [
+        [
+            "google/protobuf/timestamp.proto",
+            "users.proto",
+            "google/longrunning/operations.proto",
+            "google/protobuf/any.proto",
+        ]
+    ]
 
 
 @pytest.mark.parametrize("level", ["service", "file"])

@@ -117,3 +117,15 @@ def test_reproduction_command_field_mask_as_object(tmp_path, method, body, expec
         f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: {case.id}' "
         f"-d {shlex.quote(json.dumps(expected))} 127.0.0.1:50051 types.Types/{method}"
     )
+
+
+def test_reproduction_command_decodes_any_packed_with_schema_type(tmp_path):
+    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
+    schema = schemathesis.grpc.from_path(path)
+    case = schema["types.Types"]["Envelope"].Case(body=b"\x12%\n\x1etype.googleapis.com/types.Node\x12\x03\n\x01n")
+    assert case.as_reproduction_command(
+        headers={"x-schemathesis-testcaseid": "abc"}, verify=True, base_url="grpc://127.0.0.1:50051"
+    ) == (
+        f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: abc' "
+        """-d '{"payload": {"@type": "type.googleapis.com/types.Node", "name": "n"}}' 127.0.0.1:50051 types.Types/Envelope"""
+    )
