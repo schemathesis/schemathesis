@@ -2698,8 +2698,13 @@ def test_path_parameters_always_present(ctx, schema, expected):
     )
 
 
-def test_path_parameters_without_constraints_negative(ctx):
-    # When there are no constraints, then we can't generate negative values as everything will match the previous schema
+@pytest.mark.parametrize(
+    "parameter_schema",
+    [{}, {"pattern": "'^[-._\\p{Tibetan}]+$'"}],
+    ids=["without-constraints", "unsupported-regex-pattern"],
+)
+def test_path_parameters_without_negative_values(ctx, parameter_schema):
+    # Nothing to negate: no constraints at all, or only an untranslatable PCRE pattern.
     schema = build_schema(
         ctx,
         [
@@ -2707,28 +2712,7 @@ def test_path_parameters_without_constraints_negative(ctx):
                 "name": "foo_id",
                 "in": "path",
                 "required": True,
-                "schema": {},
-            },
-        ],
-        path="/foo/{foo_id}",
-    )
-    assert_negative_coverage(
-        schema,
-        [],
-        ("/foo/{foo_id}", "post"),
-    )
-
-
-def test_path_parameters_with_unsupported_regex_pattern(ctx):
-    # Use an untranslatable PCRE pattern to test unsupported regex handling
-    schema = build_schema(
-        ctx,
-        [
-            {
-                "name": "foo_id",
-                "in": "path",
-                "required": True,
-                "schema": {"pattern": "'^[-._\\p{Tibetan}]+$'"},
+                "schema": parameter_schema,
             },
         ],
         path="/foo/{foo_id}",

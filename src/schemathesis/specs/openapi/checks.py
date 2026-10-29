@@ -21,7 +21,12 @@ from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.types import JsonSchema, as_object_schema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
-from schemathesis.core.parameters import ParameterLocation, plain_str_values
+from schemathesis.core.parameters import (
+    CONCRETE_LOCATIONS,
+    PARAMETER_LOCATIONS,
+    ParameterLocation,
+    plain_str_values,
+)
 from schemathesis.core.transport import (
     AUTH_REJECTION_STATUSES,
     HTTP_METHODS_SCHEMA,
@@ -335,13 +340,7 @@ def _has_other_negated_location(case: Case, *locations: ParameterLocation) -> bo
     """Whether a location outside `locations` carries a negation the server could act on."""
     meta = case.meta
     assert meta is not None
-    for other in (
-        ParameterLocation.PATH,
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-        ParameterLocation.BODY,
-    ):
+    for other in PARAMETER_LOCATIONS:
         if other in locations:
             continue
         if not meta.is_negative_at(other):
@@ -793,12 +792,7 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
 
     has_negative = False
 
-    for location in (
-        ParameterLocation.PATH,
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-    ):
+    for location in CONCRETE_LOCATIONS:
         if not meta.is_negative_at(location):
             continue
 

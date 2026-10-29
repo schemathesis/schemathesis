@@ -28,45 +28,17 @@ def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
 
 @pytest.mark.parametrize(
     "make_api",
-    [lambda apps: apps.bare_slug(), lambda apps: apps.relay_connection()],
-    ids=["bare-slug-arg", "relay-connection-producer"],
+    [
+        lambda apps: apps.bare_slug(),
+        lambda apps: apps.relay_connection(),
+        lambda apps: apps.use_after_delete(),
+        lambda apps: apps.double_delete(),
+    ],
+    ids=["bare-slug-arg", "relay-connection-producer", "use-after-delete", "double-delete"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_non_id_lookup_bug(ctx, cli, snapshot_cli, make_api):
-    # Bare `slug` resolves via the enclosing return type; the producer may be a Relay connection.
-    api = make_api(ctx.graphql.apps)
-    assert (
-        cli.run(
-            api.schema_url,
-            "--no-shrink",
-            "--max-examples=20",
-            "--seed=1",
-            "--phases=stateful",
-            "-m",
-            "positive",
-            "-c",
-            "not_a_server_error",
-        )
-        == snapshot_cli
-    )
-
-
-def _use_after_delete(apps):
-    return apps.use_after_delete()
-
-
-def _double_delete(apps):
-    return apps.double_delete()
-
-
-@pytest.mark.parametrize(
-    "make_api",
-    [_use_after_delete, _double_delete],
-    ids=["use-after-delete", "double-delete"],
-)
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_tombstone_bugs(ctx, cli, snapshot_cli, make_api):
-    # Tombstones expose use-after-delete and double-delete on a known-deleted resource.
+def test_stateful_finds_captured_value_bug(ctx, cli, snapshot_cli, make_api):
+    # Bare `slug` resolves via the enclosing return type; tombstones expose reads and deletes of a deleted resource.
     api = make_api(ctx.graphql.apps)
     assert (
         cli.run(

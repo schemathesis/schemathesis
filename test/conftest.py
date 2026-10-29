@@ -396,11 +396,6 @@ def testdir(testdir):
 
     testdir.run_and_assert = run_and_assert
 
-    def make_graphql_schema_file(schema: str, extension=".gql"):
-        return testdir.makefile(extension, schema=schema)
-
-    testdir.make_graphql_schema_file = make_graphql_schema_file
-
     return testdir
 
 

@@ -196,8 +196,3 @@ def matches_either(first: tuple[str, str], second: tuple[str, str]) -> bool:
 def same_family(first: str, second: str) -> bool:
     """Whether both media types are variations of the same well-known type, e.g. `application/json` and `+json`."""
     return any(check(first) and check(second) for check in (is_json, is_xml, is_plain_text, is_yaml))
-
-
-def matches(expected: str, actual: str) -> bool:
-    """Check if two media type strings match with wildcard support."""
-    return matches_parts(parse(expected), parse(actual))

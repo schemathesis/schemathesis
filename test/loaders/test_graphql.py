@@ -81,10 +81,8 @@ def test_graphql_file_loader(transform):
     assert_schema(schema)
 
 
-def test_graphql_path_loader(tmp_path):
-    path = tmp_path / "schema.graphql"
-    path.write_text(RAW_SCHEMA)
-    schema = loaders.from_path(path)
+def test_graphql_path_loader(ctx):
+    schema = loaders.from_path(ctx.graphql.write_sdl(RAW_SCHEMA))
     assert_schema(schema)
 
 

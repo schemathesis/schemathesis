@@ -19,7 +19,7 @@ from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_form_urlencoded, is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import EXTRA_PROPERTY_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.coverage._schema import ANNOTATION_KEYWORDS
 from schemathesis.specs.openapi.headers import PLAIN_HEADER_FORMATS
@@ -862,17 +862,7 @@ def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, a
     ):
         # Every value reaches the server as a string, which one of the branches accepts.
         return False
-    if (
-        not allow_extra_parameters
-        and key == "additionalProperties"
-        and location
-        in (
-            ParameterLocation.QUERY,
-            ParameterLocation.HEADER,
-            ParameterLocation.COOKIE,
-            ParameterLocation.BODY,
-        )
-    ):
+    if not allow_extra_parameters and key == "additionalProperties" and location in EXTRA_PROPERTY_LOCATIONS:
         return False
     return not (
         key in ("type", "properties", "items", "minItems") or (key == "additionalProperties" and location.is_in_header)

@@ -3833,7 +3833,15 @@ def test_path_param_without_matching_resource_field_does_not_link_to_missing_fie
     assert inferred_links(graph) == []
 
 
-def test_list_items_link_through_allof_inherited_identifier(ctx):
+@pytest.mark.parametrize(
+    "site",
+    [
+        {"allOf": [component_ref("Base")], "properties": {"kind": {"type": "string"}}},
+        {"allOf": [component_ref("Missing"), component_ref("Base")]},
+    ],
+    ids=["inherited-identifier", "sibling-branch-reference-dangles"],
+)
+def test_list_items_link_through_allof_identifier(ctx, site):
     paths = {
         **operation(
             "get", "/sites", "200", {"type": "array", "items": component_ref("Site")}, operation_id="listSites"
@@ -3843,34 +3851,7 @@ def test_list_items_link_through_allof_inherited_identifier(ctx):
     components = {
         "schemas": {
             "Base": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
-            "Site": {"allOf": [component_ref("Base")], "properties": {"kind": {"type": "string"}}},
-        }
-    }
-    _, graph = analyze_dependencies(ctx, paths, components=components)
-    assert inferred_links(graph) == [
-        [
-            "#/paths/~1sites/get",
-            "200",
-            {
-                "operationRef": "#/paths/~1sites~1{siteId}/get",
-                "parameters": {"path.siteId": "$response.body#/*/id"},
-                "x-schemathesis": {"is_inferred": True},
-            },
-        ]
-    ]
-
-
-def test_list_items_link_through_allof_identifier_when_sibling_branch_reference_dangles(ctx):
-    paths = {
-        **operation(
-            "get", "/sites", "200", {"type": "array", "items": component_ref("Site")}, operation_id="listSites"
-        ),
-        **operation("get", "/sites/{siteId}", "200", component_ref("Site"), [path_param("siteId")], "getSite"),
-    }
-    components = {
-        "schemas": {
-            "Base": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
-            "Site": {"allOf": [component_ref("Missing"), component_ref("Base")]},
+            "Site": site,
         }
     }
     _, graph = analyze_dependencies(ctx, paths, components=components)
@@ -11439,8 +11420,13 @@ def test_read_only_body_field_is_not_linked(ctx, url):
     ]
 
 
-def test_bare_object_delete_response_does_not_shadow_created_resource(ctx):
-    # `DELETE /files/{fileId}` answers with a bare object, which says nothing about what `fileId` identifies.
+@pytest.mark.parametrize(
+    "unrelated",
+    [{}, operation("post", "/events/file", "200", {"type": "object"})],
+    ids=["delete-response", "unrelated-same-name-producer"],
+)
+def test_bare_object_response_does_not_shadow_created_resource(ctx, unrelated):
+    # A bare object, even one named after the path, says nothing about what `fileId` identifies.
     components = {
         "schemas": {
             "StoredFile": {
@@ -11451,37 +11437,7 @@ def test_bare_object_delete_response_does_not_shadow_created_resource(ctx):
     }
     paths = {
         **operation("post", "/files", "200", component_ref("StoredFile")),
-        **operation("delete", "/files/{fileId}", "200", {"type": "object"}, [path_param("fileId", "integer")]),
-    }
-
-    _, graph = analyze_dependencies(ctx, paths, components=components)
-
-    assert inferred_links(graph) == [
-        [
-            "#/paths/~1files/post",
-            "200",
-            {
-                "operationRef": "#/paths/~1files~1{fileId}/delete",
-                "parameters": {"path.fileId": "$response.body#/id"},
-                "x-schemathesis": {"is_inferred": True},
-            },
-        ]
-    ]
-
-
-def test_unrelated_bare_object_of_the_same_name_does_not_shadow_created_resource(ctx):
-    # `POST /events/file` also answers with a bare object named after its path, but it is not the files collection.
-    components = {
-        "schemas": {
-            "StoredFile": {
-                "type": "object",
-                "properties": {"id": {"type": "integer", "readOnly": True}, "label": {"type": "string"}},
-            }
-        }
-    }
-    paths = {
-        **operation("post", "/files", "200", component_ref("StoredFile")),
-        **operation("post", "/events/file", "200", {"type": "object"}),
+        **unrelated,
         **operation("delete", "/files/{fileId}", "200", {"type": "object"}, [path_param("fileId", "integer")]),
     }
 

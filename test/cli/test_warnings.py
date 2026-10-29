@@ -890,10 +890,9 @@ type Query {
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_missing_test_data_for_graphql(cli, app_runner, tmp_path, snapshot_cli):
+def test_missing_test_data_for_graphql(ctx, cli, app_runner, snapshot_cli):
     # A 200 with neither `data` nor `errors` fails no check, so nothing else in the run says the query was never served.
-    sdl = tmp_path / "schema.graphql"
-    sdl.write_text(GRAPHQL_SDL)
+    sdl = ctx.graphql.write_sdl(GRAPHQL_SDL)
 
     app = Flask(__name__)
 
@@ -925,10 +924,9 @@ type Mutation {{
 
 # The canned responses ignore the selection set.
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_missing_test_data_for_graphql_survives_stateful(cli, app_runner, tmp_path, snapshot_cli):
+def test_missing_test_data_for_graphql_survives_stateful(ctx, cli, app_runner, snapshot_cli):
     # The mutation is served, so the stateful phase reaches the query - but it still returns no data.
-    sdl = tmp_path / "schema.graphql"
-    sdl.write_text(GRAPHQL_SDL_WITH_MUTATION)
+    sdl = ctx.graphql.write_sdl(GRAPHQL_SDL_WITH_MUTATION)
 
     app = Flask(__name__)
 

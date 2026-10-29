@@ -15,7 +15,7 @@ from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.jsonschema.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
 from schemathesis.core.jsonschema.resolver import find_unresolvable_reference
 from schemathesis.core.jsonschema.types import get_type
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import CONCRETE_LOCATIONS
 from schemathesis.core.result import Ok
 
 if TYPE_CHECKING:
@@ -138,12 +138,7 @@ def check_dictionary_bindings(
 
     generation_config = operation.schema.config.generation_for(operation=operation)
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
-    for location in (
-        ParameterLocation.PATH,
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-    ):
+    for location in CONCRETE_LOCATIONS:
         try:
             properties = cast("OpenApiParameterSet", operation.get_parameter_set(location)).schema.get("properties", {})
         except InvalidSchema:

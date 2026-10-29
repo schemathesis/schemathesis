@@ -46,8 +46,8 @@ type Query {
         assert f'getByDate(value: "{expected}")' in case.body
 
 
-def test_custom_scalar_in_cli(ctx, testdir, cli, snapshot_cli):
-    schema_file = testdir.make_graphql_schema_file(
+def test_custom_scalar_in_cli(ctx, cli, snapshot_cli):
+    schema_file = ctx.graphql.write_sdl(
         """
 scalar FooBar
 
@@ -55,13 +55,14 @@ type Query {
   getByDate(value: FooBar!): Int!
 }
     """,
+        filename="schema.gql",
     )
     api = ctx.graphql.apps.books()
     assert cli.run(str(schema_file), f"--url={api.schema_url}") == snapshot_cli
 
 
-def test_built_in_scalars_in_cli(ctx, testdir, cli):
-    schema_file = testdir.make_graphql_schema_file(
+def test_built_in_scalars_in_cli(ctx, cli):
+    schema_file = ctx.graphql.write_sdl(
         """
 scalar Date
 scalar Time
@@ -84,6 +85,7 @@ type Query {
   getByBigInt(value: BigInt!): Int!
   getByUUID(value: UUID!): Int!
 }""",
+        filename="schema.gql",
     )
     api = ctx.graphql.apps.books()
     result = cli.run_and_assert(
@@ -149,9 +151,9 @@ def test_unsupported_scalar_is_not_reported_as_impossible_negative(ctx, modes):
     ids=["unsatisfiable", "large-base-example"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_custom_scalar_generation_uses_generic_diagnostics(ctx, testdir, cli, snapshot_cli, strategy):
+def test_custom_scalar_generation_uses_generic_diagnostics(ctx, cli, snapshot_cli, strategy):
     schemathesis.graphql.scalar("FooBar", strategy)
-    schema_file = testdir.make_graphql_schema_file(UNSUPPORTED_SCALAR_SDL)
+    schema_file = ctx.graphql.write_sdl(UNSUPPORTED_SCALAR_SDL, filename="schema.gql")
     api = ctx.graphql.apps.books()
     assert cli.run(str(schema_file), f"--url={api.schema_url}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
 

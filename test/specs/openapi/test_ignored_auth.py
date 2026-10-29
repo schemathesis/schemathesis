@@ -451,31 +451,30 @@ def test_ignored_auth_with_cookie_jar_kwarg():
     ]
 
 
-# Frameworks whose first authentication scheme offers no challenge answer 403 instead of 401.
-def test_forbidden_response_counts_as_enforced_auth():
+def _api_with_basic_auth(*, missing=401, invalid=401, documented=(200, 401)):
     app = FastAPI()
     api_key = APIKeyHeader(name="Authorization", auto_error=False)
 
-    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
+    @app.get("/", responses={status_code: {"model": {}} for status_code in documented})
     def root(credentials: Annotated[str | None, Security(api_key)]):
+        if credentials is None:
+            raise HTTPException(status_code=missing)
         if credentials != "Basic dGVzdDp0ZXN0":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+            raise HTTPException(status_code=invalid)
         return {"message": "OK"}
 
+    return app
+
+
+# Frameworks whose first authentication scheme offers no challenge answer 403 instead of 401.
+def test_forbidden_response_counts_as_enforced_auth():
+    app = _api_with_basic_auth(missing=403, invalid=403, documented=(200, 401, 403))
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     schema["/"]["GET"].Case().call_and_validate(session=ASGIClient(app), auth=("test", "test"), checks=[ignored_auth])
 
 
 def test_server_error_without_auth_is_reported():
-    app = FastAPI()
-    api_key = APIKeyHeader(name="Authorization", auto_error=False)
-
-    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
-    def root(credentials: Annotated[str | None, Security(api_key)]):
-        if credentials != "Basic dGVzdDp0ZXN0":
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return {"message": "OK"}
-
+    app = _api_with_basic_auth(missing=500, invalid=500)
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     with pytest.raises(FailureGroup) as exc:
         schema["/"]["GET"].Case().call_and_validate(
@@ -485,21 +484,6 @@ def test_server_error_without_auth_is_reported():
         "Unexpected response to a request without authentication\n\n"
         "Expected 401 or 403, got `500 Internal Server Error` for `GET /`"
     )
-
-
-def _api_answering_invalid_auth_with(status_code):
-    app = FastAPI()
-    api_key = APIKeyHeader(name="Authorization", auto_error=False)
-
-    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
-    def root(credentials: Annotated[str | None, Security(api_key)]):
-        if credentials is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-        if credentials != "Basic dGVzdDp0ZXN0":
-            raise HTTPException(status_code=status_code)
-        return {"message": "OK"}
-
-    return app
 
 
 @pytest.mark.parametrize(
@@ -514,7 +498,7 @@ def _api_answering_invalid_auth_with(status_code):
     ids=["redirect", "last-redirect-status", "bad-request", "server-error", "unknown-status"],
 )
 def test_invalid_auth_probe_response(status_code, expected):
-    app = _api_answering_invalid_auth_with(status_code)
+    app = _api_with_basic_auth(invalid=status_code)
     case = schemathesis.openapi.from_asgi("/openapi.json", app)["/"]["GET"].Case()
     try:
         case.call_and_validate(session=ASGIClient(app), auth=("test", "test"), checks=[ignored_auth])
@@ -770,15 +754,7 @@ async def data(api_key: str = Depends(get_api_key)):
 
 def test_explicit_auth_tuple_in_call_and_validate():
     # GH-3386: `auth` kwarg passed to `call_and_validate` is not forwarded to CheckContext
-    app = FastAPI()
-    api_key = APIKeyHeader(name="Authorization", auto_error=False)
-
-    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
-    def root(credentials: Annotated[str | None, Security(api_key)]):
-        if credentials is None or credentials != "Basic dGVzdDp0ZXN0":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-        return {"message": "OK"}
-
+    app = _api_with_basic_auth()
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     case = schema["/"]["GET"].Case()
     client = ASGIClient(app)

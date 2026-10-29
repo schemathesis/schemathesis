@@ -183,6 +183,15 @@ def build_metadata(
     )
 
 
+def _assert_rejection(case, response, *, reported, context=None):
+    context = check_context() if context is None else context
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(context, response, case)
+    else:
+        assert negative_data_rejection(context, response, case) is None
+
+
 def sample_paths():
     return {
         "/test": {
@@ -925,7 +934,7 @@ def test_additional_properties_hint_follows_response_attribution(ctx, response_f
 
 
 @pytest.mark.parametrize(
-    ("status_code", "should_raise"),
+    ("status_code", "reported"),
     [
         pytest.param(405, False, id="405-method-not-allowed-passes"),
         # 409 short-circuits validation on uniqueness-gated endpoints (duplicate email etc.)
@@ -937,7 +946,7 @@ def test_additional_properties_hint_follows_response_attribution(ctx, response_f
     ],
 )
 def test_negative_data_rejection_passes_for_rejection_status_codes(
-    response_factory, sample_schema, status_code, should_raise
+    response_factory, sample_schema, status_code, reported
 ):
     response = response_factory.requests(status_code=status_code)
     operation = sample_schema["/test"]["POST"]
@@ -948,12 +957,7 @@ def test_negative_data_rejection_passes_for_rejection_status_codes(
         ),
         query={"key": 1},
     )
-    ctx = check_context()
-    if should_raise:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(ctx, response, case)
-    else:
-        assert negative_data_rejection(ctx, response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 def test_negative_data_rejection_on_additional_properties(response_factory, sample_schema):
@@ -1218,11 +1222,7 @@ def test_negative_data_rejection_reports_type_mutations_of_wrapped_scalar_query(
         query=query,
     )
     response = case.call()
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 _PATH_TYPE_MUTATION = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="id", location=ParameterLocation.PATH)
@@ -1309,16 +1309,12 @@ def test_negative_data_rejection_reports_when_one_location_stays_invalid_on_the_
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
-@pytest.mark.parametrize(("value", "is_accepted"), [("-1", True), ("5", False)], ids=["below-minimum", "valid"])
+@pytest.mark.parametrize(("value", "reported"), [("-1", True), ("5", False)], ids=["below-minimum", "valid"])
 def test_negative_data_rejection_validates_numeric_wire_value_against_query_schema(
-    response_factory, path_and_query_schema, value, is_accepted
+    response_factory, path_and_query_schema, value, reported
 ):
     case = _path_and_query_case(path_and_query_schema, {"id": 7}, {"key": value}, {"X-Key": 7}, (_QUERY_TYPE_MUTATION,))
-    if is_accepted:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response_factory.requests(), case)
-    else:
-        assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+    _assert_rejection(case, response_factory.requests(), reported=reported)
 
 
 @pytest.mark.parametrize(
@@ -1378,23 +1374,19 @@ def test_negative_data_rejection_blank_numeric_query(ctx, response_factory, decl
     response = response_factory.requests()
     response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
 
-    if required:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=required)
 
 
 @pytest.mark.parametrize(
-    ("query", "headers", "accepted"),
+    ("query", "headers", "reported"),
     [
-        ({"title": 5}, {"X-Mode": " 3 "}, True),
-        ({"limit": "", "title": 5}, {"X-Mode": " 3 "}, True),
-        ({"title": "a", "flag": "true"}, {"X-Mode": " 3 "}, True),
-        ({"title": "a", "limit": 5}, {"X-Mode": " 3 "}, True),
-        ({"flag": None, "title": 5}, {"X-Mode": " 3 "}, True),
-        ({"title": ["a", "b"]}, {"X-Mode": " 3 "}, False),
-        ({"title": 5}, {"X-Mode": "bad"}, False),
+        ({"title": 5}, {"X-Mode": " 3 "}, False),
+        ({"limit": "", "title": 5}, {"X-Mode": " 3 "}, False),
+        ({"title": "a", "flag": "true"}, {"X-Mode": " 3 "}, False),
+        ({"title": "a", "limit": 5}, {"X-Mode": " 3 "}, False),
+        ({"flag": None, "title": 5}, {"X-Mode": " 3 "}, False),
+        ({"title": ["a", "b"]}, {"X-Mode": " 3 "}, True),
+        ({"title": 5}, {"X-Mode": "bad"}, True),
     ],
     ids=[
         "integer-sent-as-string",
@@ -1406,7 +1398,7 @@ def test_negative_data_rejection_blank_numeric_query(ctx, response_factory, decl
         "bad-header",
     ],
 )
-def test_negative_data_rejection_validates_query_and_headers_as_sent(ctx, response_factory, query, headers, accepted):
+def test_negative_data_rejection_validates_query_and_headers_as_sent(ctx, response_factory, query, headers, reported):
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
@@ -1429,11 +1421,7 @@ def test_negative_data_rejection_validates_query_and_headers_as_sent(ctx, respon
     response = response_factory.requests()
     response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
 
-    if accepted:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=reported)
 
 
 def test_negative_data_rejection_reports_invalid_query_beside_negated_path(ctx, response_factory):
@@ -1499,11 +1487,7 @@ def test_negative_data_rejection_skips_body_replaced_by_caller(
     response = response_factory.requests()
     response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
 
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(context, response, case)
-    else:
-        assert negative_data_rejection(context, response, case) is None
+    _assert_rejection(case, response, reported=reported, context=context)
 
 
 def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_value(ctx, response_factory):
@@ -1537,40 +1521,40 @@ def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_val
 
 
 @pytest.mark.parametrize(
-    ("parameter", "value", "query", "accepted"),
+    ("parameter", "value", "query", "reported"),
     [
-        ({"schema": {"type": "string"}}, {"first": [], "second": None}, "title=first&title=second", True),
-        ({"schema": {"type": "string", "maxLength": 3}}, {"long": [], "ok": None}, "title=long&title=ok", True),
-        ({"schema": {"enum": ["ok"]}}, {"bad": [], "worse": None}, "title=bad&title=worse", False),
-        ({"schema": {"enum": ["ok"]}}, {"bad": [], "ok": None}, "title=bad&title=ok", True),
+        ({"schema": {"type": "string"}}, {"first": [], "second": None}, "title=first&title=second", False),
+        ({"schema": {"type": "string", "maxLength": 3}}, {"long": [], "ok": None}, "title=long&title=ok", False),
+        ({"schema": {"enum": ["ok"]}}, {"bad": [], "worse": None}, "title=bad&title=worse", True),
+        ({"schema": {"enum": ["ok"]}}, {"bad": [], "ok": None}, "title=bad&title=ok", False),
         (
             {"schema": {"enum": ["asc"]}, "allowEmptyValue": True},
             ["null", {"key": [], "": None}],
             "title=null&title=key&title=",
-            True,
+            False,
         ),
-        ({"schema": {"enum": ["asc"]}}, ["null", {"key": [], "": None}], "title=null&title=key&title=", False),
-        ({"schema": {"type": "string"}}, [[{"key": "value"}]], "title=%7B%27key%27%3A+%27value%27%7D", True),
-        ({"schema": {"enum": ["asc"]}}, [[{"key": "value"}]], "title=%7B%27key%27%3A+%27value%27%7D", False),
+        ({"schema": {"enum": ["asc"]}}, ["null", {"key": [], "": None}], "title=null&title=key&title=", True),
+        ({"schema": {"type": "string"}}, [[{"key": "value"}]], "title=%7B%27key%27%3A+%27value%27%7D", False),
+        ({"schema": {"enum": ["asc"]}}, [[{"key": "value"}]], "title=%7B%27key%27%3A+%27value%27%7D", True),
         (
             {"schema": {"type": "string", "maxLength": 200}, "allowEmptyValue": True},
             [[{"key": "value"}]],
             "title=%7B%27key%27%3A+%27value%27%7D",
-            True,
+            False,
         ),
         (
             {"schema": {"type": "array", "items": {"enum": ["ok"]}}},
             {"bad": [], "ok": None},
             "title=bad&title=ok",
-            False,
+            True,
         ),
         *(
-            ({"schema": {"type": "number", "maximum": 10}}, ["bad", {text: None}], f"title=bad&title={text}", True)
+            ({"schema": {"type": "number", "maximum": 10}}, ["bad", {text: None}], f"title=bad&title={text}", False)
             for text in ("nan", "inf", "-Infinity", "1e400")
         ),
-        ({"schema": {"type": "boolean"}}, ["abc", "yes"], "title=abc&title=yes", True),
-        ({"schema": {"type": "boolean"}}, ["abc", {"On": None}], "title=abc&title=On", True),
-        ({"schema": {"type": "boolean"}}, ["abc", {"enabled": None}], "title=abc&title=enabled", False),
+        ({"schema": {"type": "boolean"}}, ["abc", "yes"], "title=abc&title=yes", False),
+        ({"schema": {"type": "boolean"}}, ["abc", {"On": None}], "title=abc&title=On", False),
+        ({"schema": {"type": "boolean"}}, ["abc", {"enabled": None}], "title=abc&title=enabled", True),
     ],
     ids=[
         "object-keys",
@@ -1593,7 +1577,7 @@ def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_val
     ],
 )
 def test_negative_data_rejection_validates_scalar_query_by_sent_values(
-    ctx, response_factory, parameter, value, query, accepted
+    ctx, response_factory, parameter, value, query, reported
 ):
     operation = ctx.openapi.load_operation(
         "GET /items",
@@ -1614,24 +1598,20 @@ def test_negative_data_rejection_validates_scalar_query_by_sent_values(
     response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
 
     assert response.request.url == f"http://127.0.0.1/items?{query}"
-    if accepted:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize(
-    ("license_required", "license", "collection", "path", "url", "accepted"),
+    ("license_required", "license", "collection", "path", "url", "reported"),
     [
-        (False, [], "", "/audio", "http://127.0.0.1/audio?collection=", True),
-        (False, None, "", "/audio", "http://127.0.0.1/audio?collection=", True),
-        (True, [], "", "/audio", "http://127.0.0.1/audio?collection=", False),
-        (False, [], "bogus", "/audio", "http://127.0.0.1/audio?collection=bogus", False),
-        (False, [], "", "/other", "http://127.0.0.1/other?collection=", False),
-        (False, [], ["bogus", ""], "/audio", "http://127.0.0.1/audio?collection=bogus&collection=", True),
-        (False, [], {"tag": None}, "/audio", "http://127.0.0.1/audio?collection=tag", True),
-        (False, None, ["bogus", "worse"], "/audio", "http://127.0.0.1/audio?collection=bogus&collection=worse", False),
+        (False, [], "", "/audio", "http://127.0.0.1/audio?collection=", False),
+        (False, None, "", "/audio", "http://127.0.0.1/audio?collection=", False),
+        (True, [], "", "/audio", "http://127.0.0.1/audio?collection=", True),
+        (False, [], "bogus", "/audio", "http://127.0.0.1/audio?collection=bogus", True),
+        (False, [], "", "/other", "http://127.0.0.1/other?collection=", True),
+        (False, [], ["bogus", ""], "/audio", "http://127.0.0.1/audio?collection=bogus&collection=", False),
+        (False, [], {"tag": None}, "/audio", "http://127.0.0.1/audio?collection=tag", False),
+        (False, None, ["bogus", "worse"], "/audio", "http://127.0.0.1/audio?collection=bogus&collection=worse", True),
     ],
     ids=[
         "empty-list",
@@ -1645,7 +1625,7 @@ def test_negative_data_rejection_validates_scalar_query_by_sent_values(
     ],
 )
 def test_negative_data_rejection_validates_optional_query_omitted_on_the_wire(
-    ctx, response_factory, license_required, license, collection, path, url, accepted
+    ctx, response_factory, license_required, license, collection, path, url, reported
 ):
     operation = ctx.openapi.load_operation(
         "GET /audio",
@@ -1683,20 +1663,16 @@ def test_negative_data_rejection_validates_optional_query_omitted_on_the_wire(
     response.request.prepare_url(f"http://127.0.0.1{path}", case.as_transport_kwargs()["params"])
 
     assert response.request.url == url
-    if accepted:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize(
-    ("authority", "accepted"),
-    [("0", True), (0, True), ("yes", True), ("enabled", False)],
+    ("authority", "reported"),
+    [("0", False), (0, False), ("yes", False), ("enabled", True)],
     ids=["zero-text", "zero-integer", "yes", "unknown-spelling"],
 )
 def test_negative_data_rejection_validates_boolean_spelling_beside_another_mutation(
-    ctx, response_factory, authority, accepted
+    ctx, response_factory, authority, reported
 ):
     operation = ctx.openapi.load_operation(
         "GET /audio",
@@ -1722,11 +1698,7 @@ def test_negative_data_rejection_validates_boolean_spelling_beside_another_mutat
     response = response_factory.requests()
     response.request.prepare_url("http://127.0.0.1/audio", case.as_transport_kwargs()["params"])
 
-    if accepted:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=reported)
 
 
 _NULLABLE_FLAG = {"schema": {"type": "boolean", "nullable": True}, "allowEmptyValue": True}
@@ -1734,7 +1706,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
 
 
 @pytest.mark.parametrize(
-    ("version", "parameters", "query", "mutations", "path", "url", "accepted"),
+    ("version", "parameters", "query", "mutations", "path", "url", "reported"),
     [
         (
             "3.0.2",
@@ -1754,7 +1726,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             ),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=null&full_size=null",
-            True,
+            False,
         ),
         (
             "3.1.0",
@@ -1763,7 +1735,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="compressed"),),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=null",
-            True,
+            False,
         ),
         (
             "2.0",
@@ -1772,7 +1744,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_NEGATED_NULLABLE_FLAG,),
             "/api/thumb",
             "http://127.0.0.1/api/thumb?compressed=null",
-            True,
+            False,
         ),
         (
             "3.0.2",
@@ -1781,7 +1753,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_NEGATED_NULLABLE_FLAG,),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=NULL",
-            True,
+            False,
         ),
         (
             "3.0.2",
@@ -1790,7 +1762,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_NEGATED_NULLABLE_FLAG,),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=Null",
-            True,
+            False,
         ),
         (
             "3.0.2",
@@ -1799,7 +1771,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_NEGATED_NULLABLE_FLAG,),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=bogus&compressed=null",
-            True,
+            False,
         ),
         (
             "3.0.2",
@@ -1808,7 +1780,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="compressed"),),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=null",
-            False,
+            True,
         ),
         (
             "3.0.2",
@@ -1820,7 +1792,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_NEGATED_NULLABLE_FLAG, _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("enum",), parameter="collection")),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=null&collection=bogus",
-            False,
+            True,
         ),
         (
             "3.0.2",
@@ -1829,7 +1801,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_NEGATED_NULLABLE_FLAG,),
             "/other",
             "http://127.0.0.1/other?compressed=null",
-            False,
+            True,
         ),
         (
             "3.0.2",
@@ -1841,7 +1813,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_ADDITIONAL_PROPERTIES_MUTATION,),
             "/thumb",
             "http://127.0.0.1/thumb?full_size=true&compressed=null",
-            True,
+            False,
         ),
         (
             "3.0.2",
@@ -1853,7 +1825,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             (_ADDITIONAL_PROPERTIES_MUTATION,),
             "/thumb",
             "http://127.0.0.1/thumb?compressed=null&=false",
-            True,
+            False,
         ),
     ],
     ids=[
@@ -1872,7 +1844,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
 )
 @pytest.mark.parametrize("phase", [TestPhase.FUZZING, TestPhase.STATEFUL], ids=["fuzzing", "stateful"])
 def test_negative_data_rejection_validates_null_text_for_nullable_query(
-    ctx, response_factory, version, parameters, query, mutations, path, url, accepted, phase
+    ctx, response_factory, version, parameters, query, mutations, path, url, reported, phase
 ):
     operation = ctx.openapi.load_operation(
         "GET /thumb", {"parameters": parameters, "responses": {"200": {"description": "OK"}}}, version=version
@@ -1890,21 +1862,17 @@ def test_negative_data_rejection_validates_null_text_for_nullable_query(
     response.request.prepare_url(f"http://127.0.0.1{path}", case.as_transport_kwargs()["params"])
 
     assert response.request.url == url
-    if accepted:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize("location", [ParameterLocation.HEADER, ParameterLocation.COOKIE], ids=["header", "cookie"])
 @pytest.mark.parametrize(
-    ("value", "accepted"),
-    [("yes", True), ("0", True), ("True", True), ("enabled", False)],
+    ("value", "reported"),
+    [("yes", False), ("0", False), ("True", False), ("enabled", True)],
     ids=["yes", "zero", "capitalized", "unknown-spelling"],
 )
 def test_negative_data_rejection_validates_boolean_spelling_in_headers_and_cookies(
-    ctx, response_factory, location, value, accepted
+    ctx, response_factory, location, value, reported
 ):
     operation = ctx.openapi.load_operation(
         "GET /items",
@@ -1914,26 +1882,22 @@ def test_negative_data_rejection_validates_boolean_spelling_in_headers_and_cooki
         },
     )
     case = _negative_case(operation, location, "flag", None, **{location.container_name: {"flag": value}})
-    if accepted:
-        assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response_factory.requests(), case)
+    _assert_rejection(case, response_factory.requests(), reported=reported)
 
 
 @pytest.mark.parametrize(
-    ("value", "accepted"),
+    ("value", "reported"),
     [
-        ("a" * 255 + " ", True),
-        ("a" * 252 + "\t\t\t\t", True),
-        (" \t", False),
-        ("a" * 256 + " ", False),
+        ("a" * 255 + " ", False),
+        ("a" * 252 + "\t\t\t\t", False),
+        (" \t", True),
+        ("a" * 256 + " ", True),
     ],
     ids=["trailing-space", "trailing-tabs", "only-whitespace", "too-long"],
 )
 @pytest.mark.parametrize("extra", [{}, {"X-Extra": "1"}], ids=["declared-only", "with-undeclared-header"])
 def test_negative_data_rejection_validates_headers_without_surrounding_whitespace(
-    ctx, response_factory, value, accepted, extra
+    ctx, response_factory, value, reported, extra
 ):
     # HTTP servers drop leading and trailing spaces and tabs from header values before the application reads them.
     operation = ctx.openapi.load_operation(
@@ -1954,11 +1918,7 @@ def test_negative_data_rejection_validates_headers_without_surrounding_whitespac
         operation, ParameterLocation.HEADER, "Idempotency-Key", None, headers={"Idempotency-Key": value, **extra}
     )
     response = response_factory.requests(status_code=201)
-    if accepted:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=reported)
 
 
 def test_negative_data_rejection_reports_object_query_with_another_invalid_parameter(ctx, response_factory):
@@ -2285,7 +2245,7 @@ _READ_ONLY_COMPONENTS = {
 
 # A server may ignore a read-only property instead of rejecting it, so that alone is not a failure.
 @pytest.mark.parametrize(
-    ("ref", "body", "raises"),
+    ("ref", "body", "reported"),
     [
         ("Item", {"name": "", "id": {}}, False),
         ("Widget", {"name": "", "id": {}}, False),
@@ -2317,7 +2277,7 @@ _READ_ONLY_COMPONENTS = {
         "schema-the-validator-rejects",
     ],
 )
-def test_negative_data_rejection_read_only_property(ctx, response_factory, ref, body, raises):
+def test_negative_data_rejection_read_only_property(ctx, response_factory, ref, body, reported):
     operation = ctx.openapi.load_operation(
         "POST /items",
         {
@@ -2335,16 +2295,12 @@ def test_negative_data_rejection_read_only_property(ctx, response_factory, ref, 
         _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
     )
     response = response_factory.requests(status_code=201)
-    if raises:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 # Only the alternative matching the case media type decides; an undeclared one leaves the failure standing.
 @pytest.mark.parametrize(
-    ("declared", "media_type", "raises"),
+    ("declared", "media_type", "reported"),
     [
         ("application/xml", "application/xml", False),
         ("application/xml; charset=utf-8", "application/xml", False),
@@ -2352,7 +2308,7 @@ def test_negative_data_rejection_read_only_property(ctx, response_factory, ref, 
     ],
     ids=["declared-media-type", "declared-with-parameters", "undeclared-media-type"],
 )
-def test_negative_data_rejection_read_only_property_media_types(ctx, response_factory, declared, media_type, raises):
+def test_negative_data_rejection_read_only_property_media_types(ctx, response_factory, declared, media_type, reported):
     operation = ctx.openapi.load_operation(
         "POST /items",
         {
@@ -2373,11 +2329,7 @@ def test_negative_data_rejection_read_only_property_media_types(ctx, response_fa
         _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
     )
     response = response_factory.requests(status_code=201)
-    if raises:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize(
@@ -3038,11 +2990,7 @@ def test_negative_data_rejection_single_element_array_beside_other_parameters(
     response = response_factory.requests()
     response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
 
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 def test_negative_data_rejection_single_element_array_serialization(ctx, response_factory):
@@ -3130,13 +3078,11 @@ def test_negative_data_rejection_non_mapping_query_with_another_invalid_location
 
 
 @pytest.mark.parametrize(
-    ("value", "is_accepted_negative"),
+    ("value", "reported"),
     [(["false"], True), ([-1], True), (["5"], False), ([5], False)],
     ids=["non-numeric-string", "below-minimum", "numeric-string", "valid-integer"],
 )
-def test_negative_data_rejection_single_element_array_element_validity(
-    ctx, response_factory, value, is_accepted_negative
-):
+def test_negative_data_rejection_single_element_array_element_validity(ctx, response_factory, value, reported):
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
@@ -3151,11 +3097,7 @@ def test_negative_data_rejection_single_element_array_element_validity(
         query={"id": value},
     )
     response = response_factory.requests(status_code=200)
-    if is_accepted_negative:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize(
@@ -3200,12 +3142,12 @@ def _type_mutation(name, location, new_value):
 
 @pytest.mark.parametrize("other_location", [ParameterLocation.QUERY, ParameterLocation.HEADER], ids=["query", "header"])
 @pytest.mark.parametrize(
-    ("other_value", "other_is_negated", "is_accepted_negative"),
+    ("other_value", "other_is_negated", "reported"),
     [("not-an-int", True, True), ("7", False, False)],
     ids=["other-invalid", "other-valid"],
 )
 def test_negative_data_rejection_valid_array_element_beside_invalid_parameter(
-    ctx, response_factory, other_location, other_value, other_is_negated, is_accepted_negative
+    ctx, response_factory, other_location, other_value, other_is_negated, reported
 ):
     operation = ctx.openapi.load_operation(
         "GET /items",
@@ -3234,11 +3176,7 @@ def test_negative_data_rejection_valid_array_element_beside_invalid_parameter(
         headers=headers,
     )
     response = response_factory.requests(status_code=200)
-    if is_accepted_negative:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize("page", ["null", ["null", "null"]], ids=["single", "repeated"])
@@ -3365,11 +3303,7 @@ def test_negative_data_rejection_query_string_parameter_wire_form(ctx, response_
     )
     response = response_factory.requests(status_code=200)
 
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize(
@@ -3401,11 +3335,7 @@ def test_negative_data_rejection_query_allow_empty_value(ctx, response_factory, 
     )
     response = response_factory.requests(status_code=200)
 
-    if allow_empty_value is True:
-        assert negative_data_rejection(check_context(), response, case) is None
-    else:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
+    _assert_rejection(case, response, reported=allow_empty_value is not True)
 
 
 @pytest.mark.parametrize(
@@ -3449,11 +3379,7 @@ def test_negative_data_rejection_path_array_negated_to_scalar(ctx, response_fact
     )
     response = response_factory.requests(status_code=200)
 
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 @pytest.mark.parametrize(
@@ -3491,11 +3417,7 @@ def test_negative_data_rejection_path_array_beside_other_path_parameter(
     )
     response = response_factory.requests(status_code=200)
 
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 def test_negative_data_rejection_path_string_numeric_serialization_with_other_negation(ctx, response_factory):
@@ -5082,11 +5004,7 @@ def test_negative_data_rejection_single_parameter(
         operation, location, "value", mutation, phase=phase, **{location.container_name: {"value": value}}
     )
     response = response_factory.requests(status_code=200)
-    if reported:
-        with pytest.raises(AcceptedNegativeData):
-            negative_data_rejection(check_context(), response, case)
-    else:
-        assert negative_data_rejection(check_context(), response, case) is None
+    _assert_rejection(case, response, reported=reported)
 
 
 # Validity can't be decided when the validator rejects the schema itself, so nothing is reported.
