@@ -31,7 +31,7 @@ from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.generation.jsonschema.strategy import DECLINED
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.adapter.parameters import _constant_values_at_draws, _prune_modified_constants
-from schemathesis.specs.openapi.formats import HEADER_FORMAT, format_lengths_for, header_alphabet
+from schemathesis.specs.openapi.formats import HEADER_FORMAT, cookie_alphabet, format_lengths_for, header_alphabet
 from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
@@ -339,7 +339,10 @@ def negative_schema(
 
     if location.is_in_header:
         # Header names and values answer to the same character rules whoever asks for them.
-        alphabet = header_alphabet(generation_config)
+        if location == ParameterLocation.COOKIE:
+            alphabet = cookie_alphabet(generation_config)
+        else:
+            alphabet = header_alphabet(generation_config)
         custom_formats = {name: strategy for name, strategy in custom_formats.items() if name != HEADER_FORMAT}
     else:
         alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
