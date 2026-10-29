@@ -1,0 +1,14 @@
+Exit code: 0
+---
+Stdout:
+ST117  Response does not decode as the declared message
+checks response_schema_conformance
+
+gRPC response or status details that do not decode as the declared message.
+
+A successful response must decode as the method's output message, and
+`grpc-status-details-bin` on an error must decode as `google.rpc.Status`.
+Regenerate the descriptor set if the server's protos changed.
+
+`--exclude-checks response_schema_conformance` turns it off, along with ST109,
+ST110, ST111, ST114, ST115, ST116.

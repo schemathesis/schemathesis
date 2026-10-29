@@ -9,7 +9,7 @@ import grpc
 import trustme
 from google.protobuf import descriptor_database, descriptor_pb2, descriptor_pool, message_factory
 
-from test.apps.catalog.grpc.descriptors import users_descriptor_set
+from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
 
 
 @dataclass(slots=True)
@@ -38,11 +38,9 @@ class GrpcApp:
     descriptor_set: bytes = field(default_factory=users_descriptor_set)
 
     def make_server(self, directory: Path) -> GrpcServer:
-        descriptor_set_path = directory / "api.binpb"
-        descriptor_set_path.write_bytes(self.descriptor_set)
         server = GrpcServer(
             target=f"grpc://127.0.0.1:{self.port}",
-            descriptor_set_path=descriptor_set_path,
+            descriptor_set_path=write_descriptor_set(directory, self.descriptor_set),
             calls=self.calls,
             server=self.server,
         )
@@ -99,6 +97,8 @@ def users(*, tls: bool = False, client_auth: bool = False) -> GrpcApp:
             context.abort(grpc.StatusCode.INTERNAL, "negative id")
         if user_id == 503:
             context.abort(grpc.StatusCode.UNAVAILABLE, "")
+        if user_id == 9:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, "locked")
         if user_id == 13:
             time.sleep(1)
         context.send_initial_metadata((("x-served-by", "users"),))

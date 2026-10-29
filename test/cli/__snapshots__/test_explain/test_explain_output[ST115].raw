@@ -7,4 +7,4 @@ checks response_schema_conformance
 GraphQL response that is not a JSON object, such as a list, a string or null.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109,
-ST110, ST111, ST114, ST116.
+ST110, ST111, ST114, ST116, ST117.

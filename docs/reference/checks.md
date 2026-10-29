@@ -143,7 +143,7 @@ Header values are coerced into appropriate JSON Schema types before validation, 
 
 ### `response_schema_conformance`
 
-Failure codes: [ST104](failures.md#st104), [ST108](failures.md#st108), [ST109](failures.md#st109), [ST110](failures.md#st110), [ST111](failures.md#st111), [ST114](failures.md#st114), [ST115](failures.md#st115), [ST116](failures.md#st116).
+Failure codes: [ST104](failures.md#st104), [ST108](failures.md#st108), [ST109](failures.md#st109), [ST110](failures.md#st110), [ST111](failures.md#st111), [ST114](failures.md#st114), [ST115](failures.md#st115), [ST116](failures.md#st116), [ST117](failures.md#st117).
 
 Validates the response body against its JSON Schema definition. Catches format mismatches, missing required properties, type errors, and more.
 

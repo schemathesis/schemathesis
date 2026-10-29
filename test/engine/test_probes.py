@@ -14,7 +14,7 @@ from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import PhaseName, probes
-from test.apps.catalog.grpc.descriptors import users_descriptor_set
+from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
 from test.utils import EventStream, refusing_url, run_given
 
 
@@ -237,7 +237,5 @@ def test_ctrl_c(ctx, cli, snapshot_cli):
 
 
 def test_grpc_schemas_send_no_http_probes(tmp_path):
-    path = tmp_path / "api.binpb"
-    path.write_bytes(users_descriptor_set())
-    schema = schemathesis.grpc.from_path(path)
+    schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, users_descriptor_set()))
     assert probes.run(EngineContext(schema=schema, stop_event=threading.Event())) == []

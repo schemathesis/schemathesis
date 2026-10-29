@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from google.protobuf import (
     any_pb2,
     descriptor_pb2,
@@ -10,6 +12,12 @@ from google.protobuf import (
 )
 
 FieldDescriptorProto = descriptor_pb2.FieldDescriptorProto
+
+
+def write_descriptor_set(directory: Path, data: bytes) -> Path:
+    path = directory / "api.binpb"
+    path.write_bytes(data)
+    return path
 
 
 def users_descriptor_set() -> bytes:
