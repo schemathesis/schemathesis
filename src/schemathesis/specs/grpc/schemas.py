@@ -6,18 +6,36 @@ from difflib import get_close_matches
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
 
+import jsonschema_rs
 from google.protobuf import descriptor_pool
+from hypothesis import strategies as st
 from typing_extensions import override
 
+from schemathesis import auths
 from schemathesis.core import NOT_SET, Body, NotSet, Specification
+from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.timing import Instant
 from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.meta import TestPhase
+from schemathesis.generation.jsonschema.builder import build
+from schemathesis.generation.jsonschema.context import Alphabet
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    GenerationInfo,
+    PhaseInfo,
+    TestPhase,
+    build_phase_data,
+)
+from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
+from schemathesis.specs.grpc.converter import message_schema
+from schemathesis.specs.grpc.formats import grpc_formats
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
@@ -34,6 +52,9 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ResourcePool
+
+
+MEDIA_TYPE = "application/grpc"
 
 
 def is_unary(method: MethodDescriptor) -> bool:
@@ -103,7 +124,8 @@ class GrpcSchema(BaseSchema):
 
     @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
-        raise NotImplementedError
+        # Credentials travel as metadata, which the transport builds from the case headers.
+        return False
 
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
@@ -161,7 +183,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def _case_media_type(self, operation: APIOperation, body: Body, media_type: str | None) -> str | None:
-        raise NotImplementedError
+        return MEDIA_TYPE
 
     @override
     def get_case_strategy(
@@ -180,7 +202,26 @@ class GrpcSchema(BaseSchema):
         media_type: str | None = None,
         phase: TestPhase = TestPhase.FUZZING,
     ) -> SearchStrategy[Case]:
-        raise NotImplementedError
+        generation = self.config.generation_for(operation=operation, phase=phase.value)
+        if isinstance(body, NotSet):
+            bodies = build(
+                message_schema(operation.definition.raw.input_type).schema,
+                draft=jsonschema_rs.Draft202012,
+                formats=grpc_formats(),
+                alphabet=Alphabet(allow_x00=generation.allow_x00, codec=generation.codec),
+            )
+        else:
+            bodies = st.just(body)
+        return grpc_cases(
+            operation=operation,
+            bodies=bodies,
+            hooks=hooks,
+            auth_storage=auth_storage,
+            # A body the message's JSON mapping rejects fails to encode on the client and never reaches the server.
+            skip=generation_mode.is_negative and generation.modes == [GenerationMode.NEGATIVE],
+            headers=headers,
+            phase=phase,
+        )
 
     @override
     def get_strategies_from_examples(
@@ -217,6 +258,48 @@ class GrpcSchema(BaseSchema):
     @override
     def create_extra_data_source(self) -> None:
         raise NotImplementedError
+
+
+@st.composite
+def grpc_cases(
+    draw: Callable,
+    *,
+    operation: APIOperation,
+    bodies: SearchStrategy[Any],
+    hooks: HookDispatcher | None,
+    auth_storage: AuthStorage | None,
+    skip: bool,
+    headers: dict[str, Any] | None,
+    phase: TestPhase,
+) -> Case:
+    if skip:
+        raise SkipTest("Negative test cases are not available for gRPC operations")
+    started_at = Instant()
+    hook_context = HookContext(operation=operation)
+    body_ = draw(apply_to_all_dispatchers(operation, hook_context, hooks, bodies, "body"))
+    headers_ = draw(apply_to_all_dispatchers(operation, hook_context, hooks, st.just(headers), "headers"))
+    mode = GenerationMode.POSITIVE
+    case = operation.Case(
+        headers=headers_,
+        body=body_,
+        media_type=MEDIA_TYPE,
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=started_at.elapsed, mode=mode),
+            phase=PhaseInfo(name=phase, data=build_phase_data(phase, "Positive test case")),
+            components={
+                location: ComponentInfo(mode=mode)
+                for location in (
+                    ParameterLocation.QUERY,
+                    ParameterLocation.PATH,
+                    ParameterLocation.HEADER,
+                    ParameterLocation.COOKIE,
+                    ParameterLocation.BODY,
+                )
+            },
+        ),
+    )
+    auths.set_on_case(case, auths.AuthContext(operation=operation, app=operation.app), auth_storage)
+    return case
 
 
 @dataclass(slots=True)
