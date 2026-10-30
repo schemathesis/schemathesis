@@ -1,10 +1,11 @@
+import json
 import shlex
 
 import pytest
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
-from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, users_descriptor_set, write_descriptor_set
 
 
 @pytest.mark.parametrize(
@@ -90,4 +91,29 @@ def test_reproduction_command(tmp_path, base_url, verify, config, body, expected
     assert case.as_reproduction_command(headers=headers, verify=verify, base_url=base_url) == (
         f"grpcurl {expected.format(protoset=shlex.quote(str(path)))} -H 'x-request-id: r1' -H 'x-schemathesis-testcaseid: abc' "
         f"-H 'authorization: {authorization}' -d '{{\"userId\": 7}}' 127.0.0.1:50051 pkg.Users/GetUser"
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "body", "expected"),
+    [
+        (
+            "WellKnown",
+            {"fieldMask": "a,bC", "timestamp": "1970-01-01T00:00:01Z"},
+            {"fieldMask": {"paths": ["a", "b_c"]}, "timestamp": "1970-01-01T00:00:01Z"},
+        ),
+        ("WellKnown", {"fieldMask": ""}, {"fieldMask": {"paths": []}}),
+        ("WellKnown", b"\x1a\x00", {"fieldMask": {"paths": []}}),
+        ("Node", {"name": "a", "children": [{"name": "b"}]}, {"name": "a", "children": [{"name": "b"}]}),
+        ("Maps", {"byInt32": {"1": "a"}}, {"byInt32": {"1": "a"}}),
+        ("Envelope", {"extras": {"k": {"@type": "x"}}}, {"extras": {"k": {"@type": "x"}}}),
+    ],
+    ids=["field-mask", "empty-field-mask", "empty-field-mask-bytes", "repeated", "map", "map-of-messages"],
+)
+def test_reproduction_command_field_mask_as_object(tmp_path, method, body, expected):
+    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
+    case = schemathesis.grpc.from_path(path)["types.Types"][method].Case(body=body)
+    assert case.as_reproduction_command(headers={}, verify=True, base_url="grpc://127.0.0.1:50051") == (
+        f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: {case.id}' "
+        f"-d {shlex.quote(json.dumps(expected))} 127.0.0.1:50051 types.Types/{method}"
     )

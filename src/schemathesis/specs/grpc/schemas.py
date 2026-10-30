@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import jsonschema_rs
-from google.protobuf import descriptor_pool, json_format, message, message_factory
+from google.protobuf import descriptor_pool, field_mask_pb2, json_format, message, message_factory
 
 # googleapis-common-protos ships no type information.
 from google.rpc import status_pb2  # type: ignore[import-untyped]
@@ -46,7 +46,7 @@ from schemathesis.specs.grpc.formats import grpc_formats
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 
 if TYPE_CHECKING:
-    from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
+    from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 
 
 MEDIA_TYPE = "application/grpc"
+FIELD_MASK = "google.protobuf.FieldMask"
 # HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
 EXCLUDED_METADATA = frozenset(
     {
@@ -195,12 +196,11 @@ class GrpcSchema(BaseSchema):
             sanitize_value(metadata, config=sanitization)
         for key, value in metadata.items():
             args.extend(["-H", f"{key}: {value}"])
+        input_type = operation.definition.raw.input_type
         body = {} if isinstance(case.body, NotSet) else case.body
         if isinstance(body, bytes):
-            body = json_format.MessageToDict(
-                message_factory.GetMessageClass(operation.definition.raw.input_type).FromString(body)
-            )
-        args.extend(["-d", json.dumps(body), address, operation.label])
+            body = json_format.MessageToDict(message_factory.GetMessageClass(input_type).FromString(body))
+        args.extend(["-d", json.dumps(_grpcurl_json(body, input_type)), address, operation.label])
         return " ".join(shlex.quote(arg) for arg in args)
 
     @override
@@ -404,6 +404,32 @@ def filter_metadata(headers: Mapping[str, Any]) -> dict[str, str]:
     return {
         key: value for key, value in lowered.items() if key not in EXCLUDED_METADATA and not key.startswith("grpc-")
     }
+
+
+def _grpcurl_json(value: object, message_type: Descriptor) -> object:
+    """Rewrite `FieldMask` values to `{"paths": [...]}`, the only JSON form `grpcurl` reads for them."""
+    if message_type.full_name == FIELD_MASK and isinstance(value, str):
+        mask = field_mask_pb2.FieldMask()
+        mask.FromJsonString(value)
+        return {"paths": list(mask.paths)}
+    # Other well-known types keep their canonical JSON, and their keys are not field names.
+    if message_type.full_name.startswith("google.protobuf.") or not isinstance(value, dict):
+        return value
+    fields = {**message_type.fields_by_name, **{member.json_name: member for member in message_type.fields}}
+    rendered = {}
+    for key, item in value.items():
+        member = fields.get(key)
+        nested = None if member is None else member.message_type
+        if member is None or nested is None:
+            rendered[key] = item
+        elif nested.GetOptions().map_entry and isinstance(item, dict):
+            values = nested.fields_by_name["value"].message_type
+            rendered[key] = {name: _grpcurl_json(entry, values) if values else entry for name, entry in item.items()}
+        elif member.is_repeated and isinstance(item, list):
+            rendered[key] = [_grpcurl_json(entry, nested) for entry in item]
+        else:
+            rendered[key] = _grpcurl_json(item, nested)
+    return rendered
 
 
 def _grpc_status(response: Response) -> int:
