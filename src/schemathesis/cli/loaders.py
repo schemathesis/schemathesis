@@ -21,6 +21,7 @@ from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import HookExecutionError, IncorrectUsage, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
+from schemathesis.grpc.loaders import BUILD_HINT
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
 
 GRPC_CASSETTES_MESSAGE = "HAR and VCR reports record HTTP/1.1 exchanges and are not available for gRPC targets"
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
+PROTO_FILE_MESSAGE = f"Schemathesis reads descriptor sets, not `.proto` files. {BUILD_HINT} and run `schemathesis run api.binpb --url URL`"
 
 
 def into_event_stream(
@@ -44,6 +46,8 @@ def into_event_stream(
         config.reports.get(report_format).enabled for report_format in (ReportFormat.HAR, ReportFormat.VCR)
     ):
         raise click.UsageError(GRPC_CASSETTES_MESSAGE)
+    if location.endswith(".proto") and file_exists(location):
+        raise click.UsageError(PROTO_FILE_MESSAGE)
     return _event_stream(location=location, config=config, filter_set=filter_set, engine_callback=engine_callback)
 
 

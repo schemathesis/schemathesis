@@ -585,12 +585,21 @@ class GrpcApps:
         tls: bool = False,
         client_auth: bool = False,
         reflection: str | None = "v1alpha",
+        undescribed_services: tuple[str, ...] = (),
+        reflection_imports: bool = True,
         start: bool = True,
     ) -> GrpcServer:
         # grpcio has no free-threaded build, so only tests that start a server need it.
         from test.apps.catalog.grpc import users as grpc_users
 
-        app = grpc_users.users(tls=tls, client_auth=client_auth, reflection_version=reflection, start=start)
+        app = grpc_users.users(
+            tls=tls,
+            client_auth=client_auth,
+            reflection_version=reflection,
+            undescribed_services=undescribed_services,
+            reflection_imports=reflection_imports,
+            start=start,
+        )
         self.parent.request.addfinalizer(lambda: app.server.stop(None))
         return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
 

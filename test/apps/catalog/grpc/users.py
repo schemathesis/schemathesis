@@ -91,11 +91,37 @@ def deny(requests, context):
     context.abort(grpc.StatusCode.PERMISSION_DENIED, "denied")
 
 
-def serve_reflection(server: grpc.Server, version: str, pool: descriptor_pool.DescriptorPool) -> None:
+class ReflectionServicer(reflection.ReflectionServicer):
+    def __init__(self, names: tuple[str, ...], pool: descriptor_pool.DescriptorPool, *, imports: bool) -> None:
+        super().__init__(names, pool=pool)
+        self.imports = imports
+
+    def _file_containing_symbol(self, request, fully_qualified_name):
+        response = super()._file_containing_symbol(request, fully_qualified_name)
+        # The containing file comes first, its imports after it.
+        if not self.imports:
+            del response.file_descriptor_response.file_descriptor_proto[1:]
+        return response
+
+
+def serve_reflection(
+    server: grpc.Server,
+    version: str,
+    pool: descriptor_pool.DescriptorPool,
+    *,
+    undescribed_services: tuple[str, ...] = (),
+    imports: bool = True,
+) -> None:
     # Reflection lists the health service by name only; loaders must skip it with reflection itself.
-    names = ("pkg.Users", "pkg.Admin", "grpc.health.v1.Health", f"grpc.reflection.{version}.ServerReflection")
+    names = (
+        "pkg.Users",
+        "pkg.Admin",
+        "grpc.health.v1.Health",
+        f"grpc.reflection.{version}.ServerReflection",
+        *undescribed_services,
+    )
     # Both versions exchange the same messages.
-    servicer = reflection.ReflectionServicer(names, pool=pool)
+    servicer = ReflectionServicer(names, pool=pool, imports=imports)
     handler = grpc.stream_stream_rpc_method_handler(
         servicer.ServerReflectionInfo,
         request_deserializer=reflection_pb2.ServerReflectionRequest.FromString,
@@ -111,12 +137,20 @@ def serve_reflection(server: grpc.Server, version: str, pool: descriptor_pool.De
 
 
 def users(
-    *, tls: bool = False, client_auth: bool = False, reflection_version: str | None = "v1alpha", start: bool = True
+    *,
+    tls: bool = False,
+    client_auth: bool = False,
+    reflection_version: str | None = "v1alpha",
+    undescribed_services: tuple[str, ...] = (),
+    reflection_imports: bool = True,
+    start: bool = True,
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
     404 is NOT_FOUND, and 17 answers with bytes that do not decode. `pkg.Admin/Reset` answers with `u<id>` packed
     into `response`. Reflection refuses calls that carry `x-deny: 1`.
+    Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
+    Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
     """
     database = descriptor_database.DescriptorDatabase()
     for file in descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file:
@@ -173,7 +207,13 @@ def users(
         )
     )
     if reflection_version is not None:
-        serve_reflection(server, reflection_version, pool)
+        serve_reflection(
+            server,
+            reflection_version,
+            pool,
+            undescribed_services=undescribed_services,
+            imports=reflection_imports,
+        )
     files = None
     if tls:
         ca = trustme.CA()

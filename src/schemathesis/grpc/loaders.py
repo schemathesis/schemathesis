@@ -115,11 +115,35 @@ def from_url(
             if service.name not in INFRASTRUCTURE_SERVICES
         ]
         files: dict[str, descriptor_pb2.FileDescriptorProto] = {}
-        for name in names:
-            # Each response carries the file and everything it imports.
-            for data in ask(call, file_containing_symbol=name).file_descriptor_response.file_descriptor_proto:
+
+        def describe(subject: str, **kwargs: str) -> None:
+            response = ask(call, **kwargs)
+            if response.HasField("error_response"):
+                raise LoaderError(
+                    LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
+                    f"The server cannot describe `{subject}` through reflection: "
+                    f"{response.error_response.error_message}. Build a descriptor set with `buf build -o api.binpb` "
+                    f"and run `schemathesis run api.binpb --url {url}`",
+                )
+            for data in response.file_descriptor_response.file_descriptor_proto:
                 file = descriptor_pb2.FileDescriptorProto.FromString(data)
                 files.setdefault(file.name, file)
+
+        for name in names:
+            describe(name, file_containing_symbol=name)
+        # Some servers return only the requested file, without its imports.
+        requested: set[str] = set()
+        while missing := next(
+            (
+                dependency
+                for file in files.values()
+                for dependency in file.dependency
+                if dependency not in files and dependency not in requested
+            ),
+            None,
+        ):
+            requested.add(missing)
+            describe(missing, file_by_filename=missing)
     data = descriptor_pb2.FileDescriptorSet(file=files.values()).SerializeToString()
     loaded = _from_descriptor_set(data, config=config, service_names=names)
     loaded.location = url
