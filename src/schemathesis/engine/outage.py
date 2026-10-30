@@ -181,8 +181,7 @@ class ServerMonitor:
             # and the remaining room goes to what the server is known to have seen - otherwise workers left
             # hanging by the same outage fill the list and hide the payload that caused it.
             in_flight = [item for item in newest if item.reached_server is None][:1]
-            listed = (cut_off + in_flight + after_crash + answered)[:REPORTED_REQUESTS]
-            self._message = _render_outage(url, listed)
+            self._message = _render_outage(url, cut_off + in_flight + after_crash + answered)
             # HAR reports record only HTTP requests.
             self._recordable = urlsplit(url).scheme in ("http", "https")
             self._culprit_error = cut_off[0].error if cut_off else None
@@ -208,8 +207,10 @@ class ServerMonitor:
 
 def _render_outage(url: str, candidates: list[SentRequest]) -> str:
     parts = urlsplit(url)
-    noun = "request" if len(candidates) == 1 else "requests"
-    commands = "\n\n".join(textwrap.indent(item.as_reproduction_command(), "    ") for item in candidates)
+    # A case sent again reproduces the same way, so it is listed once.
+    listed = list(dict.fromkeys(item.as_reproduction_command() for item in candidates))[:REPORTED_REQUESTS]
+    noun = "request" if len(listed) == 1 else "requests"
+    commands = "\n\n".join(textwrap.indent(command, "    ") for command in listed)
     return f"{parts.scheme}://{parts.netloc} stopped responding. Last {noun} before it went away:\n\n{commands}"
 
 

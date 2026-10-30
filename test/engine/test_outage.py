@@ -8,6 +8,7 @@ import requests
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.transport import Response
+from schemathesis.engine.errors import is_connection_refused
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.outage import CONFIRMATION_INTERVAL, REPORTED_REQUESTS, SERVER_LABEL, ServerMonitor
 from schemathesis.engine.run import PhaseName
@@ -73,6 +74,17 @@ def test_outage_lists_the_newest_requests_in_send_order(operation):
     report = monitor.take_report(PhaseName.FUZZING)
     assert (report.label, report.related_to_operation, report.info.title) == (SERVER_LABEL, False, "Server Unavailable")
     assert report.info.message == expected_message(operation, list(reversed(cases))[:REPORTED_REQUESTS])
+
+
+def test_outage_lists_a_request_sent_several_times_once(operation):
+    monitor = ServerMonitor()
+    first = operation.Case(query={"q": "first"})
+    repeated = operation.Case(query={"q": "repeated"})
+    for case in (first, repeated, repeated):
+        monitor.track(case, lambda case=case: answer(case), transport_kwargs={})
+
+    assert monitor.is_down(refusal(operation.base_url))
+    assert monitor.take_report(PhaseName.FUZZING).info.message == expected_message(operation, [repeated, first])
 
 
 def test_outage_lists_a_request_that_never_came_back(operation):
@@ -222,11 +234,18 @@ def test_grpc_server_that_stops_is_an_outage(ctx, tls):
 
     assert monitor.is_down(exc_info.value)
     info = monitor.take_report(PhaseName.FUZZING).info
+    # The cached channel may send the second call before it sees the closed connection; a call cut off this way is
+    # listed as the culprit, so no tip about older requests follows.
+    tip = (
+        # HAR reports do not record gRPC calls.
+        "If the server crashed, the request that caused it may be older than these."
+        if is_connection_refused(exc_info.value)
+        else None
+    )
     assert (info.message, info.suggestion()) == (
         f"{server.target} stopped responding. Last request before it went away:\n\n"
         f"    {case.as_reproduction_command(headers={}, verify=True)}",
-        # HAR reports do not record gRPC calls.
-        "If the server crashed, the request that caused it may be older than these.",
+        tip,
     )
 
 
