@@ -98,7 +98,8 @@ def fault_category(failure: Failure) -> tuple[int, str] | None:
     description = f"{type(failure).__name__}: {failure.title}"
     if isinstance(failure, ServerError):
         code = {500: 100, 501: 205}.get(failure.status_code, 121)
-        return code, f"{description} (status {failure.status_code})"
+        status = f"{failure.status_code} {failure.status_name}" if failure.status_name else str(failure.status_code)
+        return code, f"{description} (status {status})"
     if isinstance(failure, VALIDATION_FAILURES):
         return 200, description
     if isinstance(failure, AllowHeaderMismatch):

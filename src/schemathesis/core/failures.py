@@ -242,7 +242,7 @@ class ServerError(Failure):
     checks = ("not_a_server_error",)
     kind_title = "Server error"
 
-    __slots__ = ("status_code",)
+    __slots__ = ("status_code", "status_name")
 
     def __init__(
         self,
@@ -252,12 +252,17 @@ class ServerError(Failure):
         title: str | None = None,
         message: str = "",
         case_id: str | None = None,
+        status_name: str | None = None,
     ) -> None:
         super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
         self.status_code = status_code
+        self.status_name = status_name
 
     @property
     def _unique_key(self) -> str:
+        # Several protocol statuses share one HTTP status code; their names tell them apart.
+        if self.status_name is not None:
+            return f"{self.status_code}:{self.status_name}"
         return str(self.status_code)
 
 

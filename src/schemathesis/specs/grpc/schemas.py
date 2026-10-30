@@ -250,6 +250,10 @@ class GrpcSchema(BaseSchema):
         return " ".join(shlex.quote(arg) for arg in args)
 
     @override
+    def status_name(self, response: Response) -> str | None:
+        return GRPC_STATUSES[_grpc_status(response)][0]
+
+    @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         return GRPC_STATUSES[_grpc_status(response)][2]
 
