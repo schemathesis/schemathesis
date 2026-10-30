@@ -23,7 +23,7 @@ Schemathesis dev
 __________________________________ GET /first __________________________________
 Network Error
 
-Read timed out after 2.0 seconds
+Read timed out after 3.0 seconds
 
 Reproduce with:
 
