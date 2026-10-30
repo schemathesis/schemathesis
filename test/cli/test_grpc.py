@@ -10,6 +10,7 @@ from test.apps.catalog.grpc.descriptors import (
     users_descriptor_set,
     write_descriptor_set,
 )
+from test.utils import refusing_url
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -241,14 +242,15 @@ def map_body(context, body):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unreachable_descriptor_set_target(ctx, cli, tmp_path, snapshot_cli):
-    server = ctx.grpc.apps.users()
-    server.stop()
+def test_unreachable_descriptor_set_target(cli, tmp_path, snapshot_cli):
     write_descriptor_set(tmp_path, users_descriptor_set())
-    assert (
-        cli.run("api.binpb", f"--url={server.target}", "--include-name=pkg.Users/GetUser", "--max-examples=1")
-        == snapshot_cli
-    )
+    # A stopped server frees its port, and a server started by another test may take it over.
+    with refusing_url() as url:
+        target = url.replace("http://", "grpc://")
+        assert (
+            cli.run("api.binpb", f"--url={target}", "--include-name=pkg.Users/GetUser", "--max-examples=1")
+            == snapshot_cli
+        )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

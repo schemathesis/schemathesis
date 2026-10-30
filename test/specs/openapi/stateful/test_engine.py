@@ -808,8 +808,10 @@ def test_unique_inputs(engine_factory):
 
 def test_explicit_hypothesis_default_max_steps(ctx):
     api = ctx.openapi.apps.stateful_users()
+    # Hypothesis may end a scenario early at random, so the run is seeded.
     config = schemathesis.Config.from_dict(
         {
+            "seed": 0,
             "phases": {"stateful": {"max-steps": 50}},
             "generation": {"max-examples": 1, "database": "none"},
             "checks": {"enabled": False},
