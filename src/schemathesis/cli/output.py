@@ -480,7 +480,8 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
     click.echo(style("Test cases:", bold=True))
     parts = [f"  {click.style(str(test_cases.generated), bold=True)} generated"]
 
-    if test_cases.without_checks + test_cases.errored != test_cases.generated:
+    unchecked = test_cases.without_checks + test_cases.errored
+    if unchecked != test_cases.generated:
         unique = test_cases.unique_failures
         if unique > 0:
             parts.append(
@@ -488,7 +489,7 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
                 f"{click.style(str(unique), bold=True)} unique failure{'' if unique == 1 else 's'}"
             )
         else:
-            parts.append(f"{click.style(str(test_cases.generated), bold=True)} passed")
+            parts.append(f"{click.style(str(test_cases.generated - unchecked), bold=True)} passed")
     parts.extend(_unchecked_parts(test_cases))
 
     click.echo(style(", ".join(parts) + "\n"))

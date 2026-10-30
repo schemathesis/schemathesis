@@ -177,7 +177,7 @@ Test Phases:
   ✅ Stateful
 
 Test cases:
-  5152 generated, 5152 passed, 14 skipped
+  5152 generated, 5138 passed, 14 skipped
 
 ...
 ========================== No issues found in 18.04s ===========================

@@ -598,6 +598,7 @@ def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
     finally:
         release.set()
     assert result == snapshot_cli
+    assert "13 generated, 10 passed, 3 errored" in result.stdout
 
 
 @pytest.mark.snapshot(replace_test_cases=False, replace_reproduce_with=True)
