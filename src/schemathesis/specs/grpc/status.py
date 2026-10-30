@@ -31,6 +31,17 @@ GRPC_STATUSES: dict[int, tuple[str, int, CallOutcome]] = {
 }
 
 
+INTERNAL = 13
+
+# How gRPC servers start the INTERNAL message they send when a request does not decode, before any handler runs.
+# Client libraries word a response that does not decode differently, so a handler passing one on does not match.
+LIBRARY_DECODE_ERRORS = (
+    "grpc: error unmarshalling request",
+    "Exception deserializing request!",
+    "Error deserializing request: ",
+)
+
+
 def grpc_status(response: Response) -> int:
     return int(response.headers["grpc-status"][0])
 

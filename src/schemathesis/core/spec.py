@@ -219,6 +219,7 @@ class ApiSchema(SchemaMetadata, Protocol):
     def evaluate_server_error(self, case: Case, response: Response) -> None: ...  # pragma: no cover
 
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None: ...  # pragma: no cover
+    def explain_server_error(self, case: Case, response: Response) -> None: ...  # pragma: no cover
 
     def evaluate_negative_data(self, case: Case, response: Response) -> None: ...  # pragma: no cover
 

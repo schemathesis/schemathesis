@@ -16,7 +16,7 @@ from schemathesis.graphql.checks import (
     GraphQLServerError,
     UnexpectedGraphQLResponse,
 )
-from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields
+from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields, UndecodableGrpcRequest
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     ContentDeserializationError,
@@ -56,6 +56,7 @@ FAILURE_CLASSES: tuple[type[Failure], ...] = (
     GraphQLDataMismatch,
     MalformedGrpcMessage,
     UndeclaredGrpcFields,
+    UndecodableGrpcRequest,
     AcceptedNegativeData,
     RejectedPositiveData,
     MissingHeaderNotRejected,

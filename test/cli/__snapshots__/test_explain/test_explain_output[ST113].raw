@@ -9,4 +9,5 @@ GraphQL `errors` entry reporting a field that failed on the server.
 An `errors` entry that isn't a query validation error counts as a resolver
 failure. Return an expected outcome, such as a missing record, in `data`.
 
-`--exclude-checks not_a_server_error` turns it off, along with ST101, ST102.
+`--exclude-checks not_a_server_error` turns it off, along with ST101, ST102,
+ST119.

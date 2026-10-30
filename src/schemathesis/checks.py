@@ -457,6 +457,7 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
         # A server that does not serve the operation at all has not failed on the data it was sent.
         if case.operation.schema.classify_call_outcome(case, response) is CallOutcome.NOT_SERVED:
             return None
+        case.operation.schema.explain_server_error(case, response)
         raise ServerError(
             operation=case.operation.label,
             status_code=status_code,

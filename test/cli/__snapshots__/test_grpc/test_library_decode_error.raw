@@ -1,0 +1,57 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from grpc://127.0.0.1 (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 3 total
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+______________________________ pkg.Users/GetUser _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST119 Server could not decode the request
+
+    The gRPC library rejected the request before any handler ran. The server's message type accepts less than the schema declares, such as a fixed-length `bytes` ID.
+
+INTERNAL: Exception deserializing request!
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/3
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ ST119 Server could not decode the request: 1
+
+For more information, run `st explain ST119`.
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

@@ -81,6 +81,22 @@ def test_http_reports_refused(cli, tmp_path, snapshot_cli, report):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_library_decode_error(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 422}
+        """
+    )
+    assert (
+        cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_remote_descriptor_set_extension_is_not_grpc(cli, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/api.pb") == snapshot_cli
 

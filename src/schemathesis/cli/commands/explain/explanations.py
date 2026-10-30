@@ -132,6 +132,15 @@ EXPLANATIONS: dict[str, Explanation] = {
             lack, so the reflection data is stale or the response is built from a different message.
         """,
     ),
+    "ST119": Explanation(
+        summary="gRPC request the server's gRPC library failed to decode before any handler ran.",
+        notes="""
+            Schemathesis sends requests that match the schema, so the server's message type is stricter than its
+            descriptor, e.g. a custom `bytes` type with a fixed length. Declare the constraint, or validate in the
+            handler and answer `INVALID_ARGUMENT`. Recognized on Go, Node and synchronous Python servers; on
+            others, the same failure is ST101.
+        """,
+    ),
     "ST201": Explanation(
         summary="Schema-violating request accepted.",
         notes="""

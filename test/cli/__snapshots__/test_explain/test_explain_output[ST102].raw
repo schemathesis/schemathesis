@@ -10,4 +10,5 @@ with a declared one succeeds.
 Schemathesis sends media types the operation doesn't declare, and multipart
 without a boundary. Reject them with `415` or `400` before the body parser runs.
 
-`--exclude-checks not_a_server_error` turns it off, along with ST101, ST113.
+`--exclude-checks not_a_server_error` turns it off, along with ST101, ST113,
+ST119.

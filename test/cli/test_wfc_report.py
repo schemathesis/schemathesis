@@ -11,6 +11,7 @@ import schemathesis
 from schemathesis.cli.wfc_report import FAULT_CATEGORY_IDS, fault_category
 from schemathesis.core.failures import AcceptedNegativeData, MalformedJson, ResponseTimeExceeded, ServerError
 from schemathesis.engine.events import ScenarioFinished
+from schemathesis.grpc.checks import UndecodableGrpcRequest
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     AuthScenario,
@@ -551,9 +552,22 @@ def test_object_level_authorization_context_names_both_peers():
     )
 
 
-def test_server_error_context_names_the_protocol_status():
-    failure = ServerError(operation=OPERATION, status_code=500, status_name="DATA_LOSS")
-    assert fault_category(failure) == (100, "ServerError: Server error (status 500 DATA_LOSS)")
+@pytest.mark.parametrize(
+    ("failure", "description"),
+    [
+        (
+            ServerError(operation=OPERATION, status_code=500, status_name="DATA_LOSS"),
+            "ServerError: Server error (status 500 DATA_LOSS)",
+        ),
+        (
+            UndecodableGrpcRequest(operation=OPERATION, status_code=500, status_name="INTERNAL"),
+            "UndecodableGrpcRequest: Server could not decode the request (status 500 INTERNAL)",
+        ),
+    ],
+    ids=["server-error", "undecodable-grpc-request"],
+)
+def test_server_error_context_names_the_protocol_status(failure, description):
+    assert fault_category(failure) == (100, description)
 
 
 def test_declared_auth_not_enforced_context_names_the_scenario():

@@ -14,4 +14,5 @@ when an integration is off, can be allowed for the operation:
   include-name = "POST /orders"
   checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]
 
-`--exclude-checks not_a_server_error` turns it off, along with ST102, ST113.
+`--exclude-checks not_a_server_error` turns it off, along with ST102, ST113,
+ST119.

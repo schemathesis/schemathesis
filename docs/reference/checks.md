@@ -51,9 +51,9 @@ This check validates response times against your threshold. The actual HTTP requ
 
 ### `not_a_server_error`
 
-Failure codes: [ST101](failures.md#st101), [ST102](failures.md#st102), [ST113](failures.md#st113).
+Failure codes: [ST101](failures.md#st101), [ST102](failures.md#st102), [ST113](failures.md#st113), [ST119](failures.md#st119).
 
-Catches server-side errors: 5xx status codes, and GraphQL `errors` arrays from failed resolvers.
+Catches server-side errors: 5xx status codes, GraphQL `errors` arrays from failed resolvers, and gRPC requests the server's gRPC library failed to decode.
 
 During negative coverage, this is the only response check applied to malformed or undeclared request `Content-Type` probes.
 
