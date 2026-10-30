@@ -78,6 +78,7 @@ def test_report_shape(ctx, cli, json_path):
             "unsupported_field": [],
             "low_valid_rate": [],
             "rate_limited": [],
+            "not_served": [],
             "dictionary_mismatch": [],
         },
         "valid_rates": {

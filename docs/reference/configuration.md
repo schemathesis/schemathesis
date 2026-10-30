@@ -289,6 +289,7 @@ Rules:
     - `dictionary_mismatch`: Most entries of a dictionary fail the schema of the parameter they are bound to
     - `timeout_units`: `request-timeout` or `max_response_time` is 1000 seconds or more, likely given in milliseconds
     - `unsupported_field`: A gRPC request message has a `google.protobuf.Any` field, which Schemathesis does not generate
+    - `not_served`: Every request to an operation returned a status saying the server does not serve it
     - `low_valid_rate`: An operation accepted only a small share of the requests sent to it (opt-in; enable it by name)
 
 !!! info "CLI Only"

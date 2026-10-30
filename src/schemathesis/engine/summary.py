@@ -63,6 +63,8 @@ class WarningData:
     low_valid_rate: set[str] = field(default_factory=set)
     # Operations answered mostly with `429 Too Many Requests`.
     rate_limited: set[str] = field(default_factory=set)
+    # Operations the server answered only with statuses saying it does not serve them.
+    not_served: set[str] = field(default_factory=set)
     # Dictionary bindings whose entries mostly fail the bound parameter's schema.
     dictionary_mismatch: set[str] = field(default_factory=set)
     # Acceptance counts for every operation and phase, keyed by label then phase, for reporting.
@@ -106,6 +108,7 @@ class WarningData:
             SchemathesisWarning.UNSUPPORTED_FIELD.value: sorted(self.unsupported_field),
             SchemathesisWarning.LOW_VALID_RATE.value: sorted(self.low_valid_rate_reported),
             SchemathesisWarning.RATE_LIMITED.value: sorted(self.rate_limited),
+            SchemathesisWarning.NOT_SERVED.value: sorted(self.not_served),
             SchemathesisWarning.DICTIONARY_MISMATCH.value: sorted(self.dictionary_mismatch),
         }
 

@@ -4,6 +4,7 @@ from schemathesis.core.transport import CallOutcome
 
 # gRPC status code -> its name, the HTTP status with the same meaning and the call outcome it signals.
 # FAILED_PRECONDITION and OUT_OF_RANGE depend on system state, not on the data sent, so they are conflicts.
+# UNIMPLEMENTED answers calls to methods the server lacks or has disabled.
 GRPC_STATUSES: dict[int, tuple[str, int, CallOutcome]] = {
     0: ("OK", 200, CallOutcome.ACCEPTED),
     1: ("CANCELLED", 499, CallOutcome.UNINFORMATIVE),
@@ -17,7 +18,7 @@ GRPC_STATUSES: dict[int, tuple[str, int, CallOutcome]] = {
     9: ("FAILED_PRECONDITION", 409, CallOutcome.CONFLICT),
     10: ("ABORTED", 409, CallOutcome.CONFLICT),
     11: ("OUT_OF_RANGE", 409, CallOutcome.CONFLICT),
-    12: ("UNIMPLEMENTED", 501, CallOutcome.UNINFORMATIVE),
+    12: ("UNIMPLEMENTED", 501, CallOutcome.NOT_SERVED),
     13: ("INTERNAL", 500, CallOutcome.UNINFORMATIVE),
     14: ("UNAVAILABLE", 503, CallOutcome.UNINFORMATIVE),
     15: ("DATA_LOSS", 500, CallOutcome.UNINFORMATIVE),

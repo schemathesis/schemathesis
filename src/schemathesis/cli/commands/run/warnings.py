@@ -220,6 +220,19 @@ def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
     return False
 
 
+def none_served(recorder: RecordedScenario) -> bool:
+    """Whether the server answered every request saying it does not serve the operation."""
+    for case_id, interaction in recorder.interactions.items():
+        response = interaction.response
+        case = recorder.cases[case_id].value
+        if (
+            response is None
+            or case.operation.schema.classify_call_outcome(case, response) is not CallOutcome.NOT_SERVED
+        ):
+            return False
+    return True
+
+
 def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
     """Whether the scenario generated positive test cases and the API served none of them."""
     return any(_is_positive(case) for case in recorder.cases.values()) and not any_positive_is_accepted(recorder)
@@ -355,6 +368,9 @@ class WarningCollector:
                 SchemathesisWarning.RATE_LIMITED,
                 lambda: self.data.rate_limited.add(event.recorder.label),
             )
+
+        if warnings.should_display(SchemathesisWarning.NOT_SERVED) and none_served(event.recorder):
+            self._handle_warning(SchemathesisWarning.NOT_SERVED, lambda: self.data.not_served.add(event.recorder.label))
 
         # A wrong base URL 404s everything, and those 404s trip other checks - so this must not be
         # gated on the scenario passing, unlike the generic 404 warning below.

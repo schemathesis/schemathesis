@@ -36,6 +36,7 @@ def grpc_response(response_factory, *, status, content=b"", headers=None):
         (3, CallOutcome.REJECTED),
         (13, CallOutcome.UNINFORMATIVE),
         (16, CallOutcome.UNINFORMATIVE),
+        (12, CallOutcome.NOT_SERVED),
     ],
     ids=[
         "ok",
@@ -47,6 +48,7 @@ def grpc_response(response_factory, *, status, content=b"", headers=None):
         "invalid-argument",
         "internal",
         "unauthenticated",
+        "unimplemented",
     ],
 )
 def test_call_outcome(operation, response_factory, status, outcome):
@@ -94,3 +96,9 @@ def test_failures_group_by_message(operation, response_factory):
 def test_unknown_fields_pass_for_descriptor_sets(operation, response_factory):
     response = grpc_response(response_factory, status=0, content=b"\x0a\x02u7\x98\x06\x01")
     assert operation.validate_response(response, case=operation.Case(body={})) is None
+
+
+def test_unimplemented_is_not_a_server_error(ctx):
+    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
+    operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
+    assert operation.Case(body={"userId": 501}).call_and_validate().status_line == "UNIMPLEMENTED"

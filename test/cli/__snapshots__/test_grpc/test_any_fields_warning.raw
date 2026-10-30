@@ -16,6 +16,12 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
+Not served: 1 operation returned only statuses saying the server does not serve them, leaving them untested
+
+  - types.Types/Envelope
+
+💡 Point `--url` at the server that serves these operations, or exclude them from the run
+
 Unsupported fields: 1 operation sent requests without some fields
 
   - types.Types/Envelope
@@ -38,6 +44,7 @@ Test Phases:
   ⏭  Stateful (not supported)
 
 Warnings:
+  ⚠️ Not served: 1 operation returned only not-served statuses
   ⚠️ Unsupported fields: 1 operation had fields left out
 
 Test cases:
@@ -45,4 +52,4 @@ Test cases:
 
 Seed: 42
 
-============================== 1 warning in 1.00s ==============================
+============================= 2 warnings in 1.00s ==============================

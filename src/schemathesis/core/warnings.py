@@ -20,6 +20,7 @@ class SchemathesisWarning(enum.StrEnum):
     DICTIONARY_MISMATCH = "dictionary_mismatch"
     TIMEOUT_UNITS = "timeout_units"
     UNSUPPORTED_FIELD = "unsupported_field"
+    NOT_SERVED = "not_served"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -40,4 +41,5 @@ class SchemathesisWarning(enum.StrEnum):
             "dictionary_mismatch": cls.DICTIONARY_MISMATCH,
             "timeout_units": cls.TIMEOUT_UNITS,
             "unsupported_field": cls.UNSUPPORTED_FIELD,
+            "not_served": cls.NOT_SERVED,
         }[value.lower()]

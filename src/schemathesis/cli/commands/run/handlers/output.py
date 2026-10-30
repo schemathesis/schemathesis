@@ -418,6 +418,17 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 affects_verdict=True,
             )
         )
+    if warnings.not_served:
+        blocks.append(
+            list_block(
+                "Not served",
+                warnings.not_served,
+                " returned only statuses saying the server does not serve them, leaving them untested",
+                ["Point `--url` at the server that serves these operations, or exclude them from the run"],
+                short_suffix="returned only not-served statuses",
+                affects_verdict=True,
+            )
+        )
     if warnings.base_url_mismatch:
         blocks.append(
             list_block(

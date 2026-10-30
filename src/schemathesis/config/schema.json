@@ -1113,7 +1113,8 @@
         "rate_limited",
         "dictionary_mismatch",
         "timeout_units",
-        "unsupported_field"
+        "unsupported_field",
+        "not_served"
       ]
     },
     "WarningNameList": {

@@ -80,6 +80,35 @@ def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unserved_operation_warning(ctx, cli, tmp_path, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    write_descriptor_set(tmp_path, all_types_descriptor_set())
+    assert (
+        cli.run("api.binpb", f"--url={server.target}", "--include-name=types.Types/Scalars", "--max-examples=10")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_partly_served_operation(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    # Odd ids are served, even ones are not.
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 1 if body.get("userId", 0) % 2 else 501}
+        """
+    )
+    assert (
+        cli.main(
+            "run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=10", "--seed=1", hooks=module
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unreachable_descriptor_set_target(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
     server.stop()
