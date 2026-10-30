@@ -1,6 +1,7 @@
 import threading
 
 import pytest
+import trustme
 
 import schemathesis
 from schemathesis.core.errors import IncorrectUsage, LoaderError, LoaderErrorKind
@@ -75,6 +76,21 @@ def test_from_url_unreachable(ctx):
         schemathesis.grpc.from_url(server.target)
     assert exc_info.value.kind == LoaderErrorKind.CONNECTION_OTHER
     assert exc_info.value.message.startswith(f"Failed to connect to {server.target.removeprefix('grpc://')}: ")
+
+
+def test_from_url_tls_untrusted_certificate(ctx, tmp_path):
+    server = ctx.grpc.apps.users(tls=True)
+    other_ca = tmp_path / "other-ca.pem"
+    trustme.CA().cert_pem.write_to_path(str(other_ca))
+    with pytest.raises(LoaderError) as exc_info:
+        schemathesis.grpc.from_url(server.target, verify=str(other_ca))
+    port = server.target.rsplit(":", 1)[1]
+    assert (exc_info.value.kind, exc_info.value.message) == (
+        LoaderErrorKind.INVALID_CERTIFICATE,
+        f"TLS handshake with 127.0.0.1:{port} failed: failed to connect to all addresses; last error: UNKNOWN: "
+        f"ipv4:127.0.0.1:{port}: Tls handshake failed (TSI_PROTOCOL_FAILURE): SSL_ERROR_SSL: error:1000007d:"
+        "SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate: OK",
+    )
 
 
 def test_from_url_reports_refused_reflection(ctx):

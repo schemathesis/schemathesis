@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from schemathesis.core.output import (
     BINARY_PAYLOAD,
     EMPTY_PAYLOAD,
+    escape_nonprintable,
     escape_surrogates,
     format_response_payload,
 )
@@ -444,8 +445,12 @@ def format_failures(
 
     # Response status
     if isinstance(response, Response):
-        status_line = response.status_line or f"[{response.status_code}] {reason_phrase(response.status_code)}"
-        output += formatter(MessageBlock.STATUS, f"\n{status_line}:\n")
+        # A transport-provided status line already carries its own message, so it ends without a colon.
+        if response.status_line is not None:
+            status_line = escape_nonprintable(response.status_line)
+        else:
+            status_line = f"[{response.status_code}] {reason_phrase(response.status_code)}:"
+        output += formatter(MessageBlock.STATUS, f"\n{status_line}\n")
         payload = format_response_payload(response, config=config)
         if payload in (EMPTY_PAYLOAD, BINARY_PAYLOAD):
             output += f"\n    {payload}"

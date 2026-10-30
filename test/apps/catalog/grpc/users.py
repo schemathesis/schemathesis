@@ -187,6 +187,8 @@ def users(
             context.abort(grpc.StatusCode.UNIMPLEMENTED, "")
         if user_id == 9:
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, "locked")
+        if user_id == 401:
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "no token")
         if user_id == 13:
             time.sleep(1)
         if user_id == 17:

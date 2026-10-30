@@ -61,6 +61,28 @@ schemathesis(["run", "grpc://127.0.0.1:1"])
 """
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_streaming_method_selected(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    assert cli.run(server.target, "--include-name=pkg.Users/WatchUsers", "--max-examples=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_authentication_warning_uses_status_names(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 401}
+        """
+    )
+    assert (
+        cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
+        == snapshot_cli
+    )
+
+
 def test_missing_grpc_extra():
     result = subprocess.run([sys.executable, "-c", BLOCK_PROTOBUF_AND_RUN], capture_output=True, text=True)
     assert (result.returncode, result.stderr.splitlines()[-1]) == (

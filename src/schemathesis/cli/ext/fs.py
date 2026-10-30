@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 
 import click
 
+from schemathesis.core.output import escape_nonprintable
+
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
 
@@ -47,8 +49,7 @@ def load_baseline(config: ProjectConfig) -> None:
 
 
 def display_path(path: Path) -> str:
-    # Escapes control characters like `repr` does, but keeps Windows backslashes single.
-    return "".join(char if char.isprintable() else repr(char)[1:-1] for char in str(path))
+    return escape_nonprintable(str(path))
 
 
 def describe_path_error(exc: OSError | ValueError) -> str:

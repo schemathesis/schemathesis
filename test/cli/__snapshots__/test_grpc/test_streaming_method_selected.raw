@@ -1,0 +1,34 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from grpc://127.0.0.1 (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       0 selected / 3 total
+
+ 🕛  Fuzzing (in 0.00s)
+
+     No tests were run
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 0/3
+  Tested: 0
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ⏭  Fuzzing (nothing to test)
+  ⏭  Stateful (not supported)
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+======= Only streaming methods are selected; streaming is not supported ========

@@ -135,7 +135,7 @@ class BaseExecutionContext:
         if operations.total == 0:
             self.nothing_tested_reason = "The schema defines no API operations"
         elif operations.selected == 0:
-            self.nothing_tested_reason = "No operations matched the filters"
+            self.nothing_tested_reason = self.api_statistic.unsupported_selection or "No operations matched the filters"
         else:
             self.nothing_tested_reason = self.all_skipped_reason()
         self.exit_code = ExitCode.ERROR

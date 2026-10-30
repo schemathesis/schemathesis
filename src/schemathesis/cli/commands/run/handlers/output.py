@@ -38,8 +38,8 @@ from schemathesis.cli.output import (
     warning_items,
 )
 from schemathesis.config import ProjectConfig
-from schemathesis.core import SpecificationFeature
-from schemathesis.core.failures import case_header
+from schemathesis.core import SpecificationFeature, SpecificationKind
+from schemathesis.core.failures import case_header, reason_phrase
 from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.result import Ok
@@ -51,6 +51,7 @@ from schemathesis.engine.run import ELASTIC_PHASES, INTERNAL_PHASES, UNIT_PHASES
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
 from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
+from schemathesis.specs.grpc.status import GRPC_STATUSES
 
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType
@@ -162,6 +163,24 @@ def _unvalidated_responses(by_media_type: dict[str, dict[str, set[str]]]) -> str
     return f"responses in {len(by_media_type)} media types"
 
 
+# Each HTTP status the warnings name (401, 403, 404) stands for exactly one gRPC status.
+_GRPC_STATUS_NAMES = {http_status: name for name, http_status, _ in GRPC_STATUSES.values()}
+
+
+def _is_grpc(ctx: ExecutionContext) -> bool:
+    return ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRPC
+
+
+def _status_name(ctx: ExecutionContext, status_code: int) -> str:
+    if _is_grpc(ctx):
+        return _GRPC_STATUS_NAMES[status_code]
+    return f"{status_code} {reason_phrase(status_code)}"
+
+
+def _short_status(ctx: ExecutionContext, status_code: int) -> str:
+    return _GRPC_STATUS_NAMES[status_code] if _is_grpc(ctx) else str(status_code)
+
+
 def _status_codes_are_uninformative(ctx: ExecutionContext) -> bool:
     return ctx.specification is not None and not ctx.specification.supports_feature(
         SpecificationFeature.STATUS_CODE_ANALYSIS
@@ -264,8 +283,7 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
     missing_auth = ctx.warnings.missing_auth
     groups = [
         WarningGroup(
-            heading=f"{status_code} {'Unauthorized' if status_code == 401 else 'Forbidden'} "
-            f"({pluralize(len(labels), 'operation')})",
+            heading=f"{_status_name(ctx, status_code)} ({pluralize(len(labels), 'operation')})",
             items=warning_items(labels),
         )
         for status_code, labels in missing_auth.items()
@@ -273,12 +291,13 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
     groups[-1].tips = [
         ctx.warnings.auth_flow_suggestion or "Ensure valid authentication credentials are set via `--auth` or `-H`"
     ]
+    statuses = f"{_short_status(ctx, 401)}/{_short_status(ctx, 403)}"
     return WarningBlock(
         title="Authentication failed",
         count=sum(len(labels) for labels in missing_auth.values()),
         entity="operation",
-        suffix=" returned only 401/403 responses",
-        short_suffix="returned only 401/403 responses",
+        suffix=f" returned only {statuses} responses",
+        short_suffix=f"returned only {statuses} responses",
         groups=groups,
         affects_verdict=True,
     )
@@ -349,8 +368,8 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
         title="Missing test data",
         count=len(missing),
         entity="operation",
-        suffix=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
-        short_suffix="repeatedly returned 404 responses",
+        suffix=f" repeatedly returned {_status_name(ctx, 404)}, preventing tests from reaching your API's core logic",
+        short_suffix=f"repeatedly returned {_short_status(ctx, 404)} responses",
         groups=groups,
         affects_verdict=True,
     )

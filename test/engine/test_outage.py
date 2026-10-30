@@ -192,7 +192,10 @@ def test_grpc_server_that_stops_is_an_outage(ctx, tls):
         monitor.track(case, case.call, transport_kwargs={})
 
     assert monitor.is_down(exc_info.value)
-    assert monitor.take_report(PhaseName.FUZZING).info.message == (
+    info = monitor.take_report(PhaseName.FUZZING).info
+    assert (info.message, info.suggestion()) == (
         f"{server.target} stopped responding. Last request before it went away:\n\n"
-        f"    {case.as_reproduction_command(headers={}, verify=True)}"
+        f"    {case.as_reproduction_command(headers={}, verify=True)}",
+        # HAR reports do not record gRPC calls.
+        "If the server crashed, the request that caused it may be older than these.",
     )
