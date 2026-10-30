@@ -171,7 +171,9 @@ def map_body(context, body):
 
 
 def test_missing_grpc_extra():
-    result = subprocess.run([sys.executable, "-c", BLOCK_PROTOBUF_AND_RUN], capture_output=True, text=True)
+    result = subprocess.run(
+        [sys.executable, "-c", BLOCK_PROTOBUF_AND_RUN], capture_output=True, text=True, encoding="utf-8"
+    )
     assert (result.returncode, result.stderr.splitlines()[-1]) == (
         1,
         "Error: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`",
