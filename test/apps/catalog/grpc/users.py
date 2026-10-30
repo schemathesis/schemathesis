@@ -146,6 +146,8 @@ def users(
             context.abort(grpc.StatusCode.UNAVAILABLE, "")
         if user_id == 404:
             context.abort(grpc.StatusCode.NOT_FOUND, "no such user")
+        if user_id == 501:
+            context.abort(grpc.StatusCode.UNIMPLEMENTED, "")
         if user_id == 9:
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, "locked")
         if user_id == 13:

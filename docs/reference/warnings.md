@@ -23,6 +23,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `dictionary_mismatch` | Most entries of a dictionary fail the schema of the parameter they are bound to | Fix the entries, or bind the dictionary to a matching parameter |
 | `timeout_units` | `request-timeout` or `max_response_time` is 1000 seconds or more | Give the value in seconds |
 | `unsupported_field` | A gRPC request message has a `google.protobuf.Any` field | Fill the field with a `map_body` hook |
+| `not_served` | Every request to an operation got an answer that the server does not serve it | Point `--url` at the server that serves it, or exclude it |
 | `low_valid_rate` (opt-in) | An operation accepted only a small share of the requests sent to it | Supply real identifiers, or align the schema with the constraints the API enforces |
 
 ## Available Warnings
@@ -253,6 +254,18 @@ Unsupported fields: 1 operation sent requests without some fields
 ```
 
 **Trigger**: A gRPC request message has a `google.protobuf.Any` field, directly or in a nested message. Schemathesis leaves the field out of every request. To send one, set it in a [`map_body`](../guides/extending.md) hook.
+
+### `not_served`
+
+```
+Not served: 1 operation returned only statuses saying the server does not serve them, leaving them untested
+
+  - types.Types/Scalars
+
+💡 Point `--url` at the server that serves these operations, or exclude them from the run
+```
+
+**Trigger**: Every request to an operation returned gRPC `UNIMPLEMENTED`. A descriptor set often lists services that another server or port serves. Such responses never fail `not_a_server_error`, so the run passes without testing the operation.
 
 ### `low_valid_rate`
 

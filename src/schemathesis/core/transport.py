@@ -210,6 +210,8 @@ class CallOutcome(enum.Enum):
     REJECTED = "rejected"
     # Says nothing about whether the data was acceptable, e.g. an auth failure or a server error.
     UNINFORMATIVE = "uninformative"
+    # The server does not serve the operation at this address, whatever the data.
+    NOT_SERVED = "not_served"
 
 
 def is_uninformative_status(status_code: int) -> bool:

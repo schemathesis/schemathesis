@@ -19,7 +19,7 @@ from schemathesis.core.failures import (
     ServerError,
 )
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import Response, expand_status_codes
+from schemathesis.core.transport import CallOutcome, Response, expand_status_codes
 from schemathesis.engine import Status
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, CoverageScenario, coverage_scenario
 from schemathesis.generation.overrides import Override
@@ -453,6 +453,9 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
         scenario = coverage_scenario(case)
         if scenario in CONTENT_TYPE_PROBES:
             _check_content_type_probe(ctx, case, scenario, status_code, expected_statuses)
+            return None
+        # A server that does not serve the operation at all has not failed on the data it was sent.
+        if case.operation.schema.classify_call_outcome(case, response) is CallOutcome.NOT_SERVED:
             return None
         raise ServerError(operation=case.operation.label, status_code=status_code)
     case.operation.schema.evaluate_server_error(case, response)
