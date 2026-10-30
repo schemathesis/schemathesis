@@ -2238,6 +2238,42 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
             "additionalProperties": False,
             "required": ["a", "b"],
         },
+        {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "enum": [1],
+                            "xml": {"attribute": True, "prefix": "smp", "namespace": "http://example.com/schema"},
+                        }
+                    },
+                    "additionalProperties": False,
+                    "required": ["id"],
+                },
+                "b": {"enum": [2], "xml": {"prefix": "smp"}},
+            },
+            "additionalProperties": False,
+            "required": ["a", "b"],
+        },
+        {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"enum": [1], "xml": {"attribute": True, "prefix": "q", "namespace": "http://q"}}
+                    },
+                    "additionalProperties": False,
+                    "required": ["id"],
+                    "xml": {"prefix": "smp", "namespace": "http://example.com/schema"},
+                },
+                "b": {"enum": [2], "xml": {"prefix": "smp"}},
+            },
+            "additionalProperties": False,
+            "required": ["a", "b"],
+        },
     ],
 )
 def test_serialize_xml_unbound_prefix(ctx, schema_object):
@@ -2351,6 +2387,20 @@ def _with_child(child):
             "3.0.2",
             {"a": ["x"], "b": ["y"]},
             b'<root><p:item xmlns:p="http://p">x</p:item><item>y</item></root>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "root"},
+                "properties": {
+                    "id": {"type": "string", "xml": {**PREFIXED_CHILD_XML, "attribute": True}},
+                    "child": {"type": "string", "xml": {"prefix": "p"}},
+                },
+            },
+            {},
+            "3.0.2",
+            {"id": "x", "child": "y"},
+            b'<root xmlns:p="http://p" p:id="x"><p:child>y</p:child></root>',
         ),
         (
             {
@@ -2486,6 +2536,7 @@ def _with_child(child):
         "prefixed-nested-property-array",
         "prefixed-nested-property-wrapped-array",
         "shared-array-items-keep-own-prefix",
+        "attribute-namespace-binds-prefix-inside-element",
         "boolean-and-null-use-json-spelling",
         "referenced-property-schema",
         "referenced-array-items",
