@@ -1,0 +1,59 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from grpc://127.0.0.1 (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 3 total
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+______________________________ pkg.Users/GetUser _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST401 API accepts requests without authentication
+
+    Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `pkg.Users/GetUser`
+
+OK
+
+    `{
+      "name": "u1"
+    }`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/3
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ❌ Fuzzing
+  ⏭  Stateful (not supported)
+
+Failures:
+  ❌ ST401 API accepts requests without authentication: 1
+
+For more information, run `st explain ST401`.
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

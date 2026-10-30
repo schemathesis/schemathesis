@@ -38,6 +38,40 @@ def test_proto_file_refused(cli, tmp_path, snapshot_cli):
     assert cli.run("users.proto", "--url=grpc://127.0.0.1:1") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    ("user_id", "sent"),
+    [
+        (1, ["Bearer secret", None]),
+        # Only the first successful call is resent without credentials.
+        (403, ["Bearer secret", None, "Bearer secret", "Bearer secret"]),
+    ],
+    ids=["ignored", "enforced"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_ignored_auth(ctx, cli, snapshot_cli, user_id, sent):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.hook
+def map_body(context, body):
+    return {{"userId": {user_id}}}
+        """
+    )
+    assert (
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=3",
+            "-H",
+            "Authorization: Bearer secret",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
+    assert [dict(call.metadata).get("authorization") for call in server.calls] == sent
+
+
 @pytest.mark.parametrize("report", ["har", "vcr"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_http_reports_refused(cli, tmp_path, snapshot_cli, report):
