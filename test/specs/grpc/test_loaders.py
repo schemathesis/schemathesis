@@ -12,6 +12,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
 from test.apps.catalog.grpc.descriptors import (
+    load_descriptor_set,
     side_effects_descriptor_set,
     users_descriptor_set,
     write_descriptor_set,
@@ -141,7 +142,7 @@ def test_statistic(schema, narrow, expected):
 
 @pytest.fixture
 def side_effects_schema(tmp_path):
-    return schemathesis.grpc.from_path(write_descriptor_set(tmp_path, side_effects_descriptor_set()))
+    return load_descriptor_set(tmp_path, side_effects_descriptor_set())
 
 
 def test_operation_layers_put_reads_first_and_writes_last(side_effects_schema):
@@ -189,7 +190,7 @@ BUILD_HINT = "Build one with `buf build -o api.binpb` or `protoc --include_impor
 )
 def test_invalid_descriptor_set(tmp_path, data, message):
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_path(write_descriptor_set(tmp_path, data))
+        load_descriptor_set(tmp_path, data)
     assert (exc_info.value.kind, exc_info.value.message) == (LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET, message)
 
 
@@ -245,11 +246,9 @@ except LoaderError as exc:
 """
 
 
-@pytest.mark.parametrize("loader", ["from_path", "from_url"])
-def test_missing_grpc_extra(users_path, loader):
-    location = str(users_path) if loader == "from_path" else "grpc://127.0.0.1:1"
+def test_missing_grpc_extra(users_path):
     result = subprocess.run(
-        [sys.executable, "-c", BLOCK_PROTOBUF_AND_LOAD, loader, location], capture_output=True, text=True
+        [sys.executable, "-c", BLOCK_PROTOBUF_AND_LOAD, str(users_path)], capture_output=True, text=True
     )
     assert result.stderr.splitlines()[-1] == (
         "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`"
@@ -260,7 +259,7 @@ BLOCK_PROTOBUF_AND_LOAD = """
 import sys
 sys.modules["google.protobuf"] = None
 import schemathesis
-getattr(schemathesis.grpc, sys.argv[1])(sys.argv[2])
+schemathesis.grpc.from_path(sys.argv[1])
 """
 
 

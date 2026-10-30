@@ -600,8 +600,7 @@ class GrpcApps:
             reflection_imports=reflection_imports,
             start=start,
         )
-        self.parent.request.addfinalizer(lambda: app.server.stop(None))
-        return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
+        return self._serve(app)
 
     def crashing_users(self, how: str) -> CrashingGrpcServer:
         """`users` where a call with id 500 brings the server down: `exit` drops connections, `stop` cancels calls."""
@@ -637,6 +636,7 @@ class GrpcContext:
 
     @property
     def apps(self) -> GrpcApps:
+        pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
         return GrpcApps(parent=self.parent)
 
 

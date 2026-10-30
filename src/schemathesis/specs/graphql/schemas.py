@@ -70,11 +70,11 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.checks import CheckContext
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.spec import ApiSchema
     from schemathesis.core.transport import Response
-    from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.generation.dictionaries import DictionaryDraw
     from schemathesis.generation.stateful.state_machine import APIStateMachine
@@ -178,16 +178,6 @@ class GraphQLSchema(BaseSchema):
         from schemathesis.specs.graphql.stateful import create_state_machine
 
         return create_state_machine(self)
-
-    @override
-    def build_state_machine(
-        self,
-        *,
-        feedback: FeedbackSources,
-        link_calibration: LinkCalibrationState | None,
-    ) -> type[APIStateMachine]:
-        # GraphQL stateful transitions consume neither feedback nor link calibration.
-        return self.as_state_machine()
 
     @override
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
@@ -394,16 +384,8 @@ class GraphQLSchema(BaseSchema):
         return None
 
     @override
-    def get_operation_id(self, operation: APIOperation) -> str | None:
-        return None
-
-    @override
     def is_deprecated(self, operation: APIOperation) -> bool:
         return operation.definition.raw.deprecation_reason is not None
-
-    @override
-    def validate(self) -> None:
-        return None
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
@@ -435,17 +417,19 @@ class GraphQLSchema(BaseSchema):
             raise failure
 
     @override
-    def evaluate_negative_data(self, case: Case, response: Response) -> None:
+    def evaluate_negative_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
         failure = _response_failure(case, response)
         if isinstance(failure, AcceptedNegativeData):
             raise failure
+        return None
 
     @override
-    def evaluate_positive_data(self, case: Case, response: Response) -> None:
+    def evaluate_positive_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
 
         failure = _response_failure(case, response)
         if isinstance(failure, GraphQLClientError):
             raise failure
+        return None
 
     @override
     def validate_response(

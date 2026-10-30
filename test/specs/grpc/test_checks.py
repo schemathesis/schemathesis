@@ -13,33 +13,27 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import CallOutcome
 from schemathesis.grpc.checks import MalformedGrpcMessage, UndecodableGrpcRequest
 from schemathesis.specs.openapi.checks import ignored_auth
-from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, load_descriptor_set, users_descriptor_set
 from test.utils import check_context
 
 
 @pytest.fixture(scope="module")
 def operation(tmp_path_factory):
-    path = write_descriptor_set(tmp_path_factory.mktemp("grpc"), users_descriptor_set())
-    return schemathesis.grpc.from_path(path)["pkg.Users"]["GetUser"]
+    return load_descriptor_set(tmp_path_factory.mktemp("grpc"), users_descriptor_set())["pkg.Users"]["GetUser"]
 
 
-def grpc_response(response_factory, *, status, content=b"", headers=None):
+def grpc_response(response_factory, *, status, content=b"", headers=None, status_line=None):
     return response_factory.core(
         content=content,
         content_type=None,
         status_code=200 if status == 0 else 500,
         headers={"grpc-status": [str(status)], **(headers or {})},
+        status_line=status_line,
     )
 
 
 def server_error(operation, response_factory, status, status_line, headers=None, body=None):
-    response = response_factory.core(
-        content=b"",
-        content_type=None,
-        status_code=500,
-        headers={"grpc-status": [str(status)], **(headers or {})},
-        status_line=status_line,
-    )
+    response = grpc_response(response_factory, status=status, headers=headers, status_line=status_line)
     with pytest.raises(AssertionError) as exc_info:
         not_a_server_error(check_context(), response, operation.Case(body={} if body is None else body))
     return exc_info.value
@@ -154,7 +148,6 @@ def test_bad_status_details(operation, response_factory):
 
 # Without a run to remember the verdict, every successful call is resent without credentials.
 def test_ignored_auth_outside_a_run(ctx):
-    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
     server = ctx.grpc.apps.users()
     operation = schemathesis.grpc.from_url(server.target)["pkg.Users"]["GetUser"]
     case = operation.Case(body={"userId": 403}, headers={"authorization": "Bearer x"})
@@ -183,7 +176,6 @@ def test_unknown_fields_pass_for_descriptor_sets(operation, response_factory):
 
 
 def test_unimplemented_is_not_a_server_error(ctx):
-    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
     assert operation.Case(body={"userId": 501}).call_and_validate().status_line == "UNIMPLEMENTED"
 
@@ -213,8 +205,7 @@ def test_unknown_status_detail_types_pass(operation, response_factory):
 
 @pytest.fixture(scope="module")
 def types(tmp_path_factory):
-    path = write_descriptor_set(tmp_path_factory.mktemp("grpc"), all_types_descriptor_set())
-    return schemathesis.grpc.from_path(path)["types.Types"]
+    return load_descriptor_set(tmp_path_factory.mktemp("grpc"), all_types_descriptor_set())["types.Types"]
 
 
 @pytest.mark.parametrize(

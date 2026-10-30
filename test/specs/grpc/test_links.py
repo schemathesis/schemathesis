@@ -134,14 +134,6 @@ def test_response_value_is_empty(tmp_path, response_factory, status, content):
     assert response_value(operation, response, "name") == ""
 
 
-def test_state_machine_finds_bug_via_python_api(ctx):
-    server = ctx.grpc.apps.library()
-    schema = schemathesis.grpc.from_url(server.target)
-    with pytest.raises(FailureGroup) as exc:
-        schema.as_state_machine().run()
-    assert [(type(failure), failure.title) for failure in exc.value.exceptions] == [(ServerError, "Server error")]
-
-
 def server_errors(schema):
     with pytest.raises(FailureGroup) as exc:
         schema.as_state_machine().run()

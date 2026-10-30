@@ -15,6 +15,9 @@ from google.protobuf import (
     wrappers_pb2,
 )
 
+import schemathesis
+from schemathesis.config import SchemathesisConfig
+
 FieldDescriptorProto = descriptor_pb2.FieldDescriptorProto
 
 
@@ -22,6 +25,19 @@ def write_descriptor_set(directory: Path, data: bytes) -> Path:
     path = directory / "api.binpb"
     path.write_bytes(data)
     return path
+
+
+def load_descriptor_set(directory: Path, data: bytes, **config):
+    """Schema from `data` written as a descriptor set; without `config`, the configuration is auto-discovered."""
+    return schemathesis.grpc.from_path(
+        write_descriptor_set(directory, data), config=SchemathesisConfig.from_dict(config) if config else None
+    )
+
+
+def load(server, **config):
+    """Schema from the descriptor set `server` writes, aimed at that server."""
+    config = SchemathesisConfig.from_dict({"base-url": server.target, **config})
+    return schemathesis.grpc.from_path(server.descriptor_set_path, config=config)
 
 
 def users_descriptor_set() -> bytes:

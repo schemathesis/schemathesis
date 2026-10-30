@@ -9,14 +9,19 @@ from flask import jsonify, request
 
 import schemathesis
 from schemathesis.cli.wfc_report import FAULT_CATEGORY_IDS, fault_category
-from schemathesis.core.failures import AcceptedNegativeData, MalformedJson, ResponseTimeExceeded, ServerError
+from schemathesis.core.failures import (
+    AcceptedNegativeData,
+    AuthScenario,
+    IgnoredAuth,
+    MalformedJson,
+    ResponseTimeExceeded,
+    ServerError,
+)
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.grpc.checks import UndecodableGrpcRequest
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
-    AuthScenario,
     EnsureResourceAvailability,
-    IgnoredAuth,
     MissingHeaderNotRejected,
     ObjectLevelAuthorizationViolation,
     RejectedPositiveData,

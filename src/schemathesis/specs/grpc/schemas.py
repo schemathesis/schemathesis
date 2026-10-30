@@ -27,6 +27,7 @@ from schemathesis.core.errors import (
     SerializationError,
     not_found_message,
 )
+from schemathesis.core.failures import AuthScenario, IgnoredAuth, ServerError
 from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
@@ -47,18 +48,25 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields, UndecodableGrpcRequest
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
-from schemathesis.openapi.checks import AuthScenario, IgnoredAuth
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc import coverage, error_feedback
 from schemathesis.specs.grpc.converter import (
+    body_message,
     message_schema,
     message_to_json,
-    request_message,
     rewrite_json,
 )
 from schemathesis.specs.grpc.formats import grpc_formats
 from schemathesis.specs.grpc.stateful import create_state_machine, infer_links
-from schemathesis.specs.grpc.status import GRPC_STATUSES, INTERNAL, LIBRARY_DECODE_ERRORS, grpc_status, starts_with_verb
+from schemathesis.specs.grpc.status import (
+    GRPC_STATUSES,
+    INTERNAL,
+    LIBRARY_DECODE_ERRORS,
+    OK,
+    STATUS_NAMES_BY_HTTP_STATUS,
+    grpc_status,
+    starts_with_verb,
+)
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
@@ -70,7 +78,6 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema
-    from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.filters import FilterSet
     from schemathesis.generation.case import Case
@@ -214,10 +221,6 @@ class GrpcSchema(BaseSchema):
         return ""
 
     @override
-    def validate(self) -> None:
-        return None
-
-    @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         # Credentials travel as metadata, which the transport builds from the case headers.
         return False
@@ -258,8 +261,8 @@ class GrpcSchema(BaseSchema):
         return " ".join(shlex.quote(arg) for arg in args)
 
     @override
-    def status_name(self, response: Response) -> str | None:
-        return GRPC_STATUSES[grpc_status(response)][0]
+    def status_name_for_code(self, status_code: int) -> str | None:
+        return STATUS_NAMES_BY_HTTP_STATUS[status_code]
 
     @override
     def hash_case(self, case: Case) -> int:
@@ -274,23 +277,26 @@ class GrpcSchema(BaseSchema):
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
-        return GRPC_STATUSES[grpc_status(response)][2]
+        return GRPC_STATUSES[grpc_status(response)].outcome
 
     @override
-    def explain_server_error(self, case: Case, response: Response) -> None:
+    def server_error(self, case: Case, response: Response) -> ServerError:
+        status = grpc_status(response)
+        name = GRPC_STATUSES[status].name
         # Raw bytes are sent unchanged, so a decode failure there is the input's fault, not the message type's.
         if (
-            grpc_status(response) == INTERNAL
+            status == INTERNAL
             and not isinstance(case.body, bytes)
             and response.headers.get("grpc-message", [""])[0].startswith(LIBRARY_DECODE_ERRORS)
         ):
-            raise UndecodableGrpcRequest(
-                operation=case.operation.label, status_code=response.status_code, status_name=self.status_name(response)
+            return UndecodableGrpcRequest(
+                operation=case.operation.label, status_code=response.status_code, status_name=name
             )
+        return ServerError(operation=case.operation.label, status_code=response.status_code, status_name=name)
 
     @override
     def validate_response(self, operation: APIOperation, response: Response, *, case: Case | None = None) -> None:
-        if grpc_status(response) == 0:
+        if grpc_status(response) == OK:
             output_type = operation.definition.raw.output_type
             decoded = _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
             # A descriptor set can lag behind the server; reflection describes what the server runs.
@@ -308,7 +314,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        if grpc_status(response) != 0 or AUTH_METADATA not in response.request.headers:
+        if grpc_status(response) != OK or AUTH_METADATA not in response.request.headers:
             return True
         label = case.operation.label
         enforced = ctx.auth_enforced_operations
@@ -325,11 +331,9 @@ class GrpcSchema(BaseSchema):
         # The session carries `--auth` credentials.
         kwargs.pop("session", None)
         kwargs.pop("auth", None)
-        ctx.internals.record_case(parent_id=case.id, case=probe)
-        probe_response = self.transport.send(probe, **kwargs)
-        ctx.internals.record_response(case_id=probe.id, response=probe_response)
+        probe_response = ctx.internals.send_probe(case, probe, kwargs)
         # Without declared security, other errors may come from the anonymous caller's data, not from ignored auth.
-        if grpc_status(probe_response) == 0:
+        if grpc_status(probe_response) == OK:
             raise IgnoredAuth(
                 operation=label,
                 message=f"Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `{label}`",
@@ -355,10 +359,6 @@ class GrpcSchema(BaseSchema):
         for operation in operations:
             layers[side_effect_rank(operation.definition.raw)].append(operation)
         return [layer for layer in layers if layer]
-
-    @override
-    def get_operation_id(self, operation: APIOperation) -> str | None:
-        return None
 
     @override
     def is_deprecated(self, operation: APIOperation) -> bool:
@@ -484,12 +484,6 @@ class GrpcSchema(BaseSchema):
         )
 
     @override
-    def get_strategies_from_examples(
-        self, operation: APIOperation, feedback: FeedbackSources = NO_FEEDBACK, **kwargs: Any
-    ) -> list[SearchStrategy[Case]]:
-        raise NotImplementedError
-
-    @override
     def iter_coverage_cases(
         self,
         operation: APIOperation,
@@ -505,16 +499,6 @@ class GrpcSchema(BaseSchema):
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
-
-    @override
-    def build_state_machine(
-        self,
-        *,
-        feedback: FeedbackSources,
-        link_calibration: LinkCalibrationState | None,
-    ) -> type[APIStateMachine]:
-        # Links come from method and field names, and stateful messages are generated without runtime feedback.
-        return self.as_state_machine()
 
     @override
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
@@ -553,12 +537,10 @@ def request_payload(case: Case) -> bytes:
 
 def encode_message(body: Body | NotSet, input_type: Descriptor) -> bytes:
     """`body` serialized as an `input_type` message."""
-    if isinstance(body, NotSet):
-        body = {}
     if isinstance(body, bytes):
         return body
     try:
-        parsed = request_message(body, input_type)
+        parsed = body_message(body, input_type)
     except (json_format.ParseError, TypeError) as exc:
         raise SerializationError(f"Cannot encode the request body as `{input_type.full_name}`: {exc}") from None
     return parsed.SerializeToString(deterministic=True)

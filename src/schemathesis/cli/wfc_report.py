@@ -12,6 +12,8 @@ from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.failures import (
     AcceptedNegativeData,
+    AuthScenario,
+    IgnoredAuth,
     MalformedJson,
     ResponseTimeExceeded,
     ServerError,
@@ -22,9 +24,7 @@ from schemathesis.engine.events import EngineFinished, EngineStarted, ScenarioFi
 from schemathesis.engine.summary import running_time
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
-    AuthScenario,
     EnsureResourceAvailability,
-    IgnoredAuth,
     JsonSchemaError,
     MalformedMediaType,
     MissingContentType,

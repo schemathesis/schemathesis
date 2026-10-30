@@ -10,19 +10,18 @@ from flask import jsonify, redirect, request
 from hypothesis import Phase, given, settings
 
 import schemathesis
-from schemathesis.core.failures import FailureGroup
+from schemathesis.core.failures import AuthScenario, FailureGroup, IgnoredAuth
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.overrides import Override
-from schemathesis.openapi.checks import AuthScenario
 from schemathesis.python.asgi import ASGIClient
 from schemathesis.schemas import BaseSchema
 from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.adapter.security import SecurityParameter
-from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
+from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, ignored_auth, remove_auth
 from test.utils import EventStream, check_context, run_given
 
 

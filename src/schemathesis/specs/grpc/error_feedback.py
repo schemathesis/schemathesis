@@ -4,21 +4,19 @@ import base64
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, cast
 
-from google.protobuf import message, message_factory
+from google.protobuf import message
 
 # googleapis-common-protos ships no type information.
 from google.rpc import error_details_pb2, status_pb2  # type: ignore[import-untyped]
 
-from schemathesis.core import NotSet
 from schemathesis.core.error_feedback import Observation, ObservationKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
-from schemathesis.specs.grpc.converter import request_message, require_set
+from schemathesis.specs.grpc.converter import body_message, json_fields, require_set
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor, FieldDescriptor
 
-    from schemathesis.core import Body
     from schemathesis.core.error_feedback import ParameterPath
     from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
     from schemathesis.core.transport import Response
@@ -32,7 +30,7 @@ def parse_rejection(operation: APIOperation, case: Case, response: Response) -> 
     if not violations:
         return ()
     descriptor = operation.definition.raw.input_type
-    request = _request_message(descriptor, case.body)
+    request = body_message(case.body, descriptor)
     return tuple(
         Observation(
             operation_label=operation.label,
@@ -62,7 +60,7 @@ def require_fields(schema: JsonSchemaObject, descriptor: Descriptor, observation
             # Well-known types have no properties, and `google.protobuf.Any` fields are never generated.
             if properties is None or name not in properties:
                 break
-            field = next(field for field in message_type.fields if field.json_name == name)
+            field = json_fields(message_type)[name]
             oneof = field.containing_oneof
             if oneof is None:
                 required = cast("list[str]", target.setdefault("required", []))
@@ -91,12 +89,6 @@ def _inline(schema: JsonSchemaObject, definitions: dict[str, JsonSchemaObject]) 
         schema.update(deepclone(definitions[reference.removeprefix("#/$defs/")]))
 
 
-def _request_message(descriptor: Descriptor, body: Body) -> message.Message:
-    if isinstance(body, bytes):
-        return message_factory.GetMessageClass(descriptor).FromString(body)
-    return request_message({} if isinstance(body, NotSet) else body, descriptor)
-
-
 def _field_violations(response: Response) -> Iterator[error_details_pb2.BadRequest.FieldViolation]:
     for encoded in response.headers.get("grpc-status-details-bin", []):
         try:
@@ -121,22 +113,16 @@ def _missing_path(request: message.Message, descriptor: Descriptor, path: str) -
     container = request
     *parents, last = path.split(".")
     for name in parents:
-        field = _find_field(descriptor, name)
+        field = json_fields(descriptor).get(name)
         if field is None or field.message_type is None or field.is_repeated:
             return None
         resolved.append(field.json_name)
         container = getattr(container, field.name)
         descriptor = field.message_type
-    field = _find_field(descriptor, last)
+    field = json_fields(descriptor).get(last)
     if field is None or _is_set(container, field):
         return None
     return (*resolved, field.json_name)
-
-
-def _find_field(descriptor: Descriptor, name: str) -> FieldDescriptor | None:
-    return descriptor.fields_by_name.get(name) or next(
-        (field for field in descriptor.fields if field.json_name == name), None
-    )
 
 
 def _is_set(container: message.Message, field: FieldDescriptor) -> bool:

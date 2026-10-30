@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import json
 import textwrap
 from typing import TYPE_CHECKING, Any
@@ -408,39 +407,6 @@ class EnsureResourceAvailability(Failure):
         super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.MEDIUM)
         self.created_with = created_with
         self.not_available_with = not_available_with
-
-    @property
-    def _unique_key(self) -> str:
-        return ""
-
-
-class AuthScenario(enum.StrEnum):
-    NO_AUTH = "no_auth"
-    INVALID_AUTH = "invalid_auth"
-    GENERATED_AUTH = "generated_auth"
-
-
-class IgnoredAuth(Failure):
-    """The API operation does not check the specified authentication."""
-
-    code = "ST401"
-    checks = ("ignored_auth",)
-    kind_title = "Authentication not enforced"
-
-    __slots__ = ("scenario",)
-
-    def __init__(
-        self,
-        *,
-        operation: str,
-        message: str,
-        scenario: AuthScenario,
-        title: str = "API accepts requests without authentication",
-        case_id: str | None = None,
-    ) -> None:
-        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
-        # Which credentials the request carried when the API still let it through.
-        self.scenario = scenario
 
     @property
     def _unique_key(self) -> str:

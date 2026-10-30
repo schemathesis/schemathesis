@@ -21,6 +21,7 @@ from schemathesis.specs.grpc.converter import request_message
 from schemathesis.specs.grpc.formats import grpc_formats
 from test.apps.catalog.grpc.descriptors import (
     all_types_descriptor_set,
+    load_descriptor_set,
     nested_descriptor_set,
     validated_descriptor_set,
     write_descriptor_set,
@@ -225,7 +226,7 @@ RULES = {"Record": span_rules, "Check": extras_rules, "Edge": edges_rules}
 
 @pytest.fixture
 def validated_schema(tmp_path):
-    return schemathesis.grpc.from_path(write_descriptor_set(tmp_path, validated_descriptor_set()))
+    return load_descriptor_set(tmp_path, validated_descriptor_set())
 
 
 def broken_rules(operation, body):
@@ -391,7 +392,7 @@ def test_coverage_exclusive_float_bounds(validated_schema):
 
 @pytest.fixture
 def nested_schema(tmp_path):
-    return schemathesis.grpc.from_path(write_descriptor_set(tmp_path, nested_descriptor_set()))
+    return load_descriptor_set(tmp_path, nested_descriptor_set())
 
 
 def test_coverage_nested_messages(nested_schema):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
@@ -21,6 +22,7 @@ from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
+    from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.schemas import APIOperation, BaseSchema
 
 
@@ -204,6 +206,40 @@ def auth_flow_suggestion(schema: BaseSchema) -> str | None:
     )
 
 
+def _schema_warning_recorder(data: WarningData, warning: SchemaWarning) -> Callable[[], None] | None:
+    """How to record a schema-level warning in `data`; `None` for kinds reported elsewhere."""
+    label = warning.operation_label
+    message = warning.message
+    kind = warning.kind
+    if kind is SchemathesisWarning.MISSING_DESERIALIZER:
+        return partial(_add_by_group, data.missing_deserializer, warning.group, label, message)
+    if kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
+        # UnusedOpenAPIAuthWarning has no operation_label (schema-level)
+        return partial(data.unused_openapi_auth.add, message)
+    if kind is SchemathesisWarning.UNSUPPORTED_REGEX:
+        return partial(_add_by_label, data.unsupported_regex, label, message)
+    if kind is SchemathesisWarning.UNRESOLVABLE_REFERENCE:
+        return partial(_add_by_label, data.unresolvable_reference, label, message)
+    if kind is SchemathesisWarning.UNSUPPORTED_FIELD:
+        return partial(_add_by_label, data.unsupported_field, label, message)
+    if kind is SchemathesisWarning.DICTIONARY_MISMATCH:
+        return partial(data.dictionary_mismatch.add, message)
+    if kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
+        return partial(data.constants_extraction.add, message)
+    return None
+
+
+def _add_by_label(messages: dict[str, set[str]], label: str | None, message: str) -> None:
+    assert label is not None
+    messages.setdefault(label, set()).add(message)
+
+
+def _add_by_group(messages: dict[str, dict[str, set[str]]], group: str | None, label: str | None, message: str) -> None:
+    # Missing deserializer warnings always carry an operation label and a media type group.
+    assert group is not None
+    _add_by_label(messages.setdefault(group, {}), label, message)
+
+
 def _is_request_shape_probe(case: CaseNode) -> bool:
     return coverage_scenario(case.value) in REQUEST_SHAPE_PROBES
 
@@ -291,48 +327,12 @@ class WarningCollector:
     def on_schema_warnings(self, event: events.SchemaAnalysisWarnings) -> None:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
-            if warning.kind is SchemathesisWarning.MISSING_DESERIALIZER:
-                # MissingDeserializerWarning always has operation_label and a media type group
-                assert warning.operation_label is not None
-                assert warning.group is not None
-                self._handle_warning(
-                    warning.kind,
-                    self._record_missing_deserializer_warning(warning.operation_label, warning.group, warning.message),
-                )
-            elif warning.kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
-                # UnusedOpenAPIAuthWarning has no operation_label (schema-level)
-                self._handle_warning(
-                    warning.kind,
-                    self._record_unused_openapi_auth_warning(warning.message),
-                )
-            elif warning.kind is SchemathesisWarning.UNSUPPORTED_REGEX:
-                assert warning.operation_label is not None
-                self._handle_warning(
-                    warning.kind,
-                    self._record_unsupported_regex_warning(warning.operation_label, warning.message),
-                )
-            elif warning.kind is SchemathesisWarning.UNRESOLVABLE_REFERENCE:
-                assert warning.operation_label is not None
-                self._handle_warning(
-                    warning.kind,
-                    self._record_unresolvable_reference_warning(warning.operation_label, warning.message),
-                )
-            elif warning.kind is SchemathesisWarning.UNSUPPORTED_FIELD:
-                assert warning.operation_label is not None
-                self._handle_warning(
-                    warning.kind,
-                    self._record_unsupported_field_warning(warning.operation_label, warning.message),
-                )
-            elif warning.kind is SchemathesisWarning.DICTIONARY_MISMATCH:
-                self._handle_warning(
-                    warning.kind,
-                    self._record_dictionary_mismatch_warning(warning.message),
-                )
-            elif warning.kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
-                self._handle_warning(
-                    warning.kind,
-                    self._record_constants_extraction_warning(warning.message),
-                )
+            self._on_schema_warning(warning)
+
+    def _on_schema_warning(self, warning: SchemaWarning) -> None:
+        record = _schema_warning_recorder(self.data, warning)
+        if record is not None:
+            self._handle_warning(warning.kind, record)
 
     def _check_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.skip_warning is not None and event.label is not None:
@@ -519,77 +519,13 @@ class WarningCollector:
             if warnings.should_fail(SchemathesisWarning.METHOD_NOT_ALLOWED):
                 self.fails = True
 
-    def _record_missing_deserializer_warning(
-        self, operation_label: str, media_type: str, status_code: str
-    ) -> Callable[[], None]:
-        """Create a callback that records a missing deserializer warning."""
-
-        def record() -> None:
-            self.data.missing_deserializer.setdefault(media_type, {}).setdefault(operation_label, set()).add(
-                status_code
-            )
-
-        return record
-
-    def _record_unused_openapi_auth_warning(self, message: str) -> Callable[[], None]:
-        """Create a callback that records an unused OpenAPI auth warning."""
-
-        def record() -> None:
-            self.data.unused_openapi_auth.add(message)
-
-        return record
-
-    def _record_unsupported_regex_warning(self, operation_label: str, message: str) -> Callable[[], None]:
-        """Create a callback that records an unsupported regex warning."""
-
-        def record() -> None:
-            self.data.unsupported_regex.setdefault(operation_label, set()).add(message)
-
-        return record
-
-    def _record_unresolvable_reference_warning(self, operation_label: str, message: str) -> Callable[[], None]:
-        """Create a callback that records a dropped parameter with an unresolvable reference."""
-
-        def record() -> None:
-            self.data.unresolvable_reference.setdefault(operation_label, set()).add(message)
-
-        return record
-
-    def _record_unsupported_field_warning(self, operation_label: str, message: str) -> Callable[[], None]:
-        """Create a callback that records a request field Schemathesis does not generate."""
-
-        def record() -> None:
-            self.data.unsupported_field.setdefault(operation_label, set()).add(message)
-
-        return record
-
     def on_unmatched_filters(self, statistic: ApiStatistic) -> None:
         """Record filter expressions that no operation matched."""
         for entry in statistic.unmatched_filters:
             message = describe_filter(entry)
             if entry.suggestion is not None:
                 message += f" (did you mean {entry.suggestion!r}?)"
-            self._handle_warning(SchemathesisWarning.UNMATCHED_FILTER, self._record_unmatched_filter(message))
-
-    def _record_unmatched_filter(self, message: str) -> Callable[[], None]:
-        def record() -> None:
-            self.data.unmatched_filter.add(message)
-
-        return record
-
-    def _record_dictionary_mismatch_warning(self, message: str) -> Callable[[], None]:
-        def record() -> None:
-            self.data.dictionary_mismatch.add(message)
-
-        return record
-
-    def _record_constants_extraction_warning(self, message: str) -> Callable[[], None]:
-        """Create a callback that records a constants extraction warning."""
-
-        def record() -> None:
-            self.data.constants_extraction.add(message)
-
-        return record
+            self._handle_warning(SchemathesisWarning.UNMATCHED_FILTER, partial(self.data.unmatched_filter.add, message))
 
     def _check_stateful_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import struct
 import sys
 from dataclasses import dataclass
 from functools import lru_cache
@@ -10,7 +9,8 @@ from typing import TYPE_CHECKING, Final, cast
 from google.protobuf import json_format, message_factory
 from google.protobuf.descriptor import FieldDescriptor
 
-from schemathesis.core.jsonschema.numeric import FLOAT32_MAX, INT32_RANGE, INT64_RANGE
+from schemathesis.core import NotSet
+from schemathesis.core.jsonschema.numeric import FLOAT32_MAX, INT32_RANGE, INT64_RANGE, next_float32
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.grpc.constraints import ConstraintReader, FieldConstraints
 
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from google.protobuf.descriptor_pool import DescriptorPool
     from google.protobuf.message import Message
 
+    from schemathesis.core import Body
     from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
     from schemathesis.specs.grpc.constraints import RuleValue
 
@@ -166,22 +167,9 @@ class _Converter:
         return schema
 
     def field(self, field: FieldDescriptor, name: str, constraints: FieldConstraints | None) -> JsonSchemaObject | None:
-        message = field.message_type
-        if message is not None and message.GetOptions().map_entry:
-            value_field = message.fields_by_name["value"]
-            values = self.value(value_field, name)
-            if values is None:
-                return None
-            mapping: JsonSchemaObject = {"type": "object", "additionalProperties": values}
-            key_field = message.fields_by_name["key"]
-            if key_field.type in MAP_KEYS:
-                mapping["propertyNames"] = deepclone(MAP_KEYS[key_field.type])
-            if constraints is not None:
-                if constraints.kind == "map":
-                    _map_rules(mapping, key_field, value_field, constraints.rules)
-                if constraints.required:
-                    require_set(mapping, field)
-            return mapping
+        entry = map_entry(field)
+        if entry is not None:
+            return self._map(field, entry, name, constraints)
         schema = self.value(field, name)
         if schema is None:
             return None
@@ -198,10 +186,26 @@ class _Converter:
             if constraints.required and not field.has_presence:
                 require_set(schema, field)
         required = field.is_required or (constraints is not None and constraints.required)
+        message = field.message_type
         if message is not None and message.full_name in WRAPPERS and not required:
             # JSON `null` clears a singular field; a list, a map or a required field rejects it.
             schema["type"] = [schema["type"], "null"]
         return schema
+
+    def _map(
+        self, field: FieldDescriptor, entry: Descriptor, name: str, constraints: FieldConstraints | None
+    ) -> JsonSchemaObject | None:
+        value_field = entry.fields_by_name["value"]
+        values = self.value(value_field, name)
+        if values is None:
+            return None
+        mapping: JsonSchemaObject = {"type": "object", "additionalProperties": values}
+        key_field = entry.fields_by_name["key"]
+        if key_field.type in MAP_KEYS:
+            mapping["propertyNames"] = deepclone(MAP_KEYS[key_field.type])
+        if constraints is not None:
+            _map_constraints(mapping, field, key_field, value_field, constraints)
+        return mapping
 
     def value(self, field: FieldDescriptor, name: str) -> JsonSchemaObject | None:
         if field.message_type is None:
@@ -356,6 +360,19 @@ def _repeated_rules(array: JsonSchemaObject, field: FieldDescriptor, rules: dict
         array["uniqueItems"] = True
 
 
+def _map_constraints(
+    mapping: JsonSchemaObject,
+    field: FieldDescriptor,
+    key_field: FieldDescriptor,
+    value_field: FieldDescriptor,
+    constraints: FieldConstraints,
+) -> None:
+    if constraints.kind == "map":
+        _map_rules(mapping, key_field, value_field, constraints.rules)
+    if constraints.required:
+        require_set(mapping, field)
+
+
 def _map_rules(
     mapping: JsonSchemaObject, key_field: FieldDescriptor, value_field: FieldDescriptor, rules: dict[str, RuleValue]
 ) -> None:
@@ -419,17 +436,8 @@ def _float32_bounds(rules: dict[str, RuleValue]) -> dict[str, RuleValue]:
     for exclusive, inclusive, upward in (("gt", "gte", True), ("lt", "lte", False)):
         value = rules.pop(exclusive, None)
         if isinstance(value, (int, float)):
-            rules[inclusive] = _next_float32(float(value), upward)
+            rules[inclusive] = next_float32(value, going_up=upward)
     return rules
-
-
-def _next_float32(value: float, upward: bool) -> float:
-    if value == 0:
-        return FLOAT32_TINY if upward else -FLOAT32_TINY
-    (bits,) = struct.unpack("<i", struct.pack("<f", value))
-    # Magnitude grows with the bits for both signs.
-    bits += 1 if (value > 0) == upward else -1
-    return struct.unpack("<f", struct.pack("<i", bits))[0]
 
 
 def _integer_choices(bounds: tuple[int, int], rules: dict[str, RuleValue]) -> list[int]:
@@ -597,6 +605,13 @@ def request_message(body: object, input_type: Descriptor) -> Message:
     )
 
 
+def body_message(body: Body | NotSet, input_type: Descriptor) -> Message:
+    """The message a request body describes, whether JSON or already serialized."""
+    if isinstance(body, bytes):
+        return message_factory.GetMessageClass(input_type).FromString(body)
+    return request_message({} if isinstance(body, NotSet) else body, input_type)
+
+
 def message_to_json(message: Message, pool: DescriptorPool) -> JsonValue:
     """`message` in its JSON form, with `Any` values of types `pool` lacks kept as raw bytes."""
     try:
@@ -655,7 +670,7 @@ def rewrite_json(
         return leaf(value, name)
     if not isinstance(value, dict):
         return value
-    fields = _json_fields(message_type)
+    fields = json_fields(message_type)
     rewritten = {}
     for key, item in value.items():
         member = fields.get(key) or _extension(message_type, key)
@@ -672,8 +687,16 @@ def rewrite_json(
     return rewritten
 
 
+def map_entry(field: FieldDescriptor) -> Descriptor | None:
+    """The synthetic entry message of a `map` field."""
+    message = field.message_type
+    if message is not None and message.GetOptions().map_entry:
+        return message
+    return None
+
+
 @lru_cache(maxsize=1024)
-def _json_fields(message_type: Descriptor) -> dict[str, FieldDescriptor]:
+def json_fields(message_type: Descriptor) -> dict[str, FieldDescriptor]:
     """Fields by both of the names a JSON body may use for them."""
     return {**message_type.fields_by_name, **{member.json_name: member for member in message_type.fields}}
 
