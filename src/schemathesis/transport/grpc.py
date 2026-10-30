@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
 # How long a failed call waits for the channel to connect before blaming the network.
 READY_TIMEOUT = 0.5
+# Servers attach error details as metadata; the default 8 KB limit turns large ones into a client-side failure.
+CHANNEL_OPTIONS = (("grpc.max_metadata_size", 1024 * 1024),)
 
 ChannelKey = tuple[str, bool, "bool | str", "str | tuple[str, str] | None"]
 
@@ -161,8 +163,8 @@ def metadata_pairs(headers: Mapping[str, str]) -> tuple[tuple[str, str | bytes],
 
 def create_channel(address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.Channel:
     if tls:
-        return grpc.secure_channel(address, _credentials(verify, cert))
-    return grpc.insecure_channel(address)
+        return grpc.secure_channel(address, _credentials(verify, cert), options=CHANNEL_OPTIONS)
+    return grpc.insecure_channel(address, options=CHANNEL_OPTIONS)
 
 
 def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.ChannelCredentials:

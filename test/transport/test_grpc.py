@@ -60,6 +60,15 @@ def test_internal_error(ctx):
     )
 
 
+def test_large_error_trailers(ctx):
+    _, response = get_user(ctx.grpc.apps.users(), 400)
+    assert (response.status_code, response.status_line, response.headers) == (
+        400,
+        "INVALID_ARGUMENT: invalid",
+        {"x-details": ["x" * 65536], "grpc-status": ["3"], "grpc-message": ["invalid"]},
+    )
+
+
 def test_malformed_ok_body_is_reported_as_binary(ctx):
     case = load(ctx.grpc.apps.users())["pkg.Users"]["GetUser"].Case(body={"userId": 17})
     with pytest.raises(FailureGroup) as exc_info:
