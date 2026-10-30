@@ -2,8 +2,11 @@ import platform
 
 import pytest
 
+import schemathesis
+from schemathesis.engine import events
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
-from test.utils import run_given
+from test.utils import EventStream, run_given
 
 
 @pytest.fixture(
@@ -281,3 +284,20 @@ def test_sensitive_parameter_values_are_distinct_inputs(ctx, cli):
         config={"warnings": False},
     )
     assert len({request.raw_query for request in api.calls_to("/api/success")}) > 1
+
+
+def test_replayed_error_keeps_original_traceback(ctx):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    with ctx.restore_checks():
+
+        @schemathesis.check
+        def broken_check(ctx, response, case):
+            raise ZeroDivisionError("boom")
+
+        stream = EventStream(schema, checks=[broken_check], phases=[PhaseName.FUZZING], max_examples=10)
+        schema.config.generation.update(unique_inputs=True)
+        stream.execute()
+    [error] = stream.find_all(events.NonFatalError)
+    frames = [line for line in error.info.traceback.splitlines() if line.lstrip().startswith("File ")]
+    assert len(frames) == len(set(frames)), error.info.traceback
