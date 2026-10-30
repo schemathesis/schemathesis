@@ -27,6 +27,8 @@ class GrpcCall:
     peer_names: list[bytes]
     # Client address; calls over one connection share it.
     peer: str
+    # Serialized request message.
+    payload: bytes
 
 
 @dataclass(slots=True)
@@ -162,13 +164,14 @@ def users(
     operation_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("google.longrunning.Operation"))
     calls: list[GrpcCall] = []
 
-    def record(method: str, context: grpc.ServicerContext) -> None:
+    def record(method: str, context: grpc.ServicerContext, payload: bytes = b"") -> None:
         calls.append(
             GrpcCall(
                 method=method,
                 metadata=[(item.key, item.value) for item in context.invocation_metadata()],
                 peer_names=list(context.auth_context().get("x509_common_name", [])),
                 peer=context.peer(),
+                payload=payload,
             )
         )
 
@@ -207,7 +210,7 @@ def users(
         return user_class(name=f"u{user_id}").SerializeToString()
 
     def reset(payload: bytes, context: grpc.ServicerContext) -> bytes:
-        record("Reset", context)
+        record("Reset", context, payload)
         operation = operation_class()
         operation.response.Pack(user_class(name=f"u{request_class.FromString(payload).user_id}"))
         return operation.SerializeToString()
@@ -262,6 +265,7 @@ class AnswerEmpty(grpc.GenericRpcHandler):
                     metadata=[(item.key, item.value) for item in context.invocation_metadata()],
                     peer_names=[],
                     peer=context.peer(),
+                    payload=payload,
                 )
             )
             return b""

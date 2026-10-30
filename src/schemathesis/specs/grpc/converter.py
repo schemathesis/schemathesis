@@ -93,11 +93,16 @@ class ConvertedMessage:
     any_fields: list[str]
 
 
+def is_well_known(name: str) -> bool:
+    """Whether the message has its own JSON form rather than an object of its fields."""
+    return name == ANY or name in WRAPPERS or name in WELL_KNOWN or name in STRUCTURED
+
+
 def message_schema(descriptor: Descriptor) -> ConvertedMessage:
     converter = _Converter(ConstraintReader.from_pool(descriptor.file.pool))
     name = descriptor.full_name
     schema: JsonSchemaObject | None
-    if name == ANY or name in WRAPPERS or name in WELL_KNOWN or name in STRUCTURED:
+    if is_well_known(name):
         schema = converter.message_type(descriptor, name)
     else:
         schema = converter.message(descriptor)

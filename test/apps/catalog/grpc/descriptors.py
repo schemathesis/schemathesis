@@ -225,6 +225,21 @@ def all_types_descriptor_set() -> bytes:
     meta = types.message_type.add(name="Meta")
     _field(meta, "extra", 1, FieldDescriptorProto.TYPE_MESSAGE, type_name=".google.protobuf.Any")
 
+    blobs = types.message_type.add(name="Blobs")
+    _field(blobs, "chunks", 1, FieldDescriptorProto.TYPE_BYTES, label=FieldDescriptorProto.LABEL_REPEATED)
+    by_name = blobs.nested_type.add(name="ByNameEntry", options=descriptor_pb2.MessageOptions(map_entry=True))
+    _field(by_name, "key", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(by_name, "value", 2, FieldDescriptorProto.TYPE_BYTES)
+    _field(
+        blobs,
+        "by_name",
+        2,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".types.Blobs.ByNameEntry",
+        label=FieldDescriptorProto.LABEL_REPEATED,
+    )
+    _field(blobs, "scalars", 3, FieldDescriptorProto.TYPE_MESSAGE, type_name=".types.Scalars")
+
     choice = types.message_type.add(name="Choice")
     choice.oneof_decl.add(name="target")
     choice.oneof_decl.add(name="_note")
@@ -246,6 +261,16 @@ def all_types_descriptor_set() -> bytes:
     _field(message, "blob", 3, FieldDescriptorProto.TYPE_MESSAGE, type_name=".google.protobuf.Any", label=required)
     _field(
         message, "label", 4, FieldDescriptorProto.TYPE_MESSAGE, type_name=".google.protobuf.StringValue", label=required
+    )
+
+    extendable = legacy.message_type.add(name="Extendable")
+    extendable.extension_range.add(start=100, end=200)
+    legacy.extension.add(
+        name="blob",
+        number=100,
+        type=FieldDescriptorProto.TYPE_BYTES,
+        label=FieldDescriptorProto.LABEL_OPTIONAL,
+        extendee=".legacy.Extendable",
     )
 
     editions = descriptor_pb2.FileDescriptorProto(

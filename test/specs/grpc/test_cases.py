@@ -3,7 +3,6 @@ import ipaddress
 import re
 
 import pytest
-from google.protobuf import json_format, message_factory
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
@@ -12,6 +11,7 @@ from schemathesis.core.control import SkipTest
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.specs.grpc.formats import grpc_formats
+from schemathesis.specs.grpc.schemas import request_message
 from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, validated_descriptor_set, write_descriptor_set
 from test.utils import run_given
 
@@ -86,11 +86,10 @@ def is_ip(value):
 def test_positive_values_satisfy_validation_rules(tmp_path):
     schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, validated_descriptor_set()))
     operation = schema["validated.Spans"]["Record"]
-    message = message_factory.GetMessageClass(operation.definition.raw.input_type)
 
     @run_given(case=operation.as_strategy(), max_examples=50)
     def test(case):
-        span = json_format.ParseDict(case.body, message())
+        span = request_message(case.body, operation.definition.raw.input_type)
         target = span.WhichOneof("target")
         checks = {
             "trace_id": len(span.trace_id) == 16,
@@ -124,11 +123,10 @@ def test_positive_values_satisfy_validation_rules(tmp_path):
 def test_positive_values_satisfy_more_validation_rules(tmp_path):
     schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, validated_descriptor_set()))
     operation = schema["validated.Spans"]["Check"]
-    message = message_factory.GetMessageClass(operation.definition.raw.input_type)
 
     @run_given(case=operation.as_strategy(), max_examples=50)
     def test(case):
-        extras = json_format.ParseDict(case.body, message())
+        extras = request_message(case.body, operation.definition.raw.input_type)
         checks = {
             "file": 8 <= len(extras.file.encode()) <= 40
             and extras.file.endswith(".txt")
@@ -163,11 +161,10 @@ def test_positive_values_satisfy_more_validation_rules(tmp_path):
 def test_positive_values_satisfy_validation_rules_on_edge_cases(tmp_path):
     schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, validated_descriptor_set()))
     operation = schema["validated.Spans"]["Edge"]
-    message = message_factory.GetMessageClass(operation.definition.raw.input_type)
 
     @run_given(case=operation.as_strategy(), max_examples=50)
     def test(case):
-        edges = json_format.ParseDict(case.body, message())
+        edges = request_message(case.body, operation.definition.raw.input_type)
         checks = {
             "small": 0 < edges.small < 1,
             "nonzero": edges.nonzero != 0,
@@ -210,12 +207,11 @@ def test_bytes_use_standard_alphabet():
 @pytest.mark.parametrize("method", METHODS)
 def test_every_positive_value_encodes(schema, method):
     operation = schema["types.Types"][method]
-    message = message_factory.GetMessageClass(operation.definition.raw.input_type)
 
     # Bounds and map keys are rare draws.
     @run_given(case=operation.as_strategy(), max_examples=100)
     def test(case):
-        json_format.ParseDict(case.body, message()).SerializeToString()
+        request_message(case.body, operation.definition.raw.input_type).SerializeToString()
 
 
 def test_any_fields_are_reported(schema):

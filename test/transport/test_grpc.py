@@ -4,6 +4,7 @@ import re
 
 import pytest
 import requests
+from google.protobuf import json_format, message_factory
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
@@ -13,6 +14,8 @@ from schemathesis.core.transport import CallOutcome
 from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, write_descriptor_set
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
+
+ANY_URL = "type.googleapis.com/"
 
 
 def load(server, **config):
@@ -231,6 +234,68 @@ def test_any_field_packed_with_schema_type_is_encoded(ctx, tmp_path):
         "UNIMPLEMENTED: Method not found!",
         b"\x12%\n\x1etype.googleapis.com/types.Node\x12\x03\n\x01n",
     )
+
+
+# Newer Pythons drop standard-alphabet characters from URL-safe base64 and warn about it first.
+@pytest.mark.filterwarnings("error::FutureWarning")
+@pytest.mark.parametrize(
+    ("method", "body"),
+    [
+        ("Scalars", {"bytes": "+/8="}),
+        ("WellKnown", {"bytesValue": "+/8="}),
+        (
+            "Envelope",
+            {
+                "payload": {
+                    "@type": f"{ANY_URL}types.Blobs",
+                    "chunks": ["+/8=", "/+8="],
+                    "byName": {"k": "+/8="},
+                    "scalars": {"bytes": "+/8="},
+                }
+            },
+        ),
+        ("Envelope", {"extras": {"k": {"@type": f"{ANY_URL}types.Scalars", "bytes": "+/8="}}}),
+        ("Envelope", {"payload": {"@type": f"{ANY_URL}google.protobuf.BytesValue", "value": "+/8="}}),
+        ("Envelope", {"payload": {"@type": f"{ANY_URL}google.protobuf.StringValue", "value": "a+b/c"}}),
+        ("Envelope", {"payload": {"@type": f"{ANY_URL}legacy.Extendable", "[legacy.blob]": "+/8="}}),
+    ],
+    ids=["field", "wrapper", "packed-message", "packed-map-values", "packed-wrapper", "packed-string", "extension"],
+)
+def test_json_body_reaches_the_server_unchanged(ctx, tmp_path, method, body):
+    server = ctx.grpc.apps.side_effects()
+    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
+    schema = schemathesis.grpc.from_path(path, config=SchemathesisConfig.from_dict({"base-url": server.target}))
+    input_type = schema["types.Types"][method].definition.raw.input_type
+    schema["types.Types"][method].Case(body=body).call()
+    received = message_factory.GetMessageClass(input_type).FromString(server.calls[-1].payload)
+    assert json_format.MessageToDict(received, descriptor_pool=input_type.file.pool) == body
+
+
+def nested_nodes(depth):
+    body = {"name": "n"}
+    for _ in range(depth):
+        body = {"name": "n", "children": [body]}
+    return body
+
+
+@pytest.mark.parametrize(
+    ("method", "body", "message"),
+    [
+        ("Node", nested_nodes(400), "Message too deep"),
+        ("Node", {"children": ["n"]}, "Failed to parse children field"),
+        (
+            "Envelope",
+            {"payload": {"@type": f"{ANY_URL}legacy.Extendable", "[legacy.missing]": "+/8="}},
+            r'has no field named "\[legacy.missing\]"',
+        ),
+    ],
+    ids=["too-deep", "not-an-object", "unknown-extension"],
+)
+def test_unparsable_json_body_is_rejected(ctx, tmp_path, method, body, message):
+    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
+    case = schemathesis.grpc.from_path(path)["types.Types"][method].Case(body=body)
+    with pytest.raises(json_format.ParseError, match=message):
+        case.call(base_url=ctx.grpc.apps.side_effects().target)
 
 
 def test_any_field_packed_with_schema_type_is_rendered(ctx):
