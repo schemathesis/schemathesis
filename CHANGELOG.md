@@ -66,6 +66,7 @@
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Test case summary counting errored and skipped cases as passed.
 - Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
+- False `Network Error` when `--max-time` runs out while a response body is still arriving.
 - Outage reports leading with hanging requests, repeating cut-off ones as network errors, with misleading tips.
 - False positive `response_schema_conformance` for Open API 3.2 discriminators with `defaultMapping`.
 - Open API 3.2 media type objects behind `$ref` ignored in data generation and response validation.
