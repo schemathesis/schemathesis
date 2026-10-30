@@ -60,7 +60,8 @@ class GraphQLStateMachine(RecordingStateMachine):
         rule_name: str,
         parent_id: str | None,
         applied_parameters: list[tuple[ParameterLocation, str | None]] | None,
-    ) -> StepOutput:
+    ) -> StepOutput | None:
+        """Send `case` as one step; `None` when an identical input already passed and the step is skipped."""
         __tracebackhide__ = True
         if parent_id is not None:
             transition: Transition | None = Transition(
@@ -82,11 +83,7 @@ class GraphQLStateMachine(RecordingStateMachine):
             is_transition_applied=bool(applied_parameters),
         )
         self.control.record_step(step_input, self.recorder)
-        output = APIStateMachine._step(self, input=step_input)
-        # `_step` only returns None when an upstream mutation produced no usable result; in
-        # GraphQL that path is unreachable because every step input wraps a freshly drawn Case.
-        assert output is not None
-        return output
+        return APIStateMachine._step(self, input=step_input)
 
 
 def create_state_machine(schema: GraphQLSchema) -> type[GraphQLStateMachine]:
