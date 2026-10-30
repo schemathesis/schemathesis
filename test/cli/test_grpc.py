@@ -275,14 +275,16 @@ def map_body(context, body):
     )
 
 
+# A cancelled call says nothing about the data sent, so it is no validation mismatch.
+@pytest.mark.parametrize("user_id", [404, 499], ids=["not-found", "cancelled"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_missing_test_data_warning(ctx, cli, snapshot_cli):
+def test_missing_test_data_warning(ctx, cli, snapshot_cli, user_id):
     server = ctx.grpc.apps.users()
     module = ctx.write_pymodule(
-        """
+        f"""
 @schemathesis.hook
 def map_body(context, body):
-    return {"userId": 404}
+    return {{"userId": {user_id}}}
         """
     )
     assert (

@@ -137,6 +137,15 @@ def aggregate_status_codes(recorder: RecordedScenario, *, positive_only: bool = 
             continue
         if interaction.response is not None:
             status = interaction.response.status_code
+            # A client error that says nothing about the data, e.g. a cancelled gRPC call, is no rejection of it.
+            if (
+                positive_only
+                and case is not None
+                and 400 <= status < 500
+                and case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
+                is CallOutcome.UNINFORMATIVE
+            ):
+                continue
             counts[status] = counts.get(status, 0) + 1
             total += 1
 
