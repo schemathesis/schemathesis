@@ -95,11 +95,12 @@ def test_call_outcome(operation, response_factory, status, outcome):
 @pytest.mark.parametrize(
     "details",
     [
+        "grpc: failed to unmarshal the received message: unmarshal: invalid SpanID length",
         "grpc: error unmarshalling request: unexpected EOF",
         "Exception deserializing request!",
         "Error deserializing request: index out of range",
     ],
-    ids=["go", "python", "node"],
+    ids=["go", "go-legacy", "python", "node"],
 )
 def test_library_decode_error(operation, response_factory, details):
     failure = server_error(operation, response_factory, 13, "INTERNAL", headers={"grpc-message": [details]})
@@ -116,12 +117,11 @@ def test_library_decode_error(operation, response_factory, details):
         (13, "INTERNAL", "negative id", None),
         (2, "UNKNOWN", "Exception deserializing request!", None),
         (13, "INTERNAL", None, None),
-        (13, "INTERNAL", "grpc: failed to unmarshal the received message: invalid length", None),
         (13, "INTERNAL", "Invalid protobuf byte sequence", None),
         (13, "INTERNAL", "failed to decode Protobuf message: invalid varint", None),
         (13, "INTERNAL", "Exception deserializing request!", b"\xff"),
     ],
-    ids=["handler-internal", "unknown", "no-message", "go-client", "java-client", "rust-client", "raw-bytes-body"],
+    ids=["handler-internal", "unknown", "no-message", "java-client", "rust-client", "raw-bytes-body"],
 )
 def test_handler_errors_stay_server_errors(operation, response_factory, status, status_line, details, body):
     headers = {} if details is None else {"grpc-message": [details]}
