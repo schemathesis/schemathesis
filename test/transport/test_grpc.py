@@ -8,11 +8,12 @@ from google.protobuf import json_format, message_factory
 from google.rpc import error_details_pb2
 
 import schemathesis
-from schemathesis.config import SchemathesisConfig
+from schemathesis.config import OutputConfig, SchemathesisConfig
 from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import IncorrectUsage, SerializationError
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.output import BINARY_PAYLOAD, format_response_payload
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import CallOutcome
 from schemathesis.generation.feedback import FeedbackSources
@@ -232,6 +233,14 @@ def test_bytes_body_is_sent_as_is(ctx):
     case = load(server)["pkg.Users"]["GetUser"].Case(body=b"\x08\x07")
     response = case.call()
     assert json.loads(response.render_content(response.content)) == {"name": "u7"}
+
+
+@pytest.mark.parametrize(
+    ("limit", "expected"), [(3, BINARY_PAYLOAD), (4, '{\n  "name": "u7"\n}')], ids=["prefix", "whole"]
+)
+def test_truncated_response_goes_through_renderer(ctx, limit, expected):
+    _, response = get_user(ctx.grpc.apps.users(), 7)
+    assert format_response_payload(response.truncated(limit), config=OutputConfig()) == expected
 
 
 def test_case_without_body_sends_default_message(ctx):

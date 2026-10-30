@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import requests
 from werkzeug.test import Client
@@ -53,3 +55,12 @@ def test_text_lossy_never_raises(response_factory, content, charset, expected):
     response = Response.from_requests(raw, verify=False)
     assert response.encoding == charset
     assert response.text_lossy() == expected
+
+
+def test_truncated_copy_drops_values_derived_from_full_body(response_factory):
+    response = response_factory.core(content=b'{"a": 1}')
+    assert (response.json(), response.encoded_body) == ({"a": 1}, "eyJhIjogMX0=")
+    truncated = response.truncated(4)
+    with pytest.raises(json.JSONDecodeError):
+        truncated.json()
+    assert truncated.encoded_body == "eyJhIg=="

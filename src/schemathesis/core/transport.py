@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import enum
 import json
 import re
@@ -467,21 +468,12 @@ class Response:
 
     def truncated(self, limit: int) -> Response:
         """A copy keeping at most `limit` bytes of the body; `body_size` still reports the full size."""
-        return Response(
-            status_code=self.status_code,
-            headers=self.headers,
-            content=self.content[:limit] if self.content else self.content,
-            request=self.request,
-            elapsed=self.elapsed,
-            verify=self.verify,
-            message=self.message,
-            http_version=self.http_version,
-            encoding=self.encoding,
-            content_size=self.content_size,
-            stream_cut_short=self.stream_cut_short,
-            _override=self._override,
-            status_line=self.status_line,
-        )
+        response = copy.copy(self)
+        response.content = self.content[:limit] if self.content else self.content
+        # Values derived from the full body must not leak into the copy.
+        response._deserialized = NOT_SET
+        response._encoded_body = None
+        return response
 
     @property
     def is_truncated(self) -> bool:
