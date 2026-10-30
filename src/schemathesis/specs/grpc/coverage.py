@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from collections import deque
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Final, cast
@@ -13,6 +14,7 @@ from google.protobuf.descriptor import FieldDescriptor
 
 from schemathesis.core.cache import MISSING
 from schemathesis.core.jsonschema import make_validator_for
+from schemathesis.core.jsonschema.numeric import resolve_inclusive_bounds
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
@@ -290,13 +292,17 @@ def _bounds(schema: JsonSchemaObject) -> tuple[int | float, ...]:
     kind = schema.get("type")
     if kind not in ("integer", "number"):
         return ()
-    parts = [schema, *schema.get("allOf", ())]
-    lows = [part["minimum"] for part in parts if "minimum" in part]
-    highs = [part["maximum"] for part in parts if "maximum" in part]
-    if kind == "integer":
-        lows.extend(part["exclusiveMinimum"] + 1 for part in parts if "exclusiveMinimum" in part)
-        highs.extend(part["exclusiveMaximum"] - 1 for part in parts if "exclusiveMaximum" in part)
-    return max(lows), min(highs)
+    step = _step_integer if kind == "integer" else _step_float
+    ranges = [resolve_inclusive_bounds(part, step=step) for part in (schema, *schema.get("allOf", ()))]
+    return max(low for low, _ in ranges if low is not None), min(high for _, high in ranges if high is not None)
+
+
+def _step_integer(value: int | float, going_up: bool) -> int | float:
+    return value + 1 if going_up else value - 1
+
+
+def _step_float(value: int | float, going_up: bool) -> float:
+    return math.nextafter(value, math.inf if going_up else -math.inf)
 
 
 def _has_format(schema: JsonValue) -> bool:
