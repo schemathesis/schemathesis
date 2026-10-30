@@ -30,6 +30,8 @@ from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     import requests
 
     from schemathesis.core.error_feedback.store import Observation
@@ -68,7 +70,7 @@ class EngineContext:
 
     schema: ApiSchema
     control: ExecutionControl
-    outcome_cache: dict[int, BaseException | None]
+    outcome_cache: dict[int, tuple[BaseException, TracebackType | None] | None]
     start_time: float
     observations: Observations | None
     link_calibration: LinkCalibrationState | None
@@ -259,10 +261,15 @@ class EngineContext:
         return True
 
     def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
-        self.outcome_cache[hash(case)] = outcome
+        # Keep the first traceback so every replay reports it once instead of stacking frames on it.
+        self.outcome_cache[hash(case)] = None if outcome is None else (outcome, outcome.__traceback__)
 
     def get_cached_outcome(self, case: Case) -> BaseException | None | NotSet:
-        return self.outcome_cache.get(hash(case), NOT_SET)
+        cached = self.outcome_cache.get(hash(case), NOT_SET)
+        if isinstance(cached, tuple):
+            outcome, traceback = cached
+            return outcome.with_traceback(traceback)
+        return cached
 
     def get_session(self, *, operation: APIOperation | None = None) -> requests.Session:
         session = getattr(self._thread_local, "session", None)
