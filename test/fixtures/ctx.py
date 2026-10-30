@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from schemathesis.openapi.loaders import OpenApiSchema
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLSchema
-    from test.apps.catalog.grpc.users import GrpcApp, GrpcServer
+    from test.apps.catalog.grpc.users import CrashingGrpcServer, GrpcApp, GrpcServer
 
 
 @overload
@@ -602,6 +602,14 @@ class GrpcApps:
         )
         self.parent.request.addfinalizer(lambda: app.server.stop(None))
         return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
+
+    def crashing_users(self, how: str) -> CrashingGrpcServer:
+        """`users` where a call with id 500 brings the server down: `exit` drops connections, `stop` cancels calls."""
+        from test.apps.catalog.grpc.users import crashing_users
+
+        server = crashing_users(how, self.parent.request.getfixturevalue("tmp_path"))
+        self.parent.request.addfinalizer(server.kill)
+        return server
 
     def side_effects(self) -> GrpcServer:
         from test.apps.catalog.grpc.users import side_effects

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import os
 import secrets
+import subprocess
+import sys
 import time
+from collections.abc import Callable
 from concurrent import futures
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -85,6 +89,25 @@ class GrpcServer:
         self.server.stop(None).wait()
 
 
+@dataclass(slots=True)
+class CrashingGrpcServer:
+    target: str
+    descriptor_set_path: Path
+    process: subprocess.Popen[str]
+
+    def wait_for_call(self, user_id: int) -> None:
+        assert self.process.stdout is not None
+        for line in self.process.stdout:
+            if line.strip() == str(user_id):
+                return
+        raise AssertionError(f"The server exited before receiving {user_id}")
+
+    def kill(self) -> None:
+        self.process.kill()
+        # Reads what is left of the output and closes the pipe.
+        self.process.communicate()
+
+
 class RecordReflection(grpc.ServerInterceptor):
     def __init__(self) -> None:
         self.calls: list[list[tuple[str, str | bytes]]] = []
@@ -150,11 +173,13 @@ def users(
     undescribed_services: tuple[str, ...] = (),
     reflection_imports: bool = True,
     start: bool = True,
+    on_get_user: Callable[[int, grpc.Server], object] | None = None,
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
-    404 is NOT_FOUND, 17 answers with bytes that do not decode, and 422 fails in the request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed
-    into `response`. Reflection refuses calls that carry `x-deny: 1`.
+    `on_get_user` sees each id first. 404 is NOT_FOUND, 17 answers with bytes that do not decode, and 422 fails in the
+    request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`. Reflection refuses calls
+    that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
     `pkg.Accounts/CreateAccount` (in `accounts_descriptor_set()`, not reflected) rejects an empty `display_name`,
@@ -197,6 +222,8 @@ def users(
 
     def get_user(user_id: int, context: grpc.ServicerContext) -> bytes:
         record("GetUser", context)
+        if on_get_user is not None:
+            on_get_user(user_id, server)
         if user_id < 0:
             context.abort(grpc.StatusCode.INTERNAL, "negative id")
         if user_id == 400:
@@ -291,6 +318,42 @@ def users(
     if start:
         server.start()
     return GrpcApp(server=server, port=port, calls=calls, reflection_calls=recorder.calls, tls=files)
+
+
+def serve_crashing_users(how: str) -> None:
+    """Serve `users` until a call with id 500 exits the process or stops the server; prints the port, then each id."""
+
+    def on_get_user(user_id: int, server: grpc.Server) -> None:
+        print(user_id, flush=True)  # noqa: T201
+        if user_id == 500:
+            if how == "exit":
+                os._exit(1)
+            server.stop(None)
+
+    app = users(on_get_user=on_get_user)
+    print(app.port, flush=True)  # noqa: T201
+    app.server.wait_for_termination()
+
+
+def crashing_users(how: str, directory: Path) -> CrashingGrpcServer:
+    """`users` in a separate process, so a call can bring the whole server down."""
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            f"from test.apps.catalog.grpc.users import serve_crashing_users; serve_crashing_users({how!r})",
+        ],
+        cwd=Path(__file__).parents[4],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert process.stdout is not None
+    port = int(process.stdout.readline())
+    return CrashingGrpcServer(
+        target=f"grpc://127.0.0.1:{port}",
+        descriptor_set_path=write_descriptor_set(directory, users_descriptor_set()),
+        process=process,
+    )
 
 
 class AnswerEmpty(grpc.GenericRpcHandler):
