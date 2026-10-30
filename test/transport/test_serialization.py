@@ -2419,6 +2419,70 @@ def _with_child(child):
         (
             {
                 "type": "object",
+                "xml": {"name": "item"},
+                "properties": {"id": {"type": "integer", "xml": {"nodeType": "attribute"}}},
+            },
+            {},
+            "3.2.0",
+            {"id": 1},
+            b'<item id="1"></item>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {
+                    "tags": {
+                        "type": "array",
+                        "xml": {"nodeType": "element"},
+                        "items": {"type": "string", "xml": {"name": "tag"}},
+                    }
+                },
+            },
+            {},
+            "3.2.0",
+            {"tags": ["a", "b"]},
+            b"<item><tags><tag>a</tag><tag>b</tag></tags></item>",
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {
+                    "id": {"type": "integer", "xml": {"nodeType": "attribute"}},
+                    "note": {"type": "string", "xml": {"nodeType": "text"}},
+                },
+            },
+            {},
+            "3.2.0",
+            {"id": 1, "note": "a<b"},
+            b'<item id="1">a&lt;b</item>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {"note": {"type": "string", "xml": {"nodeType": "cdata"}}},
+            },
+            {},
+            "3.2.0",
+            {"note": "a<b]]>c\x01"},
+            b"<item><![CDATA[a<b]]]]><![CDATA[>c]]></item>",
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "item"},
+                "properties": {"note": {"type": "string", "xml": {"nodeType": "text"}}},
+            },
+            {},
+            "3.2.0",
+            {"note": {"a": "x"}},
+            b"<item><note><a>x</a></note></item>",
+        ),
+        (
+            {
+                "type": "object",
                 "properties": {
                     "flag": {"type": "boolean"},
                     "note": {"type": "null"},
@@ -2552,6 +2616,11 @@ def _with_child(child):
         "shared-array-items-keep-own-prefix",
         "attribute-namespace-binds-prefix-inside-element",
         "attribute-namespace-binds-prefix-for-earlier-element",
+        "node-type-attribute",
+        "node-type-element-array",
+        "node-type-text",
+        "node-type-cdata",
+        "node-type-text-container-written-as-element",
         "boolean-and-null-use-json-spelling",
         "referenced-property-schema",
         "referenced-array-items",
