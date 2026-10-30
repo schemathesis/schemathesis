@@ -53,8 +53,10 @@ class SentRequest:
     answered: bool = False
     # The connection broke while waiting for the answer; a timeout does not count, the server may still be working.
     reset: bool = False
-    # Position among finished requests, to tell which resets came after the last answer.
+    # Positions of the start and the end on one shared clock, to tell which requests were in flight when another ended.
+    started: int = 0
     finished: int = 0
+    error: requests.RequestException | None = None
 
     def as_reproduction_command(self) -> str:
         return build_code_sample(self.case, self.request, self.transport_kwargs)
@@ -69,9 +71,9 @@ class ServerMonitor:
         "_confirmation_lock",
         "_message",
         "_recordable",
-        "_confirmed_by",
+        "_culprit_error",
         "_health",
-        "_finished",
+        "_clock",
     )
 
     def __init__(self, health: HealthState | None = None) -> None:
@@ -82,8 +84,8 @@ class ServerMonitor:
         self._confirmation_lock = threading.Lock()
         self._message: str | None = None
         self._recordable = True
-        self._confirmed_by: requests.ConnectionError | None = None
-        self._finished = 0
+        self._culprit_error: requests.RequestException | None = None
+        self._clock = 0
 
     def track(self, case: Case, send: Callable[[], Response], *, transport_kwargs: dict[str, Any]) -> Response:
         """Send a request, remembering it for as long as it could explain an outage."""
@@ -95,7 +97,7 @@ class ServerMonitor:
         except requests.RequestException as exc:
             # Breaking after connecting still proves the server was there.
             reached_server = is_unrecoverable_network_error(exc)
-            self._finish(sent, exc.request, reached_server=reached_server, reset=_is_reset(exc))
+            self._finish(sent, exc.request, reached_server=reached_server, error=exc)
             if reached_server:
                 self._health.record_transport_failure(operation_label=case.operation.label, now=time.monotonic())
             raise
@@ -113,6 +115,8 @@ class ServerMonitor:
             return None
         sent = SentRequest(case=case, transport_kwargs=transport_kwargs, address=address)
         with self._lock:
+            self._clock += 1
+            sent.started = self._clock
             self._recent.append(sent)
         return sent
 
@@ -123,17 +127,18 @@ class ServerMonitor:
         *,
         reached_server: bool,
         answered: bool = False,
-        reset: bool = False,
+        error: requests.RequestException | None = None,
     ) -> None:
         if sent is None:
             return
         with self._lock:
-            self._finished += 1
+            self._clock += 1
             sent.request = request
             sent.reached_server = reached_server
             sent.answered = answered
-            sent.reset = reset
-            sent.finished = self._finished
+            sent.reset = error is not None and _is_reset(error)
+            sent.error = error
+            sent.finished = self._clock
 
     def is_down(self, exc: requests.ConnectionError) -> bool:
         """Whether a refused or reset connection means the server is gone for the rest of the run."""
@@ -164,34 +169,37 @@ class ServerMonitor:
                 alive = answers_after_reset(newest[0].address, https=urlsplit(url).scheme in ("https", "grpcs"))
             if alive:
                 return False
-            # A request still in flight is the likeliest culprit, so it leads the list. Only one of them can
-            # be it, and the remaining room goes to what the server is known to have seen - otherwise workers
-            # left hanging by the same outage fill the list and hide the payload that caused it.
-            in_flight = [item for item in newest if item.reached_server is None][:1]
             # A crash breaks every request the server was handling, so any reset since its last answer may be the
-            # cause. Behind a proxy every request after the outage is reset too, so the oldest ones come first.
+            # cause. The first one marks the crash: of the requests sent before it, the newest is the likeliest
+            # cause, since the server survived the older ones for longer. Later resets come from a proxy left behind.
             last_answer = max((item.finished for item in answered), default=0)
             resets = [item for item in recent if item.reset and item.finished > last_answer]
-            self._message = _render_outage(url, (in_flight + resets + answered)[:REPORTED_REQUESTS])
+            crashed_at = min((item.finished for item in resets), default=0)
+            cut_off = [item for item in reversed(resets) if item.started < crashed_at]
+            after_crash = [item for item in resets if item.started > crashed_at]
+            # Without a reset, a request still in flight is the likeliest culprit. Only one of them can be it,
+            # and the remaining room goes to what the server is known to have seen - otherwise workers left
+            # hanging by the same outage fill the list and hide the payload that caused it.
+            in_flight = [item for item in newest if item.reached_server is None][:1]
+            listed = (cut_off + in_flight + after_crash + answered)[:REPORTED_REQUESTS]
+            self._message = _render_outage(url, listed)
             # HAR reports record only HTTP requests.
             self._recordable = urlsplit(url).scheme in ("http", "https")
-            self._confirmed_by = exc
+            self._culprit_error = cut_off[0].error if cut_off else None
         return True
 
-    def confirmed_by(self, exc: BaseException) -> bool:
-        """Whether this error is the one that revealed the outage, rather than one that came after it."""
-        return self._confirmed_by is exc
-
     def is_after_outage(self, exc: Exception) -> bool:
-        """Whether this error is a consequence of the outage; the error that revealed the outage may be its cause."""
-        return not (is_unrecoverable_network_error(exc) and self.confirmed_by(exc))
+        """Whether this error is a consequence of the outage; only the likeliest culprit's own drop is not."""
+        return not (is_unrecoverable_network_error(exc) and exc is self._culprit_error)
 
     def take_report(self, phase: PhaseName | None) -> events.NonFatalError | None:
         """The outage error, or nothing while the server is still answering."""
         if self._message is None:
             return None
         return events.NonFatalError(
-            error=ServerUnavailable(self._message, recordable=self._recordable),
+            error=ServerUnavailable(
+                self._message, recordable=self._recordable, culprit_listed=self._culprit_error is not None
+            ),
             phase=phase,
             label=SERVER_LABEL,
             related_to_operation=False,

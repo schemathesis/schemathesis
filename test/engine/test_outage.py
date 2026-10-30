@@ -110,6 +110,35 @@ def test_workers_left_hanging_by_the_outage_do_not_hide_the_answered_culprit(ope
             worker.join()
 
 
+def drop(case):
+    request = requests.Request("GET", f"{case.operation.base_url}/users").prepare()
+    raise requests.ConnectionError(ConnectionResetError("Connection reset by peer"), request=request)
+
+
+def test_call_dropped_by_the_crash_leads_calls_left_hanging_and_dropped_after_it(operation):
+    monitor = ServerMonitor()
+    answered = operation.Case(query={"q": "answered"})
+    monitor.track(answered, lambda: answer(answered), transport_kwargs={})
+    hanging = operation.Case(query={"q": "hanging"})
+    release = threading.Event()
+    worker = hang(monitor, hanging, release)
+    crash = operation.Case(query={"q": "crash"})
+    later = operation.Case(query={"q": "later"})
+    try:
+        with pytest.raises(requests.ConnectionError) as exc_info:
+            monitor.track(crash, lambda: drop(crash), transport_kwargs={})
+        with pytest.raises(requests.ConnectionError):
+            monitor.track(later, lambda: drop(later), transport_kwargs={})
+
+        assert monitor.is_down(exc_info.value)
+        assert monitor.take_report(PhaseName.FUZZING).info.message == expected_message(
+            operation, [crash, hanging, later, answered]
+        )
+    finally:
+        release.set()
+        worker.join()
+
+
 def test_workers_refused_after_the_verdict_reuse_it_instead_of_probing_again(operation):
     monitor = ServerMonitor()
     first = operation.Case(query={"q": "first"})
@@ -216,6 +245,7 @@ def grpc_message(server, cases):
     return f"{server.target} stopped responding. Last requests before it went away:\n\n{commands}"
 
 
+# The culprit is listed, so no tip points to older requests.
 @pytest.mark.parametrize("how", ["exit", "stop"], ids=["connection-dropped", "calls-cancelled"])
 def test_grpc_call_that_crashes_the_server_is_listed_in_the_outage(ctx, how):
     server = crashing_server(ctx, how)
@@ -229,7 +259,8 @@ def test_grpc_call_that_crashes_the_server_is_listed_in_the_outage(ctx, how):
         monitor.track(crash, crash.call, transport_kwargs={})
 
     assert monitor.is_down(exc_info.value)
-    assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [crash, answered])
+    info = monitor.take_report(PhaseName.FUZZING).info
+    assert (info.message, info.suggestion()) == (grpc_message(server, [crash, answered]), None)
 
 
 def test_grpc_call_that_timed_out_before_the_crash_is_not_its_culprit(ctx):
@@ -250,7 +281,8 @@ def test_grpc_call_that_timed_out_before_the_crash_is_not_its_culprit(ctx):
     assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [crash, answered])
 
 
-def test_grpc_calls_dropped_together_by_a_crash_are_all_listed(ctx):
+# The call only cut off by the crash confirms the outage first, yet the culprit alone is an error of its own.
+def test_grpc_calls_dropped_together_by_a_crash_list_the_latest_first_and_only_it_as_an_operation_error(ctx):
     server = crashing_server(ctx)
     operation = grpc_operation(server)
     answered = operation.Case(body={"userId": 7})
@@ -258,10 +290,12 @@ def test_grpc_calls_dropped_together_by_a_crash_are_all_listed(ctx):
     crash = operation.Case(body={"userId": 500})
     monitor = ServerMonitor()
     monitor.track(answered, answered.call, transport_kwargs={})
+    slow_errors = []
 
     def call_slow():
-        with pytest.raises(requests.ConnectionError):
+        with pytest.raises(requests.ConnectionError) as slow_info:
             monitor.track(slow, slow.call, transport_kwargs={})
+        slow_errors.append(slow_info.value)
 
     worker = threading.Thread(target=call_slow)
     worker.start()
@@ -270,8 +304,10 @@ def test_grpc_calls_dropped_together_by_a_crash_are_all_listed(ctx):
         monitor.track(crash, crash.call, transport_kwargs={})
     worker.join()
 
+    assert monitor.is_down(slow_errors[0])
     assert monitor.is_down(exc_info.value)
-    assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [slow, crash, answered])
+    assert (monitor.is_after_outage(slow_errors[0]), monitor.is_after_outage(exc_info.value)) == (True, False)
+    assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [crash, slow, answered])
 
 
 def test_live_grpc_tls_server_after_a_dropped_call_is_not_an_outage(ctx):

@@ -53,9 +53,6 @@ http://127.0.0.1 stopped responding. Last requests before it went away:
 
     curl -X POST --insecure http://127.0.0.1/crash
 
-Tip: If the server crashed, the request that caused it may be older than these.
-Record every request sent with `--report=har`.
-
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 
