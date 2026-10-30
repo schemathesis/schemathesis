@@ -16,7 +16,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
-from schemathesis.specs.grpc.schemas import MEDIA_TYPE, encode_message, request_metadata
+from schemathesis.specs.grpc.schemas import MEDIA_TYPE, encode_message, request_metadata, request_payload
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport, SerializationContext
 
@@ -61,20 +61,21 @@ class GrpcTransport(BaseTransport["requests.Session"]):
     ) -> Response:
         # Direct calls pass nothing, so the config fills in what the caller left out.
         settings = case.operation.schema.config.request_settings_for(operation=case.operation)
-        if proxies or settings.proxy:
-            raise IncorrectUsage("Proxies are not supported for gRPC targets")
         if verify is None:
             verify = True if settings.verify is None else settings.verify
         cert = cert or settings.cert
         if timeout is None:
             timeout = settings.network_timeout
         base_url = base_url or case.operation.base_url
-        address, tls = parse_target(base_url, verify)
-        method = case.operation.definition.raw
-        payload = serialize_message(SerializationContext(case=case), case.body)["data"]
         request_headers = request_metadata(case, headers)
-        if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
-            request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
+        auth = (
+            session.auth if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2 else None
+        )
+        address, tls = prepare_target(
+            base_url, verify, request_headers, uses_proxy=bool(proxies or settings.proxy), auth=auth
+        )
+        method = case.operation.definition.raw
+        payload = request_payload(case)
         url = case.operation.schema.build_request_url(case, base_url)
         request = requests.Request(method="POST", url=url, headers=request_headers, data=payload).prepare()
         metadata = metadata_pairs(request_headers)
@@ -125,7 +126,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                     return None
 
         return Response(
-            status_code=GRPC_STATUSES[code.value[0]][1],
+            status_code=GRPC_STATUSES[code.value[0]].http_status,
             headers=response_headers,
             content=content,
             request=request,
@@ -150,6 +151,17 @@ class GrpcTransport(BaseTransport["requests.Session"]):
 def serialize_message(context: SerializationContext, body: Body) -> dict[str, bytes]:
     """The body encoded as the request message of the case's method."""
     return {"data": encode_message(body, context.case.operation.definition.raw.input_type)}
+
+
+def prepare_target(
+    url: str, verify: bool | str, headers: dict[str, str], *, uses_proxy: bool, auth: tuple[str, str] | None
+) -> tuple[str, bool]:
+    """Address and TLS mode of `url`, with basic auth added to `headers`."""
+    if uses_proxy:
+        raise IncorrectUsage("Proxies are not supported for gRPC targets")
+    if auth is not None:
+        headers.setdefault("authorization", requests.auth._basic_auth_str(*auth))
+    return parse_target(url, verify)
 
 
 def parse_target(url: str, verify: bool | str) -> tuple[str, bool]:

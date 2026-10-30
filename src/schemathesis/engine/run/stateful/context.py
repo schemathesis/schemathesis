@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
@@ -28,7 +27,8 @@ class StatefulContext:
     completed_scenarios: int = 0
     # Metrics collector for targeted testing
     metric_collector: MetricCollector = field(default_factory=MetricCollector)
-    step_outcomes: dict[int, BaseException | None] = field(default_factory=dict)
+    # Inputs that already passed in the current scenario
+    passed_steps: set[int] = field(default_factory=set)
     # Operations whose skipped timed-out steps are already reported
     reported_timeouts: set[str] = field(default_factory=set)
 
@@ -40,7 +40,7 @@ class StatefulContext:
         self.completed_scenarios += 1
         self.current_step_status = None
         self.current_response = None
-        self.step_outcomes.clear()
+        self.passed_steps.clear()
 
     def step_succeeded(self) -> None:
         self.current_step_status = Status.SUCCESS
@@ -87,9 +87,3 @@ class StatefulContext:
         self.has_new_failures_in_suite = False
         self.reset_scenario()
         self.metric_collector.reset()
-
-    def store_step_outcome(self, key: int, outcome: BaseException | None) -> None:
-        self.step_outcomes[key] = outcome
-
-    def get_step_outcome(self, key: int) -> BaseException | None | NotSet:
-        return self.step_outcomes.get(key, NOT_SET)

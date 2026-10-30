@@ -37,6 +37,7 @@ class LoadingFinished(events.EngineEvent):
     title: str | None
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None]
+    status_name_for_code: Callable[[int], str | None]
 
     __slots__ = (
         "id",
@@ -51,6 +52,7 @@ class LoadingFinished(events.EngineEvent):
         "title",
         "config",
         "find_operation_by_label",
+        "status_name_for_code",
     )
 
     def __init__(
@@ -66,6 +68,7 @@ class LoadingFinished(events.EngineEvent):
         title: str | None,
         config: ProjectConfig,
         find_operation_by_label: Callable[[str], APIOperation | None],
+        status_name_for_code: Callable[[int], str | None],
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -79,6 +82,7 @@ class LoadingFinished(events.EngineEvent):
         self.base_path = base_path
         self.config = config
         self.find_operation_by_label = find_operation_by_label
+        self.status_name_for_code = status_name_for_code
 
     @classmethod
     def from_schema(cls, schema: BaseSchema, *, location: str, start_time: float, base_url: str) -> LoadingFinished:
@@ -93,4 +97,5 @@ class LoadingFinished(events.EngineEvent):
             title=schema.title,
             config=schema.config,
             find_operation_by_label=schema.find_operation_by_label,
+            status_name_for_code=schema.status_name_for_code,
         )

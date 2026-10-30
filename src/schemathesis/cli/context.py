@@ -27,6 +27,7 @@ class BaseExecutionContext:
 
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None] | None = None
+    status_name_for_code: Callable[[int], str | None] | None = None
     specification: Specification | None = None
     api_statistic: ApiStatistic | None = None
     statistic: Statistic = field(default_factory=Statistic)
@@ -61,6 +62,12 @@ class BaseExecutionContext:
             return None
         return self.find_operation_by_label(label)
 
+    def status_name(self, status_code: int) -> str | None:
+        """Name the protocol gives `status_code`; `None` before the schema is loaded or when the code alone says it."""
+        if self.status_name_for_code is None:
+            return None
+        return self.status_name_for_code(status_code)
+
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)
 
@@ -91,6 +98,7 @@ class BaseExecutionContext:
     def on_event(self, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
             self.find_operation_by_label = event.find_operation_by_label
+            self.status_name_for_code = event.status_name_for_code
             self.specification = event.specification
             self.api_statistic = event.statistic
             self.warning_collector.on_unmatched_filters(event.statistic)

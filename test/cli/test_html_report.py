@@ -801,7 +801,6 @@ def test_html_report_graphql(ctx, cli, report_dir, snapshot_html):
 
 
 def test_html_report_grpc_status(ctx, cli, report_dir):
-    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
     server = ctx.grpc.apps.users()
     cli.run_and_assert(
         server.target,

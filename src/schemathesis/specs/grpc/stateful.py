@@ -27,7 +27,8 @@ from schemathesis.generation.stateful.control import (
     TransitionEndpoint,
 )
 from schemathesis.generation.stateful.state_machine import BundleStateMachine, normalize_name, unique_rule_name
-from schemathesis.specs.grpc.status import grpc_status, starts_with_verb
+from schemathesis.specs.grpc.converter import json_fields
+from schemathesis.specs.grpc.status import OK, grpc_status, starts_with_verb
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor
@@ -100,7 +101,7 @@ def _string_field(descriptor: Descriptor, name: str) -> FieldDescriptor | None:
 
 def response_value(operation: APIOperation, response: Response, field: str) -> str:
     """The string `field` of a successful response; empty when the call failed or the body does not decode."""
-    if grpc_status(response) != 0:
+    if grpc_status(response) != OK:
         return ""
     message_class = message_factory.GetMessageClass(operation.definition.raw.output_type)
     try:
@@ -224,9 +225,7 @@ def _link_rule(
     produced: dict[str, tuple[str, ...]],
 ) -> Callable[..., MultipleResults[Produced] | None]:
     strategy = operation.as_strategy(phase=TestPhase.STATEFUL)
-    field = next(
-        member for member in operation.definition.raw.input_type.fields if member.json_name == link.target_field
-    )
+    field = json_fields(operation.definition.raw.input_type)[link.target_field]
     # A page token is only valid with the arguments of the request that got it.
     repeats_request = link.source == link.target
 

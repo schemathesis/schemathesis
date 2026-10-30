@@ -100,29 +100,6 @@ def test_http_reports_refused(cli, tmp_path, snapshot_cli, report):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_library_decode_error(ctx, cli, snapshot_cli):
-    server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def map_body(context, body):
-    return {"userId": 422}
-        """
-    )
-    assert (
-        cli.main(
-            "run",
-            server.target,
-            "--include-name=pkg.Users/GetUser",
-            "--max-examples=1",
-            "--phases=fuzzing",
-            hooks=module,
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_remote_descriptor_set_extension_is_not_grpc(cli, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/api.pb") == snapshot_cli
 
@@ -146,29 +123,6 @@ schemathesis(["run", "grpc://127.0.0.1:1"])
 def test_streaming_method_selected(ctx, cli, snapshot_cli):
     server = ctx.grpc.apps.users()
     assert cli.run(server.target, "--include-name=pkg.Users/WatchUsers", "--max-examples=1") == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_authentication_warning_uses_status_names(ctx, cli, snapshot_cli):
-    server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def map_body(context, body):
-    return {"userId": 401}
-        """
-    )
-    assert (
-        cli.main(
-            "run",
-            server.target,
-            "--include-name=pkg.Users/GetUser",
-            "--max-examples=1",
-            "--phases=fuzzing",
-            hooks=module,
-        )
-        == snapshot_cli
-    )
 
 
 def test_missing_grpc_extra():
@@ -253,34 +207,20 @@ def test_unreachable_descriptor_set_target(cli, tmp_path, snapshot_cli):
         )
 
 
+@pytest.mark.parametrize(
+    ("user_id", "extra"),
+    [
+        (422, []),
+        (401, []),
+        (13, ["--request-timeout=0.2"]),
+        (404, []),
+        # A cancelled call says nothing about the data sent, so it is no validation mismatch.
+        (499, []),
+    ],
+    ids=["library-decode-error", "unauthenticated", "deadline-exceeded", "not-found", "cancelled"],
+)
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_deadline_exceeded(ctx, cli, snapshot_cli):
-    server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def map_body(context, body):
-    return {"userId": 13}
-        """
-    )
-    assert (
-        cli.main(
-            "run",
-            server.target,
-            "--include-name=pkg.Users/GetUser",
-            "--max-examples=1",
-            "--request-timeout=0.2",
-            "--phases=fuzzing",
-            hooks=module,
-        )
-        == snapshot_cli
-    )
-
-
-# A cancelled call says nothing about the data sent, so it is no validation mismatch.
-@pytest.mark.parametrize("user_id", [404, 499], ids=["not-found", "cancelled"])
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_missing_test_data_warning(ctx, cli, snapshot_cli, user_id):
+def test_get_user_status(ctx, cli, snapshot_cli, user_id, extra):
     server = ctx.grpc.apps.users()
     module = ctx.write_pymodule(
         f"""
@@ -296,6 +236,7 @@ def map_body(context, body):
             "--include-name=pkg.Users/GetUser",
             "--max-examples=1",
             "--phases=fuzzing",
+            *extra,
             hooks=module,
         )
         == snapshot_cli

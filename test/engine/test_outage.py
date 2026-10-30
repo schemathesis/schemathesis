@@ -6,12 +6,12 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.config import SchemathesisConfig
 from schemathesis.core.transport import Response
 from schemathesis.engine.errors import is_connection_refused
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.outage import CONFIRMATION_INTERVAL, REPORTED_REQUESTS, SERVER_LABEL, ServerMonitor
 from schemathesis.engine.run import PhaseName
+from test.apps.catalog.grpc.descriptors import load
 from test.utils import refusing_url
 
 # Connecting to an unused loopback port times out on Windows instead of being refused, so there is no
@@ -220,11 +220,8 @@ def test_tracked_answers_and_timeouts_set_the_operation_timeout(operation):
 
 @pytest.mark.parametrize("tls", [False, True], ids=["plaintext", "tls"])
 def test_grpc_server_that_stops_is_an_outage(ctx, tls):
-    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
     server = ctx.grpc.apps.users(tls=tls)
-    config = {"base-url": server.target, **({"tls-verify": str(server.ca_path)} if tls else {})}
-    schema = schemathesis.grpc.from_path(server.descriptor_set_path, config=SchemathesisConfig.from_dict(config))
-    case = schema["pkg.Users"]["GetUser"].Case(body={"userId": 7})
+    case = grpc_operation(server, **({"tls-verify": str(server.ca_path)} if tls else {})).Case(body={"userId": 7})
     monitor = ServerMonitor()
     monitor.track(case, case.call, transport_kwargs={})
     server.stop()
@@ -249,14 +246,19 @@ def test_grpc_server_that_stops_is_an_outage(ctx, tls):
     )
 
 
-def crashing_server(ctx, how="exit"):
-    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
-    return ctx.grpc.apps.crashing_users(how)
-
-
 def grpc_operation(server, **config):
-    config = SchemathesisConfig.from_dict({"base-url": server.target, **config})
-    return schemathesis.grpc.from_path(server.descriptor_set_path, config=config)["pkg.Users"]["GetUser"]
+    return load(server, **config)["pkg.Users"]["GetUser"]
+
+
+def answered_then_crash(ctx, how="exit"):
+    """A crashing server that answered one call, and the call that brings it down."""
+    server = ctx.grpc.apps.crashing_users(how)
+    operation = grpc_operation(server)
+    answered = operation.Case(body={"userId": 7})
+    crash = operation.Case(body={"userId": 500})
+    monitor = ServerMonitor()
+    monitor.track(answered, answered.call, transport_kwargs={})
+    return server, operation, monitor, answered, crash
 
 
 def grpc_message(server, cases):
@@ -267,12 +269,7 @@ def grpc_message(server, cases):
 # The culprit is listed, so no tip points to older requests.
 @pytest.mark.parametrize("how", ["exit", "stop"], ids=["connection-dropped", "calls-cancelled"])
 def test_grpc_call_that_crashes_the_server_is_listed_in_the_outage(ctx, how):
-    server = crashing_server(ctx, how)
-    operation = grpc_operation(server)
-    answered = operation.Case(body={"userId": 7})
-    crash = operation.Case(body={"userId": 500})
-    monitor = ServerMonitor()
-    monitor.track(answered, answered.call, transport_kwargs={})
+    server, _, monitor, answered, crash = answered_then_crash(ctx, how)
 
     with pytest.raises(requests.ConnectionError) as exc_info:
         monitor.track(crash, crash.call, transport_kwargs={})
@@ -283,13 +280,8 @@ def test_grpc_call_that_crashes_the_server_is_listed_in_the_outage(ctx, how):
 
 
 def test_grpc_call_that_timed_out_before_the_crash_is_not_its_culprit(ctx):
-    server = crashing_server(ctx)
-    operation = grpc_operation(server)
-    answered = operation.Case(body={"userId": 7})
+    server, operation, monitor, answered, crash = answered_then_crash(ctx)
     slow = operation.Case(body={"userId": 13})
-    crash = operation.Case(body={"userId": 500})
-    monitor = ServerMonitor()
-    monitor.track(answered, answered.call, transport_kwargs={})
     with pytest.raises(requests.ReadTimeout):
         monitor.track(slow, lambda: slow.call(timeout=0.2), transport_kwargs={})
 
@@ -302,13 +294,8 @@ def test_grpc_call_that_timed_out_before_the_crash_is_not_its_culprit(ctx):
 
 # The call only cut off by the crash confirms the outage first, yet the culprit alone is an error of its own.
 def test_grpc_calls_dropped_together_by_a_crash_list_the_latest_first_and_only_it_as_an_operation_error(ctx):
-    server = crashing_server(ctx)
-    operation = grpc_operation(server)
-    answered = operation.Case(body={"userId": 7})
+    server, operation, monitor, answered, crash = answered_then_crash(ctx)
     slow = operation.Case(body={"userId": 13})
-    crash = operation.Case(body={"userId": 500})
-    monitor = ServerMonitor()
-    monitor.track(answered, answered.call, transport_kwargs={})
     slow_errors = []
 
     def call_slow():
@@ -330,7 +317,6 @@ def test_grpc_calls_dropped_together_by_a_crash_list_the_latest_first_and_only_i
 
 
 def test_live_grpc_tls_server_after_a_dropped_call_is_not_an_outage(ctx):
-    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
     server = ctx.grpc.apps.users(tls=True)
     operation = grpc_operation(server, **{"tls-verify": str(server.ca_path)})
     case = operation.Case(body={"userId": 7})
@@ -348,12 +334,7 @@ def test_live_grpc_tls_server_after_a_dropped_call_is_not_an_outage(ctx):
     ids=["ignored-by-grpc", "used-by-grpc"],
 )
 def test_grpc_outage_follows_grpc_proxy_variables(ctx, monkeypatch, variable, is_down):
-    server = crashing_server(ctx)
-    operation = grpc_operation(server)
-    answered = operation.Case(body={"userId": 7})
-    crash = operation.Case(body={"userId": 500})
-    monitor = ServerMonitor()
-    monitor.track(answered, answered.call, transport_kwargs={})
+    _, _, monitor, _, crash = answered_then_crash(ctx)
     monkeypatch.setenv(variable, "http://127.0.0.1:1")
 
     with pytest.raises(requests.ConnectionError) as exc_info:

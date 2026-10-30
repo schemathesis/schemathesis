@@ -17,7 +17,7 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.failures import AcceptedNegativeData, Failure
+from schemathesis.core.failures import AcceptedNegativeData, AuthScenario, Failure, IgnoredAuth
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.types import JsonSchema, as_object_schema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
@@ -47,9 +47,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
-    AuthScenario,
     EnsureResourceAvailability,
-    IgnoredAuth,
     JsonSchemaError,
     MalformedMediaType,
     MissingContentType,
@@ -843,10 +841,7 @@ def _negative_body_replaced_by_caller(ctx: CheckContext, case: Case) -> bool:
 
 @schemathesis.check
 def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    if not _is_openapi(case):
-        case.operation.schema.evaluate_negative_data(case, response)
-        return None
-    return _openapi_negative_data_rejection(ctx, response, case)
+    return case.operation.schema.evaluate_negative_data(ctx, response, case)
 
 
 @skips_on_unexpected_http_status
@@ -1058,10 +1053,7 @@ def _grants_credentials(operation: APIOperation) -> bool:
 
 @schemathesis.check
 def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    if not _is_openapi(case):
-        case.operation.schema.evaluate_positive_data(case, response)
-        return None
-    return _openapi_positive_data_acceptance(ctx, response, case)
+    return case.operation.schema.evaluate_positive_data(ctx, response, case)
 
 
 @skips_on_unexpected_http_status
@@ -1560,9 +1552,7 @@ class AuthKind(enum.StrEnum):
 @schemathesis.check
 def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
-    if not _is_openapi(case):
-        return case.operation.schema.evaluate_auth(ctx, response, case)
-    return _openapi_ignored_auth(ctx, response, case)
+    return case.operation.schema.evaluate_auth(ctx, response, case)
 
 
 @skips_on_unexpected_http_status

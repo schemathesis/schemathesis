@@ -41,6 +41,31 @@ REPORTED_REQUESTS = 5
 Address = tuple[str, int]
 
 
+@dataclass(frozen=True, slots=True)
+class _Scheme:
+    tls: bool
+    default_port: int
+    # HAR reports record only HTTP requests.
+    recordable: bool
+    # gRPC reads its own proxy variables, in lower case only and without `all_proxy`; `None` defers to `requests`.
+    proxy_variables: tuple[str, ...] | None = None
+
+
+_GRPC_PROXY_VARIABLES = ("grpc_proxy", "https_proxy", "http_proxy")
+_SCHEMES = {
+    "http": _Scheme(tls=False, default_port=80, recordable=True),
+    "https": _Scheme(tls=True, default_port=443, recordable=True),
+    # gRPC targets without a port use 443, as gRPC clients do for both schemes.
+    "grpc": _Scheme(tls=False, default_port=443, recordable=False, proxy_variables=_GRPC_PROXY_VARIABLES),
+    "grpcs": _Scheme(tls=True, default_port=443, recordable=False, proxy_variables=_GRPC_PROXY_VARIABLES),
+}
+_OTHER_SCHEME = _Scheme(tls=False, default_port=80, recordable=False)
+
+
+def _scheme(url: str) -> _Scheme:
+    return _SCHEMES.get(urlsplit(url).scheme, _OTHER_SCHEME)
+
+
 @dataclass(slots=True)
 class SentRequest:
     case: Case
@@ -166,7 +191,7 @@ class ServerMonitor:
             if refused:
                 alive = accepts_connections(newest[0].address)
             else:
-                alive = answers_after_reset(newest[0].address, https=urlsplit(url).scheme in ("https", "grpcs"))
+                alive = answers_after_reset(newest[0].address, https=_scheme(url).tls)
             if alive:
                 return False
             # A crash breaks every request the server was handling, so any reset since its last answer may be the
@@ -182,8 +207,7 @@ class ServerMonitor:
             # hanging by the same outage fill the list and hide the payload that caused it.
             in_flight = [item for item in newest if item.reached_server is None][:1]
             self._message = _render_outage(url, cut_off + in_flight + after_crash + answered)
-            # HAR reports record only HTTP requests.
-            self._recordable = urlsplit(url).scheme in ("http", "https")
+            self._recordable = _scheme(url).recordable
             self._culprit_error = cut_off[0].error if cut_off else None
         return True
 
@@ -224,9 +248,9 @@ def _is_reset(exc: requests.RequestException) -> bool:
 def _through_proxy(sent: SentRequest, url: str) -> bool:
     import requests
 
-    if urlsplit(url).scheme in ("grpc", "grpcs"):
-        # gRPC reads its own variables, in lower case only and without `all_proxy`.
-        if not any(os.environ.get(name) for name in ("grpc_proxy", "https_proxy", "http_proxy")):
+    proxy_variables = _scheme(url).proxy_variables
+    if proxy_variables is not None:
+        if not any(os.environ.get(name) for name in proxy_variables):
             return False
         no_proxy = os.environ.get("no_grpc_proxy", os.environ.get("no_proxy"))  # noqa: SIM112
         return not requests.utils.should_bypass_proxies(url, no_proxy=no_proxy)
@@ -279,5 +303,4 @@ def _address(url: str) -> Address | None:
     parts = urlsplit(url)
     if parts.hostname is None:
         return None
-    # gRPC targets without a port use 443, as gRPC clients do for both schemes.
-    return parts.hostname, parts.port or (443 if parts.scheme in ("https", "grpc", "grpcs") else 80)
+    return parts.hostname, parts.port or _SCHEMES.get(parts.scheme, _OTHER_SCHEME).default_port

@@ -21,7 +21,7 @@ from schemathesis.config import GenerationConfig, ProjectConfig, SanitizationCon
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
-from schemathesis.core.failures import FailureGroup
+from schemathesis.core.failures import FailureGroup, ServerError
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation, SkippedParameter
 from schemathesis.core.result import Ok, Result
@@ -363,9 +363,8 @@ class BaseSchema(Mapping):
         """Absolute base URL the schema itself advertises, if any."""
         return None
 
-    @abstractmethod
     def validate(self) -> None:
-        raise NotImplementedError
+        return None
 
     @cached_property
     def statistic(self) -> ApiStatistic:
@@ -379,7 +378,6 @@ class BaseSchema(Mapping):
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
-    @abstractmethod
     def get_strategies_from_examples(
         self, operation: APIOperation, feedback: FeedbackSources = NO_FEEDBACK, **kwargs: Any
     ) -> list[SearchStrategy[Case]]:
@@ -551,7 +549,6 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
-    @abstractmethod
     def build_state_machine(
         self,
         *,
@@ -559,15 +556,15 @@ class BaseSchema(Mapping):
         link_calibration: LinkCalibrationState | None,
     ) -> type[APIStateMachine]:
         """Engine-internal variant of `as_state_machine` that wires per-run state."""
-        raise NotImplementedError
+        # Specs whose transitions use neither runtime feedback nor link calibration build the plain machine.
+        return self.as_state_machine()
 
     @abstractmethod
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
-    @abstractmethod
     def get_operation_id(self, operation: APIOperation) -> str | None:
-        raise NotImplementedError
+        return None
 
     @abstractmethod
     def is_deprecated(self, operation: APIOperation) -> bool:
@@ -702,30 +699,33 @@ class BaseSchema(Mapping):
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
         """Raise a Failure if the operation answers without the credentials the request carried.
 
-        Default gives no verdict; OpenAPI judges by declared security schemes in `ignored_auth` itself.
+        Default skips the check; specs that can tell whether credentials are enforced override.
         """
         return True
 
-    def explain_server_error(self, case: Case, response: Response) -> None:
-        """Raise a Failure that names the cause of an error status better than the status alone.
+    def server_error(self, case: Case, response: Response) -> ServerError:
+        """The failure an error status reports.
 
-        Default no-op; specs whose error responses carry a machine-readable origin (e.g. gRPC library errors) override.
+        Specs whose error responses carry a status name or a machine-readable origin (e.g. gRPC library errors) override.
         """
+        return ServerError(operation=case.operation.label, status_code=response.status_code)
 
-    def evaluate_negative_data(self, case: Case, response: Response) -> None:
+    def evaluate_negative_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
         """Raise a Failure if the schema's own conventions show that invalid data was accepted.
 
-        Default no-op; OpenAPI judges by status code in `negative_data_rejection` itself.
+        Default no-op; specs that can tell accepted data from rejected data override.
         """
+        return None
 
-    def evaluate_positive_data(self, case: Case, response: Response) -> None:
+    def evaluate_positive_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
         """Raise a Failure if the schema's own conventions show that valid data was rejected.
 
-        Default no-op; OpenAPI judges by status code in `positive_data_acceptance` itself.
+        Default no-op; specs that can tell accepted data from rejected data override.
         """
+        return None
 
-    def status_name(self, response: Response) -> str | None:
-        """Name of a status the protocol sends beside the HTTP status code, or `None` when the code alone says it."""
+    def status_name_for_code(self, status_code: int) -> str | None:
+        """Name the protocol gives the status an HTTP status code stands for, or `None` when the code alone says it."""
         return None
 
     def hash_case(self, case: Case) -> int:

@@ -38,7 +38,7 @@ from schemathesis.cli.output import (
     warning_items,
 )
 from schemathesis.config import ProjectConfig
-from schemathesis.core import SpecificationFeature, SpecificationKind
+from schemathesis.core import SpecificationFeature
 from schemathesis.core.failures import case_header, reason_phrase
 from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
@@ -51,7 +51,6 @@ from schemathesis.engine.run import ELASTIC_PHASES, INTERNAL_PHASES, UNIT_PHASES
 from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome, ProbeRun
 from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
-from schemathesis.specs.grpc.status import GRPC_STATUSES
 
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType
@@ -163,22 +162,14 @@ def _unvalidated_responses(by_media_type: dict[str, dict[str, set[str]]]) -> str
     return f"responses in {len(by_media_type)} media types"
 
 
-# Each HTTP status the warnings name (401, 403, 404) stands for exactly one gRPC status.
-_GRPC_STATUS_NAMES = {http_status: name for name, http_status, _ in GRPC_STATUSES.values()}
-
-
-def _is_grpc(ctx: ExecutionContext) -> bool:
-    return ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRPC
-
-
 def _status_name(ctx: ExecutionContext, status_code: int) -> str:
-    if _is_grpc(ctx):
-        return _GRPC_STATUS_NAMES[status_code]
-    return f"{status_code} {reason_phrase(status_code)}"
+    name = ctx.status_name(status_code)
+    return f"{status_code} {reason_phrase(status_code)}" if name is None else name
 
 
 def _short_status(ctx: ExecutionContext, status_code: int) -> str:
-    return _GRPC_STATUS_NAMES[status_code] if _is_grpc(ctx) else str(status_code)
+    name = ctx.status_name(status_code)
+    return str(status_code) if name is None else name
 
 
 def _status_codes_are_uninformative(ctx: ExecutionContext) -> bool:

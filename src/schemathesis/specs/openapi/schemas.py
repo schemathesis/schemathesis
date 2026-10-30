@@ -64,7 +64,7 @@ from ...hooks import (
     dispatch_before_process_path,
 )
 from ...schemas import APIOperation, APIOperationMap, BaseSchema
-from . import checks  # noqa: F401
+from . import checks
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
@@ -81,6 +81,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
+    from schemathesis.checks import CheckContext
     from schemathesis.config import GenerationConfig
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
@@ -795,6 +796,18 @@ class OpenApiSchema(BaseSchema):
     ) -> bool | None:
         __tracebackhide__ = True
         return validate_documented_response(self, operation, response, case)
+
+    @override
+    def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
+        return checks._openapi_ignored_auth(ctx, response, case)
+
+    @override
+    def evaluate_negative_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
+        return checks._openapi_negative_data_rejection(ctx, response, case)
+
+    @override
+    def evaluate_positive_data(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
+        return checks._openapi_positive_data_acceptance(ctx, response, case)
 
 
 @dataclass

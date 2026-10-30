@@ -62,8 +62,6 @@ from schemathesis.generation.metrics import MetricCollector
 from schemathesis.resources import record_delete_attempt, record_interaction
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from schemathesis.baseline import Baseline
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.resources import ResourceRecorder
@@ -283,11 +281,6 @@ def _reject_unusable_operation(engine: EngineContext, operation_label: str) -> N
         reject()
 
 
-def _replay_cached_outcome(ctx: StatefulContext, key: int) -> bool:
-    """`True` when this input already passed in the current scenario."""
-    return ctx.get_step_outcome(key) is None
-
-
 def _send_step(
     machine: RecordingStateMachine, case: Case, *, engine: EngineContext, event_queue: queue.Queue
 ) -> Response:
@@ -355,16 +348,6 @@ def _record_network_error(
     if network_error is None:
         _absorb_transport_failure(exc, case=case, engine=engine, ctx=ctx, event_queue=event_queue)
     state.store_unrecoverable_network_error(network_error)
-
-
-def _remember_step_outcome(ctx: StatefulContext, key: int | None, outcome: BaseException | None) -> None:
-    if key is not None:
-        ctx.store_step_outcome(key, outcome)
-
-
-def _remember_failures(ctx: StatefulContext, key: int | None, failures: Sequence[BaseException]) -> None:
-    for failure in failures:
-        _remember_step_outcome(ctx, key, failure)
 
 
 def _parse_step_observations(engine: EngineContext, case: Case, response: Response) -> tuple[Observation, ...]:
@@ -502,7 +485,7 @@ def _run_step(
         _reject_unusable_operation(engine, case.operation.label)
         if unique_inputs:
             key = hash(case)
-            if _replay_cached_outcome(ctx, key):
+            if key in ctx.passed_steps:
                 return None
         will_send = True
     finally:
@@ -515,8 +498,7 @@ def _run_step(
         ctx.step_succeeded()
     except UnsatisfiedAssumption:
         raise
-    except FailureGroup as exc:
-        _remember_failures(ctx, key, exc.exceptions)
+    except FailureGroup:
         ctx.step_failed()
         raise
     except Exception as exc:
@@ -524,7 +506,6 @@ def _run_step(
             machine.recorder.record_network_error(case_id=case.id, error=exc)
         outage = _detect_outage(exc, engine)
         _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
-        _remember_step_outcome(ctx, key, exc)
         ctx.step_errored()
         if outage:
             raise ServerWentAway from None
@@ -535,11 +516,9 @@ def _run_step(
             machine.recorder.forget_case(case_id=case.id)
         ctx.step_interrupted()
         raise
-    except BaseException as exc:
-        _remember_step_outcome(ctx, key, exc)
-        raise exc
     else:
-        _remember_step_outcome(ctx, key, None)
+        if key is not None:
+            ctx.passed_steps.add(key)
     return result
 
 

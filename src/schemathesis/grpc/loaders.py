@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from schemathesis.config import SchemathesisConfig
-from schemathesis.core.errors import IncorrectUsage, LoaderError, LoaderErrorKind
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.hooks import load_with_hooks
 
@@ -59,7 +59,6 @@ def from_url(
     """
     try:
         import grpc
-        import requests
         from google.protobuf import descriptor_pb2
 
         # grpcio-reflection ships no usable type information.
@@ -68,14 +67,10 @@ def from_url(
         raise ImportError(EXTRA_HINT) from exc
 
     from schemathesis.specs.grpc.schemas import filter_metadata
-    from schemathesis.transport.grpc import create_channel, metadata_pairs, parse_target
+    from schemathesis.transport.grpc import create_channel, metadata_pairs, prepare_target
 
-    if proxies:
-        raise IncorrectUsage("Proxies are not supported for gRPC targets")
-    address, tls = parse_target(url, verify)
     request_headers = filter_metadata(headers or {})
-    if auth is not None:
-        request_headers.setdefault("authorization", requests.auth._basic_auth_str(*auth))
+    address, tls = prepare_target(url, verify, request_headers, uses_proxy=bool(proxies), auth=auth)
     metadata = metadata_pairs(request_headers)
     with create_channel(address, tls, verify, cert) as channel:
         # Both versions exchange the same messages; some servers serve only one of them.

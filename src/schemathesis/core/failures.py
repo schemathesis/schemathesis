@@ -266,6 +266,39 @@ class ServerError(Failure):
         return str(self.status_code)
 
 
+class AuthScenario(StrEnum):
+    NO_AUTH = "no_auth"
+    INVALID_AUTH = "invalid_auth"
+    GENERATED_AUTH = "generated_auth"
+
+
+class IgnoredAuth(Failure):
+    """The API operation does not check the specified authentication."""
+
+    code = "ST401"
+    checks = ("ignored_auth",)
+    kind_title = "Authentication not enforced"
+
+    __slots__ = ("scenario",)
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        message: str,
+        scenario: AuthScenario,
+        title: str = "API accepts requests without authentication",
+        case_id: str | None = None,
+    ) -> None:
+        super().__init__(operation=operation, title=title, message=message, case_id=case_id, severity=Severity.CRITICAL)
+        # Which credentials the request carried when the API still let it through.
+        self.scenario = scenario
+
+    @property
+    def _unique_key(self) -> str:
+        return ""
+
+
 class ContentTypeServerError(ServerError):
     """Server failed on a request whose `Content-Type` is malformed or not accepted by the operation."""
 

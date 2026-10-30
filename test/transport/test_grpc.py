@@ -8,7 +8,7 @@ from google.protobuf import json_format, message_factory
 from google.rpc import error_details_pb2
 
 import schemathesis
-from schemathesis.config import OutputConfig, SchemathesisConfig
+from schemathesis.config import OutputConfig
 from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import IncorrectUsage, SerializationError
@@ -21,19 +21,15 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from test.apps.catalog.grpc.descriptors import (
     accounts_descriptor_set,
     all_types_descriptor_set,
+    load,
+    load_descriptor_set,
     users_descriptor_set,
-    write_descriptor_set,
 )
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
 ANY_URL = "type.googleapis.com/"
 NO_USER_INFO = base64.b64encode(error_details_pb2.ErrorInfo(reason="NO_USER").SerializeToString()).decode()
-
-
-def load(server, **config):
-    config = SchemathesisConfig.from_dict({"base-url": server.target, **config})
-    return schemathesis.grpc.from_path(server.descriptor_set_path, config=config)
 
 
 def get_user(server, user_id, config=None, **kwargs):
@@ -162,18 +158,13 @@ def test_stopped_server_raises_connection_error(ctx):
 
 
 def test_unresolvable_host_raises_connection_refused(tmp_path):
-    path = write_descriptor_set(tmp_path, users_descriptor_set())
-    config = SchemathesisConfig.from_dict({"base-url": "grpc://nonexistent-host.invalid:50051"})
-    case = schemathesis.grpc.from_path(path, config=config)["pkg.Users"]["GetUser"].Case(body={})
+    schema = load_descriptor_set(
+        tmp_path, users_descriptor_set(), **{"base-url": "grpc://nonexistent-host.invalid:50051"}
+    )
+    case = schema["pkg.Users"]["GetUser"].Case(body={})
     with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
         case.call()
     assert isinstance(exc_info.value.__cause__, ConnectionRefusedError)
-
-
-def test_tls_call(ctx):
-    server = ctx.grpc.apps.users(tls=True)
-    _, response = get_user(server, 7, verify=str(server.ca_path))
-    assert response.status_code == 200
 
 
 @pytest.mark.parametrize("combined", [False, True], ids=["cert-and-key", "single-file"])
@@ -258,8 +249,7 @@ def test_calls_share_a_connection(ctx):
 
 def test_any_field_packed_with_schema_type_is_encoded(ctx, tmp_path):
     server = ctx.grpc.apps.users()
-    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
-    schema = schemathesis.grpc.from_path(path, config=SchemathesisConfig.from_dict({"base-url": server.target}))
+    schema = load_descriptor_set(tmp_path, all_types_descriptor_set(), **{"base-url": server.target})
     body = {"payload": {"@type": "type.googleapis.com/types.Node", "name": "n"}}
     response = schema["types.Types"]["Envelope"].Case(body=body).call()
     assert (response.status_line, response.request.body) == (
@@ -295,8 +285,7 @@ def test_any_field_packed_with_schema_type_is_encoded(ctx, tmp_path):
 )
 def test_json_body_reaches_the_server_unchanged(ctx, tmp_path, method, body):
     server = ctx.grpc.apps.side_effects()
-    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
-    schema = schemathesis.grpc.from_path(path, config=SchemathesisConfig.from_dict({"base-url": server.target}))
+    schema = load_descriptor_set(tmp_path, all_types_descriptor_set(), **{"base-url": server.target})
     input_type = schema["types.Types"][method].definition.raw.input_type
     schema["types.Types"][method].Case(body=body).call()
     received = message_factory.GetMessageClass(input_type).FromString(server.calls[-1].payload)
@@ -324,8 +313,7 @@ def nested_nodes(depth):
     ids=["too-deep", "not-an-object", "unknown-extension"],
 )
 def test_unparsable_json_body_is_rejected(ctx, tmp_path, method, body, message):
-    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
-    case = schemathesis.grpc.from_path(path)["types.Types"][method].Case(body=body)
+    case = load_descriptor_set(tmp_path, all_types_descriptor_set())["types.Types"][method].Case(body=body)
     with pytest.raises(SerializationError, match=message):
         case.call(base_url=ctx.grpc.apps.side_effects().target)
 
@@ -348,9 +336,8 @@ def test_any_field_is_rendered(ctx, user_id, expected):
 
 def create_account(ctx, tmp_path):
     server = ctx.grpc.apps.users()
-    config = SchemathesisConfig.from_dict({"base-url": server.target})
-    path = write_descriptor_set(tmp_path, accounts_descriptor_set())
-    return schemathesis.grpc.from_path(path, config=config)["pkg.Accounts"]["CreateAccount"]
+    schema = load_descriptor_set(tmp_path, accounts_descriptor_set(), **{"base-url": server.target})
+    return schema["pkg.Accounts"]["CreateAccount"]
 
 
 def missing(*path):

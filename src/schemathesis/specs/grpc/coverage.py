@@ -23,7 +23,7 @@ from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo, uniform_metadata
 from schemathesis.specs.grpc.constraints import ConstraintReader
-from schemathesis.specs.grpc.converter import is_well_known, message_schema, request_message
+from schemathesis.specs.grpc.converter import is_well_known, map_entry, message_schema, request_message
 from schemathesis.specs.grpc.formats import grpc_formats
 
 if TYPE_CHECKING:
@@ -214,7 +214,7 @@ class _Values:
                 path = (*prefix, field)
                 field_schemas = (*schemas, properties[field.json_name])
                 yield path, field_schemas
-                if _map_entry(field) is None and field.message_type is not None and len(path) < MAX_DEPTH:
+                if map_entry(field) is None and field.message_type is not None and len(path) < MAX_DEPTH:
                     child = field_schemas[-1]["items"] if field.is_repeated else field_schemas[-1]
                     queue.append((field.message_type, child, path, field_schemas))
 
@@ -235,7 +235,7 @@ class _Values:
             yield CoverageScenario.VALID_OBJECT, f"Missing `{parameter}` message", parameter, missing, missing
 
     def _variants(self, field: FieldDescriptor, schema: JsonSchemaObject) -> Iterator[Variant]:
-        if _map_entry(field) is not None:
+        if map_entry(field) is not None:
             # Without a map the rules admit, the case fails them and is left out.
             entry = next((entry for entry in self._entries(schema) if self.is_valid(schema, entry)), None)
             yield CoverageScenario.VALID_OBJECT, "One default entry in `{}`", entry, entry
@@ -336,10 +336,3 @@ def _is_oneof_member(field: FieldDescriptor) -> bool:
     # Single-member groups, including the synthetic ones behind proto3 `optional`, constrain nothing.
     oneof = field.containing_oneof
     return oneof is not None and len(oneof.fields) > 1
-
-
-def _map_entry(field: FieldDescriptor) -> Descriptor | None:
-    message = field.message_type
-    if message is not None and message.GetOptions().map_entry:
-        return message
-    return None
