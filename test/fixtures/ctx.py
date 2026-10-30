@@ -613,6 +613,11 @@ class GrpcApps:
 
         return self._serve(library())
 
+    def envelope(self) -> GrpcServer:
+        from test.apps.catalog.grpc.users import envelope
+
+        return self._serve(envelope())
+
     def _serve(self, app: GrpcApp) -> GrpcServer:
         self.parent.request.addfinalizer(lambda: app.server.stop(None))
         return app.make_server(self.parent.request.getfixturevalue("tmp_path"))

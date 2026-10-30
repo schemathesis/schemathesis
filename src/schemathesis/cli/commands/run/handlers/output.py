@@ -538,7 +538,7 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
                 "Unsupported fields",
                 warnings.unsupported_field,
                 " sent requests without some fields",
-                "Fill these fields with a `map_body` hook",
+                "Fill these fields with a `map_body` hook, or `before_call` for coverage cases",
                 short_suffix="had fields left out",
             )
         )

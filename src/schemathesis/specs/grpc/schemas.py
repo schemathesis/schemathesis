@@ -43,14 +43,18 @@ from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields,
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.openapi.checks import AuthScenario, IgnoredAuth
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
-from schemathesis.specs.grpc import error_feedback
-from schemathesis.specs.grpc.converter import message_schema, request_message, rewrite_json
+from schemathesis.specs.grpc import coverage, error_feedback
+from schemathesis.specs.grpc.converter import (
+    message_schema,
+    request_message,
+    rewrite_json,
+)
 from schemathesis.specs.grpc.formats import grpc_formats
 from schemathesis.specs.grpc.stateful import create_state_machine, infer_links
 from schemathesis.specs.grpc.status import GRPC_STATUSES, INTERNAL, LIBRARY_DECODE_ERRORS, grpc_status, starts_with_verb
 
 if TYPE_CHECKING:
-    from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
+    from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
@@ -488,7 +492,7 @@ class GrpcSchema(BaseSchema):
         error_feedback: ErrorFeedbackStore | None = None,
         session: GenerationSession | None = None,
     ) -> Iterator[Case]:
-        raise NotImplementedError
+        return coverage.iter_coverage_cases(operation, generation_modes, generation_config)
 
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
@@ -536,10 +540,15 @@ class UnsupportedFieldWarning:
 
 def request_payload(case: Case) -> bytes:
     """Serialized request message a call sends."""
-    body = {} if isinstance(case.body, NotSet) else case.body
+    return encode_message(case.body, case.operation.definition.raw.input_type)
+
+
+def encode_message(body: Body | NotSet, input_type: Descriptor) -> bytes:
+    """`body` serialized as an `input_type` message."""
+    if isinstance(body, NotSet):
+        body = {}
     if isinstance(body, bytes):
         return body
-    input_type = case.operation.definition.raw.input_type
     try:
         parsed = request_message(body, input_type)
     except (json_format.ParseError, TypeError) as exc:

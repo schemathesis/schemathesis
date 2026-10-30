@@ -34,22 +34,38 @@ def test_descriptor_set_requires_url(cli, tmp_path, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_finds_empty_nested_message(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.envelope()
+    assert (
+        cli.run(
+            "api.binpb",
+            f"--url={server.target}",
+            "--include-name=types.Types/Envelope",
+            "--phases=coverage",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_proto_file_refused(cli, tmp_path, snapshot_cli):
     (tmp_path / "users.proto").write_text('syntax = "proto3";\npackage pkg;\nservice Users {}\n')
     assert cli.run("users.proto", "--url=grpc://127.0.0.1:1") == snapshot_cli
 
 
 @pytest.mark.parametrize(
-    ("user_id", "sent"),
+    ("phase", "user_id", "sent"),
     [
-        (1, ["Bearer secret", None]),
+        ("fuzzing", 1, ["Bearer secret", None]),
         # Only the first successful call is resent without credentials.
-        (403, ["Bearer secret", None, "Bearer secret", "Bearer secret"]),
+        ("fuzzing", 403, ["Bearer secret", None, "Bearer secret", "Bearer secret"]),
+        # Coverage cases skip the body hook.
+        ("coverage", 1, ["Bearer secret", None]),
     ],
-    ids=["ignored", "enforced"],
+    ids=["ignored", "enforced", "coverage"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_ignored_auth(ctx, cli, snapshot_cli, user_id, sent):
+def test_ignored_auth(ctx, cli, snapshot_cli, phase, user_id, sent):
     server = ctx.grpc.apps.users()
     module = ctx.write_pymodule(
         f"""
@@ -64,6 +80,7 @@ def map_body(context, body):
             server.target,
             "--include-name=pkg.Users/GetUser",
             "--max-examples=3",
+            f"--phases={phase}",
             "-H",
             "Authorization: Bearer secret",
             hooks=module,
@@ -92,7 +109,14 @@ def map_body(context, body):
         """
     )
     assert (
-        cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=1",
+            "--phases=fuzzing",
+            hooks=module,
+        )
         == snapshot_cli
     )
 
@@ -134,7 +158,14 @@ def map_body(context, body):
         """
     )
     assert (
-        cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=1",
+            "--phases=fuzzing",
+            hooks=module,
+        )
         == snapshot_cli
     )
 
@@ -167,7 +198,7 @@ def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
 def test_rejected_fields_are_replayed_from_cache(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
     write_descriptor_set(tmp_path, accounts_descriptor_set())
-    args = ["api.binpb", f"--url={server.target}", "--max-examples=5", "--seed=1"]
+    args = ["api.binpb", f"--url={server.target}", "--max-examples=5", "--seed=1", "--phases=fuzzing"]
     cli.run(*args)
     assert cli.run(*args) == snapshot_cli
 
@@ -195,7 +226,13 @@ def map_body(context, body):
     )
     assert (
         cli.main(
-            "run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=10", "--seed=1", hooks=module
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=10",
+            "--seed=1",
+            "--phases=fuzzing",
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -229,6 +266,7 @@ def map_body(context, body):
             "--include-name=pkg.Users/GetUser",
             "--max-examples=1",
             "--request-timeout=0.2",
+            "--phases=fuzzing",
             hooks=module,
         )
         == snapshot_cli
@@ -246,7 +284,14 @@ def map_body(context, body):
         """
     )
     assert (
-        cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=1",
+            "--phases=fuzzing",
+            hooks=module,
+        )
         == snapshot_cli
     )
 
@@ -294,6 +339,7 @@ def before_call(context, case, kwargs):
         "--include-name=pkg.Users/GetUser",
         "--max-examples=10",
         "--generation-unique-inputs",
+        "--phases=fuzzing",
         hooks=module,
     )
     assert [call.method for call in server.calls] == ["GetUser"]
@@ -316,6 +362,7 @@ def map_body(context, body):
             "--include-name=pkg.Users/GetUser",
             "--max-examples=1",
             "--generation-unique-inputs",
+            "--phases=fuzzing",
             hooks=module,
         )
         == snapshot_cli
