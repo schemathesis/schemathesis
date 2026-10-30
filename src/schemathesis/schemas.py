@@ -700,6 +700,12 @@ class BaseSchema(Mapping):
         """
         return True
 
+    def explain_server_error(self, case: Case, response: Response) -> None:
+        """Raise a Failure that names the cause of an error status better than the status alone.
+
+        Default no-op; specs whose error responses carry a machine-readable origin (e.g. gRPC library errors) override.
+        """
+
     def evaluate_negative_data(self, case: Case, response: Response) -> None:
         """Raise a Failure if the schema's own conventions show that invalid data was accepted.
 

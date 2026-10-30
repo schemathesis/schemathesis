@@ -20,7 +20,7 @@ include-name = "POST /orders"
 checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]
 ```
 
-`--exclude-checks not_a_server_error` turns it off, along with ST102, ST113.
+`--exclude-checks not_a_server_error` turns it off, along with ST102, ST113, ST119.
 
 ### ST102 Server error on undeclared request Content-Type {#st102}
 
@@ -30,7 +30,7 @@ Reported by [`not_a_server_error`](checks.md#not_a_server_error).
 
 Schemathesis sends media types the operation doesn't declare, and multipart without a boundary. Reject them with `415` or `400` before the body parser runs.
 
-`--exclude-checks not_a_server_error` turns it off, along with ST101, ST113.
+`--exclude-checks not_a_server_error` turns it off, along with ST101, ST113, ST119.
 
 ### ST103 Undocumented status code {#st103}
 
@@ -153,7 +153,7 @@ GraphQL `errors` entry reporting a field that failed on the server.
 
 An `errors` entry that isn't a query validation error counts as a resolver failure. Return an expected outcome, such as a missing record, in `data`.
 
-`--exclude-checks not_a_server_error` turns it off, along with ST101, ST102.
+`--exclude-checks not_a_server_error` turns it off, along with ST101, ST102, ST119.
 
 ### ST114 Null in non-nullable GraphQL field {#st114}
 
@@ -200,6 +200,16 @@ gRPC response with fields its message, as the server reflects it, does not decla
 Applies to schemas loaded through reflection only: the server sends fields its own reflected descriptors lack, so the reflection data is stale or the response is built from a different message.
 
 `--exclude-checks response_schema_conformance` turns it off, along with ST109, ST110, ST111, ST114, ST115, ST116, ST117.
+
+### ST119 Server could not decode the request {#st119}
+
+Reported by [`not_a_server_error`](checks.md#not_a_server_error).
+
+gRPC request the server's gRPC library failed to decode before any handler ran.
+
+Schemathesis sends requests that match the schema, so the server's message type is stricter than its descriptor, e.g. a custom `bytes` type with a fixed length. Declare the constraint, or validate in the handler and answer `INVALID_ARGUMENT`. Recognized on Go, Node and synchronous Python servers; on others, the same failure is ST101.
+
+`--exclude-checks not_a_server_error` turns it off, along with ST101, ST102, ST113.
 
 ## Input handling (ST2xx)
 

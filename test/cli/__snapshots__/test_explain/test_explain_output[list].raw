@@ -49,6 +49,9 @@ Response validation (ST1xx)
   ST118  Response carries fields the schema does not declare
          gRPC response with fields its message, as the server reflects it, does
          not declare.
+  ST119  Server could not decode the request
+         gRPC request the server's gRPC library failed to decode before any
+         handler ran.
 
 Input handling (ST2xx)
   ST201  Schema-violating request accepted

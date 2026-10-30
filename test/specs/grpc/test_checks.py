@@ -5,8 +5,9 @@ from google.rpc import status_pb2
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.core.failures import ServerError, Severity
 from schemathesis.core.transport import CallOutcome
-from schemathesis.grpc.checks import MalformedGrpcMessage
+from schemathesis.grpc.checks import MalformedGrpcMessage, UndecodableGrpcRequest
 from schemathesis.specs.openapi.checks import ignored_auth
 from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
 from test.utils import check_context
@@ -27,16 +28,16 @@ def grpc_response(response_factory, *, status, content=b"", headers=None):
     )
 
 
-def server_error(operation, response_factory, status, status_line):
+def server_error(operation, response_factory, status, status_line, headers=None, body=None):
     response = response_factory.core(
         content=b"",
         content_type=None,
         status_code=500,
-        headers={"grpc-status": [str(status)]},
+        headers={"grpc-status": [str(status)], **(headers or {})},
         status_line=status_line,
     )
     with pytest.raises(AssertionError) as exc_info:
-        not_a_server_error(check_context(), response, operation.Case(body={}))
+        not_a_server_error(check_context(), response, operation.Case(body={} if body is None else body))
     return exc_info.value
 
 
@@ -85,6 +86,44 @@ def test_call_outcome(operation, response_factory, status, outcome):
     case = operation.Case(body={})
     response = grpc_response(response_factory, status=status)
     assert operation.schema.classify_call_outcome(case, response) == outcome
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        "grpc: error unmarshalling request: unexpected EOF",
+        "Exception deserializing request!",
+        "Error deserializing request: index out of range",
+    ],
+    ids=["go", "python", "node"],
+)
+def test_library_decode_error(operation, response_factory, details):
+    failure = server_error(operation, response_factory, 13, "INTERNAL", headers={"grpc-message": [details]})
+    assert (failure, failure.severity) == (
+        UndecodableGrpcRequest(operation=operation.label, status_code=500, status_name="INTERNAL"),
+        Severity.CRITICAL,
+    )
+
+
+# Messages a client library produces when a response does not decode, so a handler may pass them on.
+@pytest.mark.parametrize(
+    ("status", "status_line", "details", "body"),
+    [
+        (13, "INTERNAL", "negative id", None),
+        (2, "UNKNOWN", "Exception deserializing request!", None),
+        (13, "INTERNAL", None, None),
+        (13, "INTERNAL", "grpc: failed to unmarshal the received message: invalid length", None),
+        (13, "INTERNAL", "Invalid protobuf byte sequence", None),
+        (13, "INTERNAL", "failed to decode Protobuf message: invalid varint", None),
+        (13, "INTERNAL", "Exception deserializing request!", b"\xff"),
+    ],
+    ids=["handler-internal", "unknown", "no-message", "go-client", "java-client", "rust-client", "raw-bytes-body"],
+)
+def test_handler_errors_stay_server_errors(operation, response_factory, status, status_line, details, body):
+    headers = {} if details is None else {"grpc-message": [details]}
+    assert server_error(operation, response_factory, status, status_line, headers=headers, body=body) == ServerError(
+        operation=operation.label, status_code=500, status_name=status_line
+    )
 
 
 def test_decodable_responses_pass(operation, response_factory):

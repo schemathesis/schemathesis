@@ -38,14 +38,14 @@ from schemathesis.generation.meta import (
     build_phase_data,
     uniform_metadata,
 )
-from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields
+from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields, UndecodableGrpcRequest
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.openapi.checks import AuthScenario, IgnoredAuth
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc.converter import message_schema
 from schemathesis.specs.grpc.formats import grpc_formats
 from schemathesis.specs.grpc.stateful import create_state_machine, infer_links
-from schemathesis.specs.grpc.status import GRPC_STATUSES, grpc_status, starts_with_verb
+from schemathesis.specs.grpc.status import GRPC_STATUSES, INTERNAL, LIBRARY_DECODE_ERRORS, grpc_status, starts_with_verb
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
@@ -253,6 +253,18 @@ class GrpcSchema(BaseSchema):
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         return GRPC_STATUSES[grpc_status(response)][2]
+
+    @override
+    def explain_server_error(self, case: Case, response: Response) -> None:
+        # Raw bytes are sent unchanged, so a decode failure there is the input's fault, not the message type's.
+        if (
+            grpc_status(response) == INTERNAL
+            and not isinstance(case.body, bytes)
+            and response.headers.get("grpc-message", [""])[0].startswith(LIBRARY_DECODE_ERRORS)
+        ):
+            raise UndecodableGrpcRequest(
+                operation=case.operation.label, status_code=response.status_code, status_name=self.status_name(response)
+            )
 
     @override
     def validate_response(self, operation: APIOperation, response: Response, *, case: Case | None = None) -> None:

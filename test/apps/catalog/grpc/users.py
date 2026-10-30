@@ -148,7 +148,7 @@ def users(
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
-    404 is NOT_FOUND, and 17 answers with bytes that do not decode. `pkg.Admin/Reset` answers with `u<id>` packed
+    404 is NOT_FOUND, 17 answers with bytes that do not decode, and 422 fails in the request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed
     into `response`. Reflection refuses calls that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
@@ -172,9 +172,15 @@ def users(
             )
         )
 
-    def get_user(payload: bytes, context: grpc.ServicerContext) -> bytes:
-        record("GetUser", context)
+    def parse_request(payload: bytes) -> int:
         user_id = request_class.FromString(payload).user_id
+        # The gRPC library answers INTERNAL itself when the request deserializer fails.
+        if user_id == 422:
+            raise ValueError("invalid user id")
+        return user_id
+
+    def get_user(user_id: int, context: grpc.ServicerContext) -> bytes:
+        record("GetUser", context)
         if user_id < 0:
             context.abort(grpc.StatusCode.INTERNAL, "negative id")
         if user_id == 400:
@@ -211,7 +217,8 @@ def users(
     server.add_generic_rpc_handlers(
         (
             grpc.method_handlers_generic_handler(
-                "pkg.Users", {"GetUser": grpc.unary_unary_rpc_method_handler(get_user)}
+                "pkg.Users",
+                {"GetUser": grpc.unary_unary_rpc_method_handler(get_user, request_deserializer=parse_request)},
             ),
             grpc.method_handlers_generic_handler("pkg.Admin", {"Reset": grpc.unary_unary_rpc_method_handler(reset)}),
         )
