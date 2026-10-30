@@ -254,10 +254,59 @@ def test_methods_with_side_effects_run_last(ctx, cli, tmp_path):
     ]
 
 
+@pytest.mark.parametrize("extra", [[], ["--generation-unique-inputs"]], ids=["default", "unique-inputs"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_reaches_created_names_and_page_tokens(ctx, cli, snapshot_cli):
+def test_stateful_reaches_created_names_and_page_tokens(ctx, cli, snapshot_cli, extra):
     server = ctx.grpc.apps.library()
     assert (
-        cli.run(server.target, "--phases=fuzzing,stateful", "--max-examples=10", "--seed=1", "--warnings=off")
+        cli.run(server.target, "--phases=fuzzing,stateful", "--max-examples=10", "--seed=1", "--warnings=off", *extra)
+        == snapshot_cli
+    )
+
+
+def test_unique_inputs_send_a_repeated_message_once(ctx, cli):
+    server = ctx.grpc.apps.users()
+    # The hook changes every case the same way after the run decides whether it was already sent.
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 1}
+
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    case.body["userId"] = 3
+        """
+    )
+    cli.main(
+        "run",
+        server.target,
+        "--include-name=pkg.Users/GetUser",
+        "--max-examples=10",
+        "--generation-unique-inputs",
+        hooks=module,
+    )
+    assert [call.method for call in server.calls] == ["GetUser"]
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unique_inputs_report_unencodable_messages(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {**body, "unknown": 1}
+        """
+    )
+    assert (
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=1",
+            "--generation-unique-inputs",
+            hooks=module,
+        )
         == snapshot_cli
     )

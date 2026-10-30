@@ -8,7 +8,7 @@ from google.protobuf import json_format, message_factory
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.errors import IncorrectUsage, SerializationError
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import CallOutcome
 from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, write_descriptor_set
@@ -294,7 +294,7 @@ def nested_nodes(depth):
 def test_unparsable_json_body_is_rejected(ctx, tmp_path, method, body, message):
     path = write_descriptor_set(tmp_path, all_types_descriptor_set())
     case = schemathesis.grpc.from_path(path)["types.Types"][method].Case(body=body)
-    with pytest.raises(json_format.ParseError, match=message):
+    with pytest.raises(SerializationError, match=message):
         case.call(base_url=ctx.grpc.apps.side_effects().target)
 
 

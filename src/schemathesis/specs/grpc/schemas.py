@@ -22,7 +22,7 @@ from typing_extensions import override
 from schemathesis import auths
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, Specification
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import InvalidSchema, OperationNotFound, not_found_message
+from schemathesis.core.errors import InvalidSchema, OperationNotFound, SerializationError, not_found_message
 from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
@@ -257,6 +257,17 @@ class GrpcSchema(BaseSchema):
     @override
     def status_name(self, response: Response) -> str | None:
         return GRPC_STATUSES[grpc_status(response)][0]
+
+    @override
+    def hash_case(self, case: Case) -> int:
+        metadata = request_metadata(case, {SCHEMATHESIS_TEST_CASE_HEADER: "0"})
+        payload: bytes | int
+        try:
+            payload = request_payload(case)
+        except SerializationError:
+            # A body that cannot be encoded fails when sent, so only its fields identify the case.
+            payload = case._hash_container(case.body)
+        return hash((case.path, payload, tuple(sorted(metadata.items()))))
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
@@ -513,6 +524,19 @@ class UnsupportedFieldWarning:
     @property
     def group(self) -> str | None:
         return None
+
+
+def request_payload(case: Case) -> bytes:
+    """Serialized request message a call sends."""
+    body = {} if isinstance(case.body, NotSet) else case.body
+    if isinstance(body, bytes):
+        return body
+    input_type = case.operation.definition.raw.input_type
+    try:
+        parsed = request_message(body, input_type)
+    except (json_format.ParseError, TypeError) as exc:
+        raise SerializationError(f"Cannot encode the request body as `{input_type.full_name}`: {exc}") from None
+    return parsed.SerializeToString(deterministic=True)
 
 
 def request_metadata(case: Case, headers: Mapping[str, Any] | None) -> dict[str, str]:

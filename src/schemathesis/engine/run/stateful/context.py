@@ -88,8 +88,8 @@ class StatefulContext:
         self.reset_scenario()
         self.metric_collector.reset()
 
-    def store_step_outcome(self, case: Case, outcome: BaseException | None) -> None:
-        self.step_outcomes[hash(case)] = outcome
+    def store_step_outcome(self, key: int, outcome: BaseException | None) -> None:
+        self.step_outcomes[key] = outcome
 
-    def get_step_outcome(self, case: Case) -> BaseException | None | NotSet:
-        return self.step_outcomes.get(hash(case), NOT_SET)
+    def get_step_outcome(self, key: int) -> BaseException | None | NotSet:
+        return self.step_outcomes.get(key, NOT_SET)

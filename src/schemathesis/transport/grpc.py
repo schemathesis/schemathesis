@@ -10,11 +10,10 @@ import requests
 from google.protobuf import json_format, message, message_factory
 from typing_extensions import override
 
-from schemathesis.core import NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
-from schemathesis.specs.grpc.schemas import request_message, request_metadata
+from schemathesis.specs.grpc.schemas import request_metadata, request_payload
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport
 
@@ -65,11 +64,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         base_url = base_url or case.operation.base_url
         address, tls = parse_target(base_url, verify)
         method = case.operation.definition.raw
-        body = {} if isinstance(case.body, NotSet) else case.body
-        if isinstance(body, bytes):
-            payload = body
-        else:
-            payload = request_message(body, method.input_type).SerializeToString()
+        payload = request_payload(case)
         request_headers = request_metadata(case, headers)
         if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
             request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))

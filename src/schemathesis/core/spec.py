@@ -229,6 +229,8 @@ class ApiSchema(SchemaMetadata, Protocol):
 
     def status_name(self, response: Response) -> str | None: ...  # pragma: no cover
 
+    def hash_case(self, case: Case) -> int: ...  # pragma: no cover
+
     def prepare_multipart(
         self,
         form_data: dict[str, Any],

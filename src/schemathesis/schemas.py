@@ -17,8 +17,8 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
-from schemathesis.config import GenerationConfig, ProjectConfig
-from schemathesis.core import NOT_SET, Body, NotSet, media_types
+from schemathesis.config import GenerationConfig, ProjectConfig, SanitizationConfig
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup
@@ -35,7 +35,7 @@ from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata, TestPhase
 from schemathesis.hooks import HookDispatcherMark
-from schemathesis.transport.prepare import prepare_path
+from schemathesis.transport.prepare import prepare_path, prepare_request
 
 from .auths import AuthStorage, ReauthState, compute_retry_on_statuses
 from .filters import (
@@ -76,6 +76,8 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool
+
+_NO_SANITIZATION = SanitizationConfig(enabled=False)
 
 
 @lru_cache
@@ -721,6 +723,13 @@ class BaseSchema(Mapping):
     def status_name(self, response: Response) -> str | None:
         """Name of a status the protocol sends beside the HTTP status code, or `None` when the code alone says it."""
         return None
+
+    def hash_case(self, case: Case) -> int:
+        """Hash of the request a case sends, ignoring its test case id."""
+        # Unmasked values, as masked ones would make distinct cases collide.
+        request = prepare_request(case, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
+        headers = tuple(sorted((name.lower(), value) for name, value in request.headers.items()))
+        return hash((request.method, request.url, headers, request.body))
 
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         """Decide what the API did with a request carrying positive test data.
