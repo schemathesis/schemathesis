@@ -49,7 +49,7 @@ from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, Con
 from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
-from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
+from schemathesis.specs.openapi.adapter.references import example_object_value, maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.converter import permit_forbidden_properties, to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
@@ -1348,9 +1348,9 @@ class OpenApiComponent(ABC):
         if not isinstance(container, dict):
             return {}
         return {
-            name: example["value"]
+            name: value
             for name, example in container.items()
-            if isinstance(example, dict) and "value" in example
+            if isinstance(example, dict) and not isinstance(value := example_object_value(example), NotSet)
         }
 
     @property
@@ -1382,10 +1382,16 @@ class OpenApiComponent(ABC):
         # Extract from top-level definition
         container = self.definition.get(self.adapter.examples_container_keyword)
         if isinstance(container, dict):
-            examples.extend(ex["value"] for ex in container.values() if isinstance(ex, dict) and "value" in ex)
+            examples.extend(
+                value
+                for ex in container.values()
+                if isinstance(ex, dict) and not isinstance(value := example_object_value(ex), NotSet)
+            )
         elif isinstance(container, list):
             # Items may be Example Objects or raw values
-            examples.extend(ex["value"] if isinstance(ex, dict) and "value" in ex else ex for ex in container)
+            for ex in container:
+                value = example_object_value(ex) if isinstance(ex, dict) else NOT_SET
+                examples.append(ex if isinstance(value, NotSet) else value)
         examples.extend(self._iter_single_and_schema_examples())
         return examples
 

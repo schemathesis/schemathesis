@@ -12,7 +12,7 @@ import requests
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core import NOT_SET
+from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import (
     InvalidSchema,
     RefResolutionError,
@@ -51,6 +51,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     _deep_merge_overlay,
     example_is_valid,
 )
+from schemathesis.specs.openapi.adapter.references import example_object_value
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from schemathesis.specs.openapi.formats import format_lengths_for
 
@@ -675,15 +676,17 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
     """Extract the value from a single OAS3 Example Object."""
     if "$ref" in example:
         _, example = resolve_reference(schema.root_resolver, example["$ref"])
-    if "value" in example:
-        yield example["value"]
+    value = example_object_value(example) if isinstance(example, dict) else NOT_SET
+    if not isinstance(value, NotSet):
+        yield value
     elif "externalValue" in example:
         try:
             # Report a warning if not available?
             yield load_external_example(example["externalValue"])
         except requests.RequestException:
             pass
-    elif example:
+    # A `serializedValue` is already on the wire form, which bodies here are not
+    elif example and "serializedValue" not in example:
         yield example
 
 

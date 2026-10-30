@@ -16,7 +16,7 @@ from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transport import expand_status_code
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import ResponseAdapter
-from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
+from schemathesis.specs.openapi.adapter.references import example_object_value, maybe_resolve_with_resolver
 from schemathesis.specs.openapi.converter import to_json_schema
 
 if TYPE_CHECKING:
@@ -848,8 +848,10 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
             examples = definition.get(examples_container_keyword, {})
             if isinstance(examples, dict):
                 for example in examples.values():
-                    if isinstance(example, dict) and "value" in example:
-                        yield name, example["value"]
+                    if isinstance(example, dict):
+                        value = example_object_value(example)
+                        if not isinstance(value, NotSet):
+                            yield name, value
             elif isinstance(examples, list):
                 for example in examples:
                     yield name, example
