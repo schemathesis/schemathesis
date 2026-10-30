@@ -3878,6 +3878,8 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
         ({}, {"propertyName": "petType"}, False),
         # No propertyName in discriminator: skip check
         ({"petType": "Fish"}, {}, False),
+        # Open API 3.2 routes unknown values to the `defaultMapping` schema
+        ({"petType": "Fish"}, {"propertyName": "petType", "defaultMapping": "#/components/schemas/Dog"}, False),
     ],
     ids=[
         "implicit-valid-cat",
@@ -3888,6 +3890,7 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
         "explicit-invalid-fish",
         "missing-property-skip",
         "no-property-name-skip",
+        "default-mapping-unknown-value",
     ],
 )
 def test_response_schema_conformance_discriminator(ctx, response_factory, body, discriminator, should_fail):
