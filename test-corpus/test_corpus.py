@@ -46,6 +46,13 @@ def pytest_generate_tests(metafunc):
     if "corpus" not in metafunc.fixturenames:
         return
     filenames = [(filename, member.name) for filename, corpus in CORPUS_FILES.items() for member in corpus.getmembers()]
+    if metafunc.function.__name__ == "test_coverage_phase":
+        filenames = [
+            pytest.param(corpus, filename, marks=pytest.mark.timeout(LONG_COVERAGE_TIMEOUT))
+            if filename in LONG_COVERAGE
+            else (corpus, filename)
+            for corpus, filename in filenames
+        ]
     metafunc.parametrize("corpus, filename", filenames)
 
 
@@ -53,6 +60,9 @@ SLOW_DEFAULT = {
     "microsoft.com/graph-beta/1.0.1.json",
     "microsoft.com/graph/1.0.1.json",
 }
+# Coverage of these schemas outlasts the default timeout on CI runners, yet still finishes.
+LONG_COVERAGE = {"xero.com/xero_accounting/2.9.4.json"}
+LONG_COVERAGE_TIMEOUT = 900
 SLOW_COVERAGE = {
     "amazonaws.com/quicksight/2018-04-01.json",
     "azure.com/network-applicationGateway/2015-06-15.json",
