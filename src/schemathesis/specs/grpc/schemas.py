@@ -46,6 +46,7 @@ from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, Oper
 from schemathesis.specs.grpc import coverage, error_feedback
 from schemathesis.specs.grpc.converter import (
     message_schema,
+    message_to_json,
     request_message,
     rewrite_json,
 )
@@ -246,9 +247,7 @@ class GrpcSchema(BaseSchema):
         input_type = operation.definition.raw.input_type
         body = {} if isinstance(case.body, NotSet) else case.body
         if isinstance(body, bytes):
-            body = json_format.MessageToDict(
-                message_factory.GetMessageClass(input_type).FromString(body), descriptor_pool=input_type.file.pool
-            )
+            body = message_to_json(message_factory.GetMessageClass(input_type).FromString(body), input_type.file.pool)
         args.extend(["-d", json.dumps(rewrite_json(body, input_type, _grpcurl_json)), address, operation.label])
         return " ".join(shlex.quote(arg) for arg in args)
 

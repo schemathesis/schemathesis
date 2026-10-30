@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import base64
+import json
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import grpc
 import requests
-from google.protobuf import json_format, message, message_factory
+from google.protobuf import message, message_factory
 from typing_extensions import override
 
 from schemathesis.core import Body
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
+from schemathesis.specs.grpc.converter import message_to_json
 from schemathesis.specs.grpc.schemas import MEDIA_TYPE, encode_message, request_metadata
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport, SerializationContext
@@ -116,9 +118,8 @@ class GrpcTransport(BaseTransport["requests.Session"]):
 
             def render_content(content: bytes) -> str | None:
                 try:
-                    return json_format.MessageToJson(
-                        output_class.FromString(content), descriptor_pool=method.output_type.file.pool
-                    )
+                    rendered = message_to_json(output_class.FromString(content), method.output_type.file.pool)
+                    return json.dumps(rendered, indent=2, ensure_ascii=False)
                 except message.DecodeError:
                     # Shown as binary; the response checks report the malformed message.
                     return None

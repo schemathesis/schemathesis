@@ -5,6 +5,7 @@ import re
 import pytest
 import requests
 from google.protobuf import json_format, message_factory
+from google.rpc import error_details_pb2
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
@@ -26,6 +27,7 @@ from test.apps.catalog.grpc.descriptors import (
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
 ANY_URL = "type.googleapis.com/"
+NO_USER_INFO = base64.b64encode(error_details_pb2.ErrorInfo(reason="NO_USER").SerializeToString()).decode()
 
 
 def load(server, **config):
@@ -319,11 +321,20 @@ def test_unparsable_json_body_is_rejected(ctx, tmp_path, method, body, message):
         case.call(base_url=ctx.grpc.apps.side_effects().target)
 
 
-def test_any_field_packed_with_schema_type_is_rendered(ctx):
-    response = load(ctx.grpc.apps.users())["pkg.Admin"]["Reset"].Case(body={"userId": 7}).call()
-    assert json.loads(response.render_content(response.content)) == {
-        "response": {"@type": "type.googleapis.com/pkg.User", "name": "u7"}
-    }
+@pytest.mark.parametrize(
+    ("user_id", "expected"),
+    [
+        (7, {"response": {"@type": f"{ANY_URL}pkg.User", "name": "u7"}}),
+        (
+            -1,
+            {"error": {"code": 5, "details": [{"@type": f"{ANY_URL}google.rpc.ErrorInfo", "value": NO_USER_INFO}]}},
+        ),
+    ],
+    ids=["schema-type", "unknown-type"],
+)
+def test_any_field_is_rendered(ctx, user_id, expected):
+    response = load(ctx.grpc.apps.users())["pkg.Admin"]["Reset"].Case(body={"userId": user_id}).call()
+    assert json.loads(response.render_content(response.content)) == expected
 
 
 def create_account(ctx, tmp_path):

@@ -86,6 +86,24 @@ def users_descriptor_set() -> bytes:
         FieldDescriptorProto.TYPE_MESSAGE,
         type_name=".google.protobuf.Any",
     )
+    _field(
+        operations.message_type[0],
+        "error",
+        4,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".google.longrunning.Status",
+    )
+    status = operations.message_type.add(name="Status")
+    _field(status, "code", 1, FieldDescriptorProto.TYPE_INT32)
+    _field(status, "message", 2, FieldDescriptorProto.TYPE_STRING)
+    _field(
+        status,
+        "details",
+        3,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".google.protobuf.Any",
+        label=FieldDescriptorProto.LABEL_REPEATED,
+    )
     operations.message_type.add(name="GetOperationRequest")
     operations.service.add(name="Operations").method.add(
         name="GetOperation",

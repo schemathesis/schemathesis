@@ -178,7 +178,8 @@ def users(
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
     `on_get_user` sees each id first. 404 is NOT_FOUND, 17 answers with bytes that do not decode, and 422 fails in the
-    request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`. Reflection refuses calls
+    request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
+    a `google.rpc.ErrorInfo` detail, a type clients do not know, in `error` for a negative id. Reflection refuses calls
     that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
@@ -276,7 +277,12 @@ def users(
     def reset(payload: bytes, context: grpc.ServicerContext) -> bytes:
         record("Reset", context, payload)
         operation = operation_class()
-        operation.response.Pack(user_class(name=f"u{request_class.FromString(payload).user_id}"))
+        user_id = request_class.FromString(payload).user_id
+        if user_id < 0:
+            operation.error.code = grpc.StatusCode.NOT_FOUND.value[0]
+            operation.error.details.add().Pack(error_details_pb2.ErrorInfo(reason="NO_USER"))
+        else:
+            operation.response.Pack(user_class(name=f"u{user_id}"))
         return operation.SerializeToString()
 
     recorder = RecordReflection()

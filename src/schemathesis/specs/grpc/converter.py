@@ -17,7 +17,9 @@ from schemathesis.specs.grpc.constraints import ConstraintReader, FieldConstrain
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+    from google.protobuf import any_pb2
     from google.protobuf.descriptor import Descriptor
+    from google.protobuf.descriptor_pool import DescriptorPool
     from google.protobuf.message import Message
 
     from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
@@ -593,6 +595,42 @@ def request_message(body: object, input_type: Descriptor) -> Message:
         request,
         descriptor_pool=input_type.file.pool,
     )
+
+
+def message_to_json(message: Message, pool: DescriptorPool) -> JsonValue:
+    """`message` in its JSON form, with `Any` values of types `pool` lacks kept as raw bytes."""
+    try:
+        return json_format.MessageToDict(message, descriptor_pool=pool)
+    except TypeError:
+        # Only an `Any` whose type the pool lacks fails to render.
+        pass
+    if message.DESCRIPTOR.full_name == ANY:
+        packed = cast("any_pb2.Any", message)
+        return {"@type": packed.type_url, "value": base64.b64encode(packed.value).decode()}
+    rest = type(message)()
+    rest.CopyFrom(message)
+    nested: dict[str, JsonValue] = {}
+    for field, value in message.ListFields():
+        item_type = field.message_type
+        is_map = False
+        if item_type is not None and item_type.GetOptions().map_entry:
+            is_map = True
+            item_type = item_type.fields_by_name["value"].message_type
+        # Extensions render with the plain fields, as only regular fields can be cleared by name.
+        if item_type is None or field.is_extension:
+            continue
+        if is_map:
+            # JSON spells boolean map keys in lowercase.
+            nested[field.json_name] = {
+                str(key).lower() if isinstance(key, bool) else str(key): message_to_json(item, pool)
+                for key, item in value.items()
+            }
+        elif field.is_repeated:
+            nested[field.json_name] = [message_to_json(item, pool) for item in value]
+        else:
+            nested[field.json_name] = message_to_json(value, pool)
+        rest.ClearField(field.name)
+    return {**json_format.MessageToDict(rest, descriptor_pool=pool), **nested}
 
 
 def _url_safe(value: object, type_name: str) -> object:

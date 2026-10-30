@@ -119,13 +119,30 @@ def test_reproduction_command_field_mask_as_object(tmp_path, method, body, expec
     )
 
 
-def test_reproduction_command_decodes_any_packed_with_schema_type(tmp_path):
+UNKNOWN_ANY = {"@type": "type.googleapis.com/x.X", "value": "CAE="}
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            b"\x12%\n\x1etype.googleapis.com/types.Node\x12\x03\n\x01n",
+            {"payload": {"@type": "type.googleapis.com/types.Node", "name": "n"}},
+        ),
+        (
+            b'\x12\x1d\n\x17type.googleapis.com/x.X\x12\x02\x08\x01\x1a"\n\x01k\x12\x1d\n\x17type.googleapis.com/x.X'
+            b'\x12\x02\x08\x01"\x1f\n\x1d\n\x17type.googleapis.com/x.X\x12\x02\x08\x01',
+            {"payload": UNKNOWN_ANY, "extras": {"k": UNKNOWN_ANY}, "first": {"extra": UNKNOWN_ANY}},
+        ),
+    ],
+    ids=["schema-type", "unknown-type"],
+)
+def test_reproduction_command_decodes_any(tmp_path, body, expected):
     path = write_descriptor_set(tmp_path, all_types_descriptor_set())
-    schema = schemathesis.grpc.from_path(path)
-    case = schema["types.Types"]["Envelope"].Case(body=b"\x12%\n\x1etype.googleapis.com/types.Node\x12\x03\n\x01n")
+    case = schemathesis.grpc.from_path(path)["types.Types"]["Envelope"].Case(body=body)
     assert case.as_reproduction_command(
         headers={"x-schemathesis-testcaseid": "abc"}, verify=True, base_url="grpc://127.0.0.1:50051"
     ) == (
         f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: abc' "
-        """-d '{"payload": {"@type": "type.googleapis.com/types.Node", "name": "n"}}' 127.0.0.1:50051 types.Types/Envelope"""
+        f"-d {shlex.quote(json.dumps(expected))} 127.0.0.1:50051 types.Types/Envelope"
     )
