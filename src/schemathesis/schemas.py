@@ -705,6 +705,10 @@ class BaseSchema(Mapping):
         Default no-op; OpenAPI judges by status code in `positive_data_acceptance` itself.
         """
 
+    def status_name(self, response: Response) -> str | None:
+        """Name of a status the protocol sends beside the HTTP status code, or `None` when the code alone says it."""
+        return None
+
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         """Decide what the API did with a request carrying positive test data.
 

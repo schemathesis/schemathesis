@@ -4,9 +4,11 @@ import pytest
 from google.rpc import status_pb2
 
 import schemathesis
+from schemathesis.checks import not_a_server_error
 from schemathesis.core.transport import CallOutcome
 from schemathesis.grpc.checks import MalformedGrpcMessage
 from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
+from test.utils import check_context
 
 
 @pytest.fixture(scope="module")
@@ -22,6 +24,33 @@ def grpc_response(response_factory, *, status, content=b"", headers=None):
         status_code=200 if status == 0 else 500,
         headers={"grpc-status": [str(status)], **(headers or {})},
     )
+
+
+def server_error(operation, response_factory, status, status_line):
+    response = response_factory.core(
+        content=b"",
+        content_type=None,
+        status_code=500,
+        headers={"grpc-status": [str(status)]},
+        status_line=status_line,
+    )
+    with pytest.raises(AssertionError) as exc_info:
+        not_a_server_error(check_context(), response, operation.Case(body={}))
+    return exc_info.value
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "same"),
+    [
+        ((2, "UNKNOWN: no user 1"), (2, "UNKNOWN: no user 2"), True),
+        ((13, "INTERNAL: corrupt"), (15, "DATA_LOSS: corrupt"), False),
+    ],
+    ids=["same-status", "different-statuses"],
+)
+def test_server_errors_are_told_apart_by_status(operation, response_factory, first, second, same):
+    assert (
+        server_error(operation, response_factory, *first) == server_error(operation, response_factory, *second)
+    ) is same
 
 
 @pytest.mark.parametrize(

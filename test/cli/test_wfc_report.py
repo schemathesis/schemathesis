@@ -551,6 +551,11 @@ def test_object_level_authorization_context_names_both_peers():
     )
 
 
+def test_server_error_context_names_the_protocol_status():
+    failure = ServerError(operation=OPERATION, status_code=500, status_name="DATA_LOSS")
+    assert fault_category(failure) == (100, "ServerError: Server error (status 500 DATA_LOSS)")
+
+
 def test_declared_auth_not_enforced_context_names_the_scenario():
     failure = IgnoredAuth(
         operation=OPERATION, message="", scenario=AuthScenario.INVALID_AUTH, title="API accepts invalid authentication"
