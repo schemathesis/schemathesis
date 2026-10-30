@@ -42,9 +42,9 @@ API Operations:
 
 Test Phases:
   ⏭  Examples (not supported)
-  ⏭  Coverage (not supported)
+  ⏭  Coverage (disabled)
   ❌ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Failures:
   ❌ ST401 API accepts requests without authentication: 1

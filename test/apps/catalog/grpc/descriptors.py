@@ -314,6 +314,45 @@ def all_types_descriptor_set() -> bytes:
     return descriptor_pb2.FileDescriptorSet(file=[*well_known, legacy, editions, types]).SerializeToString()
 
 
+def nested_descriptor_set() -> bytes:
+    """Messages whose shape stresses structural cases: deep, wide, self-nested, or with an enum at the int32 limit."""
+    nested = descriptor_pb2.FileDescriptorProto(name="nested.proto", package="nested", syntax="proto3")
+    nested.enum_type.add(name="Kind").value.add(name="KIND_UNSPECIFIED", number=0)
+    leaf = nested.message_type.add(name="Leaf")
+    _field(
+        leaf,
+        "kinds",
+        1,
+        FieldDescriptorProto.TYPE_ENUM,
+        type_name=".nested.Kind",
+        label=FieldDescriptorProto.LABEL_REPEATED,
+    )
+    middle = nested.message_type.add(name="Middle")
+    _field(middle, "leaf", 1, FieldDescriptorProto.TYPE_MESSAGE, type_name=".nested.Leaf")
+    _field(middle, "other", 2, FieldDescriptorProto.TYPE_MESSAGE, type_name=".nested.Leaf")
+    chain = nested.message_type.add(name="Chain")
+    _field(chain, "middle", 1, FieldDescriptorProto.TYPE_MESSAGE, type_name=".nested.Middle")
+    wide = nested.message_type.add(name="Wide")
+    for number in range(1, 61):
+        _field(wide, f"leaf{number}", number, FieldDescriptorProto.TYPE_MESSAGE, type_name=".nested.Leaf")
+    flat = nested.message_type.add(name="Flat")
+    for number in range(1, 51):
+        _field(flat, f"count{number}", number, FieldDescriptorProto.TYPE_INT32)
+    _field(flat, "child", 51, FieldDescriptorProto.TYPE_MESSAGE, type_name=".nested.Leaf")
+    tree = nested.message_type.add(name="Tree")
+    for number in range(1, 31):
+        _field(tree, f"branch{number}", number, FieldDescriptorProto.TYPE_MESSAGE, type_name=".nested.Tree")
+    extreme = nested.enum_type.add(name="Extreme")
+    extreme.value.add(name="EXTREME_UNSPECIFIED", number=0)
+    extreme.value.add(name="EXTREME_MAX", number=2**31 - 1)
+    edge = nested.message_type.add(name="Edge")
+    _field(edge, "extreme", 1, FieldDescriptorProto.TYPE_ENUM, type_name=".nested.Extreme")
+    service = nested.service.add(name="Nested")
+    for name in ("Chain", "Wide", "Flat", "Tree", "Edge"):
+        service.method.add(name=name, input_type=f".nested.{name}", output_type=f".nested.{name}")
+    return descriptor_pb2.FileDescriptorSet(file=[nested]).SerializeToString()
+
+
 SCALARS = {
     "int32": FieldDescriptorProto.TYPE_INT32,
     "sint32": FieldDescriptorProto.TYPE_SINT32,

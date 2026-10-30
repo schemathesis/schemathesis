@@ -106,7 +106,7 @@ def test_api(case):
 ## Current limitations
 
 - Schemathesis counts streaming methods but does not test them.
-- Only the [fuzzing](../explanations/data-generation.md#testing-phases) and [stateful](../explanations/stateful.md) phases run: no examples or coverage phases, and no [negative test cases](../explanations/data-generation.md#generation-modes).
-- Schemathesis leaves `google.protobuf.Any` fields out of requests and reports them as [`unsupported_field`](../reference/warnings.md#unsupported_field) warnings. Fill them with a [`map_body`](extending.md) hook.
+- Only the coverage, fuzzing and [stateful](../explanations/stateful.md) [phases](../explanations/data-generation.md#testing-phases) run: no examples phase, and no [negative test cases](../explanations/data-generation.md#generation-modes).
+- Schemathesis leaves `google.protobuf.Any` fields out of requests and reports them as [`unsupported_field`](../reference/warnings.md#unsupported_field) warnings. Fill them with a [`map_body`](extending.md) hook, or a `before_call` hook for the coverage phase, which skips `map_body`.
 - Schemathesis does not read `.proto` files directly; build a descriptor set first.
 - HAR and VCR reports and proxies are not available for gRPC targets.

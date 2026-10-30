@@ -1,0 +1,69 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from api.binpb (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 9 total
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+_____________________________ types.Types/Envelope _____________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+INTERNAL: nil extra
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Unsupported fields: 1 operation sent requests without some fields
+
+  - types.Types/Envelope
+    `types.Envelope.extras` - `google.protobuf.Any` is not generated
+    `types.Envelope.payload` - `google.protobuf.Any` is not generated
+    `types.Meta.extra` - `google.protobuf.Any` is not generated
+
+💡 Fill these fields with a `map_body` hook, or `before_call` for coverage cases
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/9
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ❌ Coverage
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
+
+Warnings:
+  ⚠️ Unsupported fields: 1 operation had fields left out
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 1 failure, 1 warning in 1.00s =========================

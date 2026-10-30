@@ -250,10 +250,10 @@ Unsupported fields: 1 operation sent requests without some fields
   - types.Types/Envelope
     `types.Envelope.payload` - `google.protobuf.Any` is not generated
 
-💡 Fill these fields with a `map_body` hook
+💡 Fill these fields with a `map_body` hook, or `before_call` for coverage cases
 ```
 
-**Trigger**: A gRPC request message has a `google.protobuf.Any` field, directly or in a nested message. Schemathesis leaves the field out of every request. To send one, set it in a [`map_body`](../guides/extending.md) hook.
+**Trigger**: A gRPC request message has a `google.protobuf.Any` field, directly or in a nested message. Schemathesis leaves the field out of every request. To send one, set it in a [`map_body`](../guides/extending.md) hook; the coverage phase skips `map_body`, so set it in a `before_call` hook there.
 
 ### `not_served`
 

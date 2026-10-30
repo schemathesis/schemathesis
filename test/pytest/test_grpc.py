@@ -37,4 +37,4 @@ def test_api(case):
     assert (
         re.findall(r'<span class="ev-label">Response</span>(.*?)</div>', html),
         re.findall(r'<pre class="body">(.*?)</pre>', html, flags=re.DOTALL),
-    ) == (['<span class="status s2xx">OK</span>'], ["{\n  &quot;name&quot;: &quot;u0&quot;\n}"])
+    ) == (['<span class="status s2xx">OK</span>'], ["{\n  &quot;name&quot;: &quot;u2147483647&quot;\n}"])

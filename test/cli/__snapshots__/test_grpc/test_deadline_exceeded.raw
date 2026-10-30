@@ -36,9 +36,9 @@ API Operations:
 
 Test Phases:
   ⏭  Examples (not supported)
-  ⏭  Coverage (not supported)
+  ⏭  Coverage (disabled)
   🚫 Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Errors:
   🚫 Network Error: 1

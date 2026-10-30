@@ -14,6 +14,7 @@ from grpc_reflection.v1alpha import reflection, reflection_pb2
 
 from test.apps.catalog.grpc.descriptors import (
     accounts_descriptor_set,
+    all_types_descriptor_set,
     library_descriptor_set,
     side_effects_descriptor_set,
     users_descriptor_set,
@@ -382,3 +383,30 @@ def library() -> GrpcApp:
     port = server.add_insecure_port("127.0.0.1:0")
     server.start()
     return GrpcApp(server=server, port=port, calls=[], reflection_calls=[], descriptor_set=library_descriptor_set())
+
+
+def envelope() -> GrpcApp:
+    """`types.Types/Envelope` reads `first.extra` without a presence check, as a careless handler would."""
+    pool = descriptor_pool.DescriptorPool()
+    for file in descriptor_pb2.FileDescriptorSet.FromString(all_types_descriptor_set()).file:
+        pool.Add(file)
+    envelope_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("types.Envelope"))
+    empty_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("google.protobuf.Empty"))
+
+    def handle(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        request = envelope_class.FromString(payload)
+        if request.HasField("first") and not request.first.HasField("extra"):
+            context.abort(grpc.StatusCode.INTERNAL, "nil extra")
+        return empty_class().SerializeToString()
+
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    server.add_generic_rpc_handlers(
+        (
+            grpc.method_handlers_generic_handler(
+                "types.Types", {"Envelope": grpc.unary_unary_rpc_method_handler(handle)}
+            ),
+        )
+    )
+    port = server.add_insecure_port("127.0.0.1:0")
+    server.start()
+    return GrpcApp(server=server, port=port, calls=[], reflection_calls=[], descriptor_set=all_types_descriptor_set())

@@ -221,6 +221,11 @@ def test_bytes_body_is_sent_as_is(ctx):
     assert json.loads(response.render_content(response.content)) == {"name": "u7"}
 
 
+def test_case_without_body_sends_default_message(ctx):
+    response = load(ctx.grpc.apps.users())["pkg.Users"]["GetUser"].Case().call()
+    assert json.loads(response.render_content(response.content)) == {"name": "u0"}
+
+
 def test_calls_share_a_connection(ctx):
     server = ctx.grpc.apps.users()
     operation = load(server)["pkg.Users"]["GetUser"]

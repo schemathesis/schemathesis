@@ -106,6 +106,7 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
             SpecificationFeature.STATUS_CODE_ANALYSIS,
             SpecificationFeature.SCHEMA_ANALYSIS,
             SpecificationFeature.STATEFUL_TESTING,
+            SpecificationFeature.COVERAGE,
         }
     ),
 }
