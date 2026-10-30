@@ -11,6 +11,7 @@ import schemathesis
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.control import SkipTest
 from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.jsonschema.numeric import FLOAT32_MAX, next_float32
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
@@ -75,6 +76,12 @@ def test_explicit_body_and_headers(schema):
     strategy = schema["types.Types"]["Edition"].as_strategy(body={"id": 1}, headers={"authorization": "Bearer x"})
     case = generate_many(strategy, 1)[0]
     assert (case.body, case.headers) == ({"id": 1}, {"authorization": "Bearer x"})
+
+
+@pytest.mark.parametrize("argument", ["query", "cookies", "path_parameters"], ids=["query", "cookies", "path"])
+def test_unsupported_override_rejected(schema, argument):
+    with pytest.raises(IncorrectUsage, match=f"`{argument}` is not supported for gRPC operations"):
+        schema["types.Types"]["Edition"].as_strategy(**{argument: {"x": "1"}})
 
 
 def test_hash_ignores_case_id(schema):
