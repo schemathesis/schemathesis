@@ -284,7 +284,8 @@ def _discriminator_failure(
     if not isinstance(discriminator, dict):
         return None
     property_name = discriminator.get("propertyName")
-    if not property_name:
+    # Unknown values fall back to the `defaultMapping` schema, which the body is already validated against
+    if not property_name or "defaultMapping" in discriminator:
         return None
     value = data.get(property_name)
     if not isinstance(value, str):
