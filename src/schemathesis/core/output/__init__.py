@@ -22,6 +22,11 @@ def escape_surrogates(text: str) -> str:
     return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
+def escape_nonprintable(text: str) -> str:
+    # Escapes control characters like `repr` does, but keeps backslashes single.
+    return "".join(char if char.isprintable() else repr(char)[1:-1] for char in text)
+
+
 def truncate_json(data: Any, *, config: OutputConfig, max_lines: int | None = None) -> str:
     # Convert JSON to string with indentation
     indent = 4

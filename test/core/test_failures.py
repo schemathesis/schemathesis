@@ -39,9 +39,10 @@ def test_failure_repr_shows_its_fields():
     ("status_line", "expected"),
     [
         (None, "\n- ST101 Server error\n\n[500] Internal Server Error:\n\n    <EMPTY>"),
-        ("CUSTOM: went wrong", "\n- ST101 Server error\n\nCUSTOM: went wrong:\n\n    <EMPTY>"),
+        ("CUSTOM: upgrade your client.", "\n- ST101 Server error\n\nCUSTOM: upgrade your client.\n\n    <EMPTY>"),
+        ("CUSTOM: file\x00exists", "\n- ST101 Server error\n\nCUSTOM: file\\x00exists\n\n    <EMPTY>"),
     ],
-    ids=["default", "custom"],
+    ids=["default", "custom", "control-characters"],
 )
 def test_status_line_from_response(response_factory, status_line, expected):
     response = response_factory.core(status_code=500, content=b"", content_type=None, status_line=status_line)

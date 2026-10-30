@@ -76,9 +76,12 @@ class ApiStatistic:
     resource_pool: ResourcePoolInventory
     # Filter expressions the user wrote that no operation in the schema matched.
     unmatched_filters: list[UnmatchedFilter]
+    # Why nothing is selected when every selected operation is one the specification cannot test.
+    unsupported_selection: str | None
 
     def __init__(self) -> None:
         self.operations = FilteredCount()
         self.transitions = FilteredCount()
         self.resource_pool = ResourcePoolInventory()
         self.unmatched_filters = []
+        self.unsupported_selection = None

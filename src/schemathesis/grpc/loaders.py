@@ -126,6 +126,10 @@ def from_url(
     return loaded
 
 
+# How the gRPC runtime reports a failed TLS handshake or certificate check.
+TLS_FAILURE_MARKERS = ("Tls handshake failed", "verification check failed")
+
+
 def _reflection_error(error: grpc.Call, url: str, address: str) -> LoaderError:
     import grpc
 
@@ -137,7 +141,11 @@ def _reflection_error(error: grpc.Call, url: str, address: str) -> LoaderError:
             f"and run `schemathesis run api.binpb --url {url}`",
         )
     if code == grpc.StatusCode.UNAVAILABLE:
-        return LoaderError(LoaderErrorKind.CONNECTION_OTHER, f"Failed to connect to {address}: {error.details()}")
+        details = error.details()
+        # Waiting does not fix a rejected certificate or a server without TLS, so these get no retry advice.
+        if any(marker in details for marker in TLS_FAILURE_MARKERS):
+            return LoaderError(LoaderErrorKind.INVALID_CERTIFICATE, f"TLS handshake with {address} failed: {details}")
+        return LoaderError(LoaderErrorKind.CONNECTION_OTHER, f"Failed to connect to {address}: {details}")
     return LoaderError(LoaderErrorKind.UNCLASSIFIED, f"Reflection failed with {code.name}: {error.details()}")
 
 

@@ -58,7 +58,7 @@ class SentRequest:
 class ServerMonitor:
     """Tracks recently sent requests, to tell a dead server from a single refused request."""
 
-    __slots__ = ("_recent", "_lock", "_confirmation_lock", "_message", "_confirmed_by", "_health")
+    __slots__ = ("_recent", "_lock", "_confirmation_lock", "_message", "_recordable", "_confirmed_by", "_health")
 
     def __init__(self, health: HealthState | None = None) -> None:
         self._health = health if health is not None else HealthState()
@@ -67,6 +67,7 @@ class ServerMonitor:
         self._lock = threading.Lock()
         self._confirmation_lock = threading.Lock()
         self._message: str | None = None
+        self._recordable = True
         self._confirmed_by: requests.ConnectionError | None = None
 
     def track(self, case: Case, send: Callable[[], Response], *, transport_kwargs: dict[str, Any]) -> Response:
@@ -151,6 +152,8 @@ class ServerMonitor:
             # Behind a proxy every request after the outage is reset too; the first of them is the one to show.
             first_reset = [item for item in recent if item.reached_server and not item.answered][:1]
             self._message = _render_outage(url, (in_flight + first_reset + answered)[:REPORTED_REQUESTS])
+            # HAR reports record only HTTP requests.
+            self._recordable = urlsplit(url).scheme in ("http", "https")
             self._confirmed_by = exc
         return True
 
@@ -167,7 +170,10 @@ class ServerMonitor:
         if self._message is None:
             return None
         return events.NonFatalError(
-            error=ServerUnavailable(self._message), phase=phase, label=SERVER_LABEL, related_to_operation=False
+            error=ServerUnavailable(self._message, recordable=self._recordable),
+            phase=phase,
+            label=SERVER_LABEL,
+            related_to_operation=False,
         )
 
 

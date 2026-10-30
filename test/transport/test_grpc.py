@@ -69,7 +69,7 @@ def test_malformed_ok_body_is_reported_as_binary(ctx):
         "- ST117 Response does not decode as the declared message\n\n"
         "    Cannot decode the response as `pkg.User`: Error parsing message with type 'pkg.User': "
         "Wire format was corrupt\n\n"
-        "OK:\n\n"
+        "OK\n\n"
         "    <BINARY>\n\n"
     )
 

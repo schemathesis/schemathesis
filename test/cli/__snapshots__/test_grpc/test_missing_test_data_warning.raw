@@ -16,7 +16,7 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
-Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+Missing test data: 1 operation repeatedly returned NOT_FOUND, preventing tests from reaching your API's core logic
 
   - pkg.Users/GetUser
 
@@ -35,7 +35,7 @@ Test Phases:
   ⏭  Stateful (not supported)
 
 Warnings:
-  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing test data: 1 operation repeatedly returned NOT_FOUND responses
 
 Test cases:
   N generated, N passed

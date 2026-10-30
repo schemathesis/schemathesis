@@ -245,17 +245,23 @@ class GrpcSchema(BaseSchema):
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
         usage = FilterUsage(self.filter_set) if not self.filter_set.is_empty() else None
+        streaming_selected = False
         for service in self.services.values():
             for method in service.methods:
                 statistic.operations.total += 1
                 operation = self._build_operation(method)
-                if is_unary(method) and not self._should_skip(operation):
-                    statistic.operations.selected += 1
+                if not self._should_skip(operation):
+                    if is_unary(method):
+                        statistic.operations.selected += 1
+                    else:
+                        streaming_selected = True
                 # A filter naming a streaming method matched something, even though it is not tested.
                 if usage is not None:
                     usage.record(OperationContext(operation=operation))
         if usage is not None:
             statistic.unmatched_filters = usage.results()
+        if streaming_selected and statistic.operations.selected == 0:
+            statistic.unsupported_selection = "Only streaming methods are selected; streaming is not supported"
         return statistic
 
     @override
