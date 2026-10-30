@@ -2638,6 +2638,24 @@ def test_graphql_data_mismatch(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.parametrize("app", ["generic_id_pool", "non_id_pool"], ids=["id-handles", "non-id-handles"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_graphql_stateful_unique_inputs(ctx, cli, snapshot_cli, app):
+    # Scenarios repeat inputs that already passed; those steps are skipped, not crashed on.
+    api = getattr(ctx.graphql.apps, app)()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--phases=stateful",
+            "--max-examples=20",
+            "--mode=positive",
+            "--generation-unique-inputs",
+            "--seed=1",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, cli, location, snapshot_cli):
     # When an Open API 3 parameter is missing `schema` & `content`

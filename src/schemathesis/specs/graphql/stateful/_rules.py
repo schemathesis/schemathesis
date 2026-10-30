@@ -270,6 +270,8 @@ def _make_producer_rule(
             )
         )
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
+        if output is None:
+            return multiple()
         values = [
             value
             for _field, value in iter_handle_values(
@@ -362,6 +364,8 @@ def _make_handle_producer_rule(
             )
         )
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
+        if output is None:
+            return multiple()
         values = [
             value
             for _field, value in iter_handle_values(
