@@ -32,7 +32,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ✅ Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Warnings:
   ⚠️ Not served: 1 operation returned only not-served statuses

@@ -4,35 +4,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from hypothesis.stateful import Bundle, RuleBasedStateMachine
+from hypothesis.stateful import Bundle
 
 from schemathesis.core.errors import NoProducers
-from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.case import Case
-from schemathesis.generation.stateful.control import TransitionController
-from schemathesis.generation.stateful.state_machine import (
-    APIStateMachine,
-    RecordingStateMachine,
-    StepInput,
-    StepOutput,
-    Transition,
-)
+from schemathesis.generation.stateful.state_machine import BundleStateMachine
 from schemathesis.specs.graphql.handles import Handle, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.stateful._rules import generate_rules_for
 
 if TYPE_CHECKING:
     from schemathesis.specs.graphql.schemas import GraphQLSchema
-    from schemathesis.specs.graphql.stateful._transitions import GraphQLTransitions
 
 
-class GraphQLStateMachine(RecordingStateMachine):
+class GraphQLStateMachine(BundleStateMachine):
     """State machine for GraphQL stateful testing built around producer/consumer chains."""
 
     schema: GraphQLSchema  # set on the dynamically-built subclass
-    _transitions: ClassVar[GraphQLTransitions]
     # Names of `@rule` methods that populate a bundle. Empty -> stateful testing has nothing to do.
     _producer_rule_names: ClassVar[frozenset[str]] = frozenset()
-    _root_labels: ClassVar[frozenset[str]] = frozenset()
 
     def __init__(self) -> None:
         if not type(self)._producer_rule_names:
@@ -42,48 +30,7 @@ class GraphQLStateMachine(RecordingStateMachine):
             )
         self._id_origins: dict[tuple[Handle, str], str] = {}
         self._deleted_id_origins: dict[tuple[Handle, str], str] = {}
-        self.control = TransitionController(self._transitions, self._root_labels)
         super().__init__()
-
-    def _add_result_to_targets(self, targets: tuple[str, ...], result: Any) -> None:
-        # Hypothesis <=6.131.15 only; newer versions call `_add_results_to_targets`.
-        RuleBasedStateMachine._add_result_to_targets(self, targets, result)  # type: ignore[attr-defined]
-
-    def _add_results_to_targets(self, targets: tuple[str, ...], results: list[Any]) -> None:
-        # Private Hypothesis method without annotations.
-        RuleBasedStateMachine._add_results_to_targets(self, targets, results)  # type: ignore[no-untyped-call]
-
-    def _run_case(
-        self,
-        case: Case,
-        *,
-        rule_name: str,
-        parent_id: str | None,
-        applied_parameters: list[tuple[ParameterLocation, str | None]] | None,
-    ) -> StepOutput | None:
-        """Send `case` as one step; `None` when an identical input already passed and the step is skipped."""
-        __tracebackhide__ = True
-        if parent_id is not None:
-            transition: Transition | None = Transition(
-                id=rule_name,
-                parent_id=parent_id,
-                is_inferred=False,
-                parameters={},
-                request_body=None,
-            )
-            applied = applied_parameters or []
-            step_input = StepInput(case=case, transition=transition, applied_parameters=applied)
-        else:
-            transition = None
-            step_input = StepInput.initial(case)
-        self.recorder.record_case(
-            parent_id=parent_id,
-            case=case,
-            transition=transition,
-            is_transition_applied=bool(applied_parameters),
-        )
-        self.control.record_step(step_input, self.recorder)
-        return APIStateMachine._step(self, input=step_input)
 
 
 def create_state_machine(schema: GraphQLSchema) -> type[GraphQLStateMachine]:

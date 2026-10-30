@@ -236,3 +236,12 @@ def test_methods_with_side_effects_run_last(ctx, cli, tmp_path):
         {"Alarm", "Listen"},
         {"DeleteItem", "SetConfig"},
     ]
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_reaches_created_names_and_page_tokens(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.library()
+    assert (
+        cli.run(server.target, "--phases=fuzzing,stateful", "--max-examples=10", "--seed=1", "--warnings=off")
+        == snapshot_cli
+    )

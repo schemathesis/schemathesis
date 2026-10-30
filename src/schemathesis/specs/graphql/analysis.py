@@ -7,13 +7,10 @@ from typing import TYPE_CHECKING
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.stateful._discovery import discover_handles
 from schemathesis.specs.graphql.stateful._rules import iter_operation_summaries
-from schemathesis.specs.graphql.stateful._transitions import (
-    GraphQLTransitions,
-    build_transitions,
-    count_inferred_transitions,
-)
+from schemathesis.specs.graphql.stateful._transitions import build_transitions, count_inferred_transitions
 
 if TYPE_CHECKING:
+    from schemathesis.generation.stateful.control import BundleTransitions
     from schemathesis.specs.graphql.schemas import GraphQLSchema
     from schemathesis.specs.graphql.stateful._rules import _OperationSummary
 
@@ -35,7 +32,7 @@ class GraphQLAnalysis:
         self._handles: set[Handle] | None = None
         self._schema_index: SchemaIndex | None = None
         self._summaries: list[_OperationSummary] | None = None
-        self._transitions: GraphQLTransitions | None = None
+        self._transitions: BundleTransitions | None = None
         self._transition_count: int | None = None
 
     @property
@@ -59,7 +56,7 @@ class GraphQLAnalysis:
         return self._summaries
 
     @property
-    def transitions(self) -> GraphQLTransitions:
+    def transitions(self) -> BundleTransitions:
         """Producer-to-consumer transition graph used by the state machine controller."""
         if self._transitions is None:
             self._transitions = build_transitions(self.summaries, self.handles, self.schema_index)

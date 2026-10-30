@@ -38,7 +38,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   🚫 Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Errors:
   🚫 Network Error: 1

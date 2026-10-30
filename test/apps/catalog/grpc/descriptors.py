@@ -95,6 +95,35 @@ def users_descriptor_set() -> bytes:
     return descriptor_pb2.FileDescriptorSet(file=[timestamp, users, operations, any_file]).SerializeToString()
 
 
+def library_descriptor_set() -> bytes:
+    library = descriptor_pb2.FileDescriptorProto(name="library.proto", package="library", syntax="proto3")
+    book = library.message_type.add(name="Book")
+    _field(book, "name", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(book, "title", 2, FieldDescriptorProto.TYPE_STRING)
+    _field(library.message_type.add(name="CreateBookRequest"), "title", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(library.message_type.add(name="GetBookRequest"), "name", 1, FieldDescriptorProto.TYPE_STRING)
+    request = library.message_type.add(name="ListBooksRequest")
+    _field(request, "page_size", 1, FieldDescriptorProto.TYPE_INT32)
+    _field(request, "page_token", 2, FieldDescriptorProto.TYPE_STRING)
+    response = library.message_type.add(name="ListBooksResponse")
+    _field(
+        response,
+        "books",
+        1,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".library.Book",
+        label=FieldDescriptorProto.LABEL_REPEATED,
+    )
+    _field(response, "next_page_token", 2, FieldDescriptorProto.TYPE_STRING)
+    service = library.service.add(name="Library")
+    service.method.add(name="CreateBook", input_type=".library.CreateBookRequest", output_type=".library.Book")
+    service.method.add(name="GetBook", input_type=".library.GetBookRequest", output_type=".library.Book")
+    service.method.add(
+        name="ListBooks", input_type=".library.ListBooksRequest", output_type=".library.ListBooksResponse"
+    )
+    return descriptor_pb2.FileDescriptorSet(file=[library]).SerializeToString()
+
+
 def side_effects_descriptor_set() -> bytes:
     empty = descriptor_pb2.FileDescriptorProto()
     empty_pb2.DESCRIPTOR.CopyToProto(empty)

@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from schemathesis.openapi.loaders import OpenApiSchema
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLSchema
-    from test.apps.catalog.grpc.users import GrpcServer
+    from test.apps.catalog.grpc.users import GrpcApp, GrpcServer
 
 
 @overload
@@ -604,9 +604,16 @@ class GrpcApps:
         return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
 
     def side_effects(self) -> GrpcServer:
-        from test.apps.catalog.grpc import users as grpc_users
+        from test.apps.catalog.grpc.users import side_effects
 
-        app = grpc_users.side_effects()
+        return self._serve(side_effects())
+
+    def library(self) -> GrpcServer:
+        from test.apps.catalog.grpc.users import library
+
+        return self._serve(library())
+
+    def _serve(self, app: GrpcApp) -> GrpcServer:
         self.parent.request.addfinalizer(lambda: app.server.stop(None))
         return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
 

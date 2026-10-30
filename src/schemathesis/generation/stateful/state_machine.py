@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Container
 from dataclasses import dataclass
 from random import Random
 from typing import TYPE_CHECKING, Any, ClassVar, Final
@@ -23,6 +23,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
+from schemathesis.generation.stateful.control import TransitionController
 
 StatefulSchemaMark = Mark["BaseSchema"](attr_name="stateful_schema")
 StatefulCallbackMark = Mark[Callable | None](attr_name="stateful_callback")
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
 
     from schemathesis.checks import CheckResult
     from schemathesis.core.parameters import ContainerName
+    from schemathesis.generation.stateful.control import BundleTransitions
     from schemathesis.hooks import HookContext
     from schemathesis.schemas import BaseSchema
 
@@ -159,6 +161,16 @@ class StepOutput:
 
 def normalize_name(name: str) -> str:
     return re.sub(r"\W|^(?=\d)", "_", name).replace("__", "_")
+
+
+def unique_rule_name(name: str, taken: Container[str]) -> str:
+    """Operations differing only in punctuation (`/users` vs `/users/`) normalize alike; keep them separate rules."""
+    if name not in taken:
+        return name
+    suffix = 2
+    while f"{name}_{suffix}" in taken:
+        suffix += 1
+    return f"{name}_{suffix}"
 
 
 class _ValidRuleFallbackFlags:
@@ -486,3 +498,55 @@ class RecordingStateMachine(APIStateMachine):
             transport_kwargs=kwargs or None,
             recorder=self.recorder,
         )
+
+
+class BundleStateMachine(RecordingStateMachine):
+    """State machine whose rules pass values from earlier responses to later requests through Hypothesis bundles."""
+
+    _transitions: ClassVar[BundleTransitions]
+    # Labels of operations whose rules start a chain without data from earlier steps.
+    _root_labels: ClassVar[frozenset[str]] = frozenset()
+
+    def __init__(self) -> None:
+        self.control = TransitionController(self._transitions, self._root_labels)
+        super().__init__()
+
+    def _add_result_to_targets(self, targets: tuple[str, ...], result: Any) -> None:  # pragma: no cover
+        # Hypothesis <=6.131.15 only; newer versions call `_add_results_to_targets`.
+        RuleBasedStateMachine._add_result_to_targets(self, targets, result)  # type: ignore[attr-defined]
+
+    def _add_results_to_targets(self, targets: tuple[str, ...], results: list[Any]) -> None:
+        # Private Hypothesis method without annotations.
+        RuleBasedStateMachine._add_results_to_targets(self, targets, results)  # type: ignore[no-untyped-call]
+
+    def _run_case(
+        self,
+        case: Case,
+        *,
+        rule_name: str,
+        parent_id: str | None,
+        applied_parameters: list[tuple[ParameterLocation, str | None]] | None,
+    ) -> StepOutput | None:
+        """Send `case` as one step; `None` when an identical input already passed and the step is skipped."""
+        __tracebackhide__ = True
+        if parent_id is not None:
+            transition: Transition | None = Transition(
+                id=rule_name,
+                parent_id=parent_id,
+                is_inferred=False,
+                parameters={},
+                request_body=None,
+            )
+            applied = applied_parameters or []
+            step_input = StepInput(case=case, transition=transition, applied_parameters=applied)
+        else:
+            transition = None
+            step_input = StepInput.initial(case)
+        self.recorder.record_case(
+            parent_id=parent_id,
+            case=case,
+            transition=transition,
+            is_transition_applied=bool(applied_parameters),
+        )
+        self.control.record_step(step_input, self.recorder)
+        return APIStateMachine._step(self, input=step_input)

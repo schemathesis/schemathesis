@@ -33,7 +33,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ✅ Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Warnings:
   ⚠️ Authentication failed: 1 operation returned only UNAUTHENTICATED/PERMISSION_DENIED responses

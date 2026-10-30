@@ -44,7 +44,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ❌ Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Failures:
   ❌ ST401 API accepts requests without authentication: 1

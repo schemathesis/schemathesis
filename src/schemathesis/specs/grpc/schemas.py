@@ -23,7 +23,7 @@ from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import InvalidSchema, OperationNotFound, not_found_message
 from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.result import Ok, Result
-from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.core.warnings import SchemathesisWarning
@@ -44,7 +44,8 @@ from schemathesis.openapi.checks import AuthScenario, IgnoredAuth
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc.converter import message_schema
 from schemathesis.specs.grpc.formats import grpc_formats
-from schemathesis.specs.grpc.status import GRPC_STATUSES
+from schemathesis.specs.grpc.stateful import create_state_machine, infer_links
+from schemathesis.specs.grpc.status import GRPC_STATUSES, grpc_status, starts_with_verb
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.link_calibration import LinkCalibrationState
+    from schemathesis.engine.observations import Observations
     from schemathesis.filters import FilterSet
     from schemathesis.generation.case import Case
     from schemathesis.generation.coverage import GenerationSession
@@ -118,20 +120,11 @@ def side_effect_rank(method: MethodDescriptor) -> int:
         return 0
     if level == descriptor_pb2.MethodOptions.IDEMPOTENT:
         return 2
-    if _starts_with_verb(method.name, READ_VERBS):
+    if starts_with_verb(method.name, READ_VERBS):
         return 0
-    if _starts_with_verb(method.name, WRITE_VERBS):
+    if starts_with_verb(method.name, WRITE_VERBS):
         return 2
     return 1
-
-
-def _starts_with_verb(name: str, verbs: tuple[str, ...]) -> bool:
-    for verb in verbs:
-        rest = name.removeprefix(verb)
-        # `Listen` does not start with `List`: the verb must end where the next word starts.
-        if rest != name and (not rest or rest[0].isupper()):
-            return True
-    return False
 
 
 @dataclass(eq=False, repr=False)
@@ -255,15 +248,15 @@ class GrpcSchema(BaseSchema):
 
     @override
     def status_name(self, response: Response) -> str | None:
-        return GRPC_STATUSES[_grpc_status(response)][0]
+        return GRPC_STATUSES[grpc_status(response)][0]
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
-        return GRPC_STATUSES[_grpc_status(response)][2]
+        return GRPC_STATUSES[grpc_status(response)][2]
 
     @override
     def validate_response(self, operation: APIOperation, response: Response, *, case: Case | None = None) -> None:
-        if _grpc_status(response) == 0:
+        if grpc_status(response) == 0:
             output_type = operation.definition.raw.output_type
             decoded = _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
             # A descriptor set can lag behind the server; reflection describes what the server runs.
@@ -281,7 +274,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        if _grpc_status(response) != 0 or AUTH_METADATA not in response.request.headers:
+        if grpc_status(response) != 0 or AUTH_METADATA not in response.request.headers:
             return True
         label = case.operation.label
         enforced = ctx.auth_enforced_operations
@@ -302,7 +295,7 @@ class GrpcSchema(BaseSchema):
         probe_response = self.transport.send(probe, **kwargs)
         ctx.internals.record_response(case_id=probe.id, response=probe_response)
         # Without declared security, other errors may come from the anonymous caller's data, not from ignored auth.
-        if _grpc_status(probe_response) == 0:
+        if grpc_status(probe_response) == 0:
             raise IgnoredAuth(
                 operation=label,
                 message=f"Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `{label}`",
@@ -372,12 +365,16 @@ class GrpcSchema(BaseSchema):
             yield Ok(operation)
 
     def _iter_operations(self) -> Iterator[APIOperation]:
+        for operation in self._iter_all_operations():
+            if not self._should_skip(operation):
+                yield operation
+
+    def _iter_all_operations(self) -> Iterator[APIOperation]:
+        """Unary methods, filters aside."""
         for service in self.services.values():
             for method in service.methods:
                 if is_unary(method):
-                    operation = self._build_operation(method)
-                    if not self._should_skip(operation):
-                        yield operation
+                    yield self._build_operation(method)
 
     def _build_operation(self, method: MethodDescriptor) -> APIOperation:
         label = f"{method.containing_service.full_name}/{method.name}"
@@ -456,7 +453,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
-        raise NotImplementedError
+        return create_state_machine(self)
 
     @override
     def build_state_machine(
@@ -465,7 +462,13 @@ class GrpcSchema(BaseSchema):
         feedback: FeedbackSources,
         link_calibration: LinkCalibrationState | None,
     ) -> type[APIStateMachine]:
-        raise NotImplementedError
+        # Links come from method and field names, so runtime feedback has nothing to adjust.
+        return self.as_state_machine()
+
+    @override
+    def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
+        count = len(infer_links(self._iter_operations()))
+        return StatefulInference(inferred=count, total=count, selected=count)
 
     @override
     def create_extra_data_source(self) -> None:
@@ -532,10 +535,6 @@ def _grpcurl_json(value: object, message_type: Descriptor) -> object:
         else:
             rendered[key] = _grpcurl_json(item, nested)
     return rendered
-
-
-def _grpc_status(response: Response) -> int:
-    return int(response.headers["grpc-status"][0])
 
 
 def _decode(
