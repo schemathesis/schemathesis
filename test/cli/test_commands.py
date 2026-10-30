@@ -678,6 +678,29 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_max_time_cuts_request_hanging_mid_body(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/hanging": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    release = threading.Event()
+
+    @app.route("/hanging")
+    def hanging():
+        def body():
+            yield b"{"
+            release.wait()
+            yield b"}"
+
+        return Response(body(), content_type="application/json")
+
+    try:
+        result = cli.run_openapi_app(
+            app, "--max-time=1", "--request-timeout=30", "--phases=fuzzing", "--checks=not_a_server_error"
+        )
+    finally:
+        release.set()
+    assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_max_time_reports_unreached_operations(ctx, cli, snapshot_cli):
     operation = {
         "get": {
