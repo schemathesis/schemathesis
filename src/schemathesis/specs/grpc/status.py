@@ -34,8 +34,9 @@ GRPC_STATUSES: dict[int, tuple[str, int, CallOutcome]] = {
 INTERNAL = 13
 
 # How gRPC servers start the INTERNAL message they send when a request does not decode, before any handler runs.
-# Client libraries word a response that does not decode differently, so a handler passing one on does not match.
+# Go clients word a response that does not decode the same way, so a handler passing one on is reported here too.
 LIBRARY_DECODE_ERRORS = (
+    "grpc: failed to unmarshal the received message",
     "grpc: error unmarshalling request",
     "Exception deserializing request!",
     "Error deserializing request: ",
