@@ -275,6 +275,7 @@ def _load_schema(ctx: click.Context, location: str) -> BaseSchema | None:
 
 def _find_by_case_id(ctx: click.Context, case_id: str) -> tuple[Path, list[Path]] | None:
     # One case that failed several checks is stored as one file per check, all sharing this case_id.
+    # A later run that records the same failure keeps earlier case IDs as aliases.
     for crashes_dir in _all_crash_dirs(ctx):
         matches = []
         for crash_path in _crash_files_in(crashes_dir):
@@ -282,7 +283,7 @@ def _find_by_case_id(ctx: click.Context, case_id: str) -> tuple[Path, list[Path]
                 data = json.loads(crash_path.read_text())
             except (json.JSONDecodeError, OSError):
                 continue
-            if isinstance(data, dict) and data.get("case_id") == case_id:
+            if isinstance(data, dict) and (data.get("case_id") == case_id or case_id in data.get("aliases", [])):
                 matches.append(crash_path)
         if matches:
             return crashes_dir, matches

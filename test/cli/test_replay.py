@@ -414,6 +414,44 @@ def test_replay_by_case_id_removes_fixed_crash(cli, app_runner, ctx, crash_facto
     assert not crash_file.exists()
 
 
+def test_replay_by_case_id_from_earlier_run_of_same_failure(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.failure()
+    case_ids = [
+        re.search(r"st replay (\S+)", cli.run(api.schema_url, "--max-examples=1", "--phases=fuzzing").stdout).group(1)
+        for _ in range(2)
+    ]
+    [crash_file] = _list_crash_files(crash_cache_dir(tmp_path))
+    crash = json.loads(crash_file.read_text())
+
+    result = cli.main("replay", case_ids[0], "--keep")
+
+    assert (crash["case_id"], crash["aliases"]) == (case_ids[1], [case_ids[0]])
+    assert (result.exit_code, re.findall(r"Test Case ID: (\S+)", result.stdout)) == (1, [case_ids[1]]), result.output
+
+
+def test_replay_by_case_id_without_aliases(cli, app_runner, ctx, crash_factory, tmp_path):
+    schema_url, base = _users_app(ctx, app_runner)
+    crash_dir = crash_cache_dir(tmp_path)
+    crash_dir.mkdir(parents=True, exist_ok=True)
+    crash_file = _write_crash(
+        crash_dir,
+        crash_factory,
+        url=f"{base}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "was broken"}',
+        case_id="Old456",
+    )
+    data = json.loads(crash_file.read_text())
+    del data["aliases"]
+    crash_file.write_text(json.dumps(data))
+
+    result = cli.main("replay", "Old456")
+
+    assert (result.exit_code, crash_file.exists()) == (0, False), result.output
+
+
 def test_replay_applies_per_operation_headers(cli, app_runner, ctx, crash_factory, tmp_path):
     received = []
 

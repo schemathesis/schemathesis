@@ -51,6 +51,7 @@
 - Token fetch cooldown failure reported twice in stateful testing.
 - Configured `proxy` skipped by dynamic auth token requests, WFC login and loading schemas from URLs.
 - Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
+- `st replay` not finding a case ID after a later run records the same failure.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 

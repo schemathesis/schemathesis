@@ -14,7 +14,7 @@ Schemathesis records every failing case to disk during a run. `st replay` re-sen
 
 When `st run` or `st fuzz` finds a failing case, it writes that case to a crash file under the project cache directory - `.schemathesis/<project-slug>/cache/crashes/` by default, where the slug is `default` unless your config names the project. Set `cache.directory` in `schemathesis.toml` to move it. No flag turns recording on.
 
-A single case that broke several checks becomes one crash file per check, all sharing the same case ID. Each crash also stores the schema location and base URL from the run, so replay can reload the schema on its own. Crash files for operations that pass on a later run are removed.
+A single case that broke several checks becomes one crash file per check, all sharing the same case ID. A later run that finds the same failure replaces the file with its own case; `st replay` still accepts case IDs from up to 20 earlier runs. Each crash also stores the schema location and base URL from the run, so replay can reload the schema on its own. Crash files for operations that pass on a later run are removed.
 
 !!! tip "Add it to `.gitignore`"
     Crash files live alongside the rest of the per-project cache. Ignore `.schemathesis/` unless you deliberately want to share captured failures.
@@ -221,6 +221,6 @@ When a run has both kinds of problems, `1` wins over `2`.
 
 **`No crash files found.`**: `st replay` looks in the cache directory relative to the current directory. Change to the directory where you ran `st run`, or pass the crash directory as an argument.
 
-**`Error: no crash file found for case ID: ...`**: The crash was fixed and removed by an earlier replay or run, or you are in a different directory.
+**`Error: no crash file found for case ID: ...`**: The crash was fixed and removed by an earlier replay or run, more than 20 later runs recorded the same failure, or you are in a different directory.
 
 **`Error: cannot replay without a schema. Pass --schema-location <url-or-path>.`**: The crash directory has no recorded schema location, for example after copying only the crash files. Pass `--schema-location`.
