@@ -53,19 +53,14 @@ def get_all_tests(
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
-            try:
-                test = build_operation_test(
-                    config=schema.config,
-                    operation=operation,
-                    test_func=test_func,
-                    explicit_settings=settings,
-                    given_kwargs=given_kwargs or {},
-                    feedback=feedback,
-                )
-            except InvalidSchema as exc:
-                # Coverage cases are built with the test, so a malformed definition surfaces here.
-                yield Err(exc)
-                continue
+            test = build_operation_test(
+                config=schema.config,
+                operation=operation,
+                test_func=test_func,
+                explicit_settings=settings,
+                given_kwargs=given_kwargs or {},
+                feedback=feedback,
+            )
             yield Ok((operation, test))
             for schema_error in operation.schema_errors:
                 yield Err(schema_error)

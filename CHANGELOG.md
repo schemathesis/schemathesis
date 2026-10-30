@@ -8,6 +8,10 @@
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
 - Fuzzing unary gRPC methods through server reflection or descriptor sets.
 
+### :racing_car: Performance
+
+- Faster pytest collection with lower memory: coverage phase cases are built when a test runs.
+
 ### :wrench: Changed
 
 - WFC reports declare report schema version `0.10.0`, from WFC 0.13.0.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import wraps
@@ -388,13 +388,50 @@ def add_coverage(
         feedback=feedback,
         hooks=hooks,
     )
-    # Hypothesis runs explicit examples in reverse order of attachment.
-    for case in content_type_probes_first(generator):
-        test = hypothesis.example(case=case)(test)
-    unserializable = generator.controller.unserializable_media_types
-    if unserializable:
-        UnserializablePayloadMark.set(test, sorted(unserializable))
+
+    def generate() -> list:
+        # Only carries the attached examples; Hypothesis never calls it.
+        def collector() -> None:
+            raise NotImplementedError
+
+        # Hypothesis runs explicit examples in reverse order of attachment.
+        for case in content_type_probes_first(generator):
+            hypothesis.example(case=case)(collector)
+        unserializable = generator.controller.unserializable_media_types
+        if unserializable:
+            UnserializablePayloadMark.set(test, sorted(unserializable))
+        return getattr(collector, "hypothesis_explicit_examples", [])
+
+    # Collecting a test must stay cheap: pytest builds every test up front, including skipped ones.
+    test.hypothesis_explicit_examples = _DeferredExamples(  # type: ignore[attr-defined]
+        getattr(test, "hypothesis_explicit_examples", ()), generate
+    )
     return test
+
+
+class _DeferredExamples:
+    """Explicit examples whose tail is generated on first read.
+
+    Hypothesis only reverses this sequence and checks whether it is empty.
+    """
+
+    __slots__ = ("_examples", "_generate")
+
+    def __init__(self, examples: Iterable, generate: Callable[[], list]) -> None:
+        self._examples = list(examples)
+        self._generate: Callable[[], list] | None = generate
+
+    def _materialized(self) -> list:
+        if self._generate is not None:
+            generate, self._generate = self._generate, None
+            self._examples.extend(generate())
+        return self._examples
+
+    def __reversed__(self) -> Iterator:
+        return reversed(self._materialized())
+
+    def __len__(self) -> int:
+        return len(self._materialized())
 
 
 UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")
