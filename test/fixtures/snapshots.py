@@ -126,9 +126,10 @@ class CliSnapshotConfig:
             (self.replace_duration, _mask_durations),
             (self.remove_last_line, _drop_last_line),
             (self.replace_test_case_id, _mask_test_case_ids),
+            # A seed can be 32 decimal digits, which also reads as a hex UUID.
+            (self.replace_seed, _mask_seed),
             (self.replace_uuid, _mask_uuids),
             (self.replace_response_time, _mask_slow_response_time),
-            (self.replace_seed, _mask_seed),
             (True, _mask_random_values),
             (self.replace_invalid_component, _mask_invalid_component),
             (self.replace_reproduce_with, _mask_reproduce_commands),
