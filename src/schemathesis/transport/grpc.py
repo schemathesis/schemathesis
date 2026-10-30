@@ -37,6 +37,8 @@ class GrpcTransport(BaseTransport["requests.Session"]):
     def __init__(self) -> None:
         super().__init__()
         self._channels: dict[ChannelKey, grpc.Channel] = {}
+        # Channels the server answered on; a call dropped on any other one cannot be shown to have reached it.
+        self._answered: set[grpc.Channel] = set()
         self._lock = threading.Lock()
         # Coverage cases go out only in media types the transport can encode.
         self.serializer(MEDIA_TYPE)(serialize_message)
@@ -88,10 +90,17 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             if code == grpc.StatusCode.DEADLINE_EXCEEDED:
                 timed_out = TimeoutError(f"{base_url}: Read timed out. (read timeout={timeout})")
                 raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
-            if code == grpc.StatusCode.UNAVAILABLE and not _is_ready(channel):
+            if code == grpc.StatusCode.UNAVAILABLE and not _is_reachable(address, tls, verify, cert):
+                details = outcome.details() or ""
+                # Once the server has answered, a call that did not fail on reconnecting reached it and may be
+                # what brought it down; gRPC's own message is the only sign of a call retried on a new connection.
+                if channel in self._answered and "failed to connect" not in details.lower():
+                    aborted = ConnectionAbortedError(f"Connection aborted. {details}")
+                    raise requests.exceptions.ConnectionError(aborted, request=request) from aborted
                 refused = ConnectionRefusedError(f"Failed to connect to {base_url}")
                 raise requests.exceptions.ConnectionError(refused, request=request) from refused
             content = b""
+        self._answered.add(channel)
         elapsed = started_at.elapsed
         code = outcome.code()
         details = outcome.details() or ""
@@ -177,6 +186,12 @@ def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc
     else:
         certificate_chain, private_key = Path(cert[0]).read_bytes(), Path(cert[1]).read_bytes()
     return grpc.ssl_channel_credentials(root_certificates, private_key, certificate_chain)
+
+
+def _is_reachable(address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> bool:
+    # A fresh channel, since the one a dropped call used may still look connected for a moment afterwards.
+    with create_channel(address, tls, verify, cert) as channel:
+        return _is_ready(channel)
 
 
 def _is_ready(channel: grpc.Channel) -> bool:

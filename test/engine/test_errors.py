@@ -19,7 +19,7 @@ from schemathesis.core.errors import (
     UnboundPrefix,
 )
 from schemathesis.engine import Status, events
-from schemathesis.engine.errors import EngineErrorInfo, deduplicate_errors
+from schemathesis.engine.errors import EngineErrorInfo, deduplicate_errors, is_unrecoverable_network_error
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
 from test.utils import EventStream
@@ -406,3 +406,10 @@ def test_xml_prefix_without_namespace_reports_serialization_error(ctx):
     assert [(type(event.value), event.info.title) for event in errors] == [(UnboundPrefix, "XML serialization error")]
     assert str(errors[0].value).startswith("Unbound prefix: `x`. You need to define this namespace")
     assert statuses == [Status.ERROR]
+
+
+@pytest.mark.parametrize("cause", [ConnectionAbortedError, ConnectionResetError])
+def test_connection_dropped_by_the_peer_is_unrecoverable_whatever_its_message(cause):
+    exc = requests.ConnectionError("Stream removed")
+    exc.__cause__ = cause("Socket closed")
+    assert is_unrecoverable_network_error(exc)

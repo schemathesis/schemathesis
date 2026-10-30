@@ -16,7 +16,12 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import CallOutcome
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
-from test.apps.catalog.grpc.descriptors import accounts_descriptor_set, all_types_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import (
+    accounts_descriptor_set,
+    all_types_descriptor_set,
+    users_descriptor_set,
+    write_descriptor_set,
+)
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -151,9 +156,15 @@ def test_stopped_server_raises_connection_error(ctx):
     with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
         operation.Case(body={}).call()
     assert isinstance(exc_info.value.__cause__, ConnectionRefusedError)
-    # The connectivity check stops watching the channel, so an outage does not pile up reconnecting watchers.
-    (channel,) = operation.schema.get_transport(None)._channels.values()
-    assert channel._connectivity_state.callbacks_and_connectivities == []
+
+
+def test_unresolvable_host_raises_connection_refused(tmp_path):
+    path = write_descriptor_set(tmp_path, users_descriptor_set())
+    config = SchemathesisConfig.from_dict({"base-url": "grpc://nonexistent-host.invalid:50051"})
+    case = schemathesis.grpc.from_path(path, config=config)["pkg.Users"]["GetUser"].Case(body={})
+    with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
+        case.call()
+    assert isinstance(exc_info.value.__cause__, ConnectionRefusedError)
 
 
 def test_tls_call(ctx):

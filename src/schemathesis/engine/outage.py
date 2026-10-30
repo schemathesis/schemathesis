@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import textwrap
 import threading
@@ -50,6 +51,10 @@ class SentRequest:
     reached_server: bool | None = None
     # A reset reaches whatever accepted the connection, which may be a proxy; only a response proves the server ran.
     answered: bool = False
+    # The connection broke while waiting for the answer; a timeout does not count, the server may still be working.
+    reset: bool = False
+    # Position among finished requests, to tell which resets came after the last answer.
+    finished: int = 0
 
     def as_reproduction_command(self) -> str:
         return build_code_sample(self.case, self.request, self.transport_kwargs)
@@ -58,7 +63,16 @@ class SentRequest:
 class ServerMonitor:
     """Tracks recently sent requests, to tell a dead server from a single refused request."""
 
-    __slots__ = ("_recent", "_lock", "_confirmation_lock", "_message", "_recordable", "_confirmed_by", "_health")
+    __slots__ = (
+        "_recent",
+        "_lock",
+        "_confirmation_lock",
+        "_message",
+        "_recordable",
+        "_confirmed_by",
+        "_health",
+        "_finished",
+    )
 
     def __init__(self, health: HealthState | None = None) -> None:
         self._health = health if health is not None else HealthState()
@@ -69,6 +83,7 @@ class ServerMonitor:
         self._message: str | None = None
         self._recordable = True
         self._confirmed_by: requests.ConnectionError | None = None
+        self._finished = 0
 
     def track(self, case: Case, send: Callable[[], Response], *, transport_kwargs: dict[str, Any]) -> Response:
         """Send a request, remembering it for as long as it could explain an outage."""
@@ -80,7 +95,7 @@ class ServerMonitor:
         except requests.RequestException as exc:
             # Breaking after connecting still proves the server was there.
             reached_server = is_unrecoverable_network_error(exc)
-            self._finish(sent, exc.request, reached_server=reached_server)
+            self._finish(sent, exc.request, reached_server=reached_server, reset=_is_reset(exc))
             if reached_server:
                 self._health.record_transport_failure(operation_label=case.operation.label, now=time.monotonic())
             raise
@@ -108,13 +123,17 @@ class ServerMonitor:
         *,
         reached_server: bool,
         answered: bool = False,
+        reset: bool = False,
     ) -> None:
         if sent is None:
             return
         with self._lock:
+            self._finished += 1
             sent.request = request
             sent.reached_server = reached_server
             sent.answered = answered
+            sent.reset = reset
+            sent.finished = self._finished
 
     def is_down(self, exc: requests.ConnectionError) -> bool:
         """Whether a refused or reset connection means the server is gone for the rest of the run."""
@@ -142,16 +161,18 @@ class ServerMonitor:
             if refused:
                 alive = accepts_connections(newest[0].address)
             else:
-                alive = answers_after_reset(newest[0].address, https=urlsplit(url).scheme == "https")
+                alive = answers_after_reset(newest[0].address, https=urlsplit(url).scheme in ("https", "grpcs"))
             if alive:
                 return False
             # A request still in flight is the likeliest culprit, so it leads the list. Only one of them can
             # be it, and the remaining room goes to what the server is known to have seen - otherwise workers
             # left hanging by the same outage fill the list and hide the payload that caused it.
             in_flight = [item for item in newest if item.reached_server is None][:1]
-            # Behind a proxy every request after the outage is reset too; the first of them is the one to show.
-            first_reset = [item for item in recent if item.reached_server and not item.answered][:1]
-            self._message = _render_outage(url, (in_flight + first_reset + answered)[:REPORTED_REQUESTS])
+            # A crash breaks every request the server was handling, so any reset since its last answer may be the
+            # cause. Behind a proxy every request after the outage is reset too, so the oldest ones come first.
+            last_answer = max((item.finished for item in answered), default=0)
+            resets = [item for item in recent if item.reset and item.finished > last_answer]
+            self._message = _render_outage(url, (in_flight + resets + answered)[:REPORTED_REQUESTS])
             # HAR reports record only HTTP requests.
             self._recordable = urlsplit(url).scheme in ("http", "https")
             self._confirmed_by = exc
@@ -184,7 +205,7 @@ def _render_outage(url: str, candidates: list[SentRequest]) -> str:
     return f"{parts.scheme}://{parts.netloc} stopped responding. Last {noun} before it went away:\n\n{commands}"
 
 
-def _is_reset(exc: requests.ConnectionError) -> bool:
+def _is_reset(exc: requests.RequestException) -> bool:
     # A port proxy (e.g. `docker run -p`) in front of a dead process resets connections instead of refusing them.
     import requests
 
@@ -194,6 +215,12 @@ def _is_reset(exc: requests.ConnectionError) -> bool:
 def _through_proxy(sent: SentRequest, url: str) -> bool:
     import requests
 
+    if urlsplit(url).scheme in ("grpc", "grpcs"):
+        # gRPC reads its own variables, in lower case only and without `all_proxy`.
+        if not any(os.environ.get(name) for name in ("grpc_proxy", "https_proxy", "http_proxy")):
+            return False
+        no_proxy = os.environ.get("no_grpc_proxy", os.environ.get("no_proxy"))  # noqa: SIM112
+        return not requests.utils.should_bypass_proxies(url, no_proxy=no_proxy)
     return bool(sent.transport_kwargs.get("proxies")) or bool(requests.utils.get_environ_proxies(url))
 
 

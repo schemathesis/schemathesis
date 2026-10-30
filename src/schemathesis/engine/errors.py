@@ -475,6 +475,8 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
     from urllib3.exceptions import ProtocolError
 
     def has_connection_reset(inner: BaseException) -> bool:
+        if isinstance(inner, (ConnectionAbortedError, ConnectionResetError)):
+            return True
         exc_str = str(inner)
         if any(
             pattern in exc_str
@@ -488,8 +490,10 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
         ):
             return True
 
-        if inner.__context__ is not None:
-            return has_connection_reset(inner.__context__)
+        # An explicitly chained error is the real cause; otherwise the error raised while handling another one.
+        parent = inner.__cause__ or inner.__context__
+        if parent is not None:
+            return has_connection_reset(parent)
 
         return False
 
