@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: Schemathesis reads descriptor sets, not `.proto` files. Build one with `buf build -o api.binpb` or `protoc --include_imports --descriptor_set_out=api.binpb` and run `schemathesis run api.binpb --url URL`

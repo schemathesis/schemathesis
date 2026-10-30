@@ -51,6 +51,23 @@ def test_from_url_without_reflection(ctx):
     )
 
 
+def test_from_url_reports_undescribed_service(ctx):
+    server = ctx.grpc.apps.users(undescribed_services=("pkg.Missing",))
+    with pytest.raises(LoaderError) as exc_info:
+        schemathesis.grpc.from_url(server.target)
+    assert (exc_info.value.kind, exc_info.value.message) == (
+        LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
+        "The server cannot describe `pkg.Missing` through reflection: not found. Build a descriptor set with "
+        f"`buf build -o api.binpb` and run `schemathesis run api.binpb --url {server.target}`",
+    )
+
+
+@pytest.mark.parametrize("version", ["v1", "v1alpha"])
+def test_from_url_requests_missing_imports(ctx, version):
+    server = ctx.grpc.apps.users(reflection=version, reflection_imports=False)
+    assert labels(schemathesis.grpc.from_url(server.target)) == LABELS
+
+
 def test_from_url_unreachable(ctx):
     server = ctx.grpc.apps.users()
     server.stop()

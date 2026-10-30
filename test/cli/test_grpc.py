@@ -27,6 +27,12 @@ def test_descriptor_set_requires_url(cli, tmp_path, snapshot_cli):
     assert cli.run("api.binpb") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_proto_file_refused(cli, tmp_path, snapshot_cli):
+    (tmp_path / "users.proto").write_text('syntax = "proto3";\npackage pkg;\nservice Users {}\n')
+    assert cli.run("users.proto", "--url=grpc://127.0.0.1:1") == snapshot_cli
+
+
 @pytest.mark.parametrize("report", ["har", "vcr"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_http_reports_refused(cli, tmp_path, snapshot_cli, report):
