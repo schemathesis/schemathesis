@@ -1,0 +1,52 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/v4
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+     Configuration:    /tmp/config.toml
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 2 passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /api/failure
+  - GET /api/success
+
+💡 Check `--url`, and whether the schema describes everything these operations need
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
+  ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Missing test data: 2 operations repeatedly returned 404 responses
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+======================== Warnings fail the run in 1.00s ========================

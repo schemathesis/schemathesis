@@ -62,6 +62,7 @@
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Test case summary counting errored and skipped cases as passed.
+- Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 

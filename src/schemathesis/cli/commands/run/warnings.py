@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from schemathesis.cli.commands.run.filters import describe_filter
-from schemathesis.config import ProjectConfig, SchemathesisWarning
+from schemathesis.config import ProjectConfig, SchemathesisWarning, WarningsConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
@@ -367,10 +367,13 @@ class WarningCollector:
             self._handle_warning(
                 SchemathesisWarning.RATE_LIMITED,
                 lambda: self.data.rate_limited.add(event.recorder.label),
+                warnings,
             )
 
         if warnings.should_display(SchemathesisWarning.NOT_SERVED) and none_served(event.recorder):
-            self._handle_warning(SchemathesisWarning.NOT_SERVED, lambda: self.data.not_served.add(event.recorder.label))
+            self._handle_warning(
+                SchemathesisWarning.NOT_SERVED, lambda: self.data.not_served.add(event.recorder.label), warnings
+            )
 
         # A wrong base URL 404s everything, and those 404s trip other checks - so this must not be
         # gated on the scenario passing, unlike the generic 404 warning below.
@@ -388,6 +391,7 @@ class WarningCollector:
                 self._handle_warning(
                     SchemathesisWarning.BASE_URL_MISMATCH,
                     lambda: self.data.base_url_mismatch.add(event.recorder.label),
+                    warnings,
                 )
 
         # Warn if all positive test cases got 4xx in return and no failure was found
@@ -405,11 +409,13 @@ class WarningCollector:
                 self._handle_warning(
                     SchemathesisWarning.MISSING_TEST_DATA,
                     lambda: self._record_missing_test_data(event.recorder.label, operation),
+                    warnings,
                 )
             if positive.should_warn_about_validation_mismatch():
                 self._handle_warning(
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
+                    warnings,
                 )
             # Where the status is the same whether the request was served or refused, the two checks above
             # stay silent; the response bodies are the only evidence either way.
@@ -419,6 +425,7 @@ class WarningCollector:
                 self._handle_warning(
                     SchemathesisWarning.MISSING_TEST_DATA,
                     lambda: self._record_missing_test_data(event.recorder.label, operation),
+                    warnings,
                 )
 
         # A run that did not ask for positive data has no valid-input rate worth reporting; the few
@@ -437,11 +444,12 @@ class WarningCollector:
             if (
                 outcomes.accepted
                 and outcomes.total >= MIN_CALLS_FOR_VALID_RATE
-                and outcomes.rate < self.config.warnings.low_valid_rate.threshold
+                and outcomes.rate < warnings.low_valid_rate.threshold
             ):
                 self._handle_warning(
                     SchemathesisWarning.LOW_VALID_RATE,
                     lambda: self.data.low_valid_rate.add(event.recorder.label),
+                    warnings,
                 )
 
     def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:
@@ -472,14 +480,20 @@ class WarningCollector:
         self.data.missing_test_data.discard(label)
         self.fails_on_missing_test_data.discard(label)
 
-    def _handle_warning(self, kind: SchemathesisWarning, record_callback: Callable[[], None]) -> None:
+    def _handle_warning(
+        self, kind: SchemathesisWarning, record_callback: Callable[[], None], warnings: WarningsConfig | None = None
+    ) -> None:
         """Handle a warning by checking display/fail config and recording it."""
-        if not self.config.warnings.should_display(kind):
+        if warnings is None:
+            warnings = self.config.warnings
+        if not warnings.should_display(kind):
             return
+        already_missing = set(self.data.missing_test_data)
         record_callback()
-        if self.config.warnings.should_fail(kind):
+        if warnings.should_fail(kind):
             if kind is SchemathesisWarning.MISSING_TEST_DATA:
-                self.fails_on_missing_test_data.update(self.data.missing_test_data)
+                # Only operations recorded under this config fail the run; others may not set `fail-on`.
+                self.fails_on_missing_test_data.update(self.data.missing_test_data - already_missing)
             else:
                 self.fails = True
 

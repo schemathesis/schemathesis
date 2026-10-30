@@ -308,8 +308,29 @@ def test_warning_on_no_2xx_options_only(ctx, cli, snapshot_cli):
                 }
             },
         ),
+        (
+            (),
+            {
+                "config": {
+                    "warnings": False,
+                    "operations": [
+                        {"include-name": "GET /api/failure", "warnings": ["missing_test_data"]},
+                    ],
+                }
+            },
+        ),
+        (
+            (),
+            {
+                "config": {
+                    "operations": [
+                        {"include-name": "GET /api/failure", "warnings": {"fail-on": ["missing_test_data"]}},
+                    ],
+                }
+            },
+        ),
     ],
-    ids=["default", "selected", "disabled-all", "disabled-operation"],
+    ids=["default", "selected", "disabled-all", "disabled-operation", "enabled-operation", "fail-on-operation"],
 )
 def test_warning_on_all_not_found(ctx, cli, snapshot_cli, args, kwargs):
     api = ctx.openapi.apps.success_and_failure()
@@ -512,6 +533,37 @@ def test_missing_test_data_warning_withdrawn_by_later_phase(ctx, cli, app_runner
         return jsonify({"id": item_id})
 
     assert _run_missing_test_data(cli, app_runner, app, "examples,fuzzing") == (False, ExitCode.OK, "No issues found")
+
+
+def test_missing_test_data_per_operation_fail_on_ignores_other_operations(ctx, cli, app_runner):
+    # Only `GET /orders/{id}` fails on the warning, and a later phase withdraws it; `GET /items/{id}` stays warned.
+    parameters = [{"in": "path", "name": "id", "required": True, "schema": {"type": "string"}, "example": "missing"}]
+    responses = {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{id}": {"get": {"parameters": parameters, "responses": responses}},
+            "/orders/{id}": {"get": {"parameters": parameters, "responses": responses}},
+        }
+    )
+
+    @app.route("/items/<id>", methods=["GET"])
+    def get_item(id):
+        return jsonify({"message": "Not found"}), 404
+
+    @app.route("/orders/<id>", methods=["GET"])
+    def get_order(id):
+        if id == "missing":
+            return jsonify({"message": "Not found"}), 404
+        return jsonify({"id": id})
+
+    assert _run_missing_test_data(
+        cli,
+        app_runner,
+        app,
+        "examples,fuzzing",
+        warnings=True,
+        operations=[{"include-name": "GET /orders/{id}", "warnings": {"fail-on": ["missing_test_data"]}}],
+    ) == (True, ExitCode.OK, "1 warning")
 
 
 def test_missing_test_data_warning_withdrawn_by_documented_redirect(ctx, cli, app_runner):
