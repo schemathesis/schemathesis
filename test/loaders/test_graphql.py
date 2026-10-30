@@ -113,6 +113,8 @@ def test_from_url_survives_bad_charset(app_runner, charset):
 
     @app.route("/graphql", methods=["POST"])
     def graphql_endpoint():
+        # An unread body makes the server reset the connection, and Windows then drops the response.
+        request.get_data()
         return Response(payload, content_type=f"application/json; charset={charset}")
 
     assert_schema(loaders.from_url(app_runner.openapi_url(app, path="/graphql")))

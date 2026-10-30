@@ -985,10 +985,16 @@ def test_server_that_times_out_connections_has_unknown_capabilities(ctx, cli):
     api = ctx.openapi.apps.success()
     with socket.create_server(("127.0.0.1", 0), backlog=0) as server:
         port = server.getsockname()[1]
-        pending = [socket.socket() for _ in range(3)]
-        for connection in pending:
-            connection.setblocking(False)
-            connection.connect_ex(("127.0.0.1", port))
+        pending = []
+        # The OS decides how many connections the queue holds, so fill it until an attempt goes unanswered.
+        for _ in range(100):
+            connection = socket.socket()
+            connection.settimeout(0.1)
+            pending.append(connection)
+            try:
+                connection.connect(("127.0.0.1", port))
+            except OSError:
+                break
         try:
             lines = cli.run(
                 api.schema_url,
@@ -3765,20 +3771,29 @@ def test_slow_probe_response_does_not_adapt_generation(ctx, cli):
         }
     )
     names = []
+    release = threading.Event()
 
     @app.before_request
-    def delay_probes():
+    def block_probes():
         if "X-Schemathesis-Probe" in request.headers:
-            time.sleep(1)
+            release.wait()
 
     @app.route("/items/<path:name>")
     def items(name):
         names.append(name)
         return jsonify({})
 
-    lines = cli.run_openapi_app(
-        app, "--phases=fuzzing", "--max-examples=1", "--request-timeout=0.5"
-    ).stdout.splitlines()
+    # Probes wait as long as `--request-timeout`; the test request gets its own timeout to stay clear of slow runners.
+    try:
+        lines = cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--max-examples=1",
+            "--request-timeout=0.2",
+            config={"operations": [{"include-name": "GET /items/{name}", "request-timeout": 10}]},
+        ).stdout.splitlines()
+    finally:
+        release.set()
     assert [line.strip() for line in lines if "✘" in line] == []
     assert set(names) == {"\\"}
 
