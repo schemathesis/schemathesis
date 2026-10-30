@@ -5,12 +5,14 @@ import json
 import shlex
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, NoReturn, Self
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import jsonschema_rs
 from google.protobuf import descriptor_pb2, descriptor_pool, field_mask_pb2, json_format, message, message_factory
+from google.protobuf.descriptor import FieldDescriptor
 
 # googleapis-common-protos ships no type information.
 from google.rpc import status_pb2  # type: ignore[import-untyped]
@@ -42,7 +44,7 @@ from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields,
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.openapi.checks import AuthScenario, IgnoredAuth
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
-from schemathesis.specs.grpc.converter import message_schema
+from schemathesis.specs.grpc.converter import ANY, WRAPPERS, is_well_known, message_schema
 from schemathesis.specs.grpc.formats import grpc_formats
 from schemathesis.specs.grpc.stateful import create_state_machine, infer_links
 from schemathesis.specs.grpc.status import GRPC_STATUSES, INTERNAL, LIBRARY_DECODE_ERRORS, grpc_status, starts_with_verb
@@ -70,6 +72,12 @@ if TYPE_CHECKING:
 
 MEDIA_TYPE = "application/grpc"
 FIELD_MASK = "google.protobuf.FieldMask"
+# Python's protobuf parser decodes bytes only in the URL-safe alphabet; generated values use the standard one.
+URL_SAFE_ALPHABET = str.maketrans("+/", "-_")
+# Type name the JSON body walker passes for `bytes` values.
+BYTES = "bytes"
+# The JSON parser rejects messages nested deeper than this.
+MAX_MESSAGE_DEPTH = 100
 # Metadata that carries credentials, whether set by headers, `--auth` or an auth provider.
 AUTH_METADATA = "authorization"
 # HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
@@ -243,7 +251,7 @@ class GrpcSchema(BaseSchema):
             body = json_format.MessageToDict(
                 message_factory.GetMessageClass(input_type).FromString(body), descriptor_pool=input_type.file.pool
             )
-        args.extend(["-d", json.dumps(_grpcurl_json(body, input_type)), address, operation.label])
+        args.extend(["-d", json.dumps(_rewrite_json(body, input_type, _grpcurl_json)), address, operation.label])
         return " ".join(shlex.quote(arg) for arg in args)
 
     @override
@@ -523,30 +531,102 @@ def filter_metadata(headers: Mapping[str, Any]) -> dict[str, str]:
     }
 
 
-def _grpcurl_json(value: object, message_type: Descriptor) -> object:
+def request_message(body: object, input_type: Descriptor) -> message.Message:
+    """The message a JSON request body describes."""
+    request = message_factory.GetMessageClass(input_type)()
+    # Well-known messages such as wrappers map to any JSON value, not only to objects.
+    return json_format.ParseDict(
+        cast("dict[str, Any]", _rewrite_json(body, input_type, _url_safe)),
+        request,
+        descriptor_pool=input_type.file.pool,
+    )
+
+
+def _url_safe(value: object, type_name: str) -> object:
+    if type_name == BYTES and isinstance(value, str):
+        return value.translate(URL_SAFE_ALPHABET)
+    return value
+
+
+def _grpcurl_json(value: object, type_name: str) -> object:
     """Rewrite `FieldMask` values to `{"paths": [...]}`, the only JSON form `grpcurl` reads for them."""
-    if message_type.full_name == FIELD_MASK and isinstance(value, str):
+    if type_name == FIELD_MASK and isinstance(value, str):
         mask = field_mask_pb2.FieldMask()
         mask.FromJsonString(value)
         return {"paths": list(mask.paths)}
-    # Other well-known types keep their canonical JSON, and their keys are not field names.
-    if message_type.full_name.startswith("google.protobuf.") or not isinstance(value, dict):
+    return value
+
+
+def _rewrite_json(
+    value: object, message_type: Descriptor, leaf: Callable[[object, str], object], depth: int = 1
+) -> object:
+    """Apply `leaf` to every `bytes` value and well-known message in a JSON body, passing its type name."""
+    name = message_type.full_name
+    # Deeper bodies fail to parse anyway, so the parser reports them rather than the walk.
+    if depth > MAX_MESSAGE_DEPTH:
         return value
-    fields = {**message_type.fields_by_name, **{member.json_name: member for member in message_type.fields}}
-    rendered = {}
+    if name == ANY:
+        return _rewrite_any(value, message_type, leaf, depth)
+    if name in WRAPPERS:
+        return _rewrite_field(value, message_type.fields_by_name["value"], leaf, depth)
+    if is_well_known(name):
+        return leaf(value, name)
+    if not isinstance(value, dict):
+        return value
+    fields = _json_fields(message_type)
+    rewritten = {}
     for key, item in value.items():
-        member = fields.get(key)
+        member = fields.get(key) or _extension(message_type, key)
         nested = None if member is None else member.message_type
-        if member is None or nested is None:
-            rendered[key] = item
-        elif nested.GetOptions().map_entry and isinstance(item, dict):
-            values = nested.fields_by_name["value"].message_type
-            rendered[key] = {name: _grpcurl_json(entry, values) if values else entry for name, entry in item.items()}
+        if member is None:
+            rewritten[key] = item
+        elif nested is not None and nested.GetOptions().map_entry and isinstance(item, dict):
+            values = nested.fields_by_name["value"]
+            rewritten[key] = {name: _rewrite_field(entry, values, leaf, depth) for name, entry in item.items()}
         elif member.is_repeated and isinstance(item, list):
-            rendered[key] = [_grpcurl_json(entry, nested) for entry in item]
+            rewritten[key] = [_rewrite_field(entry, member, leaf, depth) for entry in item]
         else:
-            rendered[key] = _grpcurl_json(item, nested)
-    return rendered
+            rewritten[key] = _rewrite_field(item, member, leaf, depth)
+    return rewritten
+
+
+@lru_cache(maxsize=1024)
+def _json_fields(message_type: Descriptor) -> dict[str, FieldDescriptor]:
+    """Fields by both of the names a JSON body may use for them."""
+    return {**message_type.fields_by_name, **{member.json_name: member for member in message_type.fields}}
+
+
+def _rewrite_field(value: object, member: FieldDescriptor, leaf: Callable[[object, str], object], depth: int) -> object:
+    if member.message_type is not None:
+        return _rewrite_json(value, member.message_type, leaf, depth + 1)
+    if member.type == FieldDescriptor.TYPE_BYTES:
+        return leaf(value, BYTES)
+    return value
+
+
+def _rewrite_any(value: object, any_type: Descriptor, leaf: Callable[[object, str], object], depth: int) -> object:
+    if not isinstance(value, dict) or not isinstance(value.get("@type"), str):
+        return value
+    try:
+        packed = any_type.file.pool.FindMessageTypeByName(value["@type"].rsplit("/", 1)[-1])
+    except KeyError:
+        return value
+    # A packed well-known message keeps its own JSON form under `value`.
+    if is_well_known(packed.full_name):
+        return {
+            key: _rewrite_json(item, packed, leaf, depth + 1) if key == "value" else item for key, item in value.items()
+        }
+    return _rewrite_json(value, packed, leaf, depth + 1)
+
+
+def _extension(message_type: Descriptor, key: str) -> FieldDescriptor | None:
+    """The extension a `[full.name]` JSON key sets."""
+    if not (key.startswith("[") and key.endswith("]")):
+        return None
+    try:
+        return message_type.file.pool.FindExtensionByName(key[1:-1])
+    except KeyError:
+        return None
 
 
 def _decode(

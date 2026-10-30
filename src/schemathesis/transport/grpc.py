@@ -14,7 +14,7 @@ from schemathesis.core import NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
-from schemathesis.specs.grpc.schemas import request_metadata
+from schemathesis.specs.grpc.schemas import request_message, request_metadata
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport
 
@@ -69,11 +69,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         if isinstance(body, bytes):
             payload = body
         else:
-            request_message = message_factory.GetMessageClass(method.input_type)()
-            # Well-known messages such as wrappers map to any JSON value, not only to objects.
-            payload = json_format.ParseDict(
-                cast("dict[str, Any]", body), request_message, descriptor_pool=method.input_type.file.pool
-            ).SerializeToString()
+            payload = request_message(body, method.input_type).SerializeToString()
         request_headers = request_metadata(case, headers)
         if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2:
             request_headers.setdefault("authorization", requests.auth._basic_auth_str(*session.auth))
