@@ -592,6 +592,10 @@ class BaseSchema(Mapping):
     ) -> bool | None:
         raise NotImplementedError
 
+    def parse_rejection(self, operation: APIOperation, case: Case, response: Response) -> tuple[Observation, ...]:
+        """Field-level observations a rejection carries outside its body, e.g. gRPC status details. Default: none."""
+        return ()
+
     def record_runtime_observations(
         self,
         *,

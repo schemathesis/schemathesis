@@ -1,15 +1,19 @@
 import base64
 
 import pytest
-from google.rpc import status_pb2
+from google.protobuf import any_pb2
+from google.rpc import error_details_pb2, status_pb2
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.core.error_feedback import Observation, ObservationKind
+from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import ServerError, Severity
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import CallOutcome
 from schemathesis.grpc.checks import MalformedGrpcMessage, UndecodableGrpcRequest
 from schemathesis.specs.openapi.checks import ignored_auth
-from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, users_descriptor_set, write_descriptor_set
 from test.utils import check_context
 
 
@@ -182,3 +186,118 @@ def test_unimplemented_is_not_a_server_error(ctx):
     pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
     assert operation.Case(body={"userId": 501}).call_and_validate().status_line == "UNIMPLEMENTED"
+
+
+def rejection(response_factory, *fields):
+    details = status_pb2.Status(code=3)
+    details.details.append(any_pb2.Any(type_url="type.googleapis.com/example.Unknown", value=b"\x08\x01"))
+    details.details.add().Pack(
+        error_details_pb2.BadRequest(
+            field_violations=[
+                error_details_pb2.BadRequest.FieldViolation(field=field, description="invalid") for field in fields
+            ]
+        )
+    )
+    encoded = base64.b64encode(details.SerializeToString()).decode()
+    return response_factory.core(
+        content=b"",
+        content_type=None,
+        status_code=400,
+        headers={"grpc-status": ["3"], "grpc-status-details-bin": [encoded]},
+    )
+
+
+def test_unknown_status_detail_types_pass(operation, response_factory):
+    assert operation.validate_response(rejection(response_factory, "user_id"), case=operation.Case(body={})) is None
+
+
+@pytest.fixture(scope="module")
+def types(tmp_path_factory):
+    path = write_descriptor_set(tmp_path_factory.mktemp("grpc"), all_types_descriptor_set())
+    return schemathesis.grpc.from_path(path)["types.Types"]
+
+
+@pytest.mark.parametrize(
+    ("method", "body", "field", "path"),
+    [
+        ("Scalars", {}, "string", ("string",)),
+        ("Scalars", {}, "tags", ("tags",)),
+        ("Choice", {}, "note", ("note",)),
+        ("Envelope", {}, "first.extra", ("first", "extra")),
+        ("Envelope", {}, "first.title", ("first", "title")),
+        ("Envelope", {"payload": {"@type": "type.googleapis.com/types.Node", "name": "a"}}, "id", ("id",)),
+        ("Node", {}, "name", ("name",)),
+    ],
+    ids=["implicit-presence", "repeated", "explicit-presence", "nested", "custom-json-name", "packed-any", "recursive"],
+)
+def test_violations_on_missing_fields_are_observed(types, response_factory, method, body, field, path):
+    operation = types[method]
+    case = operation.Case(body=body)
+    assert parse_observations(operation, case, rejection(response_factory, field)) == (
+        Observation(
+            operation_label=operation.label,
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="invalid",
+        ),
+    )
+
+
+@pytest.mark.parametrize("field", ["user_id", "userId"], ids=["proto-name", "json-name"])
+def test_violation_field_names_map_to_json_names(operation, response_factory, field):
+    case = operation.Case()
+    assert [
+        observation.parameter_path
+        for observation in parse_observations(operation, case, rejection(response_factory, field))
+    ] == [("userId",)]
+
+
+@pytest.mark.parametrize(
+    ("method", "body", "field"),
+    [
+        ("Scalars", {"string": "a"}, "string"),
+        ("Scalars", {"tags": [1]}, "tags"),
+        ("Choice", {"note": ""}, "note"),
+        ("Scalars", b"\x08\x05", "int32"),
+        ("Scalars", {}, "unknown"),
+        ("Scalars", {}, "tags[0]"),
+        ("Scalars", {}, "string.value"),
+        ("Node", {}, "children.name"),
+    ],
+    ids=[
+        "implicit-presence",
+        "repeated",
+        "explicit-presence",
+        "binary-body",
+        "unknown-field",
+        "indexed",
+        "scalar-parent",
+        "repeated-parent",
+    ],
+)
+def test_violations_without_a_missing_field_are_ignored(types, response_factory, method, body, field):
+    operation = types[method]
+    case = operation.Case(body=body)
+    assert parse_observations(operation, case, rejection(response_factory, field)) == ()
+
+
+def corrupt_bad_request():
+    details = status_pb2.Status(code=3)
+    details.details.append(any_pb2.Any(type_url="type.googleapis.com/google.rpc.BadRequest", value=b"\xff"))
+    return base64.b64encode(details.SerializeToString()).decode()
+
+
+@pytest.mark.parametrize(
+    ("body", "details"),
+    [({}, ["/w=="]), ({}, [corrupt_bad_request()]), ({"unknown": 1}, [])],
+    ids=["malformed-status", "malformed-bad-request", "no-details"],
+)
+def test_rejections_without_field_violations_teach_nothing(operation, response_factory, body, details):
+    response = response_factory.core(
+        content=b"",
+        content_type=None,
+        status_code=400,
+        headers={"grpc-status": ["3"], "grpc-status-details-bin": details},
+    )
+    assert parse_observations(operation, operation.Case(body=body), response) == ()

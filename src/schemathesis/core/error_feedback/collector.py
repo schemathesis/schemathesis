@@ -32,7 +32,9 @@ def parse_observations(
         or (case.meta is not None and case.meta.generation.mode.is_negative)
     ):
         return ()
-    return tuple(get_pipeline().parse(operation=operation, case=case, response=response))
+    return operation.schema.parse_rejection(operation, case, response) or tuple(
+        get_pipeline().parse(operation=operation, case=case, response=response)
+    )
 
 
 def record_response(
