@@ -593,7 +593,7 @@ def test_stateful_timeout_absorbed_by_health_monitor(ctx, cli, snapshot_cli):
             "--generation-deterministic",
             "--phases=stateful",
             "--checks=not_a_server_error",
-            config={"operations": [{"include-name": "GET /users/{userId}", "request-timeout": 0.05}]},
+            config={"operations": [{"include-name": "GET /users/{userId}", "request-timeout": 0.5}]},
         )
     finally:
         release.set()

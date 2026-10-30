@@ -27,7 +27,7 @@ Schemathesis dev
 _____________________________ GET /users/{userId} ______________________________
 Network Error
 
-Read timed out after 0.05 seconds
+Read timed out after 0.5 seconds
 
 Reproduce with:
 
