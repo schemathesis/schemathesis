@@ -7,6 +7,7 @@
 - Coverage phase for GraphQL schemas.
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
 - Fuzzing unary gRPC methods through server reflection or descriptor sets.
+- XML request bodies follow Open API 3.2 `nodeType` (`attribute`, `element`, `text`, `cdata`).
 
 ### :racing_car: Performance
 

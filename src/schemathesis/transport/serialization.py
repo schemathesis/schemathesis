@@ -270,7 +270,7 @@ def _write_object(
         child_options = property_schema.get("xml", {})
         child_tag = child_options.get("name", child_name)
 
-        if child_options.get("attribute", False):
+        if child_options.get("attribute", False) or child_options.get("nodeType") == "attribute":
             push_namespace_if_any(stack, child_options)
             if child_options.get("prefix") and child_options.get("namespace"):
                 _validate_prefix(child_options, stack)
@@ -288,6 +288,11 @@ def _write_object(
         elements.append((child_tag, value, property_schema, child_options, child_resolver))
 
     for child_tag, value, property_schema, child_options, child_resolver in elements:
+        node_type = child_options.get("nodeType")
+        # Text and CDATA nodes carry a scalar as this element's content, with no tag of their own
+        if node_type in ("text", "cdata") and not isinstance(value, (dict, list)):
+            children_buffer.write(_escape_xml(value) if node_type == "text" else _cdata_section(value))
+            continue
         push_namespace_if_any(stack, child_options)
         child_tag = _sanitize_xml_name(child_tag)
         _validate_prefix(child_options, stack)
@@ -320,7 +325,7 @@ def _write_array(
     child_tag = tag
     if options.get("prefix"):
         tag = f"{options['prefix']}:{tag}"
-    wrapped = options.get("wrapped", False)
+    wrapped = options.get("wrapped", False) or options.get("nodeType") == "element"
     is_namespace_specified = False
     if wrapped:
         buffer.write(f"<{tag}")
@@ -379,15 +384,10 @@ def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
     buffer.write(f'="{options["namespace"]}"')
 
 
-def _escape_xml(value: JsonValue) -> str:
-    """Escape special characters in XML content."""
-    if value is None or isinstance(value, ((int, float, bool))):
-        return to_wire_string(value)
-
-    # Filter out invalid XML characters
-    cleaned = "".join(
+def _drop_invalid_xml_characters(text: str) -> str:
+    return "".join(
         char
-        for char in str(value)
+        for char in text
         if (
             char in "\t\n\r"
             or 0x20 <= ord(char) <= 0xD7FF
@@ -395,6 +395,20 @@ def _escape_xml(value: JsonValue) -> str:
             or 0x10000 <= ord(char) <= 0x10FFFF
         )
     )
+
+
+def _cdata_section(value: JsonValue) -> str:
+    # A CDATA section cannot contain its own terminator, so each `]]>` is split across two sections
+    text = _drop_invalid_xml_characters(to_wire_string(value)).replace("]]>", "]]]]><![CDATA[>")
+    return f"<![CDATA[{text}]]>"
+
+
+def _escape_xml(value: JsonValue) -> str:
+    """Escape special characters in XML content."""
+    if value is None or isinstance(value, ((int, float, bool))):
+        return to_wire_string(value)
+
+    cleaned = _drop_invalid_xml_characters(str(value))
 
     replacements = {
         "&": "&amp;",
