@@ -1418,6 +1418,68 @@ def test_external_value_network_error(ctx):
     assert not operation.get_strategies_from_examples()
 
 
+@pytest.mark.parametrize("value", [{"id": 1}, 0, False, None], ids=["object", "zero", "false", "null"])
+def test_data_value_example(ctx, value):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {}, "examples": {"a": {"dataValue": value}}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+    )
+    assert examples.generate_one(operation.get_strategies_from_examples()[0]).body == value
+
+
+def test_serialized_value_example_skipped(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {}, "examples": {"a": {"serializedValue": '{"id": 2}'}}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+    )
+    assert operation.get_strategies_from_examples() == []
+
+
+@pytest.mark.parametrize("container", [{"a": {"dataValue": 5}}, [{"dataValue": 5}]], ids=["mapping", "list"])
+def test_data_value_query_example(ctx, container):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}, "examples": container}
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+    )
+    assert examples.generate_one(operation.get_strategies_from_examples()[0]).query == {"q": 5}
+
+
+def test_data_value_response_example(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {}, "examples": {"a": {"dataValue": {"id": 1}}}}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    assert list(operation.responses.iter_examples()) == [("200/application/json", {"id": 1})]
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

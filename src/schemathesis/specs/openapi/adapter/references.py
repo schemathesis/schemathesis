@@ -3,9 +3,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
-from schemathesis.core.jsonschema.types import as_object_schema
+from schemathesis.core.jsonschema.types import JsonValue, as_object_schema
 from schemathesis.specs.openapi.adapter.validators import ensure_object
+
+
+def example_object_value(example: Mapping[str, Any]) -> JsonValue | NotSet:
+    """The data an Example Object holds: `value`, or Open API 3.2 `dataValue`."""
+    if "value" in example:
+        return example["value"]
+    return example.get("dataValue", NOT_SET)
 
 
 def maybe_resolve_with_resolver(
