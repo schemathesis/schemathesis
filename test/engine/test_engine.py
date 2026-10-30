@@ -1931,11 +1931,11 @@ def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runne
 
     @schemathesis.check
     def slow_check(ctx, response, case):
-        time.sleep(3.6 if response.status_code == 500 else 3.2)
+        time.sleep(6.6 if response.status_code == 500 else 6.2)
         assert response.status_code < 500
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    stream = execute(schema, checks=(slow_check,), max_time=3, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
+    stream = execute(schema, checks=(slow_check,), max_time=6, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
 
     assert {(event.label, event.status) for event in stream.find_all(events.ScenarioFinished)} == {
         ("GET /first", Status.SUCCESS),
@@ -2053,7 +2053,7 @@ def test_max_time_reserves_for_stateful_when_links_are_only_inferred(ctx, app_ru
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     stream = execute(
         schema,
-        max_time=3,
+        max_time=6,
         max_examples=100_000,
         modes=[GenerationMode.POSITIVE],
         phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],

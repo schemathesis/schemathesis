@@ -625,8 +625,8 @@ def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
     try:
         result = cli.run_openapi_app(
             app,
-            "--max-time=3",
-            "--request-timeout=2",
+            "--max-time=6",
+            "--request-timeout=3",
             "--phases=fuzzing",
             "--checks=not_a_server_error",
         )
@@ -707,7 +707,7 @@ def test_max_time_reports_unreached_operations(ctx, cli, snapshot_cli):
 
     try:
         result = cli.run_openapi_app(
-            app, "--max-time=1", "--phases=fuzzing", "--checks=not_a_server_error", "--workers=1"
+            app, "--max-time=5", "--phases=fuzzing", "--checks=not_a_server_error", "--workers=1"
         )
     finally:
         release.set()
@@ -2346,7 +2346,7 @@ def test_max_time_counts_every_operation_once(ctx, cli, snapshot_cli):
     assert (
         cli.run_openapi_app(
             app,
-            "--max-time=2",
+            "--max-time=5",
             "--max-examples=5",
             "--generation-database=none",
             "--phases=fuzzing",
