@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from schemathesis.core.transport import CallOutcome
+
+if TYPE_CHECKING:
+    from schemathesis.core.transport import Response
 
 # gRPC status code -> its name, the HTTP status with the same meaning and the call outcome it signals.
 # FAILED_PRECONDITION and OUT_OF_RANGE depend on system state, not on the data sent, so they are conflicts.
@@ -24,3 +29,16 @@ GRPC_STATUSES: dict[int, tuple[str, int, CallOutcome]] = {
     15: ("DATA_LOSS", 500, CallOutcome.UNINFORMATIVE),
     16: ("UNAUTHENTICATED", 401, CallOutcome.UNINFORMATIVE),
 }
+
+
+def grpc_status(response: Response) -> int:
+    return int(response.headers["grpc-status"][0])
+
+
+def starts_with_verb(name: str, verbs: tuple[str, ...]) -> bool:
+    for verb in verbs:
+        rest = name.removeprefix(verb)
+        # `Listen` does not start with `List`: the verb must end where the next word starts.
+        if rest != name and (not rest or rest[0].isupper()):
+            return True
+    return False

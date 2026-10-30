@@ -102,7 +102,11 @@ _FEATURES: dict[SpecificationKind, frozenset[SpecificationFeature]] = {
         {SpecificationFeature.STATEFUL_TESTING, SpecificationFeature.COVERAGE, SpecificationFeature.HTTP_PROBES}
     ),
     SpecificationKind.GRPC: frozenset(
-        {SpecificationFeature.STATUS_CODE_ANALYSIS, SpecificationFeature.SCHEMA_ANALYSIS}
+        {
+            SpecificationFeature.STATUS_CODE_ANALYSIS,
+            SpecificationFeature.SCHEMA_ANALYSIS,
+            SpecificationFeature.STATEFUL_TESTING,
+        }
     ),
 }
 

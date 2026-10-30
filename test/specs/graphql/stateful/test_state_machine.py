@@ -7,6 +7,7 @@ from hypothesis.stateful import RuleBasedStateMachine
 import schemathesis
 from schemathesis.core.errors import NoProducers
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.stateful.state_machine import BundleStateMachine
 from schemathesis.specs.graphql.stateful import GraphQLStateMachine, create_state_machine
 
 _FULL_SCHEMA_SDL = """
@@ -227,7 +228,7 @@ def test_init_raises_NoProducers_when_no_rules(ctx):
 )
 def test_routing_override_present(method_name):
     # Regression: rule-declared target= must populate its bundle (overrides the parent's filter).
-    assert method_name in GraphQLStateMachine.__dict__
+    assert method_name in BundleStateMachine.__dict__
 
 
 def test_state_machine_has_real_transition_controller(ctx):

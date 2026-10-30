@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
@@ -46,6 +46,35 @@ class Transitions(Protocol):
     def producer_labels_for_bundle(self, bundle_name: str) -> Iterable[str]:  # pragma: no cover
         """Yield operation labels that emit values into the named bundle."""
         ...
+
+
+@dataclass(slots=True)
+class TransitionEndpoint:
+    label: str
+
+
+@dataclass(slots=True)
+class TransitionEdge:
+    source: TransitionEndpoint
+    target: TransitionEndpoint
+
+
+@dataclass(slots=True)
+class OperationTransitions:
+    incoming: list[TransitionEdge] = field(default_factory=list)
+    outgoing: list[TransitionEdge] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class BundleTransitions:
+    """Transition graph of a state machine that passes values between operations through bundles."""
+
+    operations: dict[str, OperationTransitions]
+    # Bundle name -> producer operation labels emitting into that bundle.
+    bundle_sources: dict[str, list[str]]
+
+    def producer_labels_for_bundle(self, bundle_name: str) -> Iterator[str]:
+        yield from self.bundle_sources.get(bundle_name, ())
 
 
 # It is enough to be able to catch double-click type of issues

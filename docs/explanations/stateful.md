@@ -62,6 +62,7 @@ Schemathesis discovers connections per spec:
 
 - **OpenAPI**: schema analysis, URLs in responses (`Location` headers and body fields), and explicit OpenAPI Links.
 - **GraphQL**: the type graph itself encodes the connections — a mutation returning `Book!` is automatically connected to a query taking a `Book` id-typed argument.
+- **gRPC**: method and field names following Google API conventions — `CreateBook` returns a `name` that `GetBook` takes, and `next_page_token` feeds `page_token`.
 
 ### 1. Automatic Schema Analysis (OpenAPI)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import time
 from concurrent import futures
 from dataclasses import dataclass, field
@@ -10,7 +11,12 @@ import trustme
 from google.protobuf import descriptor_database, descriptor_pb2, descriptor_pool, message_factory
 from grpc_reflection.v1alpha import reflection, reflection_pb2
 
-from test.apps.catalog.grpc.descriptors import side_effects_descriptor_set, users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import (
+    library_descriptor_set,
+    side_effects_descriptor_set,
+    users_descriptor_set,
+    write_descriptor_set,
+)
 
 
 @dataclass(slots=True)
@@ -109,17 +115,12 @@ def serve_reflection(
     version: str,
     pool: descriptor_pool.DescriptorPool,
     *,
+    # Reflection lists the health service by name only; loaders must skip it with reflection itself.
+    services: tuple[str, ...] = ("pkg.Users", "pkg.Admin", "grpc.health.v1.Health"),
     undescribed_services: tuple[str, ...] = (),
     imports: bool = True,
 ) -> None:
-    # Reflection lists the health service by name only; loaders must skip it with reflection itself.
-    names = (
-        "pkg.Users",
-        "pkg.Admin",
-        "grpc.health.v1.Health",
-        f"grpc.reflection.{version}.ServerReflection",
-        *undescribed_services,
-    )
+    names = (*services, f"grpc.reflection.{version}.ServerReflection", *undescribed_services)
     # Both versions exchange the same messages.
     servicer = ReflectionServicer(names, pool=pool, imports=imports)
     handler = grpc.stream_stream_rpc_method_handler(
@@ -271,3 +272,63 @@ def side_effects() -> GrpcApp:
     return GrpcApp(
         server=server, port=port, calls=calls, reflection_calls=[], descriptor_set=side_effects_descriptor_set()
     )
+
+
+def library() -> GrpcApp:
+    """`library.Library` with two bugs that only real values from earlier responses reach.
+
+    `CreateBook` answers `books/<random hex>`, or INVALID_ARGUMENT without a title; `GetBook` fails on a created name and answers NOT_FOUND otherwise.
+    `ListBooks` pages through two books; a page token it issued fails, any other non-empty token is INVALID_ARGUMENT.
+    """
+    database = descriptor_database.DescriptorDatabase()
+    for file in descriptor_pb2.FileDescriptorSet.FromString(library_descriptor_set()).file:
+        database.Add(file)
+    pool = descriptor_pool.DescriptorPool(database)
+
+    def message_class(name: str) -> type:
+        return message_factory.GetMessageClass(pool.FindMessageTypeByName(f"library.{name}"))
+
+    book_class = message_class("Book")
+    created: set[str] = set()
+    issued: set[str] = set()
+
+    def create_book(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        title = message_class("CreateBookRequest").FromString(payload).title
+        if not title:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "title is required")
+        name = f"books/{secrets.token_hex(8)}"
+        created.add(name)
+        return book_class(name=name, title=title).SerializeToString()
+
+    def get_book(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        name = message_class("GetBookRequest").FromString(payload).name
+        if name in created:
+            context.abort(grpc.StatusCode.INTERNAL, "cannot load a created book")
+        context.abort(grpc.StatusCode.NOT_FOUND, "no such book")
+
+    def list_books(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        token = message_class("ListBooksRequest").FromString(payload).page_token
+        if token in issued:
+            context.abort(grpc.StatusCode.INTERNAL, "cannot read the second page")
+        if token:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "malformed page token")
+        next_token = secrets.token_hex(8)
+        issued.add(next_token)
+        return message_class("ListBooksResponse")(
+            books=[book_class(name="books/first")], next_page_token=next_token
+        ).SerializeToString()
+
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    handlers = {"CreateBook": create_book, "GetBook": get_book, "ListBooks": list_books}
+    server.add_generic_rpc_handlers(
+        (
+            grpc.method_handlers_generic_handler(
+                "library.Library",
+                {name: grpc.unary_unary_rpc_method_handler(handler) for name, handler in handlers.items()},
+            ),
+        )
+    )
+    serve_reflection(server, "v1alpha", pool, services=("library.Library",))
+    port = server.add_insecure_port("127.0.0.1:0")
+    server.start()
+    return GrpcApp(server=server, port=port, calls=[], reflection_calls=[], descriptor_set=library_descriptor_set())

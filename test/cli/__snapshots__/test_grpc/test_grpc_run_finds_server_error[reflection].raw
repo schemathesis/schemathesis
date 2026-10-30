@@ -40,7 +40,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ❌ Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (disabled)
 
 Failures:
   ❌ ST101 Server error: 1

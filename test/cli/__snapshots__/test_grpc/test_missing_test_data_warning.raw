@@ -32,7 +32,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ✅ Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Warnings:
   ⚠️ Missing test data: 1 operation repeatedly returned NOT_FOUND responses
