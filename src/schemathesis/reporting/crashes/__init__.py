@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
 CRASH_FORMAT_VERSION = 1
 MANIFEST_FILENAME = "manifest.json"
+# Case IDs from earlier runs that recorded the same failure stay replayable; older ones are dropped to bound file size.
+MAX_CASE_ID_ALIASES = 20
 
 _FILENAME_NON_ALNUM = re.compile(r"[^A-Za-z0-9]+")
 
@@ -195,6 +197,8 @@ class CrashFile:
     case_id: str
     code_sample: str
     sequence: list[CrashStep]
+    # Case IDs that earlier runs printed for the same failure, oldest first.
+    aliases: list[str] = field(default_factory=list)
 
     def filename(self) -> str:
         terminal = self.sequence[-1]
@@ -210,6 +214,7 @@ class CrashFile:
             "case_id": self.case_id,
             "code_sample": self.code_sample,
             "sequence": [step.to_dict() for step in self.sequence],
+            "aliases": self.aliases,
         }
 
     @classmethod
@@ -225,6 +230,7 @@ class CrashFile:
             case_id=data["case_id"],
             code_sample=data["code_sample"],
             sequence=sequence,
+            aliases=data.get("aliases", []),
         )
 
 
@@ -252,7 +258,15 @@ class CrashWriter:
         # Write each crash once per run so its stored case_id matches the run's output.
         if filename in self._written:
             return
-        atomic_write_text(self._directory / filename, json.dumps(crash.to_dict(), indent=2))
+        path = self._directory / filename
+        try:
+            previous = CrashFile.from_dict(json.loads(path.read_text()))
+        except (OSError, KeyError, TypeError, ValueError):
+            previous_case_ids = []
+        else:
+            previous_case_ids = [*previous.aliases, previous.case_id]
+        aliases = [case_id for case_id in previous_case_ids if case_id != crash.case_id][-MAX_CASE_ID_ALIASES:]
+        atomic_write_text(path, json.dumps(replace(crash, aliases=aliases).to_dict(), indent=2))
         self._written.add(filename)
 
     def remove_by_operation(self, operation: str) -> None:
