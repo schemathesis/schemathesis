@@ -6,6 +6,7 @@ from google.rpc import status_pb2
 import schemathesis
 from schemathesis.core.transport import CallOutcome
 from schemathesis.grpc.checks import MalformedGrpcMessage
+from schemathesis.specs.openapi.checks import ignored_auth
 from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
 
 
@@ -77,6 +78,17 @@ def test_bad_status_details(operation, response_factory):
     response = grpc_response(response_factory, status=13, headers={"grpc-status-details-bin": ["/w=="]})
     with pytest.raises(MalformedGrpcMessage, match="Cannot decode the status details as `google.rpc.Status`"):
         operation.validate_response(response, case=operation.Case(body={}))
+
+
+# Without a run to remember the verdict, every successful call is resent without credentials.
+def test_ignored_auth_outside_a_run(ctx):
+    pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
+    server = ctx.grpc.apps.users()
+    operation = schemathesis.grpc.from_url(server.target)["pkg.Users"]["GetUser"]
+    case = operation.Case(body={"userId": 403}, headers={"authorization": "Bearer x"})
+    case.call_and_validate(checks=[ignored_auth])
+    case.call_and_validate(checks=[ignored_auth])
+    assert [dict(call.metadata).get("authorization") for call in server.calls] == ["Bearer x", None, "Bearer x", None]
 
 
 def test_failures_group_by_message(operation, response_factory):

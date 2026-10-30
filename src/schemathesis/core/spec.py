@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
+    from schemathesis.checks import CheckContext
     from schemathesis.config import GenerationConfig, ProjectConfig
     from schemathesis.core import Body, Specification
     from schemathesis.core.error_feedback import ErrorFeedbackStore
@@ -216,6 +217,8 @@ class ApiSchema(SchemaMetadata, Protocol):
     def prepare_request_body(self, case: Case) -> Body: ...  # pragma: no cover
 
     def evaluate_server_error(self, case: Case, response: Response) -> None: ...  # pragma: no cover
+
+    def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None: ...  # pragma: no cover
 
     def evaluate_negative_data(self, case: Case, response: Response) -> None: ...  # pragma: no cover
 

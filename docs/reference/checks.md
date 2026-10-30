@@ -353,6 +353,8 @@ Expected 401 or 403, got `200 OK` for `GET /protected-resource`
 
 The check gives no verdict when an explicitly configured `Authorization` header (e.g. `-H 'Authorization: ...'`) carries credentials the schema's security schemes do not declare: the probes cannot remove them, so a successful response proves nothing. While such a header is configured, an API that ignores the declared scheme entirely is not reported for that operation.
 
+For gRPC, a successful call that carried `authorization` metadata is resent once per method without it, and must fail with `UNAUTHENTICATED` or `PERMISSION_DENIED`.
+
 ### `object_level_authorization`
 
 Failure codes: [ST402](failures.md#st402).

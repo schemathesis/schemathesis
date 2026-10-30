@@ -193,6 +193,8 @@ def users(
             time.sleep(1)
         if user_id == 17:
             return b"\xff\xff\xff"
+        if user_id == 403 and not any(item.key == "authorization" for item in context.invocation_metadata()):
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing credentials")
         context.send_initial_metadata((("x-served-by", "users"),))
         context.set_trailing_metadata((("x-trace-bin", b"\x00\x01"),))
         return user_class(name=f"u{user_id}").SerializeToString()

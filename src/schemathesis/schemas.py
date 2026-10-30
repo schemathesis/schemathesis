@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from werkzeug.test import TestResponse
 
     from schemathesis.auths import AuthContext, AuthProvider
-    from schemathesis.checks import RunChecks
+    from schemathesis.checks import CheckContext, RunChecks
     from schemathesis.core import Specification
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
@@ -692,6 +692,13 @@ class BaseSchema(Mapping):
 
         Default no-op; specs whose errors aren't fully captured by HTTP status (e.g. GraphQL 200 + errors body) override.
         """
+
+    def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
+        """Raise a Failure if the operation answers without the credentials the request carried.
+
+        Default gives no verdict; OpenAPI judges by declared security schemes in `ignored_auth` itself.
+        """
+        return True
 
     def evaluate_negative_data(self, case: Case, response: Response) -> None:
         """Raise a Failure if the schema's own conventions show that invalid data was accepted.

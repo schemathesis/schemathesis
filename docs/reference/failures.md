@@ -342,7 +342,7 @@ Reported by [`ignored_auth`](checks.md#ignored_auth).
 
 Request with missing or invalid credentials accepted on an operation that requires authentication.
 
-After a `2xx`, Schemathesis resends the request without credentials and with invalid ones. A public operation needs `security: []` in the schema.
+After a `2xx`, Schemathesis resends the request without credentials and with invalid ones. A public operation needs `security: []` in the schema. For gRPC, a successful call that carried `authorization` metadata is resent without it and must fail with `UNAUTHENTICATED` or `PERMISSION_DENIED`.
 
 `--exclude-checks ignored_auth` turns it off.
 

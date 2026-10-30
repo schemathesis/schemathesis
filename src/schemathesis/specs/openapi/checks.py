@@ -1558,10 +1558,15 @@ class AuthKind(enum.StrEnum):
 
 
 @schemathesis.check
-@requires_openapi_schema
-@skips_on_unexpected_http_status
 def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
+    if not _is_openapi(case):
+        return case.operation.schema.evaluate_auth(ctx, response, case)
+    return _openapi_ignored_auth(ctx, response, case)
+
+
+@skips_on_unexpected_http_status
+def _openapi_ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from schemathesis.specs.openapi.adapter.security import has_effective_optional_auth
 
     operation = case.operation

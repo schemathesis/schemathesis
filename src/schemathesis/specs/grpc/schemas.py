@@ -40,6 +40,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.grpc.checks import MalformedGrpcMessage, UndeclaredGrpcFields
 from schemathesis.hooks import HookContext, apply_to_all_dispatchers
+from schemathesis.openapi.checks import AuthScenario, IgnoredAuth
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc.converter import message_schema
 from schemathesis.specs.grpc.formats import grpc_formats
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.checks import CheckContext
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
@@ -66,6 +68,8 @@ if TYPE_CHECKING:
 
 MEDIA_TYPE = "application/grpc"
 FIELD_MASK = "google.protobuf.FieldMask"
+# Metadata that carries credentials, whether set by headers, `--auth` or an auth provider.
+AUTH_METADATA = "authorization"
 # HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
 EXCLUDED_METADATA = frozenset(
     {
@@ -270,6 +274,40 @@ class GrpcSchema(BaseSchema):
         else:
             for details in response.headers.get("grpc-status-details-bin", []):
                 _decode(operation, status_pb2.Status, base64.b64decode(details), "status details")
+
+    @override
+    def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
+        if _grpc_status(response) != 0 or AUTH_METADATA not in response.request.headers:
+            return True
+        label = case.operation.label
+        enforced = ctx.auth_enforced_operations
+        # Enforcement is a property of the method, so one confirmation per run is enough.
+        if enforced is not None and label in enforced:
+            return None
+        headers = case.headers.copy()
+        headers.pop(AUTH_METADATA, None)
+        probe = case.derive(headers=headers)
+        kwargs = dict(ctx.internals.transport_kwargs or {})
+        kwargs["headers"] = {
+            key: value for key, value in (kwargs.get("headers") or {}).items() if key.lower() != AUTH_METADATA
+        }
+        # The session carries `--auth` credentials.
+        kwargs.pop("session", None)
+        kwargs.pop("auth", None)
+        ctx.internals.record_case(parent_id=case.id, case=probe)
+        probe_response = self.transport.send(probe, **kwargs)
+        ctx.internals.record_response(case_id=probe.id, response=probe_response)
+        # Without declared security, other errors may come from the anonymous caller's data, not from ignored auth.
+        if _grpc_status(probe_response) == 0:
+            raise IgnoredAuth(
+                operation=label,
+                message=f"Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `{label}`",
+                scenario=AuthScenario.NO_AUTH,
+                case_id=probe.id,
+            )
+        if enforced is not None:
+            enforced.add(label)
+        return None
 
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
