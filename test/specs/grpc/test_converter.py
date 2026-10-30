@@ -4,7 +4,11 @@ import pytest
 from google.protobuf import descriptor_pb2, descriptor_pool
 
 from schemathesis.specs.grpc.converter import ConvertedMessage, message_schema
-from test.apps.catalog.grpc.descriptors import all_types_descriptor_set
+from test.apps.catalog.grpc.descriptors import (
+    all_types_descriptor_set,
+    old_protovalidate_descriptor_set,
+    validated_descriptor_set,
+)
 
 INT32 = {"type": "integer", "minimum": -(2**31), "maximum": 2**31 - 1}
 UINT32 = {"type": "integer", "minimum": 0, "maximum": 2**32 - 1}
@@ -33,12 +37,19 @@ NODE = {
 }
 
 
-@pytest.fixture(scope="module")
-def pool():
+BASE64 = "[A-Za-z0-9+/]"
+
+
+def load_pool(data):
     pool = descriptor_pool.DescriptorPool()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(all_types_descriptor_set()).file:
+    for file in descriptor_pb2.FileDescriptorSet.FromString(data).file:
         pool.Add(file)
     return pool
+
+
+@pytest.fixture(scope="module")
+def pool():
+    return load_pool(all_types_descriptor_set())
 
 
 def convert(pool, name):
@@ -222,3 +233,196 @@ def test_proto2_required_fields(pool):
 
 def test_editions_legacy_required_fields(pool):
     assert convert(pool, "editions.Edition").schema["required"] == ["id"]
+
+
+def test_validation_rules():
+    assert convert(load_pool(validated_descriptor_set()), "validated.Span").schema == {
+        "type": "object",
+        "properties": {
+            "traceId": {"type": "string", "pattern": f"^{BASE64}{{20}}{BASE64}[AQgw]==$"},
+            "spanId": {"type": "string", "pattern": f"^{BASE64}{{8}}{BASE64}{{2}}[AEIMQUYcgkosw048]=$"},
+            "payload": {
+                "type": "string",
+                "pattern": f"^(?:(?:{BASE64}{{4}}){{1,2}}|(?:{BASE64}{{4}}){{1,2}}{BASE64}[AQgw]=="
+                f"|(?:{BASE64}{{4}}){{0,1}}{BASE64}{{2}}[AEIMQUYcgkosw048]=)$",
+            },
+            "id": {"type": "string", "format": "uuid"},
+            "name": {"type": "string", "minLength": 4, "maxLength": 10, "pattern": "^sp-", "not": {"enum": ["sp-x"]}},
+            "email": {"type": "string", "format": "email"},
+            "count": {**INT32, "maximum": 100, "exclusiveMinimum": 0},
+            "total": {**INT64, "minimum": 1, "not": {"enum": [13]}},
+            "ratio": {**DOUBLE, "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+            "outside": {**INT32, "anyOf": [{"exclusiveMinimum": 10}, {"exclusiveMaximum": 5}]},
+            "kind": {"enum": ["KIND_A", "KIND_B"]},
+            "tags": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 2},
+                "minItems": 1,
+                "maxItems": 3,
+                "uniqueItems": True,
+            },
+            "labels": {
+                "type": "object",
+                "additionalProperties": {"type": "string", "maxLength": 5},
+                "propertyNames": {"minLength": 1},
+                "maxProperties": 2,
+                "minProperties": 1,
+            },
+            "parent": {"$ref": "#/$defs/validated.Parent"},
+            "skipped": STRING,
+            "note": {"type": "string", "minLength": 3},
+            "code": {"type": "string", "not": {"const": ""}},
+            "nickname": {"type": "string", "maxLength": 3},
+            "host": {"type": "string", "format": "hostname"},
+            "address": {"type": "string", "anyOf": [{"format": "ipv4"}, {"format": "ipv6"}]},
+            "plain": STRING,
+            "left": STRING,
+            "right": STRING,
+            "legacy": {"type": "string", "maxLength": 4},
+            "legacyParent": {"$ref": "#/$defs/validated.Parent"},
+        },
+        "additionalProperties": False,
+        "required": [
+            "traceId",
+            "spanId",
+            "payload",
+            "id",
+            "name",
+            "email",
+            "count",
+            "total",
+            "ratio",
+            "outside",
+            "kind",
+            "tags",
+            "labels",
+            "parent",
+            "code",
+            "nickname",
+            "legacy",
+            "legacyParent",
+        ],
+        "allOf": [
+            {"oneOf": [{"required": ["host"]}, {"required": ["address"]}]},
+            {"oneOf": [{"required": ["left"]}, {"required": ["right"]}]},
+        ],
+        "$defs": {"validated.Parent": {"type": "object", "properties": {"id": STRING}, "additionalProperties": False}},
+    }
+
+
+def test_more_validation_rules():
+    assert convert(load_pool(validated_descriptor_set()), "validated.Extras").schema == {
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 10,
+                "pattern": r"a\.b.*\.txt$",
+                "not": {"pattern": "zz"},
+            },
+            "slug": {"type": "string", "pattern": "^[a-z]+$", "allOf": [{"pattern": "^ab"}]},
+            "fixed": {"type": "string", "const": "x"},
+            "chosen": {"type": "string", "enum": ["a", "b"]},
+            "short": {"type": "string", "minLength": 3, "maxLength": 3},
+            "v4": {"type": "string", "format": "ipv4"},
+            "v6": {"type": "string", "format": "ipv6"},
+            "link": {"type": "string", "format": "uri"},
+            "ref": {"type": "string", "format": "uri-reference"},
+            "trimmed": {"type": "string", "pattern": "^[0-9a-fA-F]{32}$"},
+            "place": {"type": "string", "anyOf": [{"format": "hostname"}, {"format": "ipv4"}, {"format": "ipv6"}]},
+            "level": {**INT32, "enum": [1, 2]},
+            "scale": {**FLOAT, "const": 1.5},
+            "on": {"type": "boolean", "const": True},
+            "flag": {"type": "boolean", "not": {"const": False}},
+            "amount": {**INT64, "not": {"const": 0}},
+            "picked": {
+                "enum": ["KIND_UNSPECIFIED", "KIND_A", "KIND_B", "KIND_C"],
+                "not": {"const": "KIND_UNSPECIFIED"},
+            },
+            "mode": {"enum": ["KIND_B"]},
+            "modes": {"type": "array", "items": {"enum": ["KIND_A", "KIND_B"]}},
+            "blob": {
+                "type": "string",
+                "pattern": f"^(?:(?:{BASE64}{{4}}){{1,}}|(?:{BASE64}{{4}}){{1,}}{BASE64}[AQgw]=="
+                f"|(?:{BASE64}{{4}}){{1,}}{BASE64}{{2}}[AEIMQUYcgkosw048]=)$",
+            },
+            "raw": {"type": "string", "format": "byte"},
+            "counts": {
+                "type": "object",
+                "additionalProperties": STRING,
+                "propertyNames": {"enum": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]},
+                "minProperties": 1,
+            },
+            "names": {"type": "array", "items": STRING, "maxItems": 2, "minItems": 1},
+            "solo": STRING,
+            "first": STRING,
+            "second": STRING,
+        },
+        "additionalProperties": False,
+        "required": [
+            "file",
+            "slug",
+            "fixed",
+            "chosen",
+            "short",
+            "v4",
+            "v6",
+            "link",
+            "ref",
+            "trimmed",
+            "place",
+            "level",
+            "scale",
+            "on",
+            "flag",
+            "amount",
+            "picked",
+            "mode",
+            "modes",
+            "blob",
+            "raw",
+            "counts",
+            "names",
+            "solo",
+        ],
+        "allOf": [
+            {
+                "oneOf": [
+                    {"required": ["first"]},
+                    {"required": ["second"]},
+                    {"not": {"anyOf": [{"required": ["first"]}, {"required": ["second"]}]}},
+                ]
+            }
+        ],
+    }
+
+
+FLOAT32_TINY = 1.401298464324817e-45
+
+
+def test_validation_rules_on_edge_cases():
+    assert convert(load_pool(validated_descriptor_set()), "validated.Edges").schema == {
+        "type": "object",
+        "properties": {
+            "small": {"type": "number", "minimum": FLOAT32_TINY, "maximum": 0.9999999403953552},
+            "nonzero": {**FLOAT, "anyOf": [{"minimum": FLOAT32_TINY}, {"maximum": -FLOAT32_TINY}]},
+            "token": {"type": "string", "format": "byte", "enum": ["AAE=", "AQI="]},
+            "magic": {"type": "string", "format": "byte", "const": "AQI="},
+            "only": STRING,
+            "ranked": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["5", "7"]}},
+            "below": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["-2", "-1"]}},
+            "created": {"type": "string", "format": "date-time"},
+        },
+        "additionalProperties": False,
+        "required": ["small", "nonzero", "token", "magic", "only", "ranked", "below", "created"],
+    }
+
+
+def test_rules_from_releases_before_field_rules_rename():
+    assert convert(load_pool(old_protovalidate_descriptor_set()), "old.Tagged").schema == {
+        "type": "object",
+        "properties": {"tags": {"type": "array", "items": {"type": "string", "minLength": 2}}},
+        "additionalProperties": False,
+        "required": ["tags"],
+    }
