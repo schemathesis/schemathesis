@@ -408,7 +408,7 @@ def test_validation_rules_on_edge_cases():
             "small": {"type": "number", "minimum": FLOAT32_TINY, "maximum": 0.9999999403953552},
             "nonzero": {**FLOAT, "anyOf": [{"minimum": FLOAT32_TINY}, {"maximum": -FLOAT32_TINY}]},
             "token": {"type": "string", "format": "byte", "enum": ["AAE=", "AQI="]},
-            "magic": {"type": "string", "format": "byte", "const": "AQI="},
+            "magic": {"type": "string", "format": "byte", "const": "+/8="},
             "only": STRING,
             "ranked": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["5", "7"]}},
             "below": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["-2", "-1"]}},
