@@ -9,7 +9,6 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Final, cast
 
 import jsonschema_rs
-from google.protobuf import json_format, message_factory
 from google.protobuf.descriptor import FieldDescriptor
 
 from schemathesis.core.cache import MISSING
@@ -24,7 +23,7 @@ from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo, uniform_metadata
 from schemathesis.specs.grpc.constraints import ConstraintReader
-from schemathesis.specs.grpc.converter import is_well_known, message_schema
+from schemathesis.specs.grpc.converter import is_well_known, message_schema, request_message
 from schemathesis.specs.grpc.formats import grpc_formats
 
 if TYPE_CHECKING:
@@ -61,7 +60,6 @@ def iter_coverage_cases(
         Alphabet(allow_x00=generation.allow_x00, codec=generation.codec),
         ConstraintReader.from_pool(root.file.pool),
     )
-    message_class = message_factory.GetMessageClass(root)
     # Different JSON bodies often encode to the same bytes, as default values of fields without presence vanish.
     seen: set[bytes] = set()
     instant = Instant()
@@ -78,9 +76,7 @@ def iter_coverage_cases(
     ) -> Case | None:
         if not values.is_valid(values.schema, checked):
             return None
-        encoded = json_format.ParseDict(
-            cast("dict", body), message_class(), descriptor_pool=root.file.pool
-        ).SerializeToString(deterministic=True)
+        encoded = request_message(body, root).SerializeToString(deterministic=True)
         if encoded in seen:
             return None
         seen.add(encoded)

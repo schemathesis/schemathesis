@@ -203,7 +203,7 @@ def edges_rules(edges):
         "small": 0 < edges.small < 1,
         "nonzero": edges.nonzero != 0,
         "token": edges.token in (b"\x00\x01", b"\x01\x02"),
-        "magic": edges.magic == b"\x01\x02",
+        "magic": edges.magic == b"\xfb\xff",
         "only": edges.WhichOneof("pick") == "only",
         "ranked": set(edges.ranked) <= {5, 7},
         "below": set(edges.below) <= {-2, -1},
@@ -244,6 +244,8 @@ def test_positive_values_satisfy_validation_rules_with_reported_fields(validated
         assert broken_rules(operation, case.body) == [], case.body
 
 
+# Newer Pythons drop standard-alphabet characters from URL-safe base64 and warn about it first.
+@pytest.mark.filterwarnings("error::FutureWarning")
 @pytest.mark.parametrize("method", RULES)
 def test_coverage_cases_satisfy_validation_rules(validated_schema, method):
     operation = validated_schema["validated.Spans"][method]

@@ -622,7 +622,7 @@ def validated_descriptor_set() -> bytes:
         ("small", FieldDescriptorProto.TYPE_FLOAT, {}, {"float": {"gt": 0, "lt": 1}}),
         ("nonzero", FieldDescriptorProto.TYPE_FLOAT, {}, {"required": True}),
         ("token", FieldDescriptorProto.TYPE_BYTES, {}, {"bytes": {"in": ["AAE=", "AQI="]}}),
-        ("magic", FieldDescriptorProto.TYPE_BYTES, {}, {"bytes": {"const": "AQI="}}),
+        ("magic", FieldDescriptorProto.TYPE_BYTES, {}, {"bytes": {"const": "-_8="}}),
         ("only", FieldDescriptorProto.TYPE_STRING, {"oneof_index": 0}, {"required": True}),
         (
             "ranked",
