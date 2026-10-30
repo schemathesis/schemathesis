@@ -220,8 +220,11 @@ class EngineErrorInfo:
             if base_url_is_set:
                 return f"Check that the API is running and reachable at {target}."
             return f"Check that the API is running and reachable at {target}; set the address with {bold('`--url`')}."
-        if isinstance(self._error, ServerUnavailable) and not self._error.recordable:
-            return CRASH_MAY_BE_OLDER
+        if isinstance(self._error, ServerUnavailable):
+            if self._error.culprit_listed:
+                return None
+            if not self._error.recordable:
+                return CRASH_MAY_BE_OLDER
         return get_runtime_error_suggestion(self._kind, bold=bold)
 
     def format(self, *, bold: Callable[[str], str] = str, indent: str = "    ", base_url_is_set: bool = False) -> str:
@@ -532,10 +535,13 @@ class ServerUnavailable(Exception):
 
     # Whether a HAR report can record the requests sent to this server.
     recordable: bool
+    # Whether the message lists a request the crash dropped, so the cause is very likely among them.
+    culprit_listed: bool
 
-    def __init__(self, message: str, *, recordable: bool) -> None:
+    def __init__(self, message: str, *, recordable: bool, culprit_listed: bool) -> None:
         super().__init__(message)
         self.recordable = recordable
+        self.culprit_listed = culprit_listed
 
 
 def _refused_address(exc: requests.ConnectionError) -> str | None:

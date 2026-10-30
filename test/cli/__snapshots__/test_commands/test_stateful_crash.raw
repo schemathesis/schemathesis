@@ -31,9 +31,6 @@ http://127.0.0.1 stopped responding. Last requests before it went away:
     curl -X GET --insecure http://127.0.0.1/users/123
 
     curl -X POST -H 'Content-Type: application/json' -d '{"name": "alice"}' --insecure http://127.0.0.1/users
-
-Tip: If the server crashed, the request that caused it may be older than these.
-Record every request sent with `--report=har`.
 ________________________________ Stateful tests ________________________________
 Network Error
 
