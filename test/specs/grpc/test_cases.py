@@ -1,5 +1,6 @@
 import base64
 import ipaddress
+import math
 import re
 import sys
 
@@ -10,7 +11,7 @@ import schemathesis
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.control import SkipTest
 from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
-from schemathesis.core.jsonschema.numeric import FLOAT32_MAX
+from schemathesis.core.jsonschema.numeric import FLOAT32_MAX, next_float32
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import FeedbackSources
@@ -367,6 +368,15 @@ def test_coverage_scalar_bounds(schema):
         {"float": -FLOAT32_MAX},
         {"double": sys.float_info.max},
         {"tags": [0]},
+    )
+
+
+def test_coverage_exclusive_float_bounds(validated_schema):
+    span = dict(coverage_cases(validated_schema, "Record", "validated.Spans"))
+    edges = dict(coverage_cases(validated_schema, "Edge", "validated.Spans"))
+    assert (span["Maximum `ratio`"]["ratio"], edges["Maximum `small`"]["small"]) == (
+        math.nextafter(1, 0),
+        next_float32(1, going_up=False),
     )
 
 
