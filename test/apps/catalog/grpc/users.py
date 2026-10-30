@@ -176,6 +176,9 @@ def users(
         user_id = request_class.FromString(payload).user_id
         if user_id < 0:
             context.abort(grpc.StatusCode.INTERNAL, "negative id")
+        if user_id == 400:
+            context.set_trailing_metadata((("x-details", "x" * 65536),))
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid")
         if user_id == 503:
             context.abort(grpc.StatusCode.UNAVAILABLE, "")
         if user_id == 404:
