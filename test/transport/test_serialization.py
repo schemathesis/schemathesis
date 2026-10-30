@@ -2405,6 +2405,20 @@ def _with_child(child):
         (
             {
                 "type": "object",
+                "xml": {"name": "root"},
+                "properties": {
+                    "child": {"type": "string", "xml": {"prefix": "p"}},
+                    "id": {"type": "string", "xml": {**PREFIXED_CHILD_XML, "attribute": True}},
+                },
+            },
+            {},
+            "3.0.2",
+            {"child": "y", "id": "x"},
+            b'<root xmlns:p="http://p" p:id="x"><p:child>y</p:child></root>',
+        ),
+        (
+            {
+                "type": "object",
                 "properties": {
                     "flag": {"type": "boolean"},
                     "note": {"type": "null"},
@@ -2537,6 +2551,7 @@ def _with_child(child):
         "prefixed-nested-property-wrapped-array",
         "shared-array-items-keep-own-prefix",
         "attribute-namespace-binds-prefix-inside-element",
+        "attribute-namespace-binds-prefix-for-earlier-element",
         "boolean-and-null-use-json-spelling",
         "referenced-property-schema",
         "referenced-array-items",

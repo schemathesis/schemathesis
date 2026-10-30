@@ -260,16 +260,18 @@ def _write_object(
     properties = (schema or {}).get("properties", {})
     # Attribute namespaces are declared on this element, so their prefixes stay bound only until it closes.
     depth = len(stack)
+    # Elements go out after every attribute is read, so they can use any attribute's prefix regardless of order.
+    elements = []
     for child_name, value in obj.items():
         property_schema = properties.get(child_name, {})
         child_resolver = resolver
         if "$ref" in property_schema:
             child_resolver, property_schema = resolve_reference(resolver, property_schema["$ref"])
         child_options = property_schema.get("xml", {})
-        push_namespace_if_any(stack, child_options)
         child_tag = child_options.get("name", child_name)
 
         if child_options.get("attribute", False):
+            push_namespace_if_any(stack, child_options)
             if child_options.get("prefix") and child_options.get("namespace"):
                 _validate_prefix(child_options, stack)
                 prefix = child_options["prefix"]
@@ -283,6 +285,10 @@ def _write_object(
                 attributes[attr_name] = f'{attr_name}="{_escape_xml(value)}"'
             continue
 
+        elements.append((child_tag, value, property_schema, child_options, child_resolver))
+
+    for child_tag, value, property_schema, child_options, child_resolver in elements:
+        push_namespace_if_any(stack, child_options)
         child_tag = _sanitize_xml_name(child_tag)
         _validate_prefix(child_options, stack)
         _write_xml(children_buffer, value, child_tag, property_schema, stack, child_resolver)
