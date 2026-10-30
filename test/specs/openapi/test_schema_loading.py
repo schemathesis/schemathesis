@@ -1,4 +1,6 @@
+import json
 import platform
+import re
 
 import jsonschema_rs
 import pytest
@@ -15,6 +17,7 @@ from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import validators
+from test.utils import run_given
 
 
 @pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
@@ -286,6 +289,85 @@ def test_openapi_3_2_querystring_parameter_is_collected(ctx):
     assert len(operation.query.items) == 1
     assert operation.query.items[0].definition["in"] == "querystring"
     assert operation.query.items[0].location == ParameterLocation.QUERY
+
+
+ITEM = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"], "additionalProperties": False}
+MEDIA_TYPE_COMPONENTS = {"mediaTypes": {"Item": {"schema": ITEM}}}
+REFERENCED_CONTENT = {"application/json": {"$ref": "#/components/mediaTypes/Item"}}
+
+
+def test_openapi_3_2_media_type_reference_in_request_body(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": REFERENCED_CONTENT},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+        components=MEDIA_TYPE_COMPONENTS,
+    )
+
+    @run_given(operation.as_strategy(), max_examples=10)
+    def test(case):
+        assert set(case.body) == {"id"}
+        assert isinstance(case.body["id"], int)
+
+
+def test_openapi_3_2_media_type_reference_in_parameter(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "q", "in": "query", "required": True, "content": REFERENCED_CONTENT}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.2.0",
+        components=MEDIA_TYPE_COMPONENTS,
+    )
+
+    @run_given(operation.as_strategy(), max_examples=10)
+    def test(case):
+        value = json.loads(case.query["q"])
+        assert set(value) == {"id"}
+        assert isinstance(value["id"], int)
+
+
+@pytest.mark.parametrize(
+    ("request_body", "reference"),
+    [
+        ({"$ref": "#/components/requestBodies/Missing"}, "#/components/requestBodies/Missing"),
+        (
+            {"required": True, "content": {"application/json": {"$ref": "#/components/mediaTypes/Missing"}}},
+            "#/components/mediaTypes/Missing",
+        ),
+    ],
+    ids=["request-body", "media-type"],
+)
+def test_openapi_3_2_unresolvable_media_type_reference(ctx, request_body, reference):
+    schema = ctx.openapi.load_schema(
+        {"/items": {"post": {"requestBody": request_body, "responses": {"200": {"description": "OK"}}}}},
+        version="3.2.0",
+        components=MEDIA_TYPE_COMPONENTS,
+    )
+    with pytest.raises(InvalidSchema, match=re.escape(reference)):
+        schema["/items"]["POST"]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [REFERENCED_CONTENT, {**REFERENCED_CONTENT, "text/plain": "malformed"}],
+    ids=["reference", "reference-next-to-malformed-entry"],
+)
+def test_openapi_3_2_media_type_reference_in_response(ctx, response_factory, content):
+    schema = ctx.openapi.load_schema(
+        {"/items": {"get": {"responses": {"200": {"description": "OK", "content": content}}}}},
+        version="3.2.0",
+        components=MEDIA_TYPE_COMPONENTS,
+    )
+    with pytest.raises(JsonSchemaError):
+        schema.validate_response(
+            schema["/items"]["GET"],
+            response_factory.core(content=b'{"id": "bad"}', headers={"content-type": ["application/json"]}),
+        )
 
 
 @pytest.mark.parametrize(

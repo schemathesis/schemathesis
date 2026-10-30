@@ -454,6 +454,17 @@ def _iter_resolved_responses(
         # Some real-world schemas use: response -> $ref to definition -> $ref to actual schema
         # While technically not spec-compliant, this pattern is common enough to warrant leniency
         response_resolver, resolved = maybe_resolve_with_resolver(resolved, response_resolver)
+        content = resolved.get("content")
+        if isinstance(content, dict) and any(isinstance(entry, dict) and "$ref" in entry for entry in content.values()):
+            resolved = {
+                **resolved,
+                "content": {
+                    media_type: maybe_resolve_with_resolver(entry, response_resolver)[1]
+                    if isinstance(entry, dict)
+                    else entry
+                    for media_type, entry in content.items()
+                },
+            }
         new_scope = response_resolver.base_uri
         yield (
             status_code,

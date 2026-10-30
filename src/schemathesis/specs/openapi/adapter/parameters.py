@@ -2120,12 +2120,15 @@ def _bundle_parameter(
                 if not isinstance(media_type_object, Mapping):
                     updated_content[media_type] = media_type_object
                     continue
+                media_type_resolver, media_type_object = maybe_resolve_with_resolver(
+                    media_type_object, parameter_resolver
+                )
                 media_type_object = dict(media_type_object)
                 nested_schema = media_type_object.get("schema")
                 if isinstance(nested_schema, dict):
                     bundled = bundler.bundle(
                         nested_schema,
-                        parameter_resolver,
+                        media_type_resolver,
                     )
                     media_type_object["schema"] = bundled.schema
                     name_to_uri.update(bundled.name_to_uri)
@@ -2358,6 +2361,7 @@ def iter_parameters_v3(
         ensure_object(request_body["content"], "`requestBody.content`")
         for media_type, content in request_body["content"].items():
             ensure_object(content, f"Media type `{media_type}`")
+            content_resolver, content = maybe_resolve_with_resolver(content, body_resolver)
             resource_name = None
             schema = content.get("schema")
             name_to_uri = {}
@@ -2375,7 +2379,7 @@ def iter_parameters_v3(
                     # their converted schemas.
                     bundled = Bundler(ref_siblings=bundler.ref_siblings).bundle(
                         to_bundle,
-                        body_resolver,
+                        content_resolver,
                     )
                     content["schema"] = bundled.schema
                     name_to_uri = bundled.name_to_uri
