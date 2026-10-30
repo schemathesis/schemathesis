@@ -177,8 +177,8 @@ def users(
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
-    `on_get_user` sees each id first. 404 is NOT_FOUND, 17 answers with bytes that do not decode, and 422 fails in the
-    request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
+    `on_get_user` sees each id first. 404 is NOT_FOUND, 499 is CANCELLED, 17 answers with bytes that do not decode,
+    and 422 fails in the request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
     a `google.rpc.ErrorInfo` detail, a type clients do not know, in `error` for a negative id. Reflection refuses calls
     that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
@@ -234,6 +234,8 @@ def users(
             context.abort(grpc.StatusCode.UNAVAILABLE, "")
         if user_id == 404:
             context.abort(grpc.StatusCode.NOT_FOUND, "no such user")
+        if user_id == 499:
+            context.abort(grpc.StatusCode.CANCELLED, "")
         if user_id == 501:
             context.abort(grpc.StatusCode.UNIMPLEMENTED, "")
         if user_id == 9:
