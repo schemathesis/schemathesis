@@ -603,6 +603,13 @@ class GrpcApps:
         self.parent.request.addfinalizer(lambda: app.server.stop(None))
         return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
 
+    def side_effects(self) -> GrpcServer:
+        from test.apps.catalog.grpc import users as grpc_users
+
+        app = grpc_users.side_effects()
+        self.parent.request.addfinalizer(lambda: app.server.stop(None))
+        return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
+
 
 @dataclass(slots=True)
 class GrpcContext:

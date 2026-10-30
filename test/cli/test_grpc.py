@@ -3,7 +3,12 @@ import sys
 
 import pytest
 
-from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import (
+    all_types_descriptor_set,
+    side_effects_descriptor_set,
+    users_descriptor_set,
+    write_descriptor_set,
+)
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -184,3 +189,16 @@ def map_body(context, body):
         cli.main("run", server.target, "--include-name=pkg.Users/GetUser", "--max-examples=1", hooks=module)
         == snapshot_cli
     )
+
+
+def test_methods_with_side_effects_run_last(ctx, cli, tmp_path):
+    server = ctx.grpc.apps.side_effects()
+    write_descriptor_set(tmp_path, side_effects_descriptor_set())
+    cli.run("api.binpb", f"--url={server.target}", "--max-examples=1", "--workers=2")
+    order = list(dict.fromkeys(call.method for call in server.calls))
+    # Two workers race within a layer, never across layers.
+    assert [set(order[:2]), set(order[2:4]), set(order[4:])] == [
+        {"ListItems", "Status"},
+        {"Alarm", "Listen"},
+        {"DeleteItem", "SetConfig"},
+    ]

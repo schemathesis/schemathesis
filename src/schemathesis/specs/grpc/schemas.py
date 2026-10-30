@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import jsonschema_rs
-from google.protobuf import descriptor_pool, field_mask_pb2, json_format, message, message_factory
+from google.protobuf import descriptor_pb2, descriptor_pool, field_mask_pb2, json_format, message, message_factory
 
 # googleapis-common-protos ships no type information.
 from google.rpc import status_pb2  # type: ignore[import-untyped]
@@ -84,6 +84,50 @@ EXCLUDED_METADATA = frozenset(
 
 def is_unary(method: MethodDescriptor) -> bool:
     return not (method.client_streaming or method.server_streaming)
+
+
+# Method name prefixes for reads and writes: API Improvement Proposals standard methods plus common custom verbs.
+READ_VERBS = ("Get", "List", "BatchGet", "Search")
+WRITE_VERBS = (
+    "Create",
+    "Update",
+    "Delete",
+    "Purge",
+    "Undelete",
+    "BatchCreate",
+    "BatchUpdate",
+    "BatchDelete",
+    "Set",
+    "Put",
+    "Add",
+    "Remove",
+)
+
+
+def side_effect_rank(method: MethodDescriptor) -> int:
+    """Run order: reads first, methods of unknown effect next, writes last.
+
+    A declared idempotency level wins over the method name.
+    """
+    level = method.GetOptions().idempotency_level
+    if level == descriptor_pb2.MethodOptions.NO_SIDE_EFFECTS:
+        return 0
+    if level == descriptor_pb2.MethodOptions.IDEMPOTENT:
+        return 2
+    if _starts_with_verb(method.name, READ_VERBS):
+        return 0
+    if _starts_with_verb(method.name, WRITE_VERBS):
+        return 2
+    return 1
+
+
+def _starts_with_verb(name: str, verbs: tuple[str, ...]) -> bool:
+    for verb in verbs:
+        rest = name.removeprefix(verb)
+        # `Listen` does not start with `List`: the verb must end where the next word starts.
+        if rest != name and (not rest or rest[0].isupper()):
+            return True
+    return False
 
 
 @dataclass(eq=False, repr=False)
@@ -230,6 +274,14 @@ class GrpcSchema(BaseSchema):
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return [operation.definition.raw.containing_service.full_name]
+
+    @override
+    def get_operation_layers(self, operations: list[APIOperation]) -> list[list[APIOperation]]:
+        # Methods that change state run after those that only read it, so a destructive call cannot spoil the rest.
+        layers: list[list[APIOperation]] = [[], [], []]
+        for operation in operations:
+            layers[side_effect_rank(operation.definition.raw)].append(operation)
+        return [layer for layer in layers if layer]
 
     @override
     def get_operation_id(self, operation: APIOperation) -> str | None:
