@@ -20,7 +20,13 @@ from typing_extensions import override
 from schemathesis import auths
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, Specification
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import InvalidSchema, OperationNotFound, SerializationError, not_found_message
+from schemathesis.core.errors import (
+    IncorrectUsage,
+    InvalidSchema,
+    OperationNotFound,
+    SerializationError,
+    not_found_message,
+)
 from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
@@ -443,6 +449,9 @@ class GrpcSchema(BaseSchema):
         media_type: str | None = None,
         phase: TestPhase = TestPhase.FUZZING,
     ) -> SearchStrategy[Case]:
+        for name, value in (("query", query), ("cookies", cookies), ("path_parameters", path_parameters)):
+            if value:
+                raise IncorrectUsage(f"`{name}` is not supported for gRPC operations")
         generation = self.config.generation_for(operation=operation, phase=phase.value)
         if isinstance(body, NotSet):
             input_type = operation.definition.raw.input_type
