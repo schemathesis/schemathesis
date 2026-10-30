@@ -91,6 +91,31 @@ def users_descriptor_set() -> bytes:
     return descriptor_pb2.FileDescriptorSet(file=[timestamp, users, operations, any_file]).SerializeToString()
 
 
+def side_effects_descriptor_set() -> bytes:
+    empty = descriptor_pb2.FileDescriptorProto()
+    empty_pb2.DESCRIPTOR.CopyToProto(empty)
+    store = descriptor_pb2.FileDescriptorProto(
+        name="store.proto", package="store", syntax="proto3", dependency=[empty.name]
+    )
+    service = store.service.add(name="Store")
+    levels = {
+        "DeleteItem": descriptor_pb2.MethodOptions.IDEMPOTENCY_UNKNOWN,
+        "SetConfig": descriptor_pb2.MethodOptions.IDEMPOTENT,
+        "Alarm": descriptor_pb2.MethodOptions.IDEMPOTENCY_UNKNOWN,
+        "Listen": descriptor_pb2.MethodOptions.IDEMPOTENCY_UNKNOWN,
+        "ListItems": descriptor_pb2.MethodOptions.IDEMPOTENCY_UNKNOWN,
+        "Status": descriptor_pb2.MethodOptions.NO_SIDE_EFFECTS,
+    }
+    for name, level in levels.items():
+        service.method.add(
+            name=name,
+            input_type=".google.protobuf.Empty",
+            output_type=".google.protobuf.Empty",
+            options=descriptor_pb2.MethodOptions(idempotency_level=level),
+        )
+    return descriptor_pb2.FileDescriptorSet(file=[empty, store]).SerializeToString()
+
+
 def all_types_descriptor_set() -> bytes:
     well_known = []
     for module in (any_pb2, duration_pb2, empty_pb2, field_mask_pb2, struct_pb2, timestamp_pb2, wrappers_pb2):

@@ -11,7 +11,11 @@ import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
-from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import (
+    side_effects_descriptor_set,
+    users_descriptor_set,
+    write_descriptor_set,
+)
 
 
 @pytest.fixture
@@ -133,6 +137,22 @@ def test_filters(schema, narrow, expected):
 def test_statistic(schema, narrow, expected):
     statistic = narrow(schema).statistic
     assert (statistic.operations.total, statistic.operations.selected, statistic.unmatched_filters) == expected
+
+
+@pytest.fixture
+def side_effects_schema(tmp_path):
+    return schemathesis.grpc.from_path(write_descriptor_set(tmp_path, side_effects_descriptor_set()))
+
+
+def test_operation_layers_put_reads_first_and_writes_last(side_effects_schema):
+    operations = [result.ok() for result in side_effects_schema.get_all_operations()]
+    assert [
+        [operation.label for operation in layer] for layer in side_effects_schema.get_operation_layers(operations)
+    ] == [
+        ["store.Store/ListItems", "store.Store/Status"],
+        ["store.Store/Alarm", "store.Store/Listen"],
+        ["store.Store/DeleteItem", "store.Store/SetConfig"],
+    ]
 
 
 def test_validate_accepts_loaded_schema(schema):

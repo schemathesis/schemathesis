@@ -10,7 +10,7 @@ import trustme
 from google.protobuf import descriptor_database, descriptor_pb2, descriptor_pool, message_factory
 from grpc_reflection.v1alpha import reflection, reflection_pb2
 
-from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import side_effects_descriptor_set, users_descriptor_set, write_descriptor_set
 
 
 @dataclass(slots=True)
@@ -191,3 +191,34 @@ def users(
     if start:
         server.start()
     return GrpcApp(server=server, port=port, calls=calls, reflection_calls=recorder.calls, tls=files)
+
+
+class AnswerEmpty(grpc.GenericRpcHandler):
+    def __init__(self, calls: list[GrpcCall]) -> None:
+        self.calls = calls
+
+    def service(self, handler_call_details):
+        def answer(payload: bytes, context: grpc.ServicerContext) -> bytes:
+            self.calls.append(
+                GrpcCall(
+                    method=handler_call_details.method.rsplit("/", 1)[1],
+                    metadata=[(item.key, item.value) for item in context.invocation_metadata()],
+                    peer_names=[],
+                    peer=context.peer(),
+                )
+            )
+            return b""
+
+        return grpc.unary_unary_rpc_method_handler(answer)
+
+
+def side_effects() -> GrpcApp:
+    """Every `store.Store` method answers an empty message; calls are recorded in arrival order."""
+    calls: list[GrpcCall] = []
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    server.add_generic_rpc_handlers((AnswerEmpty(calls),))
+    port = server.add_insecure_port("127.0.0.1:0")
+    server.start()
+    return GrpcApp(
+        server=server, port=port, calls=calls, reflection_calls=[], descriptor_set=side_effects_descriptor_set()
+    )
