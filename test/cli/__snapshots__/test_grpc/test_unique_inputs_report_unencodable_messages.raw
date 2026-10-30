@@ -1,0 +1,48 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from grpc://127.0.0.1 (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 3 total
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+______________________________ pkg.Users/GetUser _______________________________
+Serialization not possible
+
+Cannot encode the request body as `pkg.GetUserRequest`: Message type "pkg.GetUserRequest" has no field named "unknown" at "GetUserRequest".
+ Available Fields(except extensions): "['userId']"
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/3
+  Tested: 0
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  🚫 Fuzzing
+  ⏭  Stateful (not applicable)
+
+Errors:
+  🚫 Serialization not possible: 1
+
+Test cases:
+  N generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

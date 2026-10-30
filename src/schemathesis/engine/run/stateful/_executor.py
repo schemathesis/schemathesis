@@ -283,9 +283,9 @@ def _reject_unusable_operation(engine: EngineContext, operation_label: str) -> N
         reject()
 
 
-def _replay_cached_outcome(ctx: StatefulContext, case: Case) -> bool:
+def _replay_cached_outcome(ctx: StatefulContext, key: int) -> bool:
     """`True` when this input already passed in the current scenario."""
-    return ctx.get_step_outcome(case) is None
+    return ctx.get_step_outcome(key) is None
 
 
 def _send_step(
@@ -357,18 +357,14 @@ def _record_network_error(
     state.store_unrecoverable_network_error(network_error)
 
 
-def _remember_step_outcome(
-    ctx: StatefulContext, case: Case, outcome: BaseException | None, *, unique_inputs: bool
-) -> None:
-    if unique_inputs:
-        ctx.store_step_outcome(case, outcome)
+def _remember_step_outcome(ctx: StatefulContext, key: int | None, outcome: BaseException | None) -> None:
+    if key is not None:
+        ctx.store_step_outcome(key, outcome)
 
 
-def _remember_failures(
-    ctx: StatefulContext, case: Case, failures: Sequence[BaseException], *, unique_inputs: bool
-) -> None:
+def _remember_failures(ctx: StatefulContext, key: int | None, failures: Sequence[BaseException]) -> None:
     for failure in failures:
-        _remember_step_outcome(ctx, case, failure, unique_inputs=unique_inputs)
+        _remember_step_outcome(ctx, key, failure)
 
 
 def _parse_step_observations(engine: EngineContext, case: Case, response: Response) -> tuple[Observation, ...]:
@@ -499,11 +495,15 @@ def _run_step(
 ) -> StepOutput | None:
     """Send one scenario step and record its outcome; `None` when this input already passed."""
     will_send = False
+    # Hooks may change the case before it is sent; it is identified by what was generated.
+    key = None
     try:
         _raise_if_stopped(engine)
         _reject_unusable_operation(engine, case.operation.label)
-        if unique_inputs and _replay_cached_outcome(ctx, case):
-            return None
+        if unique_inputs:
+            key = hash(case)
+            if _replay_cached_outcome(ctx, key):
+                return None
         will_send = True
     finally:
         if not will_send:
@@ -516,7 +516,7 @@ def _run_step(
     except UnsatisfiedAssumption:
         raise
     except FailureGroup as exc:
-        _remember_failures(ctx, case, exc.exceptions, unique_inputs=unique_inputs)
+        _remember_failures(ctx, key, exc.exceptions)
         ctx.step_failed()
         raise
     except Exception as exc:
@@ -524,7 +524,7 @@ def _run_step(
             machine.recorder.record_network_error(case_id=case.id, error=exc)
         outage = _detect_outage(exc, engine)
         _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
-        _remember_step_outcome(ctx, case, exc, unique_inputs=unique_inputs)
+        _remember_step_outcome(ctx, key, exc)
         ctx.step_errored()
         if outage:
             raise ServerWentAway from None
@@ -536,10 +536,10 @@ def _run_step(
         ctx.step_interrupted()
         raise
     except BaseException as exc:
-        _remember_step_outcome(ctx, case, exc, unique_inputs=unique_inputs)
+        _remember_step_outcome(ctx, key, exc)
         raise exc
     else:
-        _remember_step_outcome(ctx, case, None, unique_inputs=unique_inputs)
+        _remember_step_outcome(ctx, key, None)
     return result
 
 

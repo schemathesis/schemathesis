@@ -66,6 +66,49 @@ def test_explicit_body_and_headers(schema):
     assert (case.body, case.headers) == ({"id": 1}, {"authorization": "Bearer x"})
 
 
+def test_hash_ignores_case_id(schema):
+    operation = schema["types.Types"]["Edition"]
+    assert hash(operation.Case(body={"id": 1}, headers={"authorization": "Bearer x"})) == hash(
+        operation.Case(body={"id": 1}, headers={"authorization": "Bearer x"})
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "body", "headers"),
+    [
+        ("Edition", {"id": 2}, {"authorization": "Bearer x"}),
+        ("Edition", {"id": 1}, {"authorization": "Bearer y"}),
+        ("Edition", b"\x08\x03", {"authorization": "Bearer x"}),
+        ("Legacy", {"id": 1, "blob": {}, "label": ""}, {"authorization": "Bearer x"}),
+    ],
+    ids=["body", "unmasked-header", "raw-bytes", "method"],
+)
+def test_hash_tells_cases_apart(schema, method, body, headers):
+    case = schema["types.Types"]["Edition"].Case(body={"id": 1}, headers={"authorization": "Bearer x"})
+    assert hash(case) != hash(schema["types.Types"][method].Case(body=body, headers=headers))
+
+
+def test_hash_ignores_map_entry_order(schema):
+    operation = schema["types.Types"]["Maps"]
+    assert hash(operation.Case(body={"byString": {"a": "1", "b": "2"}})) == hash(
+        operation.Case(body={"byString": {"b": "2", "a": "1"}})
+    )
+
+
+@pytest.mark.parametrize(
+    ("body", "equal_body"),
+    [
+        ({"id": 1, "unknown": 1}, {"unknown": 1, "id": 1}),
+        ({"unknown": {"b": 1, "a": [1]}}, {"unknown": {"a": [1], "b": 1}}),
+        (7, 7),
+    ],
+    ids=["unknown-field", "nested-unknown-field", "not-an-object"],
+)
+def test_hash_of_unencodable_body_matches_equal_case(schema, body, equal_body):
+    operation = schema["types.Types"]["Edition"]
+    assert hash(operation.Case(body=body)) == hash(operation.Case(body=equal_body))
+
+
 def test_body_hooks_apply(schema):
     @schema.hook
     def map_body(context, body):

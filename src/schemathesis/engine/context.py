@@ -260,12 +260,12 @@ class EngineContext:
         self.control.is_server_unavailable = True
         return True
 
-    def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
+    def cache_outcome(self, key: int, outcome: BaseException | None) -> None:
         # Keep the first traceback so every replay reports it once instead of stacking frames on it.
-        self.outcome_cache[hash(case)] = None if outcome is None else (outcome, outcome.__traceback__)
+        self.outcome_cache[key] = None if outcome is None else (outcome, outcome.__traceback__)
 
-    def get_cached_outcome(self, case: Case) -> BaseException | None | NotSet:
-        cached = self.outcome_cache.get(hash(case), NOT_SET)
+    def get_cached_outcome(self, key: int) -> BaseException | None | NotSet:
+        cached = self.outcome_cache.get(key, NOT_SET)
         if isinstance(cached, tuple):
             outcome, traceback = cached
             return outcome.with_traceback(traceback)

@@ -17,8 +17,7 @@ from schemathesis.checks import (
     run_checks,
     run_checks_for,
 )
-from schemathesis.config import SanitizationConfig
-from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, curl, media_types
+from schemathesis.core import NOT_SET, Body, NotSet, curl, media_types
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
@@ -61,7 +60,6 @@ def _default_headers() -> CaseInsensitiveDict:
 
 
 _NOTSET_HASH = 0x7F3A9B2C
-_NO_SANITIZATION = SanitizationConfig(enabled=False)
 
 
 OperationT = TypeVar("OperationT", bound="APIOperation")
@@ -217,10 +215,7 @@ class Case(Generic[OperationT]):
         return f"{output})"
 
     def __hash__(self) -> int:
-        # Identity is the wire request with unmasked values; masked ones would make distinct cases collide.
-        request = prepare_request(self, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
-        headers = tuple(sorted((name.lower(), value) for name, value in request.headers.items()))
-        return hash((request.method, request.url, headers, request.body))
+        return self.operation.schema.hash_case(self)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
