@@ -258,6 +258,8 @@ def _write_object(
     attributes = {}
     children_buffer = StringIO()
     properties = (schema or {}).get("properties", {})
+    # Attribute namespaces are declared on this element, so their prefixes stay bound only until it closes.
+    depth = len(stack)
     for child_name, value in obj.items():
         property_schema = properties.get(child_name, {})
         child_resolver = resolver
@@ -295,6 +297,7 @@ def _write_object(
     buffer.write(">")
     buffer.write(children_buffer.getvalue())
     buffer.write(f"</{tag}>")
+    del stack[depth:]
     pop_namespace_if_any(stack, options)
 
 
