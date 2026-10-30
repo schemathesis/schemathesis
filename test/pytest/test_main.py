@@ -1798,6 +1798,42 @@ def test(case):
     assert sorted(unexpected_pairs) == sorted([(m, "/items") for m in unexpected]), unexpected_pairs
 
 
+@pytest.mark.parametrize(
+    ("marker", "expected_generated"),
+    [("@pytest.mark.skip", False), ("", True)],
+    ids=["skipped", "running"],
+)
+def test_coverage_cases_generated_only_when_the_test_runs(testdir, tmp_path, marker, expected_generated):
+    log_path = tmp_path / "coverage_cases.log"
+    testdir.make_test(
+        f"""
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+@schema.hook
+def map_case(ctx, case):
+    with open({str(log_path)!r}, "a") as f:
+        f.write("generated\\n")
+    return case
+
+{marker}
+@schema.parametrize()
+def test(case):
+    pass
+""",
+        paths={
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    testdir.runpytest()
+    assert log_path.exists() is expected_generated
+
+
 def test_filter_failure_drops_a_failure(ctx, testdir):
     api = ctx.openapi.apps.failure()
     testdir.make_test(

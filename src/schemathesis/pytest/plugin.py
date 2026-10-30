@@ -28,7 +28,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_reported_failure, format_failures, get_origin
 from schemathesis.core.marks import Mark
-from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
@@ -190,19 +190,14 @@ class SchemathesisCase(PyCollector):
             if self.is_invalid_test:
                 funcobj = self.test_function
             else:
-                try:
-                    funcobj = build_operation_test(
-                        config=self.schema.config,
-                        operation=operation,
-                        test_func=self.test_function,
-                        given_kwargs=self.given_kwargs,
-                        feedback=feedback,
-                    )
-                except InvalidSchema as exc:
-                    # Coverage cases are built with the test, so a malformed definition surfaces here.
-                    result = Err(exc)
-                else:
-                    _attach_async_inner(funcobj, self.test_function)
+                funcobj = build_operation_test(
+                    config=self.schema.config,
+                    operation=operation,
+                    test_func=self.test_function,
+                    given_kwargs=self.given_kwargs,
+                    feedback=feedback,
+                )
+                _attach_async_inner(funcobj, self.test_function)
 
         if isinstance(result, Ok):
             operation = result.ok()
