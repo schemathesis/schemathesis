@@ -872,3 +872,47 @@ def test_invalid_path_parameter_missing_the_route(ctx, cli, snapshot_cli):
         cli.run_openapi_app(app, "-c", "ignored_auth", "--phases=coverage", "--mode=negative", "--max-examples=10")
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_explicit_api_key_header_in_other_case_cli(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(ITEM_WITH_API_KEY, components=API_KEY_SCHEME)
+
+    @app.route("/items/<int:item_id>")
+    def item(item_id):
+        if request.headers.get("X-API-Key") != "secret":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"id": item_id})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "-H",
+            "x-api-key: secret",
+            "-c",
+            "ignored_auth",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--max-examples=3",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize("source", ["case", "call"])
+def test_explicit_api_key_header_in_other_case(source):
+    app = FastAPI()
+    api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
+    def root(credentials: Annotated[str | None, Security(api_key)]):
+        if credentials != "secret":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return {"message": "OK"}
+
+    headers = {"x-api-key": "secret"}
+    operation = schemathesis.openapi.from_asgi("/openapi.json", app)["/"]["GET"]
+    if source == "case":
+        operation.Case(headers=headers).call_and_validate(session=ASGIClient(app), checks=[ignored_auth])
+    else:
+        operation.Case().call_and_validate(session=ASGIClient(app), headers=headers, checks=[ignored_auth])

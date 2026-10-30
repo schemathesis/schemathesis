@@ -1635,7 +1635,11 @@ def _has_undeclared_explicit_authorization(
         ctx.internals.override.headers if ctx.internals.override else None,
         response._override.headers if response._override else None,
     ]
-    return any(headers is not None and any(name.lower() == "authorization" for name in headers) for headers in sources)
+    return any(headers is not None and _has_header(headers, "Authorization") for headers in sources)
+
+
+def _has_header(headers: Mapping[str, Any], name: str) -> bool:
+    return any(key.lower() == name.lower() for key in headers)
 
 
 def _enforces_auth(response: Response, authenticated: Response) -> bool:
@@ -1716,8 +1720,8 @@ def _contains_auth(
                 # Explicit CLI headers
                 (internals.headers is not None and name in internals.headers)
                 # Other kinds of overrides
-                or (internals.override and name in internals.override.headers)
-                or (response._override and name in response._override.headers)
+                or (internals.override and _has_header(internals.override.headers, name))
+                or (response._override and _has_header(response._override.headers, name))
             ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED

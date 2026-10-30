@@ -64,7 +64,12 @@ def remove_auth_from_container(
     """Strip auth keys from a transport-kwargs container in-place."""
     for parameter in security_parameters:
         if parameter.location == location:
-            container.pop(parameter.name, None)
+            if location == ParameterLocation.HEADER:
+                # Header names are case-insensitive, query and cookie names are not.
+                for key in [key for key in container if key.lower() == parameter.name.lower()]:
+                    del container[key]
+            else:
+                container.pop(parameter.name, None)
 
 
 def remove_auth_from_cookie_header(headers: MutableMapping[str, str], name: str) -> None:
