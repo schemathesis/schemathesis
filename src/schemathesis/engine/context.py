@@ -34,10 +34,18 @@ if TYPE_CHECKING:
 
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.spec import ApiSchema
-    from schemathesis.core.transport import Response
+    from schemathesis.core.transport import CallOutcome, Response
     from schemathesis.engine import StopReason
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.resources import ExtraDataSource
+
+
+@dataclass(slots=True)
+class CachedOutcome:
+    """The run-wide result of one logical input, without its physical response."""
+
+    failure: BaseException | None = None
+    call_outcome: CallOutcome | None = None
 
 
 class _SliceBudget:
@@ -68,7 +76,7 @@ class EngineContext:
 
     schema: ApiSchema
     control: ExecutionControl
-    outcome_cache: dict[int, BaseException | None]
+    outcome_cache: dict[int, CachedOutcome]
     start_time: float
     observations: Observations | None
     link_calibration: LinkCalibrationState | None
@@ -258,10 +266,10 @@ class EngineContext:
         self.control.is_server_unavailable = True
         return True
 
-    def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
-        self.outcome_cache[hash(case)] = outcome
+    def cache_outcome(self, case: Case, outcome: CachedOutcome, *, key: int | None = None) -> None:
+        self.outcome_cache[hash(case) if key is None else key] = outcome
 
-    def get_cached_outcome(self, case: Case) -> BaseException | None | NotSet:
+    def get_cached_outcome(self, case: Case) -> CachedOutcome | NotSet:
         return self.outcome_cache.get(hash(case), NOT_SET)
 
     def get_session(self, *, operation: APIOperation | None = None) -> requests.Session:

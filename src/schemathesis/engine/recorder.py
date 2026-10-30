@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from schemathesis.checks import CheckResult
     from schemathesis.config import OutputConfig
+    from schemathesis.core.transport import CallOutcome
     from schemathesis.generation.stateful.state_machine import Transition
 
 
@@ -43,6 +44,9 @@ class RecordedScenario(Protocol):
 
     @property
     def interactions(self) -> Mapping[str, Interaction]: ...  # pragma: no cover
+
+    @property
+    def positive_outcomes(self) -> Mapping[int, CallOutcome] | None: ...  # pragma: no cover
 
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData: ...  # pragma: no cover
 
@@ -79,6 +83,8 @@ class ScenarioRecorder:
     filtered_failures: dict[str, int]
     # Network interactions by test case ID
     interactions: dict[str, Interaction]
+    # Positive semantic outcomes by input hash; `None` keeps physical-response inference.
+    positive_outcomes: dict[int, CallOutcome] | None
     __slots__ = (
         "label",
         "status",
@@ -87,6 +93,7 @@ class ScenarioRecorder:
         "checks",
         "filtered_failures",
         "interactions",
+        "positive_outcomes",
         "max_recorded_payload_size",
     )
 
@@ -96,6 +103,7 @@ class ScenarioRecorder:
         self.checks = {}
         self.filtered_failures = {}
         self.interactions = {}
+        self.positive_outcomes = None
         self.max_recorded_payload_size = (
             config.truncation.max_recorded_payload_size if config is not None else MAX_RECORDED_PAYLOAD_SIZE
         )

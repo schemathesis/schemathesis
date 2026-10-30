@@ -101,6 +101,17 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
     stay out of the count entirely rather than counting against the rate.
     """
     outcomes = ValidRate()
+    if recorder.positive_outcomes is not None:
+        for outcome in recorder.positive_outcomes.values():
+            if outcome is CallOutcome.ACCEPTED:
+                outcomes.accepted += 1
+            elif outcome is CallOutcome.UNREACHABLE:
+                outcomes.unreachable += 1
+            elif outcome is CallOutcome.CONFLICT:
+                outcomes.conflicts += 1
+            elif outcome is CallOutcome.REJECTED:
+                outcomes.rejected += 1
+        return outcomes
     for case in recorder.cases.values():
         if not _is_positive(case):
             continue
@@ -344,7 +355,7 @@ class WarningCollector:
 
         statistic = aggregate_status_codes(event.recorder)
 
-        if statistic.total == 0:
+        if statistic.total == 0 and not event.recorder.positive_outcomes:
             return
 
         # Warnings that explain why valid input was rejected look only at valid input.

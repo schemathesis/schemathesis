@@ -15,6 +15,7 @@ from schemathesis.engine._rate_limit_retry import (
     send_tracked,
     validate_case,
 )
+from schemathesis.engine.context import CachedOutcome
 from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.errors import (
     UnexpectedError,
@@ -26,6 +27,7 @@ from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, coverage_scenario
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.resources import record_delete_attempt, record_interaction
 from schemathesis.wfc.escalation import record_auth_outcome
 
@@ -103,22 +105,41 @@ def _is_skipped_by_supervisor(case: Case, ctx: EngineContext) -> bool:
     )
 
 
+def _is_positive_case(case: Case) -> bool:
+    return case.meta is not None and case.meta.generation.mode is GenerationMode.POSITIVE
+
+
 def _call_and_validate_once(
     *, case: Case, ctx: EngineContext, scenario: Scenario, pending_events: list[events.EngineEvent]
 ) -> None:
     """Send an input only the first time it is seen; later copies repeat the first outcome."""
+    recorder = scenario.recorder
+    if scenario.generation.unique_inputs and recorder.positive_outcomes is None:
+        recorder.positive_outcomes = {}
     cached = ctx.get_cached_outcome(case)
-    if isinstance(cached, BaseException):
-        raise cached
-    if cached is None:
+    if isinstance(cached, CachedOutcome):
+        if recorder.positive_outcomes is not None and _is_positive_case(case) and cached.call_outcome is not None:
+            recorder.positive_outcomes[hash(case)] = cached.call_outcome
+        if cached.failure is not None:
+            raise cached.failure
         return
+    outcome = CachedOutcome()
     try:
-        _do_call_and_validate(case=case, ctx=ctx, scenario=scenario, pending_events=pending_events)
+        _do_call_and_validate(
+            case=case,
+            ctx=ctx,
+            scenario=scenario,
+            pending_events=pending_events,
+            cached_outcome=outcome,
+        )
     except BaseException as exc:
-        ctx.cache_outcome(case, exc)
+        outcome.failure = exc
         raise
-    else:
-        ctx.cache_outcome(case, None)
+    finally:
+        key = hash(case)
+        ctx.cache_outcome(case, outcome, key=key)
+        if recorder.positive_outcomes is not None and _is_positive_case(case) and outcome.call_outcome is not None:
+            recorder.positive_outcomes[key] = outcome.call_outcome
 
 
 def _raise_case_error(
@@ -162,7 +183,12 @@ def _as_unrecoverable_network_error(
 
 
 def _do_call_and_validate(
-    *, case: Case, ctx: EngineContext, scenario: Scenario, pending_events: list[events.EngineEvent]
+    *,
+    case: Case,
+    ctx: EngineContext,
+    scenario: Scenario,
+    pending_events: list[events.EngineEvent],
+    cached_outcome: CachedOutcome | None = None,
 ) -> None:
     recorder = scenario.recorder
     transport_kwargs = scenario.transport_kwargs
@@ -171,6 +197,8 @@ def _do_call_and_validate(
         case=case, ctx=ctx, recorder=recorder, transport_kwargs=transport_kwargs, pending_events=pending_events
     )
     recorder.record_response(case_id=case.id, response=response)
+    if cached_outcome is not None:
+        cached_outcome.call_outcome = case.operation.schema.classify_call_outcome(case, response)
     _record_response_signals(
         case=case, ctx=ctx, recorder=recorder, response=response, transport_kwargs=transport_kwargs
     )
