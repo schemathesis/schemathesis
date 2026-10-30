@@ -53,7 +53,10 @@ class Override:
         """Merge the overridden parameters into the case's containers; `body` is not overridable this way."""
         for location, entry in self.items():
             name = location.container_name
-            container = getattr(case, name) or {}
+            container = getattr(case, name)
+            # Keep an empty container instead of replacing it, so headers stay case-insensitive.
+            if container is None:
+                container = {}
             container.update(entry)
             setattr(case, name, container)
 
