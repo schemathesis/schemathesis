@@ -8,10 +8,15 @@ from google.protobuf import json_format, message_factory
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
+from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
+from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import IncorrectUsage, SerializationError
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import CallOutcome
-from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, write_descriptor_set
+from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.examples import generate_many
+from test.apps.catalog.grpc.descriptors import accounts_descriptor_set, all_types_descriptor_set, write_descriptor_set
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -303,3 +308,44 @@ def test_any_field_packed_with_schema_type_is_rendered(ctx):
     assert json.loads(response.render_content(response.content)) == {
         "response": {"@type": "type.googleapis.com/pkg.User", "name": "u7"}
     }
+
+
+def create_account(ctx, tmp_path):
+    server = ctx.grpc.apps.users()
+    config = SchemathesisConfig.from_dict({"base-url": server.target})
+    path = write_descriptor_set(tmp_path, accounts_descriptor_set())
+    return schemathesis.grpc.from_path(path, config=config)["pkg.Accounts"]["CreateAccount"]
+
+
+def missing(*path):
+    return Observation(
+        operation_label="pkg.Accounts/CreateAccount",
+        location=ParameterLocation.BODY,
+        parameter_path=path,
+        kind=ObservationKind.MUST_NOT_BE_BLANK,
+        raw_message="must not be empty",
+    )
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({}, (missing("displayName"), missing("profile", "contactEmail"))),
+        ({"displayName": "", "profile": {}}, (missing("displayName"), missing("profile", "contactEmail"))),
+        ({"displayName": "admin", "profile": {"contactEmail": "a"}}, ()),
+    ],
+    ids=["omitted", "empty", "reserved"],
+)
+def test_rejected_fields_are_observed(ctx, tmp_path, body, expected):
+    case = create_account(ctx, tmp_path).Case(body=body)
+    assert parse_observations(case.operation, case, case.call()) == expected
+
+
+def test_observed_fields_are_filled(ctx, tmp_path):
+    operation = create_account(ctx, tmp_path)
+    store = ErrorFeedbackStore()
+    rejected = operation.Case(body={})
+    for observation in parse_observations(operation, rejected, rejected.call()):
+        store.record(observation)
+    cases = generate_many(operation.as_strategy(feedback=FeedbackSources(error_feedback=store)), 20)
+    assert [case.call().status_code for case in cases] == [200] * 20

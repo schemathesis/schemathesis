@@ -8,10 +8,12 @@ from pathlib import Path
 
 import grpc
 import trustme
-from google.protobuf import descriptor_database, descriptor_pb2, descriptor_pool, message_factory
+from google.protobuf import any_pb2, descriptor_database, descriptor_pb2, descriptor_pool, message_factory
+from google.rpc import error_details_pb2, status_pb2
 from grpc_reflection.v1alpha import reflection, reflection_pb2
 
 from test.apps.catalog.grpc.descriptors import (
+    accounts_descriptor_set,
     library_descriptor_set,
     side_effects_descriptor_set,
     users_descriptor_set,
@@ -154,6 +156,9 @@ def users(
     into `response`. Reflection refuses calls that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
+    `pkg.Accounts/CreateAccount` (in `accounts_descriptor_set()`, not reflected) rejects an empty `display_name`,
+    an empty `profile.contact_email` and the reserved name `admin` with INVALID_ARGUMENT, listing each field in
+    `google.rpc.BadRequest` details next to a detail of a type clients do not know.
     """
     database = descriptor_database.DescriptorDatabase()
     for file in descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file:
@@ -162,6 +167,13 @@ def users(
     request_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.GetUserRequest"))
     user_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.User"))
     operation_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("google.longrunning.Operation"))
+    accounts_pool = descriptor_pool.DescriptorPool()
+    for file in descriptor_pb2.FileDescriptorSet.FromString(accounts_descriptor_set()).file:
+        accounts_pool.Add(file)
+    account_request_class = message_factory.GetMessageClass(
+        accounts_pool.FindMessageTypeByName("pkg.CreateAccountRequest")
+    )
+    account_class = message_factory.GetMessageClass(accounts_pool.FindMessageTypeByName("pkg.Account"))
     calls: list[GrpcCall] = []
 
     def record(method: str, context: grpc.ServicerContext, payload: bytes = b"") -> None:
@@ -209,6 +221,30 @@ def users(
         context.set_trailing_metadata((("x-trace-bin", b"\x00\x01"),))
         return user_class(name=f"u{user_id}").SerializeToString()
 
+    def create_account(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        record("CreateAccount", context)
+        request = account_request_class.FromString(payload)
+        violations = []
+        if not request.display_name:
+            violations.append(("display_name", "must not be empty"))
+        elif request.display_name == "admin":
+            violations.append(("display_name", "is reserved"))
+        if not request.profile.contact_email:
+            violations.append(("profile.contact_email", "must not be empty"))
+        if violations:
+            bad_request = error_details_pb2.BadRequest(
+                field_violations=[
+                    error_details_pb2.BadRequest.FieldViolation(field=name, description=description)
+                    for name, description in violations
+                ]
+            )
+            details = status_pb2.Status(code=grpc.StatusCode.INVALID_ARGUMENT.value[0], message="invalid account")
+            details.details.add().Pack(bad_request)
+            details.details.append(any_pb2.Any(type_url="type.googleapis.com/example.Unknown", value=b"\x08\x01"))
+            context.set_trailing_metadata((("grpc-status-details-bin", details.SerializeToString()),))
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid account")
+        return account_class(display_name=request.display_name).SerializeToString()
+
     def reset(payload: bytes, context: grpc.ServicerContext) -> bytes:
         record("Reset", context, payload)
         operation = operation_class()
@@ -224,6 +260,9 @@ def users(
                 {"GetUser": grpc.unary_unary_rpc_method_handler(get_user, request_deserializer=parse_request)},
             ),
             grpc.method_handlers_generic_handler("pkg.Admin", {"Reset": grpc.unary_unary_rpc_method_handler(reset)}),
+            grpc.method_handlers_generic_handler(
+                "pkg.Accounts", {"CreateAccount": grpc.unary_unary_rpc_method_handler(create_account)}
+            ),
         )
     )
     if reflection_version is not None:

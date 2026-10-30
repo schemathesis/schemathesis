@@ -195,7 +195,7 @@ def test_any_fields_are_skipped(pool):
                 "second": {"$ref": "#/$defs/types.Meta"},
             },
             "additionalProperties": False,
-            "$defs": {"types.Meta": EMPTY_OBJECT},
+            "$defs": {"types.Meta": {**EMPTY_OBJECT, "properties": {"title": STRING}}},
         },
         any_fields=["types.Envelope.payload", "types.Envelope.extras", "types.Meta.extra"],
     )
@@ -412,10 +412,12 @@ def test_validation_rules_on_edge_cases():
             "only": STRING,
             "ranked": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["5", "7"]}},
             "below": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["-2", "-1"]}},
+            "picks": {"type": "integer", "minimum": 1, "maximum": 3, "not": {"enum": [2]}},
+            "triple": {"type": "array", "items": STRING, "minItems": 3},
             "created": {"type": "string", "format": "date-time"},
         },
         "additionalProperties": False,
-        "required": ["small", "nonzero", "token", "magic", "only", "ranked", "below", "created"],
+        "required": ["small", "nonzero", "token", "magic", "only", "ranked", "below", "picks", "triple", "created"],
     }
 
 

@@ -149,6 +149,19 @@ def side_effects_descriptor_set() -> bytes:
     return descriptor_pb2.FileDescriptorSet(file=[empty, store]).SerializeToString()
 
 
+def accounts_descriptor_set() -> bytes:
+    accounts = descriptor_pb2.FileDescriptorProto(name="accounts.proto", package="pkg", syntax="proto3")
+    request = accounts.message_type.add(name="CreateAccountRequest")
+    _field(request, "display_name", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(request, "profile", 2, FieldDescriptorProto.TYPE_MESSAGE, type_name=".pkg.Profile")
+    _field(accounts.message_type.add(name="Profile"), "contact_email", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(accounts.message_type.add(name="Account"), "display_name", 1, FieldDescriptorProto.TYPE_STRING)
+    accounts.service.add(name="Accounts").method.add(
+        name="CreateAccount", input_type=".pkg.CreateAccountRequest", output_type=".pkg.Account"
+    )
+    return descriptor_pb2.FileDescriptorSet(file=[accounts]).SerializeToString()
+
+
 def all_types_descriptor_set() -> bytes:
     well_known = []
     for module in (any_pb2, duration_pb2, empty_pb2, field_mask_pb2, struct_pb2, timestamp_pb2, wrappers_pb2):
@@ -224,6 +237,7 @@ def all_types_descriptor_set() -> bytes:
     _field(envelope, "second", 5, FieldDescriptorProto.TYPE_MESSAGE, type_name=".types.Meta")
     meta = types.message_type.add(name="Meta")
     _field(meta, "extra", 1, FieldDescriptorProto.TYPE_MESSAGE, type_name=".google.protobuf.Any")
+    _field(meta, "label", 2, FieldDescriptorProto.TYPE_STRING, json_name="title")
 
     blobs = types.message_type.add(name="Blobs")
     _field(blobs, "chunks", 1, FieldDescriptorProto.TYPE_BYTES, label=FieldDescriptorProto.LABEL_REPEATED)
@@ -292,6 +306,7 @@ def all_types_descriptor_set() -> bytes:
         ".types.Choice",
         ".legacy.Legacy",
         ".editions.Edition",
+        ".google.protobuf.StringValue",
     ):
         service.method.add(
             name=input_type.rsplit(".", 1)[1], input_type=input_type, output_type=".google.protobuf.Empty"
@@ -354,8 +369,11 @@ def _field(
     label: int = FieldDescriptorProto.LABEL_OPTIONAL,
     oneof_index: int | None = None,
     proto3_optional: bool = False,
+    json_name: str = "",
 ) -> None:
     field = message.field.add(name=name, number=number, type=kind, label=label)
+    if json_name:
+        field.json_name = json_name
     if type_name:
         field.type_name = type_name
     if oneof_index is not None:
@@ -561,6 +579,8 @@ def validated_descriptor_set() -> bytes:
             {"type_name": ".validated.Edges.BelowEntry", "label": repeated},
             {"map": {"keys": {"int32": {"gt": -3, "lt": 0}}}},
         ),
+        ("picks", FieldDescriptorProto.TYPE_INT32, {}, {"int32": {"gte": 1, "lte": 3, "notIn": [2]}}),
+        ("triple", FieldDescriptorProto.TYPE_STRING, {"label": repeated}, {"repeated": {"minItems": "3"}}),
     ]
     for number, (name, field_type, extra, value) in enumerate(edge_fields, start=1):
         _field(edges, name, number, field_type, **extra)

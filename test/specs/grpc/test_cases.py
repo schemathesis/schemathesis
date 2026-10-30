@@ -3,15 +3,18 @@ import ipaddress
 import re
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, find, given, settings
 
 import schemathesis
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core.control import SkipTest
+from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
+from schemathesis.specs.grpc.converter import request_message
 from schemathesis.specs.grpc.formats import grpc_formats
-from schemathesis.specs.grpc.schemas import request_message
 from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, validated_descriptor_set, write_descriptor_set
 from test.utils import run_given
 
@@ -201,11 +204,16 @@ def test_positive_values_satisfy_more_validation_rules(tmp_path):
         assert checks == dict.fromkeys(checks, True), case.body
 
 
-def test_positive_values_satisfy_validation_rules_on_edge_cases(tmp_path):
+@pytest.mark.parametrize(
+    "reported",
+    [(), (("nonzero",), ("picks",), ("triple",))],
+    ids=["without-feedback", "reported-missing"],
+)
+def test_positive_values_satisfy_validation_rules_on_edge_cases(tmp_path, reported):
     schema = schemathesis.grpc.from_path(write_descriptor_set(tmp_path, validated_descriptor_set()))
     operation = schema["validated.Spans"]["Edge"]
 
-    @run_given(case=operation.as_strategy(), max_examples=50)
+    @run_given(case=operation.as_strategy(feedback=feedback_for(operation, *reported)), max_examples=50)
     def test(case):
         edges = request_message(case.body, operation.definition.raw.input_type)
         checks = {
@@ -216,6 +224,8 @@ def test_positive_values_satisfy_validation_rules_on_edge_cases(tmp_path):
             "only": edges.WhichOneof("pick") == "only",
             "ranked": set(edges.ranked) <= {5, 7},
             "below": set(edges.below) <= {-2, -1},
+            "picks": edges.picks in (1, 3),
+            "triple": len(edges.triple) >= 3,
             "created": edges.HasField("created"),
         }
         assert checks == dict.fromkeys(checks, True), case.body
@@ -270,3 +280,106 @@ def test_any_fields_are_reported(schema):
             ("types.Types/Legacy", "legacy.Legacy.blob"),
         ]
     ]
+
+
+def feedback_for(operation, *paths, kind=ObservationKind.MUST_NOT_BE_BLANK):
+    store = ErrorFeedbackStore()
+    for path in paths:
+        store.record(
+            Observation(
+                operation_label=operation.label,
+                location=ParameterLocation.BODY,
+                parameter_path=path,
+                kind=kind,
+                raw_message="must not be empty",
+            )
+        )
+    return FeedbackSources(error_feedback=store)
+
+
+def is_set(message, name):
+    field = message.DESCRIPTOR.fields_by_name[name]
+    value = getattr(message, name)
+    if field.is_repeated:
+        return len(value) > 0
+    if field.has_presence:
+        return message.HasField(name)
+    return value != field.default_value
+
+
+@pytest.mark.parametrize(
+    ("method", "reported", "names"),
+    [
+        ("Scalars", ("int32",), ["int32"]),
+        ("Scalars", ("double",), ["double"]),
+        ("Scalars", ("float",), ["float"]),
+        ("Scalars", ("bool",), ["bool"]),
+        ("Scalars", ("string",), ["string"]),
+        ("Scalars", ("bytes",), ["bytes"]),
+        ("Scalars", ("color",), ["color"]),
+        ("Scalars", ("tags",), ["tags"]),
+        ("Maps", ("byString",), ["by_string"]),
+        ("WellKnown", ("int32Value",), ["int32_value"]),
+        ("WellKnown", ("timestamp", "seconds"), ["timestamp"]),
+        ("Choice", ("note",), ["note"]),
+        ("Envelope", ("first",), ["first"]),
+        ("Envelope", ("payload",), []),
+        ("Node", ("name",), ["name"]),
+        ("Node", ("children",), ["children"]),
+        ("Envelope", ("first", "title"), ["first"]),
+        ("StringValue", ("value",), []),
+        ("Legacy", ("level",), ["level"]),
+    ],
+    ids=lambda value: ".".join(value) if isinstance(value, tuple) else None,
+)
+def test_reported_missing_fields_are_always_set(schema, method, reported, names):
+    operation = schema["types.Types"][method]
+
+    @run_given(case=operation.as_strategy(feedback=feedback_for(operation, reported)), max_examples=10)
+    def test(case):
+        decoded = request_message(case.body, operation.definition.raw.input_type)
+        assert [name for name in names if not is_set(decoded, name)] == [], case.body
+
+
+def test_reported_nested_fields_are_always_set(schema):
+    operation = schema["types.Types"]["Envelope"]
+    feedback = feedback_for(operation, ("first", "extra"), ("first", "title"), ("second",))
+
+    @run_given(case=operation.as_strategy(feedback=feedback), max_examples=10)
+    def test(case):
+        assert (case.body["first"]["title"] != "", "second" in case.body) == (True, True), case.body
+
+
+def test_reported_members_of_one_oneof_set_exactly_one(schema):
+    operation = schema["types.Types"]["Choice"]
+    input_type = operation.definition.raw.input_type
+
+    @run_given(case=operation.as_strategy(feedback=feedback_for(operation, ("email",), ("node",))), max_examples=10)
+    def test(case):
+        assert request_message(case.body, input_type).WhichOneof("target") in ("email", "node"), case.body
+
+
+def leaves_unset(body, path):
+    *parents, last = path
+    for name in parents:
+        try:
+            body = body[name]
+        except (KeyError, IndexError):
+            return False
+    return not body.get(last)
+
+
+# `find` raises when every generated body sets the field.
+@pytest.mark.parametrize(
+    ("method", "kind", "reported", "unset"),
+    [
+        ("Envelope", ObservationKind.MUST_NOT_BE_BLANK, ("first", "title"), ("second", "title")),
+        ("Node", ObservationKind.MUST_NOT_BE_BLANK, ("children",), ("children", 0, "children")),
+        ("Scalars", ObservationKind.FORMAT, ("string",), ("string",)),
+    ],
+    ids=["same-type-elsewhere", "recursive", "other-kind"],
+)
+def test_fields_outside_reported_paths_stay_optional(schema, method, kind, reported, unset):
+    operation = schema["types.Types"][method]
+    strategy = operation.as_strategy(feedback=feedback_for(operation, reported, kind=kind))
+    find(strategy, lambda case: leaves_unset(case.body, unset))

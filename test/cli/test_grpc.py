@@ -4,6 +4,7 @@ import sys
 import pytest
 
 from test.apps.catalog.grpc.descriptors import (
+    accounts_descriptor_set,
     all_types_descriptor_set,
     side_effects_descriptor_set,
     users_descriptor_set,
@@ -160,6 +161,15 @@ def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_rejected_fields_are_replayed_from_cache(ctx, cli, tmp_path, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    write_descriptor_set(tmp_path, accounts_descriptor_set())
+    args = ["api.binpb", f"--url={server.target}", "--max-examples=5", "--seed=1"]
+    cli.run(*args)
+    assert cli.run(*args) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

@@ -4,8 +4,10 @@ import base64
 import struct
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from functools import lru_cache
+from typing import TYPE_CHECKING, Final, cast
 
+from google.protobuf import json_format, message_factory
 from google.protobuf.descriptor import FieldDescriptor
 
 from schemathesis.core.jsonschema.numeric import FLOAT32_MAX, INT32_RANGE, INT64_RANGE
@@ -13,9 +15,10 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.specs.grpc.constraints import ConstraintReader, FieldConstraints
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
     from google.protobuf.descriptor import Descriptor
+    from google.protobuf.message import Message
 
     from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
     from schemathesis.specs.grpc.constraints import RuleValue
@@ -175,7 +178,7 @@ class _Converter:
                 if constraints.kind == "map":
                     _map_rules(mapping, key_field, value_field, constraints.rules)
                 if constraints.required:
-                    _at_least(mapping, "minProperties", 1)
+                    require_set(mapping, field)
             return mapping
         schema = self.value(field, name)
         if schema is None:
@@ -186,16 +189,12 @@ class _Converter:
                 if constraints.kind == "repeated":
                     _repeated_rules(array, field, constraints.rules)
                 if constraints.required:
-                    _at_least(array, "minItems", 1)
+                    require_set(array, field)
             return array
         if constraints is not None:
             _value_rules(schema, _scalar_field(field), constraints)
             if constraints.required and not field.has_presence:
-                if field.type == FieldDescriptor.TYPE_FLOAT:
-                    # Smaller values round to zero as 32-bit floats.
-                    _add(schema, {"anyOf": [{"minimum": FLOAT32_TINY}, {"maximum": -FLOAT32_TINY}]})
-                else:
-                    _add(schema, {"not": {"const": _zero(field)}})
+                require_set(schema, field)
         required = field.is_required or (constraints is not None and constraints.required)
         if message is not None and message.full_name in WRAPPERS and not required:
             # JSON `null` clears a singular field; a list, a map or a required field rejects it.
@@ -226,6 +225,21 @@ class _Converter:
             self.definitions[full_name] = {}
             self.definitions[full_name] = self.message(message)
         return {"$ref": f"#/$defs/{full_name}"}
+
+
+def require_set(schema: JsonSchemaObject, field: FieldDescriptor) -> None:
+    """Constrain `schema` of `field` to values that leave the field set."""
+    if field.is_repeated:
+        # Maps are JSON objects, lists are arrays; both are unset when empty.
+        _at_least(schema, "minProperties" if schema.get("type") == "object" else "minItems", 1)
+    elif field.has_presence:
+        # JSON `null` clears a field that tracks presence.
+        _add(schema, {"not": {"const": None}})
+    elif field.type == FieldDescriptor.TYPE_FLOAT:
+        # Smaller values round to zero as 32-bit floats.
+        _add(schema, {"anyOf": [{"minimum": FLOAT32_TINY}, {"maximum": -FLOAT32_TINY}]})
+    else:
+        _add(schema, {"not": {"const": _zero(field)}})
 
 
 def scalar(field: FieldDescriptor) -> JsonSchemaObject:
@@ -560,3 +574,100 @@ def _add(schema: JsonSchemaObject, subschema: JsonSchemaObject) -> None:
             schema.setdefault("allOf", []).append({keyword: value})
         else:
             schema[keyword] = value
+
+
+# Python's protobuf parser decodes bytes only in the URL-safe alphabet; generated values use the standard one.
+URL_SAFE_ALPHABET = str.maketrans("+/", "-_")
+# Type name the JSON body walker passes for `bytes` values.
+BYTES = "bytes"
+# The JSON parser rejects messages nested deeper than this.
+MAX_MESSAGE_DEPTH = 100
+
+
+def request_message(body: object, input_type: Descriptor) -> Message:
+    """The message a JSON request body describes."""
+    request = message_factory.GetMessageClass(input_type)()
+    # Well-known messages such as wrappers map to any JSON value, not only to objects.
+    return json_format.ParseDict(
+        cast("dict[str, object]", rewrite_json(body, input_type, _url_safe)),
+        request,
+        descriptor_pool=input_type.file.pool,
+    )
+
+
+def _url_safe(value: object, type_name: str) -> object:
+    if type_name == BYTES and isinstance(value, str):
+        return value.translate(URL_SAFE_ALPHABET)
+    return value
+
+
+def rewrite_json(
+    value: object, message_type: Descriptor, leaf: Callable[[object, str], object], depth: int = 1
+) -> object:
+    """Apply `leaf` to every `bytes` value and well-known message in a JSON body, passing its type name."""
+    name = message_type.full_name
+    # Deeper bodies fail to parse anyway, so the parser reports them rather than the walk.
+    if depth > MAX_MESSAGE_DEPTH:
+        return value
+    if name == ANY:
+        return _rewrite_any(value, message_type, leaf, depth)
+    if name in WRAPPERS:
+        return _rewrite_field(value, message_type.fields_by_name["value"], leaf, depth)
+    if is_well_known(name):
+        return leaf(value, name)
+    if not isinstance(value, dict):
+        return value
+    fields = _json_fields(message_type)
+    rewritten = {}
+    for key, item in value.items():
+        member = fields.get(key) or _extension(message_type, key)
+        nested = None if member is None else member.message_type
+        if member is None:
+            rewritten[key] = item
+        elif nested is not None and nested.GetOptions().map_entry and isinstance(item, dict):
+            values = nested.fields_by_name["value"]
+            rewritten[key] = {name: _rewrite_field(entry, values, leaf, depth) for name, entry in item.items()}
+        elif member.is_repeated and isinstance(item, list):
+            rewritten[key] = [_rewrite_field(entry, member, leaf, depth) for entry in item]
+        else:
+            rewritten[key] = _rewrite_field(item, member, leaf, depth)
+    return rewritten
+
+
+@lru_cache(maxsize=1024)
+def _json_fields(message_type: Descriptor) -> dict[str, FieldDescriptor]:
+    """Fields by both of the names a JSON body may use for them."""
+    return {**message_type.fields_by_name, **{member.json_name: member for member in message_type.fields}}
+
+
+def _rewrite_field(value: object, member: FieldDescriptor, leaf: Callable[[object, str], object], depth: int) -> object:
+    if member.message_type is not None:
+        return rewrite_json(value, member.message_type, leaf, depth + 1)
+    if member.type == FieldDescriptor.TYPE_BYTES:
+        return leaf(value, BYTES)
+    return value
+
+
+def _rewrite_any(value: object, any_type: Descriptor, leaf: Callable[[object, str], object], depth: int) -> object:
+    if not isinstance(value, dict) or not isinstance(value.get("@type"), str):
+        return value
+    try:
+        packed = any_type.file.pool.FindMessageTypeByName(value["@type"].rsplit("/", 1)[-1])
+    except KeyError:
+        return value
+    # A packed well-known message keeps its own JSON form under `value`.
+    if is_well_known(packed.full_name):
+        return {
+            key: rewrite_json(item, packed, leaf, depth + 1) if key == "value" else item for key, item in value.items()
+        }
+    return rewrite_json(value, packed, leaf, depth + 1)
+
+
+def _extension(message_type: Descriptor, key: str) -> FieldDescriptor | None:
+    """The extension a `[full.name]` JSON key sets."""
+    if not (key.startswith("[") and key.endswith("]")):
+        return None
+    try:
+        return message_type.file.pool.FindExtensionByName(key[1:-1])
+    except KeyError:
+        return None
