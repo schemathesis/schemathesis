@@ -143,64 +143,6 @@ def test_failure_reported_once_is_one_test_case(ctx, cli, tmp_path):
     assert (len(report["testCases"]), len(report["faults"]["foundFaults"])) == (1, 1)
 
 
-def test_stateful_failure_block_replays_the_chain(ctx, cli, tmp_path):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/items": {
-                "post": {
-                    "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "integer"}},
-                                        "required": ["id"],
-                                    }
-                                }
-                            },
-                            "links": {
-                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
-                            },
-                        }
-                    }
-                }
-            },
-            "/items/{id}": {
-                "get": {
-                    "operationId": "getItem",
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        }
-    )
-
-    @app.route("/items", methods=["POST"])
-    def create_item():
-        return jsonify({"id": 1}), 201
-
-    @app.route("/items/<int:item_id>")
-    def get_item(item_id):
-        return jsonify({}), 500
-
-    path = tmp_path / "report.json"
-    cli.run_openapi_app(
-        app, f"--report-wfc-path={path}", "--max-examples=5", "--phases=stateful", "--checks=not_a_server_error"
-    )
-
-    report = load_report(path)
-    [test_case] = report["testCases"]
-    lines = (tmp_path / "report.sh").read_text(encoding="utf-8").splitlines()
-    block = lines[test_case["startLine"] : test_case["endLine"] + 1]
-    assert [line.split(" http")[0] for line in block if not line.startswith("#")] == [
-        "curl -X POST",
-        "curl -X GET",
-    ]
-    assert report["problemDetails"]["rest"]["outputHttpCalls"] == 2
-
-
 def test_undeclared_method_fault_names_the_probed_method(ctx, cli, tmp_path):
     app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
 

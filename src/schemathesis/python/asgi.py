@@ -19,11 +19,11 @@ from anyio.from_thread import start_blocking_portal
 from anyio.streams.stapled import StapledObjectStream
 from urllib3.exceptions import ReadTimeoutError
 
+from schemathesis.core import media_types
 from schemathesis.core.transport import (
     DEFAULT_MAX_STREAM_EVENTS,
     STREAM_CUT_SHORT_ATTRIBUTE,
     EventStreamBuffer,
-    is_event_stream,
 )
 
 if TYPE_CHECKING:
@@ -349,7 +349,7 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
                 content_type = next(
                     (value for name, value in raw_kwargs["headers"] if name.lower() == "content-type"), None
                 )
-                if is_event_stream(content_type):
+                if media_types.is_sse(content_type):
                     event_stream = EventStreamBuffer(self.max_stream_events)
                 response_started = True
             elif message["type"] == "http.response.body":

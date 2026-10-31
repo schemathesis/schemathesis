@@ -534,7 +534,6 @@ def clean_constants_registry():
 @pytest.fixture
 def make_operation(ctx):
     def factory(method: str = "post", path: str = "/api/users"):
-        sthesis_schema = ctx.openapi.load_schema({path: {method: {"responses": {"200": {"description": "OK"}}}}})
-        return sthesis_schema[path][method.upper()]
+        return ctx.openapi.load_operation(f"{method.upper()} {path}", {"responses": {"200": {"description": "OK"}}})
 
     return factory

@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Operations:       4 selected / 4 total
 
  ✅  API capabilities:
 
@@ -17,14 +17,14 @@ Schemathesis dev
 
  ⏭   Fuzzing (in 0.00s)
 
-     ⏭  1 skipped
+     ⏭  4 skipped
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
+  Selected: 4/4
   Tested: 0
-  Skipped: 1
+  Skipped: 4
     - Time limit reached
 
 Test Phases:

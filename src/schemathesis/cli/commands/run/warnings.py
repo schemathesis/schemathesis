@@ -206,8 +206,8 @@ def auth_flow_suggestion(schema: BaseSchema) -> str | None:
     )
 
 
-def _schema_warning_recorder(data: WarningData, warning: SchemaWarning) -> Callable[[], None] | None:
-    """How to record a schema-level warning in `data`; `None` for kinds reported elsewhere."""
+def _schema_warning_recorder(data: WarningData, warning: SchemaWarning) -> Callable[[], None]:
+    """How to record a schema-level warning in `data`."""
     label = warning.operation_label
     message = warning.message
     kind = warning.kind
@@ -226,7 +226,7 @@ def _schema_warning_recorder(data: WarningData, warning: SchemaWarning) -> Calla
         return partial(data.dictionary_mismatch.add, message)
     if kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
         return partial(data.constants_extraction.add, message)
-    return None
+    raise NotImplementedError
 
 
 def _add_by_label(messages: dict[str, set[str]], label: str | None, message: str) -> None:
@@ -327,12 +327,7 @@ class WarningCollector:
     def on_schema_warnings(self, event: events.SchemaAnalysisWarnings) -> None:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
-            self._on_schema_warning(warning)
-
-    def _on_schema_warning(self, warning: SchemaWarning) -> None:
-        record = _schema_warning_recorder(self.data, warning)
-        if record is not None:
-            self._handle_warning(warning.kind, record)
+            self._handle_warning(warning.kind, _schema_warning_recorder(self.data, warning))
 
     def _check_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.skip_warning is not None and event.label is not None:

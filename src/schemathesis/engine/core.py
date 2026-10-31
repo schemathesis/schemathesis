@@ -253,10 +253,7 @@ class ExecutionPlan:
         try:
             payload = self._adapt_execution(engine, phase)
         except HookExecutionError as exc:
-            yield events.NonFatalError(
-                error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
-            )
-            yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
+            yield from events.fail_phase(phase, exc, label=f"`{exc.hook_name}` hook")
             return
         yield events.PhaseStarted(phase=phase, payload=payload, operations=only)
         engine.reserve_time(self._time_to_reserve_after(phase, engine))

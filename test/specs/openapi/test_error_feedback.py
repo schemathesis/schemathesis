@@ -757,7 +757,7 @@ def test_apply_adjustments_returns_input_when_no_observations(case_factory):
 
 
 def _build_size_bound_observations(
-    *items: tuple[tuple[str | int, ...], int, int],
+    *items: tuple[tuple[str | int, ...], int | None, int | None],
 ) -> tuple[Observation, ...]:
     return tuple(
         Observation(
@@ -900,6 +900,21 @@ def _build_size_bound_observations(
                 },
             },
         ),
+        (
+            {"type": "object", "properties": {"username": {"type": "string", "maxLength": 10}}},
+            [(("username",), 0, 15)],
+            {"type": "object", "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 10}}},
+        ),
+        (
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            [(("name",), 3, None)],
+            {"type": "object", "properties": {"name": {"type": "string", "minLength": 3}}},
+        ),
+        (
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            [(("name",), None, 20)],
+            {"type": "object", "properties": {"name": {"type": "string", "maxLength": 20}}},
+        ),
     ],
     ids=[
         "string-property-applies-length-bounds",
@@ -916,6 +931,9 @@ def _build_size_bound_observations(
         "empty-path-observation-skipped",
         "non-string-step-skipped",
         "non-dict-intermediate-properties-skipped",
+        "stricter-existing-bound-preserved",
+        "min-only-payload",
+        "max-only-payload",
     ],
 )
 def test_size_bound_adjustment_applies_correctly(input_schema, items, expected, case_factory):
@@ -2006,53 +2024,6 @@ def test_enum_adjustment_applies_correctly(input_schema, items, expected, case_f
     )
 
 
-def test_size_bound_adjustment_preserves_stricter_existing_bound(case_factory):
-    # Schema's `maxLength: 10` is tighter than server's `max: 15` — keep the schema's.
-    schema = {"type": "object", "properties": {"username": {"type": "string", "maxLength": 10}}}
-    assert _apply_body_adjustment(
-        SizeBoundAdjustment(), schema, _build_size_bound_observations((("username",), 0, 15)), case_factory
-    ) == {
-        "type": "object",
-        "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 10}},
-    }
-
-
-def test_size_bound_adjustment_min_only_payload(case_factory):
-    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
-    obs = (
-        Observation(
-            operation_label="POST /api/users",
-            location=ParameterLocation.BODY,
-            parameter_path=("name",),
-            kind=ObservationKind.SIZE_BOUND,
-            raw_message="too short",
-            payload=SizeBoundPayload(min=3, max=None),
-        ),
-    )
-    assert _apply_body_adjustment(SizeBoundAdjustment(), schema, obs, case_factory) == {
-        "type": "object",
-        "properties": {"name": {"type": "string", "minLength": 3}},
-    }
-
-
-def test_size_bound_adjustment_max_only_payload(case_factory):
-    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
-    obs = (
-        Observation(
-            operation_label="POST /api/users",
-            location=ParameterLocation.BODY,
-            parameter_path=("name",),
-            kind=ObservationKind.SIZE_BOUND,
-            raw_message="too long",
-            payload=SizeBoundPayload(min=None, max=20),
-        ),
-    )
-    assert _apply_body_adjustment(SizeBoundAdjustment(), schema, obs, case_factory) == {
-        "type": "object",
-        "properties": {"name": {"type": "string", "maxLength": 20}},
-    }
-
-
 def test_apply_adjustments_does_not_mutate_caller_schema(case_factory):
     # Callers cache the input schema; the dispatcher must clone before mutating
     # so adjustment-internal mutation never leaks back to the caller.
@@ -2553,6 +2524,7 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
 @pytest.mark.parametrize(
     "input_schema, paths, expected",
     [
+        # Empty `required` violates the Open API meta-schema and crashes Hypothesis draws.
         pytest.param(
             {"type": "object", "properties": {"shadow": {}, "ok": {}}, "required": ["shadow"]},
             [("shadow",)],
@@ -2670,15 +2642,6 @@ def test_unexpected_property_adjustment_applies_correctly(input_schema, paths, e
         )
         == expected
     )
-
-
-def test_unexpected_property_adjustment_drops_empty_required(case_factory):
-    # Empty `required` violates the OpenAPI meta-schema and crashes Hypothesis draws.
-    input_schema = {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]}
-    out = _apply_body_adjustment(
-        UnexpectedPropertyAdjustment(), input_schema, _build_unexpected_property_observations(("shadow",)), case_factory
-    )
-    assert "required" not in out
 
 
 @pytest.mark.parametrize(

@@ -2,22 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-IGNORED_WARNING_STRICT_FILTERS = (
-    # Keep globally ignored teardown noise ignored when a test opts into `filterwarnings("error")`.
-    "ignore:Unclosed <MemoryObject.*:ResourceWarning",
-    "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored while finalizing file <urllib3.response.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored while finalizing file <http.client.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored while calling deallocator <function BaseEventLoop.__del__.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored while calling deallocator <function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored in.*<function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored in.*<socket.socket.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:Exception ignored while finalizing socket <socket.socket.*:pytest.PytestUnraisableExceptionWarning",
-    "ignore:unclosed <socket.socket.*:ResourceWarning",
-)
-
 
 def pytest_collection_modifyitems(session, config, items):
+    # Keep globally ignored teardown noise ignored when a test opts into `filterwarnings("error")`.
+    ignored_warnings = [line for line in config.getini("filterwarnings") if line.startswith("ignore:")]
     # During scheduled CI runs we select hypothesis_nested-marked tests and bump max_examples.
     for item in items:
         if isinstance(item, pytest.Function) and "hypothesis_max_examples" in item.fixturenames:
@@ -28,7 +16,7 @@ def pytest_collection_modifyitems(session, config, items):
             for arg in mark.args
             if isinstance(arg, str)
         ):
-            for warning_filter in IGNORED_WARNING_STRICT_FILTERS:
+            for warning_filter in ignored_warnings:
                 item.add_marker(pytest.mark.filterwarnings(warning_filter))
 
 

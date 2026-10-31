@@ -28,4 +28,4 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
           cache-suffix: hypothesis-3.14-v1
 
-      - run: uvx --from=".[tests,grpc]" pytest -m "hypothesis or hypothesis_nested" --hypothesis-profile CI --ignore=test/tooling test
+      - run: uvx --from=".[tests,grpc]" pytest -m "hypothesis or hypothesis_nested" --hypothesis-profile CI test

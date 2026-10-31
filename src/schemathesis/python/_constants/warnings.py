@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.warnings import SchemathesisWarning
 
 if TYPE_CHECKING:
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class ConstantsExtractionWarning:
+class ConstantsExtractionWarning(SchemaWarning):
     """A registered `@schemathesis.python.constants` source that produced nothing usable."""
 
     source: str
@@ -25,10 +26,6 @@ class ConstantsExtractionWarning:
     @property
     def message(self) -> str:
         return f"`{self.source}` {self.reason}"
-
-    @property
-    def group(self) -> str | None:
-        return None
 
 
 def iter_constants_warnings(pool: ConstantsPool) -> list[ConstantsExtractionWarning]:

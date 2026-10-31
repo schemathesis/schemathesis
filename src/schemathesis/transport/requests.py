@@ -27,7 +27,6 @@ from schemathesis.core.transforms import merge_at, to_wire_text
 from schemathesis.core.transport import (
     STREAM_CUT_SHORT_ATTRIBUTE,
     Response,
-    is_event_stream,
     read_event_stream,
 )
 from schemathesis.generation.overrides import Override
@@ -320,7 +319,7 @@ EVENT_STREAM_CHUNK_SIZE = 64 * 1024
 
 def _request(session: requests.Session, data: dict[str, Any], max_stream_events: int) -> requests.Response:
     response = session.request(**{**data, "stream": True})
-    if is_event_stream(response.headers.get("Content-Type")):
+    if media_types.is_sse(response.headers.get("Content-Type")):
         # An event stream may never end; stop reading once the request timeout passes in total.
         response._content, cut_short = read_event_stream(
             _iter_event_stream(response), data.get("timeout"), max_stream_events

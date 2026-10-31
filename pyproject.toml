@@ -111,7 +111,8 @@ exclude = [
 ]
 
 [tool.pytest.ini_options]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+# The repo tooling tests run on their own, through an explicit `pytest test/tooling`.
+addopts = ["-ra", "--strict-markers", "--strict-config", "--ignore=test/tooling"]
 # Fail a test running over 5 minutes and dump every thread's stack, so a stalled CI job names the culprit.
 timeout = 300
 asyncio_default_fixture_loop_scope = "function"

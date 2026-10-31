@@ -1809,66 +1809,40 @@ def test_unnegatable_path_falls_back_to_positive(ctx):
 
 
 @pytest.mark.parametrize(
-    "path_schema",
+    ("path_schema", "version"),
     [
-        {"type": "string", "properties": {"a": {"type": "integer"}}},
-        {"type": "string", "patternProperties": {"^a": {"type": "integer"}}},
-        {"type": "string", "additionalProperties": {"type": "integer"}},
-        {"type": "string", "items": {"type": "integer"}},
-        {"type": "string", "minimum": 3},
-        {"type": "string", "prefixItems": [{"type": "integer"}]},
-        {"type": "string", "minContains": 1},
-        {"type": "string", "maxContains": 1},
-        {"type": "string", "unevaluatedItems": False},
-        {"type": "string", "unevaluatedProperties": False},
-        {"type": "string", "dependentRequired": {"a": ["b"]}},
-        {"type": "string", "dependentSchemas": {"a": {"required": ["b"]}}},
-    ],
-    ids=[
-        "properties",
-        "pattern-properties",
-        "additional-properties",
-        "items",
-        "minimum",
-        "prefix-items",
-        "min-contains",
-        "max-contains",
-        "unevaluated-items",
-        "unevaluated-properties",
-        "dependent-required",
-        "dependent-schemas",
+        # Keywords for other types never apply to a string value.
+        pytest.param({"type": "string", "properties": {"a": {"type": "integer"}}}, "3.1.0", id="properties"),
+        pytest.param(
+            {"type": "string", "patternProperties": {"^a": {"type": "integer"}}}, "3.1.0", id="pattern-properties"
+        ),
+        pytest.param(
+            {"type": "string", "additionalProperties": {"type": "integer"}}, "3.1.0", id="additional-properties"
+        ),
+        pytest.param({"type": "string", "items": {"type": "integer"}}, "3.1.0", id="items"),
+        pytest.param({"type": "string", "minimum": 3}, "3.1.0", id="minimum"),
+        pytest.param({"type": "string", "prefixItems": [{"type": "integer"}]}, "3.1.0", id="prefix-items"),
+        pytest.param({"type": "string", "minContains": 1}, "3.1.0", id="min-contains"),
+        pytest.param({"type": "string", "maxContains": 1}, "3.1.0", id="max-contains"),
+        pytest.param({"type": "string", "unevaluatedItems": False}, "3.1.0", id="unevaluated-items"),
+        pytest.param({"type": "string", "unevaluatedProperties": False}, "3.1.0", id="unevaluated-properties"),
+        pytest.param({"type": "string", "dependentRequired": {"a": ["b"]}}, "3.1.0", id="dependent-required"),
+        pytest.param(
+            {"type": "string", "dependentSchemas": {"a": {"required": ["b"]}}}, "3.1.0", id="dependent-schemas"
+        ),
+        # Every path value reaches the server as a string, which one of the branches accepts.
+        pytest.param({"anyOf": [{"type": "string"}]}, "3.1.0", id="any-of"),
+        pytest.param({"oneOf": [{"type": "string"}]}, "3.1.0", id="one-of"),
+        pytest.param({"anyOf": [{"type": "string"}, {"type": "null"}]}, "3.1.0", id="any-of-null"),
+        pytest.param({"anyOf": [{"type": "string"}, {"type": "integer"}]}, "3.1.0", id="any-of-integer"),
+        pytest.param({"oneOf": [{"type": "string"}, {"type": "integer", "minimum": 0}]}, "3.1.0", id="one-of-integer"),
+        pytest.param({"anyOf": [{"type": "integer"}, {}]}, "3.1.0", id="empty-branch"),
+        pytest.param({"anyOf": [{"type": "integer"}, True]}, "3.1.0", id="true-branch"),
+        pytest.param({"properties": {"x": {"minLength": 1}}}, "3.0.2", id="untyped-object-min-length-one-property"),
     ],
 )
-def test_path_keywords_for_other_types_leave_nothing_to_negate(ctx, path_schema):
-    # Keywords for other types never apply to a string value, so they leave nothing to negate.
-    operation = _operation_with_parameters(ctx, [{**PLAIN_STRING_PARAMETER, "schema": path_schema}], version="3.1.0")
-    operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, database=None)
-    def test(case):
-        pass
-
-    with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
-        test()
-
-
-@pytest.mark.parametrize(
-    "path_schema",
-    [
-        {"anyOf": [{"type": "string"}]},
-        {"oneOf": [{"type": "string"}]},
-        {"anyOf": [{"type": "string"}, {"type": "null"}]},
-        {"anyOf": [{"type": "string"}, {"type": "integer"}]},
-        {"oneOf": [{"type": "string"}, {"type": "integer", "minimum": 0}]},
-        {"anyOf": [{"type": "integer"}, {}]},
-        {"anyOf": [{"type": "integer"}, True]},
-    ],
-    ids=["any-of", "one-of", "any-of-null", "any-of-integer", "one-of-integer", "empty-branch", "true-branch"],
-)
-def test_path_combinator_with_any_string_branch_leaves_nothing_to_negate(ctx, path_schema):
-    # Every path value reaches the server as a string, which one of the branches accepts.
-    operation = _operation_with_parameters(ctx, [{**PLAIN_STRING_PARAMETER, "schema": path_schema}], version="3.1.0")
+def test_path_schema_leaves_nothing_to_negate(ctx, path_schema, version):
+    operation = _operation_with_parameters(ctx, [{**PLAIN_STRING_PARAMETER, "schema": path_schema}], version=version)
     operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
@@ -1932,21 +1906,6 @@ def test_untyped_path_object_is_negated_through_its_properties(ctx):
         for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 10)
     ]
     assert set(modes) == {GenerationMode.NEGATIVE}
-
-
-def test_untyped_path_object_with_min_length_one_property_has_nothing_to_negate(ctx):
-    operation = _operation_with_parameters(
-        ctx, [{**PLAIN_STRING_PARAMETER, "schema": {"properties": {"x": {"minLength": 1}}}}]
-    )
-    operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
-
-    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1, database=None)
-    def test(case):
-        pass
-
-    with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
-        test()
 
 
 @pytest.mark.parametrize(

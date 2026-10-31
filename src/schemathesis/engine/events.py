@@ -368,6 +368,12 @@ class NonFatalError(EngineEvent):
         return hash((self.label, type(self.value)))
 
 
+def fail_phase(phase: Phase, error: Exception, *, label: str) -> EventGenerator:
+    """Events of a phase that errored before testing anything."""
+    yield NonFatalError(error=error, phase=phase.name, label=label, related_to_operation=False)
+    yield PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
+
+
 @dataclass
 class FatalError(EngineEvent):
     """Internal error in the engine."""

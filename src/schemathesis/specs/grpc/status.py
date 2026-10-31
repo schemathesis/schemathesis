@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING, NamedTuple
 
 from schemathesis.core.transport import CallOutcome
@@ -39,8 +40,11 @@ GRPC_STATUSES: dict[int, GrpcStatus] = {
     16: GrpcStatus("UNAUTHENTICATED", 401, CallOutcome.UNINFORMATIVE),
 }
 
-# Each HTTP status the warnings name (401, 403, 404) stands for exactly one gRPC status.
-STATUS_NAMES_BY_HTTP_STATUS = {status.http_status: status.name for status in GRPC_STATUSES.values()}
+_HTTP_STATUS_COUNTS = Counter(status.http_status for status in GRPC_STATUSES.values())
+# Only an HTTP status that stands for exactly one gRPC status names it; 409 and 500 stand for several.
+STATUS_NAMES_BY_HTTP_STATUS = {
+    status.http_status: status.name for status in GRPC_STATUSES.values() if _HTTP_STATUS_COUNTS[status.http_status] == 1
+}
 
 OK = 0
 INTERNAL = 13

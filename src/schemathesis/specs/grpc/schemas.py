@@ -31,6 +31,7 @@ from schemathesis.core.failures import AuthScenario, IgnoredAuth, ServerError
 from schemathesis.core.output.sanitization import sanitize_value
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import CallOutcome, Response
@@ -69,14 +70,13 @@ from schemathesis.specs.grpc.status import (
 )
 
 if TYPE_CHECKING:
-    from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
+    from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.checks import CheckContext
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation
-    from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.observations import Observations
     from schemathesis.filters import FilterSet
@@ -262,7 +262,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def status_name_for_code(self, status_code: int) -> str | None:
-        return STATUS_NAMES_BY_HTTP_STATUS[status_code]
+        return STATUS_NAMES_BY_HTTP_STATUS.get(status_code)
 
     @override
     def hash_case(self, case: Case) -> int:
@@ -511,7 +511,7 @@ class GrpcSchema(BaseSchema):
 
 
 @dataclass(slots=True)
-class UnsupportedFieldWarning:
+class UnsupportedFieldWarning(SchemaWarning):
     """A request field Schemathesis leaves out of every generated message."""
 
     operation_label: str | None
@@ -525,20 +525,13 @@ class UnsupportedFieldWarning:
     def message(self) -> str:
         return f"`{self.field}` - `google.protobuf.Any` is not generated"
 
-    @property
-    def group(self) -> str | None:
-        return None
-
 
 def request_payload(case: Case) -> bytes:
     """Serialized request message a call sends."""
-    return encode_message(case.body, case.operation.definition.raw.input_type)
-
-
-def encode_message(body: Body | NotSet, input_type: Descriptor) -> bytes:
-    """`body` serialized as an `input_type` message."""
+    body = case.body
     if isinstance(body, bytes):
         return body
+    input_type = case.operation.definition.raw.input_type
     try:
         parsed = body_message(body, input_type)
     except (json_format.ParseError, TypeError) as exc:

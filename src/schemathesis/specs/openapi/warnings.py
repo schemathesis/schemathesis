@@ -17,6 +17,7 @@ from schemathesis.core.jsonschema.resolver import find_unresolvable_reference
 from schemathesis.core.jsonschema.types import get_type
 from schemathesis.core.parameters import CONCRETE_LOCATIONS
 from schemathesis.core.result import Ok
+from schemathesis.core.schema_analysis import SchemaWarning
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class MissingDeserializerWarning:
+class MissingDeserializerWarning(SchemaWarning):
     """Warning for responses with structured schemas but no registered deserializer."""
 
     operation_label: str | None
@@ -88,7 +89,7 @@ def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeseria
 
 
 @dataclass(slots=True)
-class UnusedOpenAPIAuthWarning:
+class UnusedOpenAPIAuthWarning(SchemaWarning):
     """Warning for configured OpenAPI auth schemes that are not used in the schema."""
 
     operation_label: str | None
@@ -111,10 +112,6 @@ class UnusedOpenAPIAuthWarning:
         if self.suggestion:
             return f"'{self.scheme_name}' - Did you mean '{self.suggestion}'?"
         return f"'{self.scheme_name}'"
-
-    @property
-    def group(self) -> str | None:
-        return None
 
 
 @dataclass(slots=True, frozen=True)
@@ -166,7 +163,7 @@ def check_dictionary_bindings(
 
 
 @dataclass(slots=True)
-class DictionaryMismatchWarning:
+class DictionaryMismatchWarning(SchemaWarning):
     """Warning for a dictionary binding whose entries mostly fail the schema of the bound parameter."""
 
     operation_label: str | None
@@ -189,10 +186,6 @@ class DictionaryMismatchWarning:
             f"entries do not match the parameter schema{scope} and are used only in negative cases. "
             f"Example: {mismatch.example}"
         )
-
-    @property
-    def group(self) -> str | None:
-        return None
 
 
 def detect_dictionary_mismatches(schema: OpenApiSchema) -> list[DictionaryMismatchWarning]:
@@ -247,7 +240,7 @@ def _find_closest_match(value: str, candidates: list[str]) -> str | None:
 
 
 @dataclass(slots=True)
-class UnsupportedRegexWarning:
+class UnsupportedRegexWarning(SchemaWarning):
     """Warning for a regex pattern Schemathesis cannot use as written."""
 
     operation_label: str | None
@@ -268,10 +261,6 @@ class UnsupportedRegexWarning:
         if self.dropped:
             return f"Dropped `{self.pattern}` - generated values may not match it"
         return f"No value can be generated for `{self.pattern}`"
-
-    @property
-    def group(self) -> str | None:
-        return None
 
 
 def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWarning]:
@@ -316,7 +305,7 @@ def _iter_patterns(schema: Any) -> Iterator[str]:
 
 
 @dataclass(slots=True)
-class UnresolvableReferenceWarning:
+class UnresolvableReferenceWarning(SchemaWarning):
     """Warning for a part of an operation skipped because its schema names a missing component."""
 
     operation_label: str | None
@@ -335,10 +324,6 @@ class UnresolvableReferenceWarning:
     @property
     def message(self) -> str:
         return f"{self.subject} - unresolvable reference `{self.reference}`"
-
-    @property
-    def group(self) -> str | None:
-        return None
 
 
 def detect_unresolvable_references(

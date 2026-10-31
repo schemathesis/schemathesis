@@ -8,11 +8,11 @@ from typing import (
     Union,
 )
 
+import jsonschema_rs
+
 from schemathesis.core.jsonschema.resolver import Resolver
 
 if TYPE_CHECKING:
-    import jsonschema_rs
-
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.jsonschema.bundler import Bundle, BundleCache, Bundler
     from schemathesis.core.jsonschema.types import JsonSchema
@@ -72,6 +72,11 @@ class SchemaVocabulary(Protocol):
     # pin one draft's class.
     @property
     def jsonschema_validator_cls(self) -> type[jsonschema_rs.Validator]: ...
+
+
+def is_draft_2020_12(vocabulary: SchemaVocabulary) -> bool:
+    """Whether schemas follow JSON Schema Draft 2020-12, as in Open API 3.1 and later."""
+    return vocabulary.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
 
 
 class ParameterAdapter(SchemaVocabulary, Protocol):

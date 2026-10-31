@@ -272,7 +272,6 @@ class AppRunner:
     run_client_cert_flask_app: Callable[[Flask, Path], ClientCertServer]
     run_resetting_server: Callable[[], int]
     run_asgi_app: Callable[..., int]
-    unused_port: Callable[[], int]
     openapi_url: Callable[..., str]
 
 
@@ -284,6 +283,5 @@ def app_runner():
         run_client_cert_flask_app=run_client_cert_flask_app,
         run_resetting_server=run_resetting_server,
         run_asgi_app=run_asgi_app,
-        unused_port=unused_port,
         openapi_url=openapi_url,
     )

@@ -125,14 +125,24 @@ def is_plain_text(value: str) -> bool:
     return parse(value) == ("text", "plain")
 
 
-def is_sse(value: str) -> bool:
+def is_sse(value: str | None) -> bool:
     """Detect the text/event-stream media type for Server-Sent Events."""
-    return parse(value) == ("text", "event-stream")
+    if value is None:
+        return False
+    try:
+        return parse(value) == ("text", "event-stream")
+    except MalformedMediaType:
+        return False
 
 
-def is_json_sequence(value: str) -> bool:
+def is_json_sequence(value: str | None) -> bool:
     """Detect JSON Lines and JSON Text Sequences, which carry one JSON value per line or record."""
-    main, sub = parse(value)
+    if value is None:
+        return False
+    try:
+        main, sub = parse(value)
+    except MalformedMediaType:
+        return False
     return main == "application" and (sub in ("jsonl", "x-ndjson", "json-seq") or sub.endswith("+json-seq"))
 
 

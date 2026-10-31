@@ -15,11 +15,6 @@ Schema = dict[str, Any]
 StoreT = TypeVar("StoreT")
 
 
-class AppRunner(Protocol):
-    def run_flask_app(self, app: Flask, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int: ...
-    def run_asgi_app(self, app: ASGIApp, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int: ...
-
-
 @dataclass(slots=True)
 class CapturedRequest:
     method: str
