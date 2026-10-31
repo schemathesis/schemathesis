@@ -163,10 +163,10 @@ def test_schema_parsing_error(ctx, simple_schema):
     assert oks[0].method == "post"
 
 
-def test_not_recoverable_schema_error(ctx, simple_schema):
+def test_missing_paths_schema_error(ctx, simple_schema):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]
-    # Then it is an explicit exception during processing API operations
+    # Then it is a single schema error that belongs to no path or method
     schema = ctx.openapi.load_schema(
         simple_schema.get("paths"),
         version=simple_schema["swagger"],
@@ -175,8 +175,10 @@ def test_not_recoverable_schema_error(ctx, simple_schema):
         basePath=simple_schema["basePath"],
         schemes=simple_schema["schemes"],
     )
-    with pytest.raises(InvalidSchema):
-        list(schema.get_all_operations())
+    (result,) = schema.get_all_operations()
+    error = result.err()
+    assert (error.path, error.method) == (None, None)
+    assert '"paths" is a required property' in str(error)
 
 
 def test_invalid_parameter_schema_type(ctx):

@@ -69,6 +69,33 @@ def test_(case):
     )
 
 
+def test_schema_without_paths(ctx, testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+@schema.parametrize()
+def test_(case):
+    pass
+
+@lazy_schema.parametrize()
+def test_lazy(case):
+    pass
+    """,
+        schema=ctx.openapi.build_schema(None, version="2.0"),
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1, failed=2)
+    result.stdout.re_match_lines(
+        [
+            r".*::test_\[schema\] FAILED",
+            r".*::test_lazy\[schema\] SUBFAILED",
+            r".*::test_lazy PASSED",
+            r'.*"paths" is a required property',
+        ]
+    )
+
+
 def test_jsonschema_error(testdir, openapi_3_schema_with_invalid_security):
     testdir.make_test(
         """

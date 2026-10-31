@@ -455,6 +455,13 @@ def test_cli_run_output_empty(ctx, cli, workers):
     assert "= The schema defines no API operations =" in lines[-1]
 
 
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["swagger-2.0", "openapi-3.0"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_schema_without_required_paths(ctx, cli, snapshot_cli, version):
+    app = ctx.openapi.make_flask_app_from_schema(ctx.openapi.build_schema(None, version=version))
+    assert cli.run_openapi_app(app) == snapshot_cli
+
+
 def test_workers_beyond_operations_start_no_extra_threads(ctx, cli, tmp_path):
     # Every started thread costs memory, so a huge `workers` value with a small API must not start them all.
     schema_path = tmp_path / "schema.json"

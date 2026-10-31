@@ -57,6 +57,4 @@ def build_operation_test(
 
 
 def schema_error_suffix(error: InvalidSchema) -> str:
-    if error.method:
-        return f"[{error.method.upper()} {error.path}]"
-    return f"[{error.path}]"
+    return f"[{error.label}]"
