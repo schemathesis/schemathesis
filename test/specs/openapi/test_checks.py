@@ -3797,6 +3797,103 @@ def test_response_schema_conformance_reports_boolean_branch_rejection(ctx, respo
     )
 
 
+def _dynamic_tree(identifier):
+    return {
+        "$id": identifier,
+        "$dynamicAnchor": "node",
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "children": {"type": "array", "items": {"$dynamicRef": "#node"}}},
+    }
+
+
+_INTEGER_SCHEMA_SECTION = '    {\n        "type": "integer"\n    }\n\n'
+
+
+@pytest.mark.parametrize(
+    ("version", "media_type", "media_type_object", "body", "schema_section"),
+    [
+        (
+            "3.2.0",
+            "application/json",
+            {"schema": {"type": "array", "items": _dynamic_tree("https://example.com/tree")}},
+            '[{"id":1,"children":[{"id":"y"}]}]',
+            "Schema at /items/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION,
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": _dynamic_tree("https://example.com/tree")},
+            '{"id":1,"children":[{"id":"y"}]}\n',
+            "Schema at /items/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION,
+        ),
+        (
+            "3.2.0",
+            "application/json",
+            {
+                "schema": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "tree": _dynamic_tree("https://example.com/tree")},
+                }
+            },
+            '{"id":"s","tree":{"id":1,"children":[{"id":"y"}]}}',
+            "Schema at /properties/tree/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION,
+        ),
+        (
+            "3.2.0",
+            "application/json",
+            {
+                "schema": {
+                    "allOf": [
+                        {"$id": "https://example.com/list", "type": "array"},
+                        {"items": _dynamic_tree("https://example.com/tree")},
+                    ]
+                }
+            },
+            '[{"id":1,"children":[{"id":"y"}]}]',
+            "Schema at /allOf/1/items/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION,
+        ),
+        (
+            "3.2.0",
+            "application/json",
+            {"schema": {"type": "array", "items": _dynamic_tree("tree")}},
+            '[{"id":1,"children":[{"id":"y"}]}]',
+            "",
+        ),
+        (
+            "3.0.2",
+            "application/json",
+            {
+                "schema": {
+                    "type": "array",
+                    "items": {"id": "https://example.com/item", "properties": {"id": {"type": "integer"}}},
+                }
+            },
+            '[{"id":"y"}]',
+            "Schema at /items/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION,
+        ),
+    ],
+    ids=["json", "jsonl-item-schema", "same-path-in-outer-schema", "next-to-another-id", "relative-id", "draft-4-id"],
+)
+def test_response_schema_conformance_renders_failure_inside_embedded_resource(
+    ctx, response_factory, version, media_type, media_type_object, body, schema_section
+):
+    # A keyword reached through `$dynamicRef` is located relative to the schema that declares `$id`.
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"responses": {"200": {"description": "OK", "content": {media_type: media_type_object}}}},
+        version=version,
+    )
+    response = response_factory.core(content=body.encode(), headers={"content-type": [media_type]})
+
+    with pytest.raises(JsonSchemaError) as exc:
+        operation.validate_response(response)
+    assert exc.value.message == (
+        '"y" is not of type "integer"\n\n'
+        "Validated against the response schema for status code 200.\n\n"
+        f'{schema_section}Value:\n\n    "y"'
+    )
+
+
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
     schema = ctx.openapi.load_schema(_DATE_TIME_PATHS, config=config)
