@@ -3896,23 +3896,25 @@ def test_response_schema_conformance_renders_failure_inside_embedded_resource(
 
 
 @pytest.mark.parametrize(
-    ("version", "keyword", "identifier"),
+    ("version", "keyword", "identifier", "reference"),
     [
-        ("3.1.0", "$id", "https://example.com/tree"),
-        ("3.0.2", "id", "https://example.com/tree"),
-        ("3.1.0", "$id", "tree"),
+        ("3.1.0", "$id", "https://example.com/tree", "https://example.com/tree"),
+        ("3.0.2", "id", "https://example.com/tree", "https://example.com/tree"),
+        ("3.1.0", "$id", "tree", "tree"),
+        ("3.1.0", "$id", "https://example.com/schemas/tree", "tree"),
+        ("3.1.0", "$id", "schemas/tree", "tree"),
     ],
-    ids=["id", "draft-4-id", "relative-id"],
+    ids=["id", "draft-4-id", "relative-id", "reference-relative-to-id", "reference-relative-to-relative-id"],
 )
 def test_response_schema_conformance_follows_reference_into_embedded_resource(
-    ctx, response_factory, version, keyword, identifier
+    ctx, response_factory, version, keyword, identifier, reference
 ):
     tree = {
         keyword: identifier,
         "type": "object",
         "properties": {
             "id": {"type": "integer"},
-            "children": {"type": "array", "items": {"$ref": identifier}},
+            "children": {"type": "array", "items": {"$ref": reference}},
         },
     }
     operation = ctx.openapi.load_operation(
@@ -4031,12 +4033,19 @@ def test_response_schema_conformance_validate_formats_disabled(ctx, response_fac
     assert response_schema_conformance(_CHECK_CTX, response, case) is None
 
 
-def test_response_schema_conformance_follows_relative_id_in_document_loaded_from_file(ctx, tmp_path, response_factory):
-    # The relative `$id` names a resource next to the document file, and no file exists there.
+@pytest.mark.parametrize(
+    ("identifier", "reference"),
+    [("tree", "tree"), ("schemas/tree", "tree")],
+    ids=["relative-id", "reference-relative-to-relative-id"],
+)
+def test_response_schema_conformance_follows_relative_id_in_document_loaded_from_file(
+    ctx, tmp_path, response_factory, identifier, reference
+):
+    # The relative `$id` names a resource relative to the document file, and no file exists there.
     tree = {
-        "$id": "tree",
+        "$id": identifier,
         "type": "object",
-        "properties": {"id": {"type": "integer"}, "children": {"type": "array", "items": {"$ref": "tree"}}},
+        "properties": {"id": {"type": "integer"}, "children": {"type": "array", "items": {"$ref": reference}}},
     }
     raw_schema = ctx.openapi.build_schema(
         {
