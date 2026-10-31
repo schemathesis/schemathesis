@@ -8,7 +8,7 @@ from schemathesis.cli.commands import run as run_command
 from schemathesis.cli.ext.groups import GROUPS, GroupedOption
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
-from schemathesis.core.jsonschema.resolver import _load_remote_uri
+from schemathesis.core.jsonschema.resolver import _REMOTE_FAILURES, _load_remote_uri
 from schemathesis.specs.openapi import media_types
 from schemathesis.specs.openapi._caches import clear_all
 from schemathesis.specs.openapi.examples import load_external_example
@@ -59,6 +59,7 @@ def reset_hooks():
     # Formats are dropped from the registry above without going through `unregister_string_format`, and
     # monkeypatched strategies in one test must not leak cached results into the next.
     clear_all()
-    # Test servers stop with their test, so a later test may get the same port and must not see a cached response.
+    # Test servers stop with their test, so a later test on the same port must not see a cached document or failure.
     _load_remote_uri.cache_clear()
+    _REMOTE_FAILURES.clear()
     load_external_example.cache_clear()
