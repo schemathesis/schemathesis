@@ -222,8 +222,21 @@ _LIST_CONFIGS = {
             {"responses": {"ListConfigs": _LIST_CONFIGS}},
         ),
         (_LIST_CONFIGS, {"$ref": "#/paths/~1brokers~1{broker_id}~1configs/get/responses/200"}, {}),
+        (
+            {"$ref": "#/components/responses/ListConfigs"},
+            {"$ref": "#/components/responses/ListConfigs"},
+            {
+                "responses": {
+                    "ListConfigs": {
+                        **_LIST_CONFIGS,
+                        "content": {"application/json": {"$ref": "#/components/mediaTypes/Configs"}},
+                    }
+                },
+                "mediaTypes": {"Configs": _LIST_CONFIGS["content"]["application/json"]},
+            },
+        ),
     ],
-    ids=["component", "inline"],
+    ids=["component", "inline", "component-with-media-type-reference"],
 )
 def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_response, shared_response, components):
     schema = ctx.openapi.load_schema(
@@ -243,6 +256,7 @@ def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_r
             },
         },
         components=components,
+        version="3.2.0",
     )
     inject_links(schema)
 
