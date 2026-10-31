@@ -102,11 +102,16 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
             if code == grpc.StatusCode.UNAVAILABLE and not _is_reachable(address, tls, verify, cert):
                 details = outcome.details() or ""
+                failed_to_connect = "failed to connect" in details.lower()
                 # Once the server has answered, a call that did not fail on reconnecting reached it and may be
                 # what brought it down; gRPC's own message is the only sign of a call retried on a new connection.
-                if channel in self._answered and "failed to connect" not in details.lower():
+                if channel in self._answered and not failed_to_connect:
                     aborted = ConnectionAbortedError(f"Connection aborted. {details}")
                     raise requests.exceptions.ConnectionError(aborted, request=request) from aborted
+                # A port proxy accepts the connection even when the server behind it is gone, then resets it.
+                if failed_to_connect and "connection reset by peer" in details.lower():
+                    reset = ConnectionResetError(f"Connection reset. {details}")
+                    raise requests.exceptions.ConnectionError(reset, request=request) from reset
                 refused = ConnectionRefusedError(f"Failed to connect to {base_url}")
                 raise requests.exceptions.ConnectionError(refused, request=request) from refused
             content = b""
