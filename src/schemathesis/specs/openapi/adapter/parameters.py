@@ -29,7 +29,7 @@ from schemathesis.core.jsonschema import (
     schema_with_bundle,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
-from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
@@ -49,7 +49,12 @@ from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, Con
 from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
-from schemathesis.specs.openapi.adapter.references import example_object_value, maybe_resolve_with_resolver
+from schemathesis.specs.openapi.adapter.references import (
+    example_object_value,
+    maybe_resolve_with_resolver,
+    resolve_example_references,
+    resolve_media_type_object,
+)
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.converter import permit_forbidden_properties, to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
@@ -2087,7 +2092,7 @@ def _bundle_parameter(
         return deepclone(cached_definition), dict(cached_name_to_uri)
 
     parameter_resolver, definition = maybe_resolve_with_resolver(parameter, resolver)
-    definition = _resolve_example_references(definition, parameter_resolver)
+    definition = resolve_example_references(definition, parameter_resolver)
     schema = definition.get("schema")
     name_to_uri = {}
     if schema is not None:
@@ -2150,32 +2155,6 @@ def _bundle_parameter(
     # and pick up this entry.
     bundle_cache[param_id] = (parameter, deepclone(definition_), dict(name_to_uri))
     return result
-
-
-def _resolve_example_references(definition: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
-    """Inline referenced Example Objects so every phase sees their values."""
-    updated: dict[str, Any] | None = None
-    for keyword in ("examples", "x-examples"):
-        container = definition.get(keyword)
-        if not isinstance(container, dict) or not any(
-            isinstance(example, dict) and "$ref" in example for example in container.values()
-        ):
-            continue
-        resolved = {}
-        for name, example in container.items():
-            if isinstance(example, dict) and isinstance(example.get("$ref"), str):
-                try:
-                    _, target = resolve_reference(resolver, example["$ref"])
-                except RefResolutionError:
-                    # Kept as is, so the examples phase reports the broken reference.
-                    target = None
-                if isinstance(target, dict):
-                    example = target
-            resolved[name] = example
-        if updated is None:
-            updated = dict(definition)
-        updated[keyword] = resolved
-    return definition if updated is None else updated
 
 
 def _skipped_body(error: RefResolutionError, *, required: bool) -> SkippedParameter:
@@ -2374,7 +2353,7 @@ def iter_parameters_v3(
         for media_type, content in request_body["content"].items():
             ensure_object(content, f"Media type `{media_type}`")
             try:
-                content_resolver, content = maybe_resolve_with_resolver(content, body_resolver, allow_boolean=True)
+                content_resolver, content = resolve_media_type_object(content, body_resolver)
             except RefResolutionError as exc:
                 skipped.append(_skipped_body(exc, required=required))
                 continue

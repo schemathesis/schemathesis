@@ -16,7 +16,12 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.transport import expand_status_code
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import ResponseAdapter
-from schemathesis.specs.openapi.adapter.references import example_object_value, maybe_resolve_with_resolver
+from schemathesis.specs.openapi.adapter.references import (
+    example_object_value,
+    has_example_references,
+    maybe_resolve_with_resolver,
+    resolve_media_type_object,
+)
 from schemathesis.specs.openapi.converter import to_json_schema
 
 if TYPE_CHECKING:
@@ -341,7 +346,8 @@ class OpenApiResponse:
         return self.adapter.iter_response_examples(self.definition, self.status_code)
 
     def iter_links(self) -> Iterator[tuple[str, Mapping[str, Any]]]:
-        links = self.definition.get(self.adapter.links_keyword)
+        # Links inferred after this response was built land in the source only
+        links = self.source.get(self.adapter.links_keyword)
         if links is None:
             return
         for name, link in links.items():
@@ -474,7 +480,7 @@ def _iter_resolved_responses(
         if not isinstance(content, dict):
             # Written without an object value, `content` documents no media types
             resolved = {**source, "content": {}}
-        elif any(not isinstance(entry, dict) or "$ref" in entry for entry in content.values()):
+        elif any(not isinstance(entry, dict) or _has_reference(entry) for entry in content.values()):
             resolved = {
                 **source,
                 "content": {
@@ -496,12 +502,17 @@ def _iter_resolved_responses(
         )
 
 
+def _has_reference(entry: object) -> bool:
+    """Whether a media type or one of its examples is given by `$ref`."""
+    return isinstance(entry, dict) and ("$ref" in entry or has_example_references(entry))
+
+
 def _resolve_media_type(entry: object, resolver: Resolver) -> object:
     if not isinstance(entry, dict):
         # Still documented as a media type, with no schema or examples
         return {}
     try:
-        return maybe_resolve_with_resolver(entry, resolver, allow_boolean=True)[1]
+        return resolve_media_type_object(entry, resolver)[1]
     except RefResolutionError:
         # Kept as written: the response goes unvalidated and its reference is reported as unresolvable
         return entry

@@ -40,6 +40,7 @@
 - Open API 2.0 parameter `x-example` drawn twice as often in fuzzing.
 - Negative cookie values outside RFC 6265 cookie-octets, causing false `negative_data_rejection` failures.
 - Open API 3.2 Example Objects with `dataValue` or `serializedValue` sent as the example itself.
+- Example Objects referenced via `$ref` ignored in bodies and responses, or crashing in external files.
 
 #### Request serialization
 

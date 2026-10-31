@@ -1464,20 +1464,64 @@ def test_data_value_query_example(ctx, container):
     assert examples.generate_one(operation.get_strategies_from_examples()[0]).query == {"q": 5}
 
 
-def test_data_value_response_example(ctx):
+@pytest.mark.parametrize(
+    ("version", "example"),
+    [
+        ("3.2.0", {"dataValue": {"id": 1}}),
+        ("3.0.3", {"$ref": "#/components/examples/Item"}),
+        ("3.1.0", {"$ref": "#/components/examples/Item"}),
+        ("3.2.0", {"$ref": "#/components/examples/Item"}),
+    ],
+    ids=["data-value", "reference-3.0", "reference-3.1", "reference-3.2"],
+)
+def test_response_example_object(ctx, version, example):
     operation = ctx.openapi.load_operation(
         "GET /items",
         {
             "responses": {
                 "200": {
                     "description": "OK",
-                    "content": {"application/json": {"schema": {}, "examples": {"a": {"dataValue": {"id": 1}}}}},
+                    "content": {"application/json": {"schema": {}, "examples": {"a": example}}},
                 }
             }
         },
-        version="3.2.0",
+        version=version,
+        components={"examples": {"Item": {"value": {"id": 1}}}},
     )
     assert list(operation.responses.iter_examples()) == [("200/application/json", {"id": 1})]
+
+
+@pytest.mark.parametrize("version", ["3.0.3", "3.1.0", "3.2.0"])
+def test_referenced_examples_inside_another_document(ctx, version):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"$ref": "media.json#/components/requestBodies/Item"},
+                    "responses": {"200": {"$ref": "media.json#/components/responses/Item"}},
+                }
+            }
+        },
+        version=version,
+    )
+    content = {
+        "application/json": {"schema": {"type": "object"}, "examples": {"a": {"$ref": "#/components/examples/A"}}}
+    }
+    ctx.makefile(
+        {
+            "components": {
+                "requestBodies": {"Item": {"required": True, "content": content}},
+                "responses": {"Item": {"description": "OK", "content": content}},
+                "examples": {"A": {"value": {"marker": "media"}}},
+            }
+        },
+        filename="media",
+    )
+    operation = schemathesis.openapi.from_path(str(schema_path))["/items"]["POST"]
+    assert [examples.generate_one(strategy).body for strategy in operation.get_strategies_from_examples()] == [
+        {"marker": "media"}
+    ]
+    assert list(operation.responses.iter_examples()) == [("200/application/json", {"marker": "media"})]
 
 
 @pytest.mark.parametrize(

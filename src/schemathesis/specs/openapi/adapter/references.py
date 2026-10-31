@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonValue, as_object_schema
 from schemathesis.specs.openapi.adapter.validators import ensure_object
@@ -14,6 +15,44 @@ def example_object_value(example: Mapping[str, Any]) -> JsonValue | NotSet:
     if "value" in example:
         return example["value"]
     return example.get("dataValue", NOT_SET)
+
+
+def has_example_references(definition: Mapping[str, Any]) -> bool:
+    """Whether any Example Object of the definition is given by `$ref`."""
+    return any(
+        isinstance(container, dict)
+        and any(isinstance(example, dict) and "$ref" in example for example in container.values())
+        for container in (definition.get("examples"), definition.get("x-examples"))
+    )
+
+
+def resolve_example_references(definition: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
+    """Inline referenced Example Objects so every phase sees their values."""
+    if not has_example_references(definition):
+        return definition
+    updated = dict(definition)
+    for keyword in ("examples", "x-examples"):
+        container = definition.get(keyword)
+        if isinstance(container, dict):
+            updated[keyword] = {name: _resolve_example(example, resolver) for name, example in container.items()}
+    return updated
+
+
+def _resolve_example(example: object, resolver: Resolver) -> object:
+    if not isinstance(example, dict) or not isinstance(example.get("$ref"), str):
+        return example
+    try:
+        _, target = resolve_reference(resolver, example["$ref"])
+    except RefResolutionError:
+        # Kept as is, so the examples phase reports the broken reference.
+        return example
+    return target if isinstance(target, dict) else example
+
+
+def resolve_media_type_object(item: Mapping[str, Any], resolver: Resolver) -> tuple[Resolver, Mapping[str, Any]]:
+    """Resolve a Media Type Object and its referenced Example Objects against the document they appear in."""
+    media_type_resolver, media_type_object = maybe_resolve_with_resolver(item, resolver, allow_boolean=True)
+    return media_type_resolver, resolve_example_references(media_type_object, media_type_resolver)
 
 
 def maybe_resolve_with_resolver(
