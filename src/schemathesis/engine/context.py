@@ -104,6 +104,7 @@ class EngineContext:
         "_constants_extraction_lock",
         "coverage_session",
         "auth_enforced_operations",
+        "failed_operations",
         "auth_header_log",
         "reauth",
     )
@@ -152,6 +153,8 @@ class EngineContext:
         self.coverage_session = GenerationSession()
         # Operations whose missing and invalid credentials were already rejected in this run.
         self.auth_enforced_operations: set[str] = set()
+        # Operations whose fuzzing already failed in this run.
+        self.failed_operations: set[str] = set()
         self.auth_header_log = AuthHeaderLog()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...

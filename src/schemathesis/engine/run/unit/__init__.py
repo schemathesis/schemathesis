@@ -243,6 +243,9 @@ def _record_scenario_outcome(
         status = event.status
     if event.status in (Status.ERROR, Status.FAILURE):
         engine.control.count_failure((phase, event.label))
+    if phase == PhaseName.FUZZING and event.status == Status.FAILURE:
+        assert event.label is not None
+        engine.failed_operations.add(event.label)
     engine.record_observations(event.recorder)
     return status
 

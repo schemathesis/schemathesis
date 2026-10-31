@@ -44,7 +44,9 @@ def run_test(
 
     pending_events: list[events.EngineEvent] = []
     try:
-        setup_hypothesis_database_key(test_function, operation, generation=generation)
+        setup_hypothesis_database_key(
+            test_function, operation, generation=generation, failed_before=scenario.failed_before
+        )
         with catch_warnings(record=True), ignore_hypothesis_output():
             test_function(ctx=ctx, scenario=scenario, errors=errors, pending_events=pending_events)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
@@ -106,12 +108,15 @@ def _settle_stopped(
     return Status.SUCCESS, None, None
 
 
-def setup_hypothesis_database_key(test: Callable, operation: APIOperation, generation: GenerationConfig) -> None:
+def setup_hypothesis_database_key(
+    test: Callable, operation: APIOperation, generation: GenerationConfig, *, failed_before: bool
+) -> None:
     """Make Hypothesis use separate database entries for every API operation.
 
     It increases the effectiveness of the Hypothesis database in the CLI.
     """
-    if generation.database is not None and generation.database.lower() == "none":
+    # Continuing past a known failure, its replay would not fail and Hypothesis would delete it from the database.
+    if failed_before or (generation.database is not None and generation.database.lower() == "none"):
         test._hypothesis_internal_database_key = None  # type: ignore[attr-defined]
         return
     test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore[attr-defined]
