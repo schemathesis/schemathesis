@@ -101,6 +101,7 @@ class EngineContext:
         "_constants_extraction_lock",
         "coverage_session",
         "held_back_cases",
+        "failed_operations",
         "auth_header_log",
         "reauth",
     )
@@ -150,6 +151,8 @@ class EngineContext:
         self.coverage_session = GenerationSession()
         # Coverage cases a server may not survive, per operation, sent once every other coverage case went out.
         self.held_back_cases: dict[str, list[Case]] = {}
+        # Operations whose fuzzing already failed in this run.
+        self.failed_operations: set[str] = set()
         self.auth_header_log = AuthHeaderLog()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
