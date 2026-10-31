@@ -4000,6 +4000,43 @@ def test_response_schema_conformance_discriminator_ignores_nameless_reference(ct
         operation.validate_response(response_factory.requests(content=b'{"petType": ""}'))
 
 
+INTEGER_THEN_STRINGS = {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}}
+LEGACY_INTEGER_TUPLE = {"type": "array", "items": [{"type": "integer"}]}
+
+
+@pytest.mark.parametrize("version", ["3.1.0", "3.2.0"])
+@pytest.mark.parametrize(
+    ("schema", "body", "instance_path"),
+    [
+        (INTEGER_THEN_STRINGS, [1, "a"], None),
+        (INTEGER_THEN_STRINGS, ["x"], [0]),
+        (INTEGER_THEN_STRINGS, [1, 2], [1]),
+        (LEGACY_INTEGER_TUPLE, [1], None),
+        (LEGACY_INTEGER_TUPLE, ["x"], [0]),
+    ],
+    ids=[
+        "prefix-items-valid",
+        "prefix-items-invalid-prefix",
+        "prefix-items-invalid-rest",
+        "tuple-valid",
+        "tuple-invalid",
+    ],
+)
+def test_response_schema_conformance_tuple_arrays(ctx, response_factory, version, schema, body, instance_path):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"responses": {"200": {"description": "OK", "content": {"application/json": {"schema": schema}}}}},
+        version=version,
+    )
+    response = response_factory.requests(content=json.dumps(body).encode())
+    if instance_path is None:
+        operation.validate_response(response)
+    else:
+        with pytest.raises(JsonSchemaError) as exc:
+            operation.validate_response(response)
+        assert list(exc.value.instance_path) == instance_path
+
+
 JSON_SEQUENCE_ITEM = {
     "type": "object",
     "properties": {"id": {"type": "integer"}},

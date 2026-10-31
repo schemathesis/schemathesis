@@ -556,6 +556,8 @@ def _build_prepared_schema(
         update_quantifiers=False,
         clone=False,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        # Both follow from a Draft 2020-12 validator, which reads `prefixItems` and rejects array-form `items`
+        convert_prefix_items=not upgrade_legacy_exclusive_bounds,
         merge_ref_siblings=merge_ref_siblings,
     )
     return Bundle(schema=converted, name_to_uri=bundled.name_to_uri)
