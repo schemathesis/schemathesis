@@ -201,7 +201,8 @@ class ExecutionPlan:
                     if engine.is_interrupted:
                         break  # type: ignore[unreachable]
                     for event in self._run_phase(engine, phase):
-                        if isinstance(event, events.ScenarioFinished):
+                        # A scenario that sent no request, e.g. one whose inputs were all sent before, explores nothing.
+                        if isinstance(event, events.ScenarioFinished) and event.recorder.interactions:
                             executed += 1
                         elif (
                             isinstance(event, events.PhaseFinished)
