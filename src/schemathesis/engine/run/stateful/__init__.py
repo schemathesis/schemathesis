@@ -11,6 +11,7 @@ from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.generation.stateful.state_machine import APIStateMachine
 
 EVENT_QUEUE_TIMEOUT = 0.01
 
@@ -23,9 +24,18 @@ def _stateful_feedback(engine: EngineContext) -> FeedbackSources:
     )
 
 
-def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
+def _run_state_machines(
+    *, state_machine: type[APIStateMachine], event_queue: queue.Queue, engine: EngineContext, crashes: list[Exception]
+) -> None:
     from schemathesis.engine.run.stateful._executor import execute_state_machine_loop
 
+    try:
+        execute_state_machine_loop(state_machine=state_machine, event_queue=event_queue, engine=engine)
+    except Exception as exc:
+        crashes.append(exc)
+
+
+def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     try:
         state_machine = engine.schema.build_state_machine(
             feedback=_stateful_feedback(engine), link_calibration=engine.link_calibration
@@ -36,10 +46,11 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         return
 
     event_queue: queue.Queue = queue.Queue()
+    crashes: list[Exception] = []
 
     thread = threading.Thread(
-        target=execute_state_machine_loop,
-        kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": engine},
+        target=_run_state_machines,
+        kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": engine, "crashes": crashes},
         name="schemathesis_stateful_tests",
     )
     status: Status | None = None
@@ -80,6 +91,14 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     finally:
         if thread is not threading.current_thread():
             thread.join()
+
+    # A crash outside a suite leaves no suite status behind, so it must not read as a skipped phase.
+    for error in crashes:
+        is_executed = True
+        status = Status.ERROR
+        yield events.NonFatalError(
+            error=error, phase=phase.name, label=STATEFUL_TESTS_LABEL, related_to_operation=False
+        )
 
     outage = engine.server.take_report(phase.name)
     if outage is not None:

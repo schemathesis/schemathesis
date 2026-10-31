@@ -1,0 +1,75 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total
+
+     ✅ N passed
+
+==================================== ERRORS ====================================
+________________________________ Stateful tests ________________________________
+Runtime Error
+
+Broken deserializer
+
+    Traceback (most recent call last):
+      File "/package-root/engine/run/stateful/__init__.py", line XXX, in _run_state_machines
+        execute_state_machine_loop(state_machine=state_machine, event_queue=event_queue, engine=engine)
+      File "/package-root/engine/run/stateful/_executor.py", line XXX, in execute_state_machine_loop
+        _drain_suite_recorders(engine, suite_recorders)
+      File "/package-root/engine/run/stateful/_executor.py", line XXX, in _drain_suite_recorders
+        _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
+      File "/package-root/engine/run/stateful/_executor.py", line XXX, in _replay_recorders_into_pool
+        _record_into_pool(extra_data_source, recorder.cases[case_id].value, interaction.response)
+      File "/package-root/engine/run/stateful/_executor.py", line XXX, in _record_into_pool
+        record_interaction(extra_data_source, case, response)
+      File "/package-root/resources/__init__.py", line XXX, in record_interaction
+        source.record_response(operation=operation, response=response, case=case)
+      File "/package-root/specs/openapi/extra_data_source.py", line XXX, in record_response
+        payload = deserialization.deserialize_response(response, content_type, context=context)
+      File "/package-root/core/deserialization.py", line XXX, in deserialize_response
+        data = deserializer(context, response)
+      File "/tmp/module.py", line XXX, in deserialize_custom
+        raise RuntimeError("Broken deserializer")
+    RuntimeError: Broken deserializer
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  🚫 Stateful
+
+Errors:
+  🚫 Runtime Error: 1
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

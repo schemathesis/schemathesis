@@ -177,3 +177,53 @@ def test_wildcard_deserializer_matches_concrete_media_type(ctx, response_factory
     response = response_factory.requests(content=b"not-an-integer", content_type="application/msgpack")
     with pytest.raises(JsonSchemaError, match='"not-an-integer" is not of type "integer"'):
         schema["/data"]["GET"].validate_response(response)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_deserializer_error_in_stateful_phase(ctx, cli, snapshot_cli):
+    # Without `response_schema_conformance` the deserializer first runs between stateful suites.
+    custom = {"application/vnd.custom": {"schema": {"type": "object"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": custom,
+                            "links": {"GetItem": {"operationId": "getItem", "parameters": {"itemId": 1}}},
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK", "content": custom}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return Response("{}", status=201, content_type="application/vnd.custom")
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        return Response("{}", content_type="application/vnd.custom")
+
+    hooks_module = ctx.write_pymodule("""
+@schemathesis.deserializer("application/vnd.custom")
+def deserialize_custom(ctx, response):
+    raise RuntimeError("Broken deserializer")
+""")
+
+    assert (
+        cli.run_openapi_app(
+            app, "--phases=stateful", "--checks=not_a_server_error", "--max-examples=5", hooks=hooks_module
+        )
+        == snapshot_cli
+    )
