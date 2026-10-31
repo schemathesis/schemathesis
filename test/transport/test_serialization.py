@@ -2600,6 +2600,21 @@ def _with_child(child):
             {"a:b": 1, "_id": 2, "1st": 3, "": 4, "a b": 5, "\ufb01": 6},
             b"<Root><a_b>1</a_b><_id>2</_id><x_1st>3</x_1st><element>4</element><a_b>5</a_b><fi>6</fi></Root>",
         ),
+        (
+            _with_child({"type": "array", "items": {"type": "string", "xml": {"name": "1 tag"}}}),
+            {},
+            "3.0.2",
+            {"child": ["a"]},
+            b"<root><x_1_tag>a</x_1_tag></root>",
+        ),
+        ({"type": "string", "xml": {"name": "1 tag"}}, {}, "3.0.2", "a", b"<x_1_tag>a</x_1_tag>"),
+        (
+            {"type": "array", "xml": {"name": "1 tag", "wrapped": True}, "items": {"type": "string"}},
+            {},
+            "3.0.2",
+            ["a"],
+            b"<x_1_tag><x_1_tag>a</x_1_tag></x_1_tag>",
+        ),
     ],
     ids=[
         "scalar-under-prefixed-root-string",
@@ -2631,6 +2646,9 @@ def _with_child(child):
         "special-characters-escaped",
         "invalid-characters-dropped",
         "invalid-names-sanitized",
+        "invalid-primitive-item-names-sanitized",
+        "invalid-root-primitive-name-sanitized",
+        "invalid-wrapped-root-array-name-sanitized",
     ],
 )
 def test_serialize_xml_body(ctx, schema, components, version, body, expected):
