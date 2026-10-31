@@ -13,6 +13,7 @@ from typing_extensions import override
 
 from schemathesis.core import Body
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
@@ -59,8 +60,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         proxies: Mapping[str, str] | None = None,
         **kwargs: Any,
     ) -> Response:
+        config = case.operation.schema.config
         # Direct calls pass nothing, so the config fills in what the caller left out.
-        settings = case.operation.schema.config.request_settings_for(operation=case.operation)
+        settings = config.request_settings_for(operation=case.operation)
         if verify is None:
             verify = True if settings.verify is None else settings.verify
         cert = cert or settings.cert
@@ -82,9 +84,10 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         channel = self._channel(address, tls, verify, cert)
         # No serializers: the call sends and receives bytes.
         call: grpc.UnaryUnaryMultiCallable[bytes, bytes] = channel.unary_unary(case.path)
-        started_at = Instant()
         try:
-            content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata)
+            with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
+                started_at = Instant()
+                content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata)
         except grpc.RpcError as error:
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)
