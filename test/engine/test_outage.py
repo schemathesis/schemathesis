@@ -240,10 +240,16 @@ def test_tracked_answers_and_timeouts_set_the_operation_timeout(operation):
     assert health.timeout_override(operation.label) == 2.0
 
 
+@pytest.mark.parametrize("proxied", [False, True], ids=["direct", "behind-port-proxy"])
 @pytest.mark.parametrize("tls", [False, True], ids=["plaintext", "tls"])
-def test_grpc_server_that_stops_is_an_outage(ctx, tls):
+def test_grpc_server_that_stops_is_an_outage(ctx, app_runner, tls, proxied):
     server = ctx.grpc.apps.users(tls=tls)
-    case = grpc_operation(server, **({"tls-verify": str(server.ca_path)} if tls else {})).Case(body={"userId": 7})
+    target = server.target
+    if proxied:
+        scheme_and_host, _, port = target.rpartition(":")
+        target = f"{scheme_and_host}:{app_runner.run_port_proxy(int(port))}"
+    config = {"base-url": target, **({"tls-verify": str(server.ca_path)} if tls else {})}
+    case = grpc_operation(server, **config).Case(body={"userId": 7})
     monitor = ServerMonitor()
     monitor.track(case, case.call, transport_kwargs={})
     server.stop()
@@ -253,8 +259,8 @@ def test_grpc_server_that_stops_is_an_outage(ctx, tls):
 
     assert monitor.is_down(exc_info.value)
     info = monitor.take_report(PhaseName.FUZZING).info
-    # The cached channel may send the second call before it sees the closed connection; a call cut off this way is
-    # listed as the culprit, so no tip about older requests follows.
+    # The cached channel may send the second call before it sees the closed connection, and a port proxy resets the
+    # call instead of refusing it; a call cut off or reset is listed as the culprit, so no tip about older requests.
     tip = (
         # HAR reports do not record gRPC calls.
         "If the server crashed, the request that caused it may be older than these."
@@ -262,7 +268,7 @@ def test_grpc_server_that_stops_is_an_outage(ctx, tls):
         else None
     )
     assert (info.message, info.suggestion()) == (
-        f"{server.target} stopped responding. Last request before it went away:\n\n"
+        f"{target} stopped responding. Last request before it went away:\n\n"
         f"    {case.as_reproduction_command(headers={}, verify=True)}",
         tip,
     )
@@ -339,9 +345,10 @@ def test_grpc_calls_dropped_together_by_a_crash_list_the_latest_first_and_only_i
     assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [crash, slow, answered])
 
 
-def test_live_grpc_tls_server_after_a_dropped_call_is_not_an_outage(ctx):
-    server = ctx.grpc.apps.users(tls=True)
-    operation = grpc_operation(server, **{"tls-verify": str(server.ca_path)})
+@pytest.mark.parametrize("tls", [False, True], ids=["plaintext", "tls"])
+def test_live_grpc_server_after_a_dropped_call_is_not_an_outage(ctx, tls):
+    server = ctx.grpc.apps.users(tls=tls)
+    operation = grpc_operation(server, **({"tls-verify": str(server.ca_path)} if tls else {}))
     case = operation.Case(body={"userId": 7})
     monitor = ServerMonitor()
     monitor.track(case, case.call, transport_kwargs={})
