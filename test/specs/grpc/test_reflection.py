@@ -52,15 +52,38 @@ def test_from_url_without_reflection(ctx):
     )
 
 
-def test_from_url_reports_undescribed_service(ctx):
-    server = ctx.grpc.apps.users(undescribed_services=("pkg.Missing",))
+@pytest.mark.parametrize(
+    ("options", "subject"),
+    [
+        ({"undescribed_services": ("pkg.Missing",)}, "pkg.Missing"),
+        ({"unserved_files": ("google/protobuf/timestamp.proto",)}, "google/protobuf/timestamp.proto"),
+    ],
+    ids=["service", "import-with-message-types"],
+)
+def test_from_url_reports_undescribed_types(ctx, options, subject):
+    server = ctx.grpc.apps.users(**options)
     with pytest.raises(LoaderError) as exc_info:
         schemathesis.grpc.from_url(server.target)
     assert (exc_info.value.kind, exc_info.value.message) == (
         LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
-        "The server cannot describe `pkg.Missing` through reflection: not found. Build a descriptor set with "
+        f"The server cannot describe `{subject}` through reflection: not found. Build a descriptor set with "
         f"`buf build -o api.binpb` and run `schemathesis run api.binpb --url {server.target}`",
     )
+
+
+def test_from_url_reports_types_missing_from_described_imports(ctx):
+    server = ctx.grpc.apps.users(emptied_files=("google/protobuf/timestamp.proto",))
+    with pytest.raises(LoaderError) as exc_info:
+        schemathesis.grpc.from_url(server.target)
+    assert (exc_info.value.kind, exc_info.value.message) == (
+        LoaderErrorKind.GRPC_INVALID_DESCRIPTOR_SET,
+        "The descriptor set does not load: couldn't resolve name '.google.protobuf.Timestamp'",
+    )
+
+
+def test_from_url_skips_undescribed_options_import(ctx):
+    server = ctx.grpc.apps.users(annotated=True, unserved_files=("annotations.proto",))
+    assert labels(schemathesis.grpc.from_url(server.target)) == LABELS
 
 
 @pytest.mark.parametrize("version", ["v1", "v1alpha"])

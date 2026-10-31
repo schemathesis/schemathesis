@@ -40,7 +40,8 @@ def load(server, **config):
     return schemathesis.grpc.from_path(server.descriptor_set_path, config=config)
 
 
-def users_descriptor_set() -> bytes:
+def users_descriptor_set(*, annotated: bool = False) -> bytes:
+    """With `annotated`, `GetUser` sets a custom option from `annotations.proto`, imported for that option alone."""
     timestamp = descriptor_pb2.FileDescriptorProto()
     timestamp_pb2.DESCRIPTOR.CopyToProto(timestamp)
     any_file = descriptor_pb2.FileDescriptorProto()
@@ -126,7 +127,28 @@ def users_descriptor_set() -> bytes:
         input_type=".google.longrunning.GetOperationRequest",
         output_type=".google.longrunning.Operation",
     )
-    return descriptor_pb2.FileDescriptorSet(file=[timestamp, users, operations, any_file]).SerializeToString()
+    files = [timestamp, users, operations, any_file]
+    if annotated:
+        descriptor = descriptor_pb2.FileDescriptorProto()
+        descriptor_pb2.DESCRIPTOR.CopyToProto(descriptor)
+        annotations = descriptor_pb2.FileDescriptorProto(
+            name="annotations.proto", package="annotations", syntax="proto3", dependency=[descriptor.name]
+        )
+        _field(annotations.message_type.add(name="Operation"), "summary", 1, FieldDescriptorProto.TYPE_STRING)
+        _extension(annotations, "operation", 50000, ".google.protobuf.MethodOptions", ".annotations.Operation")
+        pool = descriptor_pool.DescriptorPool()
+        for file in (descriptor, annotations):
+            pool.Add(file)
+        users.dependency.append(annotations.name)
+        _set_extension(
+            pool,
+            service.method[0].options,
+            "google.protobuf.MethodOptions",
+            "annotations.operation",
+            {"summary": "Get a user"},
+        )
+        files.extend([descriptor, annotations])
+    return descriptor_pb2.FileDescriptorSet(file=files).SerializeToString()
 
 
 def library_descriptor_set() -> bytes:

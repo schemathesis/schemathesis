@@ -110,11 +110,12 @@ def from_url(
             if service.name not in INFRASTRUCTURE_SERVICES
         ]
         files: dict[str, descriptor_pb2.FileDescriptorProto] = {}
+        undescribed: list[LoaderError] = []
 
-        def describe(subject: str, **kwargs: str) -> None:
+        def describe(subject: str, **kwargs: str) -> LoaderError | None:
             response = ask(call, **kwargs)
             if response.HasField("error_response"):
-                raise LoaderError(
+                return LoaderError(
                     LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
                     f"The server cannot describe `{subject}` through reflection: "
                     f"{response.error_response.error_message}. Build a descriptor set with `buf build -o api.binpb` "
@@ -123,9 +124,11 @@ def from_url(
             for data in response.file_descriptor_response.file_descriptor_proto:
                 file = descriptor_pb2.FileDescriptorProto.FromString(data)
                 files.setdefault(file.name, file)
+            return None
 
         for name in names:
-            describe(name, file_containing_symbol=name)
+            if (error := describe(name, file_containing_symbol=name)) is not None:
+                raise error
         # Some servers return only the requested file, without its imports.
         requested: set[str] = set()
         while missing := next(
@@ -138,9 +141,17 @@ def from_url(
             None,
         ):
             requested.add(missing)
-            describe(missing, file_by_filename=missing)
+            if (error := describe(missing, file_by_filename=missing)) is not None:
+                # An import used only for custom options loads as an empty file; a type needed from it fails below.
+                files[missing] = descriptor_pb2.FileDescriptorProto(name=missing)
+                undescribed.append(error)
     data = descriptor_pb2.FileDescriptorSet(file=files.values()).SerializeToString()
-    loaded = _from_descriptor_set(data, config=config, service_names=names)
+    try:
+        loaded = _from_descriptor_set(data, config=config, service_names=names)
+    except LoaderError:
+        if undescribed:
+            raise undescribed[0] from None
+        raise
     loaded.location = url
     return loaded
 

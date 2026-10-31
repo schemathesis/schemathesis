@@ -126,15 +126,42 @@ def deny(requests, context):
 
 
 class ReflectionServicer(reflection.ReflectionServicer):
-    def __init__(self, names: tuple[str, ...], pool: descriptor_pool.DescriptorPool, *, imports: bool) -> None:
+    def __init__(
+        self,
+        names: tuple[str, ...],
+        pool: descriptor_pool.DescriptorPool,
+        *,
+        imports: bool,
+        unserved_files: tuple[str, ...],
+        emptied_files: tuple[str, ...],
+    ) -> None:
         super().__init__(names, pool=pool)
         self.imports = imports
+        self.unserved_files = unserved_files
+        self.emptied_files = emptied_files
+
+    def _file_by_filename(self, request, filename):
+        if filename in self.unserved_files:
+            return reflection_pb2.ServerReflectionResponse(
+                error_response=reflection_pb2.ErrorResponse(
+                    error_code=grpc.StatusCode.NOT_FOUND.value[0], error_message=grpc.StatusCode.NOT_FOUND.value[1]
+                ),
+                original_request=request,
+            )
+        return super()._file_by_filename(request, filename)
 
     def _file_containing_symbol(self, request, fully_qualified_name):
         response = super()._file_containing_symbol(request, fully_qualified_name)
+        files = response.file_descriptor_response.file_descriptor_proto
         # The containing file comes first, its imports after it.
         if not self.imports:
-            del response.file_descriptor_response.file_descriptor_proto[1:]
+            del files[1:]
+        for index in reversed(range(len(files))):
+            name = descriptor_pb2.FileDescriptorProto.FromString(files[index]).name
+            if name in self.unserved_files:
+                del files[index]
+            elif name in self.emptied_files:
+                files[index] = descriptor_pb2.FileDescriptorProto(name=name).SerializeToString()
         return response
 
 
@@ -147,10 +174,14 @@ def serve_reflection(
     services: tuple[str, ...] = ("pkg.Users", "pkg.Admin", "grpc.health.v1.Health"),
     undescribed_services: tuple[str, ...] = (),
     imports: bool = True,
+    unserved_files: tuple[str, ...] = (),
+    emptied_files: tuple[str, ...] = (),
 ) -> None:
     names = (*services, f"grpc.reflection.{version}.ServerReflection", *undescribed_services)
     # Both versions exchange the same messages.
-    servicer = ReflectionServicer(names, pool=pool, imports=imports)
+    servicer = ReflectionServicer(
+        names, pool=pool, imports=imports, unserved_files=unserved_files, emptied_files=emptied_files
+    )
     handler = grpc.stream_stream_rpc_method_handler(
         servicer.ServerReflectionInfo,
         request_deserializer=reflection_pb2.ServerReflectionRequest.FromString,
@@ -172,6 +203,9 @@ def users(
     reflection_version: str | None = "v1alpha",
     undescribed_services: tuple[str, ...] = (),
     reflection_imports: bool = True,
+    unserved_files: tuple[str, ...] = (),
+    emptied_files: tuple[str, ...] = (),
+    annotated: bool = False,
     start: bool = True,
     on_get_user: Callable[[int, grpc.Server], object] | None = None,
 ) -> GrpcApp:
@@ -183,12 +217,16 @@ def users(
     that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
     Without `reflection_imports`, a symbol lookup returns only its file, and imports come by file name.
+    Reflection cannot describe `unserved_files` and leaves them out of symbol lookups; it describes `emptied_files`
+    in symbol lookups as files that define nothing.
+    With `annotated`, `GetUser` sets a custom option from `annotations.proto`, imported for that option alone.
     `pkg.Accounts/CreateAccount` (in `accounts_descriptor_set()`, not reflected) rejects an empty `display_name`,
     an empty `profile.contact_email` and the reserved name `admin` with INVALID_ARGUMENT, listing each field in
     `google.rpc.BadRequest` details next to a detail of a type clients do not know.
     """
+    descriptor_set = users_descriptor_set(annotated=annotated)
     database = descriptor_database.DescriptorDatabase()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file:
+    for file in descriptor_pb2.FileDescriptorSet.FromString(descriptor_set).file:
         database.Add(file)
     pool = descriptor_pool.DescriptorPool(database)
     request_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.GetUserRequest"))
@@ -308,6 +346,8 @@ def users(
             pool,
             undescribed_services=undescribed_services,
             imports=reflection_imports,
+            unserved_files=unserved_files,
+            emptied_files=emptied_files,
         )
     files = None
     if tls:
@@ -325,7 +365,14 @@ def users(
         port = server.add_insecure_port("127.0.0.1:0")
     if start:
         server.start()
-    return GrpcApp(server=server, port=port, calls=calls, reflection_calls=recorder.calls, tls=files)
+    return GrpcApp(
+        server=server,
+        port=port,
+        calls=calls,
+        reflection_calls=recorder.calls,
+        tls=files,
+        descriptor_set=descriptor_set,
+    )
 
 
 def serve_crashing_users(how: str) -> None:
