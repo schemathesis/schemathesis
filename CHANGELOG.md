@@ -67,6 +67,7 @@
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Test case summary counting errored and skipped cases as passed.
+- Probe requests from checks counted as generated and skipped test cases.
 - Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
 - False `Network Error` when `--max-time` runs out while a response body is still arriving.
 - Outage reports leading with hanging requests, repeating cut-off ones as network errors, with misleading tips.

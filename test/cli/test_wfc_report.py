@@ -252,11 +252,12 @@ def test_only_anonymous_modifications_are_308(ctx, cli, tmp_path, accepts_anonym
         "--checks=ignored_auth",
     )
 
-    assert [
-        category["code"]
-        for fault in load_report(path)["faults"]["foundFaults"]
-        for category in fault["faultCategories"]
-    ] == [code]
+    report = load_report(path)
+    # The requests without valid credentials that reveal the fault are not test cases of their own.
+    assert (
+        [category["code"] for fault in report["faults"]["foundFaults"] for category in fault["faultCategories"]],
+        report["totalTests"],
+    ) == ([code], 1)
 
 
 def test_same_failure_on_two_operations_is_two_faults(ctx, cli, tmp_path):

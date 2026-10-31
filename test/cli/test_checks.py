@@ -827,7 +827,7 @@ def test_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_test_cases=False)
 def test_login_redirect_counts_as_enforced_auth(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {"/me": {"get": {"security": [{"session": []}], "responses": {"200": {"description": "OK"}}}}},
@@ -856,7 +856,7 @@ TOKEN_HEADER_SCHEME = {"type": "apiKey", "in": "header", "name": "Token"}
 BEARER_SCHEME = {"type": "http", "scheme": "bearer"}
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_test_cases=False)
 @pytest.mark.parametrize(
     ["scheme", "enforced", "args"],
     [
