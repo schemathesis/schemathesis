@@ -207,6 +207,25 @@ def test_files_load_in_any_order(tmp_path):
     assert [result.ok().label for result in schema.get_all_operations()] == ["pkg.Users/GetUser", "pkg.Admin/Reset"]
 
 
+@pytest.mark.parametrize(
+    ("package", "expected"),
+    [("store", ["store.Admin", "store.Store"]), ("", ["Admin"])],
+    ids=["same-package", "no-package"],
+)
+def test_services_of_imported_files(tmp_path, package, expected):
+    empty, store = descriptor_pb2.FileDescriptorSet.FromString(side_effects_descriptor_set()).file
+    _, _, operations, any_file = users_files()
+    store.package = package
+    root = descriptor_pb2.FileDescriptorProto(
+        name="api.proto", package=package, syntax="proto3", dependency=[store.name, operations.name]
+    )
+    root.service.add(name="Admin").method.add(
+        name="Reset", input_type=".google.longrunning.GetOperationRequest", output_type=".google.longrunning.Operation"
+    )
+    schema = schemathesis.grpc.from_path(write_files(tmp_path, [empty, store, operations, any_file, root]))
+    assert sorted(schema.services) == expected
+
+
 def unresolvable_type_name(files):
     files[1].service[1].method[0].input_type = ".pkg.Missing"
     return "The descriptor set does not load: couldn't resolve name '.pkg.Missing'"

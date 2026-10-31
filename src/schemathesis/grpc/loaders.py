@@ -237,6 +237,8 @@ def _from_descriptor_set(
 
     # Files pulled in for their message types carry services of other APIs.
     imported = {dependency for file in descriptor_set.file for dependency in file.dependency}
+    # Imported files of a top-level package belong to the same API. Files without a package all share the empty one.
+    packages = {file.package for file in descriptor_set.file if file.name not in imported} - {""}
     try:
         for file in descriptor_set.file:
             add(file)
@@ -248,7 +250,7 @@ def _from_descriptor_set(
                 service.full_name: service
                 for file in descriptor_set.file
                 for service in pool.FindFileByName(file.name).services_by_name.values()
-                if file.name not in imported
+                if file.name not in imported or file.package in packages
             }
     except TypeError as exc:
         raise _does_not_load(str(exc).removeprefix("Couldn't build proto file into descriptor pool: ")) from exc
