@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -133,6 +134,31 @@ def test_missing_grpc_extra():
         1,
         "Error: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`",
     )
+
+
+def test_grpc_library_logs_kept_out_of_output(ctx):
+    server = ctx.grpc.apps.users()
+    tls_target = server.target.replace("grpc://", "grpcs://")
+    env = {key: value for key, value in os.environ.items() if key != "GRPC_VERBOSITY"}
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "schemathesis.cli",
+            "run",
+            str(server.descriptor_set_path),
+            f"--url={tls_target}",
+            "--include-name=pkg.Users/GetUser",
+            "--phases=fuzzing",
+            "--max-examples=1",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert f"Failed to connect to {tls_target}" in result.stdout
+    assert "ssl_transport_security.cc" not in result.stderr
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

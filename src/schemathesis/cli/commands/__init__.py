@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from tomllib import TOMLDecodeError
 from typing import Any
@@ -67,6 +68,8 @@ def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
 )
 def schemathesis(ctx: click.Context, config_file: str | None) -> None:
     """Property-based API testing for OpenAPI and GraphQL."""
+    # grpc's native logs repeat errors the report shows. grpc reads this on import, which hooks loaded below may do.
+    os.environ.setdefault("GRPC_VERBOSITY", "NONE")
     try:
         if config_file is not None:
             config = SchemathesisConfig.from_path(config_file)
