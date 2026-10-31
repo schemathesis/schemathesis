@@ -10,7 +10,7 @@ from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, SchemaLocation
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX, unbundle_path
-from schemathesis.core.jsonschema.types import JsonSchemaObject
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.transport import Response, response_content_type
 from schemathesis.openapi.checks import (
     ContentDeserializationError,
@@ -19,6 +19,7 @@ from schemathesis.openapi.checks import (
     MissingContentType,
 )
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
+from schemathesis.specs.openapi.converter import branch_literal_tag
 from schemathesis.specs.openapi.discriminator import get_implicit_discriminator_value
 
 if TYPE_CHECKING:
@@ -259,6 +260,8 @@ def _check_discriminator(
     # Walk the schema along the response data, so the cost is bounded by the data, not by the schema size.
     stack: list[tuple[object, object]] = [(root, data)]
     seen: set[tuple[int, int]] = set()
+    # Values each discriminator accepts depend only on its schema, so objects sharing a schema reuse them.
+    known_values: dict[int, set[str]] = {}
     while stack:
         schema, value = stack.pop()
         if not isinstance(schema, dict) or not isinstance(value, (dict, list)):
@@ -271,7 +274,7 @@ def _check_discriminator(
         if isinstance(reference, str) and reference.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
             stack.append((bundle.get(reference[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]), value))
         if isinstance(value, dict):
-            failure = _discriminator_failure(operation, schema, value, resolved.name_to_uri)
+            failure = _discriminator_failure(operation, schema, value, resolved.name_to_uri, bundle, known_values)
             if failure is not None:
                 return failure
             properties = schema.get("properties")
@@ -285,7 +288,12 @@ def _check_discriminator(
 
 
 def _discriminator_failure(
-    operation: APIOperation, schema: JsonSchemaObject, data: dict[str, object], name_to_uri: dict[str, str]
+    operation: APIOperation,
+    schema: JsonSchemaObject,
+    data: dict[str, object],
+    name_to_uri: dict[str, str],
+    bundle: dict[str, JsonSchema],
+    known_values_by_schema: dict[int, set[str]],
 ) -> Failure | None:
     discriminator = schema.get("discriminator")
     if not isinstance(discriminator, dict):
@@ -298,22 +306,10 @@ def _discriminator_failure(
     if not isinstance(value, str):
         return None
 
-    known_values: set[str] = set()
-    explicit_mapping = discriminator.get("mapping")
-    if isinstance(explicit_mapping, dict):
-        known_values.update(explicit_mapping.keys())
-    for keyword in ("anyOf", "oneOf"):
-        for item in schema.get(keyword) or []:
-            if not isinstance(item, dict):
-                continue
-            ref = item.get("$ref", "")
-            if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
-                continue
-            bundled_name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
-            schema_name = get_implicit_discriminator_value(name_to_uri.get(bundled_name, ""))
-            if schema_name:
-                known_values.add(schema_name)
-
+    known_values = known_values_by_schema.get(id(schema))
+    if known_values is None:
+        known_values = _known_discriminator_values(schema, discriminator, property_name, name_to_uri, bundle)
+        known_values_by_schema[id(schema)] = known_values
     if not known_values or value in known_values:
         return None
 
@@ -325,6 +321,37 @@ def _discriminator_failure(
             f"which does not match any of the known schema values: {known}"
         ),
     )
+
+
+def _known_discriminator_values(
+    schema: JsonSchemaObject,
+    discriminator: dict[str, object],
+    property_name: str,
+    name_to_uri: dict[str, str],
+    bundle: dict[str, JsonSchema],
+) -> set[str]:
+    """Values that select a branch: mapping keys, branch schema names and the single value a branch pins."""
+    known_values: set[str] = set()
+    explicit_mapping = discriminator.get("mapping")
+    if isinstance(explicit_mapping, dict):
+        known_values.update(explicit_mapping.keys())
+    for keyword in ("anyOf", "oneOf"):
+        for item in schema.get(keyword) or []:
+            if not isinstance(item, dict):
+                continue
+            ref = item.get("$ref", "")
+            if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+                continue
+            known_values.update(_branch_discriminator_values(ref, property_name, name_to_uri, bundle))
+    return known_values
+
+
+def _branch_discriminator_values(
+    ref: str, property_name: str, name_to_uri: dict[str, str], bundle: dict[str, JsonSchema]
+) -> set[str]:
+    """Values that select a bundled branch: its schema name and the single value it pins for the property."""
+    schema_name = get_implicit_discriminator_value(name_to_uri.get(ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :], ""))
+    return {value for value in (schema_name, branch_literal_tag(ref, property_name, bundle)) if value}
 
 
 def _response_schema_context(matched_key: str, status_code: int) -> str:
