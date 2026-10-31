@@ -157,8 +157,34 @@ def test_grpc_library_logs_kept_out_of_output(ctx):
         text=True,
         encoding="utf-8",
     )
-    assert f"Failed to connect to {tls_target}" in result.stdout
+    assert f"TLS handshake with {tls_target.removeprefix('grpcs://')} failed: " in result.stdout
+    assert "WRONG_VERSION_NUMBER" in result.stdout
     assert "ssl_transport_security.cc" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("tls", "scheme", "source"),
+    [
+        (False, "grpcs", "descriptor-set"),
+        (True, "grpc", "descriptor-set"),
+        (True, "grpcs", "descriptor-set"),
+        (True, "grpc", "reflection"),
+    ],
+    ids=[
+        "tls-to-plaintext-server",
+        "plaintext-to-tls-server",
+        "untrusted-certificate",
+        "reflection-plaintext-to-tls-server",
+    ],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_tls_failure_reported(ctx, cli, snapshot_cli, tls, scheme, source):
+    server = ctx.grpc.apps.users(tls=tls)
+    target = f"{scheme}://{server.target.partition('://')[2]}"
+    location = [target] if source == "reflection" else ["api.binpb", f"--url={target}"]
+    assert (
+        cli.run(*location, "--include-name=pkg.Users/GetUser", "--phases=fuzzing", "--max-examples=1") == snapshot_cli
+    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

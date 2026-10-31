@@ -94,7 +94,7 @@ def from_url(
                     )
                 )
             except grpc.RpcError as exc:
-                raise _reflection_error(cast(grpc.Call, exc), url, address) from None
+                raise _reflection_error(cast(grpc.Call, exc), url, address, tls) from None
 
         try:
             listing = ask(v1, list_services="")
@@ -156,12 +156,10 @@ def from_url(
     return loaded
 
 
-# How the gRPC runtime reports a failed TLS handshake or certificate check.
-TLS_FAILURE_MARKERS = ("Tls handshake failed", "verification check failed")
-
-
-def _reflection_error(error: grpc.Call, url: str, address: str) -> LoaderError:
+def _reflection_error(error: grpc.Call, url: str, address: str, tls: bool) -> LoaderError:
     import grpc
+
+    from schemathesis.transport.grpc import TLS_EXPECTED, TLS_FAILED, TLS_FAILURE_MARKERS, accepts_tls
 
     code = error.code()
     if code == grpc.StatusCode.UNIMPLEMENTED:
@@ -172,10 +170,13 @@ def _reflection_error(error: grpc.Call, url: str, address: str) -> LoaderError:
         )
     if code == grpc.StatusCode.UNAVAILABLE:
         details = error.details()
-        # Waiting does not fix a rejected certificate or a server without TLS, so these get no retry advice.
+        # Waiting does not fix a rejected certificate or a TLS mismatch, so these get no retry advice.
         if any(marker in details for marker in TLS_FAILURE_MARKERS):
-            return LoaderError(LoaderErrorKind.INVALID_CERTIFICATE, f"TLS handshake with {address} failed: {details}")
-        return LoaderError(LoaderErrorKind.CONNECTION_OTHER, f"Failed to connect to {address}: {details}")
+            return LoaderError(LoaderErrorKind.INVALID_CERTIFICATE, TLS_FAILED.format(address=address, details=details))
+        message = f"Failed to connect to {address}: {details}"
+        if not tls and accepts_tls(address):
+            return LoaderError(LoaderErrorKind.NETWORK_OTHER, f"{message}. {TLS_EXPECTED.format(address=address)}")
+        return LoaderError(LoaderErrorKind.CONNECTION_OTHER, message)
     return LoaderError(LoaderErrorKind.UNCLASSIFIED, f"Reflection failed with {code.name}: {error.details()}")
 
 

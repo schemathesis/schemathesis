@@ -181,7 +181,8 @@ def _mask_generated(data: str) -> str:
 
 
 def _mask_local_ports(data: str) -> str:
-    return re.sub(r"(https?|grpcs?)://([^/@\s]+@)?127\.0\.0\.1:[0-9]{3,}", r"\1://\g<2>127.0.0.1", data)
+    # gRPC errors also name the bare address, without a scheme.
+    return re.sub(r"127\.0\.0\.1:[0-9]{3,}", "127.0.0.1", data)
 
 
 def _mask_config_path(data: str) -> str:
@@ -536,6 +537,8 @@ def normalize_connection_errors(data: str) -> str:
         .replace("WinError 10061", "Error NUM")
         .replace("WinError 10054", "Error NUM")
         .replace("Cannot connect to proxy.", "Unable to connect to proxy")
+        # gRPC on Windows names a connection closed by the server differently.
+        .replace("End of TCP stream", "Socket closed")
     )
     return data.replace(
         "No connection could be made because the target machine actively refused it", "Connection refused"

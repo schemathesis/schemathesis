@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import base64
 import json
+import socket
+import ssl
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlsplit
 
 import grpc
 import requests
@@ -38,6 +41,10 @@ CHANNEL_OPTIONS = (
 PROBE_CHANNEL_OPTIONS = (*CHANNEL_OPTIONS, ("grpc.use_local_subchannel_pool", 1))
 
 ChannelKey = tuple[str, bool, "bool | str", "str | tuple[str, str] | None"]
+# How the gRPC runtime reports a failed TLS handshake or certificate check.
+TLS_FAILURE_MARKERS = ("Tls handshake failed", "verification check failed")
+TLS_FAILED = "TLS handshake with {address} failed: {details}"
+TLS_EXPECTED = "The server expects TLS; use `grpcs://{address}`"
 
 
 class GrpcTransport(BaseTransport["requests.Session"]):
@@ -98,13 +105,16 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)
             code = outcome.code()
-            # Both errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
+            # Errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
             if code == grpc.StatusCode.DEADLINE_EXCEEDED:
                 timed_out = TimeoutError(f"{base_url}: Read timed out. (read timeout={timeout})")
                 raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
             if code == grpc.StatusCode.UNAVAILABLE and not _is_reachable(address, tls, verify, cert):
                 details = outcome.details() or ""
                 failed_to_connect = "failed to connect" in details.lower()
+                if any(marker in details for marker in TLS_FAILURE_MARKERS):
+                    failure = ConnectionError(TLS_FAILED.format(address=address, details=details))
+                    raise requests.exceptions.ConnectionError(failure, request=request) from failure
                 # Once the server has answered, a call that did not fail on reconnecting reached it and may be
                 # what brought it down; gRPC's own message is the only sign of a call retried on a new connection.
                 if channel in self._answered and not failed_to_connect:
@@ -114,6 +124,10 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 if failed_to_connect and "connection reset by peer" in details.lower():
                     reset = ConnectionResetError(f"Connection reset. {details}")
                     raise requests.exceptions.ConnectionError(reset, request=request) from reset
+                # A plaintext connection to a server that speaks TLS closes without a handshake error.
+                if not tls and accepts_tls(address):
+                    mismatch = ConnectionError(f"{details}. {TLS_EXPECTED.format(address=address)}")
+                    raise requests.exceptions.ConnectionError(mismatch, request=request) from mismatch
                 refused = ConnectionRefusedError(f"Failed to connect to {base_url}")
                 raise requests.exceptions.ConnectionError(refused, request=request) from refused
             content = b""
@@ -225,6 +239,21 @@ def _is_reachable(address: str, tls: bool, verify: bool | str, cert: str | tuple
     # A new connection, since the one a dropped call used may still look connected for a moment afterwards.
     with create_channel(address, tls, verify, cert, options=PROBE_CHANNEL_OPTIONS) as channel:
         return _is_ready(channel)
+
+
+def accepts_tls(address: str) -> bool:
+    """Whether the server at `address` completes a TLS handshake, whatever certificate it presents."""
+    parts = urlsplit(f"//{address}")
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        # gRPC targets without a port use 443.
+        with socket.create_connection((parts.hostname, parts.port or 443), timeout=READY_TIMEOUT) as sock:
+            context.wrap_socket(sock, server_hostname=parts.hostname).close()
+    except (OSError, ValueError):
+        return False
+    return True
 
 
 def _is_ready(channel: grpc.Channel) -> bool:

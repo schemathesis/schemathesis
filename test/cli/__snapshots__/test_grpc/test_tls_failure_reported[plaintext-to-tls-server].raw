@@ -1,0 +1,49 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from api.binpb (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 3 total
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+______________________________ pkg.Users/GetUser _______________________________
+Network Error
+
+Connection failed
+
+    failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1: Socket closed. The server expects TLS; use `grpcs://127.0.0.1`
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/3
+  Tested: 0
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (disabled)
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Network Error: 1
+
+Test cases:
+  N generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================
