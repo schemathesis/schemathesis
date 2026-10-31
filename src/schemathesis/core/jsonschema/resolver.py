@@ -66,10 +66,11 @@ class Resolver:
         """The resolver for references inside `schema`, whose fragments point into it once it names itself."""
         for keyword in ("$id", "id"):
             value = schema.get(keyword)
-            if isinstance(value, str) and ("://" in value or value.startswith("urn:")):
+            if isinstance(value, str) and _names_schema(keyword, value):
                 if schema is self.schema:
                     return self
-                return Resolver(self.inner, schema, base_uri=urldefrag(value)[0], document=self.document or self)
+                base_uri = urldefrag(resolve_reference_uri(self.base_uri, value))[0]
+                return Resolver(self.inner, schema, base_uri=base_uri, document=self.document or self)
         return self
 
     @property
@@ -235,6 +236,13 @@ def build_registry(
         return jsonschema_rs.Registry([(base_uri, {})], draft=draft, retriever=retrieve)
 
 
+def _names_schema(keyword: str, value: str) -> bool:
+    """Whether a string under `$id` / `id` is the name of the schema holding it."""
+    # A relative `id` is far more often an ordinary field of example data than a schema name, so only an absolute
+    # one names a schema.
+    return keyword == "$id" or "://" in value or value.startswith("urn:")
+
+
 def collect_ids(root_schema: Any, base_uri: str) -> dict[str, JsonSchema]:
     """Map every name the document gives itself, resolved against the enclosing base URI, to the node carrying it."""
     ids: dict[str, JsonSchema] = {}
@@ -246,9 +254,8 @@ def collect_ids(root_schema: Any, base_uri: str) -> dict[str, JsonSchema]:
         if isinstance(node, dict):
             for keyword in ("$id", "id"):
                 value = node.get(keyword)
-                # A non-string sits under a property named `$id`/`id`, not under the keyword. A relative `id` is far more
-                # often an ordinary field of example data than a schema name, so only an absolute one names a schema.
-                if isinstance(value, str) and (keyword == "$id" or "://" in value or value.startswith("urn:")):
+                # A non-string sits under a property named `$id`/`id`, not under the keyword.
+                if isinstance(value, str) and _names_schema(keyword, value):
                     stack.append(base)
                     base = urldefrag(resolve_reference_uri(base, value))[0]
                     ids.setdefault(base, node)
@@ -297,13 +304,9 @@ def _resolve_reference_uri_with_document(base_uri: str, reference: str) -> tuple
             scheme = "https"
         return f"{scheme}:{reference}", document_uri
 
-    if "://" in document_uri:
-        return urljoin(document_uri, reference), document_uri
-
-    # `_normalize_location` rewrites filesystem paths to `file://` URIs, so all base URIs
-    # reaching here either match the `://` branch above or are `urn:`-prefixed. URNs have
-    # no path component to resolve a relative reference against, so return it as-is.
-    return reference, document_uri
+    # A relative `$id` in a document without a location leaves a relative path as the base, and it anchors relative
+    # references like any other path. A URN has no path to anchor them, so `urljoin` returns them as written.
+    return urljoin(document_uri, reference), document_uri
 
 
 def resolve_reference_uri(base_uri: str, reference: str) -> str:
@@ -341,6 +344,11 @@ def resolve_reference_with_uri(resolver: Resolver, reference: object) -> tuple[s
             value = resolver.resolve_local_fragment(reference[1:])
             if value is not UNRESOLVABLE:
                 return f"{resolver.base_uri}{reference}", resolver, value
+        else:
+            target_uri = resolve_reference_uri(resolver.base_uri, reference)
+            # Names the document gives its schemas resolve against the `$id`, as JSON Schema specifies.
+            if target_uri.partition("#")[0] in document.ids:
+                reference = target_uri
         # Documents in the wild point at their components and files relative to the document, not to the `$id`.
         return resolve_reference_with_uri(document, reference)
     try:

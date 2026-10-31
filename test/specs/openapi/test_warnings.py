@@ -359,6 +359,21 @@ EMBEDDED_RESOURCE = {
             },
             [("response `200`", "#/definitions/Missing")],
         ),
+        (
+            {
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {**EMBEDDED_RESOURCE, "properties": {"id": {"$ref": "item"}}}
+                            }
+                        },
+                    }
+                }
+            },
+            [],
+        ),
     ],
     ids=[
         "optional-parameter",
@@ -371,6 +386,7 @@ EMBEDDED_RESOURCE = {
         "json-sequence-item-schema",
         "inside-embedded-resource",
         "missing-inside-embedded-resource",
+        "reference-relative-to-embedded-resource",
     ],
 )
 def test_detect_unresolvable_references(ctx, operation, expected):
