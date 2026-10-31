@@ -470,8 +470,11 @@ def _iter_resolved_responses(
         # While technically not spec-compliant, this pattern is common enough to warrant leniency
         response_resolver, source = maybe_resolve_with_resolver(resolved, response_resolver)
         resolved = source
-        content = source.get("content")
-        if isinstance(content, dict) and any(isinstance(entry, dict) and "$ref" in entry for entry in content.values()):
+        content = source.get("content", {})
+        if not isinstance(content, dict):
+            # Written without an object value, `content` documents no media types
+            resolved = {**source, "content": {}}
+        elif any(not isinstance(entry, dict) or "$ref" in entry for entry in content.values()):
             resolved = {
                 **source,
                 "content": {
@@ -495,7 +498,8 @@ def _iter_resolved_responses(
 
 def _resolve_media_type(entry: object, resolver: Resolver) -> object:
     if not isinstance(entry, dict):
-        return entry
+        # Still documented as a media type, with no schema or examples
+        return {}
     try:
         return maybe_resolve_with_resolver(entry, resolver, allow_boolean=True)[1]
     except RefResolutionError:

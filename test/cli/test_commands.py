@@ -1829,6 +1829,19 @@ def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli, content):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_non_object_response_media_type(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    content = {"text/plain": {"schema": {"type": "string"}}, "application/json": None}
+    schema_path = ctx.openapi.write_schema(
+        {"/success": {"get": {"responses": {"200": {"description": "OK", "content": content}}}}}
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1", "--phases=examples,fuzzing")
+        == snapshot_cli
+    )
+
+
 MALFORMED_KEYWORD_OPERATIONS = {
     "query-min-length": {
         "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string", "minLength": "x"}}]
