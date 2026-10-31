@@ -1518,7 +1518,19 @@ def test_response_list_examples(ctx, version, example, expected):
 
 
 @pytest.mark.parametrize("version", ["3.0.3", "3.1.0", "3.2.0"])
-def test_referenced_examples_inside_another_document(ctx, version):
+@pytest.mark.parametrize(
+    ("media_examples", "root_examples"),
+    [
+        ({"A": {"value": {"marker": "media"}}}, {}),
+        ({"A": {"$ref": "#/components/examples/B"}, "B": {"value": {"marker": "media"}}}, {}),
+        (
+            {"A": {"$ref": "schema.json#/components/examples/Alias"}},
+            {"Alias": {"$ref": "#/components/examples/A"}, "A": {"value": {"marker": "media"}}},
+        ),
+    ],
+    ids=["direct", "chained", "chained-through-root"],
+)
+def test_referenced_examples_inside_another_document(ctx, version, media_examples, root_examples):
     schema_path = ctx.openapi.write_schema(
         {
             "/items": {
@@ -1529,6 +1541,7 @@ def test_referenced_examples_inside_another_document(ctx, version):
             }
         },
         version=version,
+        components={"examples": root_examples},
     )
     content = {
         "application/json": {"schema": {"type": "object"}, "examples": {"a": {"$ref": "#/components/examples/A"}}}
@@ -1538,7 +1551,7 @@ def test_referenced_examples_inside_another_document(ctx, version):
             "components": {
                 "requestBodies": {"Item": {"required": True, "content": content}},
                 "responses": {"Item": {"description": "OK", "content": content}},
-                "examples": {"A": {"value": {"marker": "media"}}},
+                "examples": media_examples,
             }
         },
         filename="media",
@@ -1548,6 +1561,41 @@ def test_referenced_examples_inside_another_document(ctx, version):
         {"marker": "media"}
     ]
     assert list(operation.responses.iter_examples()) == [("200/application/json", {"marker": "media"})]
+
+
+@pytest.mark.parametrize(
+    ("components", "expected"),
+    [
+        (
+            {
+                "A": {"$ref": "#/components/examples/B"},
+                "B": {"$ref": "#/components/examples/C"},
+                "C": {"value": {"id": 1}},
+            },
+            [{"id": 1}],
+        ),
+        ({"A": {"$ref": "#/components/examples/B"}, "B": {"$ref": "#/components/examples/A"}}, []),
+    ],
+    ids=["chained", "looping"],
+)
+def test_example_reference_chains(ctx, components, expected):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object"},
+                        "examples": {"a": {"$ref": "#/components/examples/A"}},
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={"examples": components},
+    )
+    assert [examples.generate_one(strategy).body for strategy in operation.get_strategies_from_examples()] == expected
 
 
 @pytest.mark.parametrize(

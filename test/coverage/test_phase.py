@@ -366,10 +366,16 @@ REFERENCED_EXAMPLES = {"first": {"$ref": "#/components/examples/Special"}, "seco
     ],
     ids=["query", "body"],
 )
-def test_with_referenced_examples(ctx, version, kwargs, expected):
-    schema = build_schema(
-        ctx, **kwargs, version=version, components={"examples": {"Special": {"value": "special-ref"}}}
-    )
+@pytest.mark.parametrize(
+    "components",
+    [
+        {"Special": {"value": "special-ref"}},
+        {"Special": {"$ref": "#/components/examples/Alias"}, "Alias": {"value": "special-ref"}},
+    ],
+    ids=["direct", "chained"],
+)
+def test_with_referenced_examples(ctx, version, kwargs, expected, components):
+    schema = build_schema(ctx, **kwargs, version=version, components={"examples": components})
     assert_positive_coverage(schema, expected)
 
 
