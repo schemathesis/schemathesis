@@ -18,7 +18,7 @@ from jsonschema_rs import ValidationError
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
-    from requests import RequestException
+    from requests import PreparedRequest, ReadTimeout, RequestException
 
     from schemathesis.config import OutputConfig
     from schemathesis.core.jsonschema import BundleError
@@ -690,6 +690,22 @@ def _clean_inner_request_message(message: object) -> str:
     if isinstance(message, str) and message.startswith("HTTPConnectionPool"):
         return re.sub(r"HTTPConnectionPool\(.+?\): ", "", message).rstrip(".")
     return str(message)
+
+
+def read_timeout_error(url: str, timeout: float | int, request: PreparedRequest) -> ReadTimeout:
+    """A response that did not arrive within the timeout, in the form `requests` reports a late one."""
+    from requests.exceptions import ReadTimeout
+
+    return ReadTimeout(TimeoutError(f"{url}: Read timed out. (read timeout={timeout})"), request=request)
+
+
+def is_read_timeout(exc: RequestException) -> bool:
+    """Whether the response did not arrive within the timeout, before or after its headers."""
+    from requests.exceptions import ReadTimeout
+    from urllib3.exceptions import ReadTimeoutError
+
+    # A timeout while reading the body arrives as a connection error that wraps the read timeout.
+    return isinstance(exc, ReadTimeout) or isinstance(exc.args[0] if exc.args else None, ReadTimeoutError)
 
 
 def get_request_error_message(exc: RequestException) -> str:

@@ -18,7 +18,7 @@ from urllib3.exceptions import DecodeError, ProtocolError, ReadTimeoutError
 from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
-from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
+from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible, is_read_timeout, read_timeout_error
 from schemathesis.core.file_samples import MEDIA_TYPE_FILE_SAMPLES
 from schemathesis.core.jsonschema import get_type
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
@@ -331,8 +331,18 @@ def _request(session: requests.Session, data: dict[str, Any], max_stream_events:
         response.close()
     else:
         # Read the body here, so network errors while reading it are retried like before.
-        response.content  # noqa: B018
+        _read_body(response, data["timeout"])
     return response
+
+
+def _read_body(response: requests.Response, timeout: float | int) -> None:
+    try:
+        response.content  # noqa: B018
+    except requests.exceptions.ConnectionError as exc:
+        # A body that stops arriving within the timeout is reported like a response that never started.
+        if is_read_timeout(exc):
+            raise read_timeout_error(response.url, timeout, response.request) from exc
+        raise
 
 
 def _iter_event_stream(response: requests.Response) -> Iterator[bytes]:
