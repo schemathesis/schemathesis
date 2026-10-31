@@ -4,4 +4,4 @@ Stdout:
 Usage: schemathesis run [OPTIONS] LOCATION
 Try 'schemathesis run --help' for help.
 
-Error: HAR and VCR reports record HTTP/1.1 exchanges and are not available for gRPC targets
+Error: HAR, VCR and pytest reports describe HTTP/1.1 requests and are not available for gRPC targets

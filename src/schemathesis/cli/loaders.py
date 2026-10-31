@@ -29,7 +29,9 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
     from schemathesis.schemas import BaseSchema
 
-GRPC_CASSETTES_MESSAGE = "HAR and VCR reports record HTTP/1.1 exchanges and are not available for gRPC targets"
+GRPC_HTTP_REPORTS_MESSAGE = (
+    "HAR, VCR and pytest reports describe HTTP/1.1 requests and are not available for gRPC targets"
+)
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
 PROTO_FILE_MESSAGE = f"Schemathesis reads descriptor sets, not `.proto` files. {BUILD_HINT} and run `schemathesis run api.binpb --url URL`"
 
@@ -43,9 +45,10 @@ def into_event_stream(
 ) -> EventGenerator:
     # Checked before any report handler creates its file.
     if is_grpc_location(location) and any(
-        config.reports.get(report_format).enabled for report_format in (ReportFormat.HAR, ReportFormat.VCR)
+        config.reports.get(report_format).enabled
+        for report_format in (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.PYTEST)
     ):
-        raise click.UsageError(GRPC_CASSETTES_MESSAGE)
+        raise click.UsageError(GRPC_HTTP_REPORTS_MESSAGE)
     if location.endswith(".proto") and file_exists(location):
         raise click.UsageError(PROTO_FILE_MESSAGE)
     return _event_stream(location=location, config=config, filter_set=filter_set, engine_callback=engine_callback)
