@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import re
 
 import pytest
 import requests
@@ -1128,13 +1129,13 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, tmp_path, snapshot_
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 
 
-# Single-use tokens: every token fetched after the first must recover the request that found the old one expired.
+# Single-use tokens: every token fetched after the first recovers one request, unless `--max-time` cuts its replay.
 @pytest.mark.parametrize(
-    "args",
-    [("run", "--phases=stateful", "--max-examples=10"), ("fuzz", "--max-time=1")],
+    "args,max_cut_replays",
+    [(("run", "--phases=stateful", "--max-examples=10"), 0), (("fuzz", "--max-time=1"), 1)],
     ids=["stateful", "fuzz"],
 )
-def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, args):
+def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, args, max_cut_replays):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/protected": {
@@ -1171,7 +1172,9 @@ def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, 
         "--seed=42",
         config={"base-url": base_url, "auth": _dynamic_auth("OAuth2", retry_on=[401])},
     )
-    assert f"Re-authenticated {state['issued'] - 1} times" in result.stdout
+    reported = re.search(r"Re-authenticated (\d+) time", result.stdout)
+    assert reported is not None, result.stdout
+    assert state["issued"] - 1 - max_cut_replays <= int(reported.group(1)) <= state["issued"] - 1
 
 
 def test_reauth_failure_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_html):
