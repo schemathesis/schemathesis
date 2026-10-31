@@ -14,9 +14,9 @@ Schemathesis dev
 
      ✅ 1 passed
 
- ✅  Fuzzing (in 0.00s)
+ ⏭   Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ⏭  1 skipped
 
 =================================== WARNINGS ===================================
 
@@ -35,7 +35,7 @@ API Operations:
 Test Phases:
   ⏭  Examples (not supported)
   ✅ Coverage
-  ✅ Fuzzing
+  ⏭  Fuzzing
   ⏭  Stateful (not applicable)
 
 Warnings:
