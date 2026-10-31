@@ -3903,8 +3903,16 @@ def test_response_schema_conformance_renders_failure_inside_embedded_resource(
         ("3.1.0", "$id", "tree", "tree"),
         ("3.1.0", "$id", "https://example.com/schemas/tree", "tree"),
         ("3.1.0", "$id", "schemas/tree", "tree"),
+        ("3.1.0", "$id", "./tree", "tree"),
     ],
-    ids=["id", "draft-4-id", "relative-id", "reference-relative-to-id", "reference-relative-to-relative-id"],
+    ids=[
+        "id",
+        "draft-4-id",
+        "relative-id",
+        "reference-relative-to-id",
+        "reference-relative-to-relative-id",
+        "dot-segment-id",
+    ],
 )
 def test_response_schema_conformance_follows_reference_into_embedded_resource(
     ctx, response_factory, version, keyword, identifier, reference

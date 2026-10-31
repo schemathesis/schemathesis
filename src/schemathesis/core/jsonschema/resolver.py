@@ -243,6 +243,14 @@ def _names_schema(keyword: str, value: str) -> bool:
     return keyword == "$id" or "://" in value or value.startswith("urn:")
 
 
+# The same names repeat: a document is scanned for them once per reference into it.
+@lru_cache(maxsize=4096)
+def _name_key(uri: str) -> str:
+    """Name without dot segments, so `./a`, `x/../a` and `../a` all match `a` in a document without a location."""
+    # References keep their dot segments, so a file outside the document still loads from where they point.
+    return urljoin(".", uri)
+
+
 def collect_ids(root_schema: Any, base_uri: str) -> dict[str, JsonSchema]:
     """Map every name the document gives itself, resolved against the enclosing base URI, to the node carrying it."""
     ids: dict[str, JsonSchema] = {}
@@ -258,7 +266,7 @@ def collect_ids(root_schema: Any, base_uri: str) -> dict[str, JsonSchema]:
                 if isinstance(value, str) and _names_schema(keyword, value):
                     stack.append(base)
                     base = urldefrag(resolve_reference_uri(base, value))[0]
-                    ids.setdefault(base, node)
+                    ids.setdefault(_name_key(base), node)
             stack.extend(value for value in node.values() if isinstance(value, (dict, list)))
         elif isinstance(node, list):
             stack.extend(value for value in node if isinstance(value, (dict, list)))
@@ -347,7 +355,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: object) -> tuple[s
         else:
             target_uri = resolve_reference_uri(resolver.base_uri, reference)
             # Names the document gives its schemas resolve against the `$id`, as JSON Schema specifies.
-            if target_uri.partition("#")[0] in document.ids:
+            if _name_key(target_uri.partition("#")[0]) in document.ids:
                 reference = target_uri
         # Documents in the wild point at their components and files relative to the document, not to the `$id`.
         return resolve_reference_with_uri(document, reference)
@@ -358,7 +366,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: object) -> tuple[s
         if document_uri and document_uri != current_document_uri:
             # A document that names itself carries its own target; fetching it would go looking for
             # a copy that may not exist, or may have drifted from the one in hand.
-            named = resolver.ids.get(document_uri)
+            named = resolver.ids.get(_name_key(document_uri))
             if named is not None:
                 named_resolver = Resolver(resolver.inner, named, base_uri=document_uri, document=resolver)
                 if fragment:
