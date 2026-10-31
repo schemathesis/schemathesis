@@ -272,6 +272,14 @@ Rules:
 
     When `fail-on` is configured, Schemathesis will exit with code 1 if any of the specified warnings are encountered, even if all checks pass. This is useful for CI/CD pipelines that should fail when configuration or test data issues are detected.
 
+    `warnings` also works in `[[operations]]`, in any of the formats above. Silence warnings for a single operation:
+
+    ```toml
+    [[operations]]
+    include-name = "GET /orders/{order_id}"
+    warnings = false
+    ```
+
     Available warnings (see the [Warnings reference](warnings.md) for details):
 
     - `missing_auth`: API returns only 401/403 responses, suggesting missing or invalid authentication
