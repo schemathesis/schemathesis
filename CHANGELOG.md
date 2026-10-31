@@ -80,6 +80,7 @@
 - Stateful tests replaying scenarios saved in the example database for a different API.
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
+- Internal error and empty report files when enabling Allure reports without the `allure` extra.
 - Runs with `--generation-unique-inputs` spinning without requests until `--max-time` once inputs run out.
 - Internal error or wrong schema shown for response failures inside schemas reached through `$dynamicRef`.
 - False schema error for references inside nested schemas that declare their own `$id`.

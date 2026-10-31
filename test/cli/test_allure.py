@@ -1,3 +1,7 @@
+import subprocess
+import sys
+
+import pytest
 from _pytest.main import ExitCode
 from flask import jsonify
 
@@ -142,6 +146,40 @@ def test_allure_layer_label(ctx, cli, tmp_path):
 def test_allure_path_with_null_byte_reports_clean_error(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert cli.run(api.schema_url, config={"reports": {"allure": {"path": "d\x00"}}}) == snapshot_cli
+
+
+BLOCK_ALLURE_AND_RUN = """
+import sys
+sys.modules["allure_commons"] = None
+from schemathesis.cli import schemathesis
+schemathesis(sys.argv[1:])
+"""
+
+
+@pytest.mark.parametrize(
+    ("args", "config"),
+    [
+        (["run", "--report=allure,junit"], ""),
+        (["fuzz", "--report=allure,junit"], ""),
+        (["run"], "[reports.allure]\nenabled = true\n[reports.junit]\nenabled = true\n"),
+    ],
+    ids=["run", "fuzz", "config-file"],
+)
+def test_missing_allure_extra(tmp_path, args, config):
+    config_path = tmp_path / "schemathesis.toml"
+    config_path.write_text(config)
+    result = subprocess.run(
+        [sys.executable, "-c", BLOCK_ALLURE_AND_RUN, *args, "http://127.0.0.1:1/openapi.json"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert (result.returncode, result.stderr.splitlines()[-1]) == (
+        1,
+        "Error: Allure reports require the `allure` extra: `pip install schemathesis[allure]`",
+    )
+    assert list(tmp_path.iterdir()) == [config_path]
 
 
 def test_allure_path_displayed(ctx, cli, tmp_path, snapshot_cli):
