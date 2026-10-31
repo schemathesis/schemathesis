@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 import requests
 
-from schemathesis.auths import reauth_and_replay
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
@@ -201,24 +200,15 @@ def _call_with_reauth(
 
     Returns (rate_limited_responses, final_response).
     """
-    rate_limited: list[Response] = []
-
-    def _perform_call() -> Response:
-        try:
-            retried, response = send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
-        except TRANSPORT_ERRORS as error:
-            recorder.record_network_error(case_id=case.id, error=error)
-            raise
-        except BudgetExpired:
-            # Cut off by the time limit, the request says nothing about the operation.
-            recorder.forget_case(case_id=case.id)
-            raise
-        rate_limited.extend(retried)
-        return response
-
-    response = _perform_call()
-    # Replay through `_perform_call` so it keeps rate-limit and network-error handling.
-    return rate_limited, reauth_and_replay(case, response, ctx.reauth, _perform_call)
+    try:
+        return send_tracked(ctx, case, transport_kwargs=transport_kwargs, emit=pending_events.append)
+    except TRANSPORT_ERRORS as error:
+        recorder.record_network_error(case_id=case.id, error=error)
+        raise
+    except BudgetExpired:
+        # Cut off by the time limit, the request says nothing about the operation.
+        recorder.forget_case(case_id=case.id)
+        raise
 
 
 def _record_response_signals(

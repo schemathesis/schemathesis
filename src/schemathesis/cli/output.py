@@ -580,6 +580,23 @@ def display_summary_counts(summary: SummaryData) -> None:
         display_errors_summary(summary.errors)
 
 
+def reauth_summary_lines(summary: events.RunSummary | None) -> list[str]:
+    """Lines noting how often expired credentials were refreshed and whether re-login stopped working."""
+    if summary is None:
+        return []
+    lines = []
+    if summary.reauth_count > 0:
+        lines.append(f"  Re-authenticated {pluralize(summary.reauth_count, 'time')}")
+    if summary.reauth_broke:
+        lines.append(
+            style(
+                "  ⚠️ Authentication stopped working mid-run - credentials likely invalidated",
+                fg="yellow",
+            )
+        )
+    return lines
+
+
 def display_summary_footer(ctx: BaseExecutionContext, summary: SummaryData) -> None:
     if ctx.summary_lines:
         print_lines(ctx.summary_lines)

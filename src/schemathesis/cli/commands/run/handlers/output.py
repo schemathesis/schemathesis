@@ -33,6 +33,7 @@ from schemathesis.cli.output import (
     make_console,
     make_progress_bar,
     print_lines,
+    reauth_summary_lines,
     style,
     unmatched_filter_block,
     warning_items,
@@ -1599,16 +1600,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         if not ctx.warnings.is_empty:
             self.display_warnings_summary(ctx)
 
-        if event.payload is not None:
-            if event.payload.reauth_count > 0:
-                ctx.add_summary_line(f"  Re-authenticated {pluralize(event.payload.reauth_count, 'time')}")
-            if event.payload.reauth_broke:
-                ctx.add_summary_line(
-                    style(
-                        "  ⚠️ Authentication stopped working mid-run - credentials likely invalidated",
-                        fg="yellow",
-                    )
-                )
-
+        ctx.summary_lines.extend(reauth_summary_lines(event.payload))
         display_summary_footer(ctx, summary)
         self.display_final_line(ctx, event)

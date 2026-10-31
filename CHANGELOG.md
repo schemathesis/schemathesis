@@ -63,6 +63,7 @@
 - Runs with `--max-time` continuing after a request times out at the time limit.
 - `st fuzz` hiding errors raised as the time limit is reached.
 - Token fetch cooldown failure reported twice in stateful testing.
+- Expired auth tokens never refreshed in stateful testing and `st fuzz`.
 - Configured `proxy` skipped by dynamic auth token requests, WFC login and loading schemas from URLs.
 - Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
 - `st replay` not finding a case ID after a later run records the same failure.
