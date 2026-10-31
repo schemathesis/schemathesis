@@ -27,8 +27,12 @@ if TYPE_CHECKING:
 
 # How long a failed call waits for the channel to connect before blaming the network.
 READY_TIMEOUT = 0.5
-# Servers attach error details as metadata; the default 8 KB limit turns large ones into a client-side failure.
-CHANNEL_OPTIONS = (("grpc.max_metadata_size", 1024 * 1024),)
+CHANNEL_OPTIONS = (
+    # Servers attach error details as metadata; the default 8 KB limit turns large ones into a client-side failure.
+    ("grpc.max_metadata_size", 1024 * 1024),
+    # The server keeps no headers for reuse, so one unparsable response header cannot fail later responses.
+    ("grpc.http2.hpack_table_size.decoder", 0),
+)
 
 ChannelKey = tuple[str, bool, "bool | str", "str | tuple[str, str] | None"]
 

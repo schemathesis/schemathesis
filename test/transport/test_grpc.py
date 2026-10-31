@@ -72,6 +72,15 @@ def test_internal_error(ctx):
     )
 
 
+def test_unparsable_status_leaves_later_responses_intact(ctx):
+    operation = load(ctx.grpc.apps.echo_status())["pkg.Users"]["GetUser"]
+    responses = [operation.Case(body={"userId": user_id}).call() for user_id in (-1, 5)]
+    assert [(response.status_code, response.status_line) for response in responses] == [
+        (500, "INTERNAL: Stream removed (Error parsing 'grpc-status' metadata)"),
+        (404, "NOT_FOUND"),
+    ]
+
+
 def test_large_error_trailers(ctx):
     _, response = get_user(ctx.grpc.apps.users(), 400)
     assert (response.status_code, response.status_line, response.headers) == (

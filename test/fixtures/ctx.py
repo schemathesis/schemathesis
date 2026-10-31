@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from schemathesis.openapi.loaders import OpenApiSchema
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLSchema
+    from test.apps.catalog.grpc.raw import RawGrpcServer
     from test.apps.catalog.grpc.users import CrashingGrpcServer, GrpcApp, GrpcServer
 
 
@@ -630,6 +631,13 @@ class GrpcApps:
         from test.apps.catalog.grpc.users import envelope
 
         return self._serve(envelope())
+
+    def echo_status(self) -> RawGrpcServer:
+        from test.apps.catalog.grpc.raw import echo_status
+
+        server = echo_status(self.parent.request.getfixturevalue("tmp_path"))
+        self.parent.request.addfinalizer(server.stop)
+        return server
 
     def _serve(self, app: GrpcApp) -> GrpcServer:
         self.parent.request.addfinalizer(lambda: app.server.stop(None))
