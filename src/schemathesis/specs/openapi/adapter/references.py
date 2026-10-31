@@ -5,7 +5,7 @@ from typing import Any
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import RefResolutionError
-from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference, resolve_reference_with_uri
 from schemathesis.core.jsonschema.types import JsonValue, as_object_schema
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 
@@ -69,14 +69,19 @@ def resolve_example_references(definition: Mapping[str, Any], resolver: Resolver
 
 
 def _resolve_example(example: object, resolver: Resolver) -> object:
-    if not isinstance(example, dict) or not isinstance(example.get("$ref"), str):
-        return example
-    try:
-        _, target = resolve_reference(resolver, example["$ref"])
-    except RefResolutionError:
-        # Kept as is, so the examples phase reports the broken reference.
-        return example
-    return target if isinstance(target, dict) else example
+    seen: set[str] = set()
+    while isinstance(example, dict) and isinstance(reference := example.get("$ref"), str):
+        try:
+            uri, resolver, target = resolve_reference_with_uri(resolver, reference)
+        except RefResolutionError:
+            # Kept as is, so the examples phase reports the broken reference.
+            return example
+        # A chain that loops back or ends on a non-object stays a reference, which holds no data
+        if uri in seen or not isinstance(target, dict):
+            return example
+        seen.add(uri)
+        example = target
+    return example
 
 
 def resolve_media_type_object(item: Mapping[str, Any], resolver: Resolver) -> tuple[Resolver, Mapping[str, Any]]:

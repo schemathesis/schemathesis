@@ -685,8 +685,8 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
             yield load_external_example(example["externalValue"])
         except requests.RequestException:
             pass
-    # A `serializedValue` is already on the wire form, which bodies here are not
-    elif example and "serializedValue" not in example:
+    # A `serializedValue` is already on the wire form, which bodies here are not; a looping reference holds no data
+    elif example and "serializedValue" not in example and "$ref" not in example:
         yield example
 
 
