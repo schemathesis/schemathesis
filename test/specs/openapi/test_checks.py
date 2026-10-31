@@ -4153,7 +4153,7 @@ def _validated_sequence(operation, response_factory, media_type, body):
     else:
         failures = []
     return [
-        (type(failure), list(failure.instance_path))
+        (type(failure), list(failure.instance_path), failure.message.partition("\n")[0])
         if isinstance(failure, JsonSchemaError)
         else (type(failure), (failure.lineno, failure.colno))
         for failure in failures
@@ -4164,41 +4164,41 @@ def _validated_sequence(operation, response_factory, media_type, body):
     ("version", "media_type", "media_type_object", "body", "expected"),
     [
         ("3.2.0", "application/jsonl", {"itemSchema": JSON_SEQUENCE_ITEM}, '{"id":1}\r\n\r\n{"id":2}\n', []),
-        ("3.2.0", "application/jsonl", {"itemSchema": JSON_SEQUENCE_ITEM}, '﻿{"id":1}\n', []),
+        ("3.2.0", "application/jsonl", {"itemSchema": JSON_SEQUENCE_ITEM}, '\ufeff{"id":1}\n', []),
         (
             "3.2.0",
             "application/jsonl",
             {"itemSchema": JSON_SEQUENCE_ITEM},
             '{"id":1}\n{"id":"x"}\n',
-            [(JsonSchemaError, [1, "id"])],
+            [(JsonSchemaError, [1, "id"], 'Item #1: "x" is not of type "integer"')],
         ),
         (
             "3.2.0",
             "application/x-ndjson",
             {"itemSchema": JSON_SEQUENCE_ITEM},
             '{"id":1}\n{"id":"x"}\n',
-            [(JsonSchemaError, [1, "id"])],
+            [(JsonSchemaError, [1, "id"], 'Item #1: "x" is not of type "integer"')],
         ),
         (
             "3.2.0",
             "application/json-seq",
             {"itemSchema": JSON_SEQUENCE_ITEM},
             '\x1e{"id":1}\n\x1e{"id":"x"}\n',
-            [(JsonSchemaError, [1, "id"])],
+            [(JsonSchemaError, [1, "id"], 'Item #1: "x" is not of type "integer"')],
         ),
         (
             "3.2.0",
             "application/geo+json-seq",
             {"itemSchema": JSON_SEQUENCE_ITEM},
             '\x1e{"id":"x"}\n',
-            [(JsonSchemaError, [0, "id"])],
+            [(JsonSchemaError, [0, "id"], 'Item #0: "x" is not of type "integer"')],
         ),
         (
             "3.2.0",
             "application/jsonl",
             {"itemSchema": JSON_SEQUENCE_ITEM, "schema": {"maxItems": 1}},
             '{"id":1}\n{"id":2}\n',
-            [(JsonSchemaError, [])],
+            [(JsonSchemaError, [], '[{"id":1},{"id":2}] has more than 1 item')],
         ),
         (
             "3.2.0",
@@ -4206,6 +4206,41 @@ def _validated_sequence(operation, response_factory, media_type, body):
             {"itemSchema": JSON_SEQUENCE_ITEM},
             '{"id":1}\n{"id":2}\n{oops\n',
             [(MalformedJson, (3, 2))],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n\xa0\n',
+            [(MalformedJson, (2, 1))],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n\u3000\n',
+            [(MalformedJson, (2, 1))],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n\x1c\n',
+            [(MalformedJson, (2, 1))],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n\x85\n',
+            [(MalformedJson, (2, 1))],
+        ),
+        (
+            "3.2.0",
+            "application/json-seq",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '\x1e{"id":1}\n\x1e\xa0\n',
+            [(MalformedJson, (2, 2))],
         ),
         (
             "3.2.0",
@@ -4238,8 +4273,13 @@ def _validated_sequence(operation, response_factory, media_type, body):
         "json-seq-suffix-bad-item",
         "stream-schema",
         "malformed-record-position",
+        "jsonl-no-break-space-line",
+        "jsonl-ideographic-space-line",
+        "jsonl-file-separator-line",
+        "jsonl-next-line-line",
+        "json-seq-no-break-space-record",
         "content-keywords-annotate-only",
-        "openapi-3-1-item-schema-unvalidated",
+        "openapi-3-1-record-schema-unvalidated",
         "openapi-3-1-array-schema-unvalidated",
     ],
 )

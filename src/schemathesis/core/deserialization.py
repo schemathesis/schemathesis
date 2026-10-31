@@ -315,7 +315,8 @@ def parse_json_sequence(content: bytes, media_type: str) -> list[JsonValue]:
     values: list[JsonValue] = []
     offset = 0
     for record in text.split(separator):
-        if record.strip():
+        # Only JSON whitespace makes a record blank, a line of other Unicode whitespace is malformed JSON
+        if record.strip(" \t\r\n"):
             try:
                 values.append(json.loads(record))
             except json.JSONDecodeError as exc:

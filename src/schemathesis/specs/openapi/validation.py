@@ -111,9 +111,10 @@ def validate_documented_response(
         content_type = resolved_content_type
 
     context = deserialization.DeserializationContext(operation=operation, case=case)
+    is_json_sequence = resolved.media_type is not None and definition.describes_json_sequence(resolved.media_type)
 
     try:
-        if resolved.media_type is not None and definition.describes_json_sequence(resolved.media_type):
+        if is_json_sequence:
             data = deserialization.parse_json_sequence(response.content, resolved.media_type)
         else:
             data = deserialization.deserialize_response(response, content_type, context=context)
@@ -179,6 +180,9 @@ def validate_documented_response(
                     context=response_context,
                 )
                 if failure not in failures:
+                    # Records are validated as one array, so the leading index of the path names the failing record
+                    if is_json_sequence and failure.instance_path and isinstance(failure.instance_path[0], int):
+                        failure.message = f"Item #{failure.instance_path[0]}: {failure.message}"
                     failures.append(failure)
         except ValueError as exc:
             # jsonschema_rs raises ValueError for lone Unicode surrogate characters (e.g. \uDCF3);
