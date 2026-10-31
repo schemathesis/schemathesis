@@ -17,8 +17,8 @@ from schemathesis.core.transport import expand_status_code
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import ResponseAdapter
 from schemathesis.specs.openapi.adapter.references import (
-    example_object_value,
     has_example_references,
+    iter_example_values,
     maybe_resolve_with_resolver,
     resolve_media_type_object,
 )
@@ -940,16 +940,8 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
             ("examples", "example"),
             ("x-examples", "x-example"),
         ):
-            examples = definition.get(examples_container_keyword, {})
-            if isinstance(examples, dict):
-                for example in examples.values():
-                    if isinstance(example, dict):
-                        value = example_object_value(example)
-                        if not isinstance(value, NotSet):
-                            yield name, value
-            elif isinstance(examples, list):
-                for example in examples:
-                    yield name, example
+            for value in iter_example_values(definition.get(examples_container_keyword)):
+                yield name, value
             if example_keyword in definition:
                 yield name, definition[example_keyword]
 

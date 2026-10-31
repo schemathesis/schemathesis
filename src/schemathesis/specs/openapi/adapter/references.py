@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from schemathesis.core import NOT_SET, NotSet
@@ -17,11 +17,39 @@ def example_object_value(example: Mapping[str, Any]) -> JsonValue | NotSet:
     return example.get("dataValue", NOT_SET)
 
 
+def iter_example_values(container: object) -> Iterator[object]:
+    """The data an `examples` container holds: a mapping of Example Objects, or a list mixing them with plain values."""
+    if isinstance(container, dict):
+        for example in container.values():
+            if isinstance(example, dict) and not isinstance(value := example_object_value(example), NotSet):
+                yield value
+    elif isinstance(container, list):
+        for item in container:
+            if not isinstance(data := _list_example_value(item), NotSet):
+                yield data
+
+
+def _list_example_value(item: object) -> object:
+    """The data a list item holds, whether it is an Example Object or a plain value."""
+    if not isinstance(item, dict):
+        return item
+    value = example_object_value(item)
+    if not isinstance(value, NotSet):
+        return value
+    # An Example Object with only its wire form, an external location or a broken reference has no data to send
+    if "serializedValue" in item or "externalValue" in item or "$ref" in item:
+        return NOT_SET
+    return item
+
+
 def has_example_references(definition: Mapping[str, Any]) -> bool:
     """Whether any Example Object of the definition is given by `$ref`."""
     return any(
-        isinstance(container, dict)
-        and any(isinstance(example, dict) and "$ref" in example for example in container.values())
+        isinstance(container, (dict, list))
+        and any(
+            isinstance(example, dict) and "$ref" in example
+            for example in (container.values() if isinstance(container, dict) else container)
+        )
         for container in (definition.get("examples"), definition.get("x-examples"))
     )
 
@@ -35,6 +63,8 @@ def resolve_example_references(definition: Mapping[str, Any], resolver: Resolver
         container = definition.get(keyword)
         if isinstance(container, dict):
             updated[keyword] = {name: _resolve_example(example, resolver) for name, example in container.items()}
+        elif isinstance(container, list):
+            updated[keyword] = [_resolve_example(example, resolver) for example in container]
     return updated
 
 

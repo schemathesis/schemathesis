@@ -1491,6 +1491,32 @@ def test_response_example_object(ctx, version, example):
     assert list(operation.responses.iter_examples()) == [("200/application/json", {"id": 1})]
 
 
+@pytest.mark.parametrize(
+    ("version", "example", "expected"),
+    [
+        ("3.0.3", {"value": {"id": 1}}, [("200/application/json", {"id": 1})]),
+        ("3.2.0", {"dataValue": {"id": 1}}, [("200/application/json", {"id": 1})]),
+        ("3.2.0", {"serializedValue": '{"id": 1}'}, []),
+        ("3.0.3", {"externalValue": "http://127.0.0.1/item.json"}, []),
+        ("3.0.3", {"$ref": "#/components/examples/Item"}, [("200/application/json", {"id": 1})]),
+        ("3.0.3", {"$ref": "#/components/examples/Missing"}, []),
+    ],
+    ids=["value", "data-value", "serialized-value", "external-value", "reference", "dangling-reference"],
+)
+def test_response_list_examples(ctx, version, example, expected):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "responses": {
+                "200": {"description": "OK", "content": {"application/json": {"schema": {}, "examples": [example]}}}
+            }
+        },
+        version=version,
+        components={"examples": {"Item": {"value": {"id": 1}}}},
+    )
+    assert list(operation.responses.iter_examples()) == expected
+
+
 @pytest.mark.parametrize("version", ["3.0.3", "3.1.0", "3.2.0"])
 def test_referenced_examples_inside_another_document(ctx, version):
     schema_path = ctx.openapi.write_schema(
