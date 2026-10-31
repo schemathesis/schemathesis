@@ -261,6 +261,7 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
                 parent_id=None,
                 transition=None,
                 is_transition_applied=False,
+                is_probe=False,
             ),
         )
 

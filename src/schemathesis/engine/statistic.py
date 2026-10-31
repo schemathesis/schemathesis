@@ -11,7 +11,7 @@ from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.engine.recorder import CaseNode, RecordedScenario, ReproductionStep
+from schemathesis.engine.recorder import CaseNode, CheckFailureInfo, CheckNode, RecordedScenario, ReproductionStep
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import coverage_scenario, report_label
 
@@ -181,16 +181,27 @@ class Statistic:
         # Track failures per-label (may differ from recorder.label when method differs)
         failures_by_label: dict[str, dict[str, GroupedFailures]] = {}
 
-        self.total_cases += len(recorder.cases)
         self.filtered_failures += sum(recorder.filtered_failures.values())
 
         extraction_failures: set[ExtractionFailure] = set()
         scenario_errored = any(check.status == Status.ERROR for checks in recorder.checks.values() for check in checks)
+        # A probe's failures are recorded under its own id, so each reproduces with the probe request,
+        # yet they are the outcome of the check that ran on the probe's parent.
+        probe_checks: dict[str, list[tuple[str, CheckNode]]] = {}
+        for case_id, case in recorder.cases.items():
+            if case.is_probe and case.parent_id is not None:
+                probe_checks.setdefault(case.parent_id, []).extend(
+                    (case_id, check) for check in recorder.checks.get(case_id, [])
+                )
 
         for case_id, case in recorder.cases.items():
-            checks = recorder.checks.get(case_id, [])
+            if case.is_probe:
+                continue
+            self.total_cases += 1
+            checks = [(case_id, check) for check in recorder.checks.get(case_id, [])]
+            checks.extend(probe_checks.get(case_id, []))
 
-            if any(check.status == Status.ERROR for check in checks):
+            if any(check.status == Status.ERROR for _, check in checks):
                 self.errored_cases += 1
                 self.errored_operations.add(case.value.operation.label)
                 continue
@@ -205,10 +216,9 @@ class Statistic:
                 continue
 
             self.tested_operations.add(case.value.operation.label)
-            current_case_failures = []
-            last_failure_info = None
+            found: dict[str, list[CheckFailureInfo]] = {}
 
-            for check in checks:
+            for recorded_id, check in checks:
                 if check.failure_info is not None:
                     failure = check.failure_info.failure
 
@@ -220,31 +230,30 @@ class Statistic:
                         if entry is not None:
                             self.known_failures[identity] = entry.id
                             continue
-                        last_failure_info = check.failure_info
-                        self.unique_failures_map[failure] = case_id
-                        current_case_failures.append(failure)
+                        self.unique_failures_map[failure] = recorded_id
+                        found.setdefault(recorded_id, []).append(check.failure_info)
                     else:
                         # This failure was already seen - skip it
                         continue
 
-            if current_case_failures:
-                assert last_failure_info is not None
+            for recorded_id, infos in found.items():
+                failing = recorder.cases[recorded_id].value
                 label = report_label(
-                    operation_label=failure_label(case.value) if failure_label is not None else recorder.label,
-                    method=case.value.method,
-                    path=case.value.path,
-                    scenario=coverage_scenario(case.value),
+                    operation_label=failure_label(failing) if failure_label is not None else recorder.label,
+                    method=failing.method,
+                    path=failing.path,
+                    scenario=coverage_scenario(failing),
                 )
-                failures_by_label.setdefault(label, {})[case_id] = GroupedFailures(
-                    case_id=case_id,
-                    code_sample=last_failure_info.code_sample,
-                    steps=last_failure_info.steps,
-                    failures=current_case_failures,
-                    response=recorder.interactions[case_id].response,
-                    auth_identity=case.value.auth_identity,
+                failures_by_label.setdefault(label, {})[recorded_id] = GroupedFailures(
+                    case_id=recorded_id,
+                    code_sample=infos[-1].code_sample,
+                    steps=infos[-1].steps,
+                    failures=[info.failure for info in infos],
+                    response=recorder.interactions[recorded_id].response,
+                    auth_identity=failing.auth_identity,
                 )
 
-            if current_case_failures:
+            if found:
                 self.cases_with_failures += 1
 
             extraction_failures.update(_extraction_failures(recorder, case_id, case))

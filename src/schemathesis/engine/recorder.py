@@ -107,6 +107,7 @@ class ScenarioRecorder:
         parent_id: str | None = None,
         transition: Transition | None = None,
         is_transition_applied: bool = False,
+        is_probe: bool = False,
     ) -> None:
         """Record a test case and its relationship to a parent, if applicable."""
         self.cases[case.id] = CaseNode(
@@ -114,6 +115,7 @@ class ScenarioRecorder:
             parent_id=parent_id,
             transition=transition,
             is_transition_applied=is_transition_applied,
+            is_probe=is_probe,
         )
 
     def record_response(self, *, case_id: str, response: Response) -> None:
@@ -356,6 +358,8 @@ class CaseNode:
     # and outside of the implemented transition logic (e.g. spec-specific stateful transitions)
     transition: Transition | None
     is_transition_applied: bool
+    # A request sent on the parent case's behalf, e.g. by a check, not a generated test case.
+    is_probe: bool
 
 
 @dataclass(slots=True)

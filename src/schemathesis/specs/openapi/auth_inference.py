@@ -71,7 +71,7 @@ def _send_with_scheme(
     config = schema.auth_schemes[scheme_name]
 
     retry_case = case.derive()
-    recorder.record_case(parent_id=case.id, case=retry_case)
+    recorder.record_case(parent_id=case.id, case=retry_case, is_probe=True)
 
     context = AuthContext(operation=case.operation, app=case.operation.app)
 

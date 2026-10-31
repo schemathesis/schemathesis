@@ -253,7 +253,7 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             self._record(event.recorder)
 
     def _record(self, recorder: ScenarioRecorder) -> None:
-        self.total_tests += len(recorder.cases)
+        self.total_tests += sum(not node.is_probe for node in recorder.cases.values())
         for case_id, interaction in recorder.interactions.items():
             self.evaluated_calls += 1
             endpoint = _case_operation_id(recorder.cases[case_id].value)

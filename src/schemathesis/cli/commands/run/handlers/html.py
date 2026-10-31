@@ -162,7 +162,8 @@ class HtmlReportHandler(EventHandler["BaseExecutionContext"]):
 
     def _record(self, recorder: RecordedScenario) -> None:
         for node in recorder.cases.values():
-            self.cases[node.value.operation.label] += 1
+            if not node.is_probe:
+                self.cases[node.value.operation.label] += 1
 
     def _add_span(self, phase: PhaseName, started: float, finished: float) -> None:
         if self.started_at is not None:
