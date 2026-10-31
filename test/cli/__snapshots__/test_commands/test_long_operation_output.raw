@@ -1,12 +1,12 @@
-Exit code: 0
+Exit code: 1
 ---
 Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
 
@@ -19,13 +19,29 @@ Schemathesis dev
 
      ⏭  2 skipped
 
- ✅  Coverage (in 0.00s)
+ ❌  Coverage (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 1 passed  ❌ 1 failed
 
- ✅  Fuzzing (in 0.00s)
+ ❌  Fuzzing (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 1 passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+_ GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa _
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+[500] Internal Server Error:
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 
@@ -35,13 +51,18 @@ API Operations:
 
 Test Phases:
   ⏭  Examples
-  ✅ Coverage
-  ✅ Fuzzing
+  ❌ Coverage
+  ❌ Fuzzing
   ⏭  Stateful (not applicable)
 
+Failures:
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
+
 Test cases:
-  N generated, N passed
+  N generated, N found N unique failures
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 failure in 1.00s ==============================
