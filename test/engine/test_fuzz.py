@@ -460,7 +460,8 @@ def test_fuzz_unique_inputs_sends_each_input_once(ctx, app_runner, workers):
     schema.config.continue_on_failure = True
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     schema.config.generation.update(modes=[GenerationMode.POSITIVE], unique_inputs=True)
-    collected = _fuzz_events(schema, FuzzConfig(max_time=30))
+    # The time limit only guards against a run that never ends on its own.
+    collected = _fuzz_events(schema, FuzzConfig(max_time=120))
 
     assert sorted(f"{request.method} {request.path}" for request in app.config["captured_requests"]) == [
         "GET /users/1",

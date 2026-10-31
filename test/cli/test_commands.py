@@ -625,7 +625,7 @@ def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
     try:
         result = cli.run_openapi_app(
             app,
-            "--max-time=6",
+            "--max-time=5",
             "--request-timeout=3",
             "--phases=fuzzing",
             "--checks=not_a_server_error",
