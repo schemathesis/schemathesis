@@ -62,6 +62,7 @@
 - Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
 - `st replay` not finding a case ID after a later run records the same failure.
 - Operations reported as skipped, with no error shown, when an unexpected error crashes them.
+- Stateful phase reported as skipped, with exit code 0, when an unexpected error crashes it.
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Test case summary counting errored and skipped cases as passed.
