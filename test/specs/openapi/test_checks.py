@@ -3895,6 +3895,39 @@ def test_response_schema_conformance_renders_failure_inside_embedded_resource(
     )
 
 
+@pytest.mark.parametrize(("version", "keyword"), [("3.1.0", "$id"), ("3.0.2", "id")], ids=["id", "draft-4-id"])
+def test_response_schema_conformance_follows_reference_into_embedded_resource(ctx, response_factory, version, keyword):
+    tree = {
+        keyword: "https://example.com/tree",
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "children": {"type": "array", "items": {"$ref": "https://example.com/tree"}},
+        },
+    }
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {"type": "array", "items": tree}}},
+                }
+            }
+        },
+        version=version,
+    )
+    response = response_factory.core(content=b'[{"id":1,"children":[{"id":"y"}]}]')
+
+    with pytest.raises(JsonSchemaError) as exc:
+        operation.validate_response(response)
+    assert exc.value.message == (
+        '"y" is not of type "integer"\n\n'
+        "Validated against the response schema for status code 200.\n\n"
+        "Schema at /tree/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION + 'Value:\n\n    "y"'
+    )
+
+
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
     schema = ctx.openapi.load_schema(_DATE_TIME_PATHS, config=config)

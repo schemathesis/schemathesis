@@ -95,6 +95,7 @@ class Bundler:
         def bundle_recursive(
             current: JsonSchema | list[JsonSchema],
             current_resolver: Resolver,
+            identity_handled: bool = False,
         ) -> JsonSchema | list[JsonSchema]:
             """Recursively process and bundle references in the current schema."""
             # Local lookup is cheaper and it matters for large schemas.
@@ -102,6 +103,13 @@ class Bundler:
             nonlocal has_recursive_references
             _bundle_recursive = bundle_recursive
             if isinstance(current, dict):
+                if ("$id" in current or "id" in current) and not identity_handled and current is not schema:
+                    references_before = reference_count
+                    bundled_named = _bundle_recursive(current, current_resolver, True)
+                    # References into the bundle resolve against the closest `$id` above them, not the root holding it.
+                    if reference_count != references_before:
+                        return _without_identity(bundled_named)
+                    return bundled_named
                 reference = current.get("$ref")
                 if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
                     # Empty references resolve to the current scope and are not useful for test generation
