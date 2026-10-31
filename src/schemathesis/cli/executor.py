@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -79,6 +80,9 @@ def initialize_report_handlers(
 ) -> list[EventHandler]:
     """Initialize built-in report handlers and custom handlers."""
     handlers: list[EventHandler] = []
+    # Checked before any report file is created.
+    if config.reports.allure.enabled and importlib.util.find_spec("allure_commons") is None:
+        raise click.ClickException("Allure reports require the `allure` extra: `pip install schemathesis[allure]`")
 
     file_reports: tuple[tuple[ReportFormat, Callable[[Path], EventHandler]], ...] = (
         (ReportFormat.JUNIT, JunitXMLHandler),
@@ -101,10 +105,8 @@ def initialize_report_handlers(
             open_file(path, _report_option(config, params, report_format))
             handlers.append(make_handler(path))
     if config.reports.allure.enabled:
-        try:
-            from schemathesis.cli.commands.run.handlers.allure import AllureHandler
-        except ImportError as exc:
-            raise click.ClickException(str(exc)) from exc
+        from schemathesis.cli.commands.run.handlers.allure import AllureHandler
+
         allure_path = config.reports.get_path(ReportFormat.ALLURE)
         prepare_directory(allure_path, _report_option(config, params, ReportFormat.ALLURE))
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
