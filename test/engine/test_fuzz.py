@@ -25,6 +25,8 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.fuzz._executor import _relay_events
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
+from test.apps.fragments import handlers
+from test.apps.fragments.schemas import linked_users
 from test.engine._late_put import attach_late_put
 
 
@@ -440,6 +442,34 @@ def test_fuzz_generation_parameter_overrides_are_applied(ctx):
                 break
     # Then every generated case must have the fixed id value, not a random one
     assert query_values == [{"id": -1}] * len(query_values)
+
+
+@pytest.mark.parametrize("workers", [1, 3], ids=["single-worker", "multiple-workers"])
+def test_fuzz_unique_inputs_sends_each_input_once(ctx, app_runner, workers):
+    # Following a link or not is a separate choice in every step, so scenarios vastly outnumber the two inputs.
+    paths = linked_users()
+    paths["/users/{userId}"]["get"]["parameters"][0]["schema"]["enum"] = [1]
+    app, _ = ctx.openapi.make_flask_app(paths)
+    handlers.register_linked_users_create(app)
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return {}, 500
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.update(workers=workers)
+    schema.config.continue_on_failure = True
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], unique_inputs=True)
+    collected = _fuzz_events(schema, FuzzConfig(max_time=30))
+
+    assert sorted(f"{request.method} {request.path}" for request in app.config["captured_requests"]) == [
+        "GET /users/1",
+        "POST /users",
+    ]
+    assert [event for event in _finished_scenarios(collected) if not event.recorder.cases] == []
+    assert [event.value for event in _non_fatal_errors(collected)] == []
+    assert collected[-1].stop_reason == StopReason.COMPLETED
 
 
 def test_fuzz_multiple_workers_emit_distinct_worker_ids(ctx):
