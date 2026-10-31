@@ -788,19 +788,32 @@ def test_unbundle_path_decodes_pointer_escaping():
 
 
 @pytest.mark.parametrize(
-    ("keyword", "name"),
+    ("keyword", "name", "reference"),
     [
-        ("$id", "https://example.invalid/text.json"),
-        ("id", "https://example.invalid/text.json"),
-        ("$id", "urn:text"),
-        ("$id", "text.json"),
+        ("$id", "https://example.invalid/text.json", "https://example.invalid/text.json"),
+        ("id", "https://example.invalid/text.json", "https://example.invalid/text.json"),
+        ("$id", "urn:text", "urn:text"),
+        ("$id", "text.json", "text.json"),
+        ("$id", "text.json", "./text.json"),
+        ("$id", "text.json", "a/../text.json"),
+        ("$id", "text.json", "../text.json"),
+        ("$id", "./text.json", "text.json"),
     ],
-    ids=["id", "legacy-id", "urn", "relative-id"],
+    ids=[
+        "id",
+        "legacy-id",
+        "urn",
+        "relative-id",
+        "dot-segment-reference",
+        "collapsed-segment-reference",
+        "parent-segment-reference",
+        "dot-segment-id",
+    ],
 )
-def test_bundle_resolves_reference_by_declared_id(keyword, name):
+def test_bundle_resolves_reference_by_declared_id(keyword, name, reference):
     # A subschema that names itself is reachable by that name in-document, with nothing fetched.
     resolver = make_root_resolver({"definitions": {"Text": {keyword: name, "type": "string"}}})
-    assert Bundler().bundle({"$ref": name}, resolver).schema == {"type": "string"}
+    assert Bundler().bundle({"$ref": reference}, resolver).schema == {"type": "string"}
 
 
 @pytest.mark.parametrize(

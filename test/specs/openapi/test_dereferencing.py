@@ -55,8 +55,9 @@ def test_request_body_schema_reference_to_plain_name_anchor(ctx):
         ("tree", "tree"),
         ("https://example.com/schemas/tree", "tree"),
         ("schemas/tree", "tree"),
+        ("./tree", "tree"),
     ],
-    ids=["relative-id", "reference-relative-to-id", "reference-relative-to-relative-id"],
+    ids=["relative-id", "reference-relative-to-id", "reference-relative-to-relative-id", "dot-segment-id"],
 )
 def test_request_body_relative_reference_to_declared_id(ctx, identifier, reference):
     tree = {
