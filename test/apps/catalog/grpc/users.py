@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import socket
 import subprocess
 import sys
 import time
@@ -9,6 +10,7 @@ from collections.abc import Callable
 from concurrent import futures
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import grpc
 import trustme
@@ -84,9 +86,20 @@ class GrpcServer:
     ca_path: Path | None = None
     client_cert_path: Path | None = None
     client_key_path: Path | None = None
+    # Bound without listening once the server stops, so connections are refused and no other server takes the port.
+    held_port: socket.socket | None = None
 
     def stop(self) -> None:
         self.server.stop(None).wait()
+        self.held_port = socket.socket()
+        # Connections the server just closed may still occupy the port.
+        self.held_port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.held_port.bind(("127.0.0.1", urlsplit(self.target).port))
+
+    def close(self) -> None:
+        self.server.stop(None)
+        if self.held_port is not None:
+            self.held_port.close()
 
 
 @dataclass(slots=True)
