@@ -167,6 +167,8 @@ class ServerMonitor:
 
     def is_down(self, exc: requests.ConnectionError) -> bool:
         """Whether a refused or reset connection means the server is gone for the rest of the run."""
+        import requests
+
         refused = is_connection_refused(exc)
         if not self._recent or exc.request is None or not (refused or _is_reset(exc)):
             return False
@@ -206,9 +208,14 @@ class ServerMonitor:
             # and the remaining room goes to what the server is known to have seen - otherwise workers left
             # hanging by the same outage fill the list and hide the payload that caused it.
             in_flight = [item for item in newest if item.reached_server is None][:1]
-            self._message = _render_outage(url, cut_off + in_flight + after_crash + answered)
+            # A crash that hangs the server times out its cause and every later request, so the oldest timeout since the
+            # last answer is shown, after requests the server still held when it went away: slow servers time out too.
+            timed_out = [
+                item for item in recent if isinstance(item.error, requests.ReadTimeout) and item.finished > last_answer
+            ][:1]
+            self._message = _render_outage(url, cut_off + in_flight + timed_out + after_crash + answered)
             self._recordable = _scheme(url).recordable
-            self._culprit_error = cut_off[0].error if cut_off else None
+            self._culprit_error = next((item.error for item in cut_off + timed_out), None)
         return True
 
     def is_after_outage(self, exc: Exception) -> bool:

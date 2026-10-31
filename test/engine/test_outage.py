@@ -122,15 +122,37 @@ def test_workers_left_hanging_by_the_outage_do_not_hide_the_answered_culprit(ope
             worker.join()
 
 
+def test_first_request_to_time_out_after_the_last_answer_leads_the_outage(operation):
+    monitor = ServerMonitor()
+    slow = operation.Case(query={"q": "slow"})
+    with pytest.raises(requests.ReadTimeout):
+        monitor.track(slow, lambda: time_out(slow), transport_kwargs={})
+    answered = operation.Case(query={"q": "answered"})
+    monitor.track(answered, lambda: answer(answered), transport_kwargs={})
+    # Requests sent after the culprit hang on the same outage until they time out too.
+    timed_out = [operation.Case(query={"q": f"timed-out-{index}"}) for index in range(REPORTED_REQUESTS)]
+    for case in timed_out:
+        with pytest.raises(requests.ReadTimeout):
+            monitor.track(case, lambda case=case: time_out(case), transport_kwargs={})
+
+    assert monitor.is_down(refusal(operation.base_url))
+    info = monitor.take_report(PhaseName.FUZZING).info
+    # The culprit is listed, so no tip points to older requests.
+    assert (info.message, info.suggestion()) == (expected_message(operation, [timed_out[0], answered]), None)
+
+
 def drop(case):
     request = requests.Request("GET", f"{case.operation.base_url}/users").prepare()
     raise requests.ConnectionError(ConnectionResetError("Connection reset by peer"), request=request)
 
 
-def test_call_dropped_by_the_crash_leads_calls_left_hanging_and_dropped_after_it(operation):
+def test_call_dropped_by_the_crash_leads_calls_left_hanging_timed_out_and_dropped_after_it(operation):
     monitor = ServerMonitor()
     answered = operation.Case(query={"q": "answered"})
     monitor.track(answered, lambda: answer(answered), transport_kwargs={})
+    timed_out = operation.Case(query={"q": "timed-out"})
+    with pytest.raises(requests.ReadTimeout):
+        monitor.track(timed_out, lambda: time_out(timed_out), transport_kwargs={})
     hanging = operation.Case(query={"q": "hanging"})
     release = threading.Event()
     worker = hang(monitor, hanging, release)
@@ -144,7 +166,7 @@ def test_call_dropped_by_the_crash_leads_calls_left_hanging_and_dropped_after_it
 
         assert monitor.is_down(exc_info.value)
         assert monitor.take_report(PhaseName.FUZZING).info.message == expected_message(
-            operation, [crash, hanging, later, answered]
+            operation, [crash, hanging, timed_out, later, answered]
         )
     finally:
         release.set()
@@ -279,7 +301,7 @@ def test_grpc_call_that_crashes_the_server_is_listed_in_the_outage(ctx, how):
     assert (info.message, info.suggestion()) == (grpc_message(server, [crash, answered]), None)
 
 
-def test_grpc_call_that_timed_out_before_the_crash_is_not_its_culprit(ctx):
+def test_grpc_call_that_timed_out_before_the_crash_is_listed_after_the_call_it_dropped(ctx):
     server, operation, monitor, answered, crash = answered_then_crash(ctx)
     slow = operation.Case(body={"userId": 13})
     with pytest.raises(requests.ReadTimeout):
@@ -289,7 +311,8 @@ def test_grpc_call_that_timed_out_before_the_crash_is_not_its_culprit(ctx):
         monitor.track(crash, crash.call, transport_kwargs={})
 
     assert monitor.is_down(exc_info.value)
-    assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [crash, answered])
+    assert monitor.is_after_outage(exc_info.value) is False
+    assert monitor.take_report(PhaseName.FUZZING).info.message == grpc_message(server, [crash, slow, answered])
 
 
 # The call only cut off by the crash confirms the outage first, yet the culprit alone is an error of its own.
