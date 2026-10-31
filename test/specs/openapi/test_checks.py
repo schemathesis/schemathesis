@@ -3928,6 +3928,90 @@ def test_response_schema_conformance_follows_reference_into_embedded_resource(ct
     )
 
 
+def _resource_with_own_id(uri, id_type):
+    return {"$id": uri, "properties": {"id": {"$ref": "#/$defs/Id"}}, "$defs": {"Id": {"type": id_type}}}
+
+
+@pytest.mark.parametrize(
+    ("version", "schema", "schemas", "body", "location"),
+    [
+        ("3.1.0", _resource_with_own_id("https://example.com/item", "integer"), {}, '{"id":"y"}', "/$defs/Id"),
+        (
+            "3.0.2",
+            {
+                "id": "https://example.com/item",
+                "properties": {"id": {"$ref": "#/definitions/Id"}},
+                "definitions": {"Id": {"type": "integer"}},
+            },
+            {},
+            '{"id":"y"}',
+            "/definitions/Id",
+        ),
+        (
+            "3.1.0",
+            {
+                "$id": "https://example.com/item",
+                "properties": {"id": {"type": "integer"}, "copy": {"$ref": "#/properties/id"}},
+            },
+            {},
+            '{"id":1,"copy":"y"}',
+            "/properties/id",
+        ),
+        (
+            "3.1.0",
+            {
+                "$id": "https://example.com/outer",
+                "properties": {
+                    "name": {"$ref": "#/$defs/Id"},
+                    "inner": _resource_with_own_id("https://example.com/inner", "integer"),
+                },
+                "$defs": {"Id": {"type": "string"}},
+            },
+            {},
+            '{"name":"x","inner":{"id":"y"}}',
+            "/$defs/Id",
+        ),
+        (
+            "3.1.0",
+            {"properties": {"a": {"$ref": "https://example.com/a"}, "b": {"$ref": "https://example.com/b"}}},
+            {
+                "A": _resource_with_own_id("https://example.com/a", "string"),
+                "B": _resource_with_own_id("https://example.com/b", "integer"),
+            },
+            '{"a":{"id":"x"},"b":{"id":"y"}}',
+            "/$defs/Id",
+        ),
+        (
+            "3.1.0",
+            {"$id": "https://example.com/item", "properties": {"id": {"$ref": "#/components/schemas/Id"}}},
+            {"Id": {"type": "integer"}},
+            '{"id":"y"}',
+            "/components/schemas/Id",
+        ),
+    ],
+    ids=["defs", "draft-4-definitions", "own-property", "nested-resource", "named-resources", "document-component"],
+)
+def test_response_schema_conformance_reads_fragments_inside_embedded_resource(
+    ctx, response_factory, version, schema, schemas, body, location
+):
+    # A fragment inside a schema that declares `$id` points into that schema, falling back to the document.
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"responses": {"200": {"description": "OK", "content": {"application/json": {"schema": schema}}}}},
+        version=version,
+        components={"schemas": schemas},
+    )
+    response = response_factory.core(content=body.encode())
+
+    with pytest.raises(JsonSchemaError) as exc:
+        operation.validate_response(response)
+    assert exc.value.message == (
+        '"y" is not of type "integer"\n\n'
+        "Validated against the response schema for status code 200.\n\n"
+        f"Schema at {location}:\n\n" + _INTEGER_SCHEMA_SECTION + 'Value:\n\n    "y"'
+    )
+
+
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
     schema = ctx.openapi.load_schema(_DATE_TIME_PATHS, config=config)

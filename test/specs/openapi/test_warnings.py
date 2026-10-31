@@ -248,6 +248,11 @@ def test_detect_missing_deserializers_judges_each_media_type_separately(ctx, con
 
 
 MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
+EMBEDDED_RESOURCE = {
+    "id": "https://example.com/item",
+    "properties": {"id": {"$ref": "#/definitions/Id"}},
+    "definitions": {"Id": {"type": "integer"}},
+}
 
 
 @pytest.mark.parametrize(
@@ -328,6 +333,32 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
             },
             [("response `200`", "#/components/schemas/Missing")],
         ),
+        (
+            {
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {"application/json": {"schema": EMBEDDED_RESOURCE}},
+                    }
+                }
+            },
+            [],
+        ),
+        (
+            {
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {**EMBEDDED_RESOURCE, "properties": {"id": {"$ref": "#/definitions/Missing"}}}
+                            }
+                        },
+                    }
+                }
+            },
+            [("response `200`", "#/definitions/Missing")],
+        ),
     ],
     ids=[
         "optional-parameter",
@@ -338,6 +369,8 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
         "media-type-without-schema",
         "media-type-reference",
         "json-sequence-item-schema",
+        "inside-embedded-resource",
+        "missing-inside-embedded-resource",
     ],
 )
 def test_detect_unresolvable_references(ctx, operation, expected):
