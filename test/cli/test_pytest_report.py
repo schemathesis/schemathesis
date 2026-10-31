@@ -96,12 +96,24 @@ def test_stateful_failure_replays_the_chain(ctx, cli, tmp_path, pytester):
     def get_item(item_id):
         return jsonify({}), 500
 
-    path = tmp_path / "test_regressions.py"
+    wfc_path = tmp_path / "report.json"
+    pytest_path = tmp_path / "test_regressions.py"
     cli.run_openapi_app(
-        app, f"--report-pytest-path={path}", "--max-examples=5", "--phases=stateful", "--checks=not_a_server_error"
+        app,
+        f"--report-wfc-path={wfc_path}",
+        f"--report-pytest-path={pytest_path}",
+        "--max-examples=5",
+        "--phases=stateful",
+        "--checks=not_a_server_error",
     )
 
-    content = path.read_text(encoding="utf-8")
+    report = json.loads(wfc_path.read_text(encoding="utf-8"))
+    [test_case] = report["testCases"]
+    lines = (tmp_path / "report.sh").read_text(encoding="utf-8").splitlines()
+    block = lines[test_case["startLine"] : test_case["endLine"] + 1]
+    assert [line.split(" http")[0] for line in block if not line.startswith("#")] == ["curl -X POST", "curl -X GET"]
+    assert report["problemDetails"]["rest"]["outputHttpCalls"] == 2
+    content = pytest_path.read_text(encoding="utf-8")
     assert re.findall(r"requests.request\(\s*'(\w+)'", content) == ["POST", "GET"]
     assert re.findall(r"assert response.status_code == (\d+)", content) == ["201", "500"]
     assert "def test_get_items_id_" in content

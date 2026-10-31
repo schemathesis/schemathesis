@@ -15,7 +15,6 @@ from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
 from schemathesis.specs.openapi import adapter
-from schemathesis.specs.openapi.adapter import validators
 from test.utils import run_given
 
 
@@ -452,9 +451,9 @@ def test_openapi_3_2_querystring_parameter_constraints(ctx, parameters):
     ],
     ids=["openapi-3.0", "openapi-3.1", "openapi-3.2"],
 )
-def test_validate_v3_rejects_invalid_schema(version, invalid_schema, expected_error):
+def test_validate_rejects_invalid_schema(version, invalid_schema, expected_error):
     with pytest.raises(jsonschema_rs.ValidationError, match=expected_error):
-        validators.validate_v3(invalid_schema)
+        schemathesis.openapi.from_dict(invalid_schema).validate()
 
 
 @pytest.mark.parametrize(
@@ -462,14 +461,14 @@ def test_validate_v3_rejects_invalid_schema(version, invalid_schema, expected_er
     ["3.0.0", "3.1.0", "3.2.0"],
     ids=["openapi-3.0", "openapi-3.1", "openapi-3.2"],
 )
-def test_validate_v3_accepts_valid_schema(version):
+def test_validate_accepts_valid_schema(version):
     raw_schema = {
         "openapi": version,
         "info": {"title": "Test", "version": "0.1.0"},
         "paths": {},
     }
     # Should not raise
-    validators.validate_v3(raw_schema)
+    schemathesis.openapi.from_dict(raw_schema).validate()
 
 
 def test_schema_error_on_path(ctx, simple_schema):

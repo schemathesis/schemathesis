@@ -13,8 +13,7 @@ from functools import lru_cache
 from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
 
-from schemathesis.core import NOT_SET, media_types
-from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core import NOT_SET
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 # HTTP headers in wire form: lowercased name -> list of values. The list shape
@@ -69,15 +68,6 @@ def response_content_type(response: Response) -> str | None:
     """The first `Content-Type` value of a response, or `None` when it has no such header."""
     values = response.headers.get("content-type")
     return values[0] if values else None
-
-
-def is_event_stream(content_type: str | None) -> bool:
-    if content_type is None:
-        return False
-    try:
-        return media_types.is_sse(content_type)
-    except MalformedMediaType:
-        return False
 
 
 def read_event_stream(

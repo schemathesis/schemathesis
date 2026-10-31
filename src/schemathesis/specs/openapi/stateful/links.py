@@ -99,14 +99,16 @@ class OpenApiLink:
         errors = []
 
         cache = operation_cache if operation_cache is not None else {}
+        target_operation: APIOperation | None = None
         reference = definition.get("$ref")
         if reference is not None:
             target = reference
             errors.append(TransitionValidationError(f"Reference '{reference}' could not be resolved"))
         else:
             try:
-                self.target = find_link_target(source.schema, definition, cache)
-                target = self.target.label
+                target_operation = find_link_target(source.schema, definition, cache)
+                self.target = target_operation
+                target = target_operation.label
             except OperationNotFound:
                 target = definition["operationId"] if "operationId" in definition else definition["operationRef"]
                 errors.append(TransitionValidationError(f"Operation '{target}' not found"))
@@ -115,7 +117,7 @@ class OpenApiLink:
                 errors.append(TransitionValidationError(str(exc)))
 
         extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
-        self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors)
+        self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors, target_operation)
         self.body = definition.get("requestBody", NOT_SET)
         self.merge_body = extension.get("merge_body", True) if extension else True
         self.is_inferred = extension.get("is_inferred", False) if extension else False
@@ -136,7 +138,10 @@ class OpenApiLink:
         return format_transition(self.source.label, self.status_code, self.name, self.target.label)
 
     def _normalize_parameters(
-        self, parameters: dict[str, str], errors: list[TransitionValidationError]
+        self,
+        parameters: dict[str, str],
+        errors: list[TransitionValidationError],
+        target_operation: APIOperation | None,
     ) -> list[NormalizedParameter]:
         """Process link parameters and resolve their container locations.
 
@@ -172,32 +177,33 @@ class OpenApiLink:
                 except Exception as exc:
                     errors.append(TransitionValidationError(str(exc)))
 
-            is_required = False
-            if hasattr(self, "target"):
-                try:
-                    container_name = self._get_parameter_container(location, name)
-                except TransitionValidationError as exc:
-                    errors.append(exc)
-                    continue
-
-                for param in self.target.iter_parameters():
-                    if param.name == name:
-                        is_required = param.is_required
-                        break
-            else:
+            if target_operation is None:
                 continue
+            try:
+                container_name = self._get_parameter_container(location, name, target_operation)
+            except TransitionValidationError as exc:
+                errors.append(exc)
+                continue
+
+            is_required = False
+            for param in target_operation.iter_parameters():
+                if param.name == name:
+                    is_required = param.is_required
+                    break
             result.append(NormalizedParameter(location, name, expression, container_name, is_required=is_required))
         return result
 
-    def _get_parameter_container(self, location: ParameterLocation | None, name: str) -> ContainerName:
+    def _get_parameter_container(
+        self, location: ParameterLocation | None, name: str, target: APIOperation
+    ) -> ContainerName:
         """Resolve parameter container either from explicit location or by looking up in target operation."""
         if location:
             return location.container_name
 
-        for param in self.target.iter_parameters():
+        for param in target.iter_parameters():
             if param.name == name:
                 return param.location.container_name
-        raise TransitionValidationError(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
+        raise TransitionValidationError(f"Parameter `{name}` is not defined in API operation `{target.label}`")
 
     def extract(self, output: StepOutput) -> Transition:
         return self._cached_extract(StepOutputWrapper(output))

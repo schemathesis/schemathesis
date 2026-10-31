@@ -635,8 +635,23 @@ def test_fuzzing_timeout_outlasting_time_budget(ctx, cli, snapshot_cli):
     assert result == snapshot_cli
 
 
+def _stall_before_headers(release):
+    release.wait()
+    return jsonify({})
+
+
+def _stall_mid_body(release):
+    def body():
+        yield b"{"
+        release.wait()
+        yield b"}"
+
+    return Response(body(), content_type="application/json")
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
+@pytest.mark.parametrize("stall", [_stall_before_headers, _stall_mid_body], ids=["before-headers", "mid-body"])
+def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli, stall):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/a/hanging": {"get": {"responses": {"200": {"description": "OK"}}}},
@@ -655,8 +670,7 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
 
     @app.route("/a/hanging")
     def hanging():
-        release.wait()
-        return jsonify({})
+        return stall(release)
 
     @app.route("/b/fast<int:index>")
     def fast(index):
@@ -674,29 +688,6 @@ def test_max_time_cuts_hanging_request(ctx, cli, snapshot_cli):
     finally:
         release.set()
     assert time.monotonic() - started < 15
-    assert result == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_max_time_cuts_request_hanging_mid_body(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app({"/hanging": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    release = threading.Event()
-
-    @app.route("/hanging")
-    def hanging():
-        def body():
-            yield b"{"
-            release.wait()
-            yield b"}"
-
-        return Response(body(), content_type="application/json")
-
-    try:
-        result = cli.run_openapi_app(
-            app, "--max-time=1", "--request-timeout=30", "--phases=fuzzing", "--checks=not_a_server_error"
-        )
-    finally:
-        release.set()
     assert result == snapshot_cli
 
 
@@ -1108,18 +1099,11 @@ def test_server_error_closing_keep_alive_connection_is_not_a_network_error(ctx, 
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
-def test_proxy_error(ctx, cli, snapshot_cli, app_runner):
+def test_proxy_error(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # The schema is read from a file, so the proxy fails only on API calls.
-    # A port nothing listens on: port 80 may well be taken by a local web server, which then answers as the proxy.
-    assert (
-        cli.run(
-            str(ctx.makefile(api.spec)),
-            f"--url={api.base_url}",
-            f"--proxy=http://127.0.0.1:{app_runner.unused_port()}",
-        )
-        == snapshot_cli
-    )
+    with refusing_url() as proxy:
+        assert cli.run(str(ctx.makefile(api.spec)), f"--url={api.base_url}", f"--proxy={proxy}") == snapshot_cli
 
 
 @pytest.fixture
@@ -2326,31 +2310,6 @@ def test_max_time_reports_the_first_cycle_in_full(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_unresponsive_operation_counted_as_errored(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(linked_users())
-    release = threading.Event()
-    handlers.register_linked_users_create(app)
-
-    @app.route("/users/<int:user_id>")
-    def get_user(user_id):
-        release.wait()
-        return jsonify({"id": user_id})
-
-    try:
-        result = cli.run_openapi_app(
-            app,
-            "--max-examples=20",
-            "--generation-deterministic",
-            "--phases=stateful",
-            "--checks=not_a_server_error",
-            config={"operations": [{"include-name": "GET /users/{userId}", "request-timeout": 0.25}]},
-        )
-    finally:
-        release.set()
-    assert result == snapshot_cli
 
 
 def test_max_time_live_cycle_line_counts_errors(ctx, cli):

@@ -54,7 +54,7 @@ get_request_payload_content_types: GetRequestPayloadContentTypes = content_types
 get_default_media_types: GetDefaultMediaTypes = content_types.default_media_types_v3
 get_base_path: GetBasePath = base_paths.base_path_v3
 get_base_url: GetBaseUrl = base_paths.base_url_v3
-validate_schema: ValidateSchema = validators.validate_v3
+validate_schema: ValidateSchema = validators.validate_v3_0
 get_parameter_serializer: GetParameterSerializer = serialization.serialize_openapi3_parameters
 extract_security_definitions: ExtractSecurityDefinitions = security.extract_security_definitions_v3
 

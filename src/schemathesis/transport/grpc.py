@@ -17,7 +17,7 @@ from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
-from schemathesis.specs.grpc.schemas import MEDIA_TYPE, encode_message, request_metadata, request_payload
+from schemathesis.specs.grpc.schemas import MEDIA_TYPE, request_metadata, request_payload
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport, SerializationContext
 
@@ -156,8 +156,8 @@ class GrpcTransport(BaseTransport["requests.Session"]):
 
 
 def serialize_message(context: SerializationContext, body: Body) -> dict[str, bytes]:
-    """The body encoded as the request message of the case's method."""
-    return {"data": encode_message(body, context.case.operation.definition.raw.input_type)}
+    # Registered only to mark the media type as sendable; a call encodes its request message without it.
+    raise NotImplementedError
 
 
 def prepare_target(

@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 
     from schemathesis.core.spec import Scheduler
     from schemathesis.engine.context import EngineContext
-    from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 
 class DefaultScheduler:
@@ -63,7 +62,6 @@ class WorkerPool:
         scheduler: Scheduler,
         worker_factory: Callable,
         ctx: EngineContext,
-        mode: HypothesisTestMode,
         phase: PhaseName,
         suite_id: uuid.UUID,
     ) -> None:
@@ -71,7 +69,6 @@ class WorkerPool:
         self.scheduler = scheduler
         self.worker_factory = worker_factory
         self.ctx = ctx
-        self.mode = mode
         self.phase = phase
         self.suite_id = suite_id
         self.workers: list[threading.Thread] = []
@@ -92,7 +89,6 @@ class WorkerPool:
                 target=self._run_worker,
                 kwargs={
                     "ctx": self.ctx,
-                    "mode": self.mode,
                     "phase": self.phase,
                     "events_queue": self.events_queue,
                     "scheduler": self.scheduler,

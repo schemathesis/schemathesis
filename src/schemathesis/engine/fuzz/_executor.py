@@ -27,7 +27,7 @@ from schemathesis.engine._rate_limit_retry import TRANSPORT_ERRORS, send_tracked
 from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.errors import build_code_sample, is_inconsistent_replay
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run import PhaseName, relay_events
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis.reporting import FILTER_CASE_EXHAUSTED_MESSAGE, build_unsatisfiable_error
@@ -209,16 +209,10 @@ def _relay_events(
     ctx: EngineContext, *, event_queue: queue.Queue[events.EngineEvent], threads: list[threading.Thread]
 ) -> EventGenerator:
     """Yield worker events, counting failed scenarios, until every worker has exited."""
-    while True:
-        try:
-            event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
-            if isinstance(event, events.FuzzScenarioFinished) and event.status in (Status.FAILURE, Status.ERROR):
-                ctx.control.count_failure(event.id)
-            yield event
-        except queue.Empty:
-            # A worker may put its last event and exit after the poll timed out.
-            if not any(t.is_alive() for t in threads) and event_queue.empty():
-                break
+    for event in relay_events(event_queue, threads, timeout=EVENT_QUEUE_TIMEOUT):
+        if isinstance(event, events.FuzzScenarioFinished) and event.status in (Status.FAILURE, Status.ERROR):
+            ctx.control.count_failure(event.id)
+        yield event
 
 
 def _run_forever(

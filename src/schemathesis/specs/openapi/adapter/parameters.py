@@ -48,7 +48,7 @@ from schemathesis.generation.value import (
 from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, ConstantType, ConstantValue, Origin
 from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
-from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
+from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter, is_draft_2020_12
 from schemathesis.specs.openapi.adapter.references import (
     example_object_value,
     maybe_resolve_with_resolver,
@@ -1260,7 +1260,7 @@ class OpenApiComponent(ABC):
             self.raw_schema,
             nullable_keyword=self.adapter.nullable_keyword,
             update_quantifiers=False,
-            upgrade_legacy_exclusive_bounds=self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator,
+            upgrade_legacy_exclusive_bounds=is_draft_2020_12(self.adapter),
             convert_prefix_items=False,
             convert_if_then_else=False,
             name_to_uri=self.name_to_uri,
@@ -1309,15 +1309,15 @@ class OpenApiComponent(ABC):
 
     def _build_schema(self, *, optimize: bool) -> JsonSchema:
         """Build JSON schema with optional optimizations for data generation."""
-        is_draft_2020_12 = self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
+        is_2020_12 = is_draft_2020_12(self.adapter)
         schema = to_json_schema(
             self.raw_schema,
             nullable_keyword=self.adapter.nullable_keyword,
             update_quantifiers=optimize,
-            upgrade_legacy_exclusive_bounds=is_draft_2020_12,
+            upgrade_legacy_exclusive_bounds=is_2020_12,
             # Draft 2020-12 generation reads `prefixItems` and `contains` natively; the Draft 4
             # rewrite emits `items: [...]` that 2020-12 canonicalization rejects.
-            convert_prefix_items=not is_draft_2020_12,
+            convert_prefix_items=not is_2020_12,
             name_to_uri=self.name_to_uri,
             merge_ref_siblings=self.adapter.ref_siblings,
         )
@@ -1461,6 +1461,11 @@ class OpenApiParameter(OpenApiComponent):
     def media_type(self) -> None:
         """Non-body parameters have no media type."""
         return None
+
+    @property
+    def content_media_type(self) -> str | None:
+        """The media type a `content` parameter is serialized in; `None` for one described by `schema`."""
+        return next(iter(self.definition.get("content", {})), None)
 
     @property
     def name(self) -> str:

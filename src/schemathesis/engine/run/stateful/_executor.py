@@ -136,7 +136,7 @@ def _classify_failure_group(
     if engine.has_reached_the_failure_limit:
         return Status.FAILURE, False, network_events
     for failure in exc.exceptions:
-        ctx.mark_as_seen_in_run(failure)
+        ctx.seen_in_run.add(failure)
     return Status.FAILURE, True, network_events
 
 
@@ -151,7 +151,7 @@ def _classify_flaky(*, ctx: StatefulContext, engine: EngineContext, state: Testi
         return network_outcome
     retry = bool(ctx.seen_in_suite - ctx.seen_in_run)
     # Mark all failures in this suite as seen to prevent them being re-discovered
-    ctx.mark_current_suite_as_seen_in_run()
+    ctx.seen_in_run.update(ctx.seen_in_suite)
     return found, retry, []
 
 
@@ -408,10 +408,9 @@ def _validate_step_response(
     check_context_cache: CheckContextCache,
 ) -> None:
     """Feed the response to link calibration, the supervisor and error feedback, then run the checks."""
-    ctx.collect_metric(case, response)
+    ctx.metric_collector.store(case, response)
     observations = _parse_step_observations(engine, case, response)
     _calibrate_link(engine, response, observations=observations, step_input=step_input, recorder=recorder)
-    ctx.current_response = response
     engine.supervisor.observe(case, response, cache_writer=engine.cache.writer)
     _feed_error_feedback(engine, case, response, observations=observations, recorder=recorder)
     check_ctx = check_context_cache.get_or_create(
@@ -495,18 +494,18 @@ def _run_step(
     try:
         response = _send_step(machine, case, engine=engine, event_queue=event_queue)
         result = StepOutput(response, case)
-        ctx.step_succeeded()
+        ctx.current_step_status = Status.SUCCESS
     except UnsatisfiedAssumption:
         raise
     except FailureGroup:
-        ctx.step_failed()
+        ctx.current_step_status = Status.FAILURE
         raise
     except Exception as exc:
         if isinstance(exc, TRANSPORT_ERRORS):
             machine.recorder.record_network_error(case_id=case.id, error=exc)
         outage = _detect_outage(exc, engine)
         _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
-        ctx.step_errored()
+        ctx.current_step_status = Status.ERROR
         if outage:
             raise ServerWentAway from None
         raise
@@ -514,7 +513,7 @@ def _run_step(
         if isinstance(exc, BudgetExpired):
             # Cut off by the time limit, the request says nothing about the operation.
             machine.recorder.forget_case(case_id=case.id)
-        ctx.step_interrupted()
+        ctx.current_step_status = Status.INTERRUPTED
         raise
     else:
         if key is not None:
@@ -610,7 +609,7 @@ def execute_state_machine_loop(
                     suite_id=suite_id,
                     phase=PhaseName.STATEFUL_TESTING,
                     label=None,
-                    status=ctx.current_scenario_status or Status.SKIP,
+                    status=ctx.current_step_status or Status.SKIP,
                     recorder=self.recorder,
                     elapsed_time=self._started_at.elapsed,
                     skip_reason=None,
@@ -619,7 +618,7 @@ def execute_state_machine_loop(
             )
             if engine.extra_data_source is not None:
                 suite_recorders.append(self.recorder)
-            ctx.maximize_metrics()
+            ctx.metric_collector.maximize()
             ctx.reset_scenario()
             super().teardown()
 
@@ -687,7 +686,7 @@ def validate_response(
 
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
         checked_by.setdefault(failure, name)
-        if stateful_ctx.is_seen_in_suite(failure) or stateful_ctx.is_seen_in_run(failure):
+        if failure in stateful_ctx.seen_in_suite or failure in stateful_ctx.seen_in_run:
             return
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
 
@@ -704,7 +703,7 @@ def validate_response(
         if not is_known(failure, name, baseline):
             control.count_failure(failure)
             stateful_ctx.has_new_failures_in_suite = True
-        stateful_ctx.mark_as_seen_in_suite(failure)
+        stateful_ctx.seen_in_suite.add(failure)
         collected.add(failure)
 
     def on_success(name: str, case: Case) -> None:

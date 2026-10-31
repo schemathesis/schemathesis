@@ -12,7 +12,7 @@ from test.apps.catalog.openapi.modifiers.stateful import (
     OmitRequiredField,
     ReturnPlainText,
 )
-from test.utils import load_yaml_or_fail
+from test.utils import load_yaml_or_fail, refusing_url
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -161,19 +161,14 @@ def test_filtered_out(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
-def test_proxy_error(ctx, cli, snapshot_cli, app_runner):
+def test_proxy_error(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud_with_success()
-    assert (
-        cli.run(
-            # The schema is read from a file, so the proxy fails only on API calls.
-            str(ctx.makefile(api.spec)),
-            f"--url={api.base_url}",
-            # A port nothing listens on: port 80 may well be taken by a local web server, which then answers as the proxy.
-            f"--proxy=http://127.0.0.1:{app_runner.unused_port()}",
-            "--phases=stateful",
+    # The schema is read from a file, so the proxy fails only on API calls.
+    with refusing_url() as proxy:
+        assert (
+            cli.run(str(ctx.makefile(api.spec)), f"--url={api.base_url}", f"--proxy={proxy}", "--phases=stateful")
+            == snapshot_cli
         )
-        == snapshot_cli
-    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

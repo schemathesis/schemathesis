@@ -50,14 +50,14 @@ You need Python 3.11+, [uv](https://docs.astral.sh/uv/) and `curl`. The tests ru
 6. Run the tests and checks:
 
     ```bash
-    just test-dist    # or: python -m pytest test/ -n auto --ignore=test/tooling --snapshot-warn-unused
+    just test-dist    # or: python -m pytest test/ -n auto --snapshot-warn-unused
     just check        # or: uvx prek run --all-files
     ```
 
     If your change alters CLI output, update the snapshots and review the diff:
 
     ```bash
-    just snapshot-update    # or: python -m pytest test/ -n auto --ignore=test/tooling --snapshot-update
+    just snapshot-update    # or: python -m pytest test/ -n auto --snapshot-update
     ```
 
 7. Add an entry to `CHANGELOG.md` under `Unreleased`, in the `Added`, `Changed` or `Fixed` section. Describe what users see in up to 15 words. Docs-only and test-only changes need no entry.

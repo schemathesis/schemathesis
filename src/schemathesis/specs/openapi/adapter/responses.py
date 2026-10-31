@@ -276,7 +276,7 @@ class OpenApiResponse:
 
     def get_sse_validator(self, resolved_media_type: str | None, schema: JsonSchema) -> SseValidator | None:
         """Get or build a cached SSE validator. Returns None if not an SSE media type."""
-        if resolved_media_type is None or not _is_sse_media_type(resolved_media_type):
+        if not media_types.is_sse(resolved_media_type):
             return None
         if not isinstance(self._sse_validator, NotSet):
             return self._sse_validator
@@ -295,7 +295,7 @@ class OpenApiResponse:
 
     def describes_json_sequence(self, media_type: str) -> bool:
         """Whether `media_type` is documented as a JSON Lines or JSON Text Sequence body with an `itemSchema`."""
-        if not _is_json_sequence_media_type(media_type):
+        if not media_types.is_json_sequence(media_type):
             return False
         media_type_object = _media_type_object(self.definition, media_type)
         return media_type_object is not None and "itemSchema" in media_type_object
@@ -316,7 +316,7 @@ class OpenApiResponse:
                 yield media_type_object
                 continue
             schemas = [media_type_object.get("schema")]
-            if _is_sse_media_type(media_type) or _is_json_sequence_media_type(media_type):
+            if media_types.is_sse(media_type) or media_types.is_json_sequence(media_type):
                 schemas.append(media_type_object.get("itemSchema"))
             yield from (schema for schema in schemas if schema is not None)
 
@@ -546,7 +546,7 @@ def extract_raw_response_schema_v3(
     content = response.get("content", {})
     first_schema = None
     for media_type, media_type_object in content.items():
-        if _is_sse_media_type(media_type):
+        if media_types.is_sse(media_type):
             return _media_type_schema(media_type, media_type_object, schema_covers_stream=schema_covers_stream)
         if first_schema is None:
             first_schema = media_type_object.get("schema")
@@ -683,7 +683,7 @@ def extract_stream_schema_v3(
 ) -> Bundle | None:
     """Extract the schema an event stream documents for all of its events, read as an array."""
     media_type_object = _media_type_object(response, media_type)
-    if media_type is None or media_type_object is None or not _is_sse_media_type(media_type):
+    if media_type is None or media_type_object is None or not media_types.is_sse(media_type):
         return None
     # Without `itemSchema`, Open API before 3.2 has `schema` describe each event instead
     if not schema_covers_stream and "itemSchema" not in media_type_object:
@@ -725,13 +725,13 @@ def _media_type_schema(
 ) -> JsonSchema | None:
     """The schema a media type entry documents for one value - a single event for event streams."""
     schema = media_type_object.get("schema")
-    if _is_sse_media_type(media_type):
+    if media_types.is_sse(media_type):
         item_schema = media_type_object.get("itemSchema")
         if item_schema is not None:
             return item_schema
         if schema_covers_stream:
             return None
-    elif _is_json_sequence_media_type(media_type):
+    elif media_types.is_json_sequence(media_type):
         item_schema = media_type_object.get("itemSchema")
         if item_schema is not None:
             # The records are validated as one array, with `schema` covering the whole sequence
@@ -740,20 +740,6 @@ def _media_type_schema(
                 sequence["allOf"] = [schema]
             return sequence
     return schema
-
-
-def _is_sse_media_type(value: str) -> bool:
-    try:
-        return media_types.is_sse(value)
-    except MalformedMediaType:
-        return False
-
-
-def _is_json_sequence_media_type(value: str) -> bool:
-    try:
-        return media_types.is_json_sequence(value)
-    except MalformedMediaType:
-        return False
 
 
 def _is_json_media_type(value: str) -> bool:

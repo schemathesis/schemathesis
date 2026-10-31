@@ -4,6 +4,7 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
+from schemathesis.engine.run.probes import HEADER_NAME
 from test.apps.runtime import CapturedRequest
 
 
@@ -33,7 +34,7 @@ def make_flask_app_from_schema(schema: dict[str, Any]) -> Flask:
     @app.before_request
     def _capture_request() -> None:
         # Skip startup capability probes — they are infrastructure, not user-facing requests.
-        if "X-Schemathesis-Probe" in request.headers:
+        if HEADER_NAME in request.headers:
             return
         snapshot = CapturedRequest(
             method=request.method,

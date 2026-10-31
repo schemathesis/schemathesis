@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from schemathesis.core.failures import Failure
-from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.generation.case import Case
 from schemathesis.generation.metrics import MetricCollector
 
 
@@ -21,8 +19,6 @@ class StatefulContext:
     has_new_failures_in_suite: bool = False
     # Status of the current step
     current_step_status: Status | None = None
-    # The currently processed response
-    current_response: Response | None = None
     # The total number of completed test scenario
     completed_scenarios: int = 0
     # Metrics collector for targeted testing
@@ -32,36 +28,10 @@ class StatefulContext:
     # Operations whose skipped timed-out steps are already reported
     reported_timeouts: set[str] = field(default_factory=set)
 
-    @property
-    def current_scenario_status(self) -> Status | None:
-        return self.current_step_status
-
     def reset_scenario(self) -> None:
         self.completed_scenarios += 1
         self.current_step_status = None
-        self.current_response = None
         self.passed_steps.clear()
-
-    def step_succeeded(self) -> None:
-        self.current_step_status = Status.SUCCESS
-
-    def step_failed(self) -> None:
-        self.current_step_status = Status.FAILURE
-
-    def step_errored(self) -> None:
-        self.current_step_status = Status.ERROR
-
-    def step_interrupted(self) -> None:
-        self.current_step_status = Status.INTERRUPTED
-
-    def mark_as_seen_in_run(self, exc: Failure) -> None:
-        self.seen_in_run.add(exc)
-
-    def mark_as_seen_in_suite(self, exc: Failure) -> None:
-        self.seen_in_suite.add(exc)
-
-    def mark_current_suite_as_seen_in_run(self) -> None:
-        self.seen_in_run.update(self.seen_in_suite)
 
     def mark_timeout_reported(self, operation_label: str) -> bool:
         """`True` only the first time an operation's timeout is reported."""
@@ -69,18 +39,6 @@ class StatefulContext:
             return False
         self.reported_timeouts.add(operation_label)
         return True
-
-    def is_seen_in_run(self, exc: Failure) -> bool:
-        return exc in self.seen_in_run
-
-    def is_seen_in_suite(self, exc: Failure) -> bool:
-        return exc in self.seen_in_suite
-
-    def collect_metric(self, case: Case, response: Response) -> None:
-        self.metric_collector.store(case, response)
-
-    def maximize_metrics(self) -> None:
-        self.metric_collector.maximize()
 
     def reset(self) -> None:
         self.seen_in_suite.clear()

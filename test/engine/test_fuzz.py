@@ -20,9 +20,8 @@ from schemathesis.core.rate_limit import RATE_LIMIT_AUTO_MAX_RETRIES, RATE_LIMIT
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, StopReason, events, from_schema
-from schemathesis.engine.context import EngineContext
 from schemathesis.engine.control import ExecutionControl
-from schemathesis.engine.fuzz._executor import _relay_events
+from schemathesis.engine.run import relay_events
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
 from test.engine._late_put import attach_late_put
@@ -843,8 +842,7 @@ def test_fuzz_closing_stream_mid_run_stops_workers(ctx):
     assert not [thread for thread in threading.enumerate() if thread.name.startswith("schemathesis_fuzz")]
 
 
-def test_fuzz_relays_event_put_right_before_worker_exit(ctx):
-    engine = EngineContext(schema=ctx.openapi.load_schema({}), stop_event=threading.Event())
+def test_relay_events_drains_event_put_right_before_worker_exit():
     exited = threading.Thread(target=lambda: None)
     exited.start()
     exited.join()
@@ -852,7 +850,7 @@ def test_fuzz_relays_event_put_right_before_worker_exit(ctx):
     late_event = events.EngineStarted()
     attach_late_put(event_queue, late_event)
 
-    assert list(_relay_events(engine, event_queue=event_queue, threads=[exited])) == [late_event]
+    assert list(relay_events(event_queue, [exited], timeout=0.01)) == [late_event]
 
 
 def test_fuzz_keeps_running_when_server_state_changes_which_links_apply(ctx, app_runner):

@@ -6,6 +6,7 @@ from typing import Literal
 
 from flask import Flask, request
 
+from schemathesis.engine.run.probes import HEADER_NAME
 from test.apps.catalog.openapi.stateful import UserStore
 
 
@@ -164,7 +165,7 @@ class Slowdown:
         # Every API request, including the router's own 404 and 405 answers; capability probes stay fast.
         @app.before_request
         def delay_request() -> None:
-            if request.path != "/openapi.json" and "X-Schemathesis-Probe" not in request.headers:
+            if request.path != "/openapi.json" and HEADER_NAME not in request.headers:
                 time.sleep(seconds)
 
 
@@ -180,7 +181,7 @@ class FailAfterRequests:
 
         @app.before_request
         def fail_when_exhausted() -> tuple[str, int] | None:
-            if request.path == "/openapi.json" or "X-Schemathesis-Probe" in request.headers:
+            if request.path == "/openapi.json" or HEADER_NAME in request.headers:
                 return None
             served["count"] += 1
             if served["count"] > limit:

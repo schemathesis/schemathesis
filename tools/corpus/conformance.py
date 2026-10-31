@@ -188,7 +188,7 @@ def _read_from_wire(
         # A value sent as generated is spelled the way the schema declares it, even when that spelling is encoded.
         if location == ParameterLocation.PATH and text != generated[name]:
             text = unquote(text)
-        if next(iter(parameter.definition.get("content", {})), None) == "application/json":
+        if parameter.content_media_type == "application/json":
             result[name] = _read_json(text)
         else:
             result[name] = _read_text(text, parameter)

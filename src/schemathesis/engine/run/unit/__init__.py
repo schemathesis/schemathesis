@@ -5,10 +5,8 @@ This module provides high-level flow for single-, and multi-threaded modes.
 
 from __future__ import annotations
 
-import queue
 import uuid
 import warnings
-from dataclasses import dataclass
 from queue import Queue
 from typing import TYPE_CHECKING
 
@@ -27,7 +25,7 @@ from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import Scheduler
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseSkipReason
+from schemathesis.engine.run import UNIT_PHASES, PhaseName, PhaseProgress, relay_events, report_outage
 from schemathesis.engine.run.unit._direct_executor import run_driver
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import WORKER_FINISHED, DefaultScheduler, WorkerPool, split_results
@@ -120,41 +118,24 @@ def _scheduler_for_layers(
     return LayeredScheduler(layers, errors=errors)
 
 
-_TEST_MODES = {PhaseName.EXAMPLES: HypothesisTestMode.EXAMPLES, PhaseName.COVERAGE: HypothesisTestMode.COVERAGE}
-
-
-@dataclass(slots=True)
-class _SuiteProgress:
-    """What the event stream has shown so far, kept across interrupts."""
-
-    status: Status | None = None
-    is_executed: bool = False
-    checks_ran: bool = False
-
-
 def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> events.EventGenerator:
     """Run a set of unit tests.
 
     Implemented as a producer-consumer pattern via a task queue.
     The main thread provides an iterator over API operations and worker threads create test functions and run them.
     """
-    mode = _TEST_MODES.get(phase.name, HypothesisTestMode.FUZZING)
-
     # Create scheduler based on ordering configuration
     try:
         scheduler, total_entries = _create_scheduler(engine, phase, only=only)
     except HookExecutionError as exc:
-        yield events.NonFatalError(
-            error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
-        )
-        yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
+        yield from events.fail_phase(phase, exc, label=f"`{exc.hook_name}` hook")
         return
 
     suite_started = events.SuiteStarted(phase=phase.name)
 
     yield suite_started
 
-    progress = _SuiteProgress()
+    progress = PhaseProgress()
 
     try:
         with WorkerPool(
@@ -163,7 +144,6 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
             scheduler=scheduler,
             worker_factory=worker_task,
             ctx=engine,
-            mode=mode,
             phase=phase.name,
             suite_id=suite_started.id,
         ) as pool:
@@ -181,29 +161,20 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
             # down. Honor the close instead of emitting the events below into a generator that is going away.
             raise exc.__context__ from None
 
-    yield from _report_outage(engine, phase.name, progress)
+    yield from report_outage(engine, phase.name, progress)
     yield from _report_unreached(engine, scheduler, phase.name, suite_started.id)
-    status = _final_status(phase, progress)
+    status = progress.final_status(phase)
     # NOTE: Right now there is just one suite, hence two events go one after another
     yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status)
     yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
 
 def _consume_worker_events(
-    pool: WorkerPool, engine: EngineContext, phase: PhaseName, progress: _SuiteProgress
+    pool: WorkerPool, engine: EngineContext, phase: PhaseName, progress: PhaseProgress
 ) -> events.EventGenerator:
     """Forward worker events until every worker finishes, the run stops, or the failure limit is reached."""
     finished = 0
-    while True:
-        try:
-            event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
-        except queue.Empty:
-            # A worker may put its final events and exit between this thread's
-            # get(timeout=...) raising Empty and the liveness check below.
-            # Stop only when no producer remains AND nothing is left to drain.
-            if _is_drained(pool):
-                break
-            continue
+    for event in relay_events(pool.events_queue, pool.workers, timeout=WORKER_TIMEOUT):
         if event is WORKER_FINISHED:
             finished += 1
             if finished == len(pool.workers):
@@ -220,11 +191,7 @@ def _consume_worker_events(
             break
 
 
-def _is_drained(pool: WorkerPool) -> bool:
-    return all(not worker.is_alive() for worker in pool.workers) and pool.events_queue.empty()
-
-
-def _fold_event(engine: EngineContext, phase: PhaseName, event: events.EngineEvent, progress: _SuiteProgress) -> None:
+def _fold_event(engine: EngineContext, phase: PhaseName, event: events.EngineEvent, progress: PhaseProgress) -> None:
     if isinstance(event, events.NonFatalError):
         progress.status = Status.ERROR
     if isinstance(event, events.ScenarioFinished):
@@ -247,14 +214,6 @@ def _record_scenario_outcome(
     return status
 
 
-def _report_outage(engine: EngineContext, phase: PhaseName, progress: _SuiteProgress) -> events.EventGenerator:
-    outage = engine.server.take_report(phase)
-    if outage is not None:
-        progress.is_executed = True
-        progress.status = Status.ERROR
-        yield outage
-
-
 def _report_unreached(
     engine: EngineContext, scheduler: Scheduler, phase: PhaseName, suite_id: uuid.UUID
 ) -> events.EventGenerator:
@@ -268,24 +227,11 @@ def _report_unreached(
             )
 
 
-def _final_status(phase: Phase, progress: _SuiteProgress) -> Status:
-    if not progress.is_executed:
-        phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
-        return Status.SKIP
-    if progress.status is None:
-        return Status.SKIP
-    if progress.status == Status.SUCCESS and not progress.checks_ran:
-        phase.skip_reason = PhaseSkipReason.NO_CHECKS_RAN
-        return Status.SKIP
-    return progress.status
-
-
 def worker_task(
     *,
     events_queue: Queue,
     scheduler: Scheduler,
     ctx: EngineContext,
-    mode: HypothesisTestMode,
     phase: PhaseName,
     suite_id: uuid.UUID,
 ) -> None:
@@ -301,9 +247,7 @@ def worker_task(
                     break
 
                 if isinstance(result, Ok):
-                    _run_operation(
-                        result.ok(), events_queue=events_queue, ctx=ctx, mode=mode, phase=phase, suite_id=suite_id
-                    )
+                    _run_operation(result.ok(), events_queue=events_queue, ctx=ctx, phase=phase, suite_id=suite_id)
                 else:
                     error = result.err()
                     _put_error(
@@ -318,7 +262,6 @@ def _run_operation(
     *,
     events_queue: Queue,
     ctx: EngineContext,
-    mode: HypothesisTestMode,
     phase: PhaseName,
     suite_id: uuid.UUID,
 ) -> None:
@@ -334,7 +277,7 @@ def _run_operation(
             events_queue, operation.label, phase, suite_id, skip_reason=verdict.reason, skip_warning=verdict.warning
         )
         return
-    _run_scenario(operation, events_queue=events_queue, ctx=ctx, mode=mode, phase=phase, suite_id=suite_id)
+    _run_scenario(operation, events_queue=events_queue, ctx=ctx, phase=phase, suite_id=suite_id)
 
 
 _DISABLED_VERDICT = Verdict(directive=SchedulingDirective.SKIP, reason="Disabled for this operation")
@@ -352,7 +295,6 @@ def _run_scenario(
     *,
     events_queue: Queue,
     ctx: EngineContext,
-    mode: HypothesisTestMode,
     phase: PhaseName,
     suite_id: uuid.UUID,
 ) -> None:
@@ -374,7 +316,6 @@ def _run_scenario(
                 operation,
                 events_queue=events_queue,
                 ctx=ctx,
-                mode=mode,
                 phase=phase,
                 scenario_started=scenario_started,
                 override=override,
@@ -402,7 +343,6 @@ def _run_hypothesis_test(
     *,
     events_queue: Queue,
     ctx: EngineContext,
-    mode: HypothesisTestMode,
     phase: PhaseName,
     scenario_started: events.ScenarioStarted,
     override: Override,
@@ -417,7 +357,7 @@ def _run_hypothesis_test(
             operation=operation,
             test_func=run_one_case,
             config=HypothesisTestConfig(
-                modes=[mode],
+                modes=[HypothesisTestMode.FUZZING],
                 settings=ctx.config.get_hypothesis_settings(
                     operation=operation, phase=phase.value, apply_ci_profile=False
                 ),

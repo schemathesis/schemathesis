@@ -17,6 +17,7 @@ from test.apps.catalog.openapi.modifiers.under_declared_security import (
     DocumentResponseStatus,
     RespondWithStatus,
 )
+from test.utils import refusing_url
 
 VALID_TOKEN = "real-token"
 
@@ -363,23 +364,23 @@ def test_record_auth_inference_skips_for_non_openapi_schema(ctx, response_factor
     )
 
 
-def test_record_auth_inference_skips_on_retry_network_error(ctx, app_runner, response_factory):
+def test_record_auth_inference_skips_on_retry_network_error(ctx, response_factory):
     api = ctx.openapi.apps.under_declared_security()
     schema = _load_schema_with_creds(api.schema_url)
     operation = next(result.ok() for result in schema.get_all_operations())
-    operation.base_url = f"http://127.0.0.1:{app_runner.unused_port()}"
-    case = operation.Case(method="GET")
     response_401 = response_factory.requests(status_code=401)
 
     store = ErrorFeedbackStore()
     recorder = ScenarioRecorder(label="auth-inference-test")
-    record_auth_inference(
-        store=store,
-        recorder=recorder,
-        case=case,
-        response=response_401,
-        transport_kwargs={},
-    )
+    with refusing_url() as url:
+        operation.base_url = url
+        record_auth_inference(
+            store=store,
+            recorder=recorder,
+            case=operation.Case(method="GET"),
+            response=response_401,
+            transport_kwargs={},
+        )
 
     assert (
         store.observations(

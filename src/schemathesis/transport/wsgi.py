@@ -12,7 +12,7 @@ from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import to_wire_text
-from schemathesis.core.transport import Response, is_event_stream, read_event_stream
+from schemathesis.core.transport import Response, read_event_stream
 from schemathesis.generation.case import Case
 from schemathesis.generation.overrides import Override
 from schemathesis.python import wsgi
@@ -187,7 +187,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         for name, value in response.headers:
             headers.setdefault(name.lower(), []).append(value)
 
-        if is_event_stream(response.content_type):
+        if media_types.is_sse(response.content_type):
             # An event stream may never end; stop reading once the request timeout passes in total.
             content, stream_cut_short = read_event_stream(
                 # A WSGI application iterates over bytes.

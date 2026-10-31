@@ -11,15 +11,15 @@ alias tch := test-cov-html
 
 # Run all tests
 test *ARGS:
-    python -m pytest --ignore=test/tooling --snapshot-warn-unused {{ARGS}}
+    python -m pytest --snapshot-warn-unused {{ARGS}}
 
 test-dist *ARGS:
-    python -m pytest --ignore=test/tooling --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}}
+    python -m pytest --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}}
 
 # Run tests with coverage
 test-cov *ARGS:
     @rm -f .coverage*
-    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest --ignore=test/tooling --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}} || true
+    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}} || true
     uv run python -m coverage combine
     uv run python -m coverage report
 
@@ -31,21 +31,15 @@ test-cov-html *ARGS:
 
 # Run tests matching pattern
 test-k PATTERN *ARGS:
-    python -m pytest --ignore=test/tooling -k "{{PATTERN}}" {{ARGS}}
+    python -m pytest -k "{{PATTERN}}" {{ARGS}}
 
 # Update test snapshots
 snapshot-update *ARGS:
-    python -m pytest --ignore=test/tooling --snapshot-update -n auto --dist=worksteal {{ARGS}}
+    python -m pytest --snapshot-update -n auto --dist=worksteal {{ARGS}}
 
 # Run corpus tests
 test-corpus:
     python -m pytest test-corpus/ -n auto --dist=worksteal
-
-# Lint + type-check all tooling (corpus, analyze, coverage).
-check-tooling:
-    uvx ruff check tools scripts/analyze test/tooling
-    uvx ruff format --check tools scripts/analyze test/tooling
-    uvx --with=".[tests]" --with=mypy --with=types-PyYAML mypy tools/corpus scripts/analyze
 
 # Launch a catalog test app on PORT (default factory: kitchen_sink). `just serve --list` to see all factories.
 serve PORT="8081" FACTORY="kitchen_sink" *ARGS:
@@ -53,7 +47,6 @@ serve PORT="8081" FACTORY="kitchen_sink" *ARGS:
 
 check:
     uvx prek run --all-files
-    @just check-tooling
 
 fmt:
     uvx prek run ruff-format --all-files

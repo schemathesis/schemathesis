@@ -1,7 +1,11 @@
 from functools import partial
 
-from schemathesis.specs.openapi.adapter import responses
-from schemathesis.specs.openapi.adapter.protocol import ExtractRawResponseSchema, ExtractSchemaForMediaType
+from schemathesis.specs.openapi.adapter import responses, validators
+from schemathesis.specs.openapi.adapter.protocol import (
+    ExtractRawResponseSchema,
+    ExtractSchemaForMediaType,
+    ValidateSchema,
+)
 from schemathesis.specs.openapi.adapter.v3_1 import (
     build_path_parameter,
     example_keyword,
@@ -25,7 +29,6 @@ from schemathesis.specs.openapi.adapter.v3_1 import (
     prepare_multipart,
     ref_siblings,
     resolve_response_media_type,
-    validate_schema,
 )
 
 # Open API 3.2 has `schema` of a sequential media type cover the whole stream, and `itemSchema` each item
@@ -44,6 +47,7 @@ extract_stream_schema: ExtractSchemaForMediaType = partial(
     upgrade_legacy_exclusive_bounds=True,
     merge_ref_siblings=True,
 )
+validate_schema: ValidateSchema = validators.validate_v3_2
 
 __all__ = [
     "build_path_parameter",
