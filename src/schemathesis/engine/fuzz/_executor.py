@@ -502,8 +502,13 @@ def _handle_session_end(
     exc: FailureGroup | Exception | KeyboardInterrupt,
     *,
     operations: list[APIOperation],
+    scenario_error: Exception | None,
     event_queue: queue.Queue[events.EngineEvent],
 ) -> None:
+    if isinstance(exc, (_StopFuzzing, Flaky)) and scenario_error is not None:
+        # The replay was stopped or did not raise the error again.
+        event_queue.put(_suite_error(scenario_error))
+        return
     if isinstance(exc, _StopFuzzing):
         # This worker has no work left; other workers keep running.
         return
@@ -552,6 +557,8 @@ def _run_forever_thread(
 
     # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
     seen_error_labels: set[str] = set()
+    # Hypothesis reports an error only when replaying its scenario raises it again, which the time limit can prevent.
+    scenario_errors: list[Exception] = []
 
     @st.composite
     def scheduler(draw: hypothesis.strategies.DrawFn) -> tuple[ScenarioRecorder, dict[str, list[Response]]]:
@@ -640,6 +647,8 @@ def _run_forever_thread(
             )
         except (FailureGroup, Exception, KeyboardInterrupt) as exc:
             status = _status_for(exc)
+            if isinstance(exc, Exception):
+                scenario_errors.append(exc)
             raise
         finally:
             _finish_scenario(
@@ -661,5 +670,11 @@ def _run_forever_thread(
                 if seed is not None:
                     seed += 1
                 continue
-            _handle_session_end(ctx, exc, operations=plan.operations, event_queue=event_queue)
+            _handle_session_end(
+                ctx,
+                exc,
+                operations=plan.operations,
+                scenario_error=scenario_errors[0] if scenario_errors else None,
+                event_queue=event_queue,
+            )
         return
