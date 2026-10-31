@@ -13,7 +13,7 @@ import jsonschema_rs
 
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import RefResolutionError, RemoteDocumentError, unresolvable_reference
-from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
@@ -43,17 +43,34 @@ class Resolver:
     walk results.
     """
 
-    __slots__ = ("base_uri", "inner", "schema", "fragment_cache", "_ids")
+    __slots__ = ("base_uri", "inner", "schema", "fragment_cache", "_ids", "document")
 
     def __init__(
-        self, inner: jsonschema_rs.Resolver, schema: JsonSchema, ids: dict[str, JsonSchema] | None = None
+        self,
+        inner: jsonschema_rs.Resolver,
+        schema: JsonSchema,
+        *,
+        base_uri: str | None = None,
+        document: Resolver | None = None,
     ) -> None:
         self.inner = inner
         self.schema = schema
         # Frozen on the wrapper so hot-path callers don't pay a property+attribute hop.
-        self.base_uri: str = inner.base_uri
+        self.base_uri: str = inner.base_uri if base_uri is None else base_uri
         self.fragment_cache: dict[str, Any] = {}
-        self._ids = ids
+        self._ids: dict[str, JsonSchema] | None = None
+        # The document around `schema` when `schema` names itself; it resolves what `schema` does not hold.
+        self.document = document
+
+    def enter(self, schema: JsonSchemaObject) -> Resolver:
+        """The resolver for references inside `schema`, whose fragments point into it once it names itself."""
+        for keyword in ("$id", "id"):
+            value = schema.get(keyword)
+            if isinstance(value, str) and ("://" in value or value.startswith("urn:")):
+                if schema is self.schema:
+                    return self
+                return Resolver(self.inner, schema, base_uri=urldefrag(value)[0], document=self.document or self)
+        return self
 
     @property
     def ids(self) -> dict[str, JsonSchema]:
@@ -318,6 +335,14 @@ def resolve_reference_with_uri(resolver: Resolver, reference: object) -> tuple[s
         error = RefResolutionError(f"`$ref` must be a string, got {reference!r}")
         error.add_note(str(reference))
         raise error
+    document = resolver.document
+    if document is not None:
+        if reference.startswith("#"):
+            value = resolver.resolve_local_fragment(reference[1:])
+            if value is not UNRESOLVABLE:
+                return f"{resolver.base_uri}{reference}", resolver, value
+        # Documents in the wild point at their components and files relative to the document, not to the `$id`.
+        return resolve_reference_with_uri(document, reference)
     try:
         resolved_uri, current_document_uri = _resolve_reference_uri_with_document(resolver.base_uri, reference)
         document_uri, _, fragment = resolved_uri.partition("#")
@@ -327,7 +352,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: object) -> tuple[s
             # a copy that may not exist, or may have drifted from the one in hand.
             named = resolver.ids.get(document_uri)
             if named is not None:
-                named_resolver = Resolver(resolver.inner, named, resolver.ids)
+                named_resolver = Resolver(resolver.inner, named, base_uri=document_uri, document=resolver)
                 if fragment:
                     return _resolve_document_fragment(named_resolver, fragment, resolved_uri)
                 return resolved_uri, named_resolver, named
@@ -372,6 +397,8 @@ def find_unresolvable_reference(schema: JsonSchema, resolver: Resolver, memo: di
     def walk(node: JsonValue, current_resolver: Resolver) -> str | None:
         nonlocal earliest
         if isinstance(node, dict):
+            if "$id" in node or "id" in node:
+                current_resolver = current_resolver.enter(node)
             reference = node.get("$ref")
             # An empty reference points at the current scope, which always resolves.
             if isinstance(reference, str) and reference.strip():
