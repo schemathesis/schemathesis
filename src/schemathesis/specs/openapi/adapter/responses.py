@@ -299,6 +299,10 @@ class OpenApiResponse:
         for media_type, media_type_object in content.items():
             if not isinstance(media_type_object, dict):
                 continue
+            # A media type left unresolved documents nothing but its own reference
+            if "$ref" in media_type_object:
+                yield media_type_object
+                continue
             schemas = [media_type_object.get("schema")]
             if _is_sse_media_type(media_type):
                 schemas.append(media_type_object.get("itemSchema"))
@@ -464,10 +468,7 @@ def _iter_resolved_responses(
             resolved = {
                 **source,
                 "content": {
-                    media_type: maybe_resolve_with_resolver(entry, response_resolver)[1]
-                    if isinstance(entry, dict)
-                    else entry
-                    for media_type, entry in content.items()
+                    media_type: _resolve_media_type(entry, response_resolver) for media_type, entry in content.items()
                 },
             }
         new_scope = response_resolver.base_uri
@@ -483,6 +484,16 @@ def _iter_resolved_responses(
                 cache=cache,
             ),
         )
+
+
+def _resolve_media_type(entry: object, resolver: Resolver) -> object:
+    if not isinstance(entry, dict):
+        return entry
+    try:
+        return maybe_resolve_with_resolver(entry, resolver, allow_boolean=True)[1]
+    except RefResolutionError:
+        # Kept as written: the response goes unvalidated and its reference is reported as unresolvable
+        return entry
 
 
 def extract_response_schema_v2(

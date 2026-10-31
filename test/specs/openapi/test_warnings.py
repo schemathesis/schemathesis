@@ -293,6 +293,17 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
             },
             [],
         ),
+        (
+            {
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {"application/json": {"$ref": "#/components/mediaTypes/Missing"}},
+                    }
+                }
+            },
+            [("response `200`", "#/components/mediaTypes/Missing")],
+        ),
     ],
     ids=[
         "optional-parameter",
@@ -301,6 +312,7 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
         "dropped-required-body",
         "media-type-not-an-object",
         "media-type-without-schema",
+        "media-type-reference",
     ],
 )
 def test_detect_unresolvable_references(ctx, operation, expected):
