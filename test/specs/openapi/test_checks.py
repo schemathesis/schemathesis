@@ -3918,6 +3918,7 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
                                         "anyOf": [
                                             {"$ref": "#/components/schemas/Cat"},
                                             {"$ref": "#/components/schemas/Dog"},
+                                            {"$ref": "#/components/schemas/Bird"},
                                         ],
                                         "discriminator": discriminator,
                                     }
@@ -3933,6 +3934,7 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
             "schemas": {
                 "Cat": {"type": "object", "properties": {"petType": {"type": "string"}}},
                 "Dog": {"type": "object", "properties": {"petType": {"type": "string"}}},
+                "Bird": {"type": "object", "properties": {"petType": {"type": "string", "enum": ["bird"]}}},
             }
         },
     )
@@ -3978,6 +3980,17 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
         ({"petType": "Fish"}, {}, False),
         # Open API 3.2 routes unknown values to the `defaultMapping` schema
         ({"petType": "Fish"}, {"propertyName": "petType", "defaultMapping": "#/components/schemas/Dog"}, False),
+        # The single value a branch pins for the property selects that branch
+        ({"petType": "bird"}, {"propertyName": "petType"}, False),
+        (
+            {"petType": "bird"},
+            {
+                "propertyName": "petType",
+                "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+            },
+            False,
+        ),
+        ({"petType": "parrot"}, {"propertyName": "petType"}, True),
     ],
     ids=[
         "implicit-valid-cat",
@@ -3989,6 +4002,9 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
         "missing-property-skip",
         "no-property-name-skip",
         "default-mapping-unknown-value",
+        "literal-tag-valid-bird",
+        "explicit-and-literal-tag-valid-bird",
+        "literal-tag-invalid-parrot",
     ],
 )
 def test_response_schema_conformance_discriminator(ctx, response_factory, body, discriminator, should_fail):

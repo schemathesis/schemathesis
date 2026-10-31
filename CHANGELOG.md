@@ -77,6 +77,7 @@
 - False `Network Error` when `--max-time` runs out while a response body is still arriving.
 - Outage reports leading with hanging requests, repeating cut-off ones as network errors, with misleading tips.
 - False positive `response_schema_conformance` for Open API 3.2 discriminators with `defaultMapping`.
+- False positive `response_schema_conformance` for discriminator values pinned by the branch's `enum` or `const`.
 - False schema error for Open API 3.1 response schemas with `prefixItems` or array-form `items`.
 - Open API 3.2 media type objects behind `$ref` ignored in data generation and response validation.
 - Internal error on a response `content` or media type that is not an object.
