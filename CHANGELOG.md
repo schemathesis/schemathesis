@@ -44,6 +44,7 @@
 #### Request serialization
 
 - Objects and arrays inside header and query parameter values sent as Python repr.
+- `xml` settings ignored for schemas reached through `$ref` chains or declared beside a `$ref`.
 - Reject unbound XML prefixes outside the element whose attribute declares their namespace.
 - Serialize XML elements using a namespace prefix that a later sibling attribute declares.
 
