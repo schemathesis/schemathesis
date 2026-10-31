@@ -275,6 +275,100 @@ def test_reference_to_non_object_node_v3(ctx, operation, components, location):
     assert isinstance(valid, Ok)
 
 
+NON_STRING_REFERENCE = {"$ref": 5}
+
+
+@pytest.mark.parametrize(
+    ("path_item", "loads", "total"),
+    [
+        (NON_STRING_REFERENCE, False, 1),
+        ({"post": {"parameters": [NON_STRING_REFERENCE], **_OK_RESPONSES}}, False, 2),
+        ({"post": {"requestBody": NON_STRING_REFERENCE, **_OK_RESPONSES}}, False, 2),
+        (
+            {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": NON_STRING_REFERENCE}},
+                    **_OK_RESPONSES,
+                }
+            },
+            False,
+            2,
+        ),
+        (
+            {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": NON_STRING_REFERENCE}},
+                    },
+                    **_OK_RESPONSES,
+                }
+            },
+            True,
+            2,
+        ),
+        (
+            {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "array", "items": NON_STRING_REFERENCE}}},
+                    },
+                    **_OK_RESPONSES,
+                }
+            },
+            True,
+            2,
+        ),
+        ({"post": {"responses": {"200": NON_STRING_REFERENCE}}}, False, 2),
+        (
+            {
+                "post": {
+                    "responses": {"200": {"description": "OK", "content": {"application/json": NON_STRING_REFERENCE}}}
+                }
+            },
+            True,
+            2,
+        ),
+    ],
+    ids=[
+        "path-item",
+        "parameter",
+        "request-body",
+        "request-body-media-type",
+        "request-body-schema",
+        "request-body-items-schema",
+        "response",
+        "response-media-type",
+    ],
+)
+def test_non_string_reference_v3(ctx, path_item, loads, total):
+    schema = ctx.openapi.load_schema({"/things": path_item, "/ok": {"get": _OK_RESPONSES}})
+    broken, valid = list(schema.get_all_operations())
+    if loads:
+        assert isinstance(broken, Ok)
+    else:
+        assert isinstance(broken, Err)
+        assert isinstance(broken.err(), InvalidSchema)
+    assert isinstance(valid, Ok)
+    assert schema.statistic.operations.total == total
+
+
+def test_non_string_response_schema_reference_v3(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /things",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": NON_STRING_REFERENCE, "example": {"id": 1}}},
+                }
+            }
+        },
+    )
+    assert list(operation.responses.iter_examples()) == [("200/application/json", {"id": 1})]
+
+
 @pytest.mark.parametrize("required", [None, False, True], ids=["unspecified", "optional", "required"])
 def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     body = {"in": "body", "name": "payload", "schema": {"$ref": "#/definitions/Missing"}}

@@ -886,7 +886,7 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
         # Try to get a more descriptive example name from the `$ref` value
         schema = definition.get("schema")
         schema_ref = schema.get("$ref") if isinstance(schema, dict) else None
-        if schema_ref:
+        if schema_ref and isinstance(schema_ref, str):
             name = schema_ref.split("/")[-1]
         else:
             name = f"{status_code}/{media_type}"
