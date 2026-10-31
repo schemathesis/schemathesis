@@ -3895,14 +3895,24 @@ def test_response_schema_conformance_renders_failure_inside_embedded_resource(
     )
 
 
-@pytest.mark.parametrize(("version", "keyword"), [("3.1.0", "$id"), ("3.0.2", "id")], ids=["id", "draft-4-id"])
-def test_response_schema_conformance_follows_reference_into_embedded_resource(ctx, response_factory, version, keyword):
+@pytest.mark.parametrize(
+    ("version", "keyword", "identifier"),
+    [
+        ("3.1.0", "$id", "https://example.com/tree"),
+        ("3.0.2", "id", "https://example.com/tree"),
+        ("3.1.0", "$id", "tree"),
+    ],
+    ids=["id", "draft-4-id", "relative-id"],
+)
+def test_response_schema_conformance_follows_reference_into_embedded_resource(
+    ctx, response_factory, version, keyword, identifier
+):
     tree = {
-        keyword: "https://example.com/tree",
+        keyword: identifier,
         "type": "object",
         "properties": {
             "id": {"type": "integer"},
-            "children": {"type": "array", "items": {"$ref": "https://example.com/tree"}},
+            "children": {"type": "array", "items": {"$ref": identifier}},
         },
     }
     operation = ctx.openapi.load_operation(
@@ -3935,6 +3945,33 @@ def test_response_schema_conformance_validate_formats_disabled(ctx, response_fac
     response = Response.from_requests(response_factory.requests(content=_STR_DATETIME_RESPONSE), True)
 
     assert response_schema_conformance(_CHECK_CTX, response, case) is None
+
+
+def test_response_schema_conformance_follows_relative_id_in_document_loaded_from_file(ctx, tmp_path, response_factory):
+    # The relative `$id` names a resource next to the document file, and no file exists there.
+    tree = {
+        "$id": "tree",
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "children": {"type": "array", "items": {"$ref": "tree"}}},
+    }
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"description": "OK", "content": {"application/json": {"schema": tree}}}}}
+            }
+        },
+        version="3.1.0",
+    )
+    (tmp_path / "openapi.json").write_text(json.dumps(raw_schema))
+    operation = schemathesis.openapi.from_path(tmp_path / "openapi.json")["/items"]["GET"]
+
+    with pytest.raises(JsonSchemaError) as exc:
+        operation.validate_response(response_factory.core(content=b'{"id":1,"children":[{"id":"y"}]}'))
+    assert exc.value.message == (
+        '"y" is not of type "integer"\n\n'
+        "Validated against the response schema for status code 200.\n\n"
+        "Schema at /tree/properties/id:\n\n" + _INTEGER_SCHEMA_SECTION + 'Value:\n\n    "y"'
+    )
 
 
 def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):

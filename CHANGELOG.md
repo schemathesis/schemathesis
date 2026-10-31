@@ -61,6 +61,7 @@
 #### Others
 
 - Generic "Schema Error" message hiding why an operation failed to load.
+- References to a relative `$id` reported as unresolvable.
 - Internal error on a non-string `$ref` in path items, parameters, request bodies or responses.
 - Internal error on a numeric `openapi` version, such as an unquoted `3.1` in YAML.
 - Runs with `--max-time` continuing after a request times out at the time limit.

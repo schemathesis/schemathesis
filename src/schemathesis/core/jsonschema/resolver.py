@@ -59,7 +59,7 @@ class Resolver:
     def ids(self) -> dict[str, JsonSchema]:
         """Names the document gives itself and its subschemas, so a reference to one stays in-document."""
         if self._ids is None:
-            self._ids = collect_ids(self.schema)
+            self._ids = collect_ids(self.schema, self.base_uri)
         return self._ids
 
     def resolve_local_fragment(self, fragment: str) -> Any:
@@ -218,21 +218,28 @@ def build_registry(
         return jsonschema_rs.Registry([(base_uri, {})], draft=draft, retriever=retrieve)
 
 
-def collect_ids(root_schema: Any) -> dict[str, JsonSchema]:
-    """Map every absolute name the document gives itself to the node carrying it."""
+def collect_ids(root_schema: Any, base_uri: str) -> dict[str, JsonSchema]:
+    """Map every name the document gives itself, resolved against the enclosing base URI, to the node carrying it."""
     ids: dict[str, JsonSchema] = {}
+    base = base_uri
+    # Below the subschemas of a named node sits the base URI to restore once they are all visited.
     stack: list[Any] = [root_schema]
     while stack:
         node = stack.pop()
         if isinstance(node, dict):
             for keyword in ("$id", "id"):
                 value = node.get(keyword)
-                # A non-string sits under a property named `$id`/`id`, not under the keyword.
-                if isinstance(value, str) and ("://" in value or value.startswith("urn:")):
-                    ids.setdefault(urldefrag(value)[0], node)
+                # A non-string sits under a property named `$id`/`id`, not under the keyword. A relative `id` is far more
+                # often an ordinary field of example data than a schema name, so only an absolute one names a schema.
+                if isinstance(value, str) and (keyword == "$id" or "://" in value or value.startswith("urn:")):
+                    stack.append(base)
+                    base = urldefrag(resolve_reference_uri(base, value))[0]
+                    ids.setdefault(base, node)
             stack.extend(value for value in node.values() if isinstance(value, (dict, list)))
         elif isinstance(node, list):
             stack.extend(value for value in node if isinstance(value, (dict, list)))
+        else:
+            base = node
     return ids
 
 
