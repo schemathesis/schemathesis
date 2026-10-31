@@ -74,6 +74,7 @@
 - `st fuzz` ignoring `--generation-unique-inputs`.
 - Operations reported as skipped, with no error shown, when an unexpected error crashes them.
 - Stateful phase reported as skipped, with exit code 0, when an unexpected error crashes it.
+- Stateful tests replaying scenarios saved in the example database for a different API.
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Runs with `--generation-unique-inputs` spinning without requests until `--max-time` once inputs run out.

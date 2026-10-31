@@ -19,6 +19,7 @@ from hypothesis.stateful import Bundle, MultipleResults, multiple, precondition,
 
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.hypothesis import add_database_key
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.control import (
     BundleTransitions,
@@ -179,7 +180,9 @@ def create_state_machine(schema: GrpcSchema) -> type[GrpcStateMachine]:
         attrs[name] = _link_rule(
             name, link, operations[link.target], bundles[link.source], bundles.get(link.target), produced
         )
-    return type("GrpcStateMachine", (GrpcStateMachine,), attrs)
+    machine = type("GrpcStateMachine", (GrpcStateMachine,), attrs)
+    add_database_key(machine, "\n".join(attrs))
+    return machine
 
 
 def _no_links(schema: GrpcSchema) -> NoLinksFound:

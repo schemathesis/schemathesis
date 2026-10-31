@@ -8,6 +8,7 @@ from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup, ServerError
 from schemathesis.specs.grpc.stateful import GrpcLink, infer_links, response_value
 from test.apps.catalog.grpc.descriptors import library_descriptor_set, write_descriptor_set
+from test.utils import saved_example_keys
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -205,6 +206,14 @@ def test_rule_names_stay_distinct(tmp_path):
     machine = load(tmp_path, mutate_files=same_rule_names).as_state_machine()
     rules = [name for name, value in vars(machine).items() if hasattr(value, RULE_MARKER)]
     assert len(rules) == 8
+
+
+def test_saved_scenarios_are_kept_per_schema(ctx, tmp_path):
+    server = ctx.grpc.apps.library()
+    keys = saved_example_keys(load(tmp_path, server=server).as_state_machine())
+    assert keys == saved_example_keys(load(tmp_path, server=server).as_state_machine())
+    more_links = load(tmp_path, mutate_files=create_also_pages, server=server)
+    assert keys.isdisjoint(saved_example_keys(more_links.as_state_machine()))
 
 
 def without_links(file):

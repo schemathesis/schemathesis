@@ -28,7 +28,7 @@ from schemathesis.specs.openapi.stateful import (
 )
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody
-from test.utils import run_given
+from test.utils import run_given, saved_example_keys
 
 
 @pytest.mark.parametrize(
@@ -1082,6 +1082,15 @@ def test_test_case_runs_in_process(ctx):
 
     QuickTestCase().runTest()
     assert {request.method for request in api.requests} >= {"POST"}
+
+
+# Replaying one API's saved scenarios into another API's state machine changes which failures it finds.
+def test_saved_scenarios_are_kept_per_schema(ctx):
+    users_crud = ctx.openapi.apps.users_crud().schema_url
+    keys = saved_example_keys(schemathesis.openapi.from_url(users_crud).as_state_machine())
+    assert keys == saved_example_keys(schemathesis.openapi.from_url(users_crud).as_state_machine())
+    linked_users = ctx.openapi.apps.linked_users().schema_url
+    assert keys.isdisjoint(saved_example_keys(schemathesis.openapi.from_url(linked_users).as_state_machine()))
 
 
 def test_rule_names_stay_unique_when_operation_labels_normalize_alike(ctx):

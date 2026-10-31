@@ -13,6 +13,12 @@ canonical_form_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 _first_param_cache: Final[BoundedCache] = BoundedCache(maxsize=1024)
 
 
+def add_database_key(target: object, key: str) -> None:
+    """Keep the saved examples of `target` apart from other tests that share its name."""
+    # Hypothesis mixes this private attribute into its example database key; there is no public API for it.
+    target._hypothesis_internal_add_digest = key.encode("utf8")  # type: ignore[attr-defined]
+
+
 def setup() -> None:
     from hypothesis import core as root_core
     from hypothesis.internal import entropy

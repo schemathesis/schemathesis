@@ -16,6 +16,7 @@ import requests
 import urllib3
 import yaml
 from hypothesis import HealthCheck, given, settings
+from hypothesis.database import InMemoryExampleDatabase
 
 from schemathesis import Case
 from schemathesis.checks import CheckContext
@@ -27,6 +28,7 @@ from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.recorder import Interaction
 from schemathesis.engine.run import Phase, PhaseName
+from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine
 from test.apps import builders
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -460,3 +462,16 @@ def graphql_url(ctx):
 
 def stateful_phase() -> Phase:
     return Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)
+
+
+def saved_example_keys(state_machine: type[APIStateMachine]) -> set[bytes]:
+    """Example database keys a state machine saves to when its first response fails."""
+    database = InMemoryExampleDatabase()
+
+    class Failing(state_machine):
+        def validate_response(self, response: Any, case: Case, **kwargs: Any) -> None:
+            raise AssertionError
+
+    with pytest.raises(AssertionError):
+        Failing.run(settings=settings(DEFAULT_STATE_MACHINE_SETTINGS, database=database, max_examples=1))
+    return set(database.data)
