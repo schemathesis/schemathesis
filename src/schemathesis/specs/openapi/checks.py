@@ -236,7 +236,10 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         # A header whose schema names a missing component has nothing to validate against.
         if header.unresolvable_reference is not None:
             continue
-        coerced = _coerce_header_value(values[0], header.schema, explode=header.definition.get("explode", False))
+        if header.is_json:
+            coerced = _parse_json_header_value(values[0])
+        else:
+            coerced = _coerce_header_value(values[0], header.schema, explode=header.definition.get("explode", False))
         for exc in header.validator.iter_errors(coerced):
             errors.append(
                 JsonSchemaError.from_exception(
@@ -255,6 +258,14 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         errors.append(MissingHeaders(operation=case.operation.label, message=message, missing_headers=missing_headers))
 
     return maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
+
+
+def _parse_json_header_value(value: str) -> object:
+    # A value that is not JSON is validated as text, so the schema reports the mismatch
+    try:
+        return json.loads(value)
+    except ValueError:
+        return value
 
 
 def _coerce_header_value(value: str, schema: dict[str, Any], *, explode: bool = False) -> Any:
