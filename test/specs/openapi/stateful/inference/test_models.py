@@ -284,6 +284,47 @@ def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_r
     }
 
 
+USER = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+
+
+@pytest.mark.parametrize(
+    ("content", "components", "version"),
+    [
+        (
+            {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/User"},
+                    "examples": {"a": {"$ref": "#/components/examples/User"}},
+                }
+            },
+            {"schemas": {"User": USER}, "examples": {"User": {"value": {"id": "1"}}}},
+            "3.0.3",
+        ),
+        (
+            {"application/json": {"$ref": "#/components/mediaTypes/User"}},
+            {"schemas": {"User": USER}, "mediaTypes": {"User": {"schema": {"$ref": "#/components/schemas/User"}}}},
+            "3.2.0",
+        ),
+    ],
+    ids=["example-reference", "media-type-reference"],
+)
+def test_state_machine_keeps_links_inferred_for_responses_with_references(ctx, content, components, version):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created", "content": content}}}},
+            "/users/{userId}": {
+                "get": {
+                    "parameters": _path_param("userId"),
+                    "responses": _json_response("200", {"$ref": "#/components/schemas/User"}),
+                }
+            },
+        },
+        components=components,
+        version=version,
+    )
+    assert set(schema.as_state_machine().bundles) == {"POST /users -> 201"}
+
+
 # A response living in the root document keeps resolving there when its operations come from another file.
 def test_inject_links_keeps_response_references_of_external_operations(tmp_path):
     config = {"$ref": "#/components/schemas/Config"}

@@ -333,26 +333,44 @@ def test_with_examples_openapi_3(ctx):
     assert_positive_coverage(schema, EXPECTED_EXAMPLES)
 
 
-@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
-def test_with_referenced_examples(ctx, version):
-    schema = build_schema(
-        ctx,
-        [
+REFERENCED_EXAMPLES = {"first": {"$ref": "#/components/examples/Special"}, "second": {"value": "inline"}}
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0", "3.2.0"])
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        (
             {
-                "in": "query",
-                "name": "q1",
-                "schema": {"type": "string"},
-                "required": True,
-                "examples": {
-                    "first": {"$ref": "#/components/examples/Special"},
-                    "second": {"value": "inline"},
-                },
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "q1",
+                        "schema": {"type": "string"},
+                        "required": True,
+                        "examples": REFERENCED_EXAMPLES,
+                    }
+                ]
             },
-        ],
-        version=version,
-        components={"examples": {"Special": {"value": "special-ref"}}},
+            [{"query": {"q1": "inline"}}, {"query": {"q1": "special-ref"}}],
+        ),
+        (
+            {
+                "request_body": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"type": "string"}, "examples": REFERENCED_EXAMPLES}},
+                }
+            },
+            [{"body": OVERSIZED}, {"body": "inline"}, {"body": "special-ref"}],
+        ),
+    ],
+    ids=["query", "body"],
+)
+def test_with_referenced_examples(ctx, version, kwargs, expected):
+    schema = build_schema(
+        ctx, **kwargs, version=version, components={"examples": {"Special": {"value": "special-ref"}}}
     )
-    assert_positive_coverage(schema, [{"query": {"q1": "inline"}}, {"query": {"q1": "special-ref"}}])
+    assert_positive_coverage(schema, expected)
 
 
 def test_with_optional_parameters(ctx):
