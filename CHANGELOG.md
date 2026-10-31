@@ -58,6 +58,7 @@
 
 - Generic "Schema Error" message hiding why an operation failed to load.
 - Runs with `--max-time` continuing after a request times out at the time limit.
+- `st fuzz` hiding errors raised as the time limit is reached.
 - Token fetch cooldown failure reported twice in stateful testing.
 - Configured `proxy` skipped by dynamic auth token requests, WFC login and loading schemas from URLs.
 - Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
