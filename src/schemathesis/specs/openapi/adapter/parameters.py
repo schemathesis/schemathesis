@@ -2121,7 +2121,7 @@ def _bundle_parameter(
                     updated_content[media_type] = media_type_object
                     continue
                 media_type_resolver, media_type_object = maybe_resolve_with_resolver(
-                    media_type_object, parameter_resolver
+                    media_type_object, parameter_resolver, allow_boolean=True
                 )
                 media_type_object = dict(media_type_object)
                 nested_schema = media_type_object.get("schema")
@@ -2176,6 +2176,14 @@ def _resolve_example_references(definition: Mapping[str, Any], resolver: Resolve
             updated = dict(definition)
         updated[keyword] = resolved
     return definition if updated is None else updated
+
+
+def _skipped_body(error: RefResolutionError, *, required: bool) -> SkippedParameter:
+    """Record a body left out over a reference that does not resolve, or re-raise when it cannot be left out."""
+    reference = unresolvable_reference(error)
+    if required and not _is_recoverable_body_reference(reference):
+        raise error
+    return SkippedParameter(location=ParameterLocation.BODY.value, name=None, reference=reference, required=required)
 
 
 def _is_recoverable_body_reference(reference: str) -> bool:
@@ -2361,7 +2369,11 @@ def iter_parameters_v3(
         ensure_object(request_body["content"], "`requestBody.content`")
         for media_type, content in request_body["content"].items():
             ensure_object(content, f"Media type `{media_type}`")
-            content_resolver, content = maybe_resolve_with_resolver(content, body_resolver)
+            try:
+                content_resolver, content = maybe_resolve_with_resolver(content, body_resolver, allow_boolean=True)
+            except RefResolutionError as exc:
+                skipped.append(_skipped_body(exc, required=required))
+                continue
             resource_name = None
             schema = content.get("schema")
             name_to_uri = {}
@@ -2386,17 +2398,7 @@ def iter_parameters_v3(
                 except BundleError as exc:
                     raise InvalidSchema.from_bundle_error(exc, "body") from exc
                 except RefResolutionError as exc:
-                    reference = unresolvable_reference(exc)
-                    if required and not _is_recoverable_body_reference(reference):
-                        raise
-                    skipped.append(
-                        SkippedParameter(
-                            location=ParameterLocation.BODY.value,
-                            name=None,
-                            reference=reference,
-                            required=required,
-                        )
-                    )
+                    skipped.append(_skipped_body(exc, required=required))
                     continue
             yield OpenApiBody.from_definition(
                 definition=content,

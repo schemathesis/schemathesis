@@ -1,6 +1,5 @@
 import json
 import platform
-import re
 
 import jsonschema_rs
 import pytest
@@ -331,25 +330,61 @@ def test_openapi_3_2_media_type_reference_in_parameter(ctx):
         assert isinstance(value["id"], int)
 
 
-@pytest.mark.parametrize(
-    ("request_body", "reference"),
-    [
-        ({"$ref": "#/components/requestBodies/Missing"}, "#/components/requestBodies/Missing"),
-        (
-            {"required": True, "content": {"application/json": {"$ref": "#/components/mediaTypes/Missing"}}},
-            "#/components/mediaTypes/Missing",
-        ),
-    ],
-    ids=["request-body", "media-type"],
-)
-def test_openapi_3_2_unresolvable_media_type_reference(ctx, request_body, reference):
-    schema = ctx.openapi.load_schema(
-        {"/items": {"post": {"requestBody": request_body, "responses": {"200": {"description": "OK"}}}}},
+@pytest.mark.parametrize("required", [True, False], ids=["required", "optional"])
+def test_openapi_3_2_unresolvable_media_type_reference_in_request_body(ctx, required):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {
+                "required": required,
+                "content": {"application/json": {"$ref": "#/components/mediaTypes/Missing"}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
         version="3.2.0",
         components=MEDIA_TYPE_COMPONENTS,
     )
-    with pytest.raises(InvalidSchema, match=re.escape(reference)):
-        schema["/items"]["POST"]
+    assert [(skipped.location, skipped.reference, skipped.required) for skipped in operation.skipped_parameters] == [
+        ("body", "#/components/mediaTypes/Missing", required)
+    ]
+
+
+def test_openapi_3_2_unresolvable_media_type_reference_in_response(ctx, response_factory):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"$ref": "#/components/mediaTypes/Missing"}},
+                },
+                "404": {"description": "Not Found", "content": REFERENCED_CONTENT},
+            }
+        },
+        version="3.2.0",
+        components=MEDIA_TYPE_COMPONENTS,
+    )
+    headers = {"content-type": ["application/json"]}
+    operation.validate_response(response_factory.core(content=b'{"id": "bad"}', headers=headers))
+    with pytest.raises(JsonSchemaError):
+        operation.validate_response(response_factory.core(content=b'{"id": "bad"}', headers=headers, status_code=404))
+
+
+# Open API 3.0 documents sometimes point a media type at a schema; a boolean one constrains nothing.
+def test_media_type_reference_to_boolean_schema(ctx, response_factory):
+    content = {"application/json": {"$ref": "#/components/schemas/Any"}}
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": content},
+            "responses": {"200": {"description": "OK", "content": content}},
+        },
+        components={"schemas": {"Any": True}},
+    )
+    assert [body.media_type for body in operation.body] == ["application/json"]
+    operation.validate_response(
+        response_factory.core(content=b'{"id": "bad"}', headers={"content-type": ["application/json"]})
+    )
 
 
 @pytest.mark.parametrize(
@@ -358,15 +393,15 @@ def test_openapi_3_2_unresolvable_media_type_reference(ctx, request_body, refere
     ids=["reference", "reference-next-to-malformed-entry"],
 )
 def test_openapi_3_2_media_type_reference_in_response(ctx, response_factory, content):
-    schema = ctx.openapi.load_schema(
-        {"/items": {"get": {"responses": {"200": {"description": "OK", "content": content}}}}},
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"responses": {"200": {"description": "OK", "content": content}}},
         version="3.2.0",
         components=MEDIA_TYPE_COMPONENTS,
     )
     with pytest.raises(JsonSchemaError):
-        schema.validate_response(
-            schema["/items"]["GET"],
-            response_factory.core(content=b'{"id": "bad"}', headers={"content-type": ["application/json"]}),
+        operation.validate_response(
+            response_factory.core(content=b'{"id": "bad"}', headers={"content-type": ["application/json"]})
         )
 
 
