@@ -579,6 +579,16 @@ def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
     assert found_unresolvable, "Expected to find $unresolvable marker in extraction results"
 
 
+def imported_by_coverage():
+    # Branch coverage parses each source file lazily, importing on whichever thread first runs it
+    frame = sys._getframe()
+    while frame is not None:
+        if frame.f_globals.get("__name__", "").startswith("coverage."):
+            return True
+        frame = frame.f_back
+    return False
+
+
 def test_report_writers_do_not_import(cli, ctx, ndjson_path, tmp_path, monkeypatch):
     # An import on a writer thread races the main thread's own and dies, losing every later event
     api = ctx.openapi.apps.success()
@@ -587,7 +597,8 @@ def test_report_writers_do_not_import(cli, ctx, ndjson_path, tmp_path, monkeypat
     real_import = builtins.__import__
 
     def guarded_import(name, *args, **kwargs):
-        if threading.current_thread().name in ("SchemathesisNdjsonWriter", "SchemathesisHarWriter"):
+        on_writer = threading.current_thread().name in ("SchemathesisNdjsonWriter", "SchemathesisHarWriter")
+        if on_writer and not imported_by_coverage():
             raise RuntimeError(f"deadlock detected by _ModuleLock({name!r})")
         return real_import(name, *args, **kwargs)
 
