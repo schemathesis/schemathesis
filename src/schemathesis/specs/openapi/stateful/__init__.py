@@ -18,6 +18,7 @@ from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCa
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
+from schemathesis.generation.hypothesis import add_database_key
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.control import TransitionController
 from schemathesis.generation.stateful.state_machine import (
@@ -290,7 +291,7 @@ def create_state_machine(
                 root_rules.add(name)
                 root_labels.add(target.label)
 
-    return type(
+    machine = type(
         "APIWorkflow",
         (OpenAPIStateMachine,),
         {
@@ -303,6 +304,8 @@ def create_state_machine(
             **rules,
         },
     )
+    add_database_key(machine, "\n".join(rules))
+    return machine
 
 
 def classify_root_transitions(

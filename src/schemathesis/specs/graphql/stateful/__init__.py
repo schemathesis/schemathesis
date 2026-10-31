@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from hypothesis.stateful import Bundle
 
 from schemathesis.core.errors import NoProducers
+from schemathesis.generation.hypothesis import add_database_key
 from schemathesis.generation.stateful.state_machine import BundleStateMachine
 from schemathesis.specs.graphql.handles import Handle, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.stateful._rules import generate_rules_for
@@ -46,7 +47,9 @@ def create_state_machine(schema: GraphQLSchema) -> type[GraphQLStateMachine]:
         attrs[name] = decorated
     attrs["_producer_rule_names"] = rule_set.producer_names
     attrs["_root_labels"] = rule_set.root_labels
-    return type("GraphQLStateMachine", (GraphQLStateMachine,), attrs)
+    machine = type("GraphQLStateMachine", (GraphQLStateMachine,), attrs)
+    add_database_key(machine, "\n".join(attrs))
+    return machine
 
 
 __all__ = ["GraphQLStateMachine", "create_state_machine"]
