@@ -230,7 +230,7 @@ def _record_response_signals(
         )
     if _is_ordinary_request(case):
         record_auth_outcome(case, response.status_code)
-        ctx.supervisor.observe(case, response.status_code, cache_writer=ctx.cache.writer)
+        ctx.supervisor.observe(case, response, cache_writer=ctx.cache.writer)
     # Record DELETE attempts immediately to influence subsequent strategy draws.
     if ctx.extra_data_source is not None:
         record_delete_attempt(ctx.extra_data_source, case, response.status_code)

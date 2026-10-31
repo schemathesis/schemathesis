@@ -412,7 +412,7 @@ def _validate_step_response(
     observations = _parse_step_observations(engine, case, response)
     _calibrate_link(engine, response, observations=observations, step_input=step_input, recorder=recorder)
     ctx.current_response = response
-    engine.supervisor.observe(case, response.status_code, cache_writer=engine.cache.writer)
+    engine.supervisor.observe(case, response, cache_writer=engine.cache.writer)
     _feed_error_feedback(engine, case, response, observations=observations, recorder=recorder)
     check_ctx = check_context_cache.get_or_create(
         operation=case.operation, ctx=engine, phase="stateful"
