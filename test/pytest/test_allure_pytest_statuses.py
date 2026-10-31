@@ -23,7 +23,7 @@ from hypothesis import settings
 schema = schemathesis.openapi.from_url("{api.schema_url}")
 schema.config.update(base_url="{api.base_url}")
 TestCase = schema.as_state_machine().TestCase
-TestCase.settings = settings(max_examples=10, stateful_step_count=3, deadline=None)
+TestCase.settings = settings(max_examples=10, stateful_step_count=3, deadline=None, derandomize=True)
 
 def test_passing():
     pass
