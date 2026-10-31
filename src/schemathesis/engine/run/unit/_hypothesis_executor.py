@@ -46,7 +46,9 @@ def run_test(
 
     pending_events: list[events.EngineEvent] = []
     try:
-        setup_hypothesis_database_key(test_function, operation, generation=generation)
+        setup_hypothesis_database_key(
+            test_function, operation, generation=generation, failed_before=scenario.failed_before
+        )
         with catch_warnings(record=True), ignore_hypothesis_output():
             test_function(ctx=ctx, scenario=scenario, errors=errors, pending_events=pending_events)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
@@ -107,9 +109,12 @@ def _settle_stopped(
     return Status.SUCCESS, None, None
 
 
-def setup_hypothesis_database_key(test: Callable, operation: APIOperation, generation: GenerationConfig) -> None:
+def setup_hypothesis_database_key(
+    test: Callable, operation: APIOperation, generation: GenerationConfig, *, failed_before: bool
+) -> None:
     """Give each API operation its own Hypothesis database entries, or disable the database when set to `none`."""
-    if generation.database is not None and generation.database.lower() == "none":
+    # Continuing past a known failure, its replay would not fail and Hypothesis would delete it from the database.
+    if failed_before or (generation.database is not None and generation.database.lower() == "none"):
         test._hypothesis_internal_database_key = None  # type: ignore[attr-defined]
         return
     # Hypothesis-decorated tests expose the wrapped test as `hypothesis.inner_test`.

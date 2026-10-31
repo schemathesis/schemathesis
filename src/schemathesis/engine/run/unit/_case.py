@@ -119,6 +119,9 @@ def _call_and_validate_once(
     key = hash(case)
     cached = ctx.get_cached_outcome(key)
     if isinstance(cached, BaseException):
+        # An earlier cycle already reported this failure; skip the input instead of ending the run on it again.
+        if isinstance(cached, FailureGroup) and scenario.failed_before:
+            return
         raise cached
     if cached is None:
         return
