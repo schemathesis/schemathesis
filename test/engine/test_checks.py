@@ -1021,6 +1021,44 @@ RATE_LIMIT_ROWS = [
             for version in ("2.0", "3.0.2")
             for name, schema, value, expected, case_id in RATE_LIMIT_ROWS
         ),
+        *(
+            pytest.param(
+                version,
+                "X-RateLimit-Limit",
+                {"content": {"text/plain": {"schema": INTEGER_HEADER}}},
+                value,
+                expected,
+                id=f"content-{case_id}-{version}",
+            )
+            for version in ("3.0.3", "3.2.0")
+            for value, expected, case_id in (("42", True, "valid"), ("abc", False, "invalid"))
+        ),
+        pytest.param(
+            "3.0.3",
+            "X-Extent",
+            {"content": {"application/json": {"schema": EXTENT_SCHEMA}}},
+            '{"start": -5, "end": 7}',
+            True,
+            id="content-json-object",
+        ),
+        pytest.param(
+            "3.0.3",
+            "X-Extent",
+            {"content": {"application/json": {"schema": EXTENT_SCHEMA}}},
+            "start=-5",
+            False,
+            id="content-json-not-json",
+        ),
+        pytest.param(
+            "3.0.3",
+            "X-RateLimit-Limit",
+            {"content": {"json": {"schema": INTEGER_HEADER}}},
+            "abc",
+            False,
+            id="content-malformed-media-type",
+        ),
+        pytest.param("3.0.3", "X-RateLimit-Limit", {"content": {}}, "abc", True, id="content-empty"),
+        pytest.param("3.0.3", "X-RateLimit-Limit", {"content": {"text/plain": None}}, "abc", True, id="content-null"),
         pytest.param("3.1.0", "X-Count", {"schema": {"type": ["integer", "null"]}}, "5", True, id="type-list-integer"),
         pytest.param("3.1.0", "X-Count", {"schema": {"type": ["integer", "null"]}}, "null", True, id="type-list-null"),
         pytest.param(
@@ -1161,6 +1199,32 @@ def test_header_conformance_schema_behind_ref(ctx, response_factory):
     assert response_headers_conformance(check_context(), response, case) is None
 
     response = Response.from_requests(response_factory.requests(headers={"X-RateLimit-Limit": "150"}), True)
+    with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+        response_headers_conformance(check_context(), response, case)
+
+
+def test_header_conformance_media_type_behind_ref(ctx, response_factory):
+    operation = ctx.openapi.load_operation(
+        "GET /data",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "headers": {
+                        "X-RateLimit-Limit": {"content": {"text/plain": {"$ref": "#/components/mediaTypes/Limit"}}}
+                    },
+                }
+            }
+        },
+        version="3.2.0",
+        components={"mediaTypes": {"Limit": {"schema": INTEGER_HEADER}}},
+    )
+    case = operation.Case()
+
+    response = response_factory.core(headers={"X-RateLimit-Limit": ["50"]})
+    assert response_headers_conformance(check_context(), response, case) is None
+
+    response = response_factory.core(headers={"X-RateLimit-Limit": ["150"]})
     with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
         response_headers_conformance(check_context(), response, case)
 

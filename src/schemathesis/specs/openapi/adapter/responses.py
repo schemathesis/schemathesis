@@ -741,6 +741,13 @@ def _is_json_sequence_media_type(value: str) -> bool:
         return False
 
 
+def _is_json_media_type(value: str) -> bool:
+    try:
+        return media_types.is_json(value)
+    except MalformedMediaType:
+        return False
+
+
 @dataclass(slots=True)
 class OpenApiResponseHeaders:
     """Collection of OpenAPI response header definitions."""
@@ -783,6 +790,12 @@ class OpenApiResponseHeader:
     @property
     def is_required(self) -> bool:
         return self.definition.get(self.adapter.header_required_keyword, False)
+
+    @property
+    def is_json(self) -> bool:
+        """Whether the header value is a JSON document, as declared by its `content` media type."""
+        content = _header_content(self.definition)
+        return content is not None and _is_json_media_type(content[0])
 
     def _get_bundle(self) -> Bundle:
         """Get the bundled schema for this header."""
@@ -852,6 +865,17 @@ def _iter_resolved_headers(
         )
 
 
+def _header_content(header: Mapping[str, Any]) -> tuple[str, Mapping[str, Any]] | None:
+    """The media type and its object for a header that describes its value through `content` instead of `schema`."""
+    content = header.get("content")
+    if "schema" in header or not isinstance(content, dict) or not content:
+        return None
+    media_type, media_type_object = next(iter(content.items()))
+    if not isinstance(media_type_object, dict):
+        return None
+    return media_type, media_type_object
+
+
 def extract_header_schema_v2(
     header: Mapping[str, Any], resolver: Resolver, scope: str, nullable_keyword: str
 ) -> Bundle:
@@ -868,6 +892,10 @@ def extract_header_schema_v3(
     merge_ref_siblings: bool = False,
 ) -> Bundle:
     schema = header.get("schema", {})
+    content = _header_content(header)
+    if content is not None:
+        resolver, media_type_object = maybe_resolve_with_resolver(content[1], resolver, allow_boolean=True)
+        schema = media_type_object.get("schema", {})
     return _build_prepared_schema(
         schema,
         resolver,

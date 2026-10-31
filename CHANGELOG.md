@@ -70,6 +70,7 @@
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Internal error or wrong schema shown for response failures inside schemas reached through `$dynamicRef`.
+- Response headers declared with `content` instead of `schema` never validated by `response_headers_conformance`.
 - Test case summary counting errored and skipped cases as passed.
 - Probe requests from checks counted as generated and skipped test cases.
 - Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
