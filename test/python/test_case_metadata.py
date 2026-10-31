@@ -1,10 +1,13 @@
 import pytest
+from flask import jsonify, request
 from hypothesis import Phase, find
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
+import schemathesis
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CONTENT_TYPE_PROBES,
@@ -18,6 +21,7 @@ from schemathesis.generation.meta import (
     coverage_scenario,
 )
 from schemathesis.resources import PoolDraw
+from schemathesis.specs.openapi.checks import ignored_auth
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 from test.utils import run_given
 
@@ -98,6 +102,43 @@ def test_direct_assignment_marks_dirty_and_revalidates(simple_operation):
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
     case.body = {"id": "test-123"}
     assert case.meta.generation.mode == GenerationMode.POSITIVE
+
+
+def test_probe_metadata_stays_as_sent(ctx, app_runner):
+    # Reporters read recorded cases on other threads; a sent case revalidating there races the worker.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "security": [{"basicAuth": []}],
+                    "parameters": [{"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+
+    @app.route("/items")
+    def items():
+        if request.authorization is None or request.authorization.password != "pass":
+            return jsonify({}), 401
+        return jsonify([])
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/items"]["GET"].Case(query={"limit": 1}, _meta=make_positive_meta(ParameterLocation.QUERY))
+    transport_kwargs = {"auth": ("user", "pass")}
+    response = case.call(**transport_kwargs)
+    recorder = ScenarioRecorder(label="GET /items")
+    recorder.record_case(case=case)
+
+    case.validate_response(response, checks=[ignored_auth], transport_kwargs=transport_kwargs, recorder=recorder)
+
+    probes = [node.value for node in recorder.cases.values() if node.parent_id == case.id]
+    assert len(probes) == 2
+    for probe in probes:
+        probe.query["limit"] = "many"
+        assert probe.meta.generation.mode == GenerationMode.POSITIVE
 
 
 def test_inplace_modification_detected_and_revalidated(simple_operation):

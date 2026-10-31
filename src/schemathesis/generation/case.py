@@ -361,6 +361,16 @@ class Case(Generic[OperationT]):
     def freeze_metadata(self) -> None:
         object.__setattr__(self, "_freeze_metadata", True)
 
+    def settle_metadata(self) -> None:
+        """Fix metadata to the values about to be sent; later edits no longer revalidate it.
+
+        Reporters read sent cases from other threads, so a sent case must never revalidate on read.
+        """
+        self._check_modifications()
+        if self._meta and self._meta.is_dirty():
+            self._revalidate_metadata()
+        self.freeze_metadata()
+
     def derive(
         self,
         *,
@@ -468,14 +478,7 @@ class Case(Generic[OperationT]):
         self._sync_validated_hashes()
         dispatch_before_call(GLOBAL_HOOK_DISPATCHER, context=hook_context, case=self, kwargs=kwargs)
 
-        # Detect in-place container edits the hook made, then revalidate before freezing so
-        # stale generation-time metadata reflects the values actually sent.
-        self._check_modifications()
-        if self._meta and self._meta.is_dirty():
-            self._revalidate_metadata()
-
-        # Freeze metadata to prevent revalidation after request preparation transforms the body
-        self.freeze_metadata()
+        self.settle_metadata()
         object.__setattr__(self, "_base_url", base_url)
 
         if self.operation.app is not None:
