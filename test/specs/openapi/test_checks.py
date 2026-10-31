@@ -3887,8 +3887,9 @@ def test_response_schema_conformance_renders_failure_inside_embedded_resource(
 
     with pytest.raises(JsonSchemaError) as exc:
         operation.validate_response(response)
+    record = "Item #0: " if media_type == "application/jsonl" else ""
     assert exc.value.message == (
-        '"y" is not of type "integer"\n\n'
+        f'{record}"y" is not of type "integer"\n\n'
         "Validated against the response schema for status code 200.\n\n"
         f'{schema_section}Value:\n\n    "y"'
     )
