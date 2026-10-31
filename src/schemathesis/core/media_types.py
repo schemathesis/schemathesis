@@ -130,6 +130,12 @@ def is_sse(value: str) -> bool:
     return parse(value) == ("text", "event-stream")
 
 
+def is_json_sequence(value: str) -> bool:
+    """Detect JSON Lines and JSON Text Sequences, which carry one JSON value per line or record."""
+    main, sub = parse(value)
+    return main == "application" and (sub in ("jsonl", "x-ndjson", "json-seq") or sub.endswith("+json-seq"))
+
+
 def is_form_urlencoded(value: str | None) -> bool:
     """Detect the application/x-www-form-urlencoded media type."""
     if value is None:

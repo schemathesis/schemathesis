@@ -12,7 +12,7 @@ from schemathesis.core.errors import InvalidSchema, MalformedMediaType, RefResol
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, supplemental_formats
 from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.transport import expand_status_code
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import ResponseAdapter
@@ -288,6 +288,13 @@ class OpenApiResponse:
             self._sse_stream_validator = _SseValidator(schema, self.adapter.jsonschema_validator_cls)
         return self._sse_stream_validator
 
+    def describes_json_sequence(self, media_type: str) -> bool:
+        """Whether `media_type` is documented as a JSON Lines or JSON Text Sequence body with an `itemSchema`."""
+        if not _is_json_sequence_media_type(media_type):
+            return False
+        media_type_object = _media_type_object(self.definition, media_type)
+        return media_type_object is not None and "itemSchema" in media_type_object
+
     def iter_documented_schemas(self) -> Iterator[JsonSchema]:
         """Every schema this response documents, as written and one per media type."""
         content = self.definition.get("content")
@@ -304,7 +311,7 @@ class OpenApiResponse:
                 yield media_type_object
                 continue
             schemas = [media_type_object.get("schema")]
-            if _is_sse_media_type(media_type):
+            if _is_sse_media_type(media_type) or _is_json_sequence_media_type(media_type):
                 schemas.append(media_type_object.get("itemSchema"))
             yield from (schema for schema in schemas if schema is not None)
 
@@ -707,12 +714,27 @@ def _media_type_schema(
             return item_schema
         if schema_covers_stream:
             return None
+    elif _is_json_sequence_media_type(media_type):
+        item_schema = media_type_object.get("itemSchema")
+        if item_schema is not None:
+            # The records are validated as one array, with `schema` covering the whole sequence
+            sequence: JsonSchemaObject = {"type": "array", "items": item_schema}
+            if schema is not None:
+                sequence["allOf"] = [schema]
+            return sequence
     return schema
 
 
 def _is_sse_media_type(value: str) -> bool:
     try:
         return media_types.is_sse(value)
+    except MalformedMediaType:
+        return False
+
+
+def _is_json_sequence_media_type(value: str) -> bool:
+    try:
+        return media_types.is_json_sequence(value)
     except MalformedMediaType:
         return False
 
