@@ -166,10 +166,11 @@ def test_stopped_server_raises_connection_error(ctx):
     assert isinstance(exc_info.value.__cause__, ConnectionRefusedError)
 
 
-def test_unresolvable_host_raises_connection_refused(tmp_path):
-    schema = load_descriptor_set(
-        tmp_path, users_descriptor_set(), **{"base-url": "grpc://nonexistent-host.invalid:50051"}
-    )
+@pytest.mark.parametrize(
+    "base_url", ["grpc://nonexistent-host.invalid:50051", "grpc://127.0.0.1:port"], ids=["host", "port"]
+)
+def test_unresolvable_host_raises_connection_refused(tmp_path, base_url):
+    schema = load_descriptor_set(tmp_path, users_descriptor_set(), **{"base-url": base_url})
     case = schema["pkg.Users"]["GetUser"].Case(body={})
     with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
         case.call()
