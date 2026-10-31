@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard
 
 import requests
 from requests.exceptions import ChunkedEncodingError
-from urllib3.exceptions import ReadTimeoutError
 
 from schemathesis.auths import reauth_and_replay
 from schemathesis.core.failures import Failure, FailureGroup
@@ -109,12 +108,8 @@ def send_tracked(
         kwargs, is_shortened = _within_time_budget(ctx, transport_kwargs)
         try:
             response = ctx.server.track(case, lambda: call(kwargs), transport_kwargs=kwargs)
-        except (requests.Timeout, requests.ConnectionError) as exc:
-            # A timeout while reading the body arrives as a connection error that wraps the read timeout.
-            timed_out = isinstance(exc, requests.Timeout) or isinstance(
-                exc.args[0] if exc.args else None, ReadTimeoutError
-            )
-            if is_shortened and timed_out:
+        except requests.Timeout:
+            if is_shortened:
                 # The clock may still show a few milliseconds left; every later check must agree the run is over.
                 ctx.control.spend_time_budget()
                 raise BudgetExpired from None

@@ -1,10 +1,13 @@
+import os
 import platform
 import socket
+import ssl
 from collections.abc import Callable
 from http.client import RemoteDisconnected
 
 import pytest
 import requests
+import trustme
 from urllib3.exceptions import ProtocolError
 
 import schemathesis
@@ -82,6 +85,22 @@ def test_failed_resend_raises_the_original_error(post_case):
     reason = exc_info.value.args[0]
     assert isinstance(reason, ProtocolError)
     assert isinstance(reason.args[1], RemoteDisconnected)
+
+
+def test_tls_failure_mid_body_is_not_a_read_timeout(post_case):
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    trustme.CA().issue_cert("127.0.0.1").configure_cert(context)
+
+    def break_tls_mid_body(connection, listener):
+        with context.wrap_socket(connection, server_side=True) as tls:
+            tls.recv(65536)
+            tls.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{")
+            # Plain bytes in the encrypted stream are not a valid TLS record
+            os.write(tls.fileno(), b"not a TLS record" * 4)
+
+    port, _ = serve_tcp(break_tls_mid_body)
+    with pytest.raises(requests.exceptions.SSLError):
+        post_case.call(base_url=f"https://127.0.0.1:{port}", verify=False)
 
 
 def test_session_with_non_http_adapter_mount_still_sends_request(ctx):
