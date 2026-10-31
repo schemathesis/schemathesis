@@ -16,6 +16,7 @@ from hypothesis.errors import Flaky, FlakyStrategyDefinition, Unsatisfiable, Uns
 from hypothesis.strategies import one_of, sampled_from
 from urllib3.exceptions import InsecureRequestWarning
 
+from schemathesis.core import NotSet
 from schemathesis.core.control import SkipTest
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok
@@ -142,25 +143,34 @@ class FuzzPlan:
     weighted_operations: list[APIOperation]
     operations_by_label: dict[str, APIOperation]
     continue_on_failure_by_label: dict[str, bool]
+    unique_inputs_by_label: dict[str, bool]
 
 
 def build_fuzz_plan(ctx: EngineContext, *, operations: list[APIOperation]) -> FuzzPlan:
     """Resolve settings, sampling weights and per-operation flags once for all workers."""
     import hypothesis
-    from hypothesis import Phase
+    from hypothesis import HealthCheck, Phase
 
     weights_by_label = ctx.schema.compute_fuzz_operation_weights(operations)
+    unique_inputs_by_label = {op.label: ctx.config.generation_for(operation=op).unique_inputs for op in operations}
+    settings = ctx.config.get_hypothesis_settings(apply_ci_profile=False)
+    suppress_health_check = list(settings.suppress_health_check)
+    if any(unique_inputs_by_label.values()):
+        # Once inputs run out, most scenarios repeat sent ones and are rejected.
+        suppress_health_check.append(HealthCheck.filter_too_much)
     return FuzzPlan(
         hypothesis_settings=hypothesis.settings(
-            ctx.config.get_hypothesis_settings(apply_ci_profile=False),
+            settings,
             max_examples=FUZZ_MAX_EXAMPLES,
             phases=[Phase.generate, Phase.reuse],
             deadline=None,
+            suppress_health_check=suppress_health_check,
         ),
         operations=operations,
         weighted_operations=[op for op in operations for _ in range(weights_by_label[op.label])],
         operations_by_label={operation.label: operation for operation in operations},
         continue_on_failure_by_label={op.label: ctx.config.continue_on_failure_for(operation=op) for op in operations},
+        unique_inputs_by_label=unique_inputs_by_label,
     )
 
 
@@ -360,6 +370,21 @@ def _draw_case(
         return None
 
 
+# Workers share the record of sent inputs, so checking and claiming an input must not interleave.
+_SENT_INPUTS_LOCK = threading.Lock()
+
+
+def _claim_input(ctx: EngineContext, case: Case) -> bool:
+    """Claim an input for sending; `False` when it was already sent in this run."""
+    # Hooks may change the case before it is sent; it is identified by what was generated.
+    key = hash(case)
+    with _SENT_INPUTS_LOCK:
+        if not isinstance(ctx.get_cached_outcome(key), NotSet):
+            return False
+        ctx.cache_outcome(key, None)
+    return True
+
+
 def _send_step(
     ctx: EngineContext,
     case: Case,
@@ -504,6 +529,7 @@ def _handle_session_end(
     *,
     operations: list[APIOperation],
     scenario_error: Exception | None,
+    rejected_duplicates: bool,
     event_queue: queue.Queue[events.EngineEvent],
 ) -> None:
     if isinstance(exc, (_StopFuzzing, Flaky)) and scenario_error is not None:
@@ -520,6 +546,9 @@ def _handle_session_end(
         ctx.control.reach_failure_limit()
     elif isinstance(exc, Flaky) and ctx.has_to_stop:
         # Deadline-induced data-tree noise; campaign already stopping, suppress.
+        return
+    elif isinstance(exc, Unsatisfiable) and rejected_duplicates:
+        # Every input this worker drew was already sent, e.g. by other workers.
         return
     elif isinstance(exc, Unsatisfiable):
         event_queue.put(_suite_error(_explain_unsatisfiable(exc, operations)))
@@ -560,10 +589,13 @@ def _run_forever_thread(
     seen_error_labels: set[str] = set()
     # Hypothesis reports an error only when replaying its scenario raises it again, which the time limit can prevent.
     scenario_errors: list[Exception] = []
+    # Set once a scenario is rejected because every input in it was already sent.
+    rejected_duplicates = False
 
     @st.composite
     def scheduler(draw: hypothesis.strategies.DrawFn) -> tuple[ScenarioRecorder, dict[str, list[Response]]]:
         """Compose a scenario: weighted-random producers, then link-biased follow-ups."""
+        nonlocal rejected_duplicates
         if _must_stop_worker(ctx, weighted_operations=weighted_operations, scenario_started=scenario_started):
             raise _StopFuzzing
 
@@ -575,6 +607,7 @@ def _run_forever_thread(
         excluded_operations: set[str] = set()
 
         last_step: tuple[APIOperation, Case, Response] | None = None
+        skipped_duplicate = False
 
         for step in range(MAX_SCENARIO_STEPS):
             if step > 0 and ctx.has_to_stop:
@@ -601,6 +634,10 @@ def _run_forever_thread(
             )
             if case is None:
                 continue
+            if plan.unique_inputs_by_label[operation.label] and not _claim_input(ctx, case):
+                # A failure is reported once, with the scenario that first sent the input.
+                skipped_duplicate = True
+                continue
             recorder.record_case(case=case)
             sent = _send_step(
                 ctx,
@@ -618,6 +655,10 @@ def _run_forever_thread(
             recorder.record_response(case_id=case.id, response=response)
             last_step = (operation, case, response)
 
+        if skipped_duplicate and not recorder.cases:
+            # Rejecting lets Hypothesis end the session once scenarios rarely find an input not sent yet.
+            rejected_duplicates = True
+            hypothesis.reject()
         # A draw Hypothesis rejects must not spend the one scenario allowed past the time limit.
         scenario_started.set()
         _start_scenario(
@@ -676,6 +717,7 @@ def _run_forever_thread(
                 exc,
                 operations=plan.operations,
                 scenario_error=scenario_errors[0] if scenario_errors else None,
+                rejected_duplicates=rejected_duplicates,
                 event_queue=event_queue,
             )
         return
