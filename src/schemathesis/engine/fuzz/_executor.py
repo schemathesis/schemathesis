@@ -156,8 +156,8 @@ def build_fuzz_plan(ctx: EngineContext, *, operations: list[APIOperation]) -> Fu
     settings = ctx.config.get_hypothesis_settings(apply_ci_profile=False)
     suppress_health_check = list(settings.suppress_health_check)
     if any(unique_inputs_by_label.values()):
-        # Once inputs run out, most scenarios repeat sent ones and are rejected.
-        suppress_health_check.append(HealthCheck.filter_too_much)
+        # Once inputs run out, most scenarios repeat sent ones and are rejected; drawing them is not slow generation.
+        suppress_health_check.extend([HealthCheck.filter_too_much, HealthCheck.too_slow])
     return FuzzPlan(
         hypothesis_settings=hypothesis.settings(
             settings,
