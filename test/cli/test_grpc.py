@@ -92,7 +92,7 @@ def map_body(context, body):
     assert [dict(call.metadata).get("authorization") for call in server.calls] == sent
 
 
-@pytest.mark.parametrize("report", ["har", "vcr"])
+@pytest.mark.parametrize("report", ["har", "vcr", "pytest"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_http_reports_refused(cli, tmp_path, snapshot_cli, report):
     # Refused before connecting, so an unreachable target gets the same answer.
