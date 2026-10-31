@@ -205,6 +205,12 @@ def test_settings_from_config(ctx):
         operation.Case(body={"userId": 13}).call()
 
 
+def test_call_takes_a_rate_limit_slot(ctx):
+    operation = load(ctx.grpc.apps.users(), **{"rate-limit": "1/h"})["pkg.Users"]["GetUser"]
+    operation.Case(body={"userId": 7}).call()
+    assert not operation.schema.config.rate_limit_for(operation=operation).try_acquire(blocking=False)
+
+
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
