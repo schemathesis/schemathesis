@@ -167,7 +167,8 @@ class OpenApiSchema(BaseSchema):
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
         if swagger_version is not None:
-            self._spec_version = swagger_version or "2.0"
+            # Swagger has a single version, so an unquoted YAML `2.0` is unambiguous.
+            self._spec_version = str(swagger_version or "2.0")
             self.adapter = adapter.v2
             return
 

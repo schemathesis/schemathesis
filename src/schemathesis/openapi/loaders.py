@@ -230,6 +230,13 @@ def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, str
         if stringify:
             stringify_keys(schema)
         version = schema.get("openapi")
+        # Unquoted YAML versions are numbers, and `3.10` reads as `3.1`, so the intended version is unknowable.
+        if version is not None and not isinstance(version, str):
+            raise LoaderError(
+                LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
+                f"The `openapi` field must be a string, got {version!r}. "
+                'Quote the full version, e.g. `openapi: "3.1.0"`.',
+            )
         if version is not None and not OPENAPI_VERSION_RE.match(version):
             raise LoaderError(
                 LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
