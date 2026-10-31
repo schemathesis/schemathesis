@@ -249,10 +249,7 @@ def worker_task(
                 if isinstance(result, Ok):
                     _run_operation(result.ok(), events_queue=events_queue, ctx=ctx, phase=phase, suite_id=suite_id)
                 else:
-                    error = result.err()
-                    _put_error(
-                        events_queue, error, phase=phase, suite_id=suite_id, method=error.method, path=error.path
-                    )
+                    _put_error(events_queue, result.err(), phase=phase, suite_id=suite_id)
         except KeyboardInterrupt:
             events_queue.put(events.Interrupted(phase=phase))
 
@@ -396,18 +393,9 @@ def _put_all(events_queue: Queue, stream: events.EventGenerator) -> None:
         events_queue.put(event)
 
 
-def _put_error(
-    events_queue: Queue,
-    error: Exception,
-    *,
-    phase: PhaseName,
-    suite_id: uuid.UUID,
-    method: str | None,
-    path: str | None,
-) -> None:
-    if method and path:
-        label = f"{method.upper()} {path}"
-        scenario_started = events.ScenarioStarted(label=label, phase=phase, suite_id=suite_id)
+def _put_error(events_queue: Queue, error: InvalidSchema, *, phase: PhaseName, suite_id: uuid.UUID) -> None:
+    if error.method and error.path:
+        scenario_started = events.ScenarioStarted(label=error.label, phase=phase, suite_id=suite_id)
         events_queue.put(scenario_started)
         _finish_with_error(events_queue, error, scenario_started)
     else:
@@ -415,7 +403,7 @@ def _put_error(
             events.NonFatalError(
                 error=error,
                 phase=phase,
-                label=path or "-",
+                label=error.label,
                 related_to_operation=False,
             )
         )

@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from flask import Flask, Response
 
 import schemathesis
-from schemathesis.core.errors import InvalidSchema, LoaderError
+from schemathesis.core.errors import LoaderError
 from test.utils import make_schema
 
 
@@ -93,8 +93,8 @@ def test_unquoted_swagger_version():
     # Swagger has a single version, so a YAML number is unambiguous and stays accepted.
     schema = schemathesis.openapi.from_file("swagger: 2.0\ninfo: {title: t, version: '1'}")
     assert schema.specification.version == "2.0"
-    with pytest.raises(InvalidSchema, match='"paths" is a required property'):
-        list(schema.get_all_operations())
+    (result,) = schema.get_all_operations()
+    assert '"paths" is a required property' in str(result.err())
 
 
 def test_number_deserializing(ctx, testdir):

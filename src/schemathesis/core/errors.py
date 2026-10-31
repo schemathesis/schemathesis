@@ -108,7 +108,7 @@ class InvalidSchema(SchemathesisError):
     def label(self) -> str:
         if self.method and self.path:
             return f"{self.method.upper()} {self.path}"
-        return self.path or "-"
+        return self.path or "schema"
 
     @classmethod
     def from_bundle_error(cls, error: BundleError, location: str, name: str | None = None) -> InvalidSchema:

@@ -169,16 +169,17 @@ class OperationLoader:
     def iter_all(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Yield every operation as `Ok` or `Err`.
 
-        Two `Err` shapes are possible: unresolved path-level reference (path known, methods unknown)
-        and per-operation parsing failure (path and method known).
+        Three `Err` shapes are possible: missing required `paths` (neither path nor method known),
+        unresolved path-level reference (path known, methods unknown) and per-operation parsing failure
+        (path and method known).
         """
         __tracebackhide__ = True
         schema = self.schema
         paths = schema._get_paths()
         if paths is None:
-            if parse_spec_version(schema.specification.version) >= _V3_1:
-                return
-            self._raise_invalid_schema(KeyError("paths"))
+            if parse_spec_version(schema.specification.version) < _V3_1:
+                yield self._into_err(KeyError("paths"), None, None)
+            return
 
         context = HookContext()
         filters_active = not schema.filter_set.is_empty()
