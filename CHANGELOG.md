@@ -69,6 +69,7 @@
 - Stateful phase reported as skipped, with exit code 0, when an unexpected error crashes it.
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
+- Runs with `--generation-unique-inputs` spinning without requests until `--max-time` once inputs run out.
 - Internal error or wrong schema shown for response failures inside schemas reached through `$dynamicRef`.
 - Test case summary counting errored and skipped cases as passed.
 - Probe requests from checks counted as generated and skipped test cases.

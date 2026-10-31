@@ -896,6 +896,21 @@ def test_max_time(ctx):
     assert stream.finished.stop_reason == StopReason.MAX_TIME
 
 
+@pytest.mark.parametrize(
+    ("unique_inputs", "stop_reason"),
+    [(False, StopReason.MAX_TIME), (True, StopReason.COMPLETED)],
+    ids=["repeated-inputs", "unique-inputs"],
+)
+def test_max_time_ends_once_unique_inputs_run_out(ctx, unique_inputs, stop_reason):
+    # An operation without parameters has one input; once sent, unique inputs leave later cycles nothing to send.
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.generation.update(unique_inputs=unique_inputs)
+    stream = execute(schema, max_time=2, max_examples=10, phases=[PhaseName.FUZZING])
+
+    assert stream.finished.stop_reason == stop_reason
+
+
 @pytest.mark.parametrize("workers", [1, 2])
 def test_max_time_reaches_every_operation(ctx, workers):
     # Without a per-operation share the first operation consumes the whole budget and the rest are
