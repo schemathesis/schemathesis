@@ -189,7 +189,12 @@ def display_header(version: str) -> None:
 
 
 def format_summary_banner(message: str, *, width: int) -> str:
-    return f" {message} ".center(width, "=")
+    return format_banner(message, width=width, separator="=")
+
+
+def format_banner(text: str, *, width: int, separator: str) -> str:
+    # Keep at least one separator on each side, even when the text is as wide as the terminal.
+    return f" {text} ".center(max(width, len(text) + 4), separator)
 
 
 def append_replay_command(code_sample: str | None, case_id: str | None) -> str | None:
@@ -348,7 +353,7 @@ class LoadingProgressManager(SpinnerProgressManager):
 
 def display_section_name(title: str, separator: str = "=", **kwargs: object) -> None:
     """Print section name centered with separators."""
-    message = f" {title} ".center(get_terminal_width(), separator)
+    message = format_banner(title, width=get_terminal_width(), separator=separator)
     kwargs.setdefault("bold", True)
     click.echo(style(message, **kwargs))
 

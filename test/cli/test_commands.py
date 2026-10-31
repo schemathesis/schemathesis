@@ -2448,28 +2448,30 @@ def test_max_time_reports_coverage_once_beside_fuzzing(ctx, cli, snapshot_cli):
     )
 
 
-def test_long_operation_output(ctx, cli, app_runner, snapshot_cli):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_long_operation_output(ctx, cli, snapshot_cli):
     # See GH-990
     # When there is a narrow screen
     # And the API schema contains an operation with a long name
-    paths = {
-        f"/{'a' * 100}": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-        f"/{'a' * 10}": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-    }
-    schema = ctx.openapi.build_schema(paths)
-    app = ctx.openapi.make_permissive_flask_app(schema)
-    base_url = app_runner.openapi_url(app, path="")
-    schema_path = ctx.openapi.write_schema(paths)
-    # Then this operation name should be truncated
-    assert cli.run(str(schema_path), f"--url={base_url}/api", "-c not_a_server_error") == snapshot_cli
+    long_path = f"/{'a' * 100}"
+    short_path = f"/{'a' * 10}"
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            long_path: {"get": {"responses": {"200": {"description": "OK"}}}},
+            short_path: {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route(long_path)
+    def long_operation():
+        return "", 500
+
+    @app.route(short_path)
+    def short_operation():
+        return jsonify({})
+
+    # Then its failure header still has separators on both sides
+    assert cli.run_openapi_app(app, "-c not_a_server_error") == snapshot_cli
 
 
 def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
