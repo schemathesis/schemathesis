@@ -374,6 +374,7 @@ class Case(Generic[OperationT]):
         Containers not passed are shallow-copied. Auth stays behind unless `keep_auth` is set, so a request
         derived to probe the API never inherits the original's credentials by accident.
         """
+        meta = self.meta
         derived = Case(
             operation=self.operation,
             method=self.method,
@@ -385,7 +386,7 @@ class Case(Generic[OperationT]):
             body=self.body.copy() if isinstance(self.body, (list, dict)) else self.body,
             media_type=self.media_type,
             multipart_content_types=self.multipart_content_types,
-            meta=self.meta,
+            meta=meta.copy() if meta is not None else None,
         )
         if keep_auth:
             derived._auth = self._auth
