@@ -141,6 +141,8 @@ class OpenApiResponse:
 
     status_code: str
     definition: Mapping[str, Any]
+    # The response object in the loaded document. Inferred links go there, so operations rebuilt later keep them
+    source: Mapping[str, Any]
     resolver: Resolver
     scope: str
     adapter: ResponseAdapter
@@ -149,6 +151,7 @@ class OpenApiResponse:
     __slots__ = (
         "status_code",
         "definition",
+        "source",
         "resolver",
         "scope",
         "adapter",
@@ -381,6 +384,7 @@ class OpenApiResponses:
         instance = OpenApiResponse(
             status_code=status_code,
             definition=definition,
+            source=definition,
             resolver=self.resolver,
             scope=self.scope,
             adapter=self.adapter,
@@ -453,11 +457,12 @@ def _iter_resolved_responses(
         # Resolve one more level to support slightly malformed schemas with nested $ref chains
         # Some real-world schemas use: response -> $ref to definition -> $ref to actual schema
         # While technically not spec-compliant, this pattern is common enough to warrant leniency
-        response_resolver, resolved = maybe_resolve_with_resolver(resolved, response_resolver)
-        content = resolved.get("content")
+        response_resolver, source = maybe_resolve_with_resolver(resolved, response_resolver)
+        resolved = source
+        content = source.get("content")
         if isinstance(content, dict) and any(isinstance(entry, dict) and "$ref" in entry for entry in content.values()):
             resolved = {
-                **resolved,
+                **source,
                 "content": {
                     media_type: maybe_resolve_with_resolver(entry, response_resolver)[1]
                     if isinstance(entry, dict)
@@ -471,6 +476,7 @@ def _iter_resolved_responses(
             OpenApiResponse(
                 status_code=status_code,
                 definition=resolved,
+                source=source,
                 resolver=response_resolver,
                 scope=new_scope,
                 adapter=adapter,

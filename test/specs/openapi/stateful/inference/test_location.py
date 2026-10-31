@@ -928,6 +928,48 @@ def test_inferred_link_for_undocumented_response_reaches_state_machine(ctx, resp
     assert (inference.inferred, inference.total, inference.selected) == (1, 1, 1)
 
 
+@pytest.mark.parametrize(
+    ("version", "content", "components"),
+    [
+        (
+            "3.2.0",
+            {"application/json": {"$ref": "#/components/mediaTypes/User"}},
+            {"mediaTypes": {"User": {"schema": {"type": "object"}}}},
+        ),
+        (
+            "3.0.2",
+            {"application/json": {"$ref": "#/components/schemas/User"}},
+            {"schemas": {"User": {"type": "object"}}},
+        ),
+    ],
+    ids=["media-type-reference", "schema-reference-in-media-type-position"],
+)
+def test_location_link_inferred_for_referenced_media_type(ctx, version, content, components):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created", "content": content}}}},
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version=version,
+        components=components,
+    )
+    schema.config.phases.stateful.inference.algorithms = []
+    observations = Observations()
+    observations.location_headers[schema["/users"]["POST"]] = [LocationHeaderEntry(value="/users/1", status_code=201)]
+
+    inference = schema.apply_stateful_inference(observations)
+
+    response = schema["/users"]["POST"].responses.find_by_status_code(201)
+    assert response is not None
+    assert list(response.definition["links"]) == ["X-Inferred-Link-0"]
+    assert (inference.inferred, inference.total) == (1, 1)
+
+
 def test_inject_links_location_normalization_returns_none(ctx):
     schema = ctx.openapi.load_schema(
         {

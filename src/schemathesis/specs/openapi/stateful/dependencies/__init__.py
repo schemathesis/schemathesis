@@ -239,7 +239,7 @@ def inject_links(schema: OpenApiSchema) -> int:
     for response_links in schema.analysis.dependency_graph.iter_links():
         operation = _find_operation_by_reference(schema, response_links.producer_operation_ref, operation_cache)
         response = operation.responses.get(response_links.status_code)
-        links = response.definition.setdefault(schema.adapter.links_keyword, {})
+        links = response.source.setdefault(schema.adapter.links_keyword, {})
 
         entry = normalized_cache.get(id(links))
         if entry is None:
@@ -305,10 +305,10 @@ def _unshare_responses(schema: OpenApiSchema) -> None:
         assert isinstance(raw_responses, dict)
         keys = {str(key): key for key in raw_responses}
         for status_code, response in responses.items():
-            uses[id(response.definition)] = uses.get(id(response.definition), 0) + 1
+            uses[id(response.source)] = uses.get(id(response.source), 0) + 1
             # Copied elsewhere, its own references would resolve against the wrong document
             if response.resolver.base_uri == entry.resolver.base_uri:
-                slots.append((raw_responses, keys[status_code], response.definition))
+                slots.append((raw_responses, keys[status_code], response.source))
     links_keyword = schema.adapter.links_keyword
     for raw_responses, key, definition in slots:
         if uses[id(definition)] > 1:

@@ -255,7 +255,7 @@ class LinkInferencer:
                 operation.definition.raw.setdefault("responses", {})[status_code] = definition
                 operation.responses.add(status_code, definition)
             else:
-                links = response.definition.setdefault(self._links_keyword, {})
+                links = response.source.setdefault(self._links_keyword, {})
 
             for link in self._build_links_from_matches(matches, entry.expression):
                 # Inference runs again on every `--max-time` cycle with the same observations
