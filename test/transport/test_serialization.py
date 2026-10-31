@@ -2314,6 +2314,73 @@ def _with_child(child):
 @pytest.mark.parametrize(
     ("schema", "components", "version", "body", "expected"),
     [
+        (
+            {"$ref": "#/components/schemas/Item"},
+            {
+                "Item": {"$ref": "#/components/schemas/Base"},
+                "Base": {
+                    "type": "object",
+                    "xml": {"name": "base-tag"},
+                    "properties": {"id": {"type": "integer", "xml": {"attribute": True}}},
+                },
+            },
+            "3.0.2",
+            {"id": 1},
+            b'<base-tag id="1"></base-tag>',
+        ),
+        (
+            {"type": "object", "xml": {"name": "root"}, "properties": {"id": {"$ref": "#/components/schemas/IdAlias"}}},
+            {
+                "IdAlias": {"$ref": "#/components/schemas/Id"},
+                "Id": {"type": "integer", "xml": {"name": "ident", "attribute": True}},
+            },
+            "3.0.2",
+            {"id": 1},
+            b'<root ident="1"></root>',
+        ),
+        (
+            {
+                "type": "array",
+                "xml": {"name": "items", "wrapped": True},
+                "items": {"$ref": "#/components/schemas/Alias"},
+            },
+            {"Alias": {"$ref": "#/components/schemas/Item"}, "Item": {"type": "string", "xml": {"name": "item"}}},
+            "3.0.2",
+            ["x"],
+            b"<items><item>x</item></items>",
+        ),
+        (
+            {"$ref": "#/components/schemas/Item"},
+            {
+                "Item": {"$ref": "#/components/schemas/Base", "xml": {"name": "alias"}},
+                "Base": {
+                    "type": "object",
+                    "xml": {"name": "base-tag", "prefix": "p", "namespace": "http://p"},
+                    "properties": {"a": {"type": "integer"}},
+                },
+            },
+            "3.1.0",
+            {"a": 1},
+            b'<p:alias xmlns:p="http://p"><a>1</a></p:alias>',
+        ),
+        (
+            {
+                "type": "object",
+                "xml": {"name": "root"},
+                "properties": {"id": {"$ref": "#/components/schemas/Id", "xml": {"attribute": True}}},
+            },
+            {"Id": {"type": "integer"}},
+            "3.1.0",
+            {"id": 1},
+            b'<root id="1"></root>',
+        ),
+        (
+            {"$ref": "#/components/schemas/Item"},
+            {"Item": {"$ref": "#/components/schemas/Other"}, "Other": {"$ref": "#/components/schemas/Item"}},
+            "3.0.2",
+            1,
+            b"<Item>1</Item>",
+        ),
         (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", "str", b'<p:root xmlns:p="http://x">str</p:root>'),
         (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", 1, b'<p:root xmlns:p="http://x">1</p:root>'),
         (PREFIXED_ROOT_SCHEMA, {}, "3.0.2", 1.5, b'<p:root xmlns:p="http://x">1.5</p:root>'),
@@ -2617,6 +2684,12 @@ def _with_child(child):
         ),
     ],
     ids=[
+        "reference-alias-chain-root",
+        "reference-alias-chain-property",
+        "reference-alias-chain-array-items",
+        "reference-alias-xml-overrides-target",
+        "reference-sibling-xml-attribute",
+        "reference-cycle",
         "scalar-under-prefixed-root-string",
         "scalar-under-prefixed-root-integer",
         "scalar-under-prefixed-root-float",

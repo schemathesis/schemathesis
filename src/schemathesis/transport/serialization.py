@@ -8,7 +8,7 @@ from urllib.parse import quote, unquote
 
 from schemathesis.core import Body
 from schemathesis.core.errors import UnboundPrefix
-from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference_with_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.parameters import DelimitedValue, EncodedPath
 from schemathesis.core.transforms import to_wire_string, to_wire_text, transform
@@ -178,7 +178,7 @@ def serialize_xml_with_schema(value: Any, schema: JsonSchema, resource_name: str
     definition: dict[str, Any] = schema if isinstance(schema, dict) else {}
     resolver = make_root_resolver(definition)
     if "$ref" in definition:
-        resolver, definition = resolve_reference(resolver, definition["$ref"])
+        resolver, definition = _resolve_xml_schema(resolver, definition)
     if isinstance(value, ((Binary, str))) and definition.get("format") in ("binary", "file"):
         # Opaque payloads are already the wire representation and carry no XML structure to wrap.
         return {"data": value.data if isinstance(value, Binary) else value}
@@ -189,6 +189,22 @@ def serialize_xml_with_schema(value: Any, schema: JsonSchema, resource_name: str
     _write_xml(buffer, value, tag, definition, namespace_stack, resolver)
     data = buffer.getvalue()
     return {"data": data.encode("utf8")}
+
+
+def _resolve_xml_schema(resolver: Resolver, schema: dict[str, Any]) -> tuple[Resolver, dict[str, Any]]:
+    """Follow a `$ref` chain to the schema it ends at, keeping the `xml` hints declared along the way."""
+    # A hint declared closer to the referencing schema overrides the same hint further down the chain
+    xml: dict[str, Any] = {}
+    seen: set[str] = set()
+    while "$ref" in schema:
+        xml = {**schema.get("xml", {}), **xml}
+        uri, target_resolver, target = resolve_reference_with_uri(resolver, schema["$ref"])
+        # A chain that loops back ends at the last schema before the loop
+        if uri in seen:
+            break
+        seen.add(uri)
+        resolver, schema = target_resolver, target
+    return resolver, {**schema, "xml": {**schema.get("xml", {}), **xml}}
 
 
 def _get_xml_tag(schema: dict[str, Any] | None, resource_name: str | None) -> str:
@@ -266,7 +282,7 @@ def _write_object(
         property_schema = properties.get(child_name, {})
         child_resolver = resolver
         if "$ref" in property_schema:
-            child_resolver, property_schema = resolve_reference(resolver, property_schema["$ref"])
+            child_resolver, property_schema = _resolve_xml_schema(resolver, property_schema)
         child_options = property_schema.get("xml", {})
         child_tag = child_options.get("name", child_name)
 
@@ -341,7 +357,7 @@ def _write_array(
         items = {}
     items_resolver = resolver
     if "$ref" in items:
-        items_resolver, items = resolve_reference(resolver, items["$ref"])
+        items_resolver, items = _resolve_xml_schema(resolver, items)
     # The array's namespace and prefix apply to its items only here, not to other arrays sharing the items schema.
     items = dict(items)
     child_options = dict(items.get("xml", {}))
