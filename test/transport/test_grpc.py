@@ -1,6 +1,9 @@
 import base64
+import contextlib
 import json
 import re
+import socket
+import threading
 
 import pytest
 import requests
@@ -107,6 +110,39 @@ def test_malformed_ok_body_is_reported_as_binary(ctx):
 def test_server_unavailable_is_a_response(ctx):
     _, response = get_user(ctx.grpc.apps.users(), 503)
     assert (response.status_code, response.status_line) == (503, "UNAVAILABLE")
+
+
+def relay(source, target):
+    with source, contextlib.suppress(OSError):
+        while data := source.recv(65536):
+            target.sendall(data)
+        target.shutdown(socket.SHUT_WR)
+
+
+def forward_first_connection(port):
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def accept():
+        with listener:
+            client, _ = listener.accept()
+        upstream = socket.create_connection(("127.0.0.1", port))
+        for source, target in ((client, upstream), (upstream, client)):
+            threading.Thread(target=relay, args=(source, target), daemon=True).start()
+
+    threading.Thread(target=accept, daemon=True).start()
+    return listener.getsockname()[1]
+
+
+# The connection the call used stays open, so only a new one shows that the target went away.
+def test_server_unavailable_once_the_target_refuses_connections_is_a_connection_error(ctx):
+    server = ctx.grpc.apps.users()
+    port = forward_first_connection(int(server.target.rsplit(":", 1)[1]))
+    operation = load(server, **{"base-url": f"grpc://127.0.0.1:{port}"})["pkg.Users"]["GetUser"]
+    operation.Case(body={"userId": 7}).call()
+
+    with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
+        operation.Case(body={"userId": 503}).call()
+    assert isinstance(exc_info.value.__cause__, ConnectionAbortedError)
 
 
 def test_status_code_agrees_with_call_outcome(ctx):

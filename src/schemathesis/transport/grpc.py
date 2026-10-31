@@ -34,6 +34,8 @@ CHANNEL_OPTIONS = (
     # The server keeps no headers for reuse, so one unparsable response header cannot fail later responses.
     ("grpc.http2.hpack_table_size.decoder", 0),
 )
+# Channels with equal options share connections; the reachability probe needs its own.
+PROBE_CHANNEL_OPTIONS = (*CHANNEL_OPTIONS, ("grpc.use_local_subchannel_pool", 1))
 
 ChannelKey = tuple[str, bool, "bool | str", "str | tuple[str, str] | None"]
 
@@ -194,10 +196,16 @@ def metadata_pairs(headers: Mapping[str, str]) -> tuple[tuple[str, str | bytes],
     return tuple((key, base64.b64decode(value) if key.endswith("-bin") else value) for key, value in headers.items())
 
 
-def create_channel(address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.Channel:
+def create_channel(
+    address: str,
+    tls: bool,
+    verify: bool | str,
+    cert: str | tuple[str, str] | None,
+    options: tuple[tuple[str, int], ...] = CHANNEL_OPTIONS,
+) -> grpc.Channel:
     if tls:
-        return grpc.secure_channel(address, _credentials(verify, cert), options=CHANNEL_OPTIONS)
-    return grpc.insecure_channel(address, options=CHANNEL_OPTIONS)
+        return grpc.secure_channel(address, _credentials(verify, cert), options=options)
+    return grpc.insecure_channel(address, options=options)
 
 
 def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.ChannelCredentials:
@@ -214,8 +222,8 @@ def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc
 
 
 def _is_reachable(address: str, tls: bool, verify: bool | str, cert: str | tuple[str, str] | None) -> bool:
-    # A fresh channel, since the one a dropped call used may still look connected for a moment afterwards.
-    with create_channel(address, tls, verify, cert) as channel:
+    # A new connection, since the one a dropped call used may still look connected for a moment afterwards.
+    with create_channel(address, tls, verify, cert, options=PROBE_CHANNEL_OPTIONS) as channel:
         return _is_ready(channel)
 
 
