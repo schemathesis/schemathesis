@@ -188,9 +188,12 @@ def test_settings_from_config(ctx):
         "request-cert-key": str(server.client_key_path),
         "request-timeout": 0.1,
     }
-    with pytest.raises(requests.exceptions.ReadTimeout):
-        get_user(server, 13, config=config)
+    operation = load(server, **config)["pkg.Users"]["GetUser"]
+    # The TLS handshake can outlast the short timeout on slow runners, so a first call opens the channel.
+    operation.Case(body={"userId": 7}).call(timeout=10)
     assert server.calls[-1].peer_names == [b"client"]
+    with pytest.raises(requests.exceptions.ReadTimeout):
+        operation.Case(body={"userId": 13}).call()
 
 
 @pytest.mark.parametrize(
