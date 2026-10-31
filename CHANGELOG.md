@@ -74,6 +74,7 @@
 - Probe requests from checks counted as generated and skipped test cases.
 - Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
 - False `Network Error` when `--max-time` runs out while a response body is still arriving.
+- False `Connection failed` and unsupported API capabilities when a response body outlasts `--request-timeout`.
 - Outage reports leading with hanging requests, repeating cut-off ones as network errors, with misleading tips.
 - False positive `response_schema_conformance` for Open API 3.2 discriminators with `defaultMapping`.
 - False schema error for Open API 3.1 response schemas with `prefixItems` or array-form `items`.

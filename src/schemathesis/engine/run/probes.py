@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.core import SpecificationFeature
+from schemathesis.core.errors import is_read_timeout
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.engine import Status, events
@@ -176,7 +177,7 @@ PROBES = (NullByteInHeader, UnsafePathDecoder)
 
 def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     """Send the probe to the application."""
-    from requests import PreparedRequest, ReadTimeout, Request, RequestException
+    from requests import PreparedRequest, Request, RequestException
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
@@ -199,7 +200,7 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
         # A slow or unreachable server says nothing about the capability; other network errors mean it was rejected
-        inconclusive = isinstance(exc, ReadTimeout) or never_reached_server(exc)
+        inconclusive = is_read_timeout(exc) or never_reached_server(exc)
         outcome = ProbeOutcome.SKIP if inconclusive else ProbeOutcome.FAILURE
         return ProbeRun(probe, outcome, req, None, exc)
     finally:
