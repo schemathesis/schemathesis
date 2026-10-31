@@ -1128,6 +1128,52 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, tmp_path, snapshot_
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 
 
+# Single-use tokens: every token fetched after the first must recover the request that found the old one expired.
+@pytest.mark.parametrize(
+    "args",
+    [("run", "--phases=stateful", "--max-examples=10"), ("fuzz", "--max-time=1")],
+    ids=["stateful", "fuzz"],
+)
+def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, args):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "links": {
+                                "Again": {
+                                    "operationId": "getProtected",
+                                    "parameters": {"key": "$response.body#/result"},
+                                }
+                            },
+                        },
+                        "401": {"description": "Unauthorized"},
+                    },
+                }
+            }
+        },
+        components={"securitySchemes": {"OAuth2": OAUTH2_SCHEME}},
+    )
+    state = _register_single_use_token(app)
+    command, *flags = args
+    base_url = app_runner.openapi_url(app, path="")
+
+    result = cli.main(
+        command,
+        f"{base_url}/openapi.json",
+        *flags,
+        "--mode=positive",
+        "--seed=42",
+        config={"base-url": base_url, "auth": _dynamic_auth("OAuth2", retry_on=[401])},
+    )
+    assert f"Re-authenticated {state['issued'] - 1} times" in result.stdout
+
+
 def test_reauth_failure_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_html):
     app = _protected_app(ctx, "OAuth2", OAUTH2_SCHEME)
     auth_calls = itertools.count()

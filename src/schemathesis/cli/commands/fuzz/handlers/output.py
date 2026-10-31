@@ -24,6 +24,7 @@ from schemathesis.cli.output import (
     issue_parts,
     make_console,
     print_lines,
+    reauth_summary_lines,
     unmatched_filter_block,
 )
 from schemathesis.core.output import pluralize
@@ -275,6 +276,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
             click.echo()
 
         display_summary_counts(summary)
+        ctx.summary_lines.extend(reauth_summary_lines(event.payload))
         display_summary_footer(ctx, summary)
         display_final_line(
             failures=ctx.statistic.total_failures,

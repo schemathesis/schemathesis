@@ -25,5 +25,6 @@ def execute(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
     yield events.EngineFinished(
         running_time=ctx.running_time,
         stop_reason=ctx.stop_reason,
+        payload=events.RunSummary(reauth_count=ctx.reauth.reauth_count, reauth_broke=ctx.reauth.broke),
         failures=run_after_run_checks(ctx),
     )

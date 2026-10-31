@@ -8,6 +8,7 @@ import requests
 from requests.exceptions import ChunkedEncodingError
 from urllib3.exceptions import ReadTimeoutError
 
+from schemathesis.auths import reauth_and_replay
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.rate_limit import (
     RATE_LIMIT_AUTO_MAX_RETRIES,
@@ -97,6 +98,7 @@ def send_tracked(
 ) -> tuple[list[Response], Response]:
     """Send a request the outage tracker remembers, waiting out rate limits when configured.
 
+    A response signalling expired auth is replayed once with fresh credentials.
     `send` defaults to `case.call(**kwargs)`; `after_response` runs on every answered attempt,
     including each retried 429. A request still waiting when the time budget runs out raises `BudgetExpired`.
     Returns (rate_limited_responses, final_response).
@@ -124,11 +126,16 @@ def send_tracked(
     def on_delay(delay: float, retries_left: int) -> None:
         emit(events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left))
 
-    return _call_with_retry(
-        call_fn=call_fn,
-        auto_mode=ctx.config.rate_limit_for(operation=case.operation) == "auto",
-        on_delay=on_delay,
-    )
+    auto_mode = ctx.config.rate_limit_for(operation=case.operation) == "auto"
+    rate_limited, response = _call_with_retry(call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay)
+
+    def replay() -> Response:
+        retried, replayed = _call_with_retry(call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay)
+        rate_limited.extend(retried)
+        return replayed
+
+    # Replay before validation so checks see the recovered response, not the stale-token one.
+    return rate_limited, reauth_and_replay(case, response, ctx.reauth, replay)
 
 
 def validate_with_rate_limited(
