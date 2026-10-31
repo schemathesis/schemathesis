@@ -2283,7 +2283,11 @@ def iter_parameters_v2(
             for param in chain(operation_parameters, shared_parameters):
                 _, param = maybe_resolve_with_resolver(param, resolver)
                 schema = param.get("schema")
-                if param.get("in") == ParameterLocation.BODY and isinstance(schema, dict) and "$ref" in schema:
+                if (
+                    param.get("in") == ParameterLocation.BODY
+                    and isinstance(schema, dict)
+                    and isinstance(schema.get("$ref"), str)
+                ):
                     resource_name = resource_name_from_ref(schema["$ref"])
             for media_type in body_media_types:
                 yield OpenApiBody.from_definition(
@@ -2379,11 +2383,11 @@ def iter_parameters_v3(
             name_to_uri = {}
             if isinstance(schema, dict):
                 content = dict(content)
-                if "$ref" in schema:
+                if isinstance(schema.get("$ref"), str):
                     resource_name = resource_name_from_ref(schema["$ref"])
                 else:
                     items = schema.get("items")
-                    if isinstance(items, dict) and "$ref" in items:
+                    if isinstance(items, dict) and isinstance(items.get("$ref"), str):
                         resource_name = resource_name_from_ref(items["$ref"])
                 try:
                     to_bundle = cast(dict[str, Any], schema)

@@ -379,7 +379,7 @@ def _resolve_body_dependencies(
     if isinstance(items, dict):
         resource_name = body.resource_name or naming.from_path(operation.path)
 
-        if "$ref" in items:
+        if isinstance(items.get("$ref"), str):
             schema_key = items["$ref"].split("/")[-1]
             original_ref = body.name_to_uri[schema_key]
             resource_name = resource_name_from_ref(original_ref)

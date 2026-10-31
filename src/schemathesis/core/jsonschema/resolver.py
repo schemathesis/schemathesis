@@ -301,12 +301,16 @@ def _resolve_document_fragment(target_resolver: Resolver, fragment: str, target_
         raise
 
 
-def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str, Resolver, Any]:
+def resolve_reference_with_uri(resolver: Resolver, reference: object) -> tuple[str, Resolver, Any]:
     """Resolve a `$ref` and return `(target_uri, target_resolver, target_value)`.
 
     The bundler needs the absolute target URI for cycle and visited-set bookkeeping
     in addition to the resolved value, so both are returned together.
     """
+    if not isinstance(reference, str):
+        error = RefResolutionError(f"`$ref` must be a string, got {reference!r}")
+        error.add_note(str(reference))
+        raise error
     try:
         resolved_uri, current_document_uri = _resolve_reference_uri_with_document(resolver.base_uri, reference)
         document_uri, _, fragment = resolved_uri.partition("#")
