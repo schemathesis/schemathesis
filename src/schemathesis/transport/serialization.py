@@ -322,6 +322,7 @@ def _write_array(
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
+    tag = _sanitize_xml_name(tag)
     child_tag = tag
     if options.get("prefix"):
         tag = f"{options['prefix']}:{tag}"
@@ -369,6 +370,7 @@ def _write_primitive(
     # and this element don't have any children. Therefore, checking the prefix is enough, unless the element binds it
     if "namespace" not in xml_options:
         _validate_prefix(xml_options, namespace_stack)
+    tag = _sanitize_xml_name(tag)
     if "prefix" in xml_options:
         tag = f"{xml_options['prefix']}:{tag}"
     buffer.write(f"<{tag}")
