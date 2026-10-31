@@ -64,6 +64,7 @@
 - Configured `proxy` skipped by dynamic auth token requests, WFC login and loading schemas from URLs.
 - Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
 - `st replay` not finding a case ID after a later run records the same failure.
+- `st fuzz` crashing with `dictionary changed size during iteration` when auth is enforced.
 - Operations reported as skipped, with no error shown, when an unexpected error crashes them.
 - Stateful phase reported as skipped, with exit code 0, when an unexpected error crashes it.
 - False positive `ignored_auth` when an auth header's name case differs from the security scheme.

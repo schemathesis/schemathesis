@@ -368,6 +368,31 @@ def test_fuzz_checks_steps_after_a_failure(cli, app_runner, ctx):
     assert f"Tested: {len(requested)}\n" in result.stdout, result.stdout
 
 
+# Confirming that auth is enforced sends probe requests that join the scenario while its steps are checked.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_with_enforced_auth(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "security": [{"key": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"key": {"type": "apiKey", "in": "header", "name": "X-Key"}}},
+    )
+
+    @app.route("/items")
+    def items():
+        if request.headers.get("X-Key") != "secret":
+            return jsonify({"detail": "unauthorized"}), 401
+        return jsonify([])
+
+    result = cli.main("fuzz", app_runner.openapi_url(app), "-H", "X-Key: secret", "--max-time=0", "--workers=1")
+    assert_cli_snapshot(result, snapshot_cli)
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_empty_test_suite(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)

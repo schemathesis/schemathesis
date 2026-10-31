@@ -406,7 +406,8 @@ def _validate_scenario(
     """Run all checks against every answered step; raises the first failure unless it may continue."""
     # Every step is already sent, so a failure only ends the run after the remaining responses are checked.
     first_failure: FailureGroup | None = None
-    for case_id, node in recorder.cases.items():
+    # Checks record their probe requests into the same scenario.
+    for case_id, node in list(recorder.cases.items()):
         interaction = recorder.interactions.get(case_id)
         if interaction is None or interaction.response is None:
             continue
