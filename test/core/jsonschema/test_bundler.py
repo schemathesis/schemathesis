@@ -816,6 +816,19 @@ def test_bundle_drops_id_from_bundled_definitions(keyword):
     }
 
 
+@pytest.mark.parametrize("keyword", ["$id", "id"])
+def test_bundle_drops_id_around_references_into_the_bundle(keyword):
+    # References into the bundle resolve against the closest `$id` above them, and only the root holds the bundle.
+    a = {keyword: "https://example.invalid/a", "properties": {"b": {"$ref": "https://example.invalid/b"}}}
+    b = {keyword: "https://example.invalid/b", "type": "string"}
+    schema = {keyword: "https://example.invalid/root", "properties": {"a": a, "b": b}}
+    assert Bundler().bundle(schema, make_root_resolver(schema)).schema == {
+        keyword: "https://example.invalid/root",
+        "properties": {"a": {"properties": {"b": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"}}}, "b": b},
+        BUNDLE_STORAGE_KEY: {"schema000001": {"type": "string"}},
+    }
+
+
 @pytest.mark.parametrize("already_bundled", [0, 5, 95])
 def test_bundle_names_sort_in_creation_order(already_bundled):
     # Canonicalization orders definitions by name, so names that sort differently depending on how

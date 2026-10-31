@@ -77,6 +77,7 @@
 - Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
 - Runs with `--generation-unique-inputs` spinning without requests until `--max-time` once inputs run out.
 - Internal error or wrong schema shown for response failures inside schemas reached through `$dynamicRef`.
+- False schema error for references inside nested schemas that declare their own `$id`.
 - Response headers declared with `content` instead of `schema` never validated by `response_headers_conformance`.
 - Test case summary counting errored and skipped cases as passed.
 - Probe requests from checks counted as generated and skipped test cases.
