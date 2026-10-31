@@ -83,6 +83,7 @@ def _send_with_scheme(
         provider = schema.security.auth_provider_for(scheme_name, config)
         data = provider.get(retry_case, context)
         provider.set(retry_case, data, context)
+        retry_case.settle_metadata()
         response = schema.transport.send(retry_case, **kwargs)
     except Exception:  # noqa: BLE001 - probe must not propagate; one bad scheme can't kill the loop.
         return None

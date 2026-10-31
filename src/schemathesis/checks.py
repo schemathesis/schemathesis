@@ -115,6 +115,7 @@ class CheckInternals:
         if parent.operation.app is not None:
             kwargs.setdefault("app", parent.operation.app)
         self.record_case(parent_id=parent.id, case=probe)
+        probe.settle_metadata()
         response = parent.operation.schema.transport.send(probe, **kwargs)
         self.record_response(case_id=probe.id, response=response)
         return response
