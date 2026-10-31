@@ -539,6 +539,15 @@ def test_header_replaced_by_hook_with_invalid_value_is_negative(header_operation
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
 
+def test_derived_case_revalidation_leaves_original_metadata_intact(header_operation):
+    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    meta = case.meta
+    derived = case.derive(headers=CaseInsensitiveDict({"X-Count": "abc"}))
+    assert derived.meta.generation.mode == GenerationMode.NEGATIVE
+    assert meta.generation.mode == GenerationMode.POSITIVE
+    assert not meta.is_dirty()
+
+
 @pytest.fixture
 def json_body_operation(ctx):
     schema = ctx.openapi.load_schema(

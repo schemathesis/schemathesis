@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
@@ -270,6 +270,17 @@ class CaseMetadata:
     # Lets revalidation tell, per key, whether a value still equals its generated wire
     # form (use the typed snapshot) or was overwritten by a hook (validate the live value).
     _initial_containers: dict[ParameterLocation, Any] = field(default_factory=dict, init=False)
+
+    def copy(self) -> CaseMetadata:
+        """A copy that revalidating another case's containers cannot change."""
+        copied = replace(
+            self,
+            generation=GenerationInfo(time=self.generation.time, mode=self.generation.mode),
+            components=dict(self.components),
+            raw_containers=dict(self.raw_containers),
+        )
+        copied._initial_hashes = dict(self._initial_hashes)
+        return copied
 
     def is_negative_at(self, location: ParameterLocation) -> bool:
         """Whether the component at `location` was generated in negative mode."""
