@@ -51,6 +51,7 @@ from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
 from schemathesis.specs.openapi.adapter.references import (
     example_object_value,
+    iter_example_values,
     maybe_resolve_with_resolver,
     resolve_example_references,
     resolve_media_type_object,
@@ -1385,18 +1386,7 @@ class OpenApiComponent(ABC):
         examples: list[object] = []
 
         # Extract from top-level definition
-        container = self.definition.get(self.adapter.examples_container_keyword)
-        if isinstance(container, dict):
-            examples.extend(
-                value
-                for ex in container.values()
-                if isinstance(ex, dict) and not isinstance(value := example_object_value(ex), NotSet)
-            )
-        elif isinstance(container, list):
-            # Items may be Example Objects or raw values
-            for ex in container:
-                value = example_object_value(ex) if isinstance(ex, dict) else NOT_SET
-                examples.append(ex if isinstance(value, NotSet) else value)
+        examples.extend(iter_example_values(self.definition.get(self.adapter.examples_container_keyword)))
         examples.extend(self._iter_single_and_schema_examples())
         return examples
 

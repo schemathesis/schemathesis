@@ -8899,17 +8899,44 @@ def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ct
     ],
     ids=["loose", "strict"],
 )
-def test_body_list_examples_are_unwrapped(ctx, schema):
+@pytest.mark.parametrize(
+    "example", [{"value": {"name": "marker"}}, {"$ref": "#/components/examples/Marker"}], ids=["value", "reference"]
+)
+def test_body_list_examples_are_unwrapped(ctx, schema, example):
     operation = load_schema(
         ctx,
         request_body={
             "required": True,
-            "content": {"application/json": {"schema": schema, "examples": [{"value": {"name": "marker"}}]}},
+            "content": {"application/json": {"schema": schema, "examples": [example]}},
         },
+        components={"examples": {"Marker": {"value": {"name": "marker"}}}},
     )["/foo"]["post"]
     bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
     assert {"name": "marker"} in bodies, bodies
-    assert not any(isinstance(body, list) or (isinstance(body, dict) and "value" in body) for body in bodies), bodies
+    assert not any(
+        isinstance(body, list) or (isinstance(body, dict) and ("value" in body or "$ref" in body)) for body in bodies
+    ), bodies
+
+
+@pytest.mark.parametrize(
+    ("version", "example"),
+    [
+        ("3.2.0", {"serializedValue": '{"name": "marker"}'}),
+        ("3.0.2", {"externalValue": "http://127.0.0.1/marker.json"}),
+        ("3.0.2", {"$ref": "#/components/examples/Missing"}),
+    ],
+    ids=["serialized-value", "external-value", "dangling-reference"],
+)
+def test_body_list_examples_without_data_are_skipped(ctx, version, example):
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}, "examples": [example]}},
+        },
+        version=version,
+    )["/foo"]["post"]
+    assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{}]
 
 
 def test_object_parameter_example_out_of_range_as_float32_is_not_a_positive_value(ctx):
