@@ -587,6 +587,9 @@ class GrpcApps:
         reflection: str | None = "v1alpha",
         undescribed_services: tuple[str, ...] = (),
         reflection_imports: bool = True,
+        unserved_files: tuple[str, ...] = (),
+        emptied_files: tuple[str, ...] = (),
+        annotated: bool = False,
         start: bool = True,
     ) -> GrpcServer:
         # grpcio has no free-threaded build, so only tests that start a server need it.
@@ -598,6 +601,9 @@ class GrpcApps:
             reflection_version=reflection,
             undescribed_services=undescribed_services,
             reflection_imports=reflection_imports,
+            unserved_files=unserved_files,
+            emptied_files=emptied_files,
+            annotated=annotated,
             start=start,
         )
         return self._serve(app)
