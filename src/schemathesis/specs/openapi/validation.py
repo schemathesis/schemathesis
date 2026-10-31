@@ -113,7 +113,10 @@ def validate_documented_response(
     context = deserialization.DeserializationContext(operation=operation, case=case)
 
     try:
-        data = deserialization.deserialize_response(response, content_type, context=context)
+        if resolved.media_type is not None and definition.describes_json_sequence(resolved.media_type):
+            data = deserialization.parse_json_sequence(response.content, resolved.media_type)
+        else:
+            data = deserialization.deserialize_response(response, content_type, context=context)
     except JSONDecodeError as exc:
         failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
         maybe_raise_one_or_more(failures)

@@ -9,7 +9,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.config import SchemathesisWarning
-from schemathesis.core import deserialization
+from schemathesis.core import deserialization, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.jsonschema.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
@@ -68,7 +68,10 @@ def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeseria
                 continue
 
             try:
-                has_deserializer = deserialization.has_deserializer(content_type)
+                # JSON sequences documented with `itemSchema` are read without a registered deserializer
+                has_deserializer = deserialization.has_deserializer(content_type) or (
+                    "itemSchema" in media_type_object and media_types.is_json_sequence(content_type)
+                )
             except MalformedMediaType:
                 continue
 

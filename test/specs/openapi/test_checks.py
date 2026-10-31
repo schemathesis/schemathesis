@@ -4000,6 +4000,183 @@ def test_response_schema_conformance_discriminator_ignores_nameless_reference(ct
         operation.validate_response(response_factory.requests(content=b'{"petType": ""}'))
 
 
+JSON_SEQUENCE_ITEM = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}},
+    "required": ["id"],
+    "additionalProperties": False,
+}
+
+
+def _validated_sequence(operation, response_factory, media_type, body):
+    response = response_factory.core(content=body.encode(), headers={"content-type": [media_type]})
+    try:
+        operation.validate_response(response)
+    except FailureGroup as group:
+        failures = list(group.exceptions)
+    except Failure as failure:
+        failures = [failure]
+    else:
+        failures = []
+    return [
+        (type(failure), list(failure.instance_path))
+        if isinstance(failure, JsonSchemaError)
+        else (type(failure), (failure.lineno, failure.colno))
+        for failure in failures
+    ]
+
+
+@pytest.mark.parametrize(
+    ("version", "media_type", "media_type_object", "body", "expected"),
+    [
+        ("3.2.0", "application/jsonl", {"itemSchema": JSON_SEQUENCE_ITEM}, '{"id":1}\r\n\r\n{"id":2}\n', []),
+        ("3.2.0", "application/jsonl", {"itemSchema": JSON_SEQUENCE_ITEM}, '﻿{"id":1}\n', []),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n{"id":"x"}\n',
+            [(JsonSchemaError, [1, "id"])],
+        ),
+        (
+            "3.2.0",
+            "application/x-ndjson",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n{"id":"x"}\n',
+            [(JsonSchemaError, [1, "id"])],
+        ),
+        (
+            "3.2.0",
+            "application/json-seq",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '\x1e{"id":1}\n\x1e{"id":"x"}\n',
+            [(JsonSchemaError, [1, "id"])],
+        ),
+        (
+            "3.2.0",
+            "application/geo+json-seq",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '\x1e{"id":"x"}\n',
+            [(JsonSchemaError, [0, "id"])],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM, "schema": {"maxItems": 1}},
+            '{"id":1}\n{"id":2}\n',
+            [(JsonSchemaError, [])],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {"itemSchema": JSON_SEQUENCE_ITEM},
+            '{"id":1}\n{"id":2}\n{oops\n',
+            [(MalformedJson, (3, 2))],
+        ),
+        (
+            "3.2.0",
+            "application/jsonl",
+            {
+                "itemSchema": {
+                    "properties": {
+                        "payload": {"contentMediaType": "application/json", "contentSchema": {"type": "object"}}
+                    }
+                }
+            },
+            '{"payload":{"a":1}}\n{"payload":"[1]"}\n',
+            [],
+        ),
+        ("3.1.0", "application/x-ndjson", {"schema": JSON_SEQUENCE_ITEM}, '{"id":1}\n{"id":2}\n', []),
+        (
+            "3.1.0",
+            "application/x-ndjson",
+            {"schema": {"type": "array", "items": {"type": "string"}}},
+            '{"id":1}\n',
+            [],
+        ),
+    ],
+    ids=[
+        "jsonl-valid",
+        "jsonl-byte-order-mark",
+        "jsonl-bad-item",
+        "ndjson-bad-item",
+        "json-seq-bad-item",
+        "json-seq-suffix-bad-item",
+        "stream-schema",
+        "malformed-record-position",
+        "content-keywords-annotate-only",
+        "openapi-3-1-item-schema-unvalidated",
+        "openapi-3-1-array-schema-unvalidated",
+    ],
+)
+def test_response_schema_conformance_json_sequence(
+    ctx, response_factory, version, media_type, media_type_object, body, expected
+):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {"responses": {"200": {"description": "OK", "content": {media_type: media_type_object}}}},
+        version=version,
+    )
+    assert _validated_sequence(operation, response_factory, media_type, body) == expected
+
+
+@pytest.mark.parametrize(
+    ("version", "definition", "media_type"),
+    [
+        (
+            "2.0",
+            {
+                "produces": ["application/x-ndjson"],
+                "responses": {"200": {"description": "OK", "schema": JSON_SEQUENCE_ITEM}},
+            },
+            "application/x-ndjson",
+        ),
+        (
+            "3.0.2",
+            {"responses": {"200": {"description": "OK", "content": {"*/*": {"schema": JSON_SEQUENCE_ITEM}}}}},
+            "application/x-ndjson",
+        ),
+    ],
+    ids=["swagger-2-produces", "wildcard-media-type"],
+)
+def test_response_schema_conformance_json_sequence_without_item_schema(
+    ctx, response_factory, version, definition, media_type
+):
+    operation = ctx.openapi.load_operation("GET /items", definition, version=version)
+    assert _validated_sequence(operation, response_factory, media_type, '{"id":1}\n{"id":2}\n') == []
+
+
+def test_response_schema_conformance_json_sequence_discriminator(ctx, response_factory):
+    operation = ctx.openapi.load_operation(
+        "GET /pets",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/jsonl": {"itemSchema": {"$ref": "#/components/schemas/Pet"}}},
+                }
+            }
+        },
+        version="3.2.0",
+        components={
+            "schemas": {
+                "Pet": {
+                    "anyOf": [{"$ref": "#/components/schemas/Cat"}, {"$ref": "#/components/schemas/Dog"}],
+                    "discriminator": {"propertyName": "kind"},
+                },
+                "Cat": {"type": "object"},
+                "Dog": {"type": "object"},
+            }
+        },
+    )
+    with pytest.raises(DiscriminatorMismatch, match="value 'Bird'"):
+        operation.validate_response(
+            response_factory.core(
+                content=b'{"kind": "Cat"}\n{"kind": "Bird"}\n', headers={"content-type": ["application/jsonl"]}
+            )
+        )
+
+
 def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_factory):
     # Boolean schemas (true/false) in anyOf/oneOf are valid in OpenAPI 3.1.
     # The boolean item is skipped during implicit mapping extraction; only $ref items contribute.

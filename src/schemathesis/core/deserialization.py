@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from schemathesis.core.transport import Response
 if TYPE_CHECKING:
     import yaml
 
+    from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
@@ -304,3 +306,20 @@ def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSen
 def _deserialize_sse(_ctx: DeserializationContext, response: Response) -> list[ServerSentEvent]:
     # SSE streams are always UTF-8 per spec, regardless of transport-level default encoding heuristics.
     return _parse_sse_events(response.content, "utf-8")
+
+
+def parse_json_sequence(content: bytes, media_type: str) -> list[JsonValue]:
+    """Values of a JSON Lines or JSON Text Sequence body, one per line or record."""
+    separator = "\x1e" if media_types.parse(media_type)[1].endswith("json-seq") else "\n"
+    text = content.decode("utf-8-sig")
+    values: list[JsonValue] = []
+    offset = 0
+    for record in text.split(separator):
+        if record.strip():
+            try:
+                values.append(json.loads(record))
+            except json.JSONDecodeError as exc:
+                # Point at the malformed record within the whole body, not within the record alone
+                raise json.JSONDecodeError(exc.msg, text, offset + exc.pos) from None
+        offset += len(record) + len(separator)
+    return values

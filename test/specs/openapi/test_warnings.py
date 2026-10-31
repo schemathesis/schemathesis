@@ -217,8 +217,24 @@ def test_detect_missing_deserializers_with_malformed_media_type(ctx):
             },
             ["application/msgpack"],
         ),
+        (
+            {
+                "application/jsonl": {
+                    "itemSchema": {"type": "object"},
+                    "schema": {"type": "array", "maxItems": 10},
+                }
+            },
+            [],
+        ),
+        ({"application/x-ndjson": {"schema": {"type": "array"}}}, ["application/x-ndjson"]),
     ],
-    ids=["unstructured-sibling", "structured-non-first", "schemaless-sibling"],
+    ids=[
+        "unstructured-sibling",
+        "structured-non-first",
+        "schemaless-sibling",
+        "json-sequence-with-item-schema",
+        "json-sequence-without-item-schema",
+    ],
 )
 def test_detect_missing_deserializers_judges_each_media_type_separately(ctx, content, expected):
     operation = ctx.openapi.load_operation(
@@ -304,6 +320,14 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
             },
             [("response `200`", "#/components/mediaTypes/Missing")],
         ),
+        (
+            {
+                "responses": {
+                    "200": {"description": "Success", "content": {"application/jsonl": {"itemSchema": MISSING_SCHEMA}}}
+                }
+            },
+            [("response `200`", "#/components/schemas/Missing")],
+        ),
     ],
     ids=[
         "optional-parameter",
@@ -313,6 +337,7 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
         "media-type-not-an-object",
         "media-type-without-schema",
         "media-type-reference",
+        "json-sequence-item-schema",
     ],
 )
 def test_detect_unresolvable_references(ctx, operation, expected):
