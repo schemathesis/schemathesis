@@ -518,6 +518,10 @@ class WarningCollector:
             self.data.method_not_allowed.add(event.label)
             if warnings.should_fail(SchemathesisWarning.METHOD_NOT_ALLOWED):
                 self.fails = True
+        elif event.skip_warning is SchemathesisWarning.NOT_SERVED:
+            self._handle_warning(
+                SchemathesisWarning.NOT_SERVED, partial(self.data.not_served.add, event.label), warnings
+            )
 
     def on_unmatched_filters(self, statistic: ApiStatistic) -> None:
         """Record filter expressions that no operation matched."""
