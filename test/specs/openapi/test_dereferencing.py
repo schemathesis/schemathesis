@@ -8,7 +8,7 @@ import pytest
 from flask import Flask, jsonify
 from hypothesis import given, settings
 from hypothesis.errors import Unsatisfiable
-from jsonschema_rs import Draft4Validator
+from jsonschema_rs import Draft4Validator, Draft202012Validator
 from werkzeug.exceptions import InternalServerError
 
 import schemathesis
@@ -47,6 +47,28 @@ def test_request_body_schema_reference_to_plain_name_anchor(ctx):
     @run_given(case=operation.as_strategy(), max_examples=3)
     def test(case):
         assert isinstance(case.body, str)
+
+
+def test_request_body_reference_to_relative_id(ctx):
+    tree = {
+        "$id": "tree",
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "children": {"type": "array", "items": {"$ref": "tree"}}},
+        "required": ["id"],
+    }
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {"application/json": {"schema": tree}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="3.1.0",
+    )
+    validator = Draft202012Validator(tree)
+
+    bodies = [case.body for case in generate_many(operation.as_strategy(), 10)]
+
+    assert [body for body in bodies if not validator.is_valid(body)] == []
 
 
 @pytest.mark.hypothesis_nested

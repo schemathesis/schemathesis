@@ -789,13 +789,37 @@ def test_unbundle_path_decodes_pointer_escaping():
 
 @pytest.mark.parametrize(
     ("keyword", "name"),
-    [("$id", "https://example.invalid/text.json"), ("id", "https://example.invalid/text.json"), ("$id", "urn:text")],
-    ids=["id", "legacy-id", "urn"],
+    [
+        ("$id", "https://example.invalid/text.json"),
+        ("id", "https://example.invalid/text.json"),
+        ("$id", "urn:text"),
+        ("$id", "text.json"),
+    ],
+    ids=["id", "legacy-id", "urn", "relative-id"],
 )
 def test_bundle_resolves_reference_by_declared_id(keyword, name):
     # A subschema that names itself is reachable by that name in-document, with nothing fetched.
     resolver = make_root_resolver({"definitions": {"Text": {keyword: name, "type": "string"}}})
     assert Bundler().bundle({"$ref": name}, resolver).schema == {"type": "string"}
+
+
+@pytest.mark.parametrize(
+    ("definitions", "reference"),
+    [
+        ({"Text": {"$id": "text.json", "type": "string"}}, "text.json"),
+        ({"Text": {"$id": "schemas/text.json", "type": "string"}}, "schemas/text.json"),
+        (
+            {"All": {"$id": "schemas/all.json", "$defs": {"Text": {"$id": "text.json", "type": "string"}}}},
+            "schemas/text.json",
+        ),
+        ({"Text": {"$id": "text.json", "type": "string"}, "All": {"$id": "schemas/all.json"}}, "text.json"),
+    ],
+    ids=["next-to-document", "subdirectory", "inside-another-resource", "beside-another-resource"],
+)
+def test_bundle_resolves_reference_by_relative_id_against_document_location(tmp_path, definitions, reference):
+    # No file exists at the referenced location: the target is the subschema the document names that way.
+    resolver = make_root_resolver({"definitions": definitions}, location=str(tmp_path / "openapi.json"))
+    assert Bundler().bundle({"$ref": reference}, resolver).schema == {"type": "string"}
 
 
 @pytest.mark.parametrize("keyword", ["$id", "id"])
