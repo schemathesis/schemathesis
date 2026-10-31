@@ -369,6 +369,15 @@ def test_non_string_response_schema_reference_v3(ctx):
     assert list(operation.responses.iter_examples()) == [("200/application/json", {"id": 1})]
 
 
+@pytest.mark.parametrize("content", [None, {"application/json": None}], ids=["content", "media-type"])
+def test_non_object_response_content_v3(ctx, content):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"get": {"responses": {"200": {"description": "OK", "content": content}}}}}
+    )
+    assert schema.statistic.operations.total == 1
+    assert list(schema["/things"]["GET"].responses.iter_examples()) == []
+
+
 @pytest.mark.parametrize("required", [None, False, True], ids=["unspecified", "optional", "required"])
 def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     body = {"in": "body", "name": "payload", "schema": {"$ref": "#/definitions/Missing"}}
