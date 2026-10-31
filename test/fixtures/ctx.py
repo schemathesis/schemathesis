@@ -640,8 +640,9 @@ class GrpcApps:
         return server
 
     def _serve(self, app: GrpcApp) -> GrpcServer:
-        self.parent.request.addfinalizer(lambda: app.server.stop(None))
-        return app.make_server(self.parent.request.getfixturevalue("tmp_path"))
+        server = app.make_server(self.parent.request.getfixturevalue("tmp_path"))
+        self.parent.request.addfinalizer(server.close)
+        return server
 
 
 @dataclass(slots=True)
