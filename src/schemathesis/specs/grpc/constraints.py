@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final, TypeAlias
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Final, TypeAlias, cast
 
 from google.protobuf import message_factory
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
 
 if TYPE_CHECKING:
-    from google.protobuf.descriptor import OneofDescriptor
+    from google.protobuf.descriptor import Descriptor, OneofDescriptor
     from google.protobuf.descriptor_pool import DescriptorPool
 
 # Option extensions holding validation rules: `buf.validate` first, then the legacy `validate` package.
-FIELD_EXTENSIONS: Final = ("buf.validate.field", "validate.rules")
+LEGACY_FIELD_EXTENSION: Final = "validate.rules"
+FIELD_EXTENSIONS: Final = ("buf.validate.field", LEGACY_FIELD_EXTENSION)
 ONEOF_EXTENSIONS: Final = ("buf.validate.oneof", "validate.required")
+MESSAGE_EXTENSION: Final = "buf.validate.message"
 # `buf.validate.Ignore` values that skip the rules for a zero value, and that skip them always.
 IGNORE_IF_ZERO_VALUE: Final = frozenset({1, 2})
 IGNORE_ALWAYS: Final = 3
@@ -38,7 +40,7 @@ class FieldConstraints:
 class ConstraintReader:
     """Reads validation rules from the options of descriptors in one pool."""
 
-    __slots__ = ("_field_options", "_oneof_options")
+    __slots__ = ("_field_options", "_oneof_options", "_message_options")
 
     def __init__(self, pool: DescriptorPool) -> None:
         # Options parsed with the pool's own classes expose the rule extensions the pool defines.
@@ -47,6 +49,9 @@ class ConstraintReader:
         )
         self._oneof_options = message_factory.GetMessageClass(
             pool.FindMessageTypeByName("google.protobuf.OneofOptions")
+        )
+        self._message_options = message_factory.GetMessageClass(
+            pool.FindMessageTypeByName("google.protobuf.MessageOptions")
         )
 
     @classmethod
@@ -65,7 +70,11 @@ class ConstraintReader:
         for name in FIELD_EXTENSIONS:
             rules = extensions.get(name)
             if isinstance(rules, Message):
-                return _constraints(rules)
+                constraints = _constraints(rules)
+                if constraints is not None and name == LEGACY_FIELD_EXTENSION and field.containing_oneof is not None:
+                    # The legacy package checks the rules of a oneof member only when that member is set.
+                    return replace(constraints, required=False)
+                return constraints
         return None
 
     def oneof_required(self, oneof: OneofDescriptor) -> bool:
@@ -79,9 +88,20 @@ class ConstraintReader:
                 return bool(_group(value).get("required"))
         return False
 
+    def message_oneofs(self, message: Descriptor) -> list[tuple[list[str], bool]]:
+        """Groups of fields, by proto name, of which at most one may be set, and whether one must be."""
+        rules = _extensions(self._message_options, message).get(MESSAGE_EXTENSION)
+        if not isinstance(rules, Message):
+            return []
+        oneofs = []
+        for rule in cast("list[Message]", _group(rules).get("oneof", [])):
+            group = _group(rule)
+            oneofs.append((cast("list[str]", group.get("fields", [])), bool(group.get("required"))))
+        return oneofs
+
 
 def _extensions(
-    options_class: type[Message], descriptor: FieldDescriptor | OneofDescriptor
+    options_class: type[Message], descriptor: FieldDescriptor | OneofDescriptor | Descriptor
 ) -> dict[str, Message | bool]:
     """Extension values set on the options of `descriptor`, by extension name."""
     if not descriptor.has_options:

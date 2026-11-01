@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import base64
+import math
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import TYPE_CHECKING, Final, cast
 
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from google.protobuf import any_pb2
-    from google.protobuf.descriptor import Descriptor
+    from google.protobuf.descriptor import Descriptor, EnumDescriptor
     from google.protobuf.descriptor_pool import DescriptorPool
     from google.protobuf.message import Message
 
@@ -134,8 +135,13 @@ class _Converter:
     def message(self, descriptor: Descriptor) -> JsonSchemaObject:
         properties: dict[str, JsonSchemaObject] = {}
         required = []
+        message_oneofs = self.rules.message_oneofs(descriptor) if self.rules is not None else []
+        message_oneof_members = {name for fields, _ in message_oneofs for name in fields}
         for member in descriptor.fields:
             constraints = self.rules.field(member) if self.rules is not None else None
+            if constraints is not None and member.name in message_oneof_members:
+                # The rules of a message-level oneof member hold only for the member that is set.
+                constraints = replace(constraints, ignore_empty=True)
             present = member.is_required or (constraints is not None and _forces_presence(member, constraints))
             property_schema = self.field(member, f"{descriptor.full_name}.{member.json_name}", constraints)
             if property_schema is None and member.is_repeated:
@@ -145,13 +151,23 @@ class _Converter:
                 # An empty value is the only one a skipped field can carry, and a required field needs one.
                 property_schema = deepclone(EMPTY_OBJECT)
             if property_schema is not None:
+                if member.name in message_oneof_members:
+                    # A member in the body counts towards its oneof, so it holds a value that leaves it set.
+                    require_set(property_schema, member)
                 properties[member.json_name] = property_schema
             if present:
                 required.append(member.json_name)
+        oneofs = [
+            ([member.json_name for member in oneof.fields], self.rules is not None and self.rules.oneof_required(oneof))
+            for oneof in descriptor.oneofs
+        ]
+        oneofs.extend(
+            ([descriptor.fields_by_name[name].json_name for name in fields], oneof_required)
+            for fields, oneof_required in message_oneofs
+        )
         groups = []
-        for oneof in descriptor.oneofs:
-            names = [member.json_name for member in oneof.fields if member.json_name in properties]
-            oneof_required = self.rules is not None and self.rules.oneof_required(oneof)
+        for members, oneof_required in oneofs:
+            names = [name for name in members if name in properties]
             if len(names) > 1:
                 branches: list[JsonSchemaObject] = [{"required": [name]} for name in names]
                 if not oneof_required:
@@ -188,8 +204,9 @@ class _Converter:
                 require_set(schema, field)
         required = field.is_required or (constraints is not None and constraints.required)
         message = field.message_type
-        if message is not None and message.full_name in WRAPPERS and not required:
+        if message is not None and message.full_name in WRAPPERS and not required and field.containing_oneof is None:
             # JSON `null` clears a singular field; a list, a map or a required field rejects it.
+            # A oneof member set to `null` leaves its oneof unset, and command-line clients fail to send it.
             schema["type"] = [schema["type"], "null"]
         return schema
 
@@ -264,7 +281,7 @@ def scalar(field: FieldDescriptor) -> JsonSchemaObject:
     if kind == FieldDescriptor.TYPE_BYTES:
         return {"type": "string", "format": "byte"}
     if field.enum_type is not None:
-        return {"enum": [value.name for value in field.enum_type.values]}
+        return {"enum": list(_enum_names(field.enum_type).values())}
     return {"type": "string"}
 
 
@@ -351,8 +368,16 @@ def _zero(field: FieldDescriptor) -> JsonValue:
     if field.type == FieldDescriptor.TYPE_BOOL:
         return False
     if field.enum_type is not None:
-        return field.enum_type.values_by_number[0].name
+        return _enum_names(field.enum_type)[0]
     return 0
+
+
+def _enum_names(enum: EnumDescriptor) -> dict[int, str]:
+    """Names of the values of `enum` by number; aliases encode the same number, so only the first name is kept."""
+    names: dict[int, str] = {}
+    for value in enum.values:
+        names.setdefault(value.number, value.name)
+    return names
 
 
 def _value_rules(schema: JsonSchemaObject, field: FieldDescriptor, constraints: FieldConstraints) -> None:
@@ -360,6 +385,15 @@ def _value_rules(schema: JsonSchemaObject, field: FieldDescriptor, constraints: 
     if kind in NUMERIC_RULES:
         if field.type == FieldDescriptor.TYPE_FLOAT:
             rules = _float32_bounds(rules)
+            excluded = rules.pop("not_in", None)
+            if isinstance(excluded, list):
+                # A number that rounds onto an excluded 32-bit float is sent as that float.
+                # Non-finite values lie outside the generated range already.
+                rounded = [
+                    _float32_rounding(value) for value in excluded if isinstance(value, float) and math.isfinite(value)
+                ]
+                if rounded:
+                    _add(schema, {"not": {"anyOf": rounded}})
         _range(schema, rules)
         _choices(schema, rules)
     elif kind == "string":
@@ -464,24 +498,38 @@ def _float32_bounds(rules: dict[str, RuleValue]) -> dict[str, RuleValue]:
     return rules
 
 
+def _float32_rounding(value: float) -> JsonSchemaObject:
+    """Numbers that round to the 32-bit float `value`, with the halfway points on both sides."""
+    return {
+        "minimum": max((next_float32(value, going_up=False) + value) / 2, -FLOAT32_MAX),
+        "maximum": min((next_float32(value, going_up=True) + value) / 2, FLOAT32_MAX),
+    }
+
+
 def _integer_choices(bounds: tuple[int, int], rules: dict[str, RuleValue]) -> list[int]:
-    low, high = bounds
-    allowed = rules.get("in")
+    minimum, maximum = bounds
+    const = rules.get("const")
+    allowed = [const] if isinstance(const, int) else rules.get("in")
     excluded = rules.get("not_in", [])
     gt, gte, lt, lte = (rules.get(name) for name in ("gt", "gte", "lt", "lte"))
-    if isinstance(gt, int):
-        low = max(low, gt + 1)
-    if isinstance(gte, int):
-        low = max(low, gte)
-    if isinstance(lt, int):
-        high = min(high, lt - 1)
-    if isinstance(lte, int):
-        high = min(high, lte)
-    candidates = allowed if isinstance(allowed, list) else range(low, min(high, low + MAP_KEY_CHOICES - 1) + 1)
+    low = gt + 1 if isinstance(gt, int) else gte if isinstance(gte, int) else None
+    high = lt - 1 if isinstance(lt, int) else lte if isinstance(lte, int) else None
+    if low is not None and high is not None and low > high:
+        # An upper bound below the lower one admits the values outside the range.
+        ranges = [(minimum, high), (low, maximum)]
+    else:
+        ranges = [(minimum if low is None else max(minimum, low), maximum if high is None else min(maximum, high))]
+    candidates = (
+        allowed
+        if isinstance(allowed, list)
+        else [value for start, end in ranges for value in range(start, min(end, start + MAP_KEY_CHOICES - 1) + 1)]
+    )
     return [
         value
         for value in candidates
-        if isinstance(value, int) and low <= value <= high and not (isinstance(excluded, list) and value in excluded)
+        if isinstance(value, int)
+        and any(start <= value <= end for start, end in ranges)
+        and not (isinstance(excluded, list) and value in excluded)
     ]
 
 
@@ -588,11 +636,11 @@ def _enum_rules(schema: JsonSchemaObject, field: FieldDescriptor, rules: dict[st
     excluded = rules.get("not_in", [])
     assert field.enum_type is not None
     schema["enum"] = [
-        value.name
-        for value in field.enum_type.values
-        if (const is None or value.number == const)
-        and (not isinstance(allowed, list) or value.number in allowed)
-        and (not isinstance(excluded, list) or value.number not in excluded)
+        name
+        for number, name in _enum_names(field.enum_type).items()
+        if (const is None or number == const)
+        and (not isinstance(allowed, list) or number in allowed)
+        and (not isinstance(excluded, list) or number not in excluded)
     ]
 
 

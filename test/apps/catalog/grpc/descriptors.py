@@ -501,6 +501,15 @@ def validated_descriptor_set() -> bytes:
     kinds = validated.enum_type.add(name="Kind")
     for number, name in enumerate(["KIND_UNSPECIFIED", "KIND_A", "KIND_B", "KIND_C"]):
         kinds.value.add(name=name, number=number)
+    shades = validated.enum_type.add(name="Shade", options=descriptor_pb2.EnumOptions(allow_alias=True))
+    for name, number in [
+        ("SHADE_UNSPECIFIED", 0),
+        ("SHADE_NONE", 0),
+        ("SHADE_DARK", 1),
+        ("SHADE_BLACK", 1),
+        ("SHADE_LIGHT", 2),
+    ]:
+        shades.value.add(name=name, number=number)
     parent = validated.message_type.add(name="Parent")
     _field(parent, "id", 1, FieldDescriptorProto.TYPE_STRING)
 
@@ -655,9 +664,14 @@ def validated_descriptor_set() -> bytes:
             field_rules(extras.field[-1], "buf.validate.field", value)
 
     edges = validated.message_type.add(name="Edges")
-    for entry in ("RankedEntry", "BelowEntry"):
+    for entry, key_type in (
+        ("RankedEntry", FieldDescriptorProto.TYPE_INT32),
+        ("BelowEntry", FieldDescriptorProto.TYPE_INT32),
+        ("PinnedEntry", FieldDescriptorProto.TYPE_INT64),
+        ("OuterEntry", FieldDescriptorProto.TYPE_INT32),
+    ):
         keyed = edges.nested_type.add(name=entry, options=descriptor_pb2.MessageOptions(map_entry=True))
-        _field(keyed, "key", 1, FieldDescriptorProto.TYPE_INT32)
+        _field(keyed, "key", 1, key_type)
         _field(keyed, "value", 2, FieldDescriptorProto.TYPE_STRING)
     edges.oneof_decl.add(name="pick")
     _set_extension(
@@ -670,7 +684,7 @@ def validated_descriptor_set() -> bytes:
             {"type_name": ".google.protobuf.Any", "label": repeated},
             {"repeated": {"maxItems": "3"}},
         ),
-        ("small", FieldDescriptorProto.TYPE_FLOAT, {}, {"float": {"gt": 0, "lt": 1}}),
+        ("small", FieldDescriptorProto.TYPE_FLOAT, {}, {"float": {"gt": 0, "lt": 1, "notIn": ["NaN"]}}),
         ("nonzero", FieldDescriptorProto.TYPE_FLOAT, {}, {"required": True}),
         ("token", FieldDescriptorProto.TYPE_BYTES, {}, {"bytes": {"in": ["AAE=", "AQI="]}}),
         ("magic", FieldDescriptorProto.TYPE_BYTES, {}, {"bytes": {"const": "-_8="}}),
@@ -689,6 +703,31 @@ def validated_descriptor_set() -> bytes:
         ),
         ("picks", FieldDescriptorProto.TYPE_INT32, {}, {"int32": {"gte": 1, "lte": 3, "notIn": [2]}}),
         ("triple", FieldDescriptorProto.TYPE_STRING, {"label": repeated}, {"repeated": {"minItems": "3"}}),
+        ("shade", FieldDescriptorProto.TYPE_ENUM, {"type_name": ".validated.Shade"}, {"required": True}),
+        (
+            "shades",
+            FieldDescriptorProto.TYPE_ENUM,
+            {"type_name": ".validated.Shade", "label": repeated},
+            {"repeated": {"unique": True}},
+        ),
+        (
+            "odds",
+            FieldDescriptorProto.TYPE_FLOAT,
+            {},
+            {"float": {"notIn": [0.5, 1.1, 1.5, 3.4028234663852886e38, "Infinity", "-Infinity", "NaN"]}},
+        ),
+        (
+            "pinned",
+            FieldDescriptorProto.TYPE_MESSAGE,
+            {"type_name": ".validated.Edges.PinnedEntry", "label": repeated},
+            {"map": {"keys": {"int64": {"const": "5"}}}},
+        ),
+        (
+            "outer",
+            FieldDescriptorProto.TYPE_MESSAGE,
+            {"type_name": ".validated.Edges.OuterEntry", "label": repeated},
+            {"map": {"keys": {"int32": {"gt": 10, "lt": 5}}}},
+        ),
     ]
     for number, (name, field_type, extra, value) in enumerate(edge_fields, start=1):
         _field(edges, name, number, field_type, **extra)
@@ -703,10 +742,47 @@ def validated_descriptor_set() -> bytes:
     )
     field_rules(edges.field[-1], "validate.rules", {"timestamp": {"required": True}})
 
+    choices = validated.message_type.add(name="Choices")
+    choices.oneof_decl.add(name="boxed")
+    _set_extension(
+        rules, choices.oneof_decl[0].options, "google.protobuf.OneofOptions", "buf.validate.oneof", {"required": True}
+    )
+    choices.oneof_decl.add(name="matcher")
+    _set_extension(
+        rules, choices.oneof_decl[1].options, "google.protobuf.OneofOptions", "validate.required", {"required": True}
+    )
+    choices.oneof_decl.add(name="_amount")
+    _field(
+        choices, "label", 1, FieldDescriptorProto.TYPE_MESSAGE, type_name=".google.protobuf.StringValue", oneof_index=0
+    )
+    _field(
+        choices,
+        "amount",
+        2,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".google.protobuf.Int32Value",
+        oneof_index=2,
+        proto3_optional=True,
+    )
+    _field(choices, "exact", 3, FieldDescriptorProto.TYPE_STRING, oneof_index=1)
+    _field(choices, "regex", 4, FieldDescriptorProto.TYPE_MESSAGE, type_name=".validated.Parent", oneof_index=1)
+    field_rules(choices.field[-1], "validate.rules", {"message": {"required": True}})
+    _set_extension(
+        rules,
+        choices.options,
+        "google.protobuf.MessageOptions",
+        "buf.validate.message",
+        {"oneof": [{"fields": ["short_name", "alias"], "required": True}]},
+    )
+    _field(choices, "short_name", 5, FieldDescriptorProto.TYPE_STRING)
+    field_rules(choices.field[-1], "buf.validate.field", {"string": {"minLen": "2"}})
+    _field(choices, "alias", 6, FieldDescriptorProto.TYPE_STRING)
+
     service = validated.service.add(name="Spans")
     service.method.add(name="Record", input_type=".validated.Span", output_type=".google.protobuf.Empty")
     service.method.add(name="Check", input_type=".validated.Extras", output_type=".google.protobuf.Empty")
     service.method.add(name="Edge", input_type=".validated.Edges", output_type=".google.protobuf.Empty")
+    service.method.add(name="Choose", input_type=".validated.Choices", output_type=".google.protobuf.Empty")
     return descriptor_pb2.FileDescriptorSet(file=[*well_known, protovalidate, legacy, validated]).SerializeToString()
 
 
@@ -778,7 +854,10 @@ def _protovalidate_file(field_rules: str = "FieldRules") -> descriptor_pb2.FileD
                 *_numeric_rules(FieldDescriptorProto.TYPE_FLOAT),
             ],
             "BoolRules": [("const", 1, FieldDescriptorProto.TYPE_BOOL, "")],
-            "Int64Rules": _numeric_rules(FieldDescriptorProto.TYPE_INT64),
+            "Int64Rules": [
+                ("const", 1, FieldDescriptorProto.TYPE_INT64, ""),
+                *_numeric_rules(FieldDescriptorProto.TYPE_INT64),
+            ],
             "DoubleRules": _numeric_rules(FieldDescriptorProto.TYPE_DOUBLE),
             "StringRules": [
                 *_length_rules(),
@@ -836,6 +915,11 @@ def _protovalidate_file(field_rules: str = "FieldRules") -> descriptor_pb2.FileD
                 ("values", 5, FieldDescriptorProto.TYPE_MESSAGE, f".buf.validate.{field_rules}"),
             ],
             "OneofRules": [("required", 1, FieldDescriptorProto.TYPE_BOOL, "")],
+            "MessageRules": [("oneof", -4, FieldDescriptorProto.TYPE_MESSAGE, ".buf.validate.MessageOneofRule")],
+            "MessageOneofRule": [
+                ("fields", -1, FieldDescriptorProto.TYPE_STRING, ""),
+                ("required", 2, FieldDescriptorProto.TYPE_BOOL, ""),
+            ],
         },
         field_rules=field_rules,
         groups=[
@@ -853,6 +937,7 @@ def _protovalidate_file(field_rules: str = "FieldRules") -> descriptor_pb2.FileD
     )
     _extension(file, "field", 1159, ".google.protobuf.FieldOptions", f".buf.validate.{field_rules}")
     _extension(file, "oneof", 1159, ".google.protobuf.OneofOptions", ".buf.validate.OneofRules")
+    _extension(file, "message", 1159, ".google.protobuf.MessageOptions", ".buf.validate.MessageRules")
     return file
 
 

@@ -437,6 +437,8 @@ def test_more_validation_rules():
 
 
 FLOAT32_TINY = 1.401298464324817e-45
+# Aliases of a number encode the same, so each number keeps its first name.
+SHADES = ["SHADE_UNSPECIFIED", "SHADE_DARK", "SHADE_LIGHT"]
 
 
 def test_validation_rules_on_edge_cases():
@@ -452,10 +454,66 @@ def test_validation_rules_on_edge_cases():
             "below": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["-2", "-1"]}},
             "picks": {"type": "integer", "minimum": 1, "maximum": 3, "not": {"enum": [2]}},
             "triple": {"type": "array", "items": STRING, "minItems": 3},
+            "shade": {"enum": SHADES, "not": {"const": "SHADE_UNSPECIFIED"}},
+            "shades": {"type": "array", "items": {"enum": SHADES}, "uniqueItems": True},
+            "odds": {
+                **FLOAT,
+                "not": {
+                    "anyOf": [
+                        {"minimum": 0.4999999850988388, "maximum": 0.5000000298023224},
+                        {"minimum": 1.0999999642372131, "maximum": 1.1000000834465027},
+                        {"minimum": 1.4999999403953552, "maximum": 1.5000000596046448},
+                        {"minimum": 3.4028233649732406e38, "maximum": 3.4028234663852886e38},
+                    ]
+                },
+            },
+            "pinned": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": ["5"]}},
+            "outer": {
+                "type": "object",
+                "additionalProperties": STRING,
+                "propertyNames": {"enum": [str(key) for key in [*range(-(2**31), -(2**31) + 10), *range(11, 21)]]},
+            },
             "created": {"type": "string", "format": "date-time"},
         },
         "additionalProperties": False,
-        "required": ["small", "nonzero", "token", "magic", "only", "ranked", "below", "picks", "triple", "created"],
+        "required": [
+            "small",
+            "nonzero",
+            "token",
+            "magic",
+            "only",
+            "ranked",
+            "below",
+            "picks",
+            "triple",
+            "shade",
+            "shades",
+            "odds",
+            "pinned",
+            "outer",
+            "created",
+        ],
+    }
+
+
+def test_oneof_validation_rules():
+    assert convert(load_pool(validated_descriptor_set()), "validated.Choices").schema == {
+        "type": "object",
+        "properties": {
+            "label": STRING,
+            "amount": INT32,
+            "exact": STRING,
+            "regex": {"$ref": "#/$defs/validated.Parent"},
+            "shortName": {"type": "string", "minLength": 2, "not": {"const": ""}},
+            "alias": {"type": "string", "not": {"const": ""}},
+        },
+        "additionalProperties": False,
+        "required": ["label"],
+        "allOf": [
+            {"oneOf": [{"required": ["exact"]}, {"required": ["regex"]}]},
+            {"oneOf": [{"required": ["shortName"]}, {"required": ["alias"]}]},
+        ],
+        "$defs": {"validated.Parent": {"type": "object", "properties": {"id": STRING}, "additionalProperties": False}},
     }
 
 
