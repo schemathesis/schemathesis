@@ -379,6 +379,21 @@ def test_stateful_reaches_created_names_and_page_tokens(ctx, cli, snapshot_cli, 
     )
 
 
+@pytest.mark.parametrize(
+    "include",
+    [
+        ["--include-name=library.Library/CreateBook", "--include-name=library.Library/GetBook"],
+        ["--include-name=library.Library/ListBooks"],
+    ],
+    ids=["created-name", "page-token"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_follows_links(ctx, cli, snapshot_cli, include):
+    server = ctx.grpc.apps.library()
+    # The run ends at the first failure; the time limit only stops a regression from hanging the test.
+    assert cli.main("fuzz", server.target, "--max-time=60", *include) == snapshot_cli
+
+
 def test_unique_inputs_send_a_repeated_message_once(ctx, cli):
     server = ctx.grpc.apps.users()
     # The hook changes every case the same way after the run decides whether it was already sent.
