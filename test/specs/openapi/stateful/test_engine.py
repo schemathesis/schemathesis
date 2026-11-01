@@ -136,6 +136,16 @@ def test_explicit_stop(engine_factory, event_cls, stop_event):
     assert collected[-1].status == Status.INTERRUPTED
 
 
+def test_exception_thrown_into_phase_stops_state_machines(engine_factory, stop_event):
+    engine = engine_factory()
+    for event in engine:
+        if isinstance(event, events.ScenarioFinished):
+            break
+    with pytest.raises(RuntimeError, match="Timeout"):
+        engine.throw(RuntimeError("Timeout"))
+    assert stop_event.is_set()
+
+
 @pytest.mark.usefixtures("restore_checks")
 def test_stop_outside_of_state_machine_execution(engine_factory, stop_event):
     # The stop arrives with a failure, so it is first seen between suites rather than inside a scenario.
