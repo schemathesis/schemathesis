@@ -6,7 +6,6 @@ import pathlib
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from functools import reduce
-from urllib.parse import urlparse
 
 import click
 
@@ -47,7 +46,7 @@ def validate_wfc_user(config: SchemathesisConfig, path: str | None, user: str | 
 
 def validate_schema_location(ctx: click.core.Context, param: click.core.Parameter, location: str) -> str:
     try:
-        netloc = urlparse(location).netloc
+        netloc = validation.parse_url(location).netloc
         if netloc:
             validate_url(location)
             return location
@@ -74,11 +73,9 @@ def validate_url(value: str) -> None:
 
 def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
     try:
-        netloc = urlparse(raw_value).netloc
-    except ValueError as exc:
-        raise click.UsageError(INVALID_BASE_URL_MESSAGE) from exc
-    if raw_value and not netloc:
-        raise click.UsageError(INVALID_BASE_URL_MESSAGE)
+        validation.validate_base_url(raw_value)
+    except ValueError:
+        raise click.UsageError(INVALID_BASE_URL_MESSAGE) from None
     return raw_value
 
 

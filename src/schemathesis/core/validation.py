@@ -1,6 +1,6 @@
 import re
 from typing import Any, TypeGuard
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
 from schemathesis.core.errors import InvalidSchema
 
@@ -72,9 +72,16 @@ INVALID_BASE_URL_MESSAGE = (
 )
 
 
+def parse_url(value: str) -> ParseResult:
+    parsed = urlparse(value)
+    # A port that is not a number from 0 to 65535 raises `ValueError` only when read.
+    _ = parsed.port
+    return parsed
+
+
 def validate_base_url(value: str) -> None:
     try:
-        netloc = urlparse(value).netloc
+        netloc = parse_url(value).netloc
     except ValueError as exc:
         raise ValueError(INVALID_BASE_URL_MESSAGE) from exc
     if value and not netloc:
@@ -89,7 +96,7 @@ INVALID_ORIGIN_MESSAGE = (
 
 def validate_origin(value: str) -> None:
     try:
-        parsed = urlparse(value)
+        parsed = parse_url(value)
     except ValueError as exc:
         raise ValueError(INVALID_ORIGIN_MESSAGE) from exc
     if not parsed.netloc or parsed.path.strip("/") or parsed.query or parsed.fragment:

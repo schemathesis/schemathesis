@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: The provided origin is invalid. It must contain only the scheme, host and port, as the path comes from the schema. Use `--url` if you want to set the path yourself.

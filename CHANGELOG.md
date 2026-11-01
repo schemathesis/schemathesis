@@ -101,6 +101,7 @@
 - False schema error for Open API 3.1 response schemas with `prefixItems` or array-form `items`.
 - Open API 3.2 media type objects behind `$ref` ignored in data generation and response validation.
 - Internal error on a response `content` or media type that is not an object.
+- Internal error on a base URL or origin with a non-numeric or out-of-range port.
 - Occasional exit code 0 and skipped stateful phase after an `object_level_authorization` failure.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
