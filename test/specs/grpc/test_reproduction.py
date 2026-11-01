@@ -107,8 +107,27 @@ def test_reproduction_command(tmp_path, base_url, verify, config, body, expected
         ("Node", {"name": "a", "children": [{"name": "b"}]}, {"name": "a", "children": [{"name": "b"}]}),
         ("Maps", {"byInt32": {"1": "a"}}, {"byInt32": {"1": "a"}}),
         ("Envelope", {"extras": {"k": {"@type": "x"}}}, {"extras": {"k": {"@type": "x"}}}),
+        ("Maps", {"byString": {"token": "t"}}, {"byString": {"token": "[Filtered]"}}),
+        ("Maps", b"\x32\x0a\x0a\x05token\x12\x01t", {"byString": {"token": "[Filtered]"}}),
+        (
+            "WellKnown",
+            {"duration": "9223372036.854775807s", "value": None, "struct": {"k": None}, "labels": {"k": [None]}},
+            {"duration": "9223372036.854775807s", "value": None, "struct": {"k": None}, "labels": {"k": [None]}},
+        ),
+        ("WellKnown", {"duration": "-9223372036.854775808s"}, {"duration": "-9223372036.854775808s"}),
     ],
-    ids=["field-mask", "empty-field-mask", "empty-field-mask-bytes", "repeated", "map", "map-of-messages"],
+    ids=[
+        "field-mask",
+        "empty-field-mask",
+        "empty-field-mask-bytes",
+        "repeated",
+        "map",
+        "map-of-messages",
+        "sensitive",
+        "sensitive-bytes",
+        "longest-duration-and-nulls",
+        "longest-negative-duration",
+    ],
 )
 def test_reproduction_command_field_mask_as_object(tmp_path, method, body, expected):
     path = write_descriptor_set(tmp_path, all_types_descriptor_set())
@@ -145,4 +164,41 @@ def test_reproduction_command_decodes_any(tmp_path, body, expected):
     ) == (
         f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: abc' "
         f"-d {shlex.quote(json.dumps(expected))} 127.0.0.1:50051 types.Types/Envelope"
+    )
+
+
+NULL_LABEL = 'labels { key: "owner" value { null_value: NULL_VALUE } }'
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"duration": "9223372036.854775808s"}, "duration { seconds: 9223372036 nanos: 854775808 }"),
+        (
+            {"duration": "-9223372036.854775809s", "stringValue": "it's"},
+            'duration { seconds: -9223372036 nanos: -854775809 } string_value { value: "it\'s" }',
+        ),
+        ({"labels": {"owner": None}}, NULL_LABEL),
+        (b"\x92\x01\x0b\n\x05owner\x12\x02\x08\x00", NULL_LABEL),
+    ],
+    ids=["long-duration", "long-negative-duration", "null-label", "null-label-bytes"],
+)
+def test_reproduction_command_uses_text_format(tmp_path, body, expected):
+    path = write_descriptor_set(tmp_path, all_types_descriptor_set())
+    case = schemathesis.grpc.from_path(path)["types.Types"]["WellKnown"].Case(body=body)
+    assert case.as_reproduction_command(headers={}, verify=True, base_url="grpc://127.0.0.1:50051") == (
+        f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: {case.id}' "
+        f"-format text -d {shlex.quote(expected)} 127.0.0.1:50051 types.Types/WellKnown"
+    )
+
+
+@pytest.mark.parametrize("body", [b"\xff", b"\x08\x07\x98\x06\x01"], ids=["undecodable", "unknown-field"])
+def test_reproduction_command_notes_raw_bytes(tmp_path, body):
+    path = write_descriptor_set(tmp_path, users_descriptor_set())
+    case = schemathesis.grpc.from_path(path)["pkg.Users"]["GetUser"].Case(body=body)
+    assert case.as_reproduction_command(
+        headers={"x-schemathesis-testcaseid": "abc"}, verify=True, base_url="grpc://127.0.0.1:50051"
+    ) == (
+        f"grpcurl -plaintext -protoset {shlex.quote(str(path))} -H 'x-schemathesis-testcaseid: abc' "
+        f"127.0.0.1:50051 pkg.Users/GetUser\n# grpcurl cannot send this raw request body: {body!r}"
     )

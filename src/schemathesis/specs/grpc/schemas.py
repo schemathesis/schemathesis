@@ -13,7 +13,15 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import jsonschema_rs
-from google.protobuf import descriptor_pb2, descriptor_pool, field_mask_pb2, json_format, message, message_factory
+from google.protobuf import (
+    descriptor_pb2,
+    descriptor_pool,
+    field_mask_pb2,
+    json_format,
+    message,
+    message_factory,
+    text_format,
+)
 from google.protobuf.unknown_fields import UnknownFieldSet
 
 # googleapis-common-protos ships no type information.
@@ -38,6 +46,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.filters import FilterUsage, OperationContext
@@ -58,10 +67,14 @@ from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, Oper
 from schemathesis.specs.grpc import coverage, error_feedback
 from schemathesis.specs.grpc.converter import (
     ANY,
-    body_message,
+    VALUE,
+    decode_body,
+    float32_values,
+    is_well_known,
     map_entry,
     message_schema,
     message_to_json,
+    request_message,
     rewrite_json,
 )
 from schemathesis.specs.grpc.formats import grpc_formats
@@ -84,7 +97,7 @@ from schemathesis.specs.grpc.status import (
 )
 
 if TYPE_CHECKING:
-    from google.protobuf import any_pb2
+    from google.protobuf import any_pb2, duration_pb2
     from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
     from hypothesis.strategies import SearchStrategy
 
@@ -109,6 +122,9 @@ MEDIA_TYPE = "application/grpc"
 VARINT = 0
 LEN = 2
 FIELD_MASK = "google.protobuf.FieldMask"
+DURATION = "google.protobuf.Duration"
+# `grpcurl` reads a `Duration` into a signed 64-bit count of nanoseconds.
+GRPCURL_DURATION_NANOSECONDS = range(-(2**63), 2**63)
 # Metadata that carries credentials, whether set by headers, `--auth` or an auth provider.
 AUTH_METADATA = "authorization"
 # HTTP/2 forbids connection-specific headers, and gRPC sets the rest itself.
@@ -278,9 +294,22 @@ class GrpcSchema(BaseSchema):
         input_type = operation.definition.raw.input_type
         body = {} if isinstance(case.body, NotSet) else case.body
         if isinstance(body, bytes):
-            body = message_to_json(message_factory.GetMessageClass(input_type).FromString(body), input_type.file.pool)
-        args.extend(["-d", json.dumps(rewrite_json(body, input_type, _grpcurl_json)), address, operation.label])
-        return " ".join(shlex.quote(arg) for arg in args)
+            decoded = decode_body(body, input_type)
+            if decoded is None or _drop_unknown_fields(decoded):
+                args.extend([address, operation.label])
+                # `grpcurl` reads only JSON and text bodies, and neither carries these bytes unchanged.
+                return f"{shlex.join(args)}\n# grpcurl cannot send this raw request body: {body!r}"
+            body = message_to_json(decoded, input_type.file.pool)
+        if sanitization.enabled and isinstance(body, (dict, list)):
+            body = deepclone(body)
+            sanitize_value(body, config=sanitization)
+        text = _text_body(body, input_type)
+        if text is None:
+            args.extend(["-d", json.dumps(rewrite_json(body, input_type, _grpcurl_json))])
+        else:
+            args.extend(["-format", "text", "-d", text])
+        args.extend([address, operation.label])
+        return shlex.join(args)
 
     @override
     def status_name_for_code(self, status_code: int) -> str | None:
@@ -500,7 +529,7 @@ class GrpcSchema(BaseSchema):
                 draft=jsonschema_rs.Draft202012,
                 formats=grpc_formats(),
                 alphabet=Alphabet(allow_x00=generation.allow_x00, codec=generation.codec),
-            )
+            ).map(lambda generated: float32_values(generated, input_type))
             if isinstance(body, LinkedValue):
                 bodies = bodies.map(lambda generated: with_value(operation, generated, body.field, body.value))
         else:
@@ -596,7 +625,7 @@ def request_payload(case: Case) -> bytes:
         return body
     input_type = case.operation.definition.raw.input_type
     try:
-        parsed = body_message(body, input_type)
+        parsed = request_message({} if isinstance(body, NotSet) else body, input_type)
     except (json_format.ParseError, TypeError) as exc:
         raise SerializationError(f"Cannot encode the request body as `{input_type.full_name}`: {exc}") from None
     return parsed.SerializeToString(deterministic=True)
@@ -738,6 +767,54 @@ def _ignored_auth(label: str, case_id: str) -> IgnoredAuth:
         scenario=AuthScenario.NO_AUTH,
         case_id=case_id,
     )
+
+
+def _text_body(body: object, input_type: Descriptor) -> str | None:
+    """`body` in the text format, when `grpcurl` would read its JSON form as a different message."""
+    try:
+        request = request_message(body, input_type)
+    except (json_format.ParseError, TypeError):
+        # `grpcurl` rejects such a body in either format.
+        return None
+    if not _misread_by_grpcurl(request):
+        return None
+    # `grpcurl` rejects the `\'` escape, and inside double quotes a plain quote means the same.
+    return text_format.MessageToString(request, as_one_line=True).replace("\\'", "'")
+
+
+def _misread_by_grpcurl(request: message.Message) -> bool:
+    """Whether `grpcurl` reads the JSON form of `request` as a different message."""
+    name = request.DESCRIPTOR.full_name
+    if name == DURATION:
+        return cast("duration_pb2.Duration", request).ToNanoseconds() not in GRPCURL_DURATION_NANOSECONDS
+    # Other well-known messages keep their meaning, including `null` inside `Struct` and `ListValue`.
+    if is_well_known(name):
+        return False
+    for member, value in request.ListFields():
+        if member.message_type is None:
+            continue
+        entry = map_entry(member)
+        if entry is None:
+            items = value if member.is_repeated else [value]
+        else:
+            value_type = entry.fields_by_name["value"].message_type
+            if value_type is None:
+                continue
+            items = list(value.values())
+            # `grpcurl` reads `null` in a map of `Value`s as a `Value` of no kind.
+            if value_type.full_name == VALUE and any(item.WhichOneof("kind") == "null_value" for item in items):
+                return True
+        if any(_misread_by_grpcurl(item) for item in items):
+            return True
+    return False
+
+
+def _drop_unknown_fields(decoded: message.Message) -> bool:
+    """Drop fields that `decoded` and messages inside it do not declare; whether there were any."""
+    # Not every protobuf runtime counts unknown fields in `ByteSize`, but all of them serialize them.
+    size = len(decoded.SerializeToString())
+    decoded.DiscardUnknownFields()
+    return len(decoded.SerializeToString()) != size
 
 
 def _decode(

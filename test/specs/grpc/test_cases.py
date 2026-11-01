@@ -230,6 +230,7 @@ def edges_rules(edges):
         "odds": edges.odds not in (0.5, 1.100000023841858, 1.5, FLOAT32_MAX, math.inf, -math.inf),
         "pinned": set(edges.pinned) <= {5},
         "outer": all(key > 10 or key < 5 for key in edges.outer),
+        "default_kind": edges.default_kind == 0,
         "created": edges.HasField("created"),
     }
 
@@ -267,7 +268,7 @@ def test_positive_values_satisfy_validation_rules(validated_schema, method):
 
 def test_positive_values_satisfy_validation_rules_with_reported_fields(validated_schema):
     operation = validated_schema["validated.Spans"]["Edge"]
-    feedback = feedback_for(operation, ("nonzero",), ("picks",), ("triple",))
+    feedback = feedback_for(operation, ("nonzero",), ("picks",), ("triple",), ("defaultKind",))
 
     @run_given(case=operation.as_strategy(feedback=feedback), max_examples=50)
     def test(case):
@@ -374,7 +375,7 @@ def test_coverage_case_counts(schema):
     assert {method: len(coverage_cases(schema, method)) for method in METHODS} == {
         "Scalars": 26,
         "Maps": 7,
-        "WellKnown": 35,
+        "WellKnown": 36,
         "Node": 4,
         "Envelope": 4,
         "Choice": 6,
@@ -495,6 +496,16 @@ def test_bytes_use_standard_alphabet():
     @run_given(grpc_formats()["byte"], max_examples=50)
     def test(value):
         assert base64.b64encode(base64.b64decode(value, validate=True)).decode() == value
+
+
+# Command-line clients parse `float` values as 32-bit floats and drop `-0.0`.
+def test_float_values_are_sent_as_generated(schema):
+    operation = schema["types.Types"]["Scalars"]
+
+    @run_given(case=operation.as_strategy(), max_examples=50)
+    def test(case):
+        sent = request_message(case.body, operation.definition.raw.input_type).float
+        assert str(sent) == str(case.body.get("float", 0.0)) != "-0.0", case.body
 
 
 @pytest.mark.parametrize("method", METHODS)

@@ -206,10 +206,16 @@ def serialize_bodies(schema):
         return json_format.ParseDict(body, message_class()).SerializeToString()
 
 
+def undecodable_get_bodies(schema):
+    @schema.hook
+    def map_body(context, body):
+        return b"\xff" if context.operation.label == "library.Library/GetBook" else body
+
+
 @pytest.mark.parametrize(
     ("mutate_files", "hooks"),
-    [(None, serialize_bodies), (create_also_pages, None)],
-    ids=["serialized-bodies", "create-also-pages"],
+    [(None, serialize_bodies), (create_also_pages, None), (None, undecodable_get_bodies)],
+    ids=["serialized-bodies", "create-also-pages", "undecodable-bodies"],
 )
 def test_created_names_reach_get(ctx, tmp_path, mutate_files, hooks):
     schema = load(tmp_path, mutate_files=mutate_files, server=ctx.grpc.apps.library())

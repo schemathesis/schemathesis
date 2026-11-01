@@ -4,6 +4,7 @@ import base64
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, cast
 
+import jsonschema_rs
 from google.protobuf import message
 
 # googleapis-common-protos ships no type information.
@@ -12,7 +13,9 @@ from google.rpc import error_details_pb2, status_pb2  # type: ignore[import-unty
 from schemathesis.core.error_feedback import Observation, ObservationKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
 from schemathesis.specs.grpc.converter import body_message, json_fields, require_set
+from schemathesis.specs.grpc.formats import grpc_formats
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor, FieldDescriptor
@@ -31,6 +34,9 @@ def parse_rejection(operation: APIOperation, case: Case, response: Response) -> 
         return ()
     descriptor = operation.definition.raw.input_type
     request = body_message(case.body, descriptor)
+    if request is None:
+        # Nothing tells which fields raw bytes that do not decode left unset.
+        return ()
     return tuple(
         Observation(
             operation_label=operation.label,
@@ -61,6 +67,13 @@ def require_fields(schema: JsonSchemaObject, descriptor: Descriptor, observation
             if properties is None or name not in properties:
                 break
             field = json_fields(message_type)[name]
+            required_schema = deepclone(properties[name])
+            require_set(required_schema, field)
+            # Requiring a field that holds only its zero value would leave nothing to generate.
+            candidate = {**required_schema, "$defs": definitions}
+            if build(candidate, draft=jsonschema_rs.Draft202012, formats=grpc_formats()) is EMPTY_STRATEGY:
+                break
+            properties[name] = required_schema
             oneof = field.containing_oneof
             if oneof is None:
                 required = cast("list[str]", target.setdefault("required", []))
@@ -72,7 +85,6 @@ def require_fields(schema: JsonSchemaObject, descriptor: Descriptor, observation
                     oneofs[key] = []
                     cast("list[JsonValue]", target.setdefault("allOf", [])).append({"anyOf": oneofs[key]})
                 oneofs[key].append({"required": [name]})
-            require_set(properties[name], field)
             if field.message_type is None:
                 break
             message_type = field.message_type
