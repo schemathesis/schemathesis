@@ -94,6 +94,7 @@
 - Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
 - False `Network Error` when `--max-time` runs out while a response body is still arriving.
 - False `Connection failed` and unsupported API capabilities when a response body outlasts `--request-timeout`.
+- False `Connection failed` when a schema response body outlasts the timeout.
 - Outage reports leading with hanging requests, repeating cut-off ones as network errors, with misleading tips.
 - Outage reports omitting the request that crashed the server when it timed out.
 - False positive `response_schema_conformance` for Open API 3.2 discriminators with `defaultMapping`.

@@ -8,10 +8,10 @@ from django.core.wsgi import get_wsgi_application
 from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import path
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, Response, jsonify, redirect, request
 
 import schemathesis
-from schemathesis.core.errors import LoaderError
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.transport import USER_AGENT
 from test.apps.catalog.graphql import bookstore
 from test.apps.catalog.openapi import basic
@@ -177,6 +177,33 @@ def test_wait_for_schema_retries_on_read_timeout(ctx, app_runner):
     loaded = schemathesis.openapi.from_url(url, wait_for_schema=10, timeout=1)
     assert loaded.raw_schema == schema
     assert call_count[0] == 2
+
+
+# The headers arrive at once, then the body stalls past the timeout.
+def test_schema_body_read_timeout_reported_as_timeout(app_runner):
+    release = threading.Event()
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        def stall_mid_body():
+            yield "{"
+            release.wait()
+            yield "}"
+
+        return Response(stall_mid_body(), content_type="application/json")
+
+    url = app_runner.openapi_url(app)
+    try:
+        with pytest.raises(LoaderError) as exc_info:
+            schemathesis.openapi.from_url(url, timeout=0.2)
+    finally:
+        release.set()
+    assert (exc_info.value.kind, exc_info.value.message, exc_info.value.extras) == (
+        LoaderErrorKind.NETWORK_OTHER,
+        "Read timed out after 0.2 seconds",
+        [],
+    )
 
 
 COMMON_MIDDLEWARE = "django.middleware.common.CommonMiddleware"
