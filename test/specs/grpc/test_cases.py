@@ -373,9 +373,9 @@ def test_coverage_cases(schema, method, expected):
 
 def test_coverage_case_counts(schema):
     assert {method: len(coverage_cases(schema, method)) for method in METHODS} == {
-        "Scalars": 26,
+        "Scalars": 32,
         "Maps": 7,
-        "WellKnown": 36,
+        "WellKnown": 42,
         "Node": 4,
         "Envelope": 4,
         "Choice": 6,
@@ -409,12 +409,54 @@ def test_coverage_scalar_bounds(schema):
     )
 
 
+@pytest.mark.parametrize(
+    ("method", "fields"),
+    [("Scalars", ("float", "double")), ("WellKnown", ("floatValue", "doubleValue"))],
+)
+def test_coverage_non_finite_floats(schema, method, fields):
+    bodies = [body for _, body in coverage_cases(schema, method)]
+    for field in fields:
+        assert {body[field] for body in bodies if field in body} >= {"NaN", "Infinity", "-Infinity"}
+
+
 def test_coverage_exclusive_float_bounds(validated_schema):
     span = dict(coverage_cases(validated_schema, "Record", "validated.Spans"))
     edges = dict(coverage_cases(validated_schema, "Edge", "validated.Spans"))
     assert (span["Maximum `ratio`"]["ratio"], edges["Maximum `small`"]["small"]) == (
         math.nextafter(1, 0),
         next_float32(1, going_up=False),
+    )
+
+
+def test_coverage_rule_boundaries(validated_schema):
+    record = [body for _, body in coverage_cases(validated_schema, "Record", "validated.Spans")]
+    check = [body for _, body in coverage_cases(validated_schema, "Check", "validated.Spans")]
+    edge = [body for _, body in coverage_cases(validated_schema, "Edge", "validated.Spans")]
+    assert {len(body["name"]) for body in record} >= {4, 5, 9, 10}
+    assert {len(body["payload"]) for body in record} >= {4, 8, 12}
+    assert {len(body["tags"]) for body in record if "tags" in body} >= {1, 2, 3}
+    assert {len(body["labels"]) for body in record if "labels" in body} >= {1, 2}
+    assert {body["chosen"] for body in check if "chosen" in body} >= {"a", "b"}
+    assert {body["level"] for body in check if "level" in body} >= {1, 2}
+    assert {tuple(body["modes"]) for body in check if "modes" in body} >= {("KIND_A",), ("KIND_B",)}
+    assert {body["token"] for body in edge if "token" in body} >= {"AAE=", "AQI="}
+
+
+def test_coverage_required_oneof_branches(validated_schema):
+    record = dict(coverage_cases(validated_schema, "Record", "validated.Spans"))
+    choose = dict(coverage_cases(validated_schema, "Choose", "validated.Spans"))
+    right = record["Oneof branch `right`"]
+    regex = choose["Oneof branch `regex`"]
+    nested = choose["`regex.enabled` set to true"]
+    assert right["right"] == "" and "left" not in right
+    assert regex["regex"] == {} and "exact" not in regex
+    assert nested["regex"] == {"enabled": True} and "exact" not in nested
+
+
+def test_coverage_recursive_required_oneof(validated_schema):
+    assert coverage_cases(validated_schema, "Recurse", "validated.Spans")[0] == (
+        "Default positive test case",
+        {"leaf": ""},
     )
 
 

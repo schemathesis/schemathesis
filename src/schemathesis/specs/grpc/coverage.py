@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Final, cast
 
 import jsonschema_rs
 from google.protobuf.descriptor import FieldDescriptor
+from hypothesis.errors import Unsatisfiable
 
 from schemathesis.core.cache import MISSING
 from schemathesis.core.jsonschema import make_validator_for
@@ -109,7 +110,7 @@ def iter_coverage_cases(
 class _Values:
     """Values that the JSON Schema of a message admits, so they also satisfy its validation rules."""
 
-    __slots__ = ("schema", "definitions", "alphabet", "constraints", "validators", "smallest_values")
+    __slots__ = ("schema", "definitions", "alphabet", "constraints", "validators", "smallest_values", "building")
 
     def __init__(self, schema: JsonSchemaObject, alphabet: Alphabet, constraints: ConstraintReader | None) -> None:
         self.schema = schema
@@ -119,6 +120,7 @@ class _Values:
         # Keyed by the identity of subschemas of `schema`, which live as long as this object.
         self.validators: dict[int, jsonschema_rs.Validator] = {}
         self.smallest_values: dict[int, JsonValue] = {}
+        self.building: set[str] = set()
 
     def resolve(self, schema: JsonSchemaObject) -> JsonSchemaObject:
         reference = schema.get("$ref")
@@ -137,16 +139,26 @@ class _Values:
         """A zero or the first allowed value, or one generated from the schema when none of them fits."""
         key = id(schema)
         if key not in self.smallest_values:
-            value = next((value for value in self._candidates(schema) if self.is_valid(schema, value)), MISSING)
-            if value is MISSING:
-                value = generate_one(
-                    build(
-                        {**schema, "$defs": self.definitions},
-                        draft=jsonschema_rs.Draft202012,
-                        formats=grpc_formats(),
-                        alphabet=self.alphabet,
+            reference = schema.get("$ref")
+            definition = reference.rsplit("/", 1)[1] if isinstance(reference, str) else None
+            if definition is not None:
+                if definition in self.building:
+                    raise Unsatisfiable(f"Recursive definition `{definition}` has no finite value")
+                self.building.add(definition)
+            try:
+                value = next((value for value in self._candidates(schema) if self.is_valid(schema, value)), MISSING)
+                if value is MISSING:
+                    value = generate_one(
+                        build(
+                            {**schema, "$defs": self.definitions},
+                            draft=jsonschema_rs.Draft202012,
+                            formats=grpc_formats(),
+                            alphabet=self.alphabet,
+                        )
                     )
-                )
+            finally:
+                if definition is not None:
+                    self.building.remove(definition)
             self.smallest_values[key] = cast("JsonValue", value)
         return self.smallest_values[key]
 
@@ -159,7 +171,16 @@ class _Values:
             yield from ZEROS
         yield from _bounds(target)
         if "properties" in target:
-            yield {name: self.smallest(target["properties"][name]) for name in _required(target)}
+            built = False
+            for required in _required_variants(target):
+                try:
+                    value = {name: self.smallest(target["properties"][name]) for name in required}
+                except Unsatisfiable:
+                    continue
+                built = True
+                yield value
+            if not built:
+                raise Unsatisfiable("No required oneof branch has a finite value")
         elif "items" in target:
             yield [self.smallest(target["items"])]
         elif "additionalProperties" in target:
@@ -239,14 +260,35 @@ class _Values:
             # Without a map the rules admit, the case fails them and is left out.
             entry = next((entry for entry in self._entries(schema) if self.is_valid(schema, entry)), None)
             yield CoverageScenario.VALID_OBJECT, "One default entry in `{}`", entry, entry
+            yield from self._boundary_variants(field, schema)
             return
         if field.is_repeated:
             items = [self.smallest(schema["items"])]
             yield CoverageScenario.VALID_ARRAY, "One default item in `{}`", items, items
+            for item in self.resolve(schema["items"]).get("enum", ()):
+                yield CoverageScenario.ENUM_VALUE_ITEMS_ARRAY, f"`{{}}` item set to `{item}`", [item], [item]
+            yield from self._boundary_variants(field, schema)
             return
         if _is_oneof_member(field):
             value = self.smallest(schema)
             yield CoverageScenario.VALID_OBJECT, "Oneof branch `{}`", value, value
+        scalar = field
+        if field.message_type is not None and field.message_type.full_name in (
+            "google.protobuf.FloatValue",
+            "google.protobuf.DoubleValue",
+        ):
+            scalar = field.message_type.fields_by_name["value"]
+        constraints = self.constraints.field(field) if self.constraints is not None else None
+        if scalar.type in (FieldDescriptor.TYPE_FLOAT, FieldDescriptor.TYPE_DOUBLE) and (
+            constraints is None or constraints.kind not in ("float", "double")
+        ):
+            checked = self.smallest(schema)
+            for value in ("NaN", "Infinity", "-Infinity"):
+                yield CoverageScenario.VALID_NUMBER, f"`{{}}` set to {value}", value, checked
+        if field.enum_type is None:
+            for value in self.resolve(schema).get("enum", ()):
+                yield CoverageScenario.ENUM_VALUE, f"`{{}}` set to `{value}`", value, value
+        yield from self._boundary_variants(field, schema)
         if field.message_type is not None:
             value = self.smallest(schema)
             yield CoverageScenario.VALID_OBJECT, "Empty `{}` message", value, value
@@ -271,6 +313,48 @@ class _Values:
             yield CoverageScenario.MINIMUM_VALUE, "Minimum `{}`", minimum, minimum
             yield CoverageScenario.MAXIMUM_VALUE, "Maximum `{}`", maximum, maximum
 
+    def _boundary_variants(self, field: FieldDescriptor, schema: JsonSchemaObject) -> Iterator[Variant]:
+        target = self.resolve(schema)
+        kind = target.get("type")
+        if kind == "string":
+            keywords = "minLength", "maxLength"
+            scenarios = (
+                CoverageScenario.MINIMUM_LENGTH_STRING,
+                CoverageScenario.MAXIMUM_LENGTH_STRING,
+                CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
+            )
+        elif kind == "array":
+            keywords = "minItems", "maxItems"
+            scenarios = (
+                CoverageScenario.VALID_ARRAY,
+                CoverageScenario.MAXIMUM_ITEMS_ARRAY,
+                CoverageScenario.NEAR_BOUNDARY_ITEMS_ARRAY,
+            )
+        elif kind == "object" and "additionalProperties" in target:
+            keywords = "minProperties", "maxProperties"
+            scenarios = (CoverageScenario.VALID_OBJECT, CoverageScenario.VALID_OBJECT, CoverageScenario.VALID_OBJECT)
+        else:
+            return
+        sources = target.get("anyOf", ()) if field.type == FieldDescriptor.TYPE_BYTES else (target,)
+        for item in sources:
+            source = cast("JsonSchemaObject", item)
+            minimum, maximum = _limits(source, *keywords)
+            for boundary, value in _boundary_values(minimum, maximum):
+                exact = {keywords[0]: value, keywords[1]: value}
+                try:
+                    generated = generate_one(
+                        build(
+                            {"allOf": [schema, source, exact], "$defs": self.definitions},
+                            draft=jsonschema_rs.Draft202012,
+                            formats=grpc_formats(),
+                            alphabet=self.alphabet,
+                        )
+                    )
+                except Unsatisfiable:
+                    continue
+                scenario = scenarios[0 if boundary == "Minimum" else 1 if boundary == "Maximum" else 2]
+                yield scenario, f"{boundary} length or count `{{}}`", generated, generated
+
     def _nest(
         self, path: FieldPath, schemas: tuple[JsonSchemaObject, ...], value: JsonValue, base: JsonValue
     ) -> JsonValue:
@@ -280,7 +364,13 @@ class _Values:
             inner_schema = schemas[0]["items"] if field.is_repeated else schemas[0]
             inner = self._nest(tuple(rest), schemas[1:], value, self.smallest(inner_schema))
             value = [inner] if field.is_repeated else inner
-        return {**cast("dict[str, JsonValue]", base), field.json_name: value}
+        body = dict(cast("dict[str, JsonValue]", base))
+        if _is_oneof_member(field):
+            assert field.containing_oneof is not None
+            for member in field.containing_oneof.fields:
+                body.pop(member.json_name, None)
+        body[field.json_name] = value
+        return body
 
 
 def _bounds(schema: JsonSchemaObject) -> tuple[int | float, ...]:
@@ -291,6 +381,30 @@ def _bounds(schema: JsonSchemaObject) -> tuple[int | float, ...]:
     step = _step_integer if kind == "integer" else _step_float
     ranges = [resolve_inclusive_bounds(part, step=step) for part in (schema, *schema.get("allOf", ()))]
     return max(low for low, _ in ranges if low is not None), min(high for _, high in ranges if high is not None)
+
+
+def _limits(schema: JsonSchemaObject, minimum_name: str, maximum_name: str) -> tuple[int | None, int | None]:
+    parts = (schema, *schema.get("allOf", ()))
+    minimums = [part[minimum_name] for part in parts if isinstance(part.get(minimum_name), int)]
+    maximums = [part[maximum_name] for part in parts if isinstance(part.get(maximum_name), int)]
+    return (max(minimums) if minimums else None, min(maximums) if maximums else None)
+
+
+def _boundary_values(minimum: int | None, maximum: int | None) -> Iterator[tuple[str, int]]:
+    values = []
+    if minimum is not None:
+        values.append(("Minimum", minimum))
+        if maximum is None or minimum + 1 <= maximum:
+            values.append(("Near-boundary", minimum + 1))
+    if maximum is not None:
+        if minimum is None or maximum - 1 >= minimum:
+            values.append(("Near-boundary", maximum - 1))
+        values.append(("Maximum", maximum))
+    yielded = set()
+    for boundary, value in values:
+        if value not in yielded:
+            yielded.add(value)
+            yield boundary, value
 
 
 def _step_integer(value: int | float, going_up: bool) -> int | float:
@@ -311,15 +425,17 @@ def _has_format(schema: JsonValue) -> bool:
     return isinstance(schema, list) and any(_has_format(item) for item in schema)
 
 
-def _required(schema: JsonSchemaObject) -> list[str]:
-    """Required fields of a message schema, with the first member of each oneof that must be set."""
+def _required_variants(schema: JsonSchemaObject) -> Iterator[list[str]]:
+    """Required fields of a message schema, trying each member of every required oneof."""
     required = list(schema.get("required", ()))
+    choices = []
     for group in schema.get("allOf", ()):
         branches = group["oneOf"]
         # A oneof that may stay unset admits a branch with none of its members.
         if all("required" in branch for branch in branches):
-            required.append(branches[0]["required"][0])
-    return required
+            choices.append([branch["required"][0] for branch in branches])
+    for selected in itertools.product(*choices):
+        yield [*required, *selected]
 
 
 def _render(path: FieldPath) -> str:
