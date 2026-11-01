@@ -11,7 +11,7 @@ from test.apps.catalog.grpc.descriptors import (
     users_descriptor_set,
     write_descriptor_set,
 )
-from test.utils import refusing_url
+from test.utils import crash_cache_dir, refusing_url
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
@@ -90,6 +90,34 @@ def map_body(context, body):
         == snapshot_cli
     )
     assert [dict(call.metadata).get("authorization") for call in server.calls] == sent
+
+
+# The crash file keeps the credentials unmasked, so replay sends them as the run did.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_ignored_auth_replay(ctx, cli, tmp_path, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 1}
+        """
+    )
+    cli.main(
+        "run",
+        server.target,
+        "--include-name=pkg.Users/GetUser",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--checks=ignored_auth",
+        "--output-sanitize=false",
+        "-H",
+        "Authorization: Bearer secret",
+        hooks=module,
+    )
+    crash_files = sorted(crash_cache_dir(tmp_path).glob("*.json"))
+    assert cli.main("replay") == snapshot_cli
+    assert sorted(crash_cache_dir(tmp_path).glob("*.json")) == crash_files
 
 
 @pytest.mark.parametrize("report", ["har", "vcr", "pytest"])

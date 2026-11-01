@@ -7,12 +7,13 @@ import shlex
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn, Self
+from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import jsonschema_rs
 from google.protobuf import descriptor_pb2, descriptor_pool, field_mask_pb2, json_format, message, message_factory
+from google.protobuf.unknown_fields import UnknownFieldSet
 
 # googleapis-common-protos ships no type information.
 from google.rpc import status_pb2  # type: ignore[import-untyped]
@@ -54,7 +55,9 @@ from schemathesis.hooks import HookContext, apply_to_all_dispatchers
 from schemathesis.schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition, UndeclaredResponses
 from schemathesis.specs.grpc import coverage, error_feedback
 from schemathesis.specs.grpc.converter import (
+    ANY,
     body_message,
+    map_entry,
     message_schema,
     message_to_json,
     rewrite_json,
@@ -72,7 +75,8 @@ from schemathesis.specs.grpc.status import (
 )
 
 if TYPE_CHECKING:
-    from google.protobuf.descriptor import MethodDescriptor, ServiceDescriptor
+    from google.protobuf import any_pb2
+    from google.protobuf.descriptor import Descriptor, MethodDescriptor, ServiceDescriptor
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
@@ -91,6 +95,9 @@ if TYPE_CHECKING:
 
 
 MEDIA_TYPE = "application/grpc"
+# Protobuf wire types of varint and length-delimited values.
+VARINT = 0
+LEN = 2
 FIELD_MASK = "google.protobuf.FieldMask"
 # Metadata that carries credentials, whether set by headers, `--auth` or an auth provider.
 AUTH_METADATA = "authorization"
@@ -304,30 +311,40 @@ class GrpcSchema(BaseSchema):
         if grpc_status(response) == OK:
             output_type = operation.definition.raw.output_type
             decoded = _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
+            undeclared = dict.fromkeys(_undeclared_fields(operation, decoded, output_type, "response"))
             # A descriptor set can lag behind the server; reflection describes what the server runs.
-            if self.descriptor_set_path is None:
-                size = decoded.ByteSize()
-                decoded.DiscardUnknownFields()
-                if decoded.ByteSize() != size:
-                    raise UndeclaredGrpcFields(
-                        operation=operation.label,
-                        message=f"The response carries fields that `{output_type.full_name}` does not declare",
-                    )
+            if self.descriptor_set_path is None and undeclared:
+                fields = ", ".join(f"`{path}`" for path in undeclared)
+                raise UndeclaredGrpcFields(
+                    operation=operation.label,
+                    message=f"The response carries fields that `{output_type.full_name}` does not declare: {fields}",
+                )
         else:
             for details in response.headers.get("grpc-status-details-bin", []):
-                _decode(operation, status_pb2.Status, base64.b64decode(details), "status details")
+                status = _decode(operation, status_pb2.Status, base64.b64decode(details), "status details")
+                # Status details are read with bundled descriptors, not the server's, so only failures to decode count.
+                _undeclared_fields(operation, status, status_pb2.Status.DESCRIPTOR, "status details")
 
     @override
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        if grpc_status(response) != OK or AUTH_METADATA not in response.request.headers:
+        if grpc_status(response) != OK:
             return True
         label = case.operation.label
+        if AUTH_METADATA not in response.request.headers:
+            # Replaying a crash checks the probe itself, sent without the credentials of the call it came from.
+            parent = ctx.internals.find_parent(case_id=case.id)
+            if parent is None or parent.operation.label != label or not _sent_credentials(ctx, parent):
+                return True
+            raise _ignored_auth(label, case.id)
         enforced = ctx.auth_enforced_operations
         # Enforcement is a property of the method, so one confirmation per run is enough.
         if enforced is not None and label in enforced:
             return None
         headers = case.headers.copy()
-        headers.pop(AUTH_METADATA, None)
+        # Auth providers may set a plain dictionary, where the key keeps the casing they wrote.
+        for key in list(headers):
+            if key.lower() == AUTH_METADATA:
+                del headers[key]
         probe = case.derive(headers=headers)
         kwargs = dict(ctx.internals.transport_kwargs or {})
         kwargs["headers"] = {
@@ -339,12 +356,7 @@ class GrpcSchema(BaseSchema):
         probe_response = ctx.internals.send_probe(case, probe, kwargs)
         # Without declared security, other errors may come from the anonymous caller's data, not from ignored auth.
         if grpc_status(probe_response) == OK:
-            raise IgnoredAuth(
-                operation=label,
-                message=f"Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `{label}`",
-                scenario=AuthScenario.NO_AUTH,
-                case_id=probe.id,
-            )
+            raise _ignored_auth(label, probe.id)
         if enforced is not None:
             enforced.add(label)
         return None
@@ -613,16 +625,92 @@ def _grpcurl_json(value: object, type_name: str) -> object:
     return value
 
 
+def _undeclared_fields(
+    operation: APIOperation, decoded: message.Message, root: Descriptor, what: str, prefix: str = ""
+) -> list[str]:
+    """Paths to the fields that `decoded` and the messages in it carry without declaring them.
+
+    `root` holds `decoded`: failures name it, and packed values resolve among its types. Fails on what stricter
+    runtimes refuse: a declared field under another wire type, or a `google.protobuf.Any` value of a known type that
+    does not decode.
+    """
+    descriptor = decoded.DESCRIPTOR
+    undeclared = []
+    unknown_fields = UnknownFieldSet(decoded)
+    for index in range(len(unknown_fields)):
+        unknown = unknown_fields[index]
+        number = unknown.field_number
+        field = descriptor.fields_by_number.get(number)
+        if field is None:
+            # Extensions can be declared in files the schema lacks, such as ones reflection does not return.
+            if not any(start <= number < end for start, end in descriptor.extension_ranges):
+                undeclared.append(f"{prefix}{number}")
+        # A closed enum keeps values it does not list as unknown fields, under the field's own wire type.
+        elif field.enum_type is None or not field.enum_type.is_closed or unknown.wire_type not in (VARINT, LEN):
+            raise MalformedGrpcMessage(
+                operation=operation.label,
+                type_name=root.full_name,
+                message=f"Cannot decode the {what} as `{root.full_name}`: field `{prefix}{field.name}` arrived with "
+                f"wire type {unknown.wire_type}",
+            )
+    for field, value in decoded.ListFields():
+        if field.message_type is None:
+            continue
+        entry = map_entry(field)
+        if entry is None:
+            items = value if field.is_repeated else (value,)
+        elif entry.fields_by_name["value"].message_type is not None:
+            items = value.values()
+        else:
+            continue
+        for item in items:
+            undeclared.extend(_undeclared_fields(operation, item, root, what, f"{prefix}{field.name}."))
+    if descriptor.full_name == ANY:
+        packed = cast("any_pb2.Any", decoded)
+        try:
+            packed_type = root.file.pool.FindMessageTypeByName(packed.type_url.rpartition("/")[2])
+        except KeyError:
+            # Values of types without descriptors stay opaque, as they do to any client.
+            pass
+        else:
+            unpacked = _decode(
+                operation, message_factory.GetMessageClass(packed_type), packed.value, f"`{ANY}` value in the {what}"
+            )
+            undeclared.extend(_undeclared_fields(operation, unpacked, root, what, prefix))
+    return undeclared
+
+
+def _sent_credentials(ctx: CheckContext, case: Case) -> bool:
+    response = ctx.internals.find_response(case_id=case.id)
+    return response is not None and AUTH_METADATA in response.request.headers
+
+
+def _ignored_auth(label: str, case_id: str) -> IgnoredAuth:
+    return IgnoredAuth(
+        operation=label,
+        message=f"Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `{label}`",
+        scenario=AuthScenario.NO_AUTH,
+        case_id=case_id,
+    )
+
+
 def _decode(
     operation: APIOperation, message_class: type[message.Message], content: bytes, what: str
 ) -> message.Message:
     name = message_class.DESCRIPTOR.full_name
     try:
-        return message_class.FromString(content)
+        decoded = message_class.FromString(content)
     except message.DecodeError as exc:
-        raise MalformedGrpcMessage(
-            operation=operation.label, type_name=name, message=f"Cannot decode the {what} as `{name}`: {exc}"
-        ) from None
+        reason = str(exc)
+    else:
+        # Other protobuf runtimes refuse a message that lacks required fields. The type stubs omit this method.
+        missing = decoded.FindInitializationErrors()  # type: ignore[attr-defined]
+        if not missing:
+            return decoded
+        reason = f"required fields missing: {', '.join(missing)}"
+    raise MalformedGrpcMessage(
+        operation=operation.label, type_name=name, message=f"Cannot decode the {what} as `{name}`: {reason}"
+    )
 
 
 @st.composite

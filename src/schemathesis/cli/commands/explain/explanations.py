@@ -122,7 +122,9 @@ EXPLANATIONS: dict[str, Explanation] = {
         summary="gRPC response or status details that do not decode as the declared message.",
         notes="""
             A successful response must decode as the method's output message, and `grpc-status-details-bin` on an
-            error must decode as `google.rpc.Status`. Regenerate the descriptor set if the server's protos changed.
+            error must decode as `google.rpc.Status`. Required fields, wire types and `google.protobuf.Any` values of
+            known types are checked as strict protobuf runtimes check them. Regenerate the descriptor set if the
+            server's protos changed.
         """,
     ),
     "ST118": Explanation(

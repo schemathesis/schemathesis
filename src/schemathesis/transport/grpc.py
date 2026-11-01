@@ -173,7 +173,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                     rendered = message_to_json(output_class.FromString(content), method.output_type.file.pool)
                     return json.dumps(rendered, indent=2, ensure_ascii=False)
                 except message.DecodeError:
-                    # Shown as binary; the response checks report the malformed message.
+                    # Shown as binary; response conformance reports the message or packed value that does not decode.
                     return None
 
         return Response(

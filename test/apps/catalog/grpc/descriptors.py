@@ -361,12 +361,12 @@ def all_types_descriptor_set() -> bytes:
         ".types.Envelope",
         ".types.Choice",
         ".legacy.Legacy",
+        ".legacy.Extendable",
         ".editions.Edition",
         ".google.protobuf.StringValue",
     ):
-        service.method.add(
-            name=input_type.rsplit(".", 1)[1], input_type=input_type, output_type=".google.protobuf.Empty"
-        )
+        # Each method answers with its request message, so responses take every shape requests do.
+        service.method.add(name=input_type.rsplit(".", 1)[1], input_type=input_type, output_type=input_type)
     return descriptor_pb2.FileDescriptorSet(file=[*well_known, legacy, editions, types]).SerializeToString()
 
 

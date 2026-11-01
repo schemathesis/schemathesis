@@ -1,11 +1,15 @@
+import os
 import platform
 import socket
+import subprocess
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 import trustme
+from google.protobuf import any_pb2
 
 import schemathesis
 from schemathesis.core.errors import IncorrectUsage, LoaderError, LoaderErrorKind
@@ -208,12 +212,64 @@ def test_known_fields_pass_for_reflection_schemas(ctx, response_factory):
 UNKNOWN_FIELDS = [b"\x0a\x02u7\x98\x06\x01", b"\x0a\x02u7\x12\x03\x98\x06\x01"]
 
 
-@pytest.mark.parametrize("content", UNKNOWN_FIELDS, ids=["top-level", "nested"])
-def test_unknown_fields_fail_for_reflection_schemas(ctx, response_factory, content):
-    operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
+PACKED_USER = any_pb2.Any(type_url="type.googleapis.com/pkg.User", value=b"\x98\x06\x01").SerializeToString()
+# `google.longrunning.Operation` whose `response` holds a `pkg.User` with field 99.
+PACKED_UNKNOWN_FIELD = b"\x2a" + bytes([len(PACKED_USER)]) + PACKED_USER
+
+
+@pytest.mark.parametrize(
+    ("label", "content", "message"),
+    [
+        ("pkg.Users/GetUser", UNKNOWN_FIELDS[0], "`pkg.User` does not declare: `99`"),
+        ("pkg.Users/GetUser", UNKNOWN_FIELDS[1], "`pkg.User` does not declare: `created_at.99`"),
+        (
+            "pkg.Users/GetUser",
+            b"\x98\x06\x01\x98\x06\x02\x12\x06\x98\x06\x01\xa0\x06\x01",
+            "`pkg.User` does not declare: `99`, `created_at.99`, `created_at.100`",
+        ),
+        ("pkg.Admin/Reset", PACKED_UNKNOWN_FIELD, "`google.longrunning.Operation` does not declare: `response.99`"),
+    ],
+    ids=["top-level", "nested", "several", "packed"],
+)
+def test_unknown_fields_fail_for_reflection_schemas(ctx, response_factory, label, content, message):
+    operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target).find_operation_by_label(label)
     response = response_factory.core(content=content, content_type=None, headers={"grpc-status": ["0"]})
-    with pytest.raises(UndeclaredGrpcFields, match="The response carries fields that `pkg.User` does not declare"):
+    with pytest.raises(UndeclaredGrpcFields) as exc_info:
         operation.validate_response(response, case=operation.Case(body={}))
+    assert exc_info.value.message == f"The response carries fields that {message}"
+
+
+# Extensions can be declared in files that reflection does not return.
+def test_unknown_extension_numbers_pass_for_reflection_schemas(ctx, response_factory):
+    operation = schemathesis.grpc.from_url(ctx.grpc.apps.envelope().target)["types.Types"]["Extendable"]
+    response = response_factory.core(content=b"\xb0\x09\x01", content_type=None, headers={"grpc-status": ["0"]})
+    assert operation.validate_response(response, case=operation.Case(body={})) is None
+
+
+CALL_AND_VALIDATE = """
+import sys
+import schemathesis
+operation = schemathesis.grpc.from_url(sys.argv[1])["pkg.Users"]["GetUser"]
+case = operation.Case(body={"userId": 1}, headers={"x-undeclared-field": "1"})
+try:
+    operation.validate_response(case.call(), case=case)
+except AssertionError as exc:
+    print(type(exc).__name__)
+    print(exc.message)
+"""
+
+
+# Without a native build for the interpreter, protobuf runs pure Python.
+@pytest.mark.parametrize("implementation", ["upb", "python"])
+def test_unknown_fields_fail_on_every_protobuf_runtime(ctx, implementation):
+    result = subprocess.run(
+        [sys.executable, "-c", CALL_AND_VALIDATE, ctx.grpc.apps.users().target],
+        env={**os.environ, "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": implementation},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout == "UndeclaredGrpcFields\nThe response carries fields that `pkg.User` does not declare: `99`\n"
 
 
 def test_unknown_fields_report_once_per_operation(ctx, response_factory):

@@ -1,8 +1,10 @@
 import base64
+import re
 
 import pytest
 from google.protobuf import any_pb2
 from google.rpc import error_details_pb2, status_pb2
+from requests.structures import CaseInsensitiveDict
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -13,7 +15,12 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import CallOutcome
 from schemathesis.grpc.checks import MalformedGrpcMessage, UndecodableGrpcRequest
 from schemathesis.specs.openapi.checks import ignored_auth
-from test.apps.catalog.grpc.descriptors import all_types_descriptor_set, load_descriptor_set, users_descriptor_set
+from test.apps.catalog.grpc.descriptors import (
+    all_types_descriptor_set,
+    load,
+    load_descriptor_set,
+    users_descriptor_set,
+)
 from test.utils import check_context
 
 
@@ -147,13 +154,28 @@ def test_bad_status_details(operation, response_factory):
 
 
 # Without a run to remember the verdict, every successful call is resent without credentials.
-def test_ignored_auth_outside_a_run(ctx):
+@pytest.mark.parametrize(
+    "headers",
+    [
+        CaseInsensitiveDict({"authorization": "Bearer x", "x-trace": "1"}),
+        # Auth providers written as the authentication guide shows set a plain dictionary.
+        {"Authorization": "Bearer x", "x-trace": "1"},
+    ],
+    ids=["case-insensitive", "plain-dict"],
+)
+def test_ignored_auth_outside_a_run(ctx, headers):
     server = ctx.grpc.apps.users()
     operation = schemathesis.grpc.from_url(server.target)["pkg.Users"]["GetUser"]
-    case = operation.Case(body={"userId": 403}, headers={"authorization": "Bearer x"})
+    case = operation.Case(body={"userId": 403})
+    case.headers = headers
     case.call_and_validate(checks=[ignored_auth])
     case.call_and_validate(checks=[ignored_auth])
-    assert [dict(call.metadata).get("authorization") for call in server.calls] == ["Bearer x", None, "Bearer x", None]
+    assert [(dict(call.metadata).get("authorization"), dict(call.metadata)["x-trace"]) for call in server.calls] == [
+        ("Bearer x", "1"),
+        (None, "1"),
+        ("Bearer x", "1"),
+        (None, "1"),
+    ]
 
 
 def test_failures_group_by_message(operation, response_factory):
@@ -172,6 +194,68 @@ def test_failures_group_by_message(operation, response_factory):
 
 def test_unknown_fields_pass_for_descriptor_sets(operation, response_factory):
     response = grpc_response(response_factory, status=0, content=b"\x0a\x02u7\x98\x06\x01")
+    assert operation.validate_response(response, case=operation.Case(body={})) is None
+
+
+def from_reflection(server):
+    return schemathesis.grpc.from_url(server.target)
+
+
+def length_delimited(number, value):
+    return bytes([number << 3 | 2, len(value)]) + value
+
+
+def packed_node(value):
+    return any_pb2.Any(type_url="type.googleapis.com/types.Node", value=value).SerializeToString()
+
+
+@pytest.mark.parametrize("loader", [from_reflection, load], ids=["reflection", "descriptor-set"])
+@pytest.mark.parametrize(
+    ("content", "field", "wire_type"),
+    [(b"\x08\x05", "name", 0), (b"\x12\x03\x0a\x01x", "created_at.seconds", 2)],
+    ids=["top-level", "nested"],
+)
+def test_declared_fields_under_other_wire_types_do_not_decode(ctx, response_factory, loader, content, field, wire_type):
+    operation = loader(ctx.grpc.apps.users())["pkg.Users"]["GetUser"]
+    response = grpc_response(response_factory, status=0, content=content)
+    with pytest.raises(MalformedGrpcMessage) as exc_info:
+        operation.validate_response(response, case=operation.Case(body={}))
+    assert exc_info.value.message == (
+        f"Cannot decode the response as `pkg.User`: field `{field}` arrived with wire type {wire_type}"
+    )
+
+
+@pytest.mark.parametrize("loader", [from_reflection, load], ids=["reflection", "descriptor-set"])
+@pytest.mark.parametrize(
+    ("method", "content", "message"),
+    [
+        ("Legacy", b"\x08\x01", "Cannot decode the response as `legacy.Legacy`: required fields missing: blob, label"),
+        ("Edition", b"\x12\x01a", "Cannot decode the response as `editions.Edition`: required fields missing: id"),
+    ],
+    ids=["proto2", "editions"],
+)
+def test_responses_without_required_fields_do_not_decode(ctx, response_factory, loader, method, content, message):
+    operation = loader(ctx.grpc.apps.envelope())["types.Types"][method]
+    response = grpc_response(response_factory, status=0, content=content)
+    with pytest.raises(MalformedGrpcMessage) as exc_info:
+        operation.validate_response(response, case=operation.Case(body={}))
+    assert exc_info.value.message == message
+
+
+@pytest.mark.parametrize("loader", [from_reflection, load], ids=["reflection", "descriptor-set"])
+@pytest.mark.parametrize(
+    ("method", "content"),
+    [
+        # A closed enum keeps the values it does not list as unknown fields, and stricter runtimes accept them.
+        ("Legacy", b"\x08\x01\x10\x07\x1a\x00\x22\x00"),
+        ("Maps", length_delimited(1, b"\x08\x01" + length_delimited(2, b"a"))),
+        ("Envelope", length_delimited(3, length_delimited(1, b"k") + length_delimited(2, packed_node(b"\x0a\x01n")))),
+    ],
+    ids=["unlisted-closed-enum-value", "scalar-map", "packed-map-value"],
+)
+def test_well_formed_responses_pass(ctx, response_factory, loader, method, content):
+    operation = loader(ctx.grpc.apps.envelope())["types.Types"][method]
+    response = grpc_response(response_factory, status=0, content=content)
     assert operation.validate_response(response, case=operation.Case(body={})) is None
 
 
@@ -292,3 +376,36 @@ def test_rejections_without_field_violations_teach_nothing(operation, response_f
         headers={"grpc-status": ["3"], "grpc-status-details-bin": details},
     )
     assert parse_observations(operation, operation.Case(body=body), response) == ()
+
+
+MALFORMED_NODE = "Cannot decode the `google.protobuf.Any` value in the response as `types.Node`: "
+
+
+# `types.Envelope` holds packed values in `payload` and as `extras` values.
+@pytest.mark.parametrize("loader", [from_reflection, load], ids=["reflection", "descriptor-set"])
+@pytest.mark.parametrize(
+    ("status", "content", "details", "message"),
+    [
+        (0, length_delimited(2, packed_node(b"\xff")), [], MALFORMED_NODE),
+        (
+            0,
+            length_delimited(3, length_delimited(1, b"k") + length_delimited(2, packed_node(b"\xff"))),
+            [],
+            MALFORMED_NODE,
+        ),
+        (
+            3,
+            b"",
+            [corrupt_bad_request()],
+            "Cannot decode the `google.protobuf.Any` value in the status details as `google.rpc.BadRequest`: ",
+        ),
+    ],
+    ids=["field", "map-value", "status-details"],
+)
+def test_malformed_packed_messages_do_not_decode(ctx, response_factory, loader, status, content, details, message):
+    operation = loader(ctx.grpc.apps.envelope())["types.Types"]["Envelope"]
+    response = grpc_response(
+        response_factory, status=status, content=content, headers={"grpc-status-details-bin": details}
+    )
+    with pytest.raises(MalformedGrpcMessage, match=re.escape(message)):
+        operation.validate_response(response, case=operation.Case(body={}))
