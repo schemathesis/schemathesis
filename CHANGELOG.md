@@ -8,6 +8,7 @@
 - `response_schema_conformance` checks GraphQL `data` for missing, unrequested and mistyped fields.
 - Fuzzing unary gRPC methods through server reflection or descriptor sets.
 - XML request bodies follow Open API 3.2 `nodeType` (`attribute`, `element`, `text`, `cdata`).
+- Cookie parameters follow Open API 3.2 `style: cookie`.
 - `response_schema_conformance` checks JSON Lines and JSON Text Sequence responses against Open API 3.2 `itemSchema`.
 
 ### :racing_car: Performance

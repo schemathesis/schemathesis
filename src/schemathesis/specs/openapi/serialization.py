@@ -84,14 +84,13 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 type_ = schema.get("type")
             else:
                 type_ = None
-            # Apply OpenAPI 3.0 defaults for `style` and `explode`. `style`
+            # Apply OpenAPI 3 defaults for `style` and `explode`. `style`
             # defaults to `simple` for path/header and `form` for
-            # query/cookie. `explode` defaults to `true` for `form` and
-            # `false` for every other style.
+            # query/cookie. `explode` defaults to `true` for `form` and `cookie`.
             if style is None:
                 style = "simple" if location in ("path", "header") else "form"
             if explode is None:
-                explode = style == "form"
+                explode = style in ("form", "cookie")
             serialize = partial(
                 _serialize_location_openapi3,
                 name,
@@ -163,7 +162,7 @@ def _serialize_location_openapi3(
     elif location == "header":
         yield from _serialize_header_openapi3(name, type_, explode)
     elif location == "cookie":
-        yield from _serialize_cookie_openapi3(name, type_, explode)
+        yield from _serialize_cookie_openapi3(name, type_, style, explode)
 
 
 def _serialize_querystring_openapi3(
@@ -395,11 +394,17 @@ def _serialize_header_openapi3(
 
 
 def _serialize_cookie_openapi3(
-    name: str, type_: str | None, explode: bool | None
+    name: str, type_: str | None, style: str | None, explode: bool | None
 ) -> Generator[Callable | None, None, None]:
-    # A cookie holds a single value, so `explode=true` has no distinct wire form and arrays / objects
-    # collapse to the same comma-separated shape as headers instead of being dropped.
-    yield from _serialize_header_openapi3(name, type_, explode)
+    if style != "cookie":
+        # A form-style cookie holds a single value, so arrays and objects use the header-style wire form.
+        yield from _serialize_header_openapi3(name, type_, explode)
+        return
+    yield to_string(name)
+    if type_ == "array":
+        yield delimited(name, delimiter=f"; {name}=" if explode else ",")
+    if type_ == "object":
+        yield extracted_object(name, stringify=True) if explode else comma_delimited_object(name)
 
 
 def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
@@ -527,7 +532,7 @@ def delimited_object(item: Generated, name: str) -> None:
 
 
 @conversion
-def extracted_object(item: Generated, name: str) -> None:
+def extracted_object(item: Generated, name: str, stringify: bool = False) -> None:
     """Merge a child node to the parent one."""
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
@@ -535,7 +540,7 @@ def extracted_object(item: Generated, name: str) -> None:
         for key, value in generated.items():
             # A declared parameter of the same name keeps its own value.
             for expanded_key, expanded_value in _expanded(key, value).items():
-                item.setdefault(expanded_key, expanded_value)
+                item.setdefault(expanded_key, to_wire_text(expanded_value) if stringify else expanded_value)
     else:
         item[name] = ""
 
