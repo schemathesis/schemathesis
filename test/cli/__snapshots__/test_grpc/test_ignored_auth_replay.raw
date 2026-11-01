@@ -1,0 +1,33 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
+
+  x FAILED pkg.Users/GetUser
+
+=================================== FAILURES ===================================
+______________________________ pkg.Users/GetUser _______________________________
+
+     1  POST  /pkg.Users/GetUser  200
+     2  POST  /pkg.Users/GetUser  200
+
+1. Test Case ID: <PLACEHOLDER>
+
+- ST401 API accepts requests without authentication
+
+    Expected UNAUTHENTICATED or PERMISSION_DENIED, got `OK` for `pkg.Users/GetUser`
+
+OK
+
+    `{
+      "name": "u1"
+    }`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

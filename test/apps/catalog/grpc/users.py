@@ -227,7 +227,8 @@ def users(
 
     `on_get_user` sees each id first. 404 is NOT_FOUND, 499 is CANCELLED, 504 is DEADLINE_EXCEEDED sent at once,
     17 answers with bytes that do not decode, 413 answers with a name of 5 MiB, and 422 fails in the request
-    deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
+    deserializer. A call with `x-undeclared-field` metadata gets field 99 in the answer, which `pkg.User` does not
+    declare. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
     a `google.rpc.ErrorInfo` detail, a type clients do not know, in `error` for a negative id. Reflection refuses calls
     that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
@@ -307,7 +308,10 @@ def users(
             context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing credentials")
         context.send_initial_metadata((("x-served-by", "users"),))
         context.set_trailing_metadata((("x-trace-bin", b"\x00\x01"),))
-        return user_class(name=f"u{user_id}").SerializeToString()
+        answer = user_class(name=f"u{user_id}").SerializeToString()
+        if any(item.key == "x-undeclared-field" for item in context.invocation_metadata()):
+            answer += b"\x98\x06\x01"
+        return answer
 
     def create_account(payload: bytes, context: grpc.ServicerContext) -> bytes:
         record("CreateAccount", context)
@@ -523,18 +527,20 @@ def library() -> GrpcApp:
 
 
 def envelope() -> GrpcApp:
-    """`types.Types/Envelope` reads `first.extra` without a presence check, as a careless handler would."""
+    """`types.Types/Envelope` reads `first.extra` without a presence check, as a careless handler would.
+
+    It answers with an empty `types.Envelope`. Reflection describes `types.Types`.
+    """
     pool = descriptor_pool.DescriptorPool()
     for file in descriptor_pb2.FileDescriptorSet.FromString(all_types_descriptor_set()).file:
         pool.Add(file)
     envelope_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("types.Envelope"))
-    empty_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("google.protobuf.Empty"))
 
     def handle(payload: bytes, context: grpc.ServicerContext) -> bytes:
         request = envelope_class.FromString(payload)
         if request.HasField("first") and not request.first.HasField("extra"):
             context.abort(grpc.StatusCode.INTERNAL, "nil extra")
-        return empty_class().SerializeToString()
+        return envelope_class().SerializeToString()
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     server.add_generic_rpc_handlers(
@@ -544,6 +550,7 @@ def envelope() -> GrpcApp:
             ),
         )
     )
+    serve_reflection(server, "v1alpha", pool, services=("types.Types",))
     port = server.add_insecure_port("127.0.0.1:0")
     server.start()
     return GrpcApp(server=server, port=port, calls=[], reflection_calls=[], descriptor_set=all_types_descriptor_set())

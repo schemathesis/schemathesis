@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         grpc://127.0.0.1
      Specification:    gRPC
-     Operations:       1 selected / 9 total
+     Operations:       1 selected / 10 total
 
  ✅  Coverage (in 0.00s)
 
@@ -29,7 +29,7 @@ Not served: 1 operation returned only statuses saying the server does not serve 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/9
+  Selected: 1/10
   Tested: 1
 
 Test Phases:
