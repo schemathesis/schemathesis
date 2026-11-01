@@ -4082,6 +4082,8 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
                                             {"$ref": "#/components/schemas/Cat"},
                                             {"$ref": "#/components/schemas/Dog"},
                                             {"$ref": "#/components/schemas/Bird"},
+                                            {"$ref": "#/components/schemas/Feline"},
+                                            {"$ref": "#/components/schemas/Lion"},
                                         ],
                                         "discriminator": discriminator,
                                     }
@@ -4098,6 +4100,8 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
                 "Cat": {"type": "object", "properties": {"petType": {"type": "string"}}},
                 "Dog": {"type": "object", "properties": {"petType": {"type": "string"}}},
                 "Bird": {"type": "object", "properties": {"petType": {"type": "string", "enum": ["bird"]}}},
+                "Feline": {"type": "object", "properties": {"petType": {"type": "string", "enum": ["cat", "kitten"]}}},
+                "Lion": {"type": "object", "properties": {"petType": {"type": "string", "enum": ["cat", "lion"]}}},
             }
         },
     )
@@ -4154,6 +4158,9 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
             False,
         ),
         ({"petType": "parrot"}, {"propertyName": "petType"}, True),
+        # Every value of a branch's multi-value `enum` selects it, including values another branch shares
+        ({"petType": "kitten"}, {"propertyName": "petType"}, False),
+        ({"petType": "cat"}, {"propertyName": "petType"}, False),
     ],
     ids=[
         "implicit-valid-cat",
@@ -4168,6 +4175,8 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
         "literal-tag-valid-bird",
         "explicit-and-literal-tag-valid-bird",
         "literal-tag-invalid-parrot",
+        "multi-value-tag-valid-kitten",
+        "multi-value-tag-shared-cat",
     ],
 )
 def test_response_schema_conformance_discriminator(ctx, response_factory, body, discriminator, should_fail):
