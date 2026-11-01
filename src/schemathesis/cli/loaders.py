@@ -1,7 +1,7 @@
 """Automatic schema loading.
 
 This module handles the automatic detection and loading of API schemas,
-supporting both GraphQL and OpenAPI specifications.
+supporting OpenAPI, GraphQL, and gRPC services.
 """
 
 from __future__ import annotations
@@ -177,7 +177,7 @@ def _try_load_schema(location: str, config: ProjectConfig, modules: tuple[Module
 
 
 def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchema:
-    """Unified schema loader for both GraphQL and OpenAPI."""
+    """Unified schema loader for OpenAPI, GraphQL, and gRPC."""
     loader = detect_loader(location, module)
 
     kwargs: dict = {}

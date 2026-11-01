@@ -1,4 +1,5 @@
 site_name: Schemathesis
+site_description: Property-based API testing for OpenAPI, GraphQL, and gRPC
 repo_url: https://github.com/schemathesis/schemathesis
 
 nav:

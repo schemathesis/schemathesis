@@ -2,12 +2,12 @@
 
 This guide shows how to fuzz an API for a fixed time window, such as an overnight session or a scheduled fuzzing pipeline, with `st run --max-time`.
 
-With `--max-time`, `st run` first runs the examples and coverage phases once, then repeats the fuzzing and stateful phases, generating new test cases on every pass, until the time is spent. Values captured from API responses feed later passes, so the session reaches deeper into the API over time.
+With `--max-time`, `st run` first runs its supported one-time phases (Examples where available, then Coverage), then repeats the Fuzzing and Stateful phases, generating new test cases on every pass, until the time is spent. Values captured from API responses feed later passes, so the session reaches deeper into the API over time.
 
 ## Prerequisites
 
-- Schemathesis installed or available via `uvx`
-- An API with an OpenAPI or GraphQL schema that you can send many requests to
+- Schemathesis installed or available via `uvx` (with the `grpc` extra for gRPC targets)
+- An API with an OpenAPI or GraphQL schema, or a unary gRPC service, that you can send many requests to
 
 ## 1. Start a session
 
@@ -43,7 +43,7 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json \
   --report junit
 ```
 
-All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `allure`, `html`. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
+Report formats for HTTP APIs are `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `pytest`, `allure`, and `html`. gRPC targets do not support HAR, VCR, or pytest reports. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
 
 ## 3. Put the settings in a config file
 

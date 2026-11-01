@@ -1,8 +1,8 @@
 # Architecture
 
 Schemathesis is a property-based API testing framework. It loads an API
-description (OpenAPI or GraphQL), discovers its *operations*, generates requests
-against them, and checks the responses.
+description (OpenAPI, GraphQL, or gRPC), discovers its *operations*, generates
+requests against them, and checks the responses.
 
 ## A run
 
@@ -40,8 +40,8 @@ transitions between operations (e.g., OpenAPI links).
 ## Transports
 
 A configurable transport sends each case to the server: live HTTP via
-`requests`, or direct calls into a mounted WSGI or ASGI application. The same
-case runs against any of them.
+`requests`, live gRPC via `grpcio`, or direct calls into a mounted WSGI or ASGI
+application. The same case runs against any transport supported by its schema.
 
 ## Events
 
@@ -61,24 +61,24 @@ The coverage phase's JSON Schema constraint walker also lives in `specs/`
 (`specs/openapi/coverage/`); the
 engine calls it through methods on that interface.
 
-Outside `specs/`, these import it at runtime: the public `openapi/` and
-`graphql/` packages, `cli/`, and `checks.py`, which imports the OpenAPI checks so
-their `@schemathesis.check` decorators register them.
+Outside `specs/`, these import it at runtime: the public `openapi/`, `graphql/`,
+and `grpc/` packages, `cli/`, and `checks.py`, which imports the OpenAPI checks
+so their `@schemathesis.check` decorators register them.
 `generation/` has two type-only imports of `specs.openapi`.
 
 | Module | Responsibility |
 |---|---|
 | `core/` | Foundation: errors, JSON Schema utilities, primitive data types. Depends only on stdlib and third-party packages |
 | `schemas.py` | `BaseSchema`, the abstract schema interface, and `APIOperation`, the operation type shared by every spec |
-| `openapi/`, `graphql/` | Public entry points: `from_url`, `from_path`, and other loaders, plus the failure types their checks raise |
-| `specs/openapi/`, `specs/graphql/` | Concrete schema implementations: parsing, spec-flavored generation, spec-specific check functions (`specs/openapi/checks.py`) |
+| `openapi/`, `graphql/`, `grpc/` | Public entry points for loading each supported API description |
+| `specs/openapi/`, `specs/graphql/`, `specs/grpc/` | Concrete schema implementations: parsing, spec-flavored generation, and spec-specific behavior |
 | `generation/` | Produces cases |
 | `hooks.py`, `hook_specs.py` | Hook dispatch, and the name and signature of every hook |
 | `checks.py` | The `CHECKS` registry, the `@schemathesis.check` decorator, and the context passed to every check |
 | `auths.py` | Custom authentication providers |
 | `filters.py` | Operation filters (`include`/`exclude`) |
 | `engine/` | The test runner described above. `core.py` builds the phase plan and skips unsupported phases; `run/` executes the phases |
-| `transport/` | Sends a case: over HTTP with `requests`, or into a WSGI or ASGI app through the clients in `python/` |
+| `transport/` | Sends a case over HTTP with `requests`, over gRPC with `grpcio`, or into a WSGI or ASGI app through the clients in `python/` |
 | `cli/` | The `st` command line (`run`, `fuzz`, `replay`) and the event handlers that write reports; JSON and WFC reports live in `cli/json_report.py` and `cli/wfc_report.py` |
 | `reporting/` | Serializers for HAR, VCR, JUnit, Allure, NDJSON, and HTML reports; crash files for `st replay` |
 | `pytest/` | The pytest plugin |

@@ -3,7 +3,7 @@
 Once a test starts, Schemathesis watches what the API returns and updates its plan within the same run — this is what distinguishes it from a one-shot input generator.
 
 !!! note
-    The behaviors below apply to OpenAPI APIs. GraphQL pipelines support stateful chaining but not the constraint-learning loop today.
+    OpenAPI supports the full loop described below. gRPC supports required-field learning from structured rejection details and stateful chaining. GraphQL supports stateful chaining but not constraint learning today.
 
 ## What gets learned, from where
 

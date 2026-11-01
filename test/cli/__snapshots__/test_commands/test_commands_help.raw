@@ -3,7 +3,7 @@ Exit code: 2
 Stdout:
 Usage: schemathesis [OPTIONS] COMMAND [ARGS]...
 
-  Property-based API testing for OpenAPI and GraphQL.
+  Property-based API testing for OpenAPI, GraphQL, and gRPC.
 
 Options:
   --config-file PATH  The path to `schemathesis.toml` file to use for

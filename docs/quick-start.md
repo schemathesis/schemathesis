@@ -2,13 +2,13 @@
 
 **Estimated time: 5 minutes**
 
-Schemathesis reads your OpenAPI or GraphQL schema, generates requests from it, and checks your API's responses. It catches edge cases that manual testing typically misses.
+Schemathesis reads OpenAPI and GraphQL schemas or gRPC service descriptors, generates requests from them, and checks your API's responses. It catches edge cases that manual testing typically misses.
 
 During a run Schemathesis:
 
-- Generates inputs for each operation in your schema: schema examples, boundary values, and randomized data
-- Runs checks such as server error detection, status-code conformance, and response schema validation
-- Prints a `curl` command that reproduces each failure
+- Generates inputs for each operation: schema examples where supported, boundary values, and randomized data
+- Runs checks such as server error detection and response schema validation
+- Prints a `curl` or `grpcurl` command that reproduces each failure
 
 ## Try the demo
 
@@ -74,6 +74,15 @@ Each failure names the broken check, shows the response, and gives a `curl` comm
     ```bash
     uvx schemathesis run ./openapi.yaml --url http://localhost:8000
     ```
+
+=== "gRPC"
+    Test a server that has [reflection](https://grpc.io/docs/guides/reflection/) enabled:
+
+    ```bash
+    uvx --from 'schemathesis[grpc]' schemathesis run grpc://localhost:50051
+    ```
+
+    For descriptor sets, TLS, and metadata, see [Testing gRPC Services](guides/grpc.md).
 
 === "pytest integration"
     Install Schemathesis and `pytest` into your project:

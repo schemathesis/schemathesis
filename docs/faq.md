@@ -12,7 +12,7 @@ Schemathesis generates three types of data:
 - **Valid test data** that follows schema constraints
 - **Invalid test data** that deliberately breaks constraints
 
-The data covers all JSON Schema types for OpenAPI and both valid and invalid queries for GraphQL.
+The data covers all JSON Schema types for OpenAPI, both valid and invalid queries for GraphQL, and Protobuf request messages for unary gRPC methods. gRPC generation is currently positive-only.
 
 Note, that some generated data may be rejected by your API if the validation rules are not expressed in your schema.
 

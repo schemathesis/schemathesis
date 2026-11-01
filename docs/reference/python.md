@@ -38,6 +38,19 @@ Reference for Schemathesis public Python API.
       - from_wsgi
       - from_dict
 
+### gRPC
+
+::: schemathesis.grpc
+    options:
+      heading_level: 4
+      show_root_toc_entry: false
+      show_symbol_type_heading: true
+      signature_crossrefs: true
+      show_labels: true
+      members:
+      - from_url
+      - from_path
+
 
 ### Pytest
 

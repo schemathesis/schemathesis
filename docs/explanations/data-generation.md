@@ -1,16 +1,16 @@
 # Understanding Data Generation
 
-Point Schemathesis at one API operation and it may send hundreds of requests, including deliberately invalid ones. Several phases contribute test cases, all phases except Examples generate valid and invalid data by default, and a failure triggers extra requests to shrink it to a minimal reproduction.
+Point Schemathesis at one API operation and it may send hundreds of requests, including deliberately invalid ones for OpenAPI and GraphQL. Several phases contribute test cases, and a failure triggers extra requests to shrink it to a minimal reproduction. gRPC generation is positive-only today.
 
 ## The Generation Hierarchy
 
-Schemathesis is structured as four phases (Examples, Coverage, Fuzzing, Stateful), plus a feedback loop on OpenAPI that learns from server responses and influences subsequent test cases. Every phase uses Hypothesis with schema-based generators (a built-in JSON Schema strategy engine for OpenAPI, `hypothesis-graphql` for GraphQL) to drive values from the schema; what differs between phases is how each one chooses inputs and which validity mode it targets.
+Schemathesis is structured as four phases (Examples, Coverage, Fuzzing, Stateful), plus feedback loops that learn from server responses and influence subsequent test cases. Every phase uses Hypothesis with schema-based generators: a built-in JSON Schema strategy engine for OpenAPI and converted Protobuf descriptors, and `hypothesis-graphql` for GraphQL. What differs between phases is how each one chooses inputs and which validity mode it targets. Not every specification supports every phase or mode; gRPC skips Examples and negative generation.
 
 What each layer contributes:
 
 1. **Hypothesis** — primitive strategies (strings, integers, objects), shrinking, and the example database.
-2. **JSON Schema strategy engine / hypothesis-graphql** — translate JSON Schema / GraphQL fragments into Hypothesis strategies. Used by every phase as the schema-driven value source; the validity mode (positive, negative, mixed) is set by the calling phase.
-3. **Schemathesis** — the four-phase pipeline, HTTP transport, response checks, and a feedback loop that learns from what the server returns. See [Adaptive Testing](adaptive-testing.md).
+2. **Schema strategy engines** — translate JSON Schema, GraphQL fragments, or converted Protobuf descriptors into Hypothesis strategies. Used by every supported phase as the schema-driven value source; the calling phase selects the validity mode when the specification supports it.
+3. **Schemathesis** — the phase pipeline, HTTP and gRPC transports, response checks, and feedback loops that learn from what the server returns. See [Adaptive Testing](adaptive-testing.md).
 
 Schemathesis inherits Hypothesis's shrinking and example database; the feedback loop is what lets it learn server-side validation (OpenAPI) and reuse real values across operations. When a Python app is loaded via `from_asgi`/`from_wsgi`, it also reuses literals read from the application's own source as candidate inputs - see [Testing Python Apps](../guides/python-apps.md#reusing-values-from-your-source).
 
@@ -57,6 +57,8 @@ For GraphQL, each case changes one argument or input field of a fixed valid quer
 # Invalid: books, books(limit: "a"), books(limit: 2147483648), books(limit: 0, genre: invalid)
 ```
 
+For gRPC, the coverage phase walks Protobuf field types, validation rules, enum values, oneofs, and message boundaries to build valid request messages for unary methods.
+
 ### Fuzzing Phase
 
 Generates random data based on the schema constraints.
@@ -70,7 +72,7 @@ Generates random data based on the schema constraints.
 
 ### Stateful Phase
 
-Runs when Schemathesis knows how operations connect: OpenAPI links in the schema, links inferred by dependency analysis, links learned from URLs in responses (`Location` headers and body fields) during earlier CLI phases, or, for GraphQL, the connections in the type graph. Creates sequences where response data feeds into subsequent requests. See [Stateful Testing](stateful.md).
+Runs when Schemathesis knows how operations connect: OpenAPI links and inferred dependencies, GraphQL type-graph connections, or gRPC method and field names that follow Google API conventions. Creates sequences where response data feeds into subsequent requests. See [Stateful Testing](stateful.md).
 
 ```yaml
 # Connection: POST /users -> GET /users/{id}
@@ -80,7 +82,7 @@ Runs when Schemathesis knows how operations connect: OpenAPI links in the schema
 
 ## Generation Modes
 
-The Coverage, Fuzzing and Stateful phases generate both valid and invalid data by default, which is why some requests are deliberately wrong. The Examples phase is positive-only: it sends the schema's examples as valid data.
+For OpenAPI and GraphQL, the Coverage, Fuzzing, and Stateful phases generate both valid and invalid data by default, which is why some requests are deliberately wrong. The Examples phase is positive-only. gRPC supports positive generation in the Coverage, Fuzzing, and Stateful phases; selecting negative-only mode skips its operations.
 
 | Mode | Generates |
 |------|-----------|
@@ -124,7 +126,7 @@ Negative testing works for GraphQL by generating queries with:
 
 ## Serialization Process
 
-The final step transforms generated objects into actual HTTP requests based on your API's media types.
+The final step transforms generated objects into requests for the API's transport. HTTP APIs serialize values according to their media types; gRPC APIs encode generated Protobuf messages and send them with `grpcio`.
 
 Schemathesis supports many common media types out of the box, including JSON, XML (with OpenAPI XML annotations), form data, plain text, and others. For unsupported media types, you can add custom serializers.
 

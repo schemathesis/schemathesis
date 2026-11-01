@@ -44,12 +44,12 @@ The `run` and `fuzz` commands additionally accept `--no-color` and `--force-colo
 The `run` command executes API tests against an API using a schema for test generation.
 
 ```console
-$ st run [OPTIONS] SCHEMA
+$ st run [OPTIONS] LOCATION
 ```
 
 !!! note "Required Parameter"
 
-    **SCHEMA**: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file, or a URL pointing to such specifications. This schema defines the API surface to test.
+    **LOCATION**: Path to an OpenAPI (`.json`, `.yaml`, `.yml`), GraphQL SDL, or gRPC descriptor-set (`.binpb`, `.pb`, `.protoset`) file; an OpenAPI or GraphQL URL; or a gRPC reflection target such as `grpc://localhost:50051`. This location defines the API surface to test.
 
 ### Basic Options
 
