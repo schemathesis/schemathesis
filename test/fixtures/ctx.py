@@ -592,6 +592,7 @@ class GrpcApps:
         emptied_files: tuple[str, ...] = (),
         annotated: bool = False,
         start: bool = True,
+        port: int = 0,
     ) -> GrpcServer:
         # grpcio has no free-threaded build, so only tests that start a server need it.
         from test.apps.catalog.grpc import users as grpc_users
@@ -606,6 +607,7 @@ class GrpcApps:
             emptied_files=emptied_files,
             annotated=annotated,
             start=start,
+            port=port,
         )
         return self._serve(app)
 

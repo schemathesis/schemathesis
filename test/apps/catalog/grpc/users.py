@@ -220,12 +220,14 @@ def users(
     emptied_files: tuple[str, ...] = (),
     annotated: bool = False,
     start: bool = True,
+    port: int = 0,
     on_get_user: Callable[[int, grpc.Server], object] | None = None,
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
 
-    `on_get_user` sees each id first. 404 is NOT_FOUND, 499 is CANCELLED, 17 answers with bytes that do not decode,
-    and 422 fails in the request deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
+    `on_get_user` sees each id first. 404 is NOT_FOUND, 499 is CANCELLED, 504 is DEADLINE_EXCEEDED sent at once,
+    17 answers with bytes that do not decode, 413 answers with a name of 5 MiB, and 422 fails in the request
+    deserializer. `pkg.Admin/Reset` answers with `u<id>` packed into `response`, or with
     a `google.rpc.ErrorInfo` detail, a type clients do not know, in `error` for a negative id. Reflection refuses calls
     that carry `x-deny: 1`.
     Reflection also lists `undescribed_services`, which it answers with a NOT_FOUND error response.
@@ -283,6 +285,8 @@ def users(
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid")
         if user_id == 503:
             context.abort(grpc.StatusCode.UNAVAILABLE, "")
+        if user_id == 504:
+            context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, "upstream timed out")
         if user_id == 404:
             context.abort(grpc.StatusCode.NOT_FOUND, "no such user")
         if user_id == 499:
@@ -297,6 +301,8 @@ def users(
             time.sleep(1)
         if user_id == 17:
             return b"\xff\xff\xff"
+        if user_id == 413:
+            return user_class(name="x" * 5 * 1024 * 1024).SerializeToString()
         if user_id == 403 and not any(item.key == "authorization" for item in context.invocation_metadata()):
             context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing credentials")
         context.send_initial_metadata((("x-served-by", "users"),))
@@ -373,9 +379,9 @@ def users(
             root_certificates=ca.cert_pem.bytes(),
             require_client_auth=client_auth,
         )
-        port = server.add_secure_port("127.0.0.1:0", credentials)
+        port = server.add_secure_port(f"127.0.0.1:{port}", credentials)
     else:
-        port = server.add_insecure_port("127.0.0.1:0")
+        port = server.add_insecure_port(f"127.0.0.1:{port}")
     if start:
         server.start()
     return GrpcApp(
