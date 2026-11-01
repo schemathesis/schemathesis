@@ -692,7 +692,7 @@ def _clean_inner_request_message(message: object) -> str:
     return str(message)
 
 
-def read_timeout_error(url: str, timeout: float | int, request: PreparedRequest) -> ReadTimeout:
+def read_timeout_error(url: str, timeout: float | int, request: PreparedRequest | None = None) -> ReadTimeout:
     """A response that did not arrive within the timeout, in the form `requests` reports a late one."""
     from requests.exceptions import ReadTimeout
 
