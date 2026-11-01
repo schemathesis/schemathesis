@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import re
 import sys
 from dataclasses import dataclass
 from functools import lru_cache
@@ -297,6 +298,29 @@ STRING_FORMATS: Final[Mapping[str, JsonSchemaObject]] = {
     "tuuid": {"pattern": "^[0-9a-fA-F]{32}$"},
 }
 REGEX_SYNTAX: Final = frozenset("\\^$.|?*+()[]{}")
+NON_ASCII: Final = "[^\\x00-\\x7f]"
+# Validation rule patterns use RE2 syntax; these are the ASCII ranges of its POSIX classes.
+POSIX_CLASSES: Final[Mapping[str, str]] = {
+    "alnum": "0-9A-Za-z",
+    "alpha": "A-Za-z",
+    "ascii": "\\x00-\\x7f",
+    "blank": "\\t ",
+    "cntrl": "\\x00-\\x1f\\x7f",
+    "digit": "0-9",
+    "graph": "!-~",
+    "lower": "a-z",
+    "print": " -~",
+    "punct": "!-/:-@\\[-`{-~",
+    "space": "\\t\\n\\v\\f\\r ",
+    "upper": "A-Z",
+    "word": "0-9A-Za-z_",
+    "xdigit": "0-9A-Fa-f",
+}
+POSIX_CLASS: Final = re.compile(rf"\[:(\^?)({'|'.join(POSIX_CLASSES)}):\]")
+# RE2 flags hold from where they stand to the end of the enclosing group.
+INLINE_FLAGS: Final = re.compile(r"\(\?([imsU-]+)\)")
+# RE2 whitespace, which leaves out the vertical tab.
+RE2_SPACE: Final = "\\t\\n\\f\\r "
 # The standard alphabet, as command-line clients reject the URL-safe one.
 BASE64_CHARACTER: Final = "[A-Za-z0-9+/]"
 FLOAT32_TINY: Final = 1.401298464324817e-45
@@ -492,10 +516,15 @@ def _string_rules(schema: JsonSchemaObject, rules: dict[str, RuleValue]) -> None
     _at_least(schema, "minLength", rules.get("min_bytes"))
     max_bytes = rules.get("max_bytes")
     if isinstance(max_bytes, int):
-        _at_most(schema, "maxLength", max_bytes // 4)
+        if max_bytes // 4 >= cast("int", schema.get("minLength", 0)):
+            _at_most(schema, "maxLength", max_bytes // 4)
+        else:
+            # Too few characters for the minimum if each may take four bytes; one-byte characters leave room.
+            _at_most(schema, "maxLength", max_bytes)
+            _add(schema, {"not": {"pattern": NON_ASCII}})
     pattern = rules.get("pattern")
     if isinstance(pattern, str):
-        _add(schema, {"pattern": pattern})
+        _add(schema, {"pattern": _re2_pattern(pattern)})
     # One pattern for all three, as separate ones leave generation to filter for their overlap.
     parts = [
         template.format(_literal(value))
@@ -518,31 +547,38 @@ def _bytes_rules(schema: JsonSchemaObject, rules: dict[str, RuleValue]) -> None:
     maximum = length if isinstance(length, int) else rules.get("max_len")
     if not isinstance(minimum, int) or (minimum == 0 and not isinstance(maximum, int)):
         return
-    # Base64 text with a pattern on it, as a length on the text cannot count the bytes it encodes.
     del schema["format"]
-    schema["pattern"] = _base64_pattern(minimum, maximum if isinstance(maximum, int) else None)
+    branches = _base64_branches(minimum, maximum if isinstance(maximum, int) else None)
+    if len(branches) == 1:
+        schema.update(branches[0])
+    elif branches:
+        schema["anyOf"] = branches
+    else:
+        # No byte count fits both bounds.
+        schema["not"] = {}
 
 
-def _base64_pattern(minimum: int, maximum: int | None) -> str:
-    """Base64 values that decode to `minimum` to `maximum` bytes."""
+def _base64_branches(minimum: int, maximum: int | None) -> list[JsonSchemaObject]:
+    """Base64 values that decode to `minimum` to `maximum` bytes, one branch per ending.
+
+    Within a branch the text length counts the bytes, so the length keywords bound them; repetition counts in
+    the pattern would compile to one copy per repetition.
+    """
     branches = []
     for remainder, ending in enumerate(BASE64_ENDINGS):
-        # Full groups of three bytes before the ending.
+        # Full groups of three bytes before the ending, which takes four characters of its own.
         low = max(0, -(-(minimum - remainder) // 3))
-        if maximum is None:
-            groups = f"(?:{BASE64_CHARACTER}{{4}}){{{low},}}"
-        else:
+        tail = 4 if remainder else 0
+        branch: JsonSchemaObject = {"pattern": f"^(?:{BASE64_CHARACTER}{{4}})*{ending}$"}
+        if low or tail:
+            branch["minLength"] = 4 * low + tail
+        if maximum is not None:
             high = (maximum - remainder) // 3
             if high < low:
                 continue
-            if low == high:
-                groups = f"{BASE64_CHARACTER}{{{4 * low}}}" if low else ""
-            else:
-                groups = f"(?:{BASE64_CHARACTER}{{4}}){{{low},{high}}}"
-        branches.append(groups + ending)
-    if len(branches) == 1:
-        return f"^{branches[0]}$"
-    return f"^(?:{'|'.join(branches)})$"
+            branch["maxLength"] = 4 * high + tail
+        branches.append(branch)
+    return branches
 
 
 def _enum_rules(schema: JsonSchemaObject, field: FieldDescriptor, rules: dict[str, RuleValue]) -> None:
@@ -563,6 +599,77 @@ def _enum_rules(schema: JsonSchemaObject, field: FieldDescriptor, rules: dict[st
 def _literal(text: str) -> str:
     """A pattern matching `text` literally."""
     return "".join(f"\\{character}" if character in REGEX_SYNTAX else character for character in text)
+
+
+def _re2_pattern(pattern: str) -> str:
+    """An RE2 `pattern` in the syntax of JSON Schema patterns; anything without a translation stays as written."""
+    branches, end = _re2_branches(pattern, 0)
+    # A stray closing parenthesis keeps the pattern invalid, so the error still names it.
+    return "|".join(branches) + pattern[end:]
+
+
+def _re2_branches(pattern: str, index: int) -> tuple[list[str], int]:
+    """Alternatives from `index` up to the parenthesis closing their group, and the index where they stop."""
+    branches = [""]
+    while index < len(pattern) and pattern[index] != ")":
+        if pattern[index] == "|":
+            branches.append("")
+            index += 1
+        elif (flags := INLINE_FLAGS.match(pattern, index)) is not None:
+            # Bare flags are valid only at the start of a pattern, so every alternative they reach gets a scoped group.
+            rest, index = _re2_branches(pattern, flags.end())
+            scoped = [f"(?{flags.group(1)}:{branch})" for branch in rest]
+            branches[-1] += scoped[0]
+            branches.extend(scoped[1:])
+        elif pattern[index] == "(":
+            inner, index = _re2_branches(pattern, index + 1)
+            branches[-1] += f"({'|'.join(inner)}{pattern[index : index + 1]}"
+            index += 1
+        else:
+            atom, index = _re2_atom(pattern, index)
+            branches[-1] += atom
+    return branches, index
+
+
+def _re2_atom(pattern: str, index: int) -> tuple[str, int]:
+    """One escape, character class or character at `index`, and the index after it."""
+    if pattern.startswith("\\Q", index):
+        end = pattern.find("\\E", index + 2)
+        end = len(pattern) if end == -1 else end
+        return _literal(pattern[index + 2 : end]), end + 2
+    if pattern.startswith("\\s", index):
+        return f"[{RE2_SPACE}]", index + 2
+    if pattern.startswith("\\z", index):
+        return "$", index + 2
+    if pattern[index] == "\\":
+        return pattern[index : index + 2], index + 2
+    if pattern[index] == "[":
+        return _re2_class(pattern, index)
+    return pattern[index], index + 1
+
+
+def _re2_class(pattern: str, index: int) -> tuple[str, int]:
+    r"""The character class opening at `index`, with POSIX classes and `\s` spelled out, and the index after it."""
+    negated = pattern.startswith("[^", index)
+    index += 2 if negated else 1
+    members: list[str] = []
+    while index < len(pattern) and pattern[index] != "]":
+        posix = POSIX_CLASS.match(pattern, index)
+        # A negated POSIX class has a range to stand for it only when it is the whole class.
+        if posix is not None and (not posix.group(1) or (not members and pattern.startswith("]", posix.end()))):
+            members.append(POSIX_CLASSES[posix.group(2)])
+            negated ^= bool(posix.group(1))
+            index = posix.end()
+        elif pattern.startswith("\\s", index):
+            members.append(RE2_SPACE)
+            index += 2
+        elif pattern[index] == "\\":
+            members.append(pattern[index : index + 2])
+            index += 2
+        else:
+            members.append(pattern[index])
+            index += 1
+    return f"{'[^' if negated else '['}{''.join(members)}{pattern[index : index + 1]}", index + 1
 
 
 def _at_least(schema: JsonSchemaObject, keyword: str, value: RuleValue | None) -> None:

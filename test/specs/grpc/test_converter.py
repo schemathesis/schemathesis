@@ -38,6 +38,9 @@ NODE = {
 
 
 BASE64 = "[A-Za-z0-9+/]"
+WHOLE_GROUPS = f"^(?:{BASE64}{{4}})*$"
+ONE_BYTE_LEFT = f"^(?:{BASE64}{{4}})*{BASE64}[AQgw]==$"
+TWO_BYTES_LEFT = f"^(?:{BASE64}{{4}})*{BASE64}{{2}}[AEIMQUYcgkosw048]=$"
 
 
 def load_pool(data):
@@ -239,13 +242,33 @@ def test_validation_rules():
     assert convert(load_pool(validated_descriptor_set()), "validated.Span").schema == {
         "type": "object",
         "properties": {
-            "traceId": {"type": "string", "pattern": f"^{BASE64}{{20}}{BASE64}[AQgw]==$"},
-            "spanId": {"type": "string", "pattern": f"^{BASE64}{{8}}{BASE64}{{2}}[AEIMQUYcgkosw048]=$"},
+            "traceId": {"type": "string", "pattern": ONE_BYTE_LEFT, "minLength": 24, "maxLength": 24},
+            "spanId": {"type": "string", "pattern": TWO_BYTES_LEFT, "minLength": 12, "maxLength": 12},
             "payload": {
                 "type": "string",
-                "pattern": f"^(?:(?:{BASE64}{{4}}){{1,2}}|(?:{BASE64}{{4}}){{1,2}}{BASE64}[AQgw]=="
-                f"|(?:{BASE64}{{4}}){{0,1}}{BASE64}{{2}}[AEIMQUYcgkosw048]=)$",
+                "anyOf": [
+                    {"pattern": WHOLE_GROUPS, "minLength": 4, "maxLength": 8},
+                    {"pattern": ONE_BYTE_LEFT, "minLength": 8, "maxLength": 12},
+                    {"pattern": TWO_BYTES_LEFT, "minLength": 4, "maxLength": 8},
+                ],
             },
+            "upload": {
+                "type": "string",
+                "anyOf": [
+                    {"pattern": WHOLE_GROUPS, "minLength": 4, "maxLength": 1398100},
+                    {"pattern": ONE_BYTE_LEFT, "minLength": 4, "maxLength": 1398104},
+                    {"pattern": TWO_BYTES_LEFT, "minLength": 4, "maxLength": 1398100},
+                ],
+            },
+            "preview": {
+                "type": "string",
+                "anyOf": [
+                    {"pattern": WHOLE_GROUPS, "maxLength": 1398100},
+                    {"pattern": ONE_BYTE_LEFT, "minLength": 4, "maxLength": 1398104},
+                    {"pattern": TWO_BYTES_LEFT, "minLength": 4, "maxLength": 1398100},
+                ],
+            },
+            "inverted": {"type": "string", "not": {}},
             "id": {"type": "string", "format": "uuid"},
             "name": {"type": "string", "minLength": 4, "maxLength": 10, "pattern": "^sp-", "not": {"enum": ["sp-x"]}},
             "email": {"type": "string", "format": "email"},
@@ -286,6 +309,8 @@ def test_validation_rules():
             "traceId",
             "spanId",
             "payload",
+            "upload",
+            "preview",
             "id",
             "name",
             "email",
@@ -325,6 +350,11 @@ def test_more_validation_rules():
             "fixed": {"type": "string", "const": "x"},
             "chosen": {"type": "string", "enum": ["a", "b"]},
             "short": {"type": "string", "minLength": 3, "maxLength": 3},
+            "digest": {"type": "string", "minLength": 4, "maxLength": 8, "not": {"pattern": "[^\\x00-\\x7f]"}},
+            "word": {"type": "string", "pattern": "^[A-Za-z]+[^0-9]$"},
+            "version": {"type": "string", "pattern": r"^v1\.0(\.[0-9]+)?$"},
+            "day": {"type": "string", "pattern": "^(?i:mon)|(?i:tue$)"},
+            "spaced": {"type": "string", "pattern": r"^[\w\t\n\f\r ]+[\t\n\f\r ][^\t\n\f\r ]$"},
             "v4": {"type": "string", "format": "ipv4"},
             "v6": {"type": "string", "format": "ipv6"},
             "link": {"type": "string", "format": "uri"},
@@ -344,8 +374,11 @@ def test_more_validation_rules():
             "modes": {"type": "array", "items": {"enum": ["KIND_A", "KIND_B"]}},
             "blob": {
                 "type": "string",
-                "pattern": f"^(?:(?:{BASE64}{{4}}){{1,}}|(?:{BASE64}{{4}}){{1,}}{BASE64}[AQgw]=="
-                f"|(?:{BASE64}{{4}}){{1,}}{BASE64}{{2}}[AEIMQUYcgkosw048]=)$",
+                "anyOf": [
+                    {"pattern": WHOLE_GROUPS, "minLength": 4},
+                    {"pattern": ONE_BYTE_LEFT, "minLength": 8},
+                    {"pattern": TWO_BYTES_LEFT, "minLength": 8},
+                ],
             },
             "raw": {"type": "string", "format": "byte"},
             "counts": {
@@ -366,6 +399,11 @@ def test_more_validation_rules():
             "fixed",
             "chosen",
             "short",
+            "digest",
+            "word",
+            "version",
+            "day",
+            "spaced",
             "v4",
             "v6",
             "link",
