@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.26.1...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.26.2...HEAD) - TBD
+
+## [4.26.2](https://github.com/schemathesis/schemathesis/compare/v4.26.1...v4.26.2) - 2026-11-01
+
+### :bug: Fixed
+
+- Compatibility with pytest 9.2.
 
 ## [4.26.1](https://github.com/schemathesis/schemathesis/compare/v4.26.0...v4.26.1) - 2026-09-09
 
