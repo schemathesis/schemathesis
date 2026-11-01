@@ -60,7 +60,7 @@
 - GraphQL stateful phase crashing with `--generation-unique-inputs`.
 - All GraphQL fields sharing the `[POST ]` test id with `schemathesis.pytest.from_fixture`.
 
-#### Others
+#### Schema loading
 
 - Generic "Schema Error" message hiding why an operation failed to load.
 - References to a relative `$id` reported as unresolvable.
@@ -69,43 +69,58 @@
 - Internal error on a non-string `$ref` in path items, parameters, request bodies or responses.
 - Internal error on a numeric `openapi` version, such as an unquoted `3.1` in YAML.
 - Internal error on a Swagger 2.0 or Open API 3.0 schema without `paths`.
-- Runs with `--max-time` continuing after a request times out at the time limit.
-- `st fuzz` hiding errors raised as the time limit is reached.
+- Internal error or wrong schema shown for response failures inside schemas reached through `$dynamicRef`.
+- False schema error for references inside nested schemas that declare their own `$id`.
+- Response and request body schemas ignored when a nested `$id` schema references its own `$defs`.
+- False schema error for Open API 3.1 response schemas with `prefixItems` or array-form `items`.
+- Open API 3.2 media type objects behind `$ref` ignored in data generation and response validation.
+- Internal error on a response `content` or media type that is not an object.
+- Internal error on a base URL or origin with a non-numeric or out-of-range port.
+
+#### Checks
+
+- False positive `ignored_auth` when an auth header's name case differs from the security scheme.
+- Response headers declared with `content` instead of `schema` never validated by `response_headers_conformance`.
+- False positive `response_schema_conformance` for Open API 3.2 discriminators with `defaultMapping`.
+- False positive `response_schema_conformance` for discriminator values pinned by the branch's `enum` or `const`.
+
+#### Authentication
+
 - Token fetch cooldown failure reported twice in stateful testing.
 - Expired auth tokens never refreshed in stateful testing, `st fuzz` and pytest state machines.
 - Configured `proxy` skipped by dynamic auth token requests, WFC login and loading schemas from URLs.
 - Dynamic auth token requests and WFC login waiting without limit when no request timeout is set.
-- `st replay` not finding a case ID after a later run records the same failure.
-- `st fuzz` crashing with `dictionary changed size during iteration` when auth is enforced.
-- `st fuzz` ignoring `--generation-unique-inputs`.
-- Operations reported as skipped, with no error shown, when an unexpected error crashes them.
-- Stateful phase reported as skipped, with exit code 0, when an unexpected error crashes it.
-- Failure and error headers missing separators for operation names as wide as the terminal.
-- Stateful tests replaying scenarios saved in the example database for a different API.
-- False positive `ignored_auth` when an auth header's name case differs from the security scheme.
-- Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
-- Internal error and empty report files when enabling Allure reports without the `allure` extra.
-- Runs with `--generation-unique-inputs` spinning without requests until `--max-time` once inputs run out.
-- Internal error or wrong schema shown for response failures inside schemas reached through `$dynamicRef`.
-- False schema error for references inside nested schemas that declare their own `$id`.
-- Response and request body schemas ignored when a nested `$id` schema references its own `$defs`.
-- Response headers declared with `content` instead of `schema` never validated by `response_headers_conformance`.
-- Test case summary counting errored and skipped cases as passed.
-- Probe requests from checks counted as generated and skipped test cases.
-- Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
+
+#### Timeouts and outages
+
+- Runs with `--max-time` continuing after a request times out at the time limit.
+- `st fuzz` hiding errors raised as the time limit is reached.
 - False `Network Error` when `--max-time` runs out while a response body is still arriving.
 - False `Connection failed` and unsupported API capabilities when a response body outlasts `--request-timeout`.
 - False `Connection failed` when a schema response body outlasts the timeout.
 - Outage reports leading with hanging requests, repeating cut-off ones as network errors, with misleading tips.
 - Outage reports omitting the request that crashed the server when it timed out.
 - `st fuzz` hiding the error of the request that crashed the server.
-- False positive `response_schema_conformance` for Open API 3.2 discriminators with `defaultMapping`.
-- False positive `response_schema_conformance` for discriminator values pinned by the branch's `enum` or `const`.
-- False schema error for Open API 3.1 response schemas with `prefixItems` or array-form `items`.
-- Open API 3.2 media type objects behind `$ref` ignored in data generation and response validation.
-- Internal error on a response `content` or media type that is not an object.
-- Internal error on a base URL or origin with a non-numeric or out-of-range port.
+
+#### Test execution
+
+- `st fuzz` crashing with `dictionary changed size during iteration` when auth is enforced.
+- `st fuzz` ignoring `--generation-unique-inputs`.
+- Operations reported as skipped, with no error shown, when an unexpected error crashes them.
+- Stateful phase reported as skipped, with exit code 0, when an unexpected error crashes it.
+- Stateful tests replaying scenarios saved in the example database for a different API.
+- Runs with `--generation-unique-inputs` spinning without requests until `--max-time` once inputs run out.
 - Occasional exit code 0 and skipped stateful phase after an `object_level_authorization` failure.
+
+#### Reporting
+
+- `st replay` not finding a case ID after a later run records the same failure.
+- Failure and error headers missing separators for operation names as wide as the terminal.
+- Repeated traceback frames for errors replayed under `--generation-unique-inputs`.
+- Internal error and empty report files when enabling Allure reports without the `allure` extra.
+- Test case summary counting errored and skipped cases as passed.
+- Probe requests from checks counted as generated and skipped test cases.
+- Per-operation `warnings` settings ignored for `rate_limited`, `missing_test_data` and other response warnings.
 
 ## [4.32.7](https://github.com/schemathesis/schemathesis/compare/v4.32.6...v4.32.7) - 2026-10-28
 
