@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import time
 from collections.abc import Sequence
 from os import PathLike
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import TYPE_CHECKING, cast
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.loaders import WAIT_FOR_SCHEMA_INTERVAL
+from schemathesis.core.timing import Instant
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.hooks import load_with_hooks
 
@@ -75,12 +78,21 @@ def from_url(
     from grpc_reflection.v1alpha import reflection_pb2  # type: ignore[import-untyped]
 
     from schemathesis.specs.grpc.schemas import filter_metadata
-    from schemathesis.transport.grpc import create_channel, metadata_pairs, prepare_target
+    from schemathesis.transport.grpc import CHANNEL_OPTIONS, create_channel, metadata_pairs, prepare_target
 
     request_headers = filter_metadata(headers or {})
     address, tls = prepare_target(url, verify, request_headers, uses_proxy=bool(proxies), auth=auth)
     metadata = metadata_pairs(request_headers)
-    with create_channel(address, tls, verify, cert) as channel:
+    options: tuple[tuple[str, int], ...] = CHANNEL_OPTIONS
+    if wait_for_schema is not None:
+        # Reconnect as often as attempts repeat, so a server that starts late in the wait is seen before it ends.
+        backoff_ms = int(WAIT_FOR_SCHEMA_INTERVAL * 1000)
+        options = (
+            *CHANNEL_OPTIONS,
+            ("grpc.initial_reconnect_backoff_ms", backoff_ms),
+            ("grpc.max_reconnect_backoff_ms", backoff_ms),
+        )
+    with create_channel(address, tls, verify, cert, options=options) as channel:
         # Both versions exchange the same messages; some servers serve only one of them.
         v1, v1alpha = (
             channel.stream_stream(
@@ -92,17 +104,28 @@ def from_url(
         )
 
         def ask(call: grpc.StreamStreamMultiCallable, **kwargs: str) -> reflection_pb2.ServerReflectionResponse:
-            try:
-                return next(
-                    call(
-                        iter([reflection_pb2.ServerReflectionRequest(**kwargs)]),
-                        metadata=metadata,
-                        timeout=(timeout or DEFAULT_RESPONSE_TIMEOUT) + (wait_for_schema or 0),
-                        wait_for_ready=wait_for_schema is not None,
+            started_at = Instant()
+            while True:
+                # A server may accept connections before it serves, so a call may last until the wait ends.
+                remaining = max(0, (wait_for_schema or 0) - started_at.elapsed)
+                try:
+                    return next(
+                        call(
+                            iter([reflection_pb2.ServerReflectionRequest(**kwargs)]),
+                            metadata=metadata,
+                            timeout=(timeout or DEFAULT_RESPONSE_TIMEOUT) + remaining,
+                        )
                     )
-                )
-            except grpc.RpcError as exc:
-                raise _reflection_error(cast(grpc.Call, exc), url, address, tls) from None
+                except grpc.RpcError as exc:
+                    error = _reflection_error(cast(grpc.Call, exc), url, address, tls)
+                    # Waiting covers a server that is not up yet; a TLS failure would repeat on every attempt.
+                    if (
+                        wait_for_schema is None
+                        or error.kind != LoaderErrorKind.CONNECTION_OTHER
+                        or started_at.elapsed >= wait_for_schema
+                    ):
+                        raise error from None
+                    time.sleep(WAIT_FOR_SCHEMA_INTERVAL)
 
         try:
             listing = ask(v1, list_services="")

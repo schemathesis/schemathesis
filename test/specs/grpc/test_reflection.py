@@ -1,4 +1,8 @@
+import platform
+import socket
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 import trustme
@@ -92,11 +96,12 @@ def test_from_url_requests_missing_imports(ctx, version):
     assert labels(schemathesis.grpc.from_url(server.target)) == LABELS
 
 
-def test_from_url_unreachable(ctx):
+@pytest.mark.parametrize("wait_for_schema", [None, 0.2], ids=["no-wait", "wait"])
+def test_from_url_unreachable(ctx, wait_for_schema):
     server = ctx.grpc.apps.users()
     server.stop()
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_url(server.target)
+        schemathesis.grpc.from_url(server.target, wait_for_schema=wait_for_schema)
     assert exc_info.value.kind == LoaderErrorKind.CONNECTION_OTHER
     assert exc_info.value.message.startswith(f"Failed to connect to {server.target.removeprefix('grpc://')}: ")
 
@@ -144,6 +149,30 @@ def test_from_url_waits_for_schema(ctx):
     server = ctx.grpc.apps.users(start=False)
     threading.Timer(0.2, server.server.start).start()
     assert labels(schemathesis.grpc.from_url(server.target, wait_for_schema=5)) == LABELS
+
+
+def load_while_server_starts(ctx, scheme, *, tls=False):
+    # The port refuses connections until the server binds it, after the first reconnect attempt.
+    with socket.socket() as reserved, ThreadPoolExecutor(max_workers=1) as executor:
+        reserved.bind(("127.0.0.1", 0))
+        port = reserved.getsockname()[1]
+        loading = executor.submit(schemathesis.grpc.from_url, f"{scheme}://127.0.0.1:{port}", wait_for_schema=2)
+        time.sleep(1.5)
+        reserved.close()
+        ctx.grpc.apps.users(port=port, tls=tls)
+        return loading.result()
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unused ports do not refuse connections")
+def test_from_url_waits_for_refusing_server_to_start(ctx):
+    assert labels(load_while_server_starts(ctx, "grpc")) == LABELS
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unused ports do not refuse connections")
+def test_from_url_reports_tls_failure_of_server_starting_during_wait(ctx):
+    with pytest.raises(LoaderError, match=r"^TLS handshake with 127\.0\.0\.1:\d+ failed: ") as exc_info:
+        load_while_server_starts(ctx, "grpcs", tls=True)
+    assert exc_info.value.kind == LoaderErrorKind.INVALID_CERTIFICATE
 
 
 def test_known_fields_pass_for_reflection_schemas(ctx, response_factory):

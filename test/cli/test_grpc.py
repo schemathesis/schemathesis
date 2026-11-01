@@ -185,27 +185,34 @@ def test_grpc_library_logs_kept_out_of_output(ctx):
 
 
 @pytest.mark.parametrize(
-    ("tls", "scheme", "source"),
+    ("tls", "scheme", "source", "extra"),
     [
-        (False, "grpcs", "descriptor-set"),
-        (True, "grpc", "descriptor-set"),
-        (True, "grpcs", "descriptor-set"),
-        (True, "grpc", "reflection"),
+        (False, "grpcs", "descriptor-set", []),
+        (True, "grpc", "descriptor-set", []),
+        (True, "grpcs", "descriptor-set", []),
+        (True, "grpc", "reflection", []),
+        (False, "grpcs", "reflection", ["--wait-for-schema=5"]),
+        (True, "grpcs", "reflection", ["--wait-for-schema=5"]),
+        (True, "grpc", "reflection", ["--wait-for-schema=5"]),
     ],
     ids=[
         "tls-to-plaintext-server",
         "plaintext-to-tls-server",
         "untrusted-certificate",
         "reflection-plaintext-to-tls-server",
+        "reflection-tls-to-plaintext-server-waiting",
+        "reflection-untrusted-certificate-waiting",
+        "reflection-plaintext-to-tls-server-waiting",
     ],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_tls_failure_reported(ctx, cli, snapshot_cli, tls, scheme, source):
+def test_tls_failure_reported(ctx, cli, snapshot_cli, tls, scheme, source, extra):
     server = ctx.grpc.apps.users(tls=tls)
     target = f"{scheme}://{server.target.partition('://')[2]}"
     location = [target] if source == "reflection" else ["api.binpb", f"--url={target}"]
     assert (
-        cli.run(*location, "--include-name=pkg.Users/GetUser", "--phases=fuzzing", "--max-examples=1") == snapshot_cli
+        cli.run(*location, *extra, "--include-name=pkg.Users/GetUser", "--phases=fuzzing", "--max-examples=1")
+        == snapshot_cli
     )
 
 
