@@ -225,11 +225,25 @@ def edges_rules(edges):
         "below": set(edges.below) <= {-2, -1},
         "picks": edges.picks in (1, 3),
         "triple": len(edges.triple) >= 3,
+        "shade": edges.shade != 0,
+        "shades": len(set(edges.shades)) == len(edges.shades),
+        "odds": edges.odds not in (0.5, 1.100000023841858, 1.5, FLOAT32_MAX, math.inf, -math.inf),
+        "pinned": set(edges.pinned) <= {5},
+        "outer": all(key > 10 or key < 5 for key in edges.outer),
         "created": edges.HasField("created"),
     }
 
 
-RULES = {"Record": span_rules, "Check": extras_rules, "Edge": edges_rules}
+def choices_rules(choices):
+    return {
+        "label": choices.WhichOneof("boxed") == "label",
+        "matcher": choices.WhichOneof("matcher") is not None,
+        "names": (choices.short_name == "") != (choices.alias == "")
+        and (choices.short_name == "" or len(choices.short_name) >= 2),
+    }
+
+
+RULES = {"Record": span_rules, "Check": extras_rules, "Edge": edges_rules, "Choose": choices_rules}
 
 
 @pytest.fixture
@@ -258,6 +272,11 @@ def test_positive_values_satisfy_validation_rules_with_reported_fields(validated
     @run_given(case=operation.as_strategy(feedback=feedback), max_examples=50)
     def test(case):
         assert broken_rules(operation, case.body) == [], case.body
+
+
+# `find` raises when no generated body sets another member of the oneof.
+def test_legacy_rules_of_oneof_member_apply_only_when_set(validated_schema):
+    find(validated_schema["validated.Spans"]["Choose"].as_strategy(), lambda case: "exact" in case.body)
 
 
 # Newer Pythons drop standard-alphabet characters from URL-safe base64 and warn about it first.
