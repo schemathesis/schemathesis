@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ❌  Failed to load specification from grpc://127.0.0.1 after 0.00s
+
+ Schema Loading Error
+
+ Failed to connect to 127.0.0.1: failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1: Socket closed. The server expects TLS; use `grpcs://127.0.0.1`

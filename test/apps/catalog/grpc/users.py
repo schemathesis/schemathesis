@@ -220,6 +220,7 @@ def users(
     emptied_files: tuple[str, ...] = (),
     annotated: bool = False,
     start: bool = True,
+    port: int = 0,
     on_get_user: Callable[[int, grpc.Server], object] | None = None,
 ) -> GrpcApp:
     """`pkg.Users/GetUser` answers `u<id>`; a negative id fails, 13 is slow, 503 is a server-sent UNAVAILABLE.
@@ -373,9 +374,9 @@ def users(
             root_certificates=ca.cert_pem.bytes(),
             require_client_auth=client_auth,
         )
-        port = server.add_secure_port("127.0.0.1:0", credentials)
+        port = server.add_secure_port(f"127.0.0.1:{port}", credentials)
     else:
-        port = server.add_insecure_port("127.0.0.1:0")
+        port = server.add_insecure_port(f"127.0.0.1:{port}")
     if start:
         server.start()
     return GrpcApp(

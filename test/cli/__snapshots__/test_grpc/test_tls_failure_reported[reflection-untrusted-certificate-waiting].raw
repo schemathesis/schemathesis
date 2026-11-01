@@ -1,0 +1,12 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ❌  Failed to load specification from grpcs://127.0.0.1 after 0.00s
+
+ Schema Loading Error
+
+ TLS handshake with 127.0.0.1 failed: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1: Tls handshake failed (TSI_PROTOCOL_FAILURE): SSL_ERROR_SSL: error:1000007d:SSL
+ routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate: OK
