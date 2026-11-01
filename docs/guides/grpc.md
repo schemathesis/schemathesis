@@ -110,3 +110,4 @@ def test_api(case):
 - Schemathesis leaves `google.protobuf.Any` fields out of requests and reports them as [`unsupported_field`](../reference/warnings.md#unsupported_field) warnings. Fill them with a [`map_body`](extending.md) hook, or a `before_call` hook for the coverage phase, which skips `map_body`.
 - Schemathesis does not read `.proto` files directly; build a descriptor set first.
 - HAR, VCR and pytest reports and proxies are not available for gRPC targets.
+- Official Docker images and the GitHub Action do not include the `grpc` extra. Run gRPC targets from a Python installation with `pip install 'schemathesis[grpc]'`, or use `uvx --from 'schemathesis[grpc]' schemathesis ...`.

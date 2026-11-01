@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.grpc.schemas import GrpcSchema
 
 BUILD_HINT = "Build one with `buf build -o api.binpb` or `protoc --include_imports --descriptor_set_out=api.binpb`"
-EXTRA_HINT = "Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`"
+EXTRA_HINT = "Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"
 # Reflection lists every service the server registers, these included.
 INFRASTRUCTURE_SERVICES = frozenset(
     {"grpc.reflection.v1.ServerReflection", "grpc.reflection.v1alpha.ServerReflection", "grpc.health.v1.Health"}
