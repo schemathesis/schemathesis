@@ -21,7 +21,7 @@ from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import HookExecutionError, IncorrectUsage, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
-from schemathesis.grpc.loaders import BUILD_HINT
+from schemathesis.grpc.loaders import BUILD_HINT, require_extra
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -44,11 +44,16 @@ def into_event_stream(
     engine_callback: Callable[[BaseSchema], Iterable[events.EngineEvent]],
 ) -> EventGenerator:
     # Checked before any report handler creates its file.
-    if is_grpc_location(location) and any(
-        config.reports.get(report_format).enabled
-        for report_format in (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.PYTEST)
-    ):
-        raise click.UsageError(GRPC_HTTP_REPORTS_MESSAGE)
+    if is_grpc_location(location):
+        if any(
+            config.reports.get(report_format).enabled
+            for report_format in (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.PYTEST)
+        ):
+            raise click.UsageError(GRPC_HTTP_REPORTS_MESSAGE)
+        try:
+            require_extra()
+        except ImportError as exc:
+            raise click.ClickException(str(exc)) from None
     if location.endswith(".proto") and file_exists(location):
         raise click.UsageError(PROTO_FILE_MESSAGE)
     return _event_stream(location=location, config=config, filter_set=filter_set, engine_callback=engine_callback)
