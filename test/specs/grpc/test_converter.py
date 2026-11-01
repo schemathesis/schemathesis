@@ -3,7 +3,7 @@ import sys
 import pytest
 from google.protobuf import descriptor_pb2, descriptor_pool
 
-from schemathesis.specs.grpc.converter import ConvertedMessage, message_schema
+from schemathesis.specs.grpc.converter import ConvertedMessage, float32_values, message_schema
 from test.apps.catalog.grpc.descriptors import (
     all_types_descriptor_set,
     old_protovalidate_descriptor_set,
@@ -116,6 +116,11 @@ def test_conversions_share_no_state(pool):
     first = convert(pool, "types.Maps").schema
     first["properties"]["byBool"]["propertyNames"]["enum"].append("maybe")
     assert convert(pool, "types.Maps").schema["properties"]["byBool"]["propertyNames"] == {"enum": ["true", "false"]}
+
+
+# Command-line clients drop `-0.0` from fields without presence.
+def test_float_values_never_round_to_negative_zero(pool):
+    assert repr(float32_values({"float": -1e-50}, pool.FindMessageTypeByName("types.Scalars"))) == "{'float': 0.0}"
 
 
 @pytest.mark.parametrize(
@@ -473,6 +478,7 @@ def test_validation_rules_on_edge_cases():
                 "additionalProperties": STRING,
                 "propertyNames": {"enum": [str(key) for key in [*range(-(2**31), -(2**31) + 10), *range(11, 21)]]},
             },
+            "defaultKind": {"enum": ["KIND_UNSPECIFIED"]},
             "created": {"type": "string", "format": "date-time"},
         },
         "additionalProperties": False,
@@ -491,6 +497,7 @@ def test_validation_rules_on_edge_cases():
             "odds",
             "pinned",
             "outer",
+            "defaultKind",
             "created",
         ],
     }

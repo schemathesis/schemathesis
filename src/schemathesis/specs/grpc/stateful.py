@@ -28,7 +28,7 @@ from schemathesis.generation.stateful.control import (
     TransitionEndpoint,
 )
 from schemathesis.generation.stateful.state_machine import BundleStateMachine, normalize_name, unique_rule_name
-from schemathesis.specs.grpc.converter import json_fields
+from schemathesis.specs.grpc.converter import decode_body, json_fields
 from schemathesis.specs.grpc.status import OK, grpc_status, starts_with_verb
 
 if TYPE_CHECKING:
@@ -128,7 +128,10 @@ def with_value(operation: APIOperation, body: Body | NotSet, field: FieldDescrip
     """`body` with `field` set to `value`, and other members of its `oneof` cleared."""
     if isinstance(body, bytes):
         # A hook may have serialized the message already.
-        decoded = message_factory.GetMessageClass(operation.definition.raw.input_type).FromString(body)
+        decoded = decode_body(body, operation.definition.raw.input_type)
+        if decoded is None:
+            # Raw bytes that do not decode are sent unchanged, without the linked value.
+            return body
         setattr(decoded, field.name, value)
         return decoded.SerializeToString()
     fields = dict(body) if isinstance(body, dict) else {}

@@ -263,6 +263,17 @@ def all_types_descriptor_set() -> bytes:
         type_name=".google.protobuf.Int32Value",
         label=FieldDescriptorProto.LABEL_REPEATED,
     )
+    labels = known.nested_type.add(name="LabelsEntry", options=descriptor_pb2.MessageOptions(map_entry=True))
+    _field(labels, "key", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(labels, "value", 2, FieldDescriptorProto.TYPE_MESSAGE, type_name=".google.protobuf.Value")
+    _field(
+        known,
+        "labels",
+        len(WELL_KNOWN) + 2,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".types.WellKnown.LabelsEntry",
+        label=FieldDescriptorProto.LABEL_REPEATED,
+    )
 
     node = types.message_type.add(name="Node")
     _field(node, "name", 1, FieldDescriptorProto.TYPE_STRING)
@@ -728,6 +739,7 @@ def validated_descriptor_set() -> bytes:
             {"type_name": ".validated.Edges.OuterEntry", "label": repeated},
             {"map": {"keys": {"int32": {"gt": 10, "lt": 5}}}},
         ),
+        ("default_kind", FieldDescriptorProto.TYPE_ENUM, {"type_name": ".validated.Kind"}, {"enum": {"const": 0}}),
     ]
     for number, (name, field_type, extra, value) in enumerate(edge_fields, start=1):
         _field(edges, name, number, field_type, **extra)

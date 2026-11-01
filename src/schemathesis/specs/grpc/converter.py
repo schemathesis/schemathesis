@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import math
 import re
+import struct
 import sys
 from dataclasses import dataclass, replace
 from functools import lru_cache
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Final, cast
 
 from google.protobuf import json_format, message_factory
 from google.protobuf.descriptor import FieldDescriptor
+from google.protobuf.message import DecodeError
 
 from schemathesis.core import NotSet
 from schemathesis.core.jsonschema.numeric import FLOAT32_MAX, INT32_RANGE, INT64_RANGE, next_float32
@@ -745,6 +747,8 @@ def _add(schema: JsonSchemaObject, subschema: JsonSchemaObject) -> None:
 URL_SAFE_ALPHABET = str.maketrans("+/", "-_")
 # Type name the JSON body walker passes for `bytes` values.
 BYTES = "bytes"
+# Type name the JSON body walker passes for `float` values.
+FLOAT = "float"
 # The JSON parser rejects messages nested deeper than this.
 MAX_MESSAGE_DEPTH = 100
 
@@ -760,11 +764,19 @@ def request_message(body: object, input_type: Descriptor) -> Message:
     )
 
 
-def body_message(body: Body | NotSet, input_type: Descriptor) -> Message:
-    """The message a request body describes, whether JSON or already serialized."""
+def body_message(body: Body | NotSet, input_type: Descriptor) -> Message | None:
+    """The message a request body describes, whether JSON or already serialized; `None` for bytes that do not decode."""
     if isinstance(body, bytes):
-        return message_factory.GetMessageClass(input_type).FromString(body)
+        return decode_body(body, input_type)
     return request_message({} if isinstance(body, NotSet) else body, input_type)
+
+
+def decode_body(body: bytes, input_type: Descriptor) -> Message | None:
+    """The message raw request bytes encode; `None` when they do not decode, as such bytes are sent unchanged."""
+    try:
+        return message_factory.GetMessageClass(input_type).FromString(body)
+    except DecodeError:
+        return None
 
 
 def message_to_json(message: Message, pool: DescriptorPool) -> JsonValue:
@@ -809,10 +821,23 @@ def _url_safe(value: object, type_name: str) -> object:
     return value
 
 
+def float32_values(body: JsonValue, message_type: Descriptor) -> JsonValue:
+    """`body` with `float` values as the 32-bit floats the message holds, so a JSON body shows what is sent."""
+    # Rewriting leaves the JSON shape as it is.
+    return cast("JsonValue", rewrite_json(body, message_type, _float32))
+
+
+def _float32(value: object, type_name: str) -> object:
+    if type_name == FLOAT and isinstance(value, float):
+        # Command-line clients drop `-0.0` from fields without presence, and generated values never hold it elsewhere.
+        return struct.unpack("<f", struct.pack("<f", value))[0] or 0.0
+    return value
+
+
 def rewrite_json(
     value: object, message_type: Descriptor, leaf: Callable[[object, str], object], depth: int = 1
 ) -> object:
-    """Apply `leaf` to every `bytes` value and well-known message in a JSON body, passing its type name."""
+    """Apply `leaf` to every `bytes` and `float` value and well-known message in a JSON body, passing its type name."""
     name = message_type.full_name
     # Deeper bodies fail to parse anyway, so the parser reports them rather than the walk.
     if depth > MAX_MESSAGE_DEPTH:
@@ -861,6 +886,8 @@ def _rewrite_field(value: object, member: FieldDescriptor, leaf: Callable[[objec
         return rewrite_json(value, member.message_type, leaf, depth + 1)
     if member.type == FieldDescriptor.TYPE_BYTES:
         return leaf(value, BYTES)
+    if member.type == FieldDescriptor.TYPE_FLOAT:
+        return leaf(value, FLOAT)
     return value
 
 
