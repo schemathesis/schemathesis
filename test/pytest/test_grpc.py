@@ -38,3 +38,27 @@ def test_api(case):
         re.findall(r'<span class="ev-label">Response</span>(.*?)</div>', html),
         re.findall(r'<pre class="body">(.*?)</pre>', html, flags=re.DOTALL),
     ) == (['<span class="status s2xx">OK</span>'], ["{\n  &quot;name&quot;: &quot;u2147483647&quot;\n}"])
+
+
+def test_missing_grpc_extra(testdir, tmp_path):
+    path = write_descriptor_set(tmp_path, users_descriptor_set())
+    testdir.makepyfile(
+        f"""
+import sys
+sys.modules["grpc"] = None
+import schemathesis
+
+schema = schemathesis.grpc.from_path(r"{path}")
+schema.config.update(base_url="grpc://127.0.0.1:1")
+
+@schema.parametrize()
+def test_api(case):
+    case.call()
+"""
+    )
+    result = testdir.runpytest_subprocess("-q")
+    result.assert_outcomes(failed=2)
+    assert (
+        "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"
+        in result.stdout.str()
+    )

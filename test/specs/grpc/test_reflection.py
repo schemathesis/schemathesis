@@ -148,14 +148,55 @@ def test_from_url_tls_untrusted_certificate(ctx, tmp_path):
     )
 
 
-def test_from_url_reports_refused_reflection(ctx):
+@pytest.mark.parametrize(
+    ("denial", "status", "details"),
+    [
+        ("1", "PERMISSION_DENIED", "denied"),
+        ("authentication", "UNAUTHENTICATED", "missing credentials"),
+    ],
+    ids=["permission", "authentication"],
+)
+def test_from_url_reports_refused_reflection(ctx, denial, status, details):
     server = ctx.grpc.apps.users()
     with pytest.raises(LoaderError) as exc_info:
-        schemathesis.grpc.from_url(server.target, headers={"x-deny": "1"})
+        schemathesis.grpc.from_url(server.target, headers={"x-deny": denial})
     assert (exc_info.value.kind, exc_info.value.message) == (
-        LoaderErrorKind.UNCLASSIFIED,
-        "Reflection failed with PERMISSION_DENIED: denied",
+        LoaderErrorKind.HTTP_FORBIDDEN,
+        f"Reflection failed with {status}: {details}",
     )
+
+
+def test_from_url_reports_reflection_timeout(ctx):
+    server = ctx.grpc.apps.users()
+    with pytest.raises(LoaderError) as exc_info:
+        schemathesis.grpc.from_url(server.target, headers={"x-stall": "1"}, timeout=0.01)
+    assert (exc_info.value.kind, exc_info.value.message) == (
+        LoaderErrorKind.NETWORK_OTHER,
+        "Read timed out after 0.01 seconds",
+    )
+
+
+def test_from_url_reports_no_application_services(ctx):
+    server = ctx.grpc.apps.users(
+        reflection_services=("grpc.reflection.v1alpha.ServerReflection", "grpc.health.v1.Health")
+    )
+    with pytest.raises(LoaderError) as exc_info:
+        schemathesis.grpc.from_url(server.target)
+    assert (exc_info.value.kind, exc_info.value.message) == (
+        LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
+        "The server lists no services besides reflection and health. Build a descriptor set with "
+        f"`buf build -o api.binpb` and run `schemathesis run api.binpb --url {server.target}`",
+    )
+
+
+@pytest.mark.parametrize(
+    "service",
+    ["grpc.channelz.v1.Channelz", "envoy.service.status.v3.ClientStatusDiscoveryService"],
+    ids=["channelz", "csds"],
+)
+def test_from_url_skips_infrastructure_services(ctx, service):
+    server = ctx.grpc.apps.users(reflection_services=("pkg.Users", "pkg.Admin", "grpc.health.v1.Health", service))
+    assert labels(schemathesis.grpc.from_url(server.target)) == LABELS
 
 
 @pytest.mark.parametrize(
