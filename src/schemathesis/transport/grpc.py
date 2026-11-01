@@ -34,6 +34,8 @@ READY_TIMEOUT = 0.5
 CHANNEL_OPTIONS = (
     # Servers attach error details as metadata; the default 8 KB limit turns large ones into a client-side failure.
     ("grpc.max_metadata_size", 1024 * 1024),
+    # Responses of any size get validated, instead of failing on the client past the default 4 MB limit.
+    ("grpc.max_receive_message_length", -1),
     # The server keeps no headers for reuse, so one unparsable response header cannot fail later responses.
     ("grpc.http2.hpack_table_size.decoder", 0),
 )
@@ -45,6 +47,9 @@ ChannelKey = tuple[str, bool, "bool | str", "str | tuple[str, str] | None"]
 TLS_FAILURE_MARKERS = ("Tls handshake failed", "verification check failed")
 TLS_FAILED = "TLS handshake with {address} failed: {details}"
 TLS_EXPECTED = "The server expects TLS; use `grpcs://{address}`"
+NO_RESPONSE_MESSAGE = "cardinality violation: received no response message from non-server-streaming RPC"
+# How gRPC fails a call it did not send because the channel has no connection.
+NOT_CONNECTED = "failed to connect to all addresses"
 
 
 class GrpcTransport(BaseTransport["requests.Session"]):
@@ -95,21 +100,35 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         request = requests.Request(method="POST", url=url, headers=request_headers, data=payload).prepare()
         metadata = metadata_pairs(request_headers)
         channel = self._channel(address, tls, verify, cert)
-        # No serializers: the call sends and receives bytes.
-        call: grpc.UnaryUnaryMultiCallable[bytes, bytes] = channel.unary_unary(case.path)
+        # No serializers: the call sends and receives bytes, or no message at all.
+        call: grpc.UnaryUnaryMultiCallable[bytes, bytes | None] = channel.unary_unary(case.path)
+        # Whether the server refused a new connection, once a call fails before being sent.
+        unreachable = False
         try:
-            with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
+            try:
+                with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
+                    started_at = Instant()
+                    content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata)
+            except grpc.RpcError as error:
+                if not (cast(grpc.Call, error).details() or "").startswith(NOT_CONNECTED):
+                    raise
+                unreachable = not _is_reachable(address, tls, verify, cert)
+                if unreachable:
+                    raise
+                # The server is up, but a channel that failed to connect waits before trying again and fails calls in
+                # the meantime without sending them.
                 started_at = Instant()
-                content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata)
+                content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata, wait_for_ready=True)
         except grpc.RpcError as error:
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)
             code = outcome.code()
             # Errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
-            if code == grpc.StatusCode.DEADLINE_EXCEEDED:
+            # Servers send DEADLINE_EXCEEDED with any text too; only one arriving after the timeout is a read timeout.
+            if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout:
                 timed_out = TimeoutError(f"{base_url}: Read timed out. (read timeout={timeout})")
                 raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
-            if code == grpc.StatusCode.UNAVAILABLE and not _is_reachable(address, tls, verify, cert):
+            if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):
                 details = outcome.details() or ""
                 failed_to_connect = "failed to connect" in details.lower()
                 if any(marker in details for marker in TLS_FAILURE_MARKERS):
@@ -135,6 +154,11 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         elapsed = started_at.elapsed
         code = outcome.code()
         details = outcome.details() or ""
+        if content is None:
+            # A unary call answers with exactly one message, so clients turn an OK without one into an error.
+            code = grpc.StatusCode.INTERNAL
+            details = NO_RESPONSE_MESSAGE
+            content = b""
         response_headers: dict[str, list[str]] = {}
         for key, value in (*(outcome.initial_metadata() or ()), *(outcome.trailing_metadata() or ())):
             text = base64.b64encode(value).decode() if isinstance(value, bytes) else value

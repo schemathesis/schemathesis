@@ -84,6 +84,19 @@ def test_unparsable_status_leaves_later_responses_intact(ctx):
     ]
 
 
+def test_ok_without_a_message_is_an_internal_error(ctx):
+    response = load(ctx.grpc.apps.echo_status())["pkg.Users"]["GetUser"].Case(body={"userId": 0}).call()
+    assert (response.status_code, response.status_line, response.headers, response.content) == (
+        500,
+        "INTERNAL: cardinality violation: received no response message from non-server-streaming RPC",
+        {
+            "grpc-status": ["13"],
+            "grpc-message": ["cardinality violation: received no response message from non-server-streaming RPC"],
+        },
+        b"",
+    )
+
+
 def test_large_error_trailers(ctx):
     _, response = get_user(ctx.grpc.apps.users(), 400)
     assert (response.status_code, response.status_line, response.headers) == (
@@ -91,6 +104,11 @@ def test_large_error_trailers(ctx):
         "INVALID_ARGUMENT: invalid",
         {"x-details": ["x" * 65536], "grpc-status": ["3"], "grpc-message": ["invalid"]},
     )
+
+
+def test_large_ok_response(ctx):
+    _, response = get_user(ctx.grpc.apps.users(), 413)
+    assert (response.status_line, len(response.content)) == ("OK", 5 * 1024 * 1024 + 5)
 
 
 def test_malformed_ok_body_is_reported_as_binary(ctx):
@@ -107,9 +125,14 @@ def test_malformed_ok_body_is_reported_as_binary(ctx):
     )
 
 
-def test_server_unavailable_is_a_response(ctx):
-    _, response = get_user(ctx.grpc.apps.users(), 503)
-    assert (response.status_code, response.status_line) == (503, "UNAVAILABLE")
+@pytest.mark.parametrize(
+    ("user_id", "expected"),
+    [(503, (503, "UNAVAILABLE")), (504, (504, "DEADLINE_EXCEEDED: upstream timed out"))],
+    ids=["unavailable", "deadline-exceeded"],
+)
+def test_server_sent_status_is_a_response(ctx, user_id, expected):
+    _, response = get_user(ctx.grpc.apps.users(), user_id)
+    assert (response.status_code, response.status_line) == expected
 
 
 def relay(source, target):
@@ -193,13 +216,17 @@ def test_deadline_raises_timeout(ctx):
         get_user(ctx.grpc.apps.users(), 13, timeout=0.1)
 
 
-def test_stopped_server_raises_connection_error(ctx):
+# A channel that failed to connect waits before trying again and fails calls in the meantime without sending them.
+def test_stopped_server_raises_connection_error_until_it_restarts(ctx):
     server = ctx.grpc.apps.users()
     server.stop()
     operation = load(server)["pkg.Users"]["GetUser"]
     with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
         operation.Case(body={}).call()
     assert isinstance(exc_info.value.__cause__, ConnectionRefusedError)
+    server.held_port.close()
+    ctx.grpc.apps.users(port=int(server.target.rsplit(":", 1)[1]))
+    assert operation.Case(body={"userId": 7}).call().status_line == "OK"
 
 
 @pytest.mark.parametrize(
