@@ -631,6 +631,29 @@ def test_fuzz_interrupted_by_keyboard_interrupt(ctx):
         pass
 
 
+def test_fuzz_exception_thrown_into_stream_stops_workers(ctx):
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = from_schema(schema).fuzz(FuzzConfig())
+    for event in stream:
+        if isinstance(event, events.FuzzScenarioFinished):
+            break
+    error = RuntimeError("Timeout")
+    raised = []
+
+    def throw():
+        try:
+            stream.generator.throw(error)
+        except RuntimeError as exc:
+            raised.append(exc)
+
+    thrower = threading.Thread(target=throw, daemon=True)
+    thrower.start()
+    thrower.join(timeout=30)
+    assert not thrower.is_alive(), "Fuzz workers kept running after the exception"
+    assert raised == [error]
+
+
 @pytest.mark.usefixtures("restore_checks")
 def test_fuzz_runs_class_based_checks(ctx):
     seen = []

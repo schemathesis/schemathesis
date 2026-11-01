@@ -273,8 +273,8 @@ def _run_forever(
     except KeyboardInterrupt:
         ctx.stop()
         yield events.Interrupted(phase=None)
-    except GeneratorExit:
-        # The consumer stopped reading events, so wind workers down instead of fuzzing forever.
+    except BaseException:
+        # The consumer stopped reading events or failed, so wind workers down instead of fuzzing forever.
         ctx.stop()
         raise
     finally:

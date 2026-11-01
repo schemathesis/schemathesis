@@ -65,7 +65,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         engine.stop()
         progress.status = Status.INTERRUPTED
         yield events.Interrupted(phase=PhaseName.STATEFUL_TESTING)
-    except GeneratorExit:
+    except BaseException:
         engine.stop()
         raise
     finally:
