@@ -336,7 +336,13 @@ def test_validation_rules():
             {"oneOf": [{"required": ["host"]}, {"required": ["address"]}]},
             {"oneOf": [{"required": ["left"]}, {"required": ["right"]}]},
         ],
-        "$defs": {"validated.Parent": {"type": "object", "properties": {"id": STRING}, "additionalProperties": False}},
+        "$defs": {
+            "validated.Parent": {
+                "type": "object",
+                "properties": {"id": STRING, "enabled": {"type": "boolean"}},
+                "additionalProperties": False,
+            }
+        },
     }
 
 
@@ -520,7 +526,13 @@ def test_oneof_validation_rules():
             {"oneOf": [{"required": ["exact"]}, {"required": ["regex"]}]},
             {"oneOf": [{"required": ["shortName"]}, {"required": ["alias"]}]},
         ],
-        "$defs": {"validated.Parent": {"type": "object", "properties": {"id": STRING}, "additionalProperties": False}},
+        "$defs": {
+            "validated.Parent": {
+                "type": "object",
+                "properties": {"id": STRING, "enabled": {"type": "boolean"}},
+                "additionalProperties": False,
+            }
+        },
     }
 
 

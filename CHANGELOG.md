@@ -2,6 +2,11 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.33.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
+- Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
+
 ## [4.33.0](https://github.com/schemathesis/schemathesis/compare/v4.32.7...v4.33.0) - 2026-11-01
 
 ### :rocket: Added
