@@ -728,6 +728,10 @@ class BaseSchema(Mapping):
         """Name the protocol gives the status an HTTP status code stands for, or `None` when the code alone says it."""
         return None
 
+    def operation_label_for_display(self, operation_label: str | None) -> str | None:
+        """Return the API operation label when transport method and path are only protocol framing."""
+        return None
+
     def hash_case(self, case: Case) -> int:
         """Hash of the request a case sends, ignoring its test case id."""
         # Unmasked values, as masked ones would make distinct cases collide.

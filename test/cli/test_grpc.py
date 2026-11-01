@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -92,7 +93,7 @@ def map_body(context, body):
     assert [dict(call.metadata).get("authorization") for call in server.calls] == sent
 
 
-# The crash file keeps the credentials unmasked, so replay sends them as the run did.
+# Credentials stay unmasked in the crash file; the edited first step makes its replayed status differ.
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_ignored_auth_replay(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
@@ -116,6 +117,10 @@ def map_body(context, body):
         hooks=module,
     )
     crash_files = sorted(crash_cache_dir(tmp_path).glob("*.json"))
+    crash_file = next(path for path in crash_files if path.name != "manifest.json")
+    crash = json.loads(crash_file.read_text())
+    crash["sequence"][0]["case_body"]["value"]["userId"] = 404
+    crash_file.write_text(json.dumps(crash))
     assert cli.main("replay") == snapshot_cli
     assert sorted(crash_cache_dir(tmp_path).glob("*.json")) == crash_files
 

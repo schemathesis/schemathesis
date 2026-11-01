@@ -287,6 +287,10 @@ class GrpcSchema(BaseSchema):
         return STATUS_NAMES_BY_HTTP_STATUS.get(status_code)
 
     @override
+    def operation_label_for_display(self, operation_label: str | None) -> str | None:
+        return operation_label
+
+    @override
     def hash_case(self, case: Case) -> int:
         metadata = request_metadata(case, {SCHEMATHESIS_TEST_CASE_HEADER: "0"})
         payload: bytes | int

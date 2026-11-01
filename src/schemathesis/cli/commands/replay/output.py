@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from schemathesis.config import OutputConfig
+    from schemathesis.schemas import BaseSchema
 
 GLYPH_FIXED = "+"
 GLYPH_FAILING = "x"
@@ -80,6 +81,7 @@ def render_replay(
     base_url: str | None,
     duration_ms: int,
     output_config: OutputConfig,
+    schema: BaseSchema | None = None,
     removal_count: int = 0,
     incompatible_count: int = 0,
     interrupted: bool = False,
@@ -111,7 +113,7 @@ def render_replay(
                 if len(crash.sequence) > 1:
                     # Set the step chain off as its own block instead of butting it against header and failure.
                     console.print()
-                    _print_step_chain(console, sequence=crash.sequence, outcome=outcome)
+                    _print_step_chain(console, sequence=crash.sequence, outcome=outcome, schema=schema)
                     console.print()
                 case_id = case_header(index, crash.case_id) if crash.case_id else None
                 reproduce = append_replay_command(outcome.code_sample, crash.case_id)
@@ -226,6 +228,7 @@ def _print_step_chain(
     *,
     sequence: list[CrashStep],
     outcome: ReplayOutcome,
+    schema: BaseSchema | None,
 ) -> None:
     from rich.text import Text
 
@@ -235,8 +238,12 @@ def _print_step_chain(
     # so short methods/paths don't leave a wide gap before the status.
     path_limit = min(STEP_PATH_MAX, max(20, get_terminal_width() - 36))
     paths = [truncate_text(_step_path(step), path_limit) for step in sequence]
+    operation_labels: list[str | None] = []
+    for step in sequence:
+        label = schema.operation_label_for_display(step.operation) if schema is not None else None
+        operation_labels.append(truncate_text(label, path_limit) if label is not None else None)
     method_column = max(len(step.method) for step in sequence)
-    path_column = max(len(path) for path in paths)
+    path_column = max(len(label or path) for label, path in zip(operation_labels, paths, strict=True))
     masked_pointers = _link_source_pointers(sequence)
 
     rows: list[tuple[Text, str]] = []
@@ -245,6 +252,7 @@ def _print_step_chain(
 
         method = step.method
         path = paths[index - 1]
+        operation_label = operation_labels[index - 1]
         delta = _step_delta(
             index=index - 1,
             failing_index=failing_index,
@@ -262,16 +270,19 @@ def _print_step_chain(
         row.append("    ")
         row.append(f"{index:>2}", style="dim")
         row.append("  ")
-        row.append(method.ljust(method_column), style=METHOD_STYLES.get(method, "bold white"))
-        row.append("  ")
-        row.append(path.ljust(path_column), style="white")
+        if operation_label is None:
+            row.append(method.ljust(method_column), style=METHOD_STYLES.get(method, "bold white"))
+            row.append("  ")
+            row.append(path.ljust(path_column), style="white")
+        else:
+            row.append(operation_label.ljust(path_column), style="white")
         row.append("  ")
         # Show a single status when the step reproduced identically; only spell out
         # `recorded -> replayed` when the status actually drifted.
-        row.append(str(step.response_status), style=_status_style(step.response_status))
+        row.append(_status_label(schema, step.response_status), style=_status_style(step.response_status))
         if actual.status_code != step.response_status:
             row.append(f" {ARROW} ", style="dim")
-            row.append(str(actual.status_code), style=_status_style(actual.status_code))
+            row.append(_status_label(schema, actual.status_code), style=_status_style(actual.status_code))
         if delta is not None:
             row.append("  ")
             row.append(GLYPH_CHANGED, style=delta)
@@ -414,6 +425,11 @@ def _status_style(status_code: int) -> str:
     if 500 <= status_code < 600:
         return "red"
     return "white"
+
+
+def _status_label(schema: BaseSchema | None, status_code: int) -> str:
+    name = schema.status_name_for_code(status_code) if schema is not None else None
+    return name or str(status_code)
 
 
 def _step_delta(

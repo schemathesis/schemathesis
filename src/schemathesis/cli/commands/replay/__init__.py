@@ -208,6 +208,7 @@ def _replay_directory(
             base_url=base_url,
             duration_ms=duration_ms,
             output_config=ctx.obj.output,
+            schema=schema,
             removal_count=removal_count,
             incompatible_count=len(incompatible),
             interrupted=interrupted,
