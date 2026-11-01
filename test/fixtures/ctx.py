@@ -45,6 +45,8 @@ def pytest_runtest_makereport(item, call):
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from schemathesis.config import SchemathesisConfig
     from schemathesis.openapi.loaders import OpenApiSchema
     from schemathesis.schemas import APIOperation
@@ -593,6 +595,7 @@ class GrpcApps:
         annotated: bool = False,
         start: bool = True,
         port: int = 0,
+        on_get_user: Callable[[int, Any], object] | None = None,
     ) -> GrpcServer:
         # grpcio has no free-threaded build, so only tests that start a server need it.
         from test.apps.catalog.grpc import users as grpc_users
@@ -608,6 +611,7 @@ class GrpcApps:
             annotated=annotated,
             start=start,
             port=port,
+            on_get_user=on_get_user,
         )
         return self._serve(app)
 
