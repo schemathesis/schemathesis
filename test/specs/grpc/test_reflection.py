@@ -21,11 +21,16 @@ def labels(schema):
     return [result.ok().label for result in schema.get_all_operations()]
 
 
+@pytest.mark.parametrize("suffix", ["", "/"], ids=["bare", "trailing-slash"])
 @pytest.mark.parametrize("version", ["v1", "v1alpha"])
-def test_from_url_lists_operations(ctx, version):
+def test_from_url_lists_operations(ctx, version, suffix):
     server = ctx.grpc.apps.users(reflection=version)
-    schema = schemathesis.grpc.from_url(server.target)
-    assert (labels(schema), schema.location, schema.get_base_url()) == (LABELS, server.target, server.target)
+    schema = schemathesis.grpc.from_url(f"{server.target}{suffix}")
+    assert (labels(schema), schema.location, schema.get_base_url()) == (
+        LABELS,
+        f"{server.target}{suffix}",
+        server.target,
+    )
 
 
 def test_from_url_over_tls(ctx):
@@ -33,16 +38,34 @@ def test_from_url_over_tls(ctx):
     assert labels(schemathesis.grpc.from_url(server.target, verify=str(server.ca_path))) == LABELS
 
 
+@pytest.mark.filterwarnings("error")
 def test_from_url_sends_headers_and_auth(ctx):
     server = ctx.grpc.apps.users()
     schemathesis.grpc.from_url(
         server.target,
-        headers={"X-Token": "t", "X-Trace-Bin": "AAE=", "Connection": "keep-alive", "grpc-timeout": "1S"},
+        headers={
+            "X-Token": "t",
+            "X-Trace-Bin": "AAE=",
+            "X-Unpadded-Bin": "AAE",
+            "X-Url-Safe-Bin": "-_8",
+            "X-Standard-Bin": "+/8=",
+            "Connection": "keep-alive",
+            "grpc-timeout": "1S",
+        },
         auth=("user", "pass"),
     )
     assert {
         tuple((key, value) for key, value in metadata if key != "user-agent") for metadata in server.reflection_calls
-    } == {(("x-token", "t"), ("x-trace-bin", b"\x00\x01"), ("authorization", "Basic dXNlcjpwYXNz"))}
+    } == {
+        (
+            ("x-token", "t"),
+            ("x-trace-bin", b"\x00\x01"),
+            ("x-unpadded-bin", b"\x00\x01"),
+            ("x-url-safe-bin", b"\xfb\xff"),
+            ("x-standard-bin", b"\xfb\xff"),
+            ("authorization", "Basic dXNlcjpwYXNz"),
+        )
+    }
 
 
 def test_from_url_without_reflection(ctx):
@@ -137,8 +160,9 @@ def test_from_url_reports_refused_reflection(ctx):
         ("grpcs://127.0.0.1:1", False, "`tls-verify=false` is not supported for gRPC targets"),
         ("grpc://127.0.0.1:1", ".", "gRPC targets need a CA bundle file, got a directory"),
         ("http://127.0.0.1:1", True, "gRPC targets need a `grpc://` or `grpcs://` base URL"),
+        ("grpc://127.0.0.1:1/api", True, "gRPC targets need a base URL without a path"),
     ],
-    ids=["tls-verify-false", "ca-directory", "http"],
+    ids=["tls-verify-false", "ca-directory", "http", "path"],
 )
 def test_from_url_rejects_unusable_targets(url, verify, message):
     with pytest.raises(IncorrectUsage, match=message):

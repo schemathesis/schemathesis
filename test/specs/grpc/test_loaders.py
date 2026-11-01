@@ -1,5 +1,6 @@
 import gc
 import os
+import re
 import subprocess
 import sys
 import weakref
@@ -9,7 +10,7 @@ from google.protobuf import descriptor_pb2
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
-from schemathesis.core.errors import LoaderError, LoaderErrorKind, OperationNotFound
+from schemathesis.core.errors import IncorrectUsage, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
 from test.apps.catalog.grpc.descriptors import (
     load_descriptor_set,
@@ -50,6 +51,46 @@ def test_operations_use_configured_base_url(users_path):
     config = SchemathesisConfig.from_dict({"base-url": "grpc://127.0.0.1:50051"})
     schema = schemathesis.grpc.from_path(users_path, config=config)
     assert schema["pkg.Admin"]["Reset"].base_url == "grpc://127.0.0.1:50051"
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        (
+            {"base-url": "http://127.0.0.1:1"},
+            "gRPC targets need a `grpc://` or `grpcs://` base URL, got `http://127.0.0.1:1`",
+        ),
+        (
+            {"base-url": "grpc://127.0.0.1:1/api"},
+            "gRPC targets need a base URL without a path, got `grpc://127.0.0.1:1/api`",
+        ),
+        (
+            {"base-url": "grpcs://127.0.0.1:1", "tls-verify": False},
+            "`tls-verify=false` is not supported for gRPC targets; pass a CA bundle path instead",
+        ),
+        (
+            {"base-url": "grpc://127.0.0.1:1", "proxy": "http://127.0.0.1:1"},
+            "Proxies are not supported for gRPC targets",
+        ),
+        (
+            {"headers": {"X-Name": "\u00e9"}},
+            "Header `x-name` is not valid gRPC metadata: values must be printable ASCII, or base64 under a key ending in "
+            "`-bin`",
+        ),
+        (
+            {"headers": {"x@name": "1"}},
+            "Header `x@name` is not valid gRPC metadata: keys may contain only lowercase letters, digits, `-`, `_` and `.`",
+        ),
+        (
+            {"headers": {"x-trace-bin": "AA!"}},
+            "Header `x-trace-bin` is not valid gRPC metadata: values of keys ending in `-bin` must be base64",
+        ),
+    ],
+    ids=["http", "path", "tls-verify-false", "proxy", "non-ascii-value", "invalid-key", "invalid-base64"],
+)
+def test_unusable_settings_refused_on_load(users_path, config, message):
+    with pytest.raises(IncorrectUsage, match=re.escape(message)):
+        schemathesis.grpc.from_path(users_path, config=SchemathesisConfig.from_dict(config))
 
 
 @pytest.mark.parametrize(

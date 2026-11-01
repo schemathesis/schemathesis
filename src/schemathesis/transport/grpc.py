@@ -15,12 +15,11 @@ from google.protobuf import message, message_factory
 from typing_extensions import override
 
 from schemathesis.core import Body
-from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
-from schemathesis.specs.grpc.schemas import MEDIA_TYPE, request_metadata, request_payload
+from schemathesis.specs.grpc.schemas import MEDIA_TYPE, metadata_pairs, parse_target, request_metadata, request_payload
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport, SerializationContext
 
@@ -209,29 +208,9 @@ def prepare_target(
     url: str, verify: bool | str, headers: dict[str, str], *, uses_proxy: bool, auth: tuple[str, str] | None
 ) -> tuple[str, bool]:
     """Address and TLS mode of `url`, with basic auth added to `headers`."""
-    if uses_proxy:
-        raise IncorrectUsage("Proxies are not supported for gRPC targets")
     if auth is not None:
         headers.setdefault("authorization", requests.auth._basic_auth_str(*auth))
-    return parse_target(url, verify)
-
-
-def parse_target(url: str, verify: bool | str) -> tuple[str, bool]:
-    """Address and whether it uses TLS, for a `grpc://` or `grpcs://` URL."""
-    if isinstance(verify, str) and Path(verify).is_dir():
-        raise IncorrectUsage(f"gRPC targets need a CA bundle file, got a directory: `{verify}`")
-    scheme, _, address = url.partition("://")
-    if scheme not in ("grpc", "grpcs"):
-        raise IncorrectUsage(f"gRPC targets need a `grpc://` or `grpcs://` base URL, got `{url}`")
-    tls = scheme == "grpcs"
-    if tls and verify is False:
-        raise IncorrectUsage("`tls-verify=false` is not supported for gRPC targets; pass a CA bundle path instead")
-    return address, tls
-
-
-def metadata_pairs(headers: Mapping[str, str]) -> tuple[tuple[str, str | bytes], ...]:
-    """Metadata as gRPC sends it: values of `-bin` keys travel as bytes."""
-    return tuple((key, base64.b64decode(value) if key.endswith("-bin") else value) for key, value in headers.items())
+    return parse_target(url, verify, uses_proxy=uses_proxy)
 
 
 def create_channel(

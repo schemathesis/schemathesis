@@ -105,11 +105,15 @@ def test_remote_descriptor_set_extension_is_not_grpc(cli, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/api.pb") == snapshot_cli
 
 
-@pytest.mark.parametrize("option", ["--tls-verify=false", "--proxy=http://127.0.0.1:1"], ids=["tls-verify", "proxy"])
+@pytest.mark.parametrize(
+    ("location", "option"),
+    [(None, "--tls-verify=false"), (None, "--proxy=http://127.0.0.1:1"), ("api.binpb", "--url=http://127.0.0.1:1")],
+    ids=["tls-verify", "proxy", "descriptor-set-http-url"],
+)
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unusable_options_refused(ctx, cli, snapshot_cli, option):
+def test_unusable_options_refused(ctx, cli, snapshot_cli, location, option):
     server = ctx.grpc.apps.users(tls=True)
-    assert cli.run(server.target, option) == snapshot_cli
+    assert cli.run(location or server.target, option) == snapshot_cli
 
 
 BLOCK_MODULE_AND_RUN = """
