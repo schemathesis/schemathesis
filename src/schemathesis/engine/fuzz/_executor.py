@@ -400,7 +400,8 @@ def _send_step(
         recorder.forget_case(case_id=case.id)
         return None
     except TRANSPORT_ERRORS as exc:
-        if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
+        outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
+        if outage and ctx.server.is_after_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.
             return None
         recorder.record_network_error(case_id=case.id, error=exc)

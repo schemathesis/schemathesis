@@ -4425,8 +4425,17 @@ def test_crash_found_before_the_outage_is_still_reported_per_operation(subproces
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
-def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, cli):
-    port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": "refuse", "CRASH_AFTER": "5"})
+@pytest.mark.parametrize(
+    ("mode", "crasher_position", "errors"),
+    [
+        ("refuse", 0, "  🚫 Server Unavailable: 1"),
+        # The request the dying server reset leads the list and is also its operation's error.
+        ("reset", 1, "  🚫 Network Error: 1\n  🚫 Server Unavailable: 1"),
+    ],
+    ids=["refused", "reset-then-refused"],
+)
+def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, cli, mode, crasher_position, errors):
+    port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": mode, "CRASH_AFTER": "5"})
     result = cli.main(
         "fuzz",
         f"http://127.0.0.1:{port}/openapi.json",
@@ -4435,9 +4444,9 @@ def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, c
         "--max-time=20",
     )
     assert "Stop reason: Server stopped responding" in result.stdout, result.stdout
-    assert "Runtime Error" not in result.stdout, result.stdout
-    # The request that crashed the server leads the list.
-    assert int(re.findall(r"""'\{"size": (\d+)\}'""", result.stdout.split("before it went away:")[1])[0]) > 50000
+    assert result.stdout.partition("Errors:\n")[2].partition("\n\n")[0] == errors, result.stdout
+    listed = result.stdout.split("before it went away:\n\n")[1].split("\n\n")
+    assert int(re.findall(r"""'\{"size": (\d+)\}'""", listed[crasher_position])[0]) > 50000
 
 
 ERROR_THEN_GONE_SERVER = (
