@@ -2,6 +2,12 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.33.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
+- Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
+- gRPC Channelz, CSDS and health services tested as part of the API.
+
 ## [4.33.0](https://github.com/schemathesis/schemathesis/compare/v4.32.7...v4.33.0) - 2026-11-01
 
 ### :rocket: Added

@@ -24,7 +24,13 @@ BUILD_HINT = "Build one with `buf build -o api.binpb` or `protoc --include_impor
 EXTRA_HINT = "Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"
 # Reflection lists every service the server registers, these included.
 INFRASTRUCTURE_SERVICES = frozenset(
-    {"grpc.reflection.v1.ServerReflection", "grpc.reflection.v1alpha.ServerReflection", "grpc.health.v1.Health"}
+    {
+        "grpc.reflection.v1.ServerReflection",
+        "grpc.reflection.v1alpha.ServerReflection",
+        "grpc.health.v1.Health",
+        "grpc.channelz.v1.Channelz",
+        "envoy.service.status.v3.ClientStatusDiscoveryService",
+    }
 )
 
 
@@ -108,16 +114,17 @@ def from_url(
             while True:
                 # A server may accept connections before it serves, so a call may last until the wait ends.
                 remaining = max(0, (wait_for_schema or 0) - started_at.elapsed)
+                deadline = (timeout or DEFAULT_RESPONSE_TIMEOUT) + remaining
                 try:
                     return next(
                         call(
                             iter([reflection_pb2.ServerReflectionRequest(**kwargs)]),
                             metadata=metadata,
-                            timeout=(timeout or DEFAULT_RESPONSE_TIMEOUT) + remaining,
+                            timeout=deadline,
                         )
                     )
                 except grpc.RpcError as exc:
-                    error = _reflection_error(cast(grpc.Call, exc), url, address, tls)
+                    error = _reflection_error(cast(grpc.Call, exc), url, address, tls, deadline)
                     # Waiting covers a server that is not up yet; a TLS failure would repeat on every attempt.
                     if (
                         wait_for_schema is None
@@ -140,6 +147,12 @@ def from_url(
             for service in listing.list_services_response.service
             if service.name not in INFRASTRUCTURE_SERVICES
         ]
+        if not names:
+            raise LoaderError(
+                LoaderErrorKind.GRPC_REFLECTION_UNAVAILABLE,
+                "The server lists no services besides reflection and health. Build a descriptor set with "
+                f"`buf build -o api.binpb` and run `schemathesis run api.binpb --url {url}`",
+            )
         files: dict[str, descriptor_pb2.FileDescriptorProto] = {}
         undescribed: list[LoaderError] = []
 
@@ -187,7 +200,7 @@ def from_url(
     return loaded
 
 
-def _reflection_error(error: grpc.Call, url: str, address: str, tls: bool) -> LoaderError:
+def _reflection_error(error: grpc.Call, url: str, address: str, tls: bool, timeout: float) -> LoaderError:
     import grpc
 
     from schemathesis.transport.grpc import TLS_EXPECTED, TLS_FAILED, TLS_FAILURE_MARKERS, accepts_tls
@@ -208,6 +221,10 @@ def _reflection_error(error: grpc.Call, url: str, address: str, tls: bool) -> Lo
         if not tls and accepts_tls(address):
             return LoaderError(LoaderErrorKind.NETWORK_OTHER, f"{message}. {TLS_EXPECTED.format(address=address)}")
         return LoaderError(LoaderErrorKind.CONNECTION_OTHER, message)
+    if code in (grpc.StatusCode.UNAUTHENTICATED, grpc.StatusCode.PERMISSION_DENIED):
+        return LoaderError(LoaderErrorKind.HTTP_FORBIDDEN, f"Reflection failed with {code.name}: {error.details()}")
+    if code == grpc.StatusCode.DEADLINE_EXCEEDED:
+        return LoaderError(LoaderErrorKind.NETWORK_OTHER, f"Read timed out after {timeout:g} seconds")
     return LoaderError(LoaderErrorKind.UNCLASSIFIED, f"Reflection failed with {code.name}: {error.details()}")
 
 
@@ -226,7 +243,10 @@ def from_path(path: PathLike | str, *, config: SchemathesisConfig | None = None)
         ```
 
     """
-    loaded = _from_descriptor_set(Path(path).read_bytes(), config=config)
+    try:
+        loaded = _from_descriptor_set(Path(path).read_bytes(), config=config)
+    except ImportError as exc:
+        raise ImportError(EXTRA_HINT) from exc
     loaded.location = Path(path).absolute().as_uri()
     return loaded
 
@@ -293,7 +313,8 @@ def _from_descriptor_set(
                 service.full_name: service
                 for file in descriptor_set.file
                 for service in pool.FindFileByName(file.name).services_by_name.values()
-                if file.name not in imported or file.package in packages
+                if (file.name not in imported or file.package in packages)
+                and service.full_name not in INFRASTRUCTURE_SERVICES
             }
     except TypeError as exc:
         raise _does_not_load(str(exc).removeprefix("Couldn't build proto file into descriptor pool: ")) from exc

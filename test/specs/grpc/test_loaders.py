@@ -306,21 +306,52 @@ except LoaderError as exc:
 """
 
 
-def test_missing_grpc_extra(users_path):
+@pytest.mark.parametrize("blocked", ["google.protobuf", "google.rpc"], ids=["protobuf", "common-protos"])
+def test_missing_grpc_extra(users_path, blocked):
     result = subprocess.run(
-        [sys.executable, "-c", BLOCK_PROTOBUF_AND_LOAD, str(users_path)], capture_output=True, text=True
+        [sys.executable, "-c", BLOCK_MODULE_AND_LOAD, blocked, str(users_path)], capture_output=True, text=True
     )
     assert result.stderr.splitlines()[-1] == (
         "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"
     )
 
 
-BLOCK_PROTOBUF_AND_LOAD = """
+BLOCK_MODULE_AND_LOAD = """
 import sys
-sys.modules["google.protobuf"] = None
+sys.modules[sys.argv[1]] = None
 import schemathesis
-schemathesis.grpc.from_path(sys.argv[1])
+schemathesis.grpc.from_path(sys.argv[2])
 """
+
+
+def infrastructure_file(service_name):
+    package, name = service_name.rsplit(".", 1)
+    file = descriptor_pb2.FileDescriptorProto(name=f"{service_name}.proto", package=package, syntax="proto3")
+    file.message_type.add(name="Request")
+    file.message_type.add(name="Response")
+    method = file.service.add(name=name).method.add(name="Call")
+    method.input_type = f".{package}.Request"
+    method.output_type = f".{package}.Response"
+    return file
+
+
+def test_descriptor_set_skips_infrastructure_services(tmp_path):
+    files = users_files()
+    files.extend(
+        infrastructure_file(name)
+        for name in (
+            "grpc.reflection.v1.ServerReflection",
+            "grpc.reflection.v1alpha.ServerReflection",
+            "grpc.health.v1.Health",
+            "grpc.channelz.v1.Channelz",
+            "envoy.service.status.v3.ClientStatusDiscoveryService",
+        )
+    )
+    schema = schemathesis.grpc.from_path(write_files(tmp_path, files))
+    assert [result.ok().label for result in schema.get_all_operations()] == [
+        "pkg.Users/GetUser",
+        "pkg.Admin/Reset",
+    ]
 
 
 def test_before_load_schema_hook_sees_descriptor_files(users_path):
