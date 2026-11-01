@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
 # How long a failed call waits for the channel to connect before blaming the network.
 READY_TIMEOUT = 0.5
+# Coarse platform timers can fire a deadline this long before it is due on the client's clock.
+DEADLINE_CLOCK_SLACK = 0.05
 CHANNEL_OPTIONS = (
     # Servers attach error details as metadata; the default 8 KB limit turns large ones into a client-side failure.
     ("grpc.max_metadata_size", 1024 * 1024),
@@ -123,8 +125,8 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             outcome = cast(grpc.Call, error)
             code = outcome.code()
             # Errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
-            # Servers send DEADLINE_EXCEEDED with any text too; only one arriving after the timeout is a read timeout.
-            if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout:
+            # Servers send DEADLINE_EXCEEDED with any text too; only one arriving at the timeout is a read timeout.
+            if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout - DEADLINE_CLOCK_SLACK:
                 timed_out = TimeoutError(f"{base_url}: Read timed out. (read timeout={timeout})")
                 raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
             if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):

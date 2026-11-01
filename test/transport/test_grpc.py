@@ -4,6 +4,7 @@ import json
 import re
 import socket
 import threading
+import time
 
 import pytest
 import requests
@@ -214,6 +215,13 @@ def test_basic_auth_from_session(ctx):
 def test_deadline_raises_timeout(ctx):
     with pytest.raises(requests.exceptions.ReadTimeout):
         get_user(ctx.grpc.apps.users(), 13, timeout=0.1)
+
+
+# Coarse platform timers can fire the deadline a little before the timeout has passed on the client's clock.
+def test_deadline_exceeded_close_to_the_timeout_is_a_timeout(ctx):
+    server = ctx.grpc.apps.users(on_get_user=lambda user_id, server: time.sleep(0.09))
+    with pytest.raises(requests.exceptions.ReadTimeout):
+        get_user(server, 504, timeout=0.1)
 
 
 # A channel that failed to connect waits before trying again and fails calls in the meantime without sending them.
