@@ -99,6 +99,7 @@ from flask import jsonify
         pytest.param('origin = "http://127.0.0.1/api"', id="origin_with_path"),
         pytest.param('base-url = "http://[::1"', id="base_url_unparsable"),
         pytest.param('origin = "http://[::1"', id="origin_unparsable"),
+        pytest.param('base-url = "http://127.0.0.1:abc"', id="base_url_invalid_port"),
         pytest.param(
             textwrap.dedent(
                 """

@@ -81,8 +81,13 @@ def test_run_as_module(testdir):
         ("--help",),
         ("http://127.0.0.1", "--generation-codec=foobar"),
         ("http://127.0.0.1", "--report=unknown"),
+        (SIMPLE_PATH, "--url=http://127.0.0.1:abc"),
+        (SIMPLE_PATH, "--url=http://127.0.0.1:99999"),
+        (SIMPLE_PATH, "--origin=http://127.0.0.1:abc"),
+        ("grpc://127.0.0.1:abc",),
     ],
 )
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_run_output(cli, args, snapshot_cli):
     assert cli.run(*args) == snapshot_cli
 
