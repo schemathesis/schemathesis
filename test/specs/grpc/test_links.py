@@ -4,8 +4,13 @@ from hypothesis.stateful import RULE_MARKER
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
+from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup, ServerError
+from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.examples import generate_many
+from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema
 from schemathesis.specs.grpc.stateful import GrpcLink, infer_links, response_value
 from test.apps.catalog.grpc.descriptors import library_descriptor_set, write_descriptor_set
 from test.utils import saved_example_keys
@@ -14,6 +19,8 @@ pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
 NAME_LINK = GrpcLink("library.Library/CreateBook", "library.Library/GetBook", "name", "name")
 PAGE_LINK = GrpcLink("library.Library/ListBooks", "library.Library/ListBooks", "next_page_token", "pageToken")
+CREATE_BOOK = "library.Library/CreateBook"
+GET_BOOK = "library.Library/GetBook"
 
 
 def message(file, name):
@@ -59,6 +66,31 @@ def create_also_pages(files):
 
 def list_filter(files):
     _string_field(message(files.file[0], "ListBooksRequest"), "filter", 3)
+
+
+def make_proto2(files):
+    files.file[0].syntax = "proto2"
+
+
+def get_requires_version(files):
+    make_proto2(files)
+    message(files.file[0], "GetBookRequest").field.add(
+        name="version",
+        number=2,
+        type=descriptor_pb2.FieldDescriptorProto.TYPE_INT32,
+        label=descriptor_pb2.FieldDescriptorProto.LABEL_REQUIRED,
+    )
+
+
+def get_requires_itself(files):
+    make_proto2(files)
+    message(files.file[0], "GetBookRequest").field.add(
+        name="parent",
+        number=2,
+        type=descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".library.GetBookRequest",
+        label=descriptor_pb2.FieldDescriptorProto.LABEL_REQUIRED,
+    )
 
 
 def same_rule_names(files):
@@ -125,14 +157,40 @@ def test_links_follow_filters(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("status", "content"),
-    [("5", b""), ("0", b"\xff\xff\xff")],
-    ids=["failed-call", "undecodable-body"],
+    ("status", "content", "mutate_files"),
+    [("5", b"", None), ("0", b"\xff\xff\xff", None), ("0", b"\n\x07books/\xff", make_proto2)],
+    ids=["failed-call", "undecodable-body", "proto2-name-not-utf8"],
 )
-def test_response_value_is_empty(tmp_path, response_factory, status, content):
-    operation = load(tmp_path)["library.Library"]["CreateBook"]
+def test_response_value_is_empty(tmp_path, response_factory, status, content, mutate_files):
+    operation = load(tmp_path, mutate_files=mutate_files)["library.Library"]["CreateBook"]
     response = response_factory.core(content=content, headers={"grpc-status": [status]})
     assert response_value(operation, response, "name") == ""
+
+
+@pytest.mark.parametrize(
+    ("fuzzed", "excluded", "mutate_files", "expected"),
+    [
+        ({CREATE_BOOK, GET_BOOK}, set(), None, [(GET_BOOK, {"name": "books/1"})]),
+        ({CREATE_BOOK, GET_BOOK}, set(), get_requires_version, [(GET_BOOK, {"name": "books/1", "version": 0})]),
+        ({CREATE_BOOK}, set(), None, []),
+        ({CREATE_BOOK, GET_BOOK}, {GET_BOOK}, None, []),
+    ],
+    ids=["linked", "target-requires-other-fields", "target-not-fuzzed", "target-excluded"],
+)
+def test_link_candidates(tmp_path, response_factory, fuzzed, excluded, mutate_files, expected):
+    schema = load(tmp_path, mutate_files=mutate_files)
+    operations = {label: schema.find_operation_by_label(label) for label in fuzzed}
+    create = operations[CREATE_BOOK]
+    candidates = schema.iter_link_candidates(
+        operation=create,
+        case=create.Case(body={"title": "Dune"}),
+        response=response_factory.core(content=b"\n\x07books/1", headers={"grpc-status": ["0"]}),
+        operations_by_label=operations,
+        excluded_labels=excluded,
+    )
+    assert [
+        (target.label, generate_many(target.as_strategy(**overrides), 1)[0].body) for target, overrides in candidates
+    ] == expected
 
 
 def server_errors(schema):
@@ -200,6 +258,38 @@ def test_next_page_repeats_the_request(ctx, tmp_path):
     Machine.run()
     assert follow_ups
     assert all({**parent, "pageToken": child["pageToken"]} == child for parent, child in follow_ups)
+
+
+def test_fields_the_server_reported_missing_are_set(ctx, tmp_path):
+    schema = load(tmp_path, server=ctx.grpc.apps.library())
+    schema.config.checks.update(excluded_check_names=["not_a_server_error"])
+    store = ErrorFeedbackStore()
+    store.record(
+        Observation(
+            operation_label=CREATE_BOOK,
+            location=ParameterLocation.BODY,
+            parameter_path=("title",),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="title is required",
+        )
+    )
+    titles = []
+
+    class Machine(schema.build_state_machine(feedback=FeedbackSources(error_feedback=store), link_calibration=None)):
+        def before_call(self, case):
+            if case.operation.label == CREATE_BOOK:
+                titles.append(case.body.get("title", ""))
+
+    Machine.run()
+    assert titles
+    assert [title for title in titles if not title] == []
+
+
+def test_unsatisfiable_linked_method_is_reported(ctx, tmp_path):
+    schema = load(tmp_path, mutate_files=get_requires_itself, server=ctx.grpc.apps.library())
+    schema = schema.exclude(name="library.Library/ListBooks")
+    with pytest.raises(UnsatisfiableSchema, match=f"Cannot generate test data for `{GET_BOOK}`"):
+        schema.as_state_machine().run()
 
 
 def test_rule_names_stay_distinct(tmp_path):

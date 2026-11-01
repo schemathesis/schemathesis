@@ -6,6 +6,7 @@ import re
 import shlex
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn, Self
 from urllib.parse import urlsplit
@@ -41,7 +42,8 @@ from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.jsonschema.builder import build
+from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import (
     PhaseInfo,
@@ -60,7 +62,14 @@ from schemathesis.specs.grpc.converter import (
     rewrite_json,
 )
 from schemathesis.specs.grpc.formats import grpc_formats
-from schemathesis.specs.grpc.stateful import create_state_machine, infer_links
+from schemathesis.specs.grpc.stateful import (
+    GrpcLink,
+    LinkedValue,
+    create_state_machine,
+    infer_links,
+    link_candidates,
+    with_value,
+)
 from schemathesis.specs.grpc.status import (
     GRPC_STATUSES,
     INTERNAL,
@@ -80,6 +89,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation
     from schemathesis.core.spec import ApiSchema
+    from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.filters import FilterSet
     from schemathesis.generation.case import Case
@@ -458,7 +468,7 @@ class GrpcSchema(BaseSchema):
             if value:
                 raise IncorrectUsage(f"`{name}` is not supported for gRPC operations")
         generation = self.config.generation_for(operation=operation, phase=phase.value)
-        if isinstance(body, NotSet):
+        if isinstance(body, (NotSet, LinkedValue)):
             input_type = operation.definition.raw.input_type
             schema = message_schema(input_type).schema
             if feedback.error_feedback is not None:
@@ -469,12 +479,14 @@ class GrpcSchema(BaseSchema):
                         operation_label=operation.label, location=ParameterLocation.BODY
                     ),
                 )
-            bodies = build(
+            bodies: SearchStrategy[Body] = build(
                 schema,
                 draft=jsonschema_rs.Draft202012,
                 formats=grpc_formats(),
                 alphabet=Alphabet(allow_x00=generation.allow_x00, codec=generation.codec),
             )
+            if isinstance(body, LinkedValue):
+                bodies = bodies.map(lambda generated: with_value(operation, generated, body.field, body.value))
         else:
             bodies = st.just(body)
         return grpc_cases(
@@ -506,9 +518,39 @@ class GrpcSchema(BaseSchema):
         return create_state_machine(self)
 
     @override
+    def build_state_machine(
+        self,
+        *,
+        feedback: FeedbackSources,
+        link_calibration: LinkCalibrationState | None,
+    ) -> type[APIStateMachine]:
+        return create_state_machine(self, feedback)
+
+    @override
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
         count = len(infer_links(self._iter_operations()))
         return StatefulInference(inferred=count, total=count, selected=count)
+
+    @cached_property
+    def _links_by_source(self) -> dict[str, list[GrpcLink]]:
+        links: dict[str, list[GrpcLink]] = {}
+        for link in infer_links(self._iter_operations()):
+            links.setdefault(link.source, []).append(link)
+        return links
+
+    @override
+    def iter_link_candidates(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+        response: Response,
+        operations_by_label: dict[str, APIOperation],
+        excluded_labels: set[str],
+    ) -> list[tuple[APIOperation, dict[str, Body | LinkedValue]]]:
+        return link_candidates(
+            self._links_by_source.get(operation.label, []), case, response, operations_by_label, excluded_labels
+        )
 
     @override
     def create_extra_data_source(self) -> None:
@@ -641,7 +683,15 @@ def grpc_cases(
         raise SkipTest("Negative test cases are not available for gRPC operations")
     started_at = Instant()
     hook_context = HookContext(operation=operation)
-    body_ = draw(apply_to_all_dispatchers(operation, hook_context, hooks, bodies, "body"))
+    bodies = apply_to_all_dispatchers(operation, hook_context, hooks, bodies, "body")
+    if bodies is EMPTY_STRATEGY:
+        # Drawing from it only rejects the input, which stateful testing reads as nothing to test.
+        raise UnsatisfiableSchema(
+            f"Cannot generate test data for `{operation.label}`\n\n"
+            f"No `{operation.definition.raw.input_type.full_name}` message satisfies "
+            "its required fields and validation rules"
+        )
+    body_ = draw(bodies)
     headers_ = draw(apply_to_all_dispatchers(operation, hook_context, hooks, st.just(headers), "headers"))
     case = operation.Case(
         headers=headers_,

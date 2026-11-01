@@ -1,0 +1,47 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from grpc://127.0.0.1 (in 0.00s)
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ N unique failures
+
+=================================== FAILURES ===================================
+__________________________ library.Library/ListBooks ___________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+INTERNAL: cannot read the second page
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/3
+  Tested: N
+
+Stop reason: Failure limit reached
+
+Failures:
+  ❌ ST101 Server error: 1
+
+For more information, run `st explain ST101`.
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

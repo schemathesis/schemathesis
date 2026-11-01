@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 
     from schemathesis.core import Body, NotSet
     from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
+    from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.grpc.schemas import GrpcSchema
@@ -55,6 +57,14 @@ class GrpcLink:
     source_field: str
     # JSON name of the target request field, as generated bodies key it.
     target_field: str
+
+
+@dataclass(frozen=True, slots=True)
+class LinkedValue:
+    """A generated request body with `field` set to a value from an earlier response."""
+
+    field: FieldDescriptor
+    value: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +119,9 @@ def response_value(operation: APIOperation, response: Response, field: str) -> s
         decoded = message_class.FromString(response.content)
     except message.DecodeError:
         return ""
-    return getattr(decoded, field)
+    value = getattr(decoded, field)
+    # Proto2 strings that are not valid UTF-8 decode as bytes, which no request can carry as a string.
+    return value if isinstance(value, str) else ""
 
 
 def with_value(operation: APIOperation, body: Body | NotSet, field: FieldDescriptor, value: str) -> Body:
@@ -130,6 +142,29 @@ def with_value(operation: APIOperation, body: Body | NotSet, field: FieldDescrip
     return fields
 
 
+def link_candidates(
+    links: Iterable[GrpcLink],
+    case: Case,
+    response: Response,
+    operations_by_label: dict[str, APIOperation],
+    excluded_labels: set[str],
+) -> list[tuple[APIOperation, dict[str, Body | LinkedValue]]]:
+    """Methods that `links` lead to from the response of `case`, each with a body carrying the linked value."""
+    candidates: list[tuple[APIOperation, dict[str, Body | LinkedValue]]] = []
+    for link in links:
+        target = operations_by_label.get(link.target)
+        if target is None or link.target in excluded_labels:
+            continue
+        value = response_value(case.operation, response, link.source_field)
+        if not value:
+            continue
+        field = json_fields(target.definition.raw.input_type)[link.target_field]
+        # A page token is only valid with the arguments of the request that got it.
+        body = with_value(target, case.body, field, value) if link.source == link.target else LinkedValue(field, value)
+        candidates.append((target, {"body": body}))
+    return candidates
+
+
 class GrpcStateMachine(BundleStateMachine):
     """State machine that passes resource names and page tokens between gRPC calls."""
 
@@ -145,7 +180,7 @@ class GrpcStateMachine(BundleStateMachine):
         return multiple(Produced(case_id=case.id, body=case.body, values=values))
 
 
-def create_state_machine(schema: GrpcSchema) -> type[GrpcStateMachine]:
+def create_state_machine(schema: GrpcSchema, feedback: FeedbackSources | None = None) -> type[GrpcStateMachine]:
     operations = {operation.label: operation for operation in schema._iter_operations()}
     links = infer_links(operations.values())
     if not links:
@@ -169,7 +204,7 @@ def create_state_machine(schema: GrpcSchema) -> type[GrpcStateMachine]:
     for label, fields in produced.items():
         attrs[bundles[label].name] = bundles[label]
         name = unique_rule_name(normalize_name(label), attrs)
-        attrs[name] = _root_rule(name, operations[label], fields, bundles[label])
+        attrs[name] = _root_rule(name, operations[label], fields, bundles[label], feedback)
         root_rules.append(name)
     attrs["root_rules"] = frozenset(root_rules)
     for link in links:
@@ -178,7 +213,7 @@ def create_state_machine(schema: GrpcSchema) -> type[GrpcStateMachine]:
         transitions.operations[link.target].incoming.append(edge)
         name = unique_rule_name(normalize_name(f"{link.source}_to_{link.target}"), attrs)
         attrs[name] = _link_rule(
-            name, link, operations[link.target], bundles[link.source], bundles.get(link.target), produced
+            name, link, operations[link.target], bundles[link.source], bundles.get(link.target), produced, feedback
         )
     machine = type("GrpcStateMachine", (GrpcStateMachine,), attrs)
     add_database_key(machine, "\n".join(attrs))
@@ -199,10 +234,10 @@ def _no_links(schema: GrpcSchema) -> NoLinksFound:
 
 
 def _root_rule(
-    rule_name: str, operation: APIOperation, fields: tuple[str, ...], target: Bundle
+    rule_name: str, operation: APIOperation, fields: tuple[str, ...], target: Bundle, feedback: FeedbackSources | None
 ) -> Callable[..., MultipleResults[Produced]]:
     label = operation.label
-    strategy = operation.as_strategy(phase=TestPhase.STATEFUL)
+    strategy = operation.as_strategy(phase=TestPhase.STATEFUL, feedback=feedback)
 
     def body(self: GrpcStateMachine, data: st.DataObject) -> MultipleResults[Produced]:
         case = data.draw(strategy)
@@ -226,8 +261,9 @@ def _link_rule(
     source: Bundle,
     target: Bundle | None,
     produced: dict[str, tuple[str, ...]],
+    feedback: FeedbackSources | None,
 ) -> Callable[..., MultipleResults[Produced] | None]:
-    strategy = operation.as_strategy(phase=TestPhase.STATEFUL)
+    strategy = operation.as_strategy(phase=TestPhase.STATEFUL, feedback=feedback)
     field = json_fields(operation.definition.raw.input_type)[link.target_field]
     # A page token is only valid with the arguments of the request that got it.
     repeats_request = link.source == link.target
