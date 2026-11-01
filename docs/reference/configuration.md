@@ -1023,7 +1023,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
         When a response's status is in `retry_on`, Schemathesis fetches a fresh token and replays the request once. If the token fetch fails, the run ends with a "credentials likely invalidated" warning, and after 3 failed fetches in a row further token refreshes are disabled for the rest of the run. If the replay still returns a `retry_on` status, the status is not about the token: Schemathesis stops refreshing tokens for that operation's responses.
 
     !!! note
-        Reactive refresh applies to every phase of `schemathesis run`, to `schemathesis fuzz` and to `case.call_and_validate()` (the pytest plugin). A raw `case.call()` does not replay, since it performs no validation.
+        Reactive refresh applies to every phase of `schemathesis run`, to `schemathesis fuzz`, to `case.call_and_validate()` (the pytest plugin) and to state machines from `schema.as_state_machine()`. A raw `case.call()` does not replay, since it performs no validation.
 
     !!! note
         Reactive refresh covers tokens from dynamic schemes and from `@schemathesis.auth(retry_on=...)` / `schema.auth(retry_on=...)` registrations. `retry_on` codes are pooled across every configured scheme, and a triggering status refreshes all cached tokens.

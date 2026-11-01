@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import Rule, RuleBasedStateMachine, RuleStrategy
 
+from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
@@ -418,6 +419,10 @@ class APIStateMachine(RuleBasedStateMachine):
         self.before_call(input.case)
         kwargs = self.get_call_kwargs(input.case)
         response = self.call(input.case, **kwargs)
+        # Replay before validation so checks see the recovered response, not the stale-token one.
+        response = reauth_and_replay(
+            input.case, response, self.schema.reauth_state, lambda: self.call(input.case, **kwargs)
+        )
         self.after_call(response, input.case)
         self.validate_response(response, input.case, **kwargs)
         return StepOutput(response, input.case)

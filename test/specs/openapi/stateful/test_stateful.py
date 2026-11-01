@@ -3,6 +3,7 @@ from collections import Counter
 from uuid import uuid4
 
 import pytest
+import requests
 from fastapi import FastAPI, Header, HTTPException
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis.control import current_build_context
@@ -27,7 +28,7 @@ from schemathesis.specs.openapi.stateful import (
     match_status_code,
 )
 from test.apps.catalog.openapi import users as openapi_users
-from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody
+from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody, SingleUseBearerTokens
 from test.utils import run_given, saved_example_keys
 
 
@@ -643,6 +644,33 @@ def test_passing_transport_kwargs(ctx):
         pass
 
     assert [request.query for request in api.requests if "token" not in request.query] == [{"trace": "1"}]
+
+
+# Each expired token draws one 401, after which the step re-authenticates and later steps use the new token.
+def test_expired_token_is_refreshed(ctx):
+    api = ctx.openapi.apps.stateful_users(SingleUseBearerTokens())
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+    @schemathesis.auth()
+    class TokenAuth:
+        def get(self, case, context):
+            return requests.post(f"{api.base_url}/auth/token").json()["token"]
+
+        def set(self, case, data, context):
+            case.headers = case.headers or {}
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    schema.as_state_machine().run(
+        settings=settings(
+            max_examples=5,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+        )
+    )
+    assert set(Counter(api.wsgi_app.config["expired_token_uses"]).values()) == {1}
 
 
 @pytest.mark.parametrize(
