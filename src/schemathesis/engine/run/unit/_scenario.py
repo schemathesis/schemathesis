@@ -35,6 +35,8 @@ class Scenario:
     generation: GenerationConfig
     transport_kwargs: dict[str, Any]
     continue_on_failure: bool
+    # The operation's fuzzing already failed in an earlier cycle of this run.
+    failed_before: bool
 
     def non_fatal_error(self, error: Exception, code_sample: str | None = None) -> events.NonFatalError:
         return events.NonFatalError(
@@ -66,6 +68,8 @@ def start_scenario(
     started_at = Instant()
     recorder = ScenarioRecorder(label=operation.label, config=ctx.config.output)
     check_data = collect_check_context_data(operation=operation, ctx=ctx, phase=phase.value)
+    # Stopping again on a failure an earlier cycle reported would spend every later cycle resending its input.
+    failed_before = phase == PhaseName.FUZZING and operation.label in ctx.failed_operations
     scenario = Scenario(
         operation=operation,
         phase=phase,
@@ -77,7 +81,8 @@ def start_scenario(
         check_ctx=check_data.to_check_context(ctx, recorder=recorder, phase=phase),
         generation=ctx.config.generation_for(operation=operation, phase=phase.value),
         transport_kwargs=check_data.transport_kwargs,
-        continue_on_failure=ctx.config.continue_on_failure_for(operation=operation),
+        continue_on_failure=failed_before or ctx.config.continue_on_failure_for(operation=operation),
+        failed_before=failed_before,
     )
     _checkpoint_error_feedback(ctx)
     return scenario

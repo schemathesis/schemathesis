@@ -6,7 +6,7 @@ import requests
 
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import StopReason, events
 from schemathesis.engine._rate_limit_retry import (
     TRANSPORT_ERRORS,
@@ -110,6 +110,9 @@ def _call_and_validate_once(
     key = hash(case)
     cached = ctx.get_cached_outcome(key)
     if isinstance(cached, BaseException):
+        # An earlier cycle already reported this failure; skip the input instead of ending the run on it again.
+        if isinstance(cached, FailureGroup) and scenario.failed_before:
+            return
         raise cached
     if cached is None:
         return

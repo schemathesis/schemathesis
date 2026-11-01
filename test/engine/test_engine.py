@@ -1885,11 +1885,7 @@ def test_max_time_repeats_coverage_until_feedback_stops_arriving(ctx):
     assert _coverage_passes(stream) >= 3
 
 
-def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
-    # Repeating a phase is only worth the time if each cycle explores somewhere the last one did not.
-    api = ctx.openapi.apps.path_variable()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(schema, max_time=10, max_examples=20, seed=1, phases=[PhaseName.FUZZING])
+def _fuzzing_rounds(stream) -> list[set[str]]:
     rounds: list[set[str]] = []
     for event in stream.events:
         if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.FUZZING:
@@ -1899,9 +1895,74 @@ def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
                 str((case.value.path_parameters, case.value.query, case.value.body))
                 for case in event.recorder.cases.values()
             )
+    return rounds
+
+
+def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
+    # Repeating a phase is only worth the time if each cycle explores somewhere the last one did not.
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    rounds = _fuzzing_rounds(execute(schema, max_time=10, max_examples=20, seed=1, phases=[PhaseName.FUZZING]))
 
     assert len(rounds) > 1, len(rounds)
     assert rounds[1] - rounds[0], "cycle 2 generated nothing cycle 1 had not"
+
+
+def _keyed_items_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{key}": {
+                "get": {
+                    "parameters": [
+                        {"name": "key", "in": "path", "required": True, "schema": {"type": "string", "minLength": 1}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    return app
+
+
+@pytest.mark.parametrize(
+    ("database", "unique_inputs"),
+    [(False, False), (True, False), (False, True)],
+    ids=["database-off", "database-on", "unique-inputs"],
+)
+def test_max_time_cycles_keep_exploring_an_operation_that_failed(ctx, app_runner, tmp_path, database, unique_inputs):
+    # Each cycle restarts generation, which begins with the input that already failed.
+    app = _keyed_items_app(ctx)
+
+    @app.route("/items/<key>")
+    def items(key):
+        return "", 500
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.generation.update(database=str(tmp_path) if database else "none", unique_inputs=unique_inputs)
+    rounds = _fuzzing_rounds(execute(schema, max_time=2, max_examples=20, seed=1, phases=[PhaseName.FUZZING]))
+
+    assert len(rounds) > 1, len(rounds)
+    assert rounds[1] - rounds[0], f"cycle 2 sent nothing new: {rounds[1]}"
+
+
+def test_max_time_cycles_keep_the_stored_failure_for_the_next_run(ctx, app_runner, tmp_path):
+    # Later cycles move past a known failure; replaying it there without failing would delete it from the database.
+    app = _keyed_items_app(ctx)
+    runs: list[list[str]] = []
+
+    @app.route("/items/<key>")
+    def items(key):
+        runs[-1].append(key)
+        return "", 500 if len(key) > 1 else 200
+
+    url = app_runner.openapi_url(app)
+    for _ in range(2):
+        runs.append([])
+        schema = schemathesis.openapi.from_url(url)
+        schema.config.generation.update(database=str(tmp_path))
+        execute(schema, max_time=2, max_examples=20, seed=1, phases=[PhaseName.FUZZING])
+
+    assert runs[1][0] == next(key for key in runs[0] if len(key) > 1)
 
 
 def test_max_time_stops_cycling_when_a_cycle_runs_nothing(ctx):

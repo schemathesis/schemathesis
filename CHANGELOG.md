@@ -69,6 +69,7 @@
 - Internal error on a numeric `openapi` version, such as an unquoted `3.1` in YAML.
 - Internal error on a Swagger 2.0 or Open API 3.0 schema without `paths`.
 - Runs with `--max-time` continuing after a request times out at the time limit.
+- Fuzzing resending an operation's known failing input every cycle under `--max-time`.
 - `st fuzz` hiding errors raised as the time limit is reached.
 - Token fetch cooldown failure reported twice in stateful testing.
 - Expired auth tokens never refreshed in stateful testing, `st fuzz` and pytest state machines.
