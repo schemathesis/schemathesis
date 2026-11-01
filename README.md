@@ -23,7 +23,7 @@
 
 > **Catch API bugs before your users do.**
 
-Schemathesis tests OpenAPI and GraphQL APIs by generating inputs from your schema, adapting to server responses, and chaining operations into realistic workflows.
+Schemathesis tests OpenAPI, GraphQL and gRPC APIs by generating inputs from your schema, adapting to server responses, and chaining operations into realistic workflows.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
@@ -45,7 +45,12 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 # Test your own API
 uvx schemathesis run https://your-api.com/openapi.json
+
+# Test a gRPC service with server reflection
+uvx --from 'schemathesis[grpc]' schemathesis run grpc://localhost:50051
 ```
+
+Without reflection, or for TLS and metadata, see the [gRPC guide](https://schemathesis.readthedocs.io/en/stable/guides/grpc/).
 
 Schemathesis sends real requests that create, change and delete data. Point it at a dev or staging environment, not production.
 
