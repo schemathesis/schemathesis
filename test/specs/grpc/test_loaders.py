@@ -311,7 +311,7 @@ def test_missing_grpc_extra(users_path):
         [sys.executable, "-c", BLOCK_PROTOBUF_AND_LOAD, str(users_path)], capture_output=True, text=True
     )
     assert result.stderr.splitlines()[-1] == (
-        "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`"
+        "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"
     )
 
 

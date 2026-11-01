@@ -190,7 +190,7 @@ def test_missing_grpc_extra(tmp_path, blocked, command, source):
     assert (result.returncode, result.stdout, result.stderr) == (
         1,
         "",
-        "Error: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`\n",
+        "Error: Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`\n",
     )
     assert not (tmp_path / "schemathesis-report").exists()
 
