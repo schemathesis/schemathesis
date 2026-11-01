@@ -63,6 +63,9 @@ def test_(case):
             r".*test_\[GET /bar\] SUBPASSED",
             # Operation-level error
             r".*test_\[POST /bar\] SUBFAILED",
+            # pytest 8 headings carry no subtest label
+            r"_+ test_( \(label='/foo'\))? _+",
+            r"_+ test_( \(label='POST /bar'\))? _+",
             # The error in both failing cases
             ".*Unresolvable reference in the schema.*",
         ]
@@ -91,6 +94,7 @@ def test_lazy(case):
             r".*::test_\[schema\] FAILED",
             r".*::test_lazy\[schema\] SUBFAILED",
             r".*::test_lazy PASSED",
+            r"_+ test_lazy( \(label='schema'\))? _+",
             r'.*"paths" is a required property',
         ]
     )

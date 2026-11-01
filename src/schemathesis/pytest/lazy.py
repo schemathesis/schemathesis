@@ -300,13 +300,9 @@ def _set_node_id(node: pytest.Function, node_id: str) -> None:
 def _schema_error(subtests: pytest.Subtests, error: InvalidSchema, node_id: str, node: pytest.Function) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
-    kwargs: dict[str, Any] = {}
-    if error.method:
-        kwargs["method"] = error.method.upper()
-    kwargs["path"] = error.path
     _set_node_id(node, f"{node_id}{schema_error_suffix(error)}")
     __tracebackhide__ = True
-    with subtests.test(**kwargs):
+    with subtests.test(label=error.label):
         sub_test()
 
 
