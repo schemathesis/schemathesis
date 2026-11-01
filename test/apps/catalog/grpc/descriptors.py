@@ -523,6 +523,7 @@ def validated_descriptor_set() -> bytes:
         shades.value.add(name=name, number=number)
     parent = validated.message_type.add(name="Parent")
     _field(parent, "id", 1, FieldDescriptorProto.TYPE_STRING)
+    _field(parent, "enabled", 2, FieldDescriptorProto.TYPE_BOOL)
 
     span = validated.message_type.add(name="Span")
     labels = span.nested_type.add(name="LabelsEntry", options=descriptor_pb2.MessageOptions(map_entry=True))
@@ -790,11 +791,37 @@ def validated_descriptor_set() -> bytes:
     field_rules(choices.field[-1], "buf.validate.field", {"string": {"minLen": "2"}})
     _field(choices, "alias", 6, FieldDescriptorProto.TYPE_STRING)
 
+    recursive = validated.message_type.add(name="Recursive")
+    recursive.oneof_decl.add(name="kind")
+    _set_extension(
+        rules, recursive.oneof_decl[0].options, "google.protobuf.OneofOptions", "buf.validate.oneof", {"required": True}
+    )
+    recursive_group = validated.message_type.add(name="RecursiveGroup")
+    _field(
+        recursive_group,
+        "items",
+        1,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".validated.Recursive",
+        label=repeated,
+    )
+    field_rules(recursive_group.field[-1], "buf.validate.field", {"repeated": {"minItems": "1"}})
+    _field(
+        recursive,
+        "group",
+        1,
+        FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".validated.RecursiveGroup",
+        oneof_index=0,
+    )
+    _field(recursive, "leaf", 2, FieldDescriptorProto.TYPE_STRING, oneof_index=0)
+
     service = validated.service.add(name="Spans")
     service.method.add(name="Record", input_type=".validated.Span", output_type=".google.protobuf.Empty")
     service.method.add(name="Check", input_type=".validated.Extras", output_type=".google.protobuf.Empty")
     service.method.add(name="Edge", input_type=".validated.Edges", output_type=".google.protobuf.Empty")
     service.method.add(name="Choose", input_type=".validated.Choices", output_type=".google.protobuf.Empty")
+    service.method.add(name="Recurse", input_type=".validated.Recursive", output_type=".google.protobuf.Empty")
     return descriptor_pb2.FileDescriptorSet(file=[*well_known, protovalidate, legacy, validated]).SerializeToString()
 
 

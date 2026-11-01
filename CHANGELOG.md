@@ -8,6 +8,8 @@
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
+- Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
+- Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
 - connect-go request decoding failures not reported as ST119.
 - Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.
