@@ -130,12 +130,24 @@ class RecordReflection(grpc.ServerInterceptor):
             metadata = [(item.key, item.value) for item in handler_call_details.invocation_metadata]
             self.calls.append(metadata)
             if ("x-deny", "1") in metadata:
-                return grpc.stream_stream_rpc_method_handler(deny)
+                return grpc.stream_stream_rpc_method_handler(deny_permission)
+            if ("x-deny", "authentication") in metadata:
+                return grpc.stream_stream_rpc_method_handler(deny_authentication)
+            if ("x-stall", "1") in metadata:
+                return grpc.stream_stream_rpc_method_handler(stall)
         return continuation(handler_call_details)
 
 
-def deny(requests, context):
+def deny_permission(requests, context):
     context.abort(grpc.StatusCode.PERMISSION_DENIED, "denied")
+
+
+def deny_authentication(requests, context):
+    context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing credentials")
+
+
+def stall(requests, context):
+    time.sleep(1)
 
 
 class ReflectionServicer(reflection.ReflectionServicer):
@@ -214,6 +226,7 @@ def users(
     tls: bool = False,
     client_auth: bool = False,
     reflection_version: str | None = "v1alpha",
+    reflection_services: tuple[str, ...] = ("pkg.Users", "pkg.Admin", "grpc.health.v1.Health"),
     undescribed_services: tuple[str, ...] = (),
     reflection_imports: bool = True,
     unserved_files: tuple[str, ...] = (),
@@ -367,6 +380,7 @@ def users(
             server,
             reflection_version,
             pool,
+            services=reflection_services,
             undescribed_services=undescribed_services,
             imports=reflection_imports,
             unserved_files=unserved_files,

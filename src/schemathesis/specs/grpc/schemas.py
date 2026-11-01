@@ -213,7 +213,12 @@ class GrpcSchema(BaseSchema):
     def get_transport(self, app: object) -> GrpcTransport:
         if self._transport is None:
             # grpcio has no free-threaded build, so loading a schema does not import it.
-            from schemathesis.transport.grpc import GrpcTransport
+            try:
+                from schemathesis.transport.grpc import GrpcTransport
+            except ImportError as exc:
+                from schemathesis.grpc.loaders import EXTRA_HINT
+
+                raise ImportError(EXTRA_HINT) from exc
 
             self._transport = GrpcTransport()
         return self._transport
