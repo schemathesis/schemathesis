@@ -84,7 +84,10 @@ def serialize_cookies(case: Case) -> dict[str, Any] | None:
         return cookies
     serializer = case.operation.get_parameter_serializer(ParameterLocation.COOKIE)
     if serializer is not None:
-        cookies = {**cookies, **serializer(containers)}
+        cookies = {
+            **{name: value for name, value in cookies.items() if name not in containers},
+            **serializer(containers),
+        }
     # Containers the schema has no style for, such as undeclared cookies, go as percent-encoded JSON text
     return {
         name: quote(to_wire_text(value), safe=_COOKIE_SAFE_CHARACTERS) if isinstance(value, (dict, list)) else value

@@ -5,6 +5,7 @@ from urllib.parse import unquote, urlsplit
 
 import pytest
 import requests
+from flask import request
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -123,9 +124,9 @@ class DelimitedObject(Prefixed):
         return dict(item.split("=") for item in items)
 
 
-def make_openapi_schema(*parameters):
+def make_openapi_schema(*parameters, version="3.0.2"):
     return {
-        "openapi": "3.0.2",
+        "openapi": version,
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
         "paths": {
             "/teapot": {
@@ -231,19 +232,78 @@ def test_header_serialization_styles_openapi3(ctx, schema, explode, expected):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize(
-    ("schema", "explode", "expected"),
+    ("schema", "style", "explode", "expected"),
     [
-        (ARRAY_SCHEMA, True, {"SessionID": "blue,black,brown"}),
-        (ARRAY_SCHEMA, False, {"SessionID": "blue,black,brown"}),
-        (OBJECT_SCHEMA, True, {"SessionID": DelimitedObject("r=100,g=200,b=150")}),
-        (OBJECT_SCHEMA, False, {"SessionID": CommaDelimitedObject("r,100,g,200,b,150")}),
+        (ARRAY_SCHEMA, None, True, {"SessionID": "blue,black,brown"}),
+        (ARRAY_SCHEMA, None, False, {"SessionID": "blue,black,brown"}),
+        (OBJECT_SCHEMA, None, True, {"SessionID": DelimitedObject("r=100,g=200,b=150")}),
+        (OBJECT_SCHEMA, None, False, {"SessionID": CommaDelimitedObject("r,100,g,200,b,150")}),
+        (ARRAY_SCHEMA, "cookie", True, {"SessionID": "blue; SessionID=black; SessionID=brown"}),
+        (ARRAY_SCHEMA, "cookie", False, {"SessionID": "blue,black,brown"}),
+        (OBJECT_SCHEMA, "cookie", True, {"r": "100", "g": "200", "b": "150"}),
+        (OBJECT_SCHEMA, "cookie", False, {"SessionID": CommaDelimitedObject("r,100,g,200,b,150")}),
+        (OBJECT_SCHEMA, "cookie", None, {"r": "100", "g": "200", "b": "150"}),
+    ],
+    ids=[
+        "form-array-explode",
+        "form-array-no-explode",
+        "form-object-explode",
+        "form-object-no-explode",
+        "cookie-array-explode",
+        "cookie-array-no-explode",
+        "cookie-object-explode",
+        "cookie-object-no-explode",
+        "cookie-object-default-explode",
     ],
 )
-def test_cookie_serialization_styles_openapi3(ctx, schema, explode, expected):
-    raw_schema = make_openapi_schema(
-        {"name": "SessionID", "in": "cookie", "required": True, "schema": schema, "explode": explode}
-    )
+def test_cookie_serialization_styles_openapi3(ctx, schema, style, explode, expected):
+    parameter = {"name": "SessionID", "in": "cookie", "required": True, "schema": schema}
+    if style is not None:
+        parameter["style"] = style
+    if explode is not None:
+        parameter["explode"] = explode
+    raw_schema = make_openapi_schema(parameter, version="3.2.0")
     assert_generates(ctx, raw_schema, (expected,), "cookies")
+
+
+def test_cookie_style_exploded_object_reaches_wire(ctx, case_factory, app_runner):
+    app, raw_schema = ctx.openapi.make_flask_app(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "prefs",
+                            "in": "cookie",
+                            "required": True,
+                            "style": "cookie",
+                            "explode": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {"a": {"type": "string"}, "b": {"type": "integer"}},
+                                "required": ["a", "b"],
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    received = []
+
+    @app.route("/teapot")
+    def teapot():
+        received.append(request.headers.get("Cookie"))
+        return ""
+
+    operation = ctx.openapi.from_full_schema(raw_schema)["/teapot"]["GET"]
+    case_factory(operation=operation, cookies={"prefs": {"a": "x", "b": 1}}).call(
+        base_url=app_runner.openapi_url(app, path="")
+    )
+
+    assert received == ["a=x; b=1"]
 
 
 @pytest.mark.hypothesis_nested
