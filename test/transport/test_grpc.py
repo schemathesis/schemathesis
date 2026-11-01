@@ -286,8 +286,12 @@ def test_call_takes_a_rate_limit_slot(ctx):
         ({"verify": "."}, "gRPC targets need a CA bundle file, got a directory: `.`"),
         ({"proxies": {"all": "http://127.0.0.1:8080"}}, "Proxies are not supported for gRPC targets"),
         ({"config": {"proxy": "http://127.0.0.1:8080"}}, "Proxies are not supported for gRPC targets"),
+        (
+            {"headers": {"x-name": "\u00e9"}},
+            "Header `x-name` is not valid gRPC metadata: values must be printable ASCII",
+        ),
     ],
-    ids=["no-verification", "ca-directory", "proxies", "proxy-from-config"],
+    ids=["no-verification", "ca-directory", "proxies", "proxy-from-config", "non-ascii-header"],
 )
 def test_unsupported_settings(ctx, kwargs, message):
     server = ctx.grpc.apps.users(tls=True)

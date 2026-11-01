@@ -77,8 +77,8 @@ def from_url(
     # grpcio-reflection ships no usable type information.
     from grpc_reflection.v1alpha import reflection_pb2  # type: ignore[import-untyped]
 
-    from schemathesis.specs.grpc.schemas import filter_metadata
-    from schemathesis.transport.grpc import CHANNEL_OPTIONS, create_channel, metadata_pairs, prepare_target
+    from schemathesis.specs.grpc.schemas import filter_metadata, metadata_pairs
+    from schemathesis.transport.grpc import CHANNEL_OPTIONS, create_channel, prepare_target
 
     request_headers = filter_metadata(headers or {})
     address, tls = prepare_target(url, verify, request_headers, uses_proxy=bool(proxies), auth=auth)
@@ -240,7 +240,7 @@ def _from_descriptor_set(
     except ImportError as exc:
         raise ImportError(EXTRA_HINT) from exc
 
-    from schemathesis.specs.grpc.schemas import GrpcSchema
+    from schemathesis.specs.grpc.schemas import GrpcSchema, filter_metadata, metadata_pairs, parse_target
 
     try:
         descriptor_set = descriptor_pb2.FileDescriptorSet.FromString(data)
@@ -300,11 +300,17 @@ def _from_descriptor_set(
     except KeyError as exc:
         raise _does_not_load(f"couldn't resolve name {exc}") from exc
     raw_schema = json_format.MessageToDict(descriptor_set)
-    return load_with_hooks(
+    schema = load_with_hooks(
         raw_schema,
         config,
         lambda project_config: GrpcSchema(raw_schema, config=project_config, pool=pool, services=services),
     )
+    # Settings every call would fail on are refused once, before any test runs.
+    metadata_pairs(filter_metadata(schema.config.headers_for()))
+    if schema.config.base_url is not None:
+        settings = schema.config.request_settings_for()
+        parse_target(schema.config.base_url, settings.verify, uses_proxy=bool(settings.proxy))
+    return schema
 
 
 def _does_not_load(detail: str) -> LoaderError:

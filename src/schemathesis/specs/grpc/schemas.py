@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import shlex
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn, Self
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
@@ -106,6 +108,9 @@ EXCLUDED_METADATA = frozenset(
         "host",
     }
 )
+# The only characters gRPC accepts in metadata keys.
+METADATA_KEY = re.compile(r"[0-9a-z_.-]+")
+URL_SAFE_TO_STANDARD = str.maketrans("-_", "+/")
 
 
 def is_unary(method: MethodDescriptor) -> bool:
@@ -553,6 +558,50 @@ def filter_metadata(headers: Mapping[str, Any]) -> dict[str, str]:
     return {
         key: value for key, value in lowered.items() if key not in EXCLUDED_METADATA and not key.startswith("grpc-")
     }
+
+
+def parse_target(url: str, verify: bool | str | None, *, uses_proxy: bool) -> tuple[str, bool]:
+    """Address and whether it uses TLS, for a `grpc://` or `grpcs://` URL."""
+    if uses_proxy:
+        raise IncorrectUsage("Proxies are not supported for gRPC targets")
+    if isinstance(verify, str) and Path(verify).is_dir():
+        raise IncorrectUsage(f"gRPC targets need a CA bundle file, got a directory: `{verify}`")
+    scheme, _, rest = url.partition("://")
+    if scheme not in ("grpc", "grpcs"):
+        raise IncorrectUsage(f"gRPC targets need a `grpc://` or `grpcs://` base URL, got `{url}`")
+    # Calls are routed by method name alone, so only a trailing slash can follow the address.
+    address, _, path = rest.partition("/")
+    if path:
+        raise IncorrectUsage(f"gRPC targets need a base URL without a path, got `{url}`")
+    tls = scheme == "grpcs"
+    if tls and verify is False:
+        raise IncorrectUsage("`tls-verify=false` is not supported for gRPC targets; pass a CA bundle path instead")
+    return address, tls
+
+
+def metadata_pairs(headers: Mapping[str, str]) -> tuple[tuple[str, str | bytes], ...]:
+    """Metadata as gRPC sends it: values of `-bin` keys travel as bytes."""
+    return tuple((key, _metadata_value(key, value)) for key, value in headers.items())
+
+
+def _metadata_value(key: str, value: str) -> str | bytes:
+    # The gRPC library rejects invalid metadata before sending, and the call fails as if the server had.
+    if not METADATA_KEY.fullmatch(key):
+        raise _invalid_metadata(key, "keys may contain only lowercase letters, digits, `-`, `_` and `.`")
+    if key.endswith("-bin"):
+        try:
+            # Padded or not, in the standard or the URL-safe alphabet.
+            standard = value.translate(URL_SAFE_TO_STANDARD)
+            return base64.b64decode(standard + "=" * (-len(standard) % 4), validate=True)
+        except ValueError:
+            raise _invalid_metadata(key, "values of keys ending in `-bin` must be base64") from None
+    if not (value.isascii() and value.isprintable()):
+        raise _invalid_metadata(key, "values must be printable ASCII, or base64 under a key ending in `-bin`")
+    return value
+
+
+def _invalid_metadata(key: str, rule: str) -> IncorrectUsage:
+    return IncorrectUsage(f"Header `{key}` is not valid gRPC metadata: {rule}")
 
 
 def _grpcurl_json(value: object, type_name: str) -> object:
