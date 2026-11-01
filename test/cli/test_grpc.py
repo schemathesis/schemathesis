@@ -112,11 +112,11 @@ def test_unusable_options_refused(ctx, cli, snapshot_cli, option):
     assert cli.run(server.target, option) == snapshot_cli
 
 
-BLOCK_PROTOBUF_AND_RUN = """
+BLOCK_MODULE_AND_RUN = """
 import sys
-sys.modules["google.protobuf"] = None
+sys.modules[sys.argv[1]] = None
 from schemathesis.cli import schemathesis
-schemathesis(["run", "grpc://127.0.0.1:1"])
+schemathesis(sys.argv[2:])
 """
 
 
@@ -126,14 +126,36 @@ def test_streaming_method_selected(ctx, cli, snapshot_cli):
     assert cli.run(server.target, "--include-name=pkg.Users/WatchUsers", "--max-examples=1") == snapshot_cli
 
 
-def test_missing_grpc_extra():
+@pytest.mark.parametrize(
+    ("blocked", "command", "source"),
+    [
+        ("google.protobuf", "run", "reflection"),
+        ("google.protobuf", "run", "descriptor-set"),
+        ("google.protobuf", "fuzz", "reflection"),
+        ("google.protobuf", "fuzz", "descriptor-set"),
+        ("grpc", "run", "descriptor-set"),
+        ("google.rpc", "run", "reflection"),
+    ],
+)
+def test_missing_grpc_extra(tmp_path, blocked, command, source):
+    if source == "reflection":
+        args = ["grpc://127.0.0.1:1"]
+    else:
+        write_descriptor_set(tmp_path, users_descriptor_set())
+        args = ["api.binpb", "--url=grpc://127.0.0.1:1"]
     result = subprocess.run(
-        [sys.executable, "-c", BLOCK_PROTOBUF_AND_RUN], capture_output=True, text=True, encoding="utf-8"
+        [sys.executable, "-c", BLOCK_MODULE_AND_RUN, blocked, command, *args, "--report=junit"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
     )
-    assert (result.returncode, result.stderr.splitlines()[-1]) == (
+    assert (result.returncode, result.stdout, result.stderr) == (
         1,
-        "Error: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`",
+        "",
+        "Error: Loading gRPC schemas requires the `grpc` extra: `pip install schemathesis[grpc]`\n",
     )
+    assert not (tmp_path / "schemathesis-report").exists()
 
 
 def test_grpc_library_logs_kept_out_of_output(ctx):

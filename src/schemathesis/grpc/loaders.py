@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from collections.abc import Sequence
 from os import PathLike
 from pathlib import Path
@@ -22,6 +23,15 @@ EXTRA_HINT = "Loading gRPC schemas requires the `grpc` extra: `pip install schem
 INFRASTRUCTURE_SERVICES = frozenset(
     {"grpc.reflection.v1.ServerReflection", "grpc.reflection.v1alpha.ServerReflection", "grpc.health.v1.Health"}
 )
+
+
+def require_extra() -> None:
+    """Raise `ImportError` naming the `grpc` extra if any of its packages is missing."""
+    try:
+        for package in ("google.protobuf", "google.rpc", "grpc", "grpc_reflection"):
+            importlib.import_module(package)
+    except ImportError as exc:
+        raise ImportError(EXTRA_HINT) from exc
 
 
 def from_url(
@@ -57,14 +67,12 @@ def from_url(
         ```
 
     """
-    try:
-        import grpc
-        from google.protobuf import descriptor_pb2
+    require_extra()
+    import grpc
+    from google.protobuf import descriptor_pb2
 
-        # grpcio-reflection ships no usable type information.
-        from grpc_reflection.v1alpha import reflection_pb2  # type: ignore[import-untyped]
-    except ImportError as exc:
-        raise ImportError(EXTRA_HINT) from exc
+    # grpcio-reflection ships no usable type information.
+    from grpc_reflection.v1alpha import reflection_pb2  # type: ignore[import-untyped]
 
     from schemathesis.specs.grpc.schemas import filter_metadata
     from schemathesis.transport.grpc import create_channel, metadata_pairs, prepare_target
