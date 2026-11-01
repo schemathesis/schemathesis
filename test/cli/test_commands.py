@@ -4222,7 +4222,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MODE = os.environ["CRASH_MODE"]
-# Answered collections before a large one may crash the server, so the requests leading up to it are known.
+# Distinct bodies answered before a large one may crash the server; the outage report lists each body once.
 CRASH_AFTER = int(os.environ.get("CRASH_AFTER", "0"))
 ADDRESS = ("127.0.0.1", int(os.environ["PORT"]))
 SCHEMA = {
@@ -4278,7 +4278,7 @@ SCHEMA = {
     },
 }
 KILLED = False
-CREATED = 0
+ANSWERED = set()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -4293,7 +4293,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"id": 1})
 
     def do_POST(self):
-        global CREATED, KILLED
+        global KILLED
         # Reading the body first keeps the reset after the client's last write, so it always sees the reset.
         payload = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         self.reset_after_crash()
@@ -4302,8 +4302,8 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             body = None
         size = body.get("size") if isinstance(body, dict) else None
-        if KILLED or CREATED < CRASH_AFTER or not isinstance(size, int) or size <= 50000:
-            CREATED += 1
+        if KILLED or len(ANSWERED) < CRASH_AFTER or not isinstance(size, int) or size <= 50000:
+            ANSWERED.add(payload)
             self.send_json(201, {"id": 1})
             return
         KILLED = True
