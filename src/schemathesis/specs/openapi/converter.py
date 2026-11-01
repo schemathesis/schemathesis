@@ -358,7 +358,7 @@ def _pin_discriminator_property(
                 continue
             # Without an explicit mapping, prefer the branch's own const/enum so the literal
             # tag (`"function"`) wins over the schema name (`FunctionTool`).
-            disc_value = branch_literal_tag(ref, property_name, bundle)
+            disc_value = _branch_literal_tag(ref, property_name, bundle)
             if disc_value is None:
                 # Fall back to schema name -- unless the target is itself polymorphic,
                 # in which case the real discriminator values live on its inner branches
@@ -366,7 +366,7 @@ def _pin_discriminator_property(
                 if _branch_is_polymorphic(ref, bundle):
                     continue
                 disc_value = get_implicit_discriminator_value(resolved_ref)
-                allowed = _branch_tag_values(ref, property_name, bundle)
+                allowed = branch_tag_values(ref, property_name, bundle)
                 # The branch spells out which values it takes and this is not one of them;
                 # pinning it would leave the branch impossible to satisfy.
                 if allowed is not None and disc_value not in allowed:
@@ -378,15 +378,15 @@ def _pin_discriminator_property(
             items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": [disc_value]}}}]}
 
 
-def branch_literal_tag(ref: str, property_name: str, bundle: dict[str, JsonSchema] | None) -> str | None:
+def _branch_literal_tag(ref: str, property_name: str, bundle: dict[str, JsonSchema] | None) -> str | None:
     """The single value the branch itself pins for the discriminator property, if any."""
-    values = _branch_tag_values(ref, property_name, bundle)
+    values = branch_tag_values(ref, property_name, bundle)
     if values is not None and len(values) == 1:
         return next(iter(values))
     return None
 
 
-def _branch_tag_values(
+def branch_tag_values(
     ref: str, property_name: str, bundle: dict[str, Any] | None, seen: set[str] | None = None
 ) -> set[str] | None:
     """Literal values the branch itself allows for the discriminator property, or `None` when unconstrained."""
@@ -414,7 +414,7 @@ def _tag_values_in_schema(
             continue
         ref = branch.get("$ref")
         if isinstance(ref, str):
-            branch_values = _branch_tag_values(ref, property_name, bundle, seen)
+            branch_values = branch_tag_values(ref, property_name, bundle, seen)
         else:
             branch_values = _tag_values_in_schema(branch, property_name, bundle, seen)
         if branch_values is not None:

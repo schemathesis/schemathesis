@@ -19,7 +19,7 @@ from schemathesis.openapi.checks import (
     MissingContentType,
 )
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
-from schemathesis.specs.openapi.converter import branch_literal_tag
+from schemathesis.specs.openapi.converter import branch_tag_values
 from schemathesis.specs.openapi.discriminator import get_implicit_discriminator_value
 
 if TYPE_CHECKING:
@@ -330,7 +330,7 @@ def _known_discriminator_values(
     name_to_uri: dict[str, str],
     bundle: dict[str, JsonSchema],
 ) -> set[str]:
-    """Values that select a branch: mapping keys, branch schema names and the single value a branch pins."""
+    """Values that select a branch: mapping keys, branch schema names and every value a branch pins."""
     known_values: set[str] = set()
     explicit_mapping = discriminator.get("mapping")
     if isinstance(explicit_mapping, dict):
@@ -349,9 +349,10 @@ def _known_discriminator_values(
 def _branch_discriminator_values(
     ref: str, property_name: str, name_to_uri: dict[str, str], bundle: dict[str, JsonSchema]
 ) -> set[str]:
-    """Values that select a bundled branch: its schema name and the single value it pins for the property."""
+    """Values that select a bundled branch: its schema name and every value it pins for the property."""
     schema_name = get_implicit_discriminator_value(name_to_uri.get(ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :], ""))
-    return {value for value in (schema_name, branch_literal_tag(ref, property_name, bundle)) if value}
+    tag_values = branch_tag_values(ref, property_name, bundle) or set()
+    return {value for value in (schema_name, *tag_values) if value}
 
 
 def _response_schema_context(matched_key: str, status_code: int) -> str:
