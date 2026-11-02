@@ -2220,6 +2220,22 @@ CANONICAL_CASES = [
         },
         (lambda value: any(len(item) >= 4 for item in value) and any(len(item) < 4 for item in value),),
     ),
+    # Under a pointer target, the ceiling leaves no filler for the positions under `maxItems`.
+    (
+        {
+            "$ref": "#/$defs/node",
+            "$defs": {
+                "node": {
+                    "type": "array",
+                    "items": {"type": "null"},
+                    "contains": {"type": "null"},
+                    "maxContains": 1,
+                    "maxItems": 2,
+                }
+            },
+        },
+        (lambda value: value == [None],),
+    ),
     # A pattern demand cannot be negated constructively, so the filler holds the ceiling by filter.
     (
         {"type": "array", "items": {"type": "string"}, "contains": {"pattern": "^a"}, "maxContains": 1, "minItems": 2},
@@ -2797,6 +2813,34 @@ RECURSIVE_SHAPES = [
     {"type": "array", "prefixItems": [{"$ref": "#/$defs/node"}, {"type": "integer"}], "maxItems": 2},
     # A pointer under `additionalProperties`, where every undeclared key nests another level.
     {"type": "object", "additionalProperties": {"$ref": "#/$defs/node"}},
+    # Pointers both at a `prefixItems` position and in the positions that follow it.
+    {
+        "type": "array",
+        "prefixItems": [{"type": "string"}, {"$ref": "#/$defs/node"}],
+        "items": {"$ref": "#/$defs/node"},
+        "minItems": 1,
+    },
+    # A pointer under `items` beside a `contains` demand, one level down.
+    {
+        "type": "object",
+        "properties": {
+            "kids": {
+                "type": "array",
+                "items": {"$ref": "#/$defs/node"},
+                "contains": {"type": "object", "required": ["v"]},
+            },
+            "v": {"type": "integer"},
+        },
+    },
+    # A pointer in the distinct positions after `prefixItems`.
+    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"$ref": "#/$defs/node"}, "uniqueItems": True},
+    # A pointer among the positions a `maxContains` ceiling keeps clear of the demand.
+    {
+        "type": "array",
+        "items": {"anyOf": [{"$ref": "#/$defs/node"}, {"type": "integer"}]},
+        "contains": {"type": "integer"},
+        "maxContains": 1,
+    },
 ]
 
 

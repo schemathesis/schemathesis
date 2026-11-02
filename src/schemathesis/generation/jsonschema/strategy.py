@@ -596,16 +596,19 @@ def _from_layout(
     if max_items is not None and max_items < fixed:
         # The spelled-out elements alone overflow the length ceiling.
         return st.nothing()
-    if layout.closed or max_items == fixed:
-        free: SearchStrategy[JsonValue] = st.nothing()
-        free_values = None
-    else:
+    # What the positions past the spelled-out ones draw from, or `None` when no value can follow them.
+    tail: SearchStrategy[JsonValue] | None = None
+    free_values = None
+    if not layout.closed and max_items != fixed:
         free, free_values = _free(view, layout.placements, ctx)
+        # Skipped while a pointer target is still being built, where `is_empty` would force a strategy not there yet.
+        if free is not st.nothing() and (ctx.building_cycle or not free.is_empty):
+            tail = free
     if layout.closed:
         # The opening positions are the whole array, so the lower size bound has to fall within them.
         if minimum > fixed:
             return st.nothing()
-    elif free.is_empty:
+    elif tail is None:
         # The demanded elements carry the length: the shortfall first, then slack under the ceilings.
         if not _carry(layout.placements, minimum - fixed, unique=all_distinct):
             return st.nothing()
@@ -633,14 +636,14 @@ def _from_layout(
         for placement in layout.placements
         if placement.placed or placement.slack
     )
-    if free.is_empty:
+    if tail is None:
         # No tail part: `st.lists` refuses a positive ceiling over an element strategy drawing nothing.
         return _joined(parts, unique=all_distinct, checked=layout.counted, schema=schema)
     kwargs: _SizeBounds = {"min_size": max(0, minimum - fixed)}
     if max_items is not None:
         kwargs["max_size"] = max_items - fixed
     # `unique_by` settles the free positions; collisions across parts are left to the joined filter.
-    parts.append(st.lists(free, unique_by=json_identity if all_distinct else None, **kwargs))
+    parts.append(st.lists(tail, unique_by=json_identity if all_distinct else None, **kwargs))
     return _joined(parts, unique=all_distinct, checked=layout.counted, schema=schema)
 
 
@@ -821,6 +824,9 @@ def _free(
     else:
         # At least one demand is bounded, so the loop left a schema behind.
         assert remaining is not None
+        if isinstance(remaining.view(), canonical.FalseView):
+            # The demands take every value `items` admits, so no filler is left to follow them.
+            return st.nothing(), None
         return from_schema(remaining, ctx), _finite_values(remaining)
     if any(_covers(demand, view.items) for demand in bounded):
         # A demand admits everything `items` does; the matches carry the array on their own.
