@@ -20,7 +20,7 @@ uvx --from 'schemathesis[grpc]' schemathesis run grpc://localhost:50051
      Operations:       2 selected / 3 total
 ```
 
-Schemathesis asks the server for its services and tests every unary method. It skips the reflection and `grpc.health.v1.Health` services. To test one method, pass `--include-name pkg.Users/GetUser`.
+Schemathesis asks the server for its services and tests every unary method. It skips infrastructure services such as reflection and health checking. To test one method, pass `--include-name pkg.Users/GetUser`.
 
 ## Testing with a descriptor set
 
@@ -37,7 +37,7 @@ With `protoc`, include the imported files in the set:
 protoc --include_imports --descriptor_set_out=api.binpb users.proto
 ```
 
-Files ending in `.binpb`, `.pb` or `.protoset` load as descriptor sets. For a TLS server, pass a `grpcs://` URL.
+Files ending in `.binpb`, `.pb` or `.protoset` load as descriptor sets.
 
 ## TLS
 
@@ -48,7 +48,7 @@ uvx --from 'schemathesis[grpc]' schemathesis run grpcs://api.example.com:443 \
     --tls-verify ca.pem
 ```
 
-For mutual TLS, add `--request-cert client.pem --request-cert-key client.key`. gRPC targets do not accept `--tls-verify=false`. Without a port in the URL, Schemathesis connects to port 443.
+With a descriptor set, pass the `grpcs://` URL to `--url`. For mutual TLS, add `--request-cert client.pem --request-cert-key client.key`. gRPC targets do not accept `--tls-verify=false`. Without a port in the URL, Schemathesis connects to port 443.
 
 ## Metadata and authentication
 
@@ -84,11 +84,11 @@ Reproduce with:
     st replay LGSYov
 ```
 
-`<EMPTY>` marks a response without a body. With a descriptor set, the command passes it to `grpcurl` through `-protoset`. `st replay` reruns the case with Schemathesis; `st` is the short name of the `schemathesis` command.
+`<EMPTY>` marks a response without a body. `st replay LGSYov` reruns the case with Schemathesis.
 
-Schemathesis counts `UNKNOWN`, `INTERNAL`, `DATA_LOSS` and `UNAVAILABLE` as server errors. `UNIMPLEMENTED` means the server does not serve the method, so Schemathesis does not report it as a failure; a method that returns nothing else gets a [`not_served`](../reference/warnings.md#not_served) warning. `response_schema_conformance` fails a response that does not decode as the method's output message. For a reflection target it also fails a response with fields the server's own descriptors do not declare.
+Schemathesis counts `UNKNOWN`, `INTERNAL`, `DATA_LOSS` and `UNAVAILABLE` as server errors. `UNIMPLEMENTED` means the server does not serve the method, so Schemathesis does not report it as a failure; a method that returns nothing else gets a [`not_served`](../reference/warnings.md#not_served) warning.
 
-Allow an expected server error by its gRPC status name:
+Allow an expected server error by its gRPC status name in `schemathesis.toml`:
 
 ```toml
 [[operations]]
@@ -114,8 +114,8 @@ def test_api(case):
 ## Current limitations
 
 - Schemathesis counts streaming methods but does not test them.
-- Only the coverage, fuzzing and [stateful](../explanations/stateful.md) [phases](../explanations/data-generation.md#testing-phases) run: no examples phase, and no [negative test cases](../explanations/data-generation.md#generation-modes).
+- Only the coverage, fuzzing and [stateful](../explanations/stateful.md) [phases](../explanations/data-generation.md#testing-phases) run, with no [negative test cases](../explanations/data-generation.md#generation-modes).
 - Schemathesis leaves `google.protobuf.Any` fields out of requests and reports them as [`unsupported_field`](../reference/warnings.md#unsupported_field) warnings. Fill them with a [`map_body`](extending.md) hook, or a `before_call` hook for the coverage phase, which skips `map_body`.
 - Schemathesis does not read `.proto` files directly; build a descriptor set first.
-- HAR, VCR and pytest reports and proxies are not available for gRPC targets.
+- HAR, VCR and pytest reports and the `--proxy` option are not available for gRPC targets.
 - Official Docker images and the GitHub Action do not include the `grpc` extra. Run gRPC targets from a Python installation with `pip install 'schemathesis[grpc]'`, or use `uvx --from 'schemathesis[grpc]' schemathesis ...`.
