@@ -48,7 +48,7 @@ def test_ok_response(ctx):
         response.status_code,
         response.status_line,
         response.headers,
-        json.loads(response.render_content(response.content)),
+        response.json(),
         response.request.method,
         response.request.url,
     ) == (

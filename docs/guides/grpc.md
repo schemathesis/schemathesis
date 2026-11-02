@@ -111,6 +111,8 @@ def test_api(case):
     case.call_and_validate()
 ```
 
+Custom checks read the response message with `response.json()`, the gRPC status with `response.status_line`, and response metadata from `response.headers`.
+
 ## Current limitations
 
 - Schemathesis counts streaming methods but does not test them.

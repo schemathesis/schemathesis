@@ -11,6 +11,7 @@
 - Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
 - Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
+- `response.json()` failing on gRPC responses in custom checks.
 - connect-go request decoding failures not reported as ST119.
 - Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.
 - gRPC Channelz, CSDS and health services tested as part of the API.
