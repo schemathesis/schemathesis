@@ -68,7 +68,7 @@ class ExecutionContext(BaseExecutionContext):
             ):
                 self.exit_code = ExitCode.FAILURES
         elif isinstance(event, events.ScenarioFinished) and event.is_test_scenario:
-            self.statistic.on_scenario_finished(event.recorder)
+            self.statistic.on_scenario_finished(event.recorder, status=event.status)
             collector.on_scenario_finished(self, event)
             if (
                 event.phase in UNIT_PHASES

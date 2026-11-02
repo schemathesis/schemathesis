@@ -23,9 +23,9 @@ Schemathesis dev
 
      ❌ 1 failed
 
- ✅  Fuzzing (in 0.00s)
+ ⏭   Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ⏭  1 skipped
 
 =================================== FAILURES ===================================
 _______________________________ GET /api/failure _______________________________
@@ -51,6 +51,12 @@ Schema validation mismatch: 1 operation mostly rejected generated data due to va
 
 💡 Check your schema constraints - API validation may be stricter than documented
 
+Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed`, skipped from later phases
+
+  - POST /api/failure
+
+💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -60,7 +66,7 @@ API Operations:
 Test Phases:
   ✅ Examples
   ❌ Coverage
-  ✅ Fuzzing
+  ⏭  Fuzzing
   ⏭  Stateful (not applicable)
 
 Failures:
@@ -70,10 +76,11 @@ For more information, run `st explain ST101`.
 
 Warnings:
   ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
+  ⚠️ Method Not Allowed: 1 operation skipped after consistent 405 responses
 
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-======================== 1 failure, 1 warning in 1.00s =========================
+======================== 1 failure, 2 warnings in 1.00s ========================

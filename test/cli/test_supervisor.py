@@ -50,10 +50,13 @@ def test_unserved_operation_skipped_in_later_phases(ctx, load_schema, missing, s
     fuzzing_missing_skipped = 0
     fuzzing_missing_ran = 0
     fuzzing_served_ran = 0
+    missing_outcomes = []
     skip_reasons: dict[str, str | None] = {}
     for event in from_schema(schema).execute():
         if not isinstance(event, events.ScenarioFinished):
             continue
+        if event.label == missing and event.recorder.has_responses():
+            missing_outcomes.append((event.status, event.skip_warning))
         if event.skip_warning is warning and event.label is not None:
             skip_reasons[event.label] = event.skip_reason
         if event.phase is not PhaseName.FUZZING:
@@ -69,6 +72,7 @@ def test_unserved_operation_skipped_in_later_phases(ctx, load_schema, missing, s
     assert fuzzing_missing_ran == 0, f"Expected {missing} fuzzing to be entirely skipped, but {fuzzing_missing_ran} ran"
     assert fuzzing_missing_skipped >= 1, f"Expected at least one synthetic SKIP event for {missing} in fuzzing"
     assert fuzzing_served_ran > 0, f"Expected {served} fuzzing to run normally, got {fuzzing_served_ran}"
+    assert missing_outcomes[-1] == (Status.SKIP, warning)
     assert skip_reasons == {missing: f"Skipped after {METHOD_NOT_ALLOWED_THRESHOLD} consecutive `{status}` responses"}
 
 
@@ -94,8 +98,9 @@ def test_baked_cases_short_circuit_after_supervisor_fires(ctx):
     assert store.hits["items"] > 0, "GET /items should still be exercised"
 
 
+@pytest.mark.parametrize("extra", [[], ["--checks=not_a_server_error"]], ids=["all-checks", "passing-checks"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli):
+def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli, extra):
     api = ctx.openapi.apps.unimplemented_method()
     assert (
         cli.run(
@@ -104,6 +109,7 @@ def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli):
             "--phases=examples,coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
+            *extra,
         )
         == snapshot_cli
     )

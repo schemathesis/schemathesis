@@ -18,7 +18,7 @@ from schemathesis.engine.run.unit._case import (
 from schemathesis.engine.run.unit._errors import (
     translate_iteration_exception,
 )
-from schemathesis.engine.run.unit._scenario import iter_closing_events, start_scenario
+from schemathesis.engine.run.unit._scenario import finish_scenario, iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.meta import content_type_probes_first
 
@@ -135,7 +135,7 @@ def run_driver(
 
     yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 
-    yield scenario.finished(status, skip_reason)
+    yield finish_scenario(scenario, ctx, status, skip_reason)
 
 
 def _settle_status(

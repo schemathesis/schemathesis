@@ -1,0 +1,46 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from grpc://127.0.0.1 (in 0.00s)
+
+     Base URL:         grpc://127.0.0.1
+     Specification:    gRPC
+     Operations:       1 selected / 3 total
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+=================================== WARNINGS ===================================
+
+Not served: 1 operation returned only statuses saying the server does not serve them, leaving them untested
+
+  - pkg.Users/GetUser
+
+💡 Point `--url` at the server that serves these operations, or exclude them from the run
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/3
+  Tested: 0
+  Skipped: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
+  ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Not served: 1 operation returned only not-served statuses
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+===================== Every selected operation was skipped =====================

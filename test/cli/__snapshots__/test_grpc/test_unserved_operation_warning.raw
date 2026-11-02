@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 2
 ---
 Stdout:
 Schemathesis dev
@@ -10,9 +10,9 @@ Schemathesis dev
      Specification:    gRPC
      Operations:       1 selected / 10 total
 
- ✅  Coverage (in 0.00s)
+ ⏭   Coverage (in 0.00s)
 
-     ✅ 1 passed
+     ⏭  1 skipped
 
  ⏭   Fuzzing (in 0.00s)
 
@@ -30,11 +30,13 @@ Not served: 1 operation returned only statuses saying the server does not serve 
 
 API Operations:
   Selected: 1/10
-  Tested: 1
+  Tested: 0
+  Skipped: 1
+    - Skipped after 10 consecutive `UNIMPLEMENTED` responses
 
 Test Phases:
   ⏭  Examples (not supported)
-  ✅ Coverage
+  ⏭  Coverage
   ⏭  Fuzzing
   ⏭  Stateful (not applicable)
 
@@ -42,8 +44,8 @@ Warnings:
   ⚠️ Not served: 1 operation returned only not-served statuses
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
 Seed: 42
 
-============================== 1 warning in 1.00s ==============================
+===================== Every selected operation was skipped =====================
