@@ -30,6 +30,7 @@ from hypothesis import strategies as st
 from typing_extensions import override
 
 from schemathesis import auths
+from schemathesis.config._checks import NOT_A_SERVER_ERROR_EXPECTED_STATUSES
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, Specification
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -47,7 +48,7 @@ from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.transport import CallOutcome, Response, expand_status_code
+from schemathesis.core.transport import CallOutcome, Response, StatusClass
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
@@ -87,10 +88,10 @@ from schemathesis.specs.grpc.stateful import (
     with_value,
 )
 from schemathesis.specs.grpc.status import (
+    GRPC_STATUS_CODES_BY_CLASS,
     GRPC_STATUS_CODES_BY_NAME,
     GRPC_STATUSES,
     OK,
-    STATUS_NAMES_BY_HTTP_STATUS,
     grpc_status,
     is_library_decode_error,
     starts_with_verb,
@@ -330,23 +331,29 @@ class GrpcSchema(BaseSchema):
 
     @override
     def status_name_for_code(self, status_code: int) -> str | None:
-        return STATUS_NAMES_BY_HTTP_STATUS.get(status_code)
+        status = GRPC_STATUSES.get(status_code)
+        return status.name if status is not None else None
+
+    @override
+    def classify_status(self, status_code: int) -> StatusClass:
+        status = GRPC_STATUSES.get(status_code)
+        # Crash files may record a status from outside the gRPC range.
+        return status.status_class if status is not None else StatusClass.OTHER
+
+    @override
+    def status_code_for(self, status_class: StatusClass) -> int:
+        return GRPC_STATUS_CODES_BY_CLASS[status_class]
 
     @override
     def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
-        invalid = [
-            status
-            for status in expected_statuses
-            if status not in GRPC_STATUS_CODES_BY_NAME and not expand_status_code(status)
-        ]
+        status = grpc_status(response)
+        # The default names HTTP status classes, and a gRPC status belongs to the class it shares a meaning with.
+        if expected_statuses == NOT_A_SERVER_ERROR_EXPECTED_STATUSES:
+            return not GRPC_STATUSES[status].status_class.is_server_error
+        invalid = [expected for expected in expected_statuses if expected not in GRPC_STATUS_CODES_BY_NAME]
         if invalid:
             self._raise_invalid_status_values(invalid)
-        status = grpc_status(response)
-        if any(GRPC_STATUS_CODES_BY_NAME.get(expected) == status for expected in expected_statuses):
-            return True
-        return super().is_response_status_expected(
-            response, [expected for expected in expected_statuses if expected not in GRPC_STATUS_CODES_BY_NAME]
-        )
+        return any(GRPC_STATUS_CODES_BY_NAME[expected] == status for expected in expected_statuses)
 
     @override
     def operation_label_for_display(self, operation_label: str | None) -> str | None:

@@ -166,6 +166,8 @@ class ExtractionNote:
     # Requests that led to the response, oldest first.
     commands: list[Command]
     status_code: int
+    # Shown in place of the status code and reason when the transport provides one.
+    status_line: str | None
     body: str
 
 

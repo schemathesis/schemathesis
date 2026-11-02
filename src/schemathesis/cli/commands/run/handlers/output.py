@@ -45,6 +45,7 @@ from schemathesis.core.output import format_response_payload, pluralize
 from schemathesis.core.output.sanitization import sanitized
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
+from schemathesis.core.transport import StatusClass
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import never_reached_server
@@ -283,7 +284,9 @@ def _missing_auth_block(ctx: ExecutionContext) -> WarningBlock:
     groups[-1].tips = [
         ctx.warnings.auth_flow_suggestion or "Ensure valid authentication credentials are set via `--auth` or `-H`"
     ]
-    statuses = f"{_short_status(ctx, 401)}/{_short_status(ctx, 403)}"
+    unauthenticated = ctx.status_code_for(StatusClass.UNAUTHENTICATED)
+    forbidden = ctx.status_code_for(StatusClass.FORBIDDEN)
+    statuses = f"{_short_status(ctx, unauthenticated)}/{_short_status(ctx, forbidden)}"
     return WarningBlock(
         title="Authentication failed",
         count=sum(len(labels) for labels in missing_auth.values()),
@@ -356,12 +359,13 @@ def _missing_test_data_block(ctx: ExecutionContext) -> WarningBlock:
             )
             for (one, many, tip), labels in sorted(labels_by_advice.items())
         ]
+    not_found = ctx.status_code_for(StatusClass.NOT_FOUND)
     return WarningBlock(
         title="Missing test data",
         count=len(missing),
         entity="operation",
-        suffix=f" repeatedly returned {_status_name(ctx, 404)}, preventing tests from reaching your API's core logic",
-        short_suffix=f"repeatedly returned {_short_status(ctx, 404)} responses",
+        suffix=f" repeatedly returned {_status_name(ctx, not_found)}, preventing tests from reaching your API's core logic",
+        short_suffix=f"repeatedly returned {_short_status(ctx, not_found)} responses",
         groups=groups,
         affects_verdict=True,
     )
@@ -419,13 +423,14 @@ def warning_blocks(ctx: ExecutionContext) -> list[WarningBlock]:
     if warnings.missing_auth:
         blocks.append(_missing_auth_block(ctx))
     if warnings.rate_limited:
+        rate_limited = ctx.status_code_for(StatusClass.RATE_LIMITED)
         blocks.append(
             list_block(
                 "Rate limited",
                 warnings.rate_limited,
-                " mostly returned 429 Too Many Requests, leaving the logic behind them untested",
+                f" mostly returned {_status_name(ctx, rate_limited)}, leaving the logic behind them untested",
                 ["Send requests no faster than the API allows with `--rate-limit`, e.g. `--rate-limit=100/m`"],
-                short_suffix="mostly returned 429 responses",
+                short_suffix=f"mostly returned {_short_status(ctx, rate_limited)} responses",
                 affects_verdict=True,
             )
         )
@@ -1517,7 +1522,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 click.echo()
 
                 for status_code, curl in extraction_failure_steps(failure):
-                    click.echo(f"{indent}[{status_code}] {curl}")
+                    click.echo(f"{indent}[{_short_status(ctx, status_code)}] {curl}")
 
                 payload = format_response_payload(failure.response, config=ctx.config.output)
                 click.echo(textwrap.indent(f"\n{payload}", prefix=indent))

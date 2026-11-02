@@ -12,7 +12,7 @@ from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
-from schemathesis.core.transport import CallOutcome
+from schemathesis.core.transport import CallOutcome, StatusClass
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, RecordedScenario
 from schemathesis.engine.run import UNIT_PHASES, PhaseName
@@ -28,39 +28,46 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class StatusCodeStatistic:
-    """Statistics about HTTP status codes in a scenario."""
+    """Statistics about response status codes in a scenario."""
 
     counts: dict[int, int]
     total: int
+    classify_status: Callable[[int], StatusClass]
 
-    def ratio_for(self, status_code: int) -> float:
-        """Calculate the ratio of responses with the given status code."""
+    def ratio_for(self, status_class: StatusClass) -> float:
+        """Calculate the ratio of responses with a status of the given class."""
         if self.total == 0:
             return 0.0
-        return self.counts.get(status_code, 0) / self.total
+        return self._count(status_class) / self.total
+
+    def codes_of(self, status_class: StatusClass) -> list[int]:
+        return [code for code in self.counts if self.classify_status(code) is status_class]
+
+    def _count(self, *status_classes: StatusClass) -> int:
+        return sum(count for code, count in self.counts.items() if self.classify_status(code) in status_classes)
 
     def _get_4xx_breakdown(self) -> tuple[int, int, int]:
-        """Get breakdown of 4xx responses: (404_count, other_4xx_count, total_4xx_count).
+        """Get breakdown of client errors: (not_found_count, other_count, total_count).
 
         Auth, conflict and rate-limit responses say nothing about the data sent, so they are left out.
         """
-        count_404 = self.counts.get(404, 0)
-        count_other_4xx = sum(
-            count for code, count in self.counts.items() if 400 <= code < 500 and code not in {401, 403, 404, 409, 429}
-        )
+        count_404 = self._count(StatusClass.NOT_FOUND)
+        count_other_4xx = self._count(StatusClass.CLIENT_ERROR, StatusClass.METHOD_NOT_ALLOWED)
         total_4xx = count_404 + count_other_4xx
         return count_404, count_other_4xx, total_4xx
 
     def _is_only_4xx_responses(self) -> bool:
-        """Check if all responses are 4xx (excluding 5xx)."""
-        return all(400 <= code < 500 for code in self.counts if code != 500)
+        """Check if all responses are client errors, internal server errors aside."""
+        classes = {self.classify_status(code) for code in self.counts}
+        return all(status_class.is_client_error for status_class in classes - {StatusClass.INTERNAL_ERROR})
 
     def _can_warn_about_4xx(self) -> bool:
         """Check basic conditions for 4xx warnings."""
         if self.total == 0:
             return False
         # Skip if only auth errors
-        if set(self.counts.keys()) <= {401, 403, 500}:
+        classes = {self.classify_status(code) for code in self.counts}
+        if classes <= {StatusClass.UNAUTHENTICATED, StatusClass.FORBIDDEN, StatusClass.INTERNAL_ERROR}:
             return False
         return self._is_only_4xx_responses()
 
@@ -121,7 +128,9 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
     return outcomes
 
 
-def aggregate_status_codes(recorder: RecordedScenario, *, positive_only: bool = False) -> StatusCodeStatistic:
+def aggregate_status_codes(
+    recorder: RecordedScenario, classify_status: Callable[[int], StatusClass], *, positive_only: bool = False
+) -> StatusCodeStatistic:
     """Analyze status codes the operation answered with.
 
     Requests with a method the operation does not declare reach a different operation, or none,
@@ -143,7 +152,7 @@ def aggregate_status_codes(recorder: RecordedScenario, *, positive_only: bool = 
             if (
                 positive_only
                 and case is not None
-                and 400 <= status < 500
+                and classify_status(status).is_client_error
                 and case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
                 is CallOutcome.UNINFORMATIVE
             ):
@@ -151,7 +160,7 @@ def aggregate_status_codes(recorder: RecordedScenario, *, positive_only: bool = 
             counts[status] = counts.get(status, 0) + 1
             total += 1
 
-    return StatusCodeStatistic(counts=counts, total=total)
+    return StatusCodeStatistic(counts=counts, total=total, classify_status=classify_status)
 
 
 def auth_error_codes(statistic: StatusCodeStatistic, recorder: RecordedScenario) -> tuple[int, ...]:
@@ -168,7 +177,12 @@ def auth_error_codes(statistic: StatusCodeStatistic, recorder: RecordedScenario)
             and meta.phase.data.parameter_location == ParameterLocation.HEADER
         ):
             return ()
-    return tuple(code for code in (401, 403) if statistic.ratio_for(code) >= AUTH_ERRORS_THRESHOLD)
+    return tuple(
+        code
+        for status_class in (StatusClass.UNAUTHENTICATED, StatusClass.FORBIDDEN)
+        if statistic.ratio_for(status_class) >= AUTH_ERRORS_THRESHOLD
+        for code in statistic.codes_of(status_class)
+    )
 
 
 def missing_base_path(operation: APIOperation) -> str | None:
@@ -335,13 +349,13 @@ class WarningCollector:
             # Synthetic skip scenarios carry no interactions to inspect.
             return
 
-        statistic = aggregate_status_codes(event.recorder)
+        statistic = aggregate_status_codes(event.recorder, ctx.classify_status)
 
         if statistic.total == 0:
             return
 
         # Warnings that explain why valid input was rejected look only at valid input.
-        positive = aggregate_status_codes(event.recorder, positive_only=True)
+        positive = aggregate_status_codes(event.recorder, ctx.classify_status, positive_only=True)
 
         assert event.label is not None
         try:
@@ -365,7 +379,7 @@ class WarningCollector:
                 if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
                     self.fails_on_auth.add(event.recorder.label)
 
-        if statistic.ratio_for(429) >= RATE_LIMITED_THRESHOLD and warnings.should_display(
+        if statistic.ratio_for(StatusClass.RATE_LIMITED) >= RATE_LIMITED_THRESHOLD and warnings.should_display(
             SchemathesisWarning.RATE_LIMITED
         ):
             self._handle_warning(

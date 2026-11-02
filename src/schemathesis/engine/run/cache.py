@@ -29,7 +29,6 @@ from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import format_timestamp
-from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.wfc.escalation import identity_assignments, restore_identity_assignments
@@ -283,7 +282,7 @@ def _verify_auth_required(ctx: EngineContext, entry: Entry, operation: APIOperat
     unauth_response = _send_without_auth(ctx, case, operation)
     if unauth_response is None:
         return _Outcome.SKIPPED
-    if unauth_response.status_code not in AUTH_REJECTION_STATUSES:
+    if not operation.schema.classify_status(unauth_response.status_code).is_auth_failure:
         return _Outcome.CONTRADICTED
 
     recorder = ScenarioRecorder(label="cache-auth-replay", config=ctx.config.output)

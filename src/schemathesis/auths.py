@@ -23,7 +23,7 @@ from schemathesis.config._auth import DEFAULT_RETRY_ON
 from schemathesis.core.errors import AuthenticationError, IncorrectUsage, SchemathesisError
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transport import RequestSettings, decode_lossy, load_json_lossy, parse_set_cookie
+from schemathesis.core.transport import RequestSettings, StatusClass, decode_lossy, load_json_lossy, parse_set_cookie
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, attach_filter_chain
 from schemathesis.generation.meta import negated_parameters
 from schemathesis.transport import is_asgi_app
@@ -757,10 +757,10 @@ class ReauthState:
             if self._consecutive_failures >= REAUTH_BREAKER_THRESHOLD:
                 self.disabled = True
 
-    def note_replay(self, status_code: int, label: str) -> None:
+    def note_replay(self, status_code: int, label: str, *, succeeded: bool) -> None:
         with self._lock:
             self._consecutive_failures = 0
-            if 200 <= status_code < 300:
+            if succeeded:
                 self.reauth_count += 1
             elif status_code in self.retry_on_statuses:
                 self._token_independent.add(label)
@@ -798,7 +798,8 @@ def reauth_and_replay(case: Case, response: Response, state: ReauthState, recall
     except Exception:
         # Replay could not complete (e.g. transport error); keep the response we already have.
         return response
-    state.note_replay(replay.status_code, case.operation.label)
+    succeeded = case.operation.schema.classify_status(replay.status_code) is StatusClass.SUCCESS
+    state.note_replay(replay.status_code, case.operation.label, succeeded=succeeded)
     return replay
 
 

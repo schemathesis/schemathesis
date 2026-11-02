@@ -14,7 +14,6 @@ from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import UNRESOLVABLE, iter_decoded_pointer_segments
-from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 from schemathesis.reporting.crashes import CrashCheck, CrashFile, CrashLink, CrashStep
 
 if TYPE_CHECKING:
@@ -70,8 +69,8 @@ class RejectedStep:
     """A replayed step the API rejected for authentication though the recorded request was accepted."""
 
     number: int
-    status_code: int
-    recorded_status_code: int
+    status: str
+    recorded_status: str
 
 
 @dataclass(slots=True)
@@ -176,7 +175,7 @@ def _unverified_without_recorded_values(outcome: ReplayOutcome, *, unrestorable:
         note = f"{_masked_names(outcome.unsupplied_masked)} masked in the crash file"
     elif outcome.rejected is not None:
         message = _rejected_credentials_message(outcome.rejected, steps=len(outcome.step_outcomes))
-        note = f"replay was not authenticated ({outcome.rejected.status_code})"
+        note = f"replay was not authenticated ({outcome.rejected.status})"
     elif unrestorable:
         message = (
             "the crash file has masked values that replay cannot restore; "
@@ -328,11 +327,13 @@ def _replay_sequence(
 
         if (
             rejected is None
-            and response.status_code in AUTH_REJECTION_STATUSES
-            and step.response_status not in AUTH_REJECTION_STATUSES
+            and schema.classify_status(response.status_code).is_auth_failure
+            and not schema.classify_status(step.response_status).is_auth_failure
         ):
             rejected = RejectedStep(
-                number=index + 1, status_code=response.status_code, recorded_status_code=step.response_status
+                number=index + 1,
+                status=status_label(schema, response.status_code),
+                recorded_status=status_label(schema, step.response_status),
             )
 
         for parameter in _masked_parameters(step, replacement):
@@ -615,11 +616,16 @@ def _missing_credentials_message(missing: list[tuple[ParameterLocation, str]]) -
     return f"{names} were masked in the crash file; provide them via config, -H, --auth or an auth hook"
 
 
+def status_label(schema: BaseSchema | None, status_code: int) -> str:
+    name = schema.status_name_for_code(status_code) if schema is not None else None
+    return name or str(status_code)
+
+
 def _rejected_credentials_message(rejected: RejectedStep, *, steps: int) -> str:
     location = f" at step {rejected.number}" if steps > 1 else ""
     return (
-        f"replay was not authenticated: the API answered {rejected.status_code}{location} "
-        f"where the recorded request got {rejected.recorded_status_code}; "
+        f"replay was not authenticated: the API answered {rejected.status}{location} "
+        f"where the recorded request got {rejected.recorded_status}; "
         "check the credentials passed via config, -H, --auth or an auth hook"
     )
 

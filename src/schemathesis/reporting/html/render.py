@@ -286,7 +286,7 @@ def _extraction_failures(data: ReportData) -> str:
         parts = [
             f'<div class="case-owner"><span class="ex-link">{esc(failure.link)}</span></div>',
             f'<div class="finding"><h4 class="finding-title">{_code_spans(title)}</h4>{details}</div>',
-            _evidence("Response", _body(failure.body), _status(failure.status_code)),
+            _evidence("Response", _body(failure.body), _status(failure.status_code, failure.status_line)),
             _reproduce(failure.commands, None),
             _evidence("Tip", f'<p class="tip">{_EXTRACTION_TIP}</p>'),
         ]
@@ -759,7 +759,7 @@ def _anchor(label: str, taken: set[str]) -> str:
 
 def _status(code: int, status_line: str | None = None) -> str:
     if status_line is not None:
-        return f'<span class="status s{code // 100}xx">{esc(status_line)}</span>'
+        return f'<span class="status">{esc(status_line)}</span>'
     return f'<span class="status s{code // 100}xx"><span class="status-code">{code}</span> {esc(reason_phrase(code))}</span>'
 
 

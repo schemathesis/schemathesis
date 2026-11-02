@@ -28,7 +28,6 @@ from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
 from schemathesis.core.transport import Response
 from schemathesis.python._constants.registry import default_registry
-from schemathesis.specs.grpc.status import GRPC_STATUSES
 
 from .utils import make_schema, profile_max_examples
 
@@ -516,7 +515,7 @@ def response_factory():
         return core_factory(
             content=content,
             content_type=None,
-            status_code=GRPC_STATUSES[status].http_status,
+            status_code=status,
             headers={"grpc-status": [str(status)], **(headers or {})},
             status_line=status_line,
         )

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from schemathesis.core.cache import CacheWriter, Kind, request_from_case
 from schemathesis.core.error_feedback.pipeline import get_pipeline
 from schemathesis.core.error_feedback.store import ErrorFeedbackStore, Observation, observation_fingerprint
-from schemathesis.core.transport import AUTH_REJECTION_STATUSES
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import Response
@@ -18,16 +17,15 @@ def parse_observations(
     case: Case,
     response: Response,
 ) -> tuple[Observation, ...]:
-    """Parse a 4xx response into structured observations without storing them.
+    """Parse a client error response into structured observations without storing them.
 
-    Returns `()` for non-4xx, 401/403, and negative-mode cases.
+    Returns `()` for other statuses, auth failures, and negative-mode cases.
     """
-    status = response.status_code
+    status_class = operation.schema.classify_status(response.status_code)
     if (
-        # Only 4xx is actionable: 5xx is already a check finding; 401/403 are auth noise.
-        status < 400
-        or status >= 500
-        or status in AUTH_REJECTION_STATUSES
+        # Only client errors are actionable: server errors are already check findings; auth failures are noise.
+        not status_class.is_client_error
+        or status_class.is_auth_failure
         # Negative-mode is meant to fail — recording it would poison the signal.
         or (case.meta is not None and case.meta.generation.mode.is_negative)
     ):

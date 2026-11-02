@@ -811,7 +811,7 @@ def test_html_report_grpc_status(ctx, cli, report_dir):
         exit_code=ExitCode.FAILURES,
     )
     assert re.findall(r'<span class="ev-label">Response</span>(.*?)</div>', read_report(report_dir)) == [
-        '<span class="status s5xx">INTERNAL: negative id</span>'
+        '<span class="status">INTERNAL: negative id</span>'
     ]
 
 

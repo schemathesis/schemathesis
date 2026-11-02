@@ -120,7 +120,7 @@ def test_successful_relogin_resets_breaker_streak():
 
     state.note_refresh_failure()
     state.note_refresh_failure()
-    state.note_replay(500, "GET /a")
+    state.note_replay(500, "GET /a", succeeded=False)
     state.note_refresh_failure()
 
     assert state.disabled is False
@@ -129,8 +129,8 @@ def test_successful_relogin_resets_breaker_streak():
 def test_reauth_count_only_counts_successful_recovery():
     state = _reauth_state()
 
-    state.note_replay(403, "GET /a")
-    state.note_replay(200, "GET /a")
+    state.note_replay(403, "GET /a", succeeded=False)
+    state.note_replay(200, "GET /a", succeeded=True)
 
     assert state.reauth_count == 1
 
