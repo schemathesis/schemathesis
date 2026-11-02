@@ -907,6 +907,38 @@ def test_pool_chains_picks_when_no_instance_covers_every_slot(cli, ctx):
     assert "g-dead" not in {tag_id for *_, tag_id in tag_lookups} | {body["tag_id"] for body in task_bodies}
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_pool_skips_ids_that_cannot_fill_a_path_segment(cli, snapshot_cli, ctx):
+    client_schema = _object_schema({"clientId": {"type": "string"}}, required=["clientId"])
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/clients": {
+                "get": {
+                    "operationId": "listClients",
+                    "responses": {"200": _json_response({"type": "array", "items": client_schema})},
+                }
+            },
+            "/clients/{clientId}": {
+                "delete": {
+                    "operationId": "deleteClient",
+                    "parameters": [{"name": "clientId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/clients", methods=["GET"])
+    def list_clients():
+        return jsonify([{"clientId": f"https://example.com/{index}/metadata.json"} for index in range(5)])
+
+    @app.route("/clients/<path:client_id>", methods=["DELETE"])
+    def delete_client(client_id):
+        return "", 404
+
+    assert cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=50", "--seed=1") == snapshot_cli
+
+
 def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
     # After a successful DELETE, the pool no longer feeds the deleted id to GET/PUT/PATCH
     # consumers. Verified by counting per-id calls server-side, not by snapshotting CLI output.
