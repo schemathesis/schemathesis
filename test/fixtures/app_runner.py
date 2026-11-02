@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import socket
 import ssl
 import struct
@@ -54,10 +55,27 @@ def stop_test_servers():
     del _SERVERS[started:]
 
 
+def _ephemeral_port_floor() -> int:
+    try:
+        return int(Path("/proc/sys/net/ipv4/ip_local_port_range").read_text().split()[0])
+    except OSError:
+        # The dynamic range start on macOS and Windows.
+        return 49152
+
+
 def unused_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    # A port picked here is free only until the server binds it. Staying below the range the OS draws from for
+    # `bind(0)` keeps servers started by parallel tests off it, and keeps it unclaimed after the server stops.
+    floor = _ephemeral_port_floor()
+    # `secrets`, not `random`: the test run reseeds `random` identically in every xdist worker.
+    while True:
+        port = secrets.choice(range(10000, floor))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
 
 
 def wait_for_port(port: int, *, timeout: float = 5.0, interval: float = 0.01) -> None:
