@@ -9,7 +9,31 @@ from test.apps.catalog.grpc.descriptors import users_descriptor_set, write_descr
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
 
-def test_grpc_html_report_via_xdist(testdir, ctx):
+@pytest.mark.parametrize(
+    ("args", "set_body", "status", "body"),
+    [
+        (
+            ("-n", "2"),
+            "",
+            '<span class="status"><span class="status-code">OK</span></span>',
+            ["{\n  &quot;name&quot;: &quot;u2147483647&quot;\n}"],
+        ),
+        (
+            (),
+            'case.body = {"userId": -1}',
+            '<span class="status s5xx"><span class="status-code">INTERNAL</span>: negative id</span>',
+            [],
+        ),
+        (
+            (),
+            'case.body = {"userId": 400}',
+            '<span class="status s4xx"><span class="status-code">INVALID_ARGUMENT</span>: invalid</span>',
+            [],
+        ),
+    ],
+    ids=["xdist", "server-error", "client-error"],
+)
+def test_grpc_html_report(testdir, ctx, args, set_body, status, body):
     server = ctx.grpc.apps.users()
     path = write_descriptor_set(pathlib.Path(testdir.tmpdir), users_descriptor_set())
     report_dir = testdir.tmpdir.join("report")
@@ -28,16 +52,17 @@ schema.config.reports.update(html_path=r"{report_dir}")
 @schema.include(name="pkg.Users/GetUser").parametrize()
 @settings(max_examples=1)
 def test_api(case):
+    {set_body}
     case.call_and_validate(checks=[always_fails])
 """
     )
-    testdir.runpytest("-n", "2").assert_outcomes(failed=1)
+    testdir.runpytest(*args).assert_outcomes(failed=1)
     html = report_dir.join("index.html").read_text(encoding="utf-8")
     # Workers decode the body; the controller only receives bytes.
     assert (
         re.findall(r'<span class="ev-label">Response</span>(.*?)</div>', html),
         re.findall(r'<pre class="body">(.*?)</pre>', html, flags=re.DOTALL),
-    ) == (['<span class="status">OK</span>'], ["{\n  &quot;name&quot;: &quot;u2147483647&quot;\n}"])
+    ) == ([status], body)
 
 
 def test_missing_grpc_extra(testdir, tmp_path):
