@@ -2271,6 +2271,64 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) == 2,),
     ),
+    # Every array `items` admits has distinct elements here, so no filler can follow the one match.
+    (
+        {
+            "type": "array",
+            "items": {
+                "type": "array",
+                "prefixItems": [{"type": "null"}, {"type": "boolean"}],
+                "unevaluatedItems": False,
+            },
+            "contains": {"type": "array", "uniqueItems": True},
+            "maxContains": 1,
+        },
+        (),
+    ),
+    (
+        {
+            "type": "array",
+            "items": {"type": "array", "prefixItems": [{"type": "null"}, {"type": "boolean"}], "items": False},
+            "contains": {"type": "array", "uniqueItems": True, "minItems": 1},
+            "minContains": 1,
+            "maxContains": 2,
+        },
+        (lambda value: len(value) == 2,),
+    ),
+    # Fillers are the arrays repeating an element.
+    (
+        {
+            "type": "array",
+            "items": {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "integer"}], "items": False},
+            "contains": {"type": "array", "uniqueItems": True},
+            "maxContains": 1,
+        },
+        (lambda value: len(value) > 1,),
+    ),
+    # Named positions and demands still leave an element to repeat.
+    (
+        {"type": "array", "prefixItems": [{"type": "integer"}], "not": {"uniqueItems": True}},
+        (lambda value: len(value) > 2,),
+    ),
+    (
+        {
+            "type": "array",
+            "prefixItems": [{"enum": [1, 2]}, {"enum": [2, 3]}],
+            "items": False,
+            "not": {"uniqueItems": True},
+        },
+        (lambda value: value == [2, 2],),
+    ),
+    (
+        {
+            "type": "array",
+            "items": {"type": "integer"},
+            "contains": {"const": 1},
+            "maxContains": 1,
+            "not": {"uniqueItems": True},
+        },
+        (lambda value: len(value) > 2,),
+    ),
     # Which branch applies depends on the value, so both have to be reachable.
     (
         {

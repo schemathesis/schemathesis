@@ -8,6 +8,7 @@ import sys
 from dataclasses import dataclass, replace
 from fractions import Fraction
 from functools import lru_cache, partial
+from itertools import chain
 from typing import TYPE_CHECKING, NamedTuple, TypedDict, TypeGuard, TypeVar, cast
 
 import jsonschema_rs
@@ -454,7 +455,11 @@ def _array(
         # No array can be that long.
         return st.nothing()
     if view.prefix_items or view.contains:
-        return _with_fixed_elements(schema, view, ctx)
+        if view.distinctness is not canonical.Distinctness.SOME_REPEATED:
+            return _with_fixed_elements(schema, view, ctx)
+        if not _can_repeat(view):
+            return st.nothing()
+        return _with_fixed_elements(schema, view, ctx).map(_repeat_valid(schema)).filter(_is_drawn)
     all_distinct = view.distinctness is canonical.Distinctness.ALL_DISTINCT
     try:
         element = _element(view.items, ctx)
@@ -963,6 +968,47 @@ def _tiled(item: JsonValue, length: int) -> list[JsonValue]:
     if isinstance(item, (dict, list)):
         return [deepclone(item) for _ in range(length)]
     return [item] * length
+
+
+def _can_repeat(view: jsonschema_rs.canonical.ArrayView) -> bool:
+    """Whether two positions admit a common value, which a repeated element needs."""
+    max_items = _countable(view.max_items)
+    positions: list[jsonschema_rs.CanonicalSchema | None] = list(
+        view.prefix_items if max_items is None else view.prefix_items[:max_items]
+    )
+    # Two positions past the named ones are enough to hold a repeat between themselves.
+    tail = 2 if max_items is None else min(2, max_items - len(positions))
+    positions.extend([view.items] * tail)
+    for index, left in enumerate(positions):
+        for right in positions[index + 1 :]:
+            # A position admitting anything takes a copy of whatever the other one holds.
+            if left is None or right is None or _narrowed(left, right) is not None:
+                return True
+    return False
+
+
+def _repeat_valid(schema: jsonschema_rs.CanonicalSchema) -> Callable[[JsonValue], list[JsonValue] | None]:
+    """Make an earlier element repeat in a drawn array, or `None` when no such repeat clears the schema."""
+    is_valid = _validator(schema)
+
+    def repeat(value: JsonValue) -> list[JsonValue] | None:
+        assert isinstance(value, list)
+        if len({json_identity(item) for item in value}) < len(value):
+            return value
+        # A copy overwriting a later position keeps the length; an appended copy covers positions no copy fits.
+        overwritten = (
+            [*value[:position], value[source], *value[position + 1 :]]
+            for position in reversed(range(1, len(value)))
+            for source in range(position)
+        )
+        appended = ([*value, item] for item in value)
+        return next((candidate for candidate in chain(overwritten, appended) if is_valid(candidate)), None)
+
+    return repeat
+
+
+def _is_drawn(value: list[JsonValue] | None) -> bool:
+    return value is not None
 
 
 def _repeat_one(value: list[JsonValue]) -> list[JsonValue]:

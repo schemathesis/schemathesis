@@ -60,6 +60,7 @@
 
 - Crash when generating unique arrays of binary strings.
 - Generated strings failing `pattern` when combined with `minLength` / `maxLength`.
+- Generated arrays failing `maxContains`, or `not: {uniqueItems: true}` alongside `prefixItems` / `contains`.
 - Valid strings never generated for `pattern` with optional or repeated parts combined with length bounds.
 - Open API 2.0 parameter `x-example` drawn twice as often in fuzzing.
 - Example Objects in list-style `examples` used as the example itself.
