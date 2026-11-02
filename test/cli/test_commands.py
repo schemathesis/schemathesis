@@ -3010,9 +3010,17 @@ def test_rate_limit(ctx, cli):
     assert time.perf_counter() - start >= len(api.requests) - 1
 
 
-def test_invalid_tls_verify(ctx, cli, snapshot_cli):
+@pytest.mark.parametrize("source", ["flag", "config"])
+def test_invalid_tls_verify(ctx, cli, tmp_path, snapshot_cli, source):
     api = ctx.openapi.apps.failure()
-    assert cli.run(api.schema_url.replace("http", "https"), "--tls-verify=falst") == snapshot_cli
+    missing = tmp_path / "missing.pem"
+    args = [api.schema_url.replace("http", "https")]
+    if source == "flag":
+        args.append(f"--tls-verify={missing}")
+        config = None
+    else:
+        config = {"tls-verify": str(missing)}
+    assert cli.run(*args, config=config) == snapshot_cli
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])

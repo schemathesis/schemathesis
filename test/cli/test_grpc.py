@@ -149,6 +149,20 @@ def test_unusable_options_refused(ctx, cli, snapshot_cli, location, option):
     assert cli.run(location or server.target, option) == snapshot_cli
 
 
+@pytest.mark.parametrize("source", ["flag", "config"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_tls_verify_file(ctx, cli, tmp_path, snapshot_cli, source):
+    server = ctx.grpc.apps.users(tls=True)
+    args = [server.target]
+    missing = tmp_path / "missing.pem"
+    if source == "flag":
+        args.append(f"--tls-verify={missing}")
+        config = None
+    else:
+        config = {"tls-verify": str(missing)}
+    assert cli.run(*args, config=config) == snapshot_cli
+
+
 BLOCK_MODULE_AND_RUN = """
 import sys
 sys.modules[sys.argv[1]] = None
