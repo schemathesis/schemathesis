@@ -439,7 +439,7 @@ def audit_schema(
         result.operations += 1
         unsatisfiable: list[GenerationMode] = []
         op_method = operation.method.upper()
-        op_path = operation.full_path
+        op_path = operation.path
         rss_before = _rss_bytes()
         try:
             for case in _cases_for_phase(

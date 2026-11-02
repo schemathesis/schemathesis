@@ -46,11 +46,12 @@ _PATHS = {
 
 @pytest.mark.parametrize("phase", [PhaseName.COVERAGE, PhaseName.FUZZING])
 def test_audit_schema_drives_each_phase(ctx, phase):
-    raw = ctx.openapi.build_schema(_PATHS)
+    raw = ctx.openapi.build_schema(_PATHS, servers=[{"url": "/api"}])
     outcome = audit_schema(raw, api="t", corpus="external", phase=phase, fuzzing_max_examples=3)
     assert outcome.coverage_map is not None
     assert outcome.result.errors == []
     assert outcome.result.operations == 2
+    assert outcome.result.statistic["operations"]["seen"] == 2
     assert outcome.result.cases_generated > 0
     assert outcome.result.phase == phase.value
 
