@@ -299,6 +299,10 @@ def users(
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "invalid")
         if user_id == 503:
             context.abort(grpc.StatusCode.UNAVAILABLE, "")
+        if user_id == 502:
+            context.abort(grpc.StatusCode.UNKNOWN, "")
+        if user_id == 505:
+            context.abort(grpc.StatusCode.DATA_LOSS, "")
         if user_id == 504:
             context.abort(grpc.StatusCode.DEADLINE_EXCEEDED, "upstream timed out")
         if user_id == 404:

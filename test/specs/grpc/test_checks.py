@@ -8,6 +8,8 @@ from requests.structures import CaseInsensitiveDict
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.config import ConfigError
+from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.error_feedback import Observation, ObservationKind
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import ServerError, Severity
@@ -262,6 +264,43 @@ def test_well_formed_responses_pass(ctx, response_factory, loader, method, conte
 def test_unimplemented_is_not_a_server_error(ctx):
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
     assert operation.Case(body={"userId": 501}).call_and_validate().status_line == "UNIMPLEMENTED"
+
+
+@pytest.mark.parametrize(
+    ("expected_status", "user_id"),
+    [("UNAVAILABLE", 503), ("INTERNAL", -1)],
+    ids=["unavailable", "internal"],
+)
+def test_expected_grpc_status_name(ctx, expected_status, user_id):
+    operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
+    case = operation.Case(body={"userId": user_id})
+    response = case.call()
+    config = ChecksConfig.from_dict({"not_a_server_error": {"expected-statuses": [expected_status]}})
+    assert not_a_server_error(check_context(config), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("user_id", "status_name"),
+    [(502, "UNKNOWN"), (505, "DATA_LOSS")],
+    ids=["unknown", "data-loss"],
+)
+def test_expected_internal_does_not_allow_other_grpc_statuses(ctx, user_id, status_name):
+    operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
+    case = operation.Case(body={"userId": user_id})
+    response = case.call()
+    config = ChecksConfig.from_dict({"not_a_server_error": {"expected-statuses": ["INTERNAL"]}})
+    with pytest.raises(ServerError) as exc_info:
+        not_a_server_error(check_context(config), response, case)
+    assert exc_info.value == ServerError(operation=operation.label, status_code=500, status_name=status_name)
+
+
+def test_unknown_expected_grpc_status_name(ctx):
+    operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
+    case = operation.Case(body={"userId": 503})
+    response = case.call()
+    with pytest.raises(ConfigError, match="Invalid status value `NOT_A_STATUS` for gRPC"):
+        config = ChecksConfig.from_dict({"not_a_server_error": {"expected-statuses": ["NOT_A_STATUS"]}})
+        not_a_server_error(check_context(config), response, case)
 
 
 def rejection(response_factory, *fields):

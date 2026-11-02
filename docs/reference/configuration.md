@@ -1154,7 +1154,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
 
     This allows you to customize validation for APIs that use non-standard success or error codes.
 
-    Status codes can be specified as exact integers (e.g., `200`) or as wildcard strings using the `X` character to match any digit (e.g., `"2XX"` to match all 2xx codes, `"4XX"` for all client error responses).
+    For Open API targets, status codes can be specified as exact integers (e.g., `200`) or as wildcard strings using the `X` character to match any digit (e.g., `"2XX"` to match all 2xx codes, `"4XX"` for all client error responses). For gRPC targets, gRPC status names such as `UNAVAILABLE` and `INTERNAL` are also accepted.
 
     ```toml
     [checks]

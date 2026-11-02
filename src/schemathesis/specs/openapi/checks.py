@@ -862,11 +862,10 @@ def _openapi_negative_data_rejection(ctx: CheckContext, response: Response, case
     assert meta is not None
 
     config = ctx.config.negative_data_rejection
-    allowed_statuses = expand_status_codes(config.expected_statuses or [])
 
     if (
         meta.generation.mode.is_negative
-        and response.status_code not in allowed_statuses
+        and not case.operation.schema.is_response_status_expected(response, config.expected_statuses or [])
         and not has_only_additional_properties_in_non_body_parameters(case)
         and not _body_negation_becomes_valid_after_serialization(response, case)
         and not _body_negation_is_only_forbidden_property(case)
@@ -1074,9 +1073,10 @@ def _openapi_positive_data_acceptance(ctx: CheckContext, response: Response, cas
     assert meta is not None
 
     config = ctx.config.positive_data_acceptance
-    allowed_statuses = expand_status_codes(config.expected_statuses or [])
 
-    if meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
+    if meta.generation.mode.is_positive and not case.operation.schema.is_response_status_expected(
+        response, config.expected_statuses or []
+    ):
         # A schema promises which requests are well formed, not which credentials exist.
         if response.status_code in CREDENTIAL_REJECTION_STATUSES and _grants_credentials(case.operation):
             return None
@@ -1109,10 +1109,12 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
     ):
         if data.parameter.lower() == "authorization":
             expected_statuses = frozenset({401})
+            is_expected = response.status_code in expected_statuses
         else:
             config = ctx.config.missing_required_header
             expected_statuses = expand_status_codes(config.expected_statuses or [])
-        if response.status_code not in expected_statuses:
+            is_expected = case.operation.schema.is_response_status_expected(response, config.expected_statuses or [])
+        if not is_expected:
             # A drawn identifier rarely exists, so the server can reject the request before reading headers.
             if response.status_code == 404 and _targets_generated_resource(ctx, case.operation):
                 return None

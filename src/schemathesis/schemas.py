@@ -17,7 +17,7 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
-from schemathesis.config import GenerationConfig, ProjectConfig, SanitizationConfig
+from schemathesis.config import ConfigError, GenerationConfig, ProjectConfig, SanitizationConfig
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
@@ -27,7 +27,15 @@ from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocatio
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
-from schemathesis.core.transport import CallOutcome, HttpMethod, HttpMethodSchema, Response, is_uninformative_status
+from schemathesis.core.transport import (
+    CallOutcome,
+    HttpMethod,
+    HttpMethodSchema,
+    Response,
+    expand_status_code,
+    expand_status_codes,
+    is_uninformative_status,
+)
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
@@ -727,6 +735,18 @@ class BaseSchema(Mapping):
     def status_name_for_code(self, status_code: int) -> str | None:
         """Name the protocol gives the status an HTTP status code stands for, or `None` when the code alone says it."""
         return None
+
+    def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
+        """Whether the response has a status described by one of the specification's configured status entries."""
+        invalid = [status for status in expected_statuses if not expand_status_code(status)]
+        if invalid:
+            self._raise_invalid_status_values(invalid)
+        return response.status_code in expand_status_codes(expected_statuses)
+
+    def _raise_invalid_status_values(self, invalid: list[str]) -> NoReturn:
+        label = "value" if len(invalid) == 1 else "values"
+        values = ", ".join(f"`{status}`" for status in invalid)
+        raise ConfigError(f"Invalid status {label} {values} for {self.specification.name}")
 
     def operation_label_for_display(self, operation_label: str | None) -> str | None:
         """Return the API operation label when transport method and path are only protocol framing."""

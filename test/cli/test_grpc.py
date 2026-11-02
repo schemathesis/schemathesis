@@ -31,6 +31,37 @@ def test_grpc_run_finds_server_error(ctx, cli, tmp_path, snapshot_cli, source):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_expected_status_name(ctx, cli, snapshot_cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": 503}
+        """
+    )
+    assert (
+        cli.main(
+            "run",
+            server.target,
+            "--include-name=pkg.Users/GetUser",
+            "--max-examples=1",
+            "--phases=fuzzing",
+            config={
+                "operations": [
+                    {
+                        "include-name": "pkg.Users/GetUser",
+                        "checks": {"not_a_server_error": {"expected-statuses": ["UNAVAILABLE"]}},
+                    }
+                ]
+            },
+            hooks=module,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_descriptor_set_requires_url(cli, tmp_path, snapshot_cli):
     write_descriptor_set(tmp_path, users_descriptor_set())
     assert cli.run("api.binpb") == snapshot_cli

@@ -18,7 +18,7 @@ from schemathesis.core.failures import (
     ResponseTimeExceeded,
 )
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import CallOutcome, Response, expand_status_codes
+from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.engine import Status
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, CoverageScenario, coverage_scenario
 from schemathesis.generation.overrides import Override
@@ -421,7 +421,7 @@ def check(func: CheckT) -> CheckT:
 
 
 def _check_content_type_probe(
-    ctx: CheckContext, case: Case, scenario: CoverageScenario, status_code: int, expected_statuses: frozenset[int]
+    ctx: CheckContext, case: Case, scenario: CoverageScenario, status_code: int, expected_statuses: list[str]
 ) -> None:
     """Report a server error only when the probe's `Content-Type` causes it."""
     headers = case.headers.copy()
@@ -430,7 +430,7 @@ def _check_content_type_probe(
     # the operation's ordinary requests report that server error with a plain reproducer.
     control = case.derive(headers=headers, keep_auth=True)
     control_response = ctx.internals.send_probe(case, control, dict(ctx.internals.transport_kwargs or {}))
-    if control_response.status_code not in expected_statuses:
+    if not case.operation.schema.is_response_status_expected(control_response, expected_statuses):
         return
     if scenario == CoverageScenario.MALFORMED_CONTENT_TYPE:
         message = (
@@ -450,10 +450,10 @@ def _check_content_type_probe(
 @check
 def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
-    expected_statuses = expand_status_codes(ctx.config.not_a_server_error.expected_statuses or [])
+    expected_statuses = ctx.config.not_a_server_error.expected_statuses or []
 
     status_code = response.status_code
-    if status_code not in expected_statuses:
+    if not case.operation.schema.is_response_status_expected(response, expected_statuses):
         scenario = coverage_scenario(case)
         if scenario in CONTENT_TYPE_PROBES:
             _check_content_type_probe(ctx, case, scenario, status_code, expected_statuses)

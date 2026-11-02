@@ -36,6 +36,8 @@ def validate_status_codes(value: Sequence[str] | None) -> Sequence[str] | None:
     invalid = []
 
     for code in value:
+        if code.isupper() and code.replace("_", "").isalpha():
+            continue
         if len(code) != 3:
             invalid.append(code)
             continue
