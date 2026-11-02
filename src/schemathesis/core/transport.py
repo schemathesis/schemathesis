@@ -449,7 +449,8 @@ class Response:
 
         """
         if self._deserialized is NOT_SET:
-            self._deserialized = json.loads(self.text)
+            rendered = self.render_content(self.content) if self.render_content is not None else None
+            self._deserialized = json.loads(rendered if rendered is not None else self.text)
         return self._deserialized
 
     def clear_cache(self) -> None:
