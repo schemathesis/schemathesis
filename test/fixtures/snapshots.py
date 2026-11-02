@@ -540,9 +540,15 @@ def normalize_connection_errors(data: str) -> str:
         # gRPC on Windows names a connection closed by the server differently.
         .replace("End of TCP stream", "Socket closed")
     )
-    return data.replace(
+    data = data.replace(
         "No connection could be made because the target machine actively refused it", "Connection refused"
     ).replace("An existing connection was forcibly closed by the remote host", "Connection reset by peer")
+    # gRPC on Windows reports a refused connection with a different status and the system error text.
+    return re.sub(
+        r"UNAVAILABLE: (ipv4:\S+?): WSAGetOverlappedResult: Connection refused \(Connection refused\.\r?\n -- 10061\)",
+        r"UNKNOWN: \1: Failed to connect to remote host: Connection refused",
+        data,
+    )
 
 
 @pytest.fixture

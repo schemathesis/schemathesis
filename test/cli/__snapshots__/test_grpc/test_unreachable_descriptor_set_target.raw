@@ -24,7 +24,7 @@ Network Error
 
 Connection failed
 
-    Failed to connect to grpc://127.0.0.1
+    Failed to connect to grpc://127.0.0.1: failed to connect to all addresses; last error: UNKNOWN: ipv4:127.0.0.1: Failed to connect to remote host: Connection refused
 
 Tip: Check that the API is running and reachable at `grpc://127.0.0.1`.
 

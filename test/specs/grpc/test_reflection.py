@@ -148,6 +148,22 @@ def test_from_url_tls_untrusted_certificate(ctx, tmp_path):
     )
 
 
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="gRPC names the closed connection with varying system errors"
+)
+def test_from_url_missing_tls_client_certificate_keeps_details_without_retry_advice(ctx):
+    server = ctx.grpc.apps.users(tls=True, client_auth=True)
+    with pytest.raises(LoaderError) as exc_info:
+        schemathesis.grpc.from_url(server.target, verify=str(server.ca_path))
+    port = server.target.rsplit(":", 1)[1]
+    assert (exc_info.value.kind, exc_info.value.message) == (
+        LoaderErrorKind.NETWORK_OTHER,
+        f"Failed to connect to 127.0.0.1:{port}: failed to connect to all addresses; last error: UNAVAILABLE: "
+        f"ipv4:127.0.0.1:{port}: Socket closed. The server may require a client certificate; use "
+        "`--request-cert` and `--request-cert-key`",
+    )
+
+
 @pytest.mark.parametrize(
     ("denial", "status", "details"),
     [

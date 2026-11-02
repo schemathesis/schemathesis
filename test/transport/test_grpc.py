@@ -1,6 +1,7 @@
 import base64
 import contextlib
 import json
+import platform
 import re
 import socket
 import threading
@@ -136,6 +137,16 @@ def test_server_sent_status_is_a_response(ctx, user_id, expected):
     assert (response.status_code, response.status_line) == expected
 
 
+def test_unavailable_reachability_probe_is_excluded_from_response_elapsed(ctx):
+    server = ctx.grpc.apps.users()
+    operation = load(server)["pkg.Users"]["GetUser"]
+    operation.Case(body={"userId": 7}).call()
+
+    response = operation.Case(body={"userId": 503}).call()
+
+    assert response.elapsed < 0.1
+
+
 def relay(source, target):
     with source, contextlib.suppress(OSError):
         while data := source.recv(65536):
@@ -260,6 +271,41 @@ def test_tls_client_certificate(ctx, tmp_path, combined):
         cert = (str(server.client_cert_path), str(server.client_key_path))
     get_user(server, 7, verify=str(server.ca_path), cert=cert)
     assert server.calls[-1].peer_names == [b"client"]
+
+
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="gRPC names the closed connection with varying system errors"
+)
+def test_missing_tls_client_certificate_keeps_grpc_details_and_gives_a_hint(ctx):
+    server = ctx.grpc.apps.users(tls=True, client_auth=True)
+    with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
+        get_user(server, 7, verify=str(server.ca_path))
+    assert str(exc_info.value) == (
+        f"failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1:{server.target.rsplit(':', 1)[1]}: "
+        "Socket closed. The server may require a client certificate; use `--request-cert` and "
+        "`--request-cert-key`"
+    )
+
+
+def test_http1_server_keeps_grpc_details_and_gives_a_protocol_hint(ctx, tmp_path):
+    api = ctx.openapi.apps.success()
+    schema = load_descriptor_set(
+        tmp_path,
+        users_descriptor_set(),
+        **{"base-url": api.base_url.replace("http://", "grpc://")},
+    )
+    with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
+        schema["pkg.Users"]["GetUser"].Case(body={}).call()
+    prefix = (
+        f"failed to connect to all addresses; last error: UNAVAILABLE: ipv4:{api.base_url.removeprefix('http://')}: "
+        "Failed parsing HTTP/2 (Expected SETTINGS frame as the first frame, got frame type "
+    )
+    suffix = ". The server does not support HTTP/2; use a gRPC endpoint"
+    # Older Python patch releases answer an HTTP/2 request with an error page and no status line.
+    assert str(exc_info.value) in {
+        f"{prefix}80) (Trying to connect an http1.x server (HTTP status 505)){suffix}",
+        f"{prefix}79){suffix}",
+    }
 
 
 def test_settings_from_config(ctx):

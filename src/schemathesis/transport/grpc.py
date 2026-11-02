@@ -45,9 +45,16 @@ PROBE_CHANNEL_OPTIONS = (*CHANNEL_OPTIONS, ("grpc.use_local_subchannel_pool", 1)
 
 ChannelKey = tuple[str, bool, "bool | str", "str | tuple[str, str] | None"]
 # How the gRPC runtime reports a failed TLS handshake or certificate check.
-TLS_FAILURE_MARKERS = ("Tls handshake failed", "verification check failed")
+TLS_FAILURE_MARKERS = (
+    "Tls handshake failed",
+    "Ssl handshake failed",
+    "verification check failed",
+    "is not in peer certificate",
+)
 TLS_FAILED = "TLS handshake with {address} failed: {details}"
 TLS_EXPECTED = "The server expects TLS; use `grpcs://{address}`"
+MTLS_EXPECTED = "The server may require a client certificate; use `--request-cert` and `--request-cert-key`"
+GRPC_EXPECTED = "The server does not support HTTP/2; use a gRPC endpoint"
 NO_RESPONSE_MESSAGE = "cardinality violation: received no response message from non-server-streaming RPC"
 # How gRPC fails a call it did not send because the channel has no connection.
 NOT_CONNECTED = "failed to connect to all addresses"
@@ -124,6 +131,8 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 started_at = Instant()
                 content, outcome = call.with_call(**call_kwargs, timeout=timeout, wait_for_ready=True)
         except grpc.RpcError as error:
+            # Taken before the reachability check, which is not part of the response time.
+            elapsed = started_at.elapsed
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)
             code = outcome.code()
@@ -147,15 +156,15 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 if failed_to_connect and "connection reset by peer" in details.lower():
                     reset = ConnectionResetError(f"Connection reset. {details}")
                     raise requests.exceptions.ConnectionError(reset, request=request) from reset
-                # A plaintext connection to a server that speaks TLS closes without a handshake error.
-                if not tls and accepts_tls(address):
-                    mismatch = ConnectionError(f"{details}. {TLS_EXPECTED.format(address=address)}")
+                if hint := connection_configuration_hint(address, tls, details):
+                    mismatch = ConnectionError(f"{details}. {hint}")
                     raise requests.exceptions.ConnectionError(mismatch, request=request) from mismatch
-                refused = ConnectionRefusedError(f"Failed to connect to {base_url}")
+                refused = ConnectionRefusedError(f"Failed to connect to {base_url}: {details}")
                 raise requests.exceptions.ConnectionError(refused, request=request) from refused
             content = b""
+        else:
+            elapsed = started_at.elapsed
         self._answered.add(channel)
-        elapsed = started_at.elapsed
         code = outcome.code()
         details = outcome.details() or ""
         if content is None:
@@ -264,12 +273,36 @@ def accepts_tls(address: str) -> bool:
     return True
 
 
+def connection_configuration_hint(address: str, tls: bool, details: str) -> str | None:
+    normalized = details.lower()
+    # A server without HTTP/2 answers the connection preface with an HTTP/1 response.
+    if "trying to connect an http1.x server" in normalized:
+        return GRPC_EXPECTED
+    # A plaintext connection to a server that speaks TLS closes without a handshake error.
+    if not tls and accepts_tls(address):
+        return TLS_EXPECTED.format(address=address)
+    # A server that requires a client certificate closes the connection right after the handshake.
+    if tls and "socket closed" in normalized and accepts_tls(address):
+        return MTLS_EXPECTED
+    # Any other server that is not TLS and answers with something other than HTTP/2 speaks another protocol.
+    if "expected settings frame as the first frame" in normalized:
+        return GRPC_EXPECTED
+    return None
+
+
 def _is_ready(channel: grpc.Channel) -> bool:
-    future = grpc.channel_ready_future(channel)
+    event = threading.Event()
+    reachable = False
+
+    def on_state_change(state: grpc.ChannelConnectivity) -> None:
+        nonlocal reachable
+        if state in (grpc.ChannelConnectivity.READY, grpc.ChannelConnectivity.TRANSIENT_FAILURE):
+            reachable = state == grpc.ChannelConnectivity.READY
+            event.set()
+
+    channel.subscribe(on_state_change, try_to_connect=True)
     try:
-        future.result(timeout=READY_TIMEOUT)
-    except grpc.FutureTimeoutError:
-        # A pending check keeps watching the channel and asking it to reconnect.
-        future.cancel()
-        return False
-    return True
+        event.wait(READY_TIMEOUT)
+        return reachable
+    finally:
+        channel.unsubscribe(on_state_change)
