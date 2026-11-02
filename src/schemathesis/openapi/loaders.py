@@ -159,7 +159,11 @@ def from_path(
     """
     with open(path, encoding=encoding) as file:
         content_type = detect_content_type(headers=None, path=str(path))
-        schema = load_content(file.read(), content_type)
+        try:
+            content = file.read()
+        except UnicodeDecodeError as exc:
+            raise LoaderError(LoaderErrorKind.SYNTAX_ERROR, SCHEMA_SYNTAX_ERROR, extras=[str(exc)]) from exc
+        schema = load_content(content, content_type)
     loaded = _from_dict(schema, config=config, stringify=False)
     loaded.location = Path(path).absolute().as_uri()
     return loaded

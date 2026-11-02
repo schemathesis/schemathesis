@@ -1537,11 +1537,11 @@ def test_negative_mode_with_unsupported_regex_in_body(cli, ctx, snapshot_cli):
 
 
 @pytest.mark.skipif(not yaml.__with_libyaml__, reason="Pure-Python PyYAML words the error differently")
-def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli, ctx):
+@pytest.mark.parametrize(("suffix", "encoding"), [("\x00", "utf-8"), ("", "utf-16")], ids=["control-byte", "utf16"])
+def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli, ctx, suffix, encoding):
     api = ctx.openapi.apps.success()
-    schema = yaml.dump(simple_openapi)
-    schema += "\x00"
-    schema_file = testdir.makefile(".yaml", schema=schema)
+    schema_file = testdir.tmpdir / "schema.yaml"
+    schema_file.write_binary((yaml.dump(simple_openapi) + suffix).encode(encoding))
     assert cli.run(str(schema_file), f"--url={api.base_url}/api") == snapshot_cli
 
 
