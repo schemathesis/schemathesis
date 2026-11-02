@@ -8,7 +8,7 @@ Schemathesis dev
 
      Base URL:         grpc://127.0.0.1
      Specification:    gRPC
-     Operations:       1 selected / 3 total
+     Operations:       1 selected / 4 total
 
  🚫  Fuzzing (in 0.00s)
 
@@ -28,7 +28,7 @@ Need more help?
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/3
+  Selected: 1/4
   Tested: 0
   Errored: 1
 

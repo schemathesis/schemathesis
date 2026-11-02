@@ -22,6 +22,9 @@ if TYPE_CHECKING:
 
 BUILD_HINT = "Build one with `buf build -o api.binpb` or `protoc --include_imports --descriptor_set_out=api.binpb`"
 EXTRA_HINT = "Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"
+# Field numbers of the per-file metadata `buf build` appends to each file of an image.
+BUF_IMAGE_FILE_EXTENSION = 8042
+BUF_IS_IMPORT = 1
 # Reflection lists every service the server registers, these included.
 INFRASTRUCTURE_SERVICES = frozenset(
     {
@@ -302,6 +305,14 @@ def _from_descriptor_set(
     imported = {dependency for file in descriptor_set.file for dependency in file.dependency}
     # Imported files of a top-level package belong to the same API. Files without a package all share the empty one.
     packages = {file.package for file in descriptor_set.file if file.name not in imported} - {""}
+
+    def is_imported(file: descriptor_pb2.FileDescriptorProto) -> bool:
+        marked = _marked_as_import(file)
+        if marked is not None:
+            return marked
+        return file.name in imported and file.package not in packages
+
+    imported_services: set[str] = set()
     try:
         for file in descriptor_set.file:
             add(file)
@@ -309,13 +320,13 @@ def _from_descriptor_set(
         if service_names is not None:
             services = {name: pool.FindServiceByName(name) for name in service_names}
         else:
-            services = {
-                service.full_name: service
-                for file in descriptor_set.file
-                for service in pool.FindFileByName(file.name).services_by_name.values()
-                if (file.name not in imported or file.package in packages)
-                and service.full_name not in INFRASTRUCTURE_SERVICES
-            }
+            services = {}
+            for file in descriptor_set.file:
+                for service in pool.FindFileByName(file.name).services_by_name.values():
+                    if service.full_name not in INFRASTRUCTURE_SERVICES:
+                        services[service.full_name] = service
+                        if is_imported(file):
+                            imported_services.add(service.full_name)
     except TypeError as exc:
         raise _does_not_load(str(exc).removeprefix("Couldn't build proto file into descriptor pool: ")) from exc
     except KeyError as exc:
@@ -324,7 +335,13 @@ def _from_descriptor_set(
     schema = load_with_hooks(
         raw_schema,
         config,
-        lambda project_config: GrpcSchema(raw_schema, config=project_config, pool=pool, services=services),
+        lambda project_config: GrpcSchema(
+            raw_schema,
+            config=project_config,
+            pool=pool,
+            services=services,
+            imported_services=frozenset(imported_services),
+        ),
     )
     # Settings every call would fail on are refused once, before any test runs.
     metadata_pairs(filter_metadata(schema.config.headers_for()))
@@ -332,6 +349,25 @@ def _from_descriptor_set(
         settings = schema.config.request_settings_for()
         parse_target(schema.config.base_url, settings.verify, uses_proxy=bool(settings.proxy))
     return schema
+
+
+def _marked_as_import(file: descriptor_pb2.FileDescriptorProto) -> bool | None:
+    """Whether a `buf build` image marks the file as pulled in from outside the built module.
+
+    `None` for descriptor sets without the marker, such as the ones `protoc` writes.
+    """
+    from google.protobuf import empty_pb2, unknown_fields
+
+    fields = unknown_fields.UnknownFieldSet(file)
+    markers = [
+        fields[index].data for index in range(len(fields)) if fields[index].field_number == BUF_IMAGE_FILE_EXTENSION
+    ]
+    if not markers:
+        return None
+    extension = unknown_fields.UnknownFieldSet(empty_pb2.Empty.FromString(markers[0]))
+    return any(
+        extension[index].field_number == BUF_IS_IMPORT and extension[index].data == 1 for index in range(len(extension))
+    )
 
 
 def _does_not_load(detail: str) -> LoaderError:
