@@ -19,7 +19,7 @@ from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
-from schemathesis.specs.grpc.schemas import MEDIA_TYPE, metadata_pairs, parse_target, request_metadata, request_payload
+from schemathesis.specs.grpc.schemas import MEDIA_TYPE, parse_target, prepare_call_kwargs, request_metadata
 from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport, SerializationContext
 
@@ -95,11 +95,14 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         address, tls = prepare_target(
             base_url, verify, request_headers, uses_proxy=bool(proxies or settings.proxy), auth=auth
         )
+        call_kwargs = prepare_call_kwargs(case, request_headers)
         method = case.operation.definition.raw
-        payload = request_payload(case)
-        url = case.operation.schema.build_request_url(case, base_url)
-        request = requests.Request(method="POST", url=url, headers=request_headers, data=payload).prepare()
-        metadata = metadata_pairs(request_headers)
+        request = requests.Request(
+            method="POST",
+            url=case.operation.schema.build_request_url(case, base_url),
+            headers=request_headers,
+            data=call_kwargs["request"],
+        ).prepare()
         channel = self._channel(address, tls, verify, cert)
         # No serializers: the call sends and receives bytes, or no message at all.
         call: grpc.UnaryUnaryMultiCallable[bytes, bytes | None] = channel.unary_unary(case.path)
@@ -109,7 +112,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             try:
                 with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
                     started_at = Instant()
-                    content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata)
+                    content, outcome = call.with_call(**call_kwargs, timeout=timeout)
             except grpc.RpcError as error:
                 if not (cast(grpc.Call, error).details() or "").startswith(NOT_CONNECTED):
                     raise
@@ -119,7 +122,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 # The server is up, but a channel that failed to connect waits before trying again and fails calls in
                 # the meantime without sending them.
                 started_at = Instant()
-                content, outcome = call.with_call(payload, timeout=timeout, metadata=metadata, wait_for_ready=True)
+                content, outcome = call.with_call(**call_kwargs, timeout=timeout, wait_for_ready=True)
         except grpc.RpcError as error:
             # Every error a unary call raises is also the call itself.
             outcome = cast(grpc.Call, error)

@@ -89,11 +89,10 @@ from schemathesis.specs.grpc.stateful import (
 from schemathesis.specs.grpc.status import (
     GRPC_STATUS_CODES_BY_NAME,
     GRPC_STATUSES,
-    INTERNAL,
-    LIBRARY_DECODE_ERRORS,
     OK,
     STATUS_NAMES_BY_HTTP_STATUS,
     grpc_status,
+    is_library_decode_error,
     starts_with_verb,
 )
 
@@ -318,6 +317,18 @@ class GrpcSchema(BaseSchema):
         return shlex.join(args)
 
     @override
+    def as_curl_command(
+        self, case: Case, *, headers: Mapping[str, Any] | None, verify: bool, base_url: str | None = None
+    ) -> str:
+        return self.as_reproduction_command(case, headers=headers, verify=verify, base_url=base_url)
+
+    @override
+    def as_transport_kwargs(
+        self, case: Case, *, base_url: str | None, headers: dict[str, str] | None
+    ) -> dict[str, Any]:
+        return prepare_call_kwargs(case, request_metadata(case, headers))
+
+    @override
     def status_name_for_code(self, status_code: int) -> str | None:
         return STATUS_NAMES_BY_HTTP_STATUS.get(status_code)
 
@@ -354,18 +365,20 @@ class GrpcSchema(BaseSchema):
 
     @override
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
+        if _is_library_decode_error(case, response):
+            return CallOutcome.UNINFORMATIVE
         return GRPC_STATUSES[grpc_status(response)].outcome
+
+    @override
+    def evaluate_server_error(self, case: Case, response: Response) -> None:
+        if _is_library_decode_error(case, response):
+            raise self.server_error(case, response)
 
     @override
     def server_error(self, case: Case, response: Response) -> ServerError:
         status = grpc_status(response)
         name = GRPC_STATUSES[status].name
-        # Raw bytes are sent unchanged, so a decode failure there is the input's fault, not the message type's.
-        if (
-            status == INTERNAL
-            and not isinstance(case.body, bytes)
-            and response.headers.get("grpc-message", [""])[0].startswith(LIBRARY_DECODE_ERRORS)
-        ):
+        if _is_library_decode_error(case, response):
             return UndecodableGrpcRequest(
                 operation=case.operation.label, status_code=response.status_code, status_name=name
             )
@@ -693,6 +706,11 @@ def metadata_pairs(headers: Mapping[str, str]) -> tuple[tuple[str, str | bytes],
     return tuple((key, _metadata_value(key, value)) for key, value in headers.items())
 
 
+def prepare_call_kwargs(case: Case, request_headers: Mapping[str, str]) -> dict[str, Any]:
+    """Arguments for the bound unary RPC callable."""
+    return {"request": request_payload(case), "metadata": metadata_pairs(request_headers)}
+
+
 def _metadata_value(key: str, value: str) -> str | bytes:
     # The gRPC library rejects invalid metadata before sending, and the call fails as if the server had.
     if not METADATA_KEY.fullmatch(key):
@@ -837,6 +855,11 @@ def _drop_unknown_fields(decoded: message.Message) -> bool:
     size = len(decoded.SerializeToString())
     decoded.DiscardUnknownFields()
     return len(decoded.SerializeToString()) != size
+
+
+def _is_library_decode_error(case: Case, response: Response) -> bool:
+    # Raw bytes are sent unchanged, so a decode failure there is the input's fault, not the message type's.
+    return not isinstance(case.body, bytes) and is_library_decode_error(response)
 
 
 def _decode(

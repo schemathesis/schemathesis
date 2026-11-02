@@ -73,7 +73,7 @@ A failure shows the gRPC status and its message where an HTTP failure shows the 
 ```
 - ST101 Server error
 
-INTERNAL: negative id:
+INTERNAL: negative id
 
     <EMPTY>
 
@@ -86,7 +86,7 @@ Reproduce with:
 
 `<EMPTY>` marks a response without a body. With a descriptor set, the command passes it to `grpcurl` through `-protoset`. `st replay` reruns the case with Schemathesis; `st` is the short name of the `schemathesis` command.
 
-The gRPC statuses `UNKNOWN`, `INTERNAL`, `DATA_LOSS` and `UNAVAILABLE` count as server errors. `UNIMPLEMENTED` means the server does not serve the method, so Schemathesis does not report it as a failure; a method that returns nothing else gets a [`not_served`](../reference/warnings.md#not_served) warning. `response_schema_conformance` fails a response that does not decode as the method's output message. For a reflection target it also fails a response with fields the server's own descriptors do not declare.
+Schemathesis counts `UNKNOWN`, `INTERNAL`, `DATA_LOSS` and `UNAVAILABLE` as server errors. `UNIMPLEMENTED` means the server does not serve the method, so Schemathesis does not report it as a failure; a method that returns nothing else gets a [`not_served`](../reference/warnings.md#not_served) warning. `response_schema_conformance` fails a response that does not decode as the method's output message. For a reflection target it also fails a response with fields the server's own descriptors do not declare.
 
 Allow an expected server error by its gRPC status name:
 
