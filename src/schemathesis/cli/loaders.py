@@ -17,6 +17,7 @@ import click
 from schemathesis import graphql, grpc, openapi
 from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
+from schemathesis.cli.validation import validate_tls_verify
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import HookExecutionError, IncorrectUsage, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
@@ -43,6 +44,7 @@ def into_event_stream(
     filter_set: dict[str, Any],
     engine_callback: Callable[[BaseSchema], Iterable[events.EngineEvent]],
 ) -> EventGenerator:
+    validate_tls_verify(config.tls_verify)
     # Checked before any report handler creates its file.
     if is_grpc_location(location):
         if any(

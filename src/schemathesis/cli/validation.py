@@ -34,6 +34,7 @@ INVALID_ORIGIN_MESSAGE = (
 )
 CONFLICTING_URL_MESSAGE = "The `--url` and `--origin` options are mutually exclusive."
 WFC_USER_REQUIRES_PATH_MESSAGE = "--auth-wfc-user requires --auth-wfc or path under [auth.wfc]"
+MISSING_TLS_VERIFY_FILE_MESSAGE = "TLS verification CA bundle does not exist: `{}`"
 
 
 def validate_wfc_user(config: SchemathesisConfig, path: str | None, user: str | None) -> None:
@@ -42,6 +43,11 @@ def validate_wfc_user(config: SchemathesisConfig, path: str | None, user: str | 
     projects = (config.projects.default, *config.projects.named.values())
     if not any(project.auth.wfc is not None and project.auth.wfc.path for project in projects):
         raise click.UsageError(WFC_USER_REQUIRES_PATH_MESSAGE)
+
+
+def validate_tls_verify(value: bool | str | None) -> None:
+    if isinstance(value, str) and not file_exists(value):
+        raise click.UsageError(MISSING_TLS_VERIFY_FILE_MESSAGE.format(value))
 
 
 def validate_schema_location(ctx: click.core.Context, param: click.core.Parameter, location: str) -> str:

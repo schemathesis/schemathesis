@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Traceback when `--tls-verify` points to a missing CA bundle.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
 - gRPC Channelz, CSDS and health services tested as part of the API.
