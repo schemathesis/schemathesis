@@ -1129,13 +1129,13 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, tmp_path, snapshot_
     assert (report_dir / "index.html").read_text(encoding="utf-8") == snapshot_html
 
 
-# Single-use tokens: every token fetched after the first recovers one request, unless `--max-time` cuts its replay.
+# Single-use tokens: every token fetched after the first recovers one request.
 @pytest.mark.parametrize(
-    "args,max_cut_replays",
-    [(("run", "--phases=stateful", "--max-examples=10"), 0), (("fuzz", "--max-time=1"), 1)],
+    "args",
+    [("run", "--phases=stateful", "--max-examples=10"), ("fuzz", "--max-time=30")],
     ids=["stateful", "fuzz"],
 )
-def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, args, max_cut_replays):
+def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, args):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/protected": {
@@ -1161,6 +1161,17 @@ def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, 
         components={"securitySchemes": {"OAuth2": OAUTH2_SCHEME}},
     )
     state = _register_single_use_token(app)
+    # Fuzzing ends once the hook stops accepting cases, so the request count does not depend on machine speed.
+    module = ctx.write_pymodule(
+        """
+CALLS = []
+
+@schemathesis.hook
+def filter_case(context, case):
+    CALLS.append(1)
+    return len(CALLS) <= 10
+"""
+    )
     command, *flags = args
     base_url = app_runner.openapi_url(app, path="")
 
@@ -1171,10 +1182,11 @@ def test_reauth_recovers_expired_token_in_multi_step_runs(ctx, cli, app_runner, 
         "--mode=positive",
         "--seed=42",
         config={"base-url": base_url, "auth": _dynamic_auth("OAuth2", retry_on=[401])},
+        hooks=module,
     )
     reported = re.search(r"Re-authenticated (\d+) time", result.stdout)
     assert reported is not None, result.stdout
-    assert state["issued"] - 1 - max_cut_replays <= int(reported.group(1)) <= state["issued"] - 1
+    assert int(reported.group(1)) == state["issued"] - 1
 
 
 def test_reauth_failure_in_html_report(ctx, cli, app_runner, tmp_path, snapshot_html):
