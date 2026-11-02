@@ -206,7 +206,7 @@ def from_url(
 def _reflection_error(error: grpc.Call, url: str, address: str, tls: bool, timeout: float) -> LoaderError:
     import grpc
 
-    from schemathesis.transport.grpc import TLS_EXPECTED, TLS_FAILED, TLS_FAILURE_MARKERS, accepts_tls
+    from schemathesis.transport.grpc import TLS_FAILED, TLS_FAILURE_MARKERS, connection_configuration_hint
 
     code = error.code()
     if code == grpc.StatusCode.UNIMPLEMENTED:
@@ -221,8 +221,8 @@ def _reflection_error(error: grpc.Call, url: str, address: str, tls: bool, timeo
         if any(marker in details for marker in TLS_FAILURE_MARKERS):
             return LoaderError(LoaderErrorKind.INVALID_CERTIFICATE, TLS_FAILED.format(address=address, details=details))
         message = f"Failed to connect to {address}: {details}"
-        if not tls and accepts_tls(address):
-            return LoaderError(LoaderErrorKind.NETWORK_OTHER, f"{message}. {TLS_EXPECTED.format(address=address)}")
+        if hint := connection_configuration_hint(address, tls, details):
+            return LoaderError(LoaderErrorKind.NETWORK_OTHER, f"{message}. {hint}")
         return LoaderError(LoaderErrorKind.CONNECTION_OTHER, message)
     if code in (grpc.StatusCode.UNAUTHENTICATED, grpc.StatusCode.PERMISSION_DENIED):
         return LoaderError(LoaderErrorKind.HTTP_FORBIDDEN, f"Reflection failed with {code.name}: {error.details()}")

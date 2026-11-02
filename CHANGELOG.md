@@ -13,6 +13,9 @@
 - Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.
 - Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
 - Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
+- gRPC `UNAVAILABLE` response times inflated by a server reachability check.
+- gRPC connection errors hiding details for HTTP/1 servers and missing client certificates.
+- gRPC TLS failures reported as connection failures on grpcio 1.72 to 1.76.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
 - `response.json()` failing on gRPC responses in custom checks.
 - connect-go request decoding failures not reported as ST119.
