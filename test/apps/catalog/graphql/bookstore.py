@@ -179,6 +179,33 @@ def _make_use_after_create() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation, config=_book_id_config())
 
 
+def _make_unknown_id_failure(*, fixed: bool) -> strawberry.Schema:
+    @strawberry.type
+    class Note:
+        id: strawberry.ID
+        text: str
+
+    notes: dict[str, Note] = {}
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def note(self, id: strawberry.ID) -> Note | None:
+            if notes and id not in notes and not fixed:
+                raise RuntimeError("planted: unknown-id")
+            return notes.get(id)
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def addNote(self, text: str) -> Note:
+            note = Note(id=strawberry.ID(str(uuid.uuid4())), text=text)
+            notes[note.id] = note
+            return note
+
+    return strawberry.Schema(Query, Mutation)
+
+
 def _make_tombstone() -> strawberry.Schema:
     books: dict[str, Book] = {}
 
@@ -554,6 +581,10 @@ def canned_response(payload: object, *, status_code: int = 200, endpoint: str = 
 
 def use_after_create(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_use_after_create(), endpoint, "flask")
+
+
+def unknown_id_failure(*, fixed: bool, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_unknown_id_failure(fixed=fixed), endpoint, "flask")
 
 
 def tombstone_pool(*, endpoint: str = "/graphql") -> GraphQLApp:

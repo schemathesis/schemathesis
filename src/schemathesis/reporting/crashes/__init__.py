@@ -14,9 +14,10 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION
+from schemathesis.core.result import Ok
 from schemathesis.core.storage import atomic_write_text, retry_while_locked
 from schemathesis.core.timing import format_timestamp
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone
 from schemathesis.core.transport import HttpMethod
 from schemathesis.engine import Status
 from schemathesis.reporting.crashes.encoding import decode_case_body, encode_case_body, from_json_safe, to_json_safe
@@ -91,17 +92,24 @@ class CrashLink:
     parameters: dict[str, str]
     # The link's `requestBody` definition (dict/list/expression), re-evaluated against the live response on replay.
     request_body: Any = None
+    # Values taken from the previous response without an expression to re-evaluate, keyed like `parameters`.
+    recorded_values: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {"operationId": self.operation_id, "parameters": self.parameters}
         if self.request_body is not None:
             result["requestBody"] = self.request_body
+        if self.recorded_values:
+            result["recordedValues"] = self.recorded_values
         return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CrashLink:
         return cls(
-            operation_id=data["operationId"], parameters=data["parameters"], request_body=data.get("requestBody")
+            operation_id=data["operationId"],
+            parameters=data["parameters"],
+            request_body=data.get("requestBody"),
+            recorded_values=data.get("recordedValues", {}),
         )
 
 
@@ -368,12 +376,33 @@ def build_crashes_from_recorder(
         if index > 0 and node.transition is not None:
             transition = node.transition
             link_parameters: dict[str, str] = {}
+            recorded_values: dict[str, object] = {}
             for container_name, parameter_dict in transition.parameters.items():
                 location = CONTAINER_TO_LOCATION[container_name]
+                recorded: dict[str, object] = {}
                 for parameter_name, extracted in parameter_dict.items():
-                    link_parameters[f"{location.value}.{parameter_name}"] = extracted.definition
-            request_body = transition.request_body.definition if transition.request_body is not None else None
-            link = CrashLink(operation_id=transition.id, parameters=link_parameters, request_body=request_body)
+                    if extracted.definition is NOT_SET:
+                        assert isinstance(extracted.value, Ok)
+                        recorded[parameter_name] = extracted.value.ok()
+                    # Values the run could not extract were generated, so replay keeps them as recorded.
+                    elif isinstance(extracted.value, Ok) and extracted.value.ok() not in (None, UNRESOLVABLE):
+                        link_parameters[f"{location.value}.{parameter_name}"] = extracted.definition
+                sanitize_mapping(recorded)
+                recorded_values.update((f"{location.value}.{name}", value) for name, value in recorded.items())
+            extracted_body = transition.request_body
+            request_body = (
+                extracted_body.definition
+                if extracted_body is not None
+                and isinstance(extracted_body.value, Ok)
+                and extracted_body.value.ok() is not UNRESOLVABLE
+                else None
+            )
+            link = CrashLink(
+                operation_id=transition.id,
+                parameters=link_parameters,
+                request_body=request_body,
+                recorded_values=recorded_values,
+            )
 
         base_url = case.operation.base_url or ""
         url_template = sanitize_uri(case.operation.schema.build_url_template(case, base_url))

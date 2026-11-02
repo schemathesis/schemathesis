@@ -18,7 +18,7 @@ from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, MultipleResults, multiple, precondition, rule
 
 from schemathesis.core.errors import NoLinksFound
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis import add_database_key
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.control import (
@@ -27,7 +27,12 @@ from schemathesis.generation.stateful.control import (
     TransitionEdge,
     TransitionEndpoint,
 )
-from schemathesis.generation.stateful.state_machine import BundleStateMachine, normalize_name, unique_rule_name
+from schemathesis.generation.stateful.state_machine import (
+    BundleStateMachine,
+    ExtractedParam,
+    normalize_name,
+    unique_rule_name,
+)
 from schemathesis.specs.grpc.converter import decode_body, json_fields
 from schemathesis.specs.grpc.status import OK, grpc_status, starts_with_verb
 
@@ -244,7 +249,7 @@ def _root_rule(
 
     def body(self: GrpcStateMachine, data: st.DataObject) -> MultipleResults[Produced]:
         case = data.draw(strategy)
-        output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
+        output = self._run_case(case, rule_name=rule_name, parent_id=None, linked=None)
         result = self._produce(output, fields)
         if result.values:
             self.control.record_productive_root(label)
@@ -277,12 +282,9 @@ def _link_rule(
             return None
         case = data.draw(strategy)
         case.body = with_value(operation, parent.body if repeats_request else case.body, field, value)
-        return self._run_case(
-            case,
-            rule_name=rule_name,
-            parent_id=parent.case_id,
-            applied_parameters=[(ParameterLocation.BODY, link.target_field)],
-        )
+        # Replay reads the value again from the same field of the parent's response.
+        linked = {link.target_field: ExtractedParam(definition=link.source_field, value=Ok(value), is_required=True)}
+        return self._run_case(case, rule_name=rule_name, parent_id=parent.case_id, linked=linked)
 
     def allowed(self: GrpcStateMachine) -> bool:
         return self.control.allow_transition(link.source, link.target)

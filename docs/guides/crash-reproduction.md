@@ -196,7 +196,7 @@ Reproduce with:
     st replay dnNCj2
 ```
 
-A `~` marks a step whose status or body changed since the crash was recorded; `500 -> 503` shows the recorded and the current status. Values a step takes from an earlier response are listed as `name = replayed (was recorded, from step N)` (here the `itemId` of the item the replay just created, taken from step 1); an unchanged value shows only `(from step N)`, and a new ID alone does not count as a change. The curls use the replayed values, so they run against the current server state. If a linked value is no longer in the response, replay sends the recorded value and marks it `(recorded, not re-extracted)`.
+A `~` marks a step whose status or body changed since the crash was recorded; `500 -> 503` shows the recorded and the current status. Values a step takes from an earlier response are listed as `name = replayed (was recorded, from step N)` (here the `itemId` of the item the replay just created, taken from step 1); an unchanged value shows only `(from step N)`, and a new ID alone does not count as a change. The curls use the replayed values, so they run against the current server state. If a linked value is no longer in the response, replay sends the recorded value and marks it `(recorded, not re-extracted)`. GraphQL steps always send linked IDs as recorded. A replay that resends a linked value as recorded is never reported as fixed: when every check passes, the case shows as `! ERROR` and the crash file is kept.
 
 ## Keep failures as pytest tests
 

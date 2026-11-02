@@ -1665,7 +1665,9 @@ def test_use_after_free_related_case_ids(deleted_case_id, expected):
     assert failure.related_case_ids() == expected
 
 
-def test_iter_chain_cases_includes_referenced_sibling(ctx, response_factory):
+@pytest.mark.parametrize("referenced", [True, False], ids=["referenced", "unreferenced"])
+def test_iter_chain_cases_includes_earlier_sibling(ctx, referenced):
+    # An earlier write to the same created resource may have changed what the failing step sees; a read did not.
     schema = ctx.openapi.load_schema(
         {
             "/users": {
@@ -1691,19 +1693,24 @@ def test_iter_chain_cases_includes_referenced_sibling(ctx, response_factory):
     delete_op = schema["/users/{userId}"]["DELETE"]
 
     parent = post_op.Case(method="POST", body={}, media_type="application/json")
+    other_root = post_op.Case(method="POST", body={}, media_type="application/json")
     sibling_delete = delete_op.Case(method="DELETE", path_parameters={"userId": 1})
+    probe = post_op.Case(method="POST", body={}, media_type="application/json")
+    sibling_get = get_op.Case(method="GET", path_parameters={"userId": 1})
     current_get = get_op.Case(method="GET", path_parameters={"userId": 1})
+    later_delete = delete_op.Case(method="DELETE", path_parameters={"userId": 1})
 
     recorder = ScenarioRecorder(label="chain-helper-test")
-    for c in (parent, sibling_delete, current_get):
-        recorder.record_case(
-            parent_id=parent.id if c is not parent else None,
-            case=c,
-            transition=None,
-            is_transition_applied=False,
-        )
+    recorder.record_case(case=parent)
+    recorder.record_case(case=other_root)
+    recorder.record_case(parent_id=parent.id, case=sibling_delete)
+    recorder.record_case(parent_id=parent.id, case=probe, is_probe=True)
+    recorder.record_case(parent_id=parent.id, case=sibling_get)
+    recorder.record_case(parent_id=parent.id, case=current_get)
+    recorder.record_case(parent_id=parent.id, case=later_delete)
 
-    chain = list(recorder.iter_chain_cases(case_id=current_get.id, related_case_ids=(sibling_delete.id,)))
+    related_case_ids = (sibling_delete.id,) if referenced else ()
+    chain = list(recorder.iter_chain_cases(case_id=current_get.id, related_case_ids=related_case_ids))
     assert [c.id for c in chain] == [parent.id, sibling_delete.id, current_get.id]
 
 

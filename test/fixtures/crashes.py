@@ -63,11 +63,14 @@ class Step:
     parent: int | None = None
 
 
-def _build_transition(*, link: Link, parent_id: str) -> Transition:
+def _build_transition(*, step: Step, link: Link, parent_id: str) -> Transition:
     parameters: dict[str, dict[str, ExtractedParam]] = {}
+    sent = {"path": step.path_parameters, "query": step.query, "cookie": step.cookies}
     for parameter in link.parameters:
         container = LOCATION_TO_CONTAINER[parameter.location]
-        extracted = ExtractedParam(definition=parameter.expression, value=Ok(None), is_required=True)
+        # The link extracted the value the step sent.
+        value = Ok(sent[parameter.location][parameter.name])
+        extracted = ExtractedParam(definition=parameter.expression, value=value, is_required=True)
         parameters.setdefault(container, {})[parameter.name] = extracted
     request_body = (
         ExtractedParam(definition=link.request_body, value=Ok(None), is_required=True)
@@ -105,7 +108,9 @@ def crash_factory(ctx, response_factory):
             body=step.case_body,
             media_type=step.media_type,
         )
-        transition = _build_transition(link=step.link, parent_id=parent_id) if step.link is not None else None
+        transition = (
+            _build_transition(step=step, link=step.link, parent_id=parent_id) if step.link is not None else None
+        )
         recorder.record_case(
             parent_id=parent_id,
             case=case,

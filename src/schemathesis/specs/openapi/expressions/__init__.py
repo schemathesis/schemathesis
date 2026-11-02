@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from schemathesis.core import NOT_SET
 from schemathesis.core.deserialization import DeserializationContext, deserialize_response
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer_all, to_wire_text
 from schemathesis.generation.stateful.state_machine import StepOutput
@@ -68,6 +69,21 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
         if matches:
             return MultiMatch(matches)
     return UNRESOLVABLE
+
+
+def prefer_recorded(value: object, recorded: object) -> object:
+    """`value` with each wildcard match narrowed to `recorded` when it is among the matches, else to the first one."""
+    if isinstance(value, MultiMatch):
+        return recorded if recorded in value.values else value.values[0]
+    if isinstance(value, dict):
+        fields = recorded if isinstance(recorded, dict) else {}
+        return {key: prefer_recorded(item, fields.get(key, NOT_SET)) for key, item in value.items()}
+    if isinstance(value, list):
+        items = recorded if isinstance(recorded, list) else []
+        return [
+            prefer_recorded(item, items[index] if index < len(items) else NOT_SET) for index, item in enumerate(value)
+        ]
+    return value
 
 
 def body_pointers(expressions: object) -> list[str]:
