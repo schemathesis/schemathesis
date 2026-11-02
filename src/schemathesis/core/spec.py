@@ -234,6 +234,10 @@ class ApiSchema(SchemaMetadata, Protocol):
 
     def status_name_for_code(self, status_code: int) -> str | None: ...  # pragma: no cover
 
+    def is_response_status_expected(
+        self, response: Response, expected_statuses: list[str]
+    ) -> bool: ...  # pragma: no cover
+
     def hash_case(self, case: Case) -> int: ...  # pragma: no cover
 
     def prepare_multipart(

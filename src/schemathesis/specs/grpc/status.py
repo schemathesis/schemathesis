@@ -39,6 +39,7 @@ GRPC_STATUSES: dict[int, GrpcStatus] = {
     15: GrpcStatus("DATA_LOSS", 500, CallOutcome.UNINFORMATIVE),
     16: GrpcStatus("UNAUTHENTICATED", 401, CallOutcome.UNINFORMATIVE),
 }
+GRPC_STATUS_CODES_BY_NAME = {status.name: code for code, status in GRPC_STATUSES.items()}
 
 _HTTP_STATUS_COUNTS = Counter(status.http_status for status in GRPC_STATUSES.values())
 # Only an HTTP status that stands for exactly one gRPC status names it; 409 and 500 stand for several.

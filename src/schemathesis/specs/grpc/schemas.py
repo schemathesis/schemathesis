@@ -47,7 +47,7 @@ from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.transport import CallOutcome, Response
+from schemathesis.core.transport import CallOutcome, Response, expand_status_code
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
@@ -87,6 +87,7 @@ from schemathesis.specs.grpc.stateful import (
     with_value,
 )
 from schemathesis.specs.grpc.status import (
+    GRPC_STATUS_CODES_BY_NAME,
     GRPC_STATUSES,
     INTERNAL,
     LIBRARY_DECODE_ERRORS,
@@ -319,6 +320,22 @@ class GrpcSchema(BaseSchema):
     @override
     def status_name_for_code(self, status_code: int) -> str | None:
         return STATUS_NAMES_BY_HTTP_STATUS.get(status_code)
+
+    @override
+    def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
+        invalid = [
+            status
+            for status in expected_statuses
+            if status not in GRPC_STATUS_CODES_BY_NAME and not expand_status_code(status)
+        ]
+        if invalid:
+            self._raise_invalid_status_values(invalid)
+        status = grpc_status(response)
+        if any(GRPC_STATUS_CODES_BY_NAME.get(expected) == status for expected in expected_statuses):
+            return True
+        return super().is_response_status_expected(
+            response, [expected for expected in expected_statuses if expected not in GRPC_STATUS_CODES_BY_NAME]
+        )
 
     @override
     def operation_label_for_display(self, operation_label: str | None) -> str | None:

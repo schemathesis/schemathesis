@@ -8,7 +8,8 @@ import yaml
 from flask import jsonify
 
 import schemathesis
-from schemathesis.config import SchemathesisConfig
+from schemathesis.checks import not_a_server_error
+from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
@@ -2719,6 +2720,16 @@ def test_positive_data_acceptance_passes_for_rate_limiting(response_factory, sam
     # A throttle refuses the request without judging its data.
     case = sample_schema["/test"]["POST"].Case(_meta=build_metadata())
     assert positive_data_acceptance(check_context(), response_factory.requests(status_code=429), case) is None
+
+
+def test_grpc_status_name_is_invalid_for_openapi(ctx):
+    api = ctx.openapi.apps.failure()
+    operation = schemathesis.openapi.from_url(api.schema_url)["/api/failure"]["GET"]
+    case = operation.Case()
+    response = case.call()
+    with pytest.raises(ConfigError, match="Invalid status value `UNAVAILABLE` for Open API"):
+        config = ChecksConfig.from_dict({"not_a_server_error": {"expected-statuses": ["UNAVAILABLE"]}})
+        not_a_server_error(check_context(config), response, case)
 
 
 @pytest.mark.parametrize(
