@@ -6,6 +6,8 @@
 
 - Traceback when `--tls-verify` points to a missing CA bundle.
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
+- Slow, memory-hungry data generation for schemas whose objects refer to themselves several times.
+- `filter_too_much` health check on recursive schemas with low `--max-examples` or a reused example database.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
 - Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.

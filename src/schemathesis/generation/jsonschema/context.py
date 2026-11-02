@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
 
+    from schemathesis.generation.jsonschema.strategy import _Node
+
 
 @dataclass(slots=True, frozen=True)
 class Alphabet:
@@ -80,7 +82,7 @@ class StrategyContext:
     formats: dict[str, SearchStrategy] = field(default_factory=dict)
     # What each generator above reaches, where the caller knows it.
     format_lengths: dict[str, FormatLengths] = field(default_factory=dict)
-    cache: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
+    cache: dict[jsonschema_rs.CanonicalSchema, _Node] = field(default_factory=dict)
     # Placeholders for the pointer targets currently being built, by URI.
     pending: dict[str, SearchStrategy] = field(default_factory=dict)
     # Whether a pointer led back into a value still being built.

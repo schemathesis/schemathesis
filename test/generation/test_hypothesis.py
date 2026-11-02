@@ -2825,6 +2825,104 @@ def test_canonical_recursion_is_drawn_at_any_depth(node):
     find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
 
 
+DEEP_RECURSIVE_SHAPES = [
+    {
+        "type": "object",
+        "properties": {
+            "left": {"$ref": "#/$defs/node"},
+            "middle": {"$ref": "#/$defs/node"},
+            "right": {"$ref": "#/$defs/node"},
+            "name": {"type": "string"},
+        },
+    },
+    {
+        "type": "object",
+        "properties": {"all": {"$ref": "#/$defs/list"}, "any": {"$ref": "#/$defs/list"}, "expr": {"type": "string"}},
+        "additionalProperties": False,
+        "allOf": [{"oneOf": [{"required": ["all"]}, {"required": ["any"]}, {"required": ["expr"]}]}],
+    },
+    {"anyOf": [{"type": "integer"}, {"type": "array", "items": {"$ref": "#/$defs/node"}, "minItems": 1}]},
+    # Every name is needed to reach the floor, the one leading back included.
+    {
+        "type": "object",
+        "propertyNames": {"enum": ["other", "name"]},
+        "properties": {"other": {"$ref": "#/$defs/other"}, "name": {"type": "string"}},
+        "minProperties": 2,
+    },
+]
+
+
+@pytest.mark.parametrize(
+    "node",
+    [*RECURSIVE_SHAPES, *DEEP_RECURSIVE_SHAPES],
+    ids=[str(shape) for shape in [*RECURSIVE_SHAPES, *DEEP_RECURSIVE_SHAPES]],
+)
+def test_canonical_recursion_never_abandons_draws_at_max_depth(node):
+    # Abandoned draws count against the filter health check and end a run with few examples.
+    schema = {
+        "$ref": "#/$defs/node",
+        "$defs": {
+            "node": node,
+            "other": {"type": "object", "properties": {"back": {"$ref": "#/$defs/node"}}},
+            "list": {
+                "type": "object",
+                "required": ["of"],
+                "properties": {"of": {"type": "array", "items": {"$ref": "#/$defs/node"}, "minItems": 1}},
+            },
+        },
+    }
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    reasons = []
+
+    @given(built)
+    @settings(max_examples=100, database=None, derandomize=True, phases=[Phase.generate], deadline=None)
+    def test(value):
+        pass
+
+    with with_observability_callback(
+        lambda observation: reasons.append(observation.status_reason) if observation.type == "test_case" else None
+    ):
+        test()
+
+    assert "max depth exceeded" not in reasons
+
+
+def test_canonical_recursion_shrinks_to_the_smallest_value():
+    leaf = {
+        "type": "object",
+        "required": ["lit"],
+        "properties": {"lit": {"type": "integer"}},
+        "additionalProperties": False,
+    }
+    operation = {
+        "type": "object",
+        "required": ["op", "l", "r"],
+        "properties": {"op": {"enum": ["+", "*"]}, "l": {"$ref": "#/$defs/e"}, "r": {"$ref": "#/$defs/e"}},
+        "additionalProperties": False,
+    }
+    schema = {"$ref": "#/$defs/e", "$defs": {"e": {"oneOf": [leaf, operation]}}}
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+    def depth(value):
+        if isinstance(value, dict):
+            return 1 + max((depth(item) for item in value.values()), default=0)
+        return 0
+
+    found = find(
+        built, lambda value: depth(value) >= 5, settings=settings(max_examples=2000, database=None, derandomize=True)
+    )
+
+    assert found == {
+        "l": {"lit": 0},
+        "op": "*",
+        "r": {
+            "l": {"lit": 0},
+            "op": "*",
+            "r": {"l": {"lit": 0}, "op": "*", "r": {"l": {"lit": 0}, "op": "*", "r": {"lit": 0}}},
+        },
+    }
+
+
 def test_canonical_negated_recursive_additional_properties():
     schema = {
         "type": "object",
