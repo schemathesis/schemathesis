@@ -2584,6 +2584,8 @@ class OpenApiParameterSet(ParameterSet):
             self.get_schema_with_exclusions(exclude), operation, self.location, feedback.error_feedback
         )
         captured = _captured_variants(feedback.extra_data_source, operation, self.location, schema)
+        if captured is not None and self.location == ParameterLocation.PATH:
+            captured = self._fit_for_path(*captured)
         if captured is not None and generation_mode.is_negative:
             # Mostly reuse captured values to reach deeper application logic, with occasional negative cases.
             strategy = self._build_negative_aware_strategy(
@@ -2610,6 +2612,20 @@ class OpenApiParameterSet(ParameterSet):
         if cache_key is not None and not consumes_captured:
             self._strategy_cache[cache_key] = strategy
         return strategy
+
+    def _fit_for_path(
+        self, variants: list[CapturedVariant], usage_tracker: VariantUsageTracker
+    ) -> tuple[list[CapturedVariant], VariantUsageTracker] | None:
+        """Drop captured values that a path segment can't carry, e.g. ids holding a `/`."""
+        from schemathesis.openapi.generation.filters import is_valid_path
+
+        allowed = _get_explicit_intent_path_names(parameters=self.items)
+        fitting = [
+            variant
+            for variant in variants
+            if is_valid_path(_quote_all_safe(cast("dict[str, Any]", variant.overlay)), allow_encoded_slash_for=allowed)
+        ]
+        return (fitting, usage_tracker) if fitting else None
 
     def _build_strategy(
         self,
