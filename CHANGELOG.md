@@ -7,6 +7,7 @@
 - Traceback when `--tls-verify` points to a missing CA bundle.
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
+- gRPC services in files another package imports skipped silently and unselectable with `--include-name`.
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
 - Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.
 - Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.

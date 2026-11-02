@@ -44,6 +44,7 @@ def test_services_expose_unary_methods(schema):
     assert {service: (len(schema[service]), list(schema[service])) for service in schema} == {
         "pkg.Users": (1, ["GetUser"]),
         "pkg.Admin": (1, ["Reset"]),
+        "google.longrunning.Operations": (1, ["GetOperation"]),
     }
 
 
@@ -142,7 +143,10 @@ def test_missing_method(schema, method, message):
     [
         (lambda schema: schema.include(name="pkg.Admin/Reset"), ["pkg.Admin/Reset"]),
         (lambda schema: schema.include(path="/pkg.Users/GetUser"), ["pkg.Users/GetUser"]),
-        (lambda schema: schema.include(method="POST"), ["pkg.Users/GetUser", "pkg.Admin/Reset"]),
+        (
+            lambda schema: schema.include(method="POST"),
+            ["pkg.Users/GetUser", "pkg.Admin/Reset", "google.longrunning.Operations/GetOperation"],
+        ),
         (lambda schema: schema.include(tag="pkg.Users"), ["pkg.Users/GetUser"]),
         (lambda schema: schema.include(operation_id="GetUser"), []),
         (lambda schema: schema.exclude(deprecated=True), ["pkg.Admin/Reset"]),
@@ -156,11 +160,11 @@ def test_filters(schema, narrow, expected):
 @pytest.mark.parametrize(
     ("narrow", "expected"),
     [
-        (lambda schema: schema, (3, 2, [])),
+        (lambda schema: schema, (4, 2, [])),
         (
             lambda schema: schema.include(name="pkg.Admin/Rest"),
             (
-                3,
+                4,
                 0,
                 [
                     UnmatchedFilter(
@@ -172,7 +176,7 @@ def test_filters(schema, narrow, expected):
                 ],
             ),
         ),
-        (lambda schema: schema.include(name="pkg.Users/WatchUsers"), (3, 0, [])),
+        (lambda schema: schema.include(name="pkg.Users/WatchUsers"), (4, 0, [])),
     ],
     ids=["streaming-unselected", "unmatched-filter", "filter-naming-streaming-method"],
 )
@@ -243,9 +247,59 @@ def users_files():
     return list(descriptor_pb2.FileDescriptorSet.FromString(users_descriptor_set()).file)
 
 
+def with_buf_image_marker(file, is_import):
+    if is_import is None:
+        return file
+    # `buf build` appends field 8042 to each file of an image; its field 1 is `is_import`.
+    marker = b"\xd2\xf6\x03\x04\x08" + bytes([is_import]) + b"\x18\x00"
+    return descriptor_pb2.FileDescriptorProto.FromString(file.SerializeToString() + marker)
+
+
+def imported_services_files(users_is_import, orders_is_import):
+    users = descriptor_pb2.FileDescriptorProto(name="users.proto", package="users", syntax="proto3")
+    users.message_type.add(name="GetUserRequest")
+    users.message_type.add(name="User")
+    users.service.add(name="UserService").method.add(
+        name="GetUser", input_type=".users.GetUserRequest", output_type=".users.User"
+    )
+    orders = descriptor_pb2.FileDescriptorProto(
+        name="orders.proto", package="orders", syntax="proto3", dependency=[users.name]
+    )
+    orders.message_type.add(name="Order")
+    orders.service.add(name="OrderService").method.add(
+        name="CreateOrder", input_type=".users.GetUserRequest", output_type=".orders.Order"
+    )
+    return [with_buf_image_marker(users, users_is_import), with_buf_image_marker(orders, orders_is_import)]
+
+
 def test_files_load_in_any_order(tmp_path):
     schema = schemathesis.grpc.from_path(write_files(tmp_path, users_files()[::-1]))
     assert [result.ok().label for result in schema.get_all_operations()] == ["pkg.Users/GetUser", "pkg.Admin/Reset"]
+
+
+@pytest.mark.parametrize(
+    ("users_is_import", "orders_is_import", "expected"),
+    [
+        (False, False, ["users.UserService/GetUser", "orders.OrderService/CreateOrder"]),
+        (True, False, ["orders.OrderService/CreateOrder"]),
+        (None, None, ["orders.OrderService/CreateOrder"]),
+    ],
+    ids=["buf-module", "buf-import", "protoc"],
+)
+def test_services_of_first_party_imported_files(tmp_path, users_is_import, orders_is_import, expected):
+    schema = schemathesis.grpc.from_path(
+        write_files(tmp_path, imported_services_files(users_is_import, orders_is_import))
+    )
+    assert [result.ok().label for result in schema.get_all_operations()] == expected
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (2, len(expected))
+
+    selected = schema.include(name="users.UserService/GetUser")
+    assert [result.ok().label for result in selected.get_all_operations()] == ["users.UserService/GetUser"]
+    assert (
+        selected.statistic.operations.total,
+        selected.statistic.operations.selected,
+        selected.statistic.unmatched_filters,
+    ) == (2, 1, [])
 
 
 @pytest.mark.parametrize(
@@ -264,7 +318,7 @@ def test_services_of_imported_files(tmp_path, package, expected):
         name="Reset", input_type=".google.longrunning.GetOperationRequest", output_type=".google.longrunning.Operation"
     )
     schema = schemathesis.grpc.from_path(write_files(tmp_path, [empty, store, operations, any_file, root]))
-    assert sorted(schema.services) == expected
+    assert sorted({result.ok().label.partition("/")[0] for result in schema.get_all_operations()}) == expected
 
 
 def unresolvable_type_name(files):

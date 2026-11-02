@@ -192,6 +192,8 @@ class GrpcSchema(BaseSchema):
     pool: descriptor_pool.DescriptorPool = field(default_factory=descriptor_pool.DescriptorPool)
     # Tested services by full name, in declaration order.
     services: dict[str, ServiceDescriptor] = field(default_factory=dict)
+    # Services of files imported from other APIs, tested only when a filter selects them explicitly.
+    imported_services: frozenset[str] = frozenset()
     _transport: GrpcTransport | None = None
 
     def __repr__(self) -> str:
@@ -203,6 +205,7 @@ class GrpcSchema(BaseSchema):
         # Descriptors never change, so clones share them.
         cloned.pool = self.pool
         cloned.services = self.services
+        cloned.imported_services = self.imported_services
         return cloned
 
     @property
@@ -467,6 +470,15 @@ class GrpcSchema(BaseSchema):
         method = operation.definition.raw
         service = method.containing_service
         return method.GetOptions().deprecated or service.GetOptions().deprecated or service.file.GetOptions().deprecated
+
+    @override
+    def _should_skip(self, operation: APIOperation) -> bool:
+        if (
+            operation.definition.raw.containing_service.full_name in self.imported_services
+            and not self.filter_set.is_explicitly_included(operation)
+        ):
+            return True
+        return super()._should_skip(operation)
 
     @override
     def _measure_statistic(self) -> ApiStatistic:
