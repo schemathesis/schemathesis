@@ -28,12 +28,15 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import (
+    HTTP_STATUS_CODES_BY_CLASS,
     CallOutcome,
     HttpMethod,
     HttpMethodSchema,
     Response,
+    StatusClass,
     expand_status_code,
     expand_status_codes,
+    http_status_class,
     is_uninformative_status,
 )
 from schemathesis.generation import GenerationMode
@@ -757,8 +760,16 @@ class BaseSchema(Mapping):
         return None
 
     def status_name_for_code(self, status_code: int) -> str | None:
-        """Name the protocol gives the status an HTTP status code stands for, or `None` when the code alone says it."""
+        """Name the protocol gives a status code, or `None` when the code alone says it."""
         return None
+
+    def classify_status(self, status_code: int) -> StatusClass:
+        """What a response status code says about the call."""
+        return http_status_class(status_code)
+
+    def status_code_for(self, status_class: StatusClass) -> int:
+        """The status code the protocol answers with for a status class only one code stands for."""
+        return HTTP_STATUS_CODES_BY_CLASS[status_class]
 
     def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
         """Whether the response has a status described by one of the specification's configured status entries."""

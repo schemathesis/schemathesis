@@ -20,7 +20,6 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
 from schemathesis.specs.grpc.schemas import MEDIA_TYPE, parse_target, prepare_call_kwargs, request_metadata
-from schemathesis.specs.grpc.status import GRPC_STATUSES
 from schemathesis.transport import BaseTransport, SerializationContext
 
 if TYPE_CHECKING:
@@ -182,7 +181,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                     return None
 
         return Response(
-            status_code=GRPC_STATUSES[code.value[0]].http_status,
+            status_code=code.value[0],
             headers=response_headers,
             content=content,
             request=request,

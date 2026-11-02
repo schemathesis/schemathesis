@@ -476,6 +476,7 @@ def _extraction_notes(ctx: BaseExecutionContext) -> list[ExtractionNote]:
             reason=extraction_failure_reason(failure),
             commands=_extraction_commands(failure),
             status_code=failure.response.status_code,
+            status_line=failure.response.status_line,
             body=format_response_payload(failure.response, config=ctx.config.output),
         )
         for failure in ctx.statistic.extraction_failures

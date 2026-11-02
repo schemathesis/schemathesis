@@ -28,6 +28,7 @@ from schemathesis.openapi.checks import (
     UnsupportedMethodResponse,
     UseAfterFree,
 )
+from test.apps.catalog.grpc.descriptors import load_descriptor_set, users_descriptor_set
 
 WFC_DATA = resources.files("webfuzzing_commons").joinpath("data")
 WFC_REPORT_SCHEMA = yaml.safe_load(WFC_DATA.joinpath("report.yaml").read_text(encoding="utf-8"))
@@ -504,18 +505,19 @@ def test_object_level_authorization_context_names_both_peers():
     ("failure", "description"),
     [
         (
-            ServerError(operation=OPERATION, status_code=500, status_name="DATA_LOSS"),
-            "ServerError: Server error (status 500 DATA_LOSS)",
+            ServerError(operation=OPERATION, status_code=15, status_name="DATA_LOSS"),
+            "ServerError: Server error (status 15 DATA_LOSS)",
         ),
         (
-            UndecodableGrpcRequest(operation=OPERATION, status_code=500, status_name="INTERNAL"),
-            "UndecodableGrpcRequest: Server could not decode the request (status 500 INTERNAL)",
+            UndecodableGrpcRequest(operation=OPERATION, status_code=13, status_name="INTERNAL"),
+            "UndecodableGrpcRequest: Server could not decode the request (status 13 INTERNAL)",
         ),
     ],
     ids=["server-error", "undecodable-grpc-request"],
 )
-def test_server_error_context_names_the_protocol_status(failure, description):
-    assert fault_category(failure) == (100, description)
+def test_server_error_context_names_the_protocol_status(tmp_path, failure, description):
+    schema = load_descriptor_set(tmp_path, users_descriptor_set())
+    assert fault_category(failure, schema.classify_status) == (100, description)
 
 
 def test_declared_auth_not_enforced_context_names_the_scenario():

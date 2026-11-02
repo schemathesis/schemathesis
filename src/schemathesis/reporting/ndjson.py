@@ -32,7 +32,7 @@ TextOutput = IO[str] | StringIO | Path
 SKIP_FIELDS: dict[str, frozenset[str]] = {
     # `location` and `base_url` can hold credentials or query-string tokens; the generic
     # dataclass serializer doesn't run them through `sanitize_url`, so skip them entirely.
-    # `base_path` is dropped alongside for consistency. `find_operation_by_label` and `status_name_for_code` are callables.
+    # `base_path` is dropped alongside for consistency. `find_operation_by_label` and the status lookups are callables.
     "LoadingStarted": frozenset({"location"}),
     "LoadingFinished": frozenset(
         {
@@ -41,6 +41,8 @@ SKIP_FIELDS: dict[str, frozenset[str]] = {
             "config",
             "find_operation_by_label",
             "status_name_for_code",
+            "classify_status",
+            "status_code_for",
             "location",
             "base_url",
             "base_path",

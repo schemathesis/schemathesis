@@ -52,7 +52,7 @@ def test_ok_response(ctx):
         response.request.method,
         response.request.url,
     ) == (
-        200,
+        0,
         "OK",
         {
             "x-served-by": ["users"],
@@ -69,7 +69,7 @@ def test_ok_response(ctx):
 def test_internal_error(ctx):
     _, response = get_user(ctx.grpc.apps.users(), -1)
     assert (response.status_code, response.status_line, response.headers, response.content) == (
-        500,
+        13,
         "INTERNAL: negative id",
         {"grpc-status": ["13"], "grpc-message": ["negative id"]},
         b"",
@@ -80,15 +80,15 @@ def test_unparsable_status_leaves_later_responses_intact(ctx):
     operation = load(ctx.grpc.apps.echo_status())["pkg.Users"]["GetUser"]
     responses = [operation.Case(body={"userId": user_id}).call() for user_id in (-1, 5)]
     assert [(response.status_code, response.status_line) for response in responses] == [
-        (500, "INTERNAL: Stream removed (Error parsing 'grpc-status' metadata)"),
-        (404, "NOT_FOUND"),
+        (13, "INTERNAL: Stream removed (Error parsing 'grpc-status' metadata)"),
+        (5, "NOT_FOUND"),
     ]
 
 
 def test_ok_without_a_message_is_an_internal_error(ctx):
     response = load(ctx.grpc.apps.echo_status())["pkg.Users"]["GetUser"].Case(body={"userId": 0}).call()
     assert (response.status_code, response.status_line, response.headers, response.content) == (
-        500,
+        13,
         "INTERNAL: cardinality violation: received no response message from non-server-streaming RPC",
         {
             "grpc-status": ["13"],
@@ -101,7 +101,7 @@ def test_ok_without_a_message_is_an_internal_error(ctx):
 def test_large_error_trailers(ctx):
     _, response = get_user(ctx.grpc.apps.users(), 400)
     assert (response.status_code, response.status_line, response.headers) == (
-        400,
+        3,
         "INVALID_ARGUMENT: invalid",
         {"x-details": ["x" * 65536], "grpc-status": ["3"], "grpc-message": ["invalid"]},
     )
@@ -128,7 +128,7 @@ def test_malformed_ok_body_is_reported_as_binary(ctx):
 
 @pytest.mark.parametrize(
     ("user_id", "expected"),
-    [(503, (503, "UNAVAILABLE")), (504, (504, "DEADLINE_EXCEEDED: upstream timed out"))],
+    [(503, (14, "UNAVAILABLE")), (504, (4, "DEADLINE_EXCEEDED: upstream timed out"))],
     ids=["unavailable", "deadline-exceeded"],
 )
 def test_server_sent_status_is_a_response(ctx, user_id, expected):
@@ -172,7 +172,7 @@ def test_server_unavailable_once_the_target_refuses_connections_is_a_connection_
 def test_status_code_agrees_with_call_outcome(ctx):
     case, response = get_user(ctx.grpc.apps.users(), 9)
     assert (response.status_code, case.operation.schema.classify_call_outcome(case, response)) == (
-        409,
+        9,
         CallOutcome.CONFLICT,
     )
 
@@ -466,4 +466,4 @@ def test_observed_fields_are_filled(ctx, tmp_path):
     for observation in parse_observations(operation, rejected, rejected.call()):
         store.record(observation)
     cases = generate_many(operation.as_strategy(feedback=FeedbackSources(error_feedback=store)), 20)
-    assert [case.call().status_code for case in cases] == [200] * 20
+    assert [case.call().status_code for case in cases] == [0] * 20

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.statistic import ApiStatistic, StatefulInference
-    from schemathesis.core.transport import CallOutcome, HttpMethod, Response
+    from schemathesis.core.transport import CallOutcome, HttpMethod, Response, StatusClass
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
@@ -233,6 +233,10 @@ class ApiSchema(SchemaMetadata, Protocol):
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome: ...  # pragma: no cover
 
     def status_name_for_code(self, status_code: int) -> str | None: ...  # pragma: no cover
+
+    def classify_status(self, status_code: int) -> StatusClass: ...  # pragma: no cover
+
+    def status_code_for(self, status_class: StatusClass) -> int: ...  # pragma: no cover
 
     def is_response_status_expected(
         self, response: Response, expected_statuses: list[str]

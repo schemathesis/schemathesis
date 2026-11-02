@@ -4,7 +4,7 @@ import pytest
 import requests
 from werkzeug.test import Client
 
-from schemathesis.core.transport import Response, expand_status_code
+from schemathesis.core.transport import Response, StatusClass, expand_status_code, http_status_class
 
 
 @pytest.mark.parametrize(
@@ -22,6 +22,24 @@ from schemathesis.core.transport import Response, expand_status_code
 )
 def test_expand_status_code(value, expected):
     assert expand_status_code(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [
+        (101, StatusClass.OTHER),
+        (204, StatusClass.SUCCESS),
+        (302, StatusClass.REDIRECT),
+        (422, StatusClass.CLIENT_ERROR),
+        (429, StatusClass.RATE_LIMITED),
+        (500, StatusClass.INTERNAL_ERROR),
+        (503, StatusClass.SERVER_ERROR),
+        (600, StatusClass.OTHER),
+    ],
+    ids=["informational", "success", "redirect", "client-error", "rate-limited", "internal", "server-error", "beyond"],
+)
+def test_http_status_class(status_code, expected):
+    assert http_status_class(status_code) is expected
 
 
 @pytest.mark.parametrize(

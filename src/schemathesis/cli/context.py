@@ -10,6 +10,7 @@ from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.config import ConfigError, ReportFormat
 from schemathesis.core.failures import RUN_CHECKS_LABEL
+from schemathesis.core.transport import HTTP_STATUS_CODES_BY_CLASS, StatusClass, http_status_class
 from schemathesis.engine import StopReason, events
 from schemathesis.engine.statistic import Statistic
 from schemathesis.engine.summary import SummaryData, WarningData
@@ -28,6 +29,8 @@ class BaseExecutionContext:
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None] | None = None
     status_name_for_code: Callable[[int], str | None] | None = None
+    classify_status: Callable[[int], StatusClass] = http_status_class
+    status_code_for: Callable[[StatusClass], int] = HTTP_STATUS_CODES_BY_CLASS.__getitem__
     specification: Specification | None = None
     api_statistic: ApiStatistic | None = None
     statistic: Statistic = field(default_factory=Statistic)
@@ -99,6 +102,8 @@ class BaseExecutionContext:
         if isinstance(event, LoadingFinished):
             self.find_operation_by_label = event.find_operation_by_label
             self.status_name_for_code = event.status_name_for_code
+            self.classify_status = event.classify_status
+            self.status_code_for = event.status_code_for
             self.specification = event.specification
             self.api_statistic = event.statistic
             self.warning_collector.on_unmatched_filters(event.statistic)

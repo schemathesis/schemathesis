@@ -14,7 +14,7 @@ from schemathesis.core.rate_limit import (
     RATE_LIMIT_AUTO_REPORT_THRESHOLD,
     parse_retry_after,
 )
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, StatusClass
 from schemathesis.engine import events
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.control import BudgetExpired
@@ -49,18 +49,19 @@ def _call_with_retry(
     call_fn: Callable[[], Response],
     auto_mode: bool,
     on_delay: Callable[[float, int], None],
+    classify_status: Callable[[int], StatusClass],
 ) -> tuple[list[Response], Response]:
-    """Call an API, retrying on 429 + Retry-After.
+    """Call an API, retrying rate-limited responses that carry Retry-After.
 
     Returns (rate_limited_responses, final_response).
-    rate_limited_responses contains each 429 received before the final response.
+    rate_limited_responses contains each rate-limited response received before the final response.
     """
     retries_left = RATE_LIMIT_AUTO_MAX_RETRIES
     rate_limited: list[Response] = []
 
     while True:
         response = call_fn()
-        if response.status_code == 429 and auto_mode and retries_left > 0:
+        if auto_mode and retries_left > 0 and classify_status(response.status_code) is StatusClass.RATE_LIMITED:
             delay = parse_retry_after(_get_retry_after(response))
             if delay is not None:
                 rate_limited.append(response)
@@ -122,10 +123,15 @@ def send_tracked(
         emit(events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left))
 
     auto_mode = ctx.config.rate_limit_for(operation=case.operation) == "auto"
-    rate_limited, response = _call_with_retry(call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay)
+    classify_status = case.operation.schema.classify_status
+    rate_limited, response = _call_with_retry(
+        call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay, classify_status=classify_status
+    )
 
     def replay() -> Response:
-        retried, replayed = _call_with_retry(call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay)
+        retried, replayed = _call_with_retry(
+            call_fn=call_fn, auto_mode=auto_mode, on_delay=on_delay, classify_status=classify_status
+        )
         rate_limited.extend(retried)
         return replayed
 

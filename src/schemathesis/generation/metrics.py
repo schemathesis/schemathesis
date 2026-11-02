@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Response, StatusClass
 from schemathesis.generation.case import Case
 
 
@@ -53,8 +53,8 @@ def response_time(ctx: MetricContext) -> float:
 
 
 def success_rate(ctx: MetricContext) -> float:
-    """Return 1.0 for 2xx responses, 0.0 otherwise."""
-    return 1.0 if 200 <= ctx.response.status_code < 300 else 0.0
+    """Return 1.0 for successful responses, 0.0 otherwise."""
+    return 1.0 if ctx.case.operation.schema.classify_status(ctx.response.status_code) is StatusClass.SUCCESS else 0.0
 
 
 class MetricCollector:

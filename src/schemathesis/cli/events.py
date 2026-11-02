@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from schemathesis.config import ProjectConfig
 from schemathesis.core import Specification
 from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.transport import StatusClass
 from schemathesis.engine import events
 from schemathesis.schemas import APIOperation, BaseSchema
 
@@ -38,6 +39,8 @@ class LoadingFinished(events.EngineEvent):
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None]
     status_name_for_code: Callable[[int], str | None]
+    classify_status: Callable[[int], StatusClass]
+    status_code_for: Callable[[StatusClass], int]
 
     __slots__ = (
         "id",
@@ -53,6 +56,8 @@ class LoadingFinished(events.EngineEvent):
         "config",
         "find_operation_by_label",
         "status_name_for_code",
+        "classify_status",
+        "status_code_for",
     )
 
     def __init__(
@@ -69,6 +74,8 @@ class LoadingFinished(events.EngineEvent):
         config: ProjectConfig,
         find_operation_by_label: Callable[[str], APIOperation | None],
         status_name_for_code: Callable[[int], str | None],
+        classify_status: Callable[[int], StatusClass],
+        status_code_for: Callable[[StatusClass], int],
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -83,6 +90,8 @@ class LoadingFinished(events.EngineEvent):
         self.config = config
         self.find_operation_by_label = find_operation_by_label
         self.status_name_for_code = status_name_for_code
+        self.classify_status = classify_status
+        self.status_code_for = status_code_for
 
     @classmethod
     def from_schema(cls, schema: BaseSchema, *, location: str, start_time: float, base_url: str) -> LoadingFinished:
@@ -98,4 +107,6 @@ class LoadingFinished(events.EngineEvent):
             config=schema.config,
             find_operation_by_label=schema.find_operation_by_label,
             status_name_for_code=schema.status_name_for_code,
+            classify_status=schema.classify_status,
+            status_code_for=schema.status_code_for,
         )
