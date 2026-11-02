@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from schemathesis.core.failures import group_failures, reproducible_by_identity
 from schemathesis.core.output import format_response_payload
+from schemathesis.core.transport import StatusClass, http_status_class
 from schemathesis.reporting.html.model import Command, FailingCase, FailureEntry, OperationStatus, split_label
 
 if TYPE_CHECKING:
@@ -11,7 +13,13 @@ if TYPE_CHECKING:
     from schemathesis.engine.statistic import GroupedFailures
 
 
-def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | None) -> FailingCase:
+def failing_case(
+    group: GroupedFailures,
+    *,
+    config: OutputConfig,
+    replay: str | None,
+    classify_status: Callable[[int], StatusClass] = http_status_class,
+) -> FailingCase:
     response = group.response
     return FailingCase(
         case_id=group.case_id,
@@ -26,6 +34,7 @@ def failing_case(group: GroupedFailures, *, config: OutputConfig, replay: str | 
         ],
         status_code=response.status_code if response is not None else None,
         status_line=response.status_line if response is not None else None,
+        status_class=classify_status(response.status_code) if response is not None else None,
         body=format_response_payload(response, config=config) if response is not None else None,
         commands=_commands(group),
         replay=replay,

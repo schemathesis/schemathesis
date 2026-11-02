@@ -34,6 +34,7 @@ from schemathesis.reporting.html.timeline import (
 
 if TYPE_CHECKING:
     from schemathesis.core.failures import Severity
+    from schemathesis.core.transport import StatusClass
     from schemathesis.engine.summary import WarningBlock, WarningGroup, WarningItem
     from schemathesis.reporting.html.model import ErrorEntry, FailingCase, OperationRow, ReportData
 
@@ -286,7 +287,9 @@ def _extraction_failures(data: ReportData) -> str:
         parts = [
             f'<div class="case-owner"><span class="ex-link">{esc(failure.link)}</span></div>',
             f'<div class="finding"><h4 class="finding-title">{_code_spans(title)}</h4>{details}</div>',
-            _evidence("Response", _body(failure.body), _status(failure.status_code, failure.status_line)),
+            _evidence(
+                "Response", _body(failure.body), _status(failure.status_code, failure.status_line, failure.status_class)
+            ),
             _reproduce(failure.commands, None),
             _evidence("Tip", f'<p class="tip">{_EXTRACTION_TIP}</p>'),
         ]
@@ -757,9 +760,16 @@ def _anchor(label: str, taken: set[str]) -> str:
     return anchor
 
 
-def _status(code: int, status_line: str | None = None) -> str:
+def _status(code: int, status_line: str | None, status_class: StatusClass | None) -> str:
     if status_line is not None:
-        return f'<span class="status">{esc(status_line)}</span>'
+        name, separator, message = status_line.partition(":")
+        if status_class is not None and status_class.is_server_error:
+            severity = " s5xx"
+        elif status_class is not None and status_class.is_client_error:
+            severity = " s4xx"
+        else:
+            severity = ""
+        return f'<span class="status{severity}"><span class="status-code">{esc(name)}</span>{esc(separator + message)}</span>'
     return f'<span class="status s{code // 100}xx"><span class="status-code">{code}</span> {esc(reason_phrase(code))}</span>'
 
 
@@ -822,7 +832,9 @@ def _failing_case(case: FailingCase, owner: str = "", filters: str = "") -> str:
             f"{messages}</div>"
         )
     if case.status_code is not None and case.body is not None:
-        parts.append(_evidence("Response", _body(case.body), _status(case.status_code, case.status_line)))
+        parts.append(
+            _evidence("Response", _body(case.body), _status(case.status_code, case.status_line, case.status_class))
+        )
     if case.commands:
         parts.append(_reproduce(case.commands, case.replay))
     meta = ""

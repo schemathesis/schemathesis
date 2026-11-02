@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.output.sanitization import sanitized
+from schemathesis.core.transport import StatusClass, http_status_class
 from schemathesis.engine import Status, StopReason
 from schemathesis.engine.statistic import GroupedFailures, Statistic
 from schemathesis.engine.summary import (
@@ -18,12 +19,14 @@ from schemathesis.engine.summary import (
     reduce_failures,
     reduce_test_cases,
 )
+from schemathesis.generation.case import Case
 from schemathesis.reporting.html import write_report
 from schemathesis.reporting.html.build import failing_case, failure_titles, operation_status
 from schemathesis.reporting.html.model import ErrorEntry, OperationRow, OperationStatus, ReportData, ReportMeta
 from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from schemathesis.config import OutputConfig
@@ -38,6 +41,7 @@ class _Operation:
     errors: list[ErrorEntry] = field(default_factory=list)
     skip_reasons: set[str] = field(default_factory=set)
     ran: bool = False
+    classify_status: Callable[[int], StatusClass] = http_status_class
 
 
 class HtmlWriter:
@@ -77,6 +81,10 @@ class HtmlWriter:
         label = recorder.label
         operation = self._operations.setdefault(label, _Operation())
         operation.cases += len(recorder.cases)
+        case = next(iter(recorder.cases.values())).value if recorder.cases else None
+        # Under xdist the controller only holds case metadata, so its statuses fall back to HTTP classes.
+        if isinstance(case, Case):
+            operation.classify_status = case.operation.schema.classify_status
         self._statistic.total_cases += len(recorder.cases)
         recorded = grouped_failures_from_recorder(recorder)
         groups = _latest_per_failure(recorded, operation.seen)
@@ -156,7 +164,7 @@ class HtmlWriter:
 
     def _row(self, label: str, operation: _Operation) -> OperationRow:
         cases = [
-            failing_case(group, config=self._config, replay=None)
+            failing_case(group, config=self._config, replay=None, classify_status=operation.classify_status)
             for group in self._statistic.failures.get(label, {}).values()
         ]
         failures = failure_titles(cases)
