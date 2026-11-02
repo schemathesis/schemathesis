@@ -300,7 +300,7 @@ def test_tls_failure_reported(ctx, cli, snapshot_cli, tls, scheme, source, extra
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_any_fields_warning(ctx, cli, tmp_path, snapshot_cli):
-    server = ctx.grpc.apps.users()
+    server = ctx.grpc.apps.envelope()
     write_descriptor_set(tmp_path, all_types_descriptor_set())
     assert (
         cli.run(
@@ -379,8 +379,9 @@ def test_unreachable_descriptor_set_target(cli, tmp_path, snapshot_cli):
         (404, []),
         # A cancelled call says nothing about the data sent, so it is no validation mismatch.
         (499, []),
+        (501, []),
     ],
-    ids=["library-decode-error", "unauthenticated", "deadline-exceeded", "not-found", "cancelled"],
+    ids=["library-decode-error", "unauthenticated", "deadline-exceeded", "not-found", "cancelled", "unimplemented"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_get_user_status(ctx, cli, snapshot_cli, user_id, extra):

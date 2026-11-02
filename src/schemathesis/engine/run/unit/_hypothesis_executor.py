@@ -15,7 +15,7 @@ from schemathesis.engine.control import BudgetExpired
 from schemathesis.engine.run import TESTING_PHASES, PhaseName
 from schemathesis.engine.run.unit._case import ServerWentAway
 from schemathesis.engine.run.unit._errors import classify_test_exception
-from schemathesis.engine.run.unit._scenario import Scenario, iter_closing_events, start_scenario
+from schemathesis.engine.run.unit._scenario import Scenario, finish_scenario, iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis import add_database_key
 from schemathesis.generation.hypothesis.builder import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -89,7 +89,7 @@ def run_test(
 
     yield from iter_closing_events(scenario, ctx, pending_events=pending_events, errors=errors)
 
-    yield scenario.finished(status, skip_reason)
+    yield finish_scenario(scenario, ctx, status, skip_reason)
 
 
 def _settle_stopped(

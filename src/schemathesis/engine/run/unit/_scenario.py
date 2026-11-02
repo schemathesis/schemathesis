@@ -6,12 +6,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.timing import Instant
+from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.engine import Status, events
 from schemathesis.engine._check_context import collect_check_context_data
 from schemathesis.engine.errors import TestingState, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import record_extra_data_from_recorder
+from schemathesis.engine.supervisor import SchedulingDirective
 
 if TYPE_CHECKING:
     from schemathesis.checks import CheckContext
@@ -45,7 +47,9 @@ class Scenario:
             code_sample=code_sample,
         )
 
-    def finished(self, status: Status, skip_reason: str | None) -> events.ScenarioFinished:
+    def finished(
+        self, status: Status, skip_reason: str | None, *, skip_warning: SchemathesisWarning | None = None
+    ) -> events.ScenarioFinished:
         return events.ScenarioFinished(
             id=self.scenario_id,
             suite_id=self.suite_id,
@@ -55,6 +59,7 @@ class Scenario:
             status=status,
             elapsed_time=self.started_at.elapsed,
             skip_reason=skip_reason,
+            skip_warning=skip_warning,
             is_final=False,
         )
 
@@ -86,6 +91,16 @@ def start_scenario(
 def _checkpoint_error_feedback(ctx: EngineContext) -> None:
     if ctx.error_feedback is not None:
         ctx.error_feedback.checkpoint()
+
+
+def finish_scenario(
+    scenario: Scenario, ctx: EngineContext, status: Status, skip_reason: str | None
+) -> events.ScenarioFinished:
+    verdict = ctx.supervisor.verdict(scenario.operation.label)
+    # A scenario the supervisor cut short left the operation untested, unless it already found something.
+    if verdict.directive is SchedulingDirective.SKIP and status is Status.SUCCESS:
+        status, skip_reason = Status.SKIP, verdict.reason
+    return scenario.finished(status, skip_reason, skip_warning=verdict.warning)
 
 
 def iter_closing_events(

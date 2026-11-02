@@ -9,7 +9,7 @@ from schemathesis.baseline import failure_identity
 from schemathesis.core.failures import BlockFormatter, Failure, case_header, format_failures
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.engine import Status
 from schemathesis.engine.recorder import CaseNode, CheckFailureInfo, CheckNode, RecordedScenario, ReproductionStep
 from schemathesis.generation.case import Case
@@ -175,7 +175,11 @@ class Statistic:
         return sum(len(group.failures) for grouped in self.failures.values() for group in grouped.values())
 
     def on_scenario_finished(
-        self, recorder: RecordedScenario, *, failure_label: Callable[[Case], str] | None = None
+        self,
+        recorder: RecordedScenario,
+        *,
+        failure_label: Callable[[Case], str] | None = None,
+        status: Status | None = None,
     ) -> None:
         """Update statistics and store failures from a new batch of checks."""
         # Track failures per-label (may differ from recorder.label when method differs)
@@ -197,6 +201,14 @@ class Statistic:
         for case_id, case in recorder.cases.items():
             if case.is_probe:
                 continue
+            interaction = recorder.interactions.get(case_id)
+            if (
+                interaction is not None
+                and interaction.response is not None
+                and case.value.operation.schema.classify_call_outcome(case.value, interaction.response)
+                is CallOutcome.NOT_SERVED
+            ):
+                continue
             self.total_cases += 1
             checks = [(case_id, check) for check in recorder.checks.get(case_id, [])]
             checks.extend(probe_checks.get(case_id, []))
@@ -207,7 +219,6 @@ class Statistic:
                 continue
 
             if not checks:
-                interaction = recorder.interactions.get(case_id)
                 if scenario_errored or interaction is None or interaction.response is None:
                     self.errored_cases += 1
                 else:
@@ -215,7 +226,8 @@ class Statistic:
                     self.operations_without_checks.add(case.value.operation.label)
                 continue
 
-            self.tested_operations.add(case.value.operation.label)
+            if status is not Status.SKIP:
+                self.tested_operations.add(case.value.operation.label)
             found: dict[str, list[CheckFailureInfo]] = {}
 
             for recorded_id, check in checks:
