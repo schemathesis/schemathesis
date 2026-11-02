@@ -17,7 +17,7 @@ from schemathesis.checks import (
     run_checks,
     run_checks_for,
 )
-from schemathesis.core import NOT_SET, Body, NotSet, curl, media_types
+from schemathesis.core import NOT_SET, Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
@@ -38,7 +38,7 @@ from schemathesis.hooks import (
     dispatch_before_call,
     schema_hook_dispatchers,
 )
-from schemathesis.transport.prepare import base_url_from_request_url, prepare_path, prepare_request
+from schemathesis.transport.prepare import base_url_from_request_url, prepare_path
 from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
@@ -425,22 +425,7 @@ class Case(Generic[OperationT]):
             base_url: Base URL the request was sent to. Defaults to the one passed to `call`, then the schema's.
 
         """
-        request_data = prepare_request(
-            self, headers, config=self.operation.schema.config.output.sanitization, base_url=base_url
-        )
-        result = curl.generate(
-            method=str(request_data.method),
-            url=str(request_data.url),
-            body=request_data.body,
-            verify=verify,
-            headers=dict(request_data.headers),
-            known_generated_headers=dict(self.headers or {}),
-        )
-        # Include warnings if any exist
-        if result.warnings:
-            warnings_text = "\n\n".join(f"⚠️  {warning}" for warning in result.warnings)
-            return f"{result.command}\n\n{warnings_text}"
-        return result.command
+        return self.operation.schema.as_curl_command(self, headers=headers, verify=verify, base_url=base_url)
 
     def as_reproduction_command(
         self, headers: Mapping[str, Any] | None = None, verify: bool = True, *, base_url: str | None = None
@@ -449,7 +434,7 @@ class Case(Generic[OperationT]):
         return self.operation.schema.as_reproduction_command(self, headers=headers, verify=verify, base_url=base_url)
 
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)
+        return self.operation.schema.as_transport_kwargs(self, base_url=base_url, headers=headers)
 
     def call(
         self,

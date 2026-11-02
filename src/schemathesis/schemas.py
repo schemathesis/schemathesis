@@ -18,7 +18,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
 from schemathesis.config import ConfigError, GenerationConfig, ProjectConfig, SanitizationConfig
-from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, media_types
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, curl, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup, ServerError
@@ -158,6 +158,30 @@ class BaseSchema(Mapping):
     ) -> str:
         """Command that reproduces `case` outside Schemathesis."""
         return case.as_curl_command(headers, verify, base_url=base_url)
+
+    def as_curl_command(
+        self, case: Case, *, headers: Mapping[str, Any] | None, verify: bool, base_url: str | None = None
+    ) -> str:
+        """Generate a curl command that reproduces `case`."""
+        request_data = prepare_request(case, headers, config=self.config.output.sanitization, base_url=base_url)
+        result = curl.generate(
+            method=str(request_data.method),
+            url=str(request_data.url),
+            body=request_data.body,
+            verify=verify,
+            headers=dict(request_data.headers),
+            known_generated_headers=dict(case.headers or {}),
+        )
+        if result.warnings:
+            warnings_text = "\n\n".join(f"⚠️  {warning}" for warning in result.warnings)
+            return f"{result.command}\n\n{warnings_text}"
+        return result.command
+
+    def as_transport_kwargs(
+        self, case: Case, *, base_url: str | None, headers: dict[str, str] | None
+    ) -> dict[str, Any]:
+        """Prepare `case` for the schema's transport."""
+        return self.transport.serialize_case(case, base_url=base_url, headers=headers)
 
     def is_security_param_negated(self, case: Case) -> bool:
         return False

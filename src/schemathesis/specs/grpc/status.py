@@ -48,20 +48,26 @@ STATUS_NAMES_BY_HTTP_STATUS = {
 }
 
 OK = 0
-INTERNAL = 13
 
-# How gRPC servers start the INTERNAL message they send when a request does not decode, before any handler runs.
-# Go clients word a response that does not decode the same way, so a handler passing one on is reported here too.
-LIBRARY_DECODE_ERRORS = (
-    "grpc: failed to unmarshal the received message",
-    "grpc: error unmarshalling request",
-    "Exception deserializing request!",
-    "Error deserializing request: ",
-)
+# How gRPC servers start messages for requests that do not decode before any handler runs.
+LIBRARY_DECODE_ERRORS = {
+    3: ("unmarshal message: ",),
+    13: (
+        "grpc: failed to unmarshal the received message",
+        "grpc: error unmarshalling request",
+        "Exception deserializing request!",
+        "Error deserializing request: ",
+    ),
+}
 
 
 def grpc_status(response: Response) -> int:
     return int(response.headers["grpc-status"][0])
+
+
+def is_library_decode_error(response: Response) -> bool:
+    prefixes = LIBRARY_DECODE_ERRORS.get(grpc_status(response), ())
+    return response.headers.get("grpc-message", [""])[0].startswith(prefixes)
 
 
 def starts_with_verb(name: str, verbs: tuple[str, ...]) -> bool:

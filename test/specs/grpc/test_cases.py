@@ -73,6 +73,19 @@ def test_case_shape(schema):
     )
 
 
+def test_as_transport_kwargs(schema):
+    case = schema["types.Types"]["Edition"].Case(body={"id": 1})
+    assert case.as_transport_kwargs(base_url="grpc://127.0.0.1:50051", headers={"authorization": "Bearer 123"}) == {
+        "request": b"\x08\x01",
+        "metadata": (("x-schemathesis-testcaseid", case.id), ("authorization", "Bearer 123")),
+    }
+
+
+def test_as_curl_command_uses_grpcurl(schema):
+    case = schema["types.Types"]["Edition"].Case(body={"id": 1})
+    assert case.as_curl_command() == case.as_reproduction_command()
+
+
 def test_explicit_body_and_headers(schema):
     strategy = schema["types.Types"]["Edition"].as_strategy(body={"id": 1}, headers={"authorization": "Bearer x"})
     case = generate_many(strategy, 1)[0]

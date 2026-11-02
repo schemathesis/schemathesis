@@ -8,6 +8,8 @@
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
+- connect-go request decoding failures not reported as ST119.
+- Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.
 - gRPC Channelz, CSDS and health services tested as part of the API.
 
 ## [4.33.0](https://github.com/schemathesis/schemathesis/compare/v4.32.7...v4.33.0) - 2026-11-01

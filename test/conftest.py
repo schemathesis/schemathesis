@@ -28,6 +28,7 @@ from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
 from schemathesis.core.transport import Response
 from schemathesis.python._constants.registry import default_registry
+from schemathesis.specs.grpc.status import GRPC_STATUSES
 
 from .utils import make_schema, profile_max_examples
 
@@ -406,6 +407,7 @@ class ResponseFactory:
     requests: Callable[..., requests.Response]
     wsgi: Callable[..., TestResponse]
     core: Callable[..., Response]
+    grpc: Callable[..., Response]
 
 
 @pytest.fixture
@@ -504,12 +506,28 @@ def response_factory():
             status_line=status_line,
         )
 
+    def grpc_factory(
+        *,
+        status: int = 0,
+        content: bytes = b"",
+        headers: dict[str, list[str]] | None = None,
+        status_line: str | None = None,
+    ) -> Response:
+        return core_factory(
+            content=content,
+            content_type=None,
+            status_code=GRPC_STATUSES[status].http_status,
+            headers={"grpc-status": [str(status)], **(headers or {})},
+            status_line=status_line,
+        )
+
     return ResponseFactory(
         httpx=_httpx_like(httpx),
         httpx2=_httpx_like(httpx2),
         requests=requests_factory,
         wsgi=werkzeug_factory,
         core=core_factory,
+        grpc=grpc_factory,
     )
 
 

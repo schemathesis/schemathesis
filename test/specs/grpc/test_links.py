@@ -158,12 +158,12 @@ def test_links_follow_filters(tmp_path):
 
 @pytest.mark.parametrize(
     ("status", "content", "mutate_files"),
-    [("5", b"", None), ("0", b"\xff\xff\xff", None), ("0", b"\n\x07books/\xff", make_proto2)],
+    [(5, b"", None), (0, b"\xff\xff\xff", None), (0, b"\n\x07books/\xff", make_proto2)],
     ids=["failed-call", "undecodable-body", "proto2-name-not-utf8"],
 )
 def test_response_value_is_empty(tmp_path, response_factory, status, content, mutate_files):
     operation = load(tmp_path, mutate_files=mutate_files)["library.Library"]["CreateBook"]
-    response = response_factory.core(content=content, headers={"grpc-status": [status]})
+    response = response_factory.grpc(status=status, content=content)
     assert response_value(operation, response, "name") == ""
 
 
@@ -184,7 +184,7 @@ def test_link_candidates(tmp_path, response_factory, fuzzed, excluded, mutate_fi
     candidates = schema.iter_link_candidates(
         operation=create,
         case=create.Case(body={"title": "Dune"}),
-        response=response_factory.core(content=b"\n\x07books/1", headers={"grpc-status": ["0"]}),
+        response=response_factory.grpc(content=b"\n\x07books/1"),
         operations_by_label=operations,
         excluded_labels=excluded,
     )

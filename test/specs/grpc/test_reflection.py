@@ -246,7 +246,7 @@ def test_from_url_reports_tls_failure_of_server_starting_during_wait(ctx):
 
 def test_known_fields_pass_for_reflection_schemas(ctx, response_factory):
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
-    response = response_factory.core(content=b"\x0a\x02u7", content_type=None, headers={"grpc-status": ["0"]})
+    response = response_factory.grpc(content=b"\x0a\x02u7")
     assert operation.validate_response(response, case=operation.Case(body={})) is None
 
 
@@ -274,7 +274,7 @@ PACKED_UNKNOWN_FIELD = b"\x2a" + bytes([len(PACKED_USER)]) + PACKED_USER
 )
 def test_unknown_fields_fail_for_reflection_schemas(ctx, response_factory, label, content, message):
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target).find_operation_by_label(label)
-    response = response_factory.core(content=content, content_type=None, headers={"grpc-status": ["0"]})
+    response = response_factory.grpc(content=content)
     with pytest.raises(UndeclaredGrpcFields) as exc_info:
         operation.validate_response(response, case=operation.Case(body={}))
     assert exc_info.value.message == f"The response carries fields that {message}"
@@ -283,7 +283,7 @@ def test_unknown_fields_fail_for_reflection_schemas(ctx, response_factory, label
 # Extensions can be declared in files that reflection does not return.
 def test_unknown_extension_numbers_pass_for_reflection_schemas(ctx, response_factory):
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.envelope().target)["types.Types"]["Extendable"]
-    response = response_factory.core(content=b"\xb0\x09\x01", content_type=None, headers={"grpc-status": ["0"]})
+    response = response_factory.grpc(content=b"\xb0\x09\x01")
     assert operation.validate_response(response, case=operation.Case(body={})) is None
 
 
@@ -317,7 +317,7 @@ def test_unknown_fields_report_once_per_operation(ctx, response_factory):
     operation = schemathesis.grpc.from_url(ctx.grpc.apps.users().target)["pkg.Users"]["GetUser"]
     failures = []
     for content in UNKNOWN_FIELDS:
-        response = response_factory.core(content=content, content_type=None, headers={"grpc-status": ["0"]})
+        response = response_factory.grpc(content=content)
         with pytest.raises(UndeclaredGrpcFields) as exc_info:
             operation.validate_response(response, case=operation.Case(body={}))
         failures.append(exc_info.value)
