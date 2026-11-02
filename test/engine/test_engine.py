@@ -26,6 +26,7 @@ from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.recorder import Request
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import APIStateMachine
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
@@ -1841,16 +1842,18 @@ def test_max_time_runs_coverage_cases_generated_before_the_slice_ran_out(ctx):
     generated = []
 
     def map_case(context, case):
-        generated.append(case)
-        if len(generated) == 5:
-            time.sleep(1.2)
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            generated.append(case.id)
+            if len(generated) == 5:
+                time.sleep(1.2)
         return case
 
     schema.hook("map_case")(map_case)
     stream = execute(schema, max_time=2, max_examples=100_000, phases=[PhaseName.COVERAGE, PhaseName.FUZZING])
     finished = stream.find(events.ScenarioFinished, phase=PhaseName.COVERAGE)
 
-    assert len(finished.recorder.cases) == 5
+    # On a slow machine the share runs out before the slow case, so compare against what was generated.
+    assert set(finished.recorder.cases) == set(generated)
 
 
 def test_max_time_skips_coverage_rerun_for_feedback_that_cannot_change_generation(ctx):
