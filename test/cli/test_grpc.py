@@ -67,6 +67,27 @@ def test_descriptor_set_requires_url(cli, tmp_path, snapshot_cli):
     assert cli.run("api.binpb") == snapshot_cli
 
 
+@pytest.mark.parametrize("filename", ["api.desc", "api.proto.bin"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_descriptor_set_detected_by_content(cli, tmp_path, snapshot_cli, filename):
+    (tmp_path / filename).write_bytes(users_descriptor_set())
+    assert cli.run(filename) == snapshot_cli
+
+
+@pytest.mark.parametrize(
+    ("filename", "data"),
+    [
+        ("random.bin", b"\xff"),
+        ("api.desc", b"\x00"),
+    ],
+    ids=["invalid-utf8", "control-byte"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_binary_schema_file_error(cli, tmp_path, snapshot_cli, filename, data):
+    (tmp_path / filename).write_bytes(data)
+    assert cli.run(filename, "--url=grpc://127.0.0.1:1") == snapshot_cli
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_finds_empty_nested_message(ctx, cli, snapshot_cli):
     server = ctx.grpc.apps.envelope()

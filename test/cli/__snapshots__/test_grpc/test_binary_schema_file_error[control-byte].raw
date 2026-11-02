@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ❌  Failed to load specification from api.desc after 0.00s
+
+ Schema Loading Error
+
+ The file is not a serialized `FileDescriptorSet`. Build one with `buf build -o api.binpb` or `protoc --include_imports --descriptor_set_out=api.binpb`

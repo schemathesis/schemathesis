@@ -34,6 +34,7 @@ GRPC_HTTP_REPORTS_MESSAGE = (
     "HAR, VCR and pytest reports describe HTTP/1.1 requests and are not available for gRPC targets"
 )
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
+TEXT_SCHEMA_EXTENSIONS = (".json", ".yaml", ".yml")
 PROTO_FILE_MESSAGE = f"Schemathesis reads descriptor sets, not `.proto` files. {BUILD_HINT} and run `schemathesis run api.binpb --url URL`"
 
 
@@ -209,7 +210,22 @@ def is_probably_graphql(location: str) -> bool:
 def is_grpc_location(location: str) -> bool:
     if location.startswith(("grpc://", "grpcs://")):
         return True
-    return location.endswith(GRPC_DESCRIPTOR_SET_EXTENSIONS) and file_exists(location)
+    if not file_exists(location):
+        return False
+    if location.endswith(GRPC_DESCRIPTOR_SET_EXTENSIONS):
+        return True
+    # Descriptor sets may have any extension, but JSON and YAML files are text schemas even when malformed.
+    return not location.lower().endswith(TEXT_SCHEMA_EXTENSIONS) and _is_binary_file(location)
+
+
+def _is_binary_file(location: str) -> bool:
+    with open(location, "rb") as file:
+        data = file.read()
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return True
+    return any(byte < 32 and byte not in b"\t\n\r" for byte in data)
 
 
 def is_openapi_file(location: str) -> bool:
