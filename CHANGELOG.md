@@ -19,6 +19,7 @@
 - `RecursionError` during generation for self-referencing arrays with `prefixItems` or `contains`.
 - No API operations found when a path item `$ref` points to another `$ref`.
 - Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.
+- Crash writing the HAR report for `Cookie` headers the cookie parser rejects.
 - Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
 - gRPC values violating empty protovalidate ranges such as `gt: 5, lt: 5`.
 - Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
