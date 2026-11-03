@@ -18,6 +18,7 @@
 - gRPC connection errors hiding details for HTTP/1 servers and missing client certificates.
 - gRPC TLS failures reported as connection failures on grpcio 1.72 to 1.76.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
+- Explicit links in path items from external files not selected and duplicated by inference.
 - `response.json()` failing on gRPC responses in custom checks.
 - connect-go request decoding failures not reported as ST119.
 - gRPC responses, output and reports showing HTTP status codes instead of gRPC statuses.

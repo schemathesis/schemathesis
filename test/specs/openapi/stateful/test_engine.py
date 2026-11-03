@@ -1,3 +1,4 @@
+import json
 import threading
 from dataclasses import dataclass
 
@@ -898,6 +899,56 @@ def test_transition_count_follows_chained_response_references(ctx):
         },
     )
     assert (schema.statistic.transitions.total, schema.statistic.transitions.selected) == (1, 1)
+
+
+def test_explicit_link_in_referenced_path_file_is_selected_and_not_duplicated(tmp_path):
+    (tmp_path / "users.json").write_text(
+        json.dumps(
+            {
+                "item": {
+                    "post": {
+                        "responses": {
+                            "201": {
+                                "description": "Created",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                    }
+                                },
+                                "links": {"GetUser": {"$ref": "#/links/GetUser"}},
+                            }
+                        }
+                    }
+                },
+                "links": {"GetUser": {"operationId": "getUser", "parameters": {"id": "$response.body#/id"}}},
+            }
+        )
+    )
+    root = tmp_path / "root.json"
+    root.write_text(
+        json.dumps(
+            {
+                "openapi": "3.0.2",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/users": {"$ref": "users.json#/item"},
+                    "/users/{id}": {
+                        "get": {
+                            "operationId": "getUser",
+                            "parameters": [
+                                {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}
+                            ],
+                            "responses": {"200": {"description": "OK"}},
+                        }
+                    },
+                },
+            }
+        )
+    )
+    schema = schemathesis.openapi.from_path(root)
+    assert (schema.statistic.transitions.total, schema.statistic.transitions.selected) == (1, 1)
+    state_machine = schema.as_state_machine()
+    assert sum(len(operation.outgoing) for operation in state_machine._transitions.operations.values()) == 1
 
 
 def test_transition_count_with_non_object_links(ctx):

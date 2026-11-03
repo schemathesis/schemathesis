@@ -53,6 +53,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import (
 from schemathesis.specs.openapi.stateful.links import find_link_target
 
 if TYPE_CHECKING:
+    from schemathesis.core.jsonschema.resolver import Resolver
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -246,7 +247,7 @@ def inject_links(schema: OpenApiSchema) -> int:
             index: dict[tuple[str, str], list[NormalizedLink]] = {}
             for link in links.values():
                 try:
-                    normalized = _normalize_link(link, schema, operation_cache)
+                    normalized = _normalize_link(link, response.resolver, schema, operation_cache)
                 except (OperationNotFound, InvalidSchema, RefResolutionError):
                     # Dangling links are reported when the stateful phase validates them
                     continue
@@ -262,7 +263,7 @@ def inject_links(schema: OpenApiSchema) -> int:
             inferred_link = definition.to_openapi()
 
             # Check if duplicate / subsets exists
-            normalized = _normalize_link(inferred_link, schema, operation_cache)
+            normalized = _normalize_link(inferred_link, response.resolver, schema, operation_cache)
             if any(
                 _is_subset_link(normalized, existing)
                 for existing in index.get((normalized.path, normalized.method), ())
@@ -324,9 +325,11 @@ def _find_operation_by_reference(schema: OpenApiSchema, reference: str, cache: d
     return operation
 
 
-def _normalize_link(link: Mapping[str, Any], schema: OpenApiSchema, cache: dict[str, APIOperation]) -> NormalizedLink:
+def _normalize_link(
+    link: Mapping[str, Any], resolver: Resolver, schema: OpenApiSchema, cache: dict[str, APIOperation]
+) -> NormalizedLink:
     """Normalize a link definition for comparison."""
-    _, link = maybe_resolve_with_resolver(link, schema.root_resolver)
+    _, link = maybe_resolve_with_resolver(link, resolver)
     operation = find_link_target(schema, link, cache)
 
     normalized_params = _normalize_parameter_keys(link.get("parameters", {}), operation)
