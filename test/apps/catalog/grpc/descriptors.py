@@ -681,6 +681,7 @@ def validated_descriptor_set() -> bytes:
         ("BelowEntry", FieldDescriptorProto.TYPE_INT32),
         ("PinnedEntry", FieldDescriptorProto.TYPE_INT64),
         ("OuterEntry", FieldDescriptorProto.TYPE_INT32),
+        ("BetweenEntry", FieldDescriptorProto.TYPE_INT32),
     ):
         keyed = edges.nested_type.add(name=entry, options=descriptor_pb2.MessageOptions(map_entry=True))
         _field(keyed, "key", 1, key_type)
@@ -741,6 +742,18 @@ def validated_descriptor_set() -> bytes:
             {"map": {"keys": {"int32": {"gt": 10, "lt": 5}}}},
         ),
         ("default_kind", FieldDescriptorProto.TYPE_ENUM, {"type_name": ".validated.Kind"}, {"enum": {"const": 0}}),
+        (
+            "between",
+            FieldDescriptorProto.TYPE_MESSAGE,
+            {"type_name": ".validated.Edges.BetweenEntry", "label": repeated},
+            {"map": {"keys": {"int32": {"gt": 5, "lt": 6}}}},
+        ),
+        (
+            "tied",
+            FieldDescriptorProto.TYPE_INT32,
+            {},
+            {"ignore": "IGNORE_IF_ZERO_VALUE", "int32": {"gte": 5, "lt": 5}},
+        ),
     ]
     for number, (name, field_type, extra, value) in enumerate(edge_fields, start=1):
         _field(edges, name, number, field_type, **extra)

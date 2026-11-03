@@ -244,6 +244,8 @@ def edges_rules(edges):
         "pinned": set(edges.pinned) <= {5},
         "outer": all(key > 10 or key < 5 for key in edges.outer),
         "default_kind": edges.default_kind == 0,
+        "between": len(edges.between) == 0,
+        "tied": edges.tied == 0,
         "created": edges.HasField("created"),
     }
 
