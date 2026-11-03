@@ -543,6 +543,8 @@ def normalize_connection_errors(data: str) -> str:
     data = data.replace(
         "No connection could be made because the target machine actively refused it", "Connection refused"
     ).replace("An existing connection was forcibly closed by the remote host", "Connection reset by peer")
+    # gRPC on Windows sometimes wraps the closed connection error when a write is still pending.
+    data = re.sub(r"Delayed close due to in-progress write \((.+?)\)", r"\1", data)
     # gRPC on Windows reports a refused connection with a different status and the system error text.
     return re.sub(
         r"UNAVAILABLE: (ipv4:\S+?): WSAGetOverlappedResult: Connection refused \(Connection refused\.\r?\n -- 10061\)",
