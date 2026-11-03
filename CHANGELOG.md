@@ -7,6 +7,8 @@
 - Traceback when `--tls-verify` points to a missing CA bundle.
 - Unserved operations counted as tested and passed.
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
+- Slow, memory-hungry data generation for schemas whose objects refer to themselves several times.
+- `filter_too_much` health check on recursive schemas with low `--max-examples` or a reused example database.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
 - Schema error for security schemes defined through a chain of `$ref`s.
 - gRPC services in files another package imports skipped silently and unselectable with `--include-name`.

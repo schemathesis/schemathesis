@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, NamedTuple, TypedDict, TypeGuard, TypeVar, cas
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
+from hypothesis.internal.conjecture.data import MAX_DEPTH
 from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
@@ -66,6 +67,7 @@ if TYPE_CHECKING:
 
 # Any JSON value, kept as the narrower type a caller passes in.
 JsonT = TypeVar("JsonT", bound="JsonValue")
+BuiltT = TypeVar("BuiltT")
 
 # Upper bound on properties drawn beyond the ones the schema names.
 _EXTRA_KEYS = 5
@@ -129,20 +131,37 @@ class _Node(DeferredStrategy):
     # A schema reached from many places, or from itself, would otherwise spell out the same subtree at
     # every mention, growing what Hypothesis prints - a rejected filter, a failed draw - past any use.
 
-    def __init__(self, strategy: SearchStrategy[JsonValue], kind: canonical.CanonicalKind) -> None:
+    def __init__(self, strategy: SearchStrategy[JsonValue], kind: canonical.CanonicalKind, recursive: bool) -> None:
         super().__init__(lambda: strategy)
         self.kind = kind
+        # Whether a value drawn here can lead back into a value still being built, and so nest without end.
+        self.recursive = recursive
 
     def __repr__(self) -> str:
         return f"schema({self.kind.value})"
 
 
-def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> _Node:
     cached = ctx.cache.get(schema)
     if cached is None:
-        cached = _Node(_build(schema, ctx), schema.kind)
+        strategy, recursive = _tracked(partial(_build, schema, ctx), ctx)
+        cached = _Node(strategy, schema.kind, recursive)
         ctx.cache[schema] = cached
+    elif cached.recursive:
+        ctx.cyclic = True
     return cached
+
+
+def _tracked(build: Callable[[], BuiltT], ctx: StrategyContext) -> tuple[BuiltT, bool]:
+    """What `build` returns, and whether it led back into a value still being built."""
+    outer = ctx.cyclic
+    ctx.cyclic = False
+    try:
+        built = build()
+    finally:
+        recursive = ctx.cyclic
+        ctx.cyclic = outer or recursive
+    return built, recursive
 
 
 def _simplest_first(value: JsonValue) -> tuple[int, float, str]:
@@ -208,7 +227,7 @@ def _displayed(schema: jsonschema_rs.CanonicalSchema) -> str:
 
 def _any_of(view: jsonschema_rs.canonical.AnyOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     """Values any of the branches admits."""
-    strategies = []
+    strategies: list[_Node] = []
     declined: Exception | None = None
     for branch in view.branches:
         try:
@@ -220,7 +239,17 @@ def _any_of(view: jsonschema_rs.canonical.AnyOfView, ctx: StrategyContext) -> Se
         # Every alternative declined, so the last reason is the one worth reporting.
         assert declined is not None
         raise declined
-    return st.one_of(strategies)
+    return _damped(st.one_of(strategies), _leaves(strategies, [strategy.recursive for strategy in strategies]))
+
+
+def _leaves(
+    strategies: Sequence[SearchStrategy[JsonValue]], recursive: Sequence[bool]
+) -> SearchStrategy[JsonValue] | None:
+    """The alternatives that end a recursive value, where some do and some do not."""
+    leaves = [strategy for strategy, nests in zip(strategies, recursive, strict=True) if not nests]
+    if not leaves or len(leaves) == len(strategies):
+        return None
+    return st.one_of(leaves)
 
 
 def _target(schema: jsonschema_rs.CanonicalSchema, uri: str, ctx: StrategyContext) -> jsonschema_rs.CanonicalSchema:
@@ -374,7 +403,7 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
         # Nothing folded, so what the pointers name is only spelled by the draw one branch drives and
         # the rest judge.
         driver, *rest = followed
-        strategy = from_schema(driver, ctx)
+        strategy: SearchStrategy[JsonValue] = from_schema(driver, ctx)
         for other in rest:
             strategy = strategy.filter(_validator(other))
         return strategy
@@ -389,14 +418,13 @@ def _one_of(
     return _exclusive(schema, [from_schema(branch, ctx) for branch in view.branches])
 
 
-def _exclusive(
-    node: jsonschema_rs.CanonicalSchema, strategies: list[SearchStrategy[JsonValue]]
-) -> SearchStrategy[JsonValue]:
+def _exclusive(node: jsonschema_rs.CanonicalSchema, strategies: list[_Node]) -> SearchStrategy[JsonValue]:
     """Values from each strategy that no branch other than its own admits."""
     # A value its own branch drew already clears that branch, so "no other branch admits it" and
     # "exactly one branch admits it" are the same test - one validator for the node, not one per branch.
     exactly_one = _validator(node)
-    return st.one_of([strategy.filter(exactly_one) for strategy in strategies])
+    filtered = [strategy.filter(exactly_one) for strategy in strategies]
+    return _damped(st.one_of(filtered), _leaves(filtered, [strategy.recursive for strategy in strategies]))
 
 
 def _intersection(branches: list[jsonschema_rs.CanonicalSchema]) -> jsonschema_rs.CanonicalSchema:
@@ -480,17 +508,28 @@ def _array(
     if kwargs and not ctx.building_cycle and element.is_empty:
         # No position can be filled, so the empty array is the only value the bounds may allow.
         return st.nothing() if kwargs.get("min_size") else st.builds(list)
-    if all_distinct:
-        return st.lists(element, unique_by=json_identity, **kwargs)
-    if view.distinctness is canonical.Distinctness.SOME_REPEATED:
-        drawn = st.lists(element, **kwargs).map(_repeat_one)
-    else:
-        drawn = st.lists(element, **kwargs)
     floor = view.min_items or 0
+    leaf = None
+    if isinstance(element, _Node) and element.recursive and floor != max_items:
+        # Every element past the floor nests another level.
+        leaf = _sized_list(element, view.distinctness, {"min_size": floor, "max_size": floor})
+    drawn = _damped(_sized_list(element, view.distinctness, kwargs), leaf)
+    if all_distinct:
+        return drawn
     if floor > MAX_DRAWN_ARRAY_ITEMS and (max_items is None or max_items >= floor):
         # Every element spends several choices, so a long floor can outgrow one draw; one element repeated never does.
         return st.one_of(element.map(lambda item: _tiled(item, floor)), drawn)
     return drawn
+
+
+def _sized_list(
+    element: SearchStrategy[JsonValue], distinctness: canonical.Distinctness, bounds: _SizeBounds
+) -> SearchStrategy[JsonValue]:
+    if distinctness is canonical.Distinctness.ALL_DISTINCT:
+        return st.lists(element, unique_by=json_identity, **bounds)
+    if distinctness is canonical.Distinctness.SOME_REPEATED:
+        return st.lists(element, **bounds).map(_repeat_one)
+    return st.lists(element, **bounds)
 
 
 def _with_fixed_elements(
@@ -543,8 +582,11 @@ def _with_fixed_elements(
         for length in range(view.min_items or 0, len(entries))
         if (layout := _laid_out(entries[:length], demands, closed=True, carry=True)) is not None
     ]
-    layouts = [*shorter, *layouts]
-    return st.one_of([_from_layout(schema, view, layout, ctx) for layout in layouts])
+    strategies, recursive = _tracked(
+        lambda: [_from_layout(schema, view, layout, ctx) for layout in [*shorter, *layouts]], ctx
+    )
+    # The shortest array nests least.
+    return _damped(st.one_of(strategies), strategies[0] if recursive and shorter else None)
 
 
 def _laid_out(
@@ -1061,7 +1103,7 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
     # A key can be required without `properties` saying anything about its value.
     required = {key: entries[key] if key in entries else value_for(key) for key in view.required}
     # A property no value satisfies can only be absent, so it is never picked.
-    optional = {
+    optional: dict[str, SearchStrategy[JsonValue]] = {
         key: entry
         for key, entry in entries.items()
         if key not in view.required and view.properties[key].kind is not canonical.CanonicalKind.FALSE
@@ -1094,32 +1136,53 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
                 # the way `contains` demands are folded into a length floor, so this combo can still
                 # reach here despite satisfiability saying otherwise.
                 return st.nothing()
+    base = _keyed_object(required, optional, extra, minimum, max_properties)
+    recursive = {key for key, entry in entries.items() if key in optional and entry.recursive}
+    free = [*view.pattern_properties.values()]
+    if view.additional_properties is not None:
+        free.append(view.additional_properties)
+    # Free keys are left out only where none has to fill a floor.
+    free_recursive = extra is not None and minimum == 0 and any(from_schema(schema, ctx).recursive for schema in free)
+    if recursive or free_recursive:
+        shallow: dict[str, SearchStrategy[JsonValue]] = {
+            key: entry for key, entry in optional.items() if key not in recursive
+        }
+        shallow_extra = None if free_recursive else extra
+        # Without the keys that nest, the rest still has to reach the floor.
+        if shallow_extra is not None or len(required) + len(shallow) >= minimum:
+            base = _Damped(base, _keyed_object(required, shallow, shallow_extra, minimum, max_properties))
+    if not view.violations:
+        return base
+    entries_to_inject = [_violation_entry(violation, view, value_for, known, ctx) for violation in view.violations]
+    return _with_violations(base, entries_to_inject)
+
+
+def _keyed_object(
+    required: dict[str, SearchStrategy[JsonValue]],
+    optional: dict[str, SearchStrategy[JsonValue]],
+    extra: SearchStrategy[tuple[str, JsonValue]] | None,
+    minimum: int,
+    max_properties: int | None,
+) -> SearchStrategy[JsonValue]:
+    """Every required key, a pick of the optional ones, and free keys drawn from `extra`."""
     # Sorted: set iteration order is not stable across processes, and draw order decides replays.
     keys = sorted(optional)
     # Documented keys fill the floor first; names drawn out of nowhere only cover what they cannot.
     low = min(len(keys), max(0, minimum - len(required)))
     high = len(keys) if max_properties is None else min(len(keys), max_properties - len(required))
-    if high < low:
-        # The required keys alone overrun the ceiling.
-        return st.nothing()
     # A coin per optional key lands on half of them, which compounds at every nesting level. Built
     # here rather than per draw, where it would be one strategy per generated value.
     picker = st.sets(st.sampled_from(keys), min_size=low, max_size=high) if keys else None
     if extra is not None and minimum == 0 and max_properties is None:
         # Nothing here moves with the drawn key count, so the free keys are one strategy built once
         # instead of a lookup and a fresh draw on every value. This is the common shape by far.
-        base = st.tuples(_named_object(required, optional, picker), _collect(extra, 0, _EXTRA_KEYS)).map(
+        return st.tuples(_named_object(required, optional, picker), _collect(extra, 0, _EXTRA_KEYS)).map(
             lambda parts: {**parts[1], **parts[0]}
         )
-    else:
-        # Past a floor or under a ceiling the bounds do move with it, so the draws are memoized per
-        # object rather than rebuilt every value. Bound to this strategy, so nothing outlives it.
-        collect = None if extra is None else lru_cache(maxsize=8)(partial(_collect, extra))
-        base = _drawn_object(required, optional, picker, collect, minimum, max_properties)
-    if not view.violations:
-        return base
-    entries_to_inject = [_violation_entry(violation, view, value_for, known, ctx) for violation in view.violations]
-    return _with_violations(base, entries_to_inject)
+    # Past a floor or under a ceiling the bounds do move with it, so the draws are memoized per
+    # object rather than rebuilt every value. Bound to this strategy, so nothing outlives it.
+    collect = None if extra is None else lru_cache(maxsize=8)(partial(_collect, extra))
+    return _drawn_object(required, optional, picker, collect, minimum, max_properties)
 
 
 @lru_cache
@@ -1210,6 +1273,44 @@ def _with_violations(
         key, value = draw(entry.filter(lambda pair: pair[0] not in result))
         result[key] = value
     return result
+
+
+# Draw depth from which a recursive value always takes its leaf, leaving room below Hypothesis's limit for the leaf itself.
+_LEAF_DEPTH = MAX_DEPTH * 3 // 5
+# Below half of that depth, depth alone never picks the leaf, so deep values stay reachable.
+_DAMPING_START = _LEAF_DEPTH // 2
+# Share of the size budget where the leaf is certain; its odds grow with every choice, so wide values stay small.
+_LEAF_SIZE = 1 / 8
+# The full value is never certain, so the shrinker can always swap a nested value for its leaf.
+_MOST_LIKELY_FULL = 1 - 2**-20
+
+
+class _Damped(st.SearchStrategy):
+    """Values from `full`, or from `leaf`, which stops a recursive value from nesting further."""
+
+    # Every level of a recursive value can open several more, so without a brake most draws run
+    # into the depth or size limit and are thrown away. The more of either is spent, the likelier the leaf.
+
+    def __init__(self, full: SearchStrategy[JsonValue], leaf: SearchStrategy[JsonValue]) -> None:
+        super().__init__()
+        self.full = full
+        self.leaf = leaf
+
+    def calc_is_empty(self, recur: Callable[[SearchStrategy], bool]) -> bool:
+        return recur(self.full)
+
+    def do_draw(self, data: ConjectureData) -> JsonValue:
+        # Shrinking settles on `False`, so a shrunk value nests no deeper than it has to.
+        spent = max(
+            (data.depth - _DAMPING_START) / (_LEAF_DEPTH - _DAMPING_START), data.length / (_LEAF_SIZE * data.max_length)
+        )
+        if self.leaf.is_empty or data.draw_boolean(min(_MOST_LIKELY_FULL, max(0.0, 1 - spent))):
+            return data.draw(self.full)
+        return data.draw(self.leaf)
+
+
+def _damped(full: SearchStrategy[JsonValue], leaf: SearchStrategy[JsonValue] | None) -> SearchStrategy[JsonValue]:
+    return full if leaf is None else _Damped(full, leaf)
 
 
 class _Collected(st.SearchStrategy):
