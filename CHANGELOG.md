@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Traceback when `--tls-verify` points to a missing CA bundle.
+- Crash in the examples phase on `$ref` Example Objects inside a schema's `examples` map.
 - Unserved operations counted as tested and passed.
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
