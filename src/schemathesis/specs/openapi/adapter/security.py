@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 from schemathesis.config import ApiKeyAuthConfig, DynamicTokenAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
 from schemathesis.config._error import ConfigError
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.meta import negated_parameters
+from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.auths import (
     ApiKeyAuthProvider,
@@ -343,12 +344,8 @@ def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: Resolve
     ensure_object(components, "`components`")
     security_schemes = components.get("securitySchemes", {})
     ensure_object(security_schemes, "`components.securitySchemes`")
-    if "$ref" in security_schemes:
-        return resolve_reference(resolver, security_schemes["$ref"])[1]
-    return {
-        key: resolve_reference(resolver, value["$ref"])[1] if "$ref" in value else value
-        for key, value in security_schemes.items()
-    }
+    resolver, security_schemes = maybe_resolve_with_resolver(security_schemes, resolver)
+    return {key: maybe_resolve_with_resolver(value, resolver)[1] for key, value in security_schemes.items()}
 
 
 def build_auth_provider(

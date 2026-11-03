@@ -1,5 +1,8 @@
+import json
+
 import pytest
 
+import schemathesis
 from schemathesis.config._auth import AuthConfig
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.generation import GenerationMode
@@ -35,6 +38,41 @@ def test_ref_resolving_nested():
     }
     resolver = make_root_resolver(schema)
     assert extract_security_definitions_v3(schema, resolver) == {"basic_auth": http_schema}
+
+
+@pytest.mark.parametrize(
+    ("components", "files"),
+    [
+        (
+            {
+                "x-alias": {"A": {"$ref": "schemes/apikey.json"}},
+                "securitySchemes": {"ApiKey": {"$ref": "#/components/x-alias/A"}},
+            },
+            {},
+        ),
+        (
+            {"securitySchemes": {"$ref": "security.json"}},
+            {"security.json": {"ApiKey": {"$ref": "schemes/apikey.json"}}},
+        ),
+    ],
+    ids=["aliased-scheme", "external-map"],
+)
+def test_security_scheme_ref_chain(ctx, tmp_path, components, files):
+    raw_schema = ctx.openapi.build_schema(
+        {"/items": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        components=components,
+        security=[{"ApiKey": []}],
+    )
+    (tmp_path / "schemes").mkdir()
+    (tmp_path / "schemes" / "apikey.json").write_text(json.dumps({"type": "apiKey", "in": "header", "name": "X-Key"}))
+    for name, content in files.items():
+        (tmp_path / name).write_text(json.dumps(content))
+    (tmp_path / "openapi.json").write_text(json.dumps(raw_schema))
+    schema = schemathesis.openapi.from_path(str(tmp_path / "openapi.json"))
+
+    @run_given(case=schema["/items"]["GET"].as_strategy(), max_examples=5)
+    def test(case):
+        assert "X-Key" in case.headers
 
 
 PARAMETER_NAME = "TestApiKey"
