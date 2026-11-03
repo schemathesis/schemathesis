@@ -485,6 +485,8 @@ def test_validation_rules_on_edge_cases():
                 "propertyNames": {"enum": [str(key) for key in [*range(-(2**31), -(2**31) + 10), *range(11, 21)]]},
             },
             "defaultKind": {"enum": ["KIND_UNSPECIFIED"]},
+            "between": {"type": "object", "additionalProperties": STRING, "propertyNames": {"enum": []}},
+            "tied": {**INT32, "minimum": 5, "exclusiveMaximum": 5},
             "created": {"type": "string", "format": "date-time"},
         },
         "additionalProperties": False,
@@ -504,6 +506,7 @@ def test_validation_rules_on_edge_cases():
             "pinned",
             "outer",
             "defaultKind",
+            "between",
             "created",
         ],
     }
