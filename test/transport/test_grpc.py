@@ -1,7 +1,6 @@
 import base64
 import contextlib
 import json
-import platform
 import re
 import socket
 import threading
@@ -31,7 +30,7 @@ from test.apps.catalog.grpc.descriptors import (
     users_descriptor_set,
 )
 
-pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
+grpc_transport = pytest.importorskip("schemathesis.transport.grpc", reason="grpcio has no free-threaded build")
 
 ANY_URL = "type.googleapis.com/"
 NO_USER_INFO = base64.b64encode(error_details_pb2.ErrorInfo(reason="NO_USER").SerializeToString()).decode()
@@ -273,18 +272,37 @@ def test_tls_client_certificate(ctx, tmp_path, combined):
     assert server.calls[-1].peer_names == [b"client"]
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows", reason="gRPC names the closed connection with varying system errors"
-)
 def test_missing_tls_client_certificate_keeps_grpc_details_and_gives_a_hint(ctx):
     server = ctx.grpc.apps.users(tls=True, client_auth=True)
     with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
         get_user(server, 7, verify=str(server.ca_path))
-    assert str(exc_info.value) == (
-        f"failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1:{server.target.rsplit(':', 1)[1]}: "
-        "Socket closed. The server may require a client certificate; use `--request-cert` and "
-        "`--request-cert-key`"
+    prefix = (
+        "failed to connect to all addresses; last error: UNAVAILABLE: "
+        f"ipv4:127.0.0.1:{server.target.rsplit(':', 1)[1]}: "
     )
+    suffix = ". The server may require a client certificate; use `--request-cert` and `--request-cert-key`"
+    # The closed connection text depends on the platform.
+    assert re.fullmatch(f"{re.escape(prefix)}.+{re.escape(suffix)}", str(exc_info.value), re.DOTALL)
+
+
+@pytest.mark.parametrize(
+    "closed",
+    [
+        "Socket closed",
+        "End of TCP stream",
+        "Delayed close due to in-progress write (End of TCP stream)",
+        "WSARecv: Connection aborted (An established connection was aborted by the software in your host machine.\r\n"
+        " -- 10053)",
+        "Delayed close due to in-progress write (WSARecv: Connection reset (An existing connection was forcibly closed "
+        "by the remote host.\r\n -- 10054))",
+    ],
+    ids=["socket-closed", "end-of-stream", "delayed-end-of-stream", "aborted", "delayed-reset"],
+)
+def test_closed_tls_connection_hints_at_a_client_certificate(ctx, closed):
+    server = ctx.grpc.apps.users(tls=True, client_auth=True)
+    address = server.target.removeprefix("grpcs://")
+    details = f"failed to connect to all addresses; last error: UNAVAILABLE: ipv4:{address}: {closed}"
+    assert grpc_transport.connection_configuration_hint(address, True, details) == grpc_transport.MTLS_EXPECTED
 
 
 def test_http1_server_keeps_grpc_details_and_gives_a_protocol_hint(ctx, tmp_path):

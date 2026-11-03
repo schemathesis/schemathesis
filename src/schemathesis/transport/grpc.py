@@ -54,6 +54,8 @@ TLS_FAILED = "TLS handshake with {address} failed: {details}"
 TLS_EXPECTED = "The server expects TLS; use `grpcs://{address}`"
 MTLS_EXPECTED = "The server may require a client certificate; use `--request-cert` and `--request-cert-key`"
 GRPC_EXPECTED = "The server does not support HTTP/2; use a gRPC endpoint"
+# Ways gRPC names a connection the server closed, depending on the platform.
+CLOSED_CONNECTION_DETAILS = ("socket closed", "end of tcp stream", "connection reset", "connection aborted")
 NO_RESPONSE_MESSAGE = "cardinality violation: received no response message from non-server-streaming RPC"
 # How gRPC fails a call it did not send because the channel has no connection.
 NOT_CONNECTED = "failed to connect to all addresses"
@@ -281,7 +283,7 @@ def connection_configuration_hint(address: str, tls: bool, details: str) -> str 
     if not tls and accepts_tls(address):
         return TLS_EXPECTED.format(address=address)
     # A server that requires a client certificate closes the connection right after the handshake.
-    if tls and "socket closed" in normalized and accepts_tls(address):
+    if tls and any(closed in normalized for closed in CLOSED_CONNECTION_DETAILS) and accepts_tls(address):
         return MTLS_EXPECTED
     # Any other server that is not TLS and answers with something other than HTTP/2 speaks another protocol.
     if "expected settings frame as the first frame" in normalized:
