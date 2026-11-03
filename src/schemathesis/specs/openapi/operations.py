@@ -281,7 +281,7 @@ class OperationLoader:
 
         selected_operations_by_id: set[str] = set()
         selected_operations_by_path: set[tuple[str, str]] = set()
-        collected_links: list[dict] = []
+        collected_links: list[tuple[Resolver, object]] = []
 
         for path, path_item in paths.items():
             if _is_specification_extension(path):
@@ -321,21 +321,21 @@ class OperationLoader:
                         # A vendor extension key inside `responses` may carry any JSON value.
                         if not isinstance(response, dict):
                             continue
-                        _, response = maybe_resolve_with_resolver(response, path_resolver)
+                        response_resolver, response = maybe_resolve_with_resolver(response, path_resolver)
                         defined_links = response.get(links_keyword)
                         if defined_links is not None:
                             statistic.transitions.total += len(defined_links)
                             if is_selected:
-                                collected_links.extend(defined_links.values())
+                                collected_links.extend((response_resolver, link) for link in defined_links.values())
             except SCHEMA_PARSING_ERRORS:
                 complete_walk = False
                 continue
 
-        def is_link_selected(link: object) -> bool:
+        def is_link_selected(resolver: Resolver, link: object) -> bool:
             if not isinstance(link, dict):
                 return False
             try:
-                _, link = maybe_resolve_with_resolver(link, root_resolver)
+                _, link = maybe_resolve_with_resolver(link, resolver)
             except (RefResolutionError, InvalidSchema):
                 return False
 
@@ -348,8 +348,8 @@ class OperationLoader:
             except Exception:
                 return False
 
-        for link in collected_links:
-            if is_link_selected(link):
+        for resolver, link in collected_links:
+            if is_link_selected(resolver, link):
                 statistic.transitions.selected += 1
 
         # Hook/schema errors raised by `analyze` re-fire during engine iteration where
