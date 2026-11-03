@@ -1598,6 +1598,26 @@ def test_example_reference_chains(ctx, components, expected):
     assert [examples.generate_one(strategy).body for strategy in operation.get_strategies_from_examples()] == expected
 
 
+def test_example_reference_in_schema_examples(ctx):
+    schema = {"$ref": "#/components/schemas/Name"}
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "parameters": [{"name": "q", "in": "query", "required": True, "schema": schema}],
+            "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+        components={
+            "schemas": {"Name": {"type": "string", "examples": {"a": {"$ref": "#/components/examples/A"}}}},
+            "examples": {"A": {"value": "alice"}},
+        },
+    )
+    assert [example_to_dict(example) for example in extract_top_level(operation)] == [
+        {"container": "query", "name": "q", "value": "alice"},
+        {"media_type": "application/json", "value": "alice"},
+    ]
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

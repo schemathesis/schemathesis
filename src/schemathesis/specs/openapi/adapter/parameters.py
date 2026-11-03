@@ -1403,7 +1403,7 @@ class OpenApiComponent(ABC):
 
         container = self.definition.get(self.adapter.examples_container_keyword)
         if container is not None:
-            examples.extend(extract_inner_examples(container, operation.schema))
+            examples.extend(extract_inner_examples(container, operation.schema.root_resolver))
         examples.extend(self._iter_single_and_schema_examples())
         return examples
 

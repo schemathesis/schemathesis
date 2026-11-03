@@ -58,7 +58,7 @@ from schemathesis.specs.openapi.formats import format_lengths_for
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.specs.openapi.schemas import OpenApiOperation, OpenApiSchema
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 
 @dataclass(slots=True)
@@ -328,15 +328,17 @@ def _iter_parameter_defaults(operation: OpenApiOperation) -> Generator[tuple[Ope
             yield parameter, schema["default"]
 
 
-def _expanded_definitions(definition: dict[str, Any], *, merge_ref_siblings: bool) -> list[dict[str, Any] | bool]:
+def _expanded_definitions(
+    definition: dict[str, Any], *, merge_ref_siblings: bool
+) -> list[tuple[dict[str, Any] | bool, Resolver]]:
     """Every subschema the definition's own schema expands to, or nothing when it declares no schema."""
     if "schema" not in definition:
         return []
     schema = definition["schema"]
     resolver = make_root_resolver(schema)
     return [
-        expanded_schema
-        for expanded_schema, _, _ in _expand_subschemas(
+        (expanded_schema, expanded_resolver)
+        for expanded_schema, _, expanded_resolver in _expand_subschemas(
             schema=schema,
             resolver=resolver,
             reference_path=(),
@@ -353,7 +355,7 @@ def extract_top_level(
     responses = list(operation.responses.iter_examples())
     for parameter in operation.iter_parameters():
         expanded = _expanded_definitions(parameter.definition, merge_ref_siblings=merge_ref_siblings)
-        definitions = [parameter.definition, *expanded]
+        definitions = [parameter.definition, *(expanded_schema for expanded_schema, _ in expanded)]
         param_validator: jsonschema_rs.Validator | None = _make_example_validator(parameter.validation_schema)
         for definition in definitions:
             if definition is parameter.definition:
@@ -379,7 +381,7 @@ def extract_top_level(
         for container_keyword in container_keywords:
             if container_keyword in parameter.definition:
                 for example_name, value in extract_named_inner_examples(
-                    parameter.definition[container_keyword], operation.schema
+                    parameter.definition[container_keyword], operation.schema.root_resolver
                 ):
                     if example_is_valid(value, param_validator):
                         yield ParameterExample(
@@ -388,13 +390,13 @@ def extract_top_level(
                             value=value,
                             example_name=example_name,
                         )
-        for expanded_schema in expanded:
+        for expanded_schema, expanded_resolver in expanded:
             if not isinstance(expanded_schema, dict):
                 continue
             # A oneOf/anyOf branch's examples are checked against that branch, like its `example` above.
             expanded_validator = _make_example_validator(expanded_schema)
             for container_keyword in container_keywords:
-                for value in _iter_schema_examples(expanded_schema.get(container_keyword), operation.schema):
+                for value in _iter_schema_examples(expanded_schema.get(container_keyword), expanded_resolver):
                     if example_is_valid(value, expanded_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
@@ -414,7 +416,7 @@ def extract_top_level(
         )
 
         expanded = _expanded_definitions(body.definition, merge_ref_siblings=merge_ref_siblings)
-        definitions = [body.definition, *expanded]
+        definitions = [body.definition, *(expanded_schema for expanded_schema, _ in expanded)]
         for definition in definitions:
             # Open API 2 also supports `example`
             for example_keyword in dict.fromkeys((body.adapter.example_keyword, "example")):
@@ -435,7 +437,7 @@ def extract_top_level(
                             yield BodyExample(value=completed, media_type=body.media_type)
         if body.adapter.examples_container_keyword in body.definition:
             for value in extract_inner_examples(
-                body.definition[body.adapter.examples_container_keyword], operation.schema
+                body.definition[body.adapter.examples_container_keyword], operation.schema.root_resolver
             ):
                 if example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
@@ -443,10 +445,10 @@ def extract_top_level(
                     completed = _completed_body_example(value, body.validation_schema, declared_validator, operation)
                     if completed is not None:
                         yield BodyExample(value=completed, media_type=body.media_type)
-        for expanded_schema in expanded:
+        for expanded_schema, expanded_resolver in expanded:
             if isinstance(expanded_schema, dict):
                 container = expanded_schema.get(body.adapter.examples_container_keyword)
-                for value in _iter_schema_examples(container, operation.schema):
+                for value in _iter_schema_examples(container, expanded_resolver):
                     if example_is_valid(value, declared_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
@@ -672,10 +674,10 @@ def _merge_all_of(
     return merged, expanded_path, expanded_resolver
 
 
-def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Generator[Any, None, None]:
+def _unpack_example_object(example: dict[str, Any], resolver: Resolver) -> Generator[Any, None, None]:
     """Extract the value from a single OAS3 Example Object."""
     if "$ref" in example:
-        _, example = resolve_reference(schema.root_resolver, example["$ref"])
+        _, example = resolve_reference(resolver, example["$ref"])
     value = example_object_value(example) if isinstance(example, dict) else NOT_SET
     if not isinstance(value, NotSet):
         yield value
@@ -690,35 +692,35 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
         yield example
 
 
-def extract_inner_examples(examples: dict[str, Any] | list, schema: OpenApiSchema) -> Generator[Any, None, None]:
+def extract_inner_examples(examples: dict[str, Any] | list, resolver: Resolver) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
-    for _, value in extract_named_inner_examples(examples, schema):
+    for _, value in extract_named_inner_examples(examples, resolver):
         yield value
 
 
-def _iter_schema_examples(container: object, schema: OpenApiSchema) -> Generator[Any, None, None]:
+def _iter_schema_examples(container: object, resolver: Resolver) -> Generator[Any, None, None]:
     """Example values held by an `examples` container that sits inside a schema."""
     # A list is the JSON Schema spelling, where every item is a raw value, while a mapping can only be
     # the Open API one, where every entry is an Example Object keyed by its name.
     if isinstance(container, dict):
-        yield from extract_inner_examples(container, schema)
+        yield from extract_inner_examples(container, resolver)
     elif isinstance(container, list):
         yield from container
 
 
 def extract_named_inner_examples(
-    examples: dict[str, Any] | list, schema: OpenApiSchema
+    examples: dict[str, Any] | list, resolver: Resolver
 ) -> Generator[tuple[str | None, Any], None, None]:
     """Extract exact example values together with their names."""
     if isinstance(examples, dict):
         for name, example in examples.items():
             if isinstance(example, dict):
-                for value in _unpack_example_object(example, schema):
+                for value in _unpack_example_object(example, resolver):
                     yield name, value
     elif isinstance(examples, list):
         for example in examples:
             if isinstance(example, dict):
-                for value in _unpack_example_object(example, schema):
+                for value in _unpack_example_object(example, resolver):
                     yield None, value
             else:
                 yield None, example
