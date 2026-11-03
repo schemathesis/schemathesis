@@ -699,6 +699,40 @@ def test_uncommon_type_in_generation(ctx, testdir, key, expected):
         test()
 
 
+def test_parameter_ref_chain_repeating_pointer_across_files(ctx, tmp_path):
+    (tmp_path / "other.json").write_text(
+        json.dumps(
+            {
+                "components": {
+                    "parameters": {
+                        "Alias": {"$ref": "#/components/parameters/Limit"},
+                        "Limit": {"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}},
+                    }
+                }
+            }
+        )
+    )
+    root = tmp_path / "root.json"
+    root.write_text(
+        json.dumps(
+            ctx.openapi.build_schema(
+                {
+                    "/items": {
+                        "get": {
+                            "parameters": [{"$ref": "#/components/parameters/Limit"}],
+                            "responses": {"200": {"description": "OK"}},
+                        }
+                    }
+                },
+                components={"parameters": {"Limit": {"$ref": "other.json#/components/parameters/Alias"}}},
+            )
+        )
+    )
+    operation = schemathesis.openapi.from_path(str(root))["/items"]["GET"]
+
+    assert [(parameter.name, parameter.location) for parameter in operation.iter_parameters()] == [("limit", "query")]
+
+
 def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_cli):
     # See GH-2300
     api = ctx.openapi.apps.success()

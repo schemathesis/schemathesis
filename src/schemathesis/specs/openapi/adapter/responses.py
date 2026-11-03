@@ -470,11 +470,7 @@ def _iter_resolved_responses(
         if not isinstance(response, dict):
             continue
         status_code = str(key)
-        response_resolver, resolved = maybe_resolve_with_resolver(response, resolver)
-        # Resolve one more level to support slightly malformed schemas with nested $ref chains
-        # Some real-world schemas use: response -> $ref to definition -> $ref to actual schema
-        # While technically not spec-compliant, this pattern is common enough to warrant leniency
-        response_resolver, source = maybe_resolve_with_resolver(resolved, response_resolver)
+        response_resolver, source = maybe_resolve_with_resolver(response, resolver)
         resolved = source
         content = source.get("content", {})
         if not isinstance(content, dict):
