@@ -2339,9 +2339,7 @@ def iter_parameters_v3(
     request_body_or_ref = operation.get("requestBody")
     if request_body_or_ref is not None:
         ensure_object(request_body_or_ref, "`requestBody`")
-        body_resolver, request_body_or_ref = maybe_resolve_with_resolver(request_body_or_ref, resolver)
-        # It could be an object inside `requestBodies`, which could be a reference itself
-        body_resolver, request_body = maybe_resolve_with_resolver(request_body_or_ref, body_resolver)
+        body_resolver, request_body = maybe_resolve_with_resolver(request_body_or_ref, resolver)
 
         required = request_body.get("required", False)
         ensure_object(request_body["content"], "`requestBody.content`")

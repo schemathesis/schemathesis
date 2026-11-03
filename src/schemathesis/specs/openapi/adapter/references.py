@@ -5,7 +5,7 @@ from typing import Any
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import RefResolutionError
-from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference, resolve_reference_with_uri
+from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_with_uri
 from schemathesis.core.jsonschema.types import JsonValue, as_object_schema
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 
@@ -106,11 +106,10 @@ def maybe_resolve_with_resolver(
         if reference is None:
             return current_resolver, current_item
 
-        if reference in seen:
+        uri, current_resolver, current_item = resolve_reference_with_uri(current_resolver, reference)
+        if uri in seen:
             return current_resolver, current_item
-        seen.add(reference)
-
-        current_resolver, current_item = resolve_reference(current_resolver, reference)
+        seen.add(uri)
         if allow_boolean and isinstance(current_item, bool):
             return current_resolver, as_object_schema(current_item)
         ensure_object(current_item, f"Reference target `{reference}`")
