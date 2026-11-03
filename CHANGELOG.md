@@ -17,6 +17,7 @@
 - gRPC `UNAVAILABLE` response times inflated by a server reachability check.
 - gRPC connection errors hiding details for HTTP/1 servers and missing client certificates.
 - gRPC TLS failures reported as connection failures on grpcio 1.72 to 1.76.
+- `--auth-wfc` and `--report wfc` silently misbehaving with gRPC schemas.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
 - `response.json()` failing on gRPC responses in custom checks.
 - connect-go request decoding failures not reported as ST119.

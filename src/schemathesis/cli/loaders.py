@@ -31,7 +31,10 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 GRPC_HTTP_REPORTS_MESSAGE = (
-    "HAR, VCR and pytest reports describe HTTP/1.1 requests and are not available for gRPC targets"
+    "HAR, VCR, WFC and pytest reports describe HTTP/1.1 requests and are not available for gRPC targets"
+)
+GRPC_WFC_AUTH_MESSAGE = (
+    "Web Fuzzing Commons authentication (`--auth-wfc`, `[auth.wfc]`) is not available for gRPC targets"
 )
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
 TEXT_SCHEMA_EXTENSIONS = (".json", ".yaml", ".yml")
@@ -50,9 +53,11 @@ def into_event_stream(
     if is_grpc_location(location):
         if any(
             config.reports.get(report_format).enabled
-            for report_format in (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.PYTEST)
+            for report_format in (ReportFormat.HAR, ReportFormat.VCR, ReportFormat.WFC, ReportFormat.PYTEST)
         ):
             raise click.UsageError(GRPC_HTTP_REPORTS_MESSAGE)
+        if config.auth.wfc is not None:
+            raise click.UsageError(GRPC_WFC_AUTH_MESSAGE)
         try:
             require_extra()
         except ImportError as exc:

@@ -177,11 +177,18 @@ def map_body(context, body):
     assert sorted(crash_cache_dir(tmp_path).glob("*.json")) == crash_files
 
 
-@pytest.mark.parametrize("report", ["har", "vcr", "pytest"])
+@pytest.mark.parametrize(
+    "option",
+    ["--report=har", "--report=vcr", "--report=pytest", "--report=wfc", "--auth-wfc=auth.json"],
+    ids=["har", "vcr", "pytest", "wfc", "auth-wfc"],
+)
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_http_reports_refused(cli, tmp_path, snapshot_cli, report):
+def test_http_only_options_refused(cli, tmp_path, snapshot_cli, option):
+    (tmp_path / "auth.json").write_text(
+        json.dumps({"auth": [{"name": "user", "fixedHeaders": [{"name": "authorization", "value": "Bearer token"}]}]})
+    )
     # Refused before connecting, so an unreachable target gets the same answer.
-    assert cli.run("grpc://127.0.0.1:1", f"--report={report}") == snapshot_cli
+    assert cli.run("grpc://127.0.0.1:1", option) == snapshot_cli
     assert not (tmp_path / "schemathesis-report").exists()
 
 

@@ -119,5 +119,5 @@ Custom checks read the response message with `response.json()`, the gRPC status 
 - Only the coverage, fuzzing and [stateful](../explanations/stateful.md) [phases](../explanations/data-generation.md#testing-phases) run, with no [negative test cases](../explanations/data-generation.md#generation-modes).
 - Schemathesis leaves `google.protobuf.Any` fields out of requests and reports them as [`unsupported_field`](../reference/warnings.md#unsupported_field) warnings. Fill them with a [`map_body`](extending.md) hook, or a `before_call` hook for the coverage phase, which skips `map_body`.
 - Schemathesis does not read `.proto` files directly; build a descriptor set first.
-- HAR, VCR and pytest reports and the `--proxy` option are not available for gRPC targets.
+- HAR, VCR, WFC and pytest reports, `--auth-wfc` and the `--proxy` option are not available for gRPC targets.
 - Official Docker images and the GitHub Action do not include the `grpc` extra. Run gRPC targets from a Python installation with `pip install 'schemathesis[grpc]'`, or use `uvx --from 'schemathesis[grpc]' schemathesis ...`.
