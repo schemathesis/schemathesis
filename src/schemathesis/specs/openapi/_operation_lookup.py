@@ -4,10 +4,10 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from schemathesis.core.errors import OperationNotFound, RefResolutionError
+from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.transforms import encode_pointer
-from schemathesis.specs.openapi.operations import is_parsable_operation, parse_operation_reference
+from schemathesis.specs.openapi.operations import is_parsable_operation, parse_operation_reference, resolve_path_item
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import HttpMethodSchema
@@ -82,16 +82,14 @@ class OperationLookup:
             self._operations_by_reference = operations_by_reference
             return
         root_resolver = self.schema.root_resolver
-        default_scope = root_resolver.base_uri
         for path, path_item in paths.items():
             if not isinstance(path_item, dict):
                 continue
-            if "$ref" in path_item:
-                resolved_resolver, resolved_path_item = resolve_reference(root_resolver, path_item["$ref"])
-                scope = resolved_resolver.base_uri
-            else:
-                scope = default_scope
-                resolved_path_item = path_item
+            try:
+                resolved_resolver, resolved_path_item = resolve_path_item(root_resolver, path_item)
+            except InvalidSchema:
+                continue
+            scope = resolved_resolver.base_uri
             if not isinstance(resolved_path_item, dict):
                 continue
             shared_parameters = tuple(resolved_path_item.get("parameters", []))

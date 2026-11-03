@@ -464,6 +464,24 @@ def test_path_item_reference_is_resolved(ctx):
         assert isinstance(case.body, str)
 
 
+def test_path_item_reference_chain_is_resolved(ctx, tmp_path):
+    (tmp_path / "items.json").write_text(json.dumps({"get": {"responses": {"200": {"description": "OK"}}}}))
+    root = tmp_path / "root.json"
+    root.write_text(
+        json.dumps(
+            ctx.openapi.build_schema(
+                {"/items": {"$ref": "#/x-paths/alias"}}, **{"x-paths": {"alias": {"$ref": "items.json"}}}
+            )
+        )
+    )
+    schema = schemathesis.openapi.from_path(str(root))
+
+    assert [result.ok().label for result in schema.get_all_operations()] == ["GET /items"]
+    assert schema.statistic.operations.total == 1
+    assert schema.find_operation_by_reference("#/paths/~1items/get").label == "GET /items"
+    assert schema["/items"]["GET"].label == "GET /items"
+
+
 def test_nullable_enum_without_null_keeps_null_out(ctx):
     operation = ctx.openapi.load_operation(
         "GET /users",

@@ -66,6 +66,13 @@ def is_parsable_operation(definition: object) -> bool:
     return isinstance(definition, dict) and bool(definition)
 
 
+def resolve_path_item(resolver: Resolver, path_item: object) -> tuple[Resolver, object]:
+    """Follow a Path Item `$ref` chain to the node it ends at, with the resolver of that node's document."""
+    if isinstance(path_item, dict) and "$ref" in path_item:
+        return maybe_resolve_with_resolver(path_item, resolver)
+    return resolver, path_item
+
+
 def parse_operation_reference(reference: str) -> tuple[str, str]:
     """Path and method an `operationRef` like `#/paths/~1users~1%7Bid%7D/get` points to."""
     _, separator, suffix = reference.partition("#/paths/")
@@ -197,12 +204,8 @@ class OperationLoader:
                 if not _is_utf8_encodable(path):
                     raise InvalidSchema("Path is not valid UTF-8", path=path)
                 dispatch_before_process_path(schema, context, path, path_item)
-                if isinstance(path_item, dict) and "$ref" in path_item:
-                    path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
-                    scope = path_resolver.base_uri
-                else:
-                    path_resolver = root_resolver
-                    scope = path_resolver.base_uri
+                path_resolver, path_item = resolve_path_item(root_resolver, path_item)
+                scope = path_resolver.base_uri
                 if not isinstance(path_item, dict):
                     raise InvalidSchema("Path item must be an object", path=path)
                 shared_parameters = path_item.get("parameters", [])
@@ -245,8 +248,7 @@ class OperationLoader:
             if _is_specification_extension(path):
                 continue
             try:
-                if isinstance(path_item, dict) and "$ref" in path_item:
-                    _, path_item = resolve_reference(root_resolver, path_item["$ref"])
+                _, path_item = resolve_path_item(root_resolver, path_item)
                 if not isinstance(path_item, dict):
                     continue
                 for method, definition in path_item.items():
@@ -285,10 +287,7 @@ class OperationLoader:
             if _is_specification_extension(path):
                 continue
             try:
-                if isinstance(path_item, dict) and "$ref" in path_item:
-                    path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
-                else:
-                    path_resolver = root_resolver
+                path_resolver, path_item = resolve_path_item(root_resolver, path_item)
                 if not isinstance(path_item, dict):
                     complete_walk = False
                     continue
