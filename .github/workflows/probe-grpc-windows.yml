@@ -1,0 +1,37 @@
+name: Probe gRPC Windows
+
+on:
+  push:
+    branches:
+      - dd/probe-grpc-windows-cert
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
+      fail-fast: false
+    name: Probe (Python ${{ matrix.python }} on windows-2022)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: ${{ matrix.python }}-v2
+
+      - run: uv venv .venv --python ${{ matrix.python }}
+      - run: uv pip install --python .venv -e ".[tests,grpc]"
+      - run: .venv\Scripts\python -m pytest -vv -p no:cacheprovider test/transport/test_grpc.py test/specs/grpc/test_reflection.py

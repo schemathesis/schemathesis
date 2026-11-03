@@ -1,7 +1,6 @@
 import base64
 import contextlib
 import json
-import platform
 import re
 import socket
 import threading
@@ -273,10 +272,8 @@ def test_tls_client_certificate(ctx, tmp_path, combined):
     assert server.calls[-1].peer_names == [b"client"]
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows", reason="gRPC names the closed connection with varying system errors"
-)
-def test_missing_tls_client_certificate_keeps_grpc_details_and_gives_a_hint(ctx):
+@pytest.mark.parametrize("attempt", range(5))
+def test_missing_tls_client_certificate_keeps_grpc_details_and_gives_a_hint(ctx, attempt):
     server = ctx.grpc.apps.users(tls=True, client_auth=True)
     with pytest.raises(requests.exceptions.ConnectionError) as exc_info:
         get_user(server, 7, verify=str(server.ca_path))
@@ -284,7 +281,7 @@ def test_missing_tls_client_certificate_keeps_grpc_details_and_gives_a_hint(ctx)
         f"failed to connect to all addresses; last error: UNAVAILABLE: ipv4:127.0.0.1:{server.target.rsplit(':', 1)[1]}: "
         "Socket closed. The server may require a client certificate; use `--request-cert` and "
         "`--request-cert-key`"
-    )
+    ), f"PROBE transport: {exc_info.value!r} CAUSE: {exc_info.value.__cause__!r}"
 
 
 def test_http1_server_keeps_grpc_details_and_gives_a_protocol_hint(ctx, tmp_path):
