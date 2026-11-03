@@ -3368,6 +3368,52 @@ def test_all_of_response_with_boolean_schema_properties_keeps_fields_and_link(ct
 
 
 @pytest.mark.parametrize(
+    "order",
+    [
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "customer": {
+                    "$id": "https://example.com/customer",
+                    "$defs": {"C": {"type": "object", "properties": {"id": {"type": "string"}}}},
+                    "$ref": "#/$defs/C",
+                },
+            },
+        },
+        {
+            "$id": "https://example.com/order",
+            "$defs": {"Base": {"type": "object", "properties": {"id": {"type": "string"}}}},
+            "allOf": [{"$ref": "#/$defs/Base"}, {"type": "object", "properties": {"customer": {"type": "string"}}}],
+        },
+    ],
+    ids=["property", "all-of"],
+)
+def test_resource_naming_its_own_document_keeps_fields_and_link(ctx, order):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/orders", "201", component_ref("Order")),
+            **operation("get", "/orders/{orderId}", "200", component_ref("Order"), parameters=[path_param("orderId")]),
+        },
+        version="3.1.0",
+        components={"schemas": {"Order": order}},
+    )
+    assert graph.resources["Order"].fields == ["customer", "id"]
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1orders/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders~1{orderId}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.orderId": "$response.body#/id"},
+            },
+        ]
+    ]
+
+
+@pytest.mark.parametrize(
     "response_schema",
     [
         pytest.param(ref("#/info/title"), id="direct"),

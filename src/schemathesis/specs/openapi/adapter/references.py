@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from typing import Any
+from typing import Any, cast
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_with_uri
-from schemathesis.core.jsonschema.types import JsonValue, as_object_schema
+from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue, as_object_schema
 from schemathesis.specs.openapi.adapter.validators import ensure_object
 
 
@@ -106,6 +106,7 @@ def maybe_resolve_with_resolver(
         if reference is None:
             return current_resolver, current_item
 
+        current_resolver = current_resolver.enter(cast(JsonSchemaObject, current_item))
         uri, current_resolver, current_item = resolve_reference_with_uri(current_resolver, reference)
         if uri in seen:
             return current_resolver, current_item
