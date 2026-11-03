@@ -225,8 +225,8 @@ def test_invalidate_forces_refetch(auth_operation):
 
 @pytest.mark.parametrize(
     "kwargs, expected",
-    [({}, [401]), ({"retry_on": [401, 440]}, [401, 440]), ({"retry_on": []}, [])],
-    ids=["default", "explicit", "empty-disables"],
+    [({"retry_on": [401, 440]}, [401, 440]), ({"retry_on": []}, [])],
+    ids=["explicit", "empty-disables"],
 )
 def test_auth_decorator_retry_on(kwargs, expected):
 

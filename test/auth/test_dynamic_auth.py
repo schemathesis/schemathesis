@@ -18,6 +18,7 @@ from schemathesis.auths import (
     refresh_auth,
     set_on_case,
 )
+from schemathesis.checks import not_a_server_error
 from schemathesis.config import ApiKeyAuthConfig, ConfigError, SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.core.errors import AuthenticationError
@@ -1511,3 +1512,23 @@ class TokenAuth:
     )
     assert result.exit_code == 0, result.stdout
     assert state["issued"] >= 2
+
+
+def test_grpc_reauth_on_unauthenticated_by_default(ctx):
+    server = ctx.grpc.apps.users()
+    schema = schemathesis.grpc.from_url(server.target)
+    tokens = iter(["old", "new"])
+
+    @schema.auth()
+    class TokenAuth:
+        def get(self, case, context):
+            return next(tokens)
+
+        def set(self, case, data, context):
+            case.headers = {**(case.headers or {}), "authorization": f"Bearer {data}"}
+
+    operation = schema["pkg.Users"]["GetUser"]
+    case = operation.Case(body={"userId": 401})
+    set_on_case(case, AuthContext(operation=operation, app=None), schema.auth)
+    case.call_and_validate(checks=[not_a_server_error])
+    assert [dict(call.metadata).get("authorization") for call in server.calls] == ["Bearer old", "Bearer new"]

@@ -142,6 +142,22 @@ def test_retry_on_statuses_empty_by_default(ctx):
     assert engine.reauth.retry_on_statuses == frozenset()
 
 
+def test_retry_on_statuses_default_to_unauthenticated_status(ctx):
+    schema = _simple_schema(ctx)
+
+    @schema.auth()
+    class TokenAuth:
+        def get(self, case, context):
+            return "token"
+
+        def set(self, case, data, context):
+            case.headers = case.headers or {}
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    engine = EngineContext(schema=schema, stop_event=threading.Event())
+    assert engine.reauth.retry_on_statuses == frozenset({401})
+
+
 def test_retry_on_statuses_unions_dynamic_scheme_and_registered_auth_provider(ctx):
     schema = _simple_schema(ctx)
     schema.config.auth.dynamic.schemes["petstore_auth"] = DynamicTokenAuthConfig(path="/token", retry_on=[401, 419])
