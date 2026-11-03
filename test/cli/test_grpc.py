@@ -30,14 +30,15 @@ def test_grpc_run_finds_server_error(ctx, cli, tmp_path, snapshot_cli, source):
     assert cli.run(*args, "--max-examples=10", "--phases=fuzzing", "--seed=1") == snapshot_cli
 
 
+@pytest.mark.parametrize("user_id", [1, 503], ids=["ok", "unavailable"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_expected_status_name(ctx, cli, snapshot_cli):
+def test_expected_status_name(ctx, cli, snapshot_cli, user_id):
     server = ctx.grpc.apps.users()
     module = ctx.write_pymodule(
-        """
+        f"""
 @schemathesis.hook
 def map_body(context, body):
-    return {"userId": 503}
+    return {{"userId": {user_id}}}
         """
     )
     assert (
