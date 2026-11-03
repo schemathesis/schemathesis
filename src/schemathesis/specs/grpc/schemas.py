@@ -350,13 +350,17 @@ class GrpcSchema(BaseSchema):
     @override
     def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
         status = grpc_status(response)
-        # The default names HTTP status classes, and a gRPC status belongs to the class it shares a meaning with.
-        if expected_statuses == NOT_A_SERVER_ERROR_EXPECTED_STATUSES:
-            return not GRPC_STATUSES[status].status_class.is_server_error
-        invalid = [expected for expected in expected_statuses if expected not in GRPC_STATUS_CODES_BY_NAME]
+        # The default names HTTP status classes; listed gRPC status names are allowed on top of every non-server error.
+        invalid = [
+            expected
+            for expected in expected_statuses
+            if expected not in GRPC_STATUS_CODES_BY_NAME and expected not in NOT_A_SERVER_ERROR_EXPECTED_STATUSES
+        ]
         if invalid:
             self._raise_invalid_status_values(invalid)
-        return any(GRPC_STATUS_CODES_BY_NAME[expected] == status for expected in expected_statuses)
+        if not GRPC_STATUSES[status].status_class.is_server_error:
+            return True
+        return any(GRPC_STATUS_CODES_BY_NAME.get(expected) == status for expected in expected_statuses)
 
     @override
     def operation_label_for_display(self, operation_label: str | None) -> str | None:
