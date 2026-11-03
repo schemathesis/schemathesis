@@ -392,6 +392,7 @@ def test_response_body_charset_in_reports(ctx, cli, cassette_path, charset, body
                 harfile.Cookie(name="spam", value="baz"),
             ],
         ),
+        ("A=a; $=b", []),
     ],
 )
 def test_cookie_to_har(value, expected):

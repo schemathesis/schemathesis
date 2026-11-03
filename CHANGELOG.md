@@ -12,6 +12,7 @@
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
 - `RecursionError` during generation for self-referencing arrays with `prefixItems` or `contains`.
 - Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.
+- Crash writing the HAR report for `Cookie` headers the cookie parser rejects.
 - Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
 - Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
 - gRPC `UNAVAILABLE` response times inflated by a server reachability check.

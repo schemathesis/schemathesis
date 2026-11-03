@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from http.cookies import SimpleCookie
+from http.cookies import CookieError, SimpleCookie
 from io import StringIO
 from pathlib import Path
 from types import TracebackType
@@ -168,7 +168,12 @@ def _extract_cookies(headers: list[str]) -> list[harfile.Cookie]:
 
 
 def _cookie_to_har(cookie: str) -> Iterator[harfile.Cookie]:
-    parsed = SimpleCookie(cookie)
+    parsed: SimpleCookie = SimpleCookie()
+    try:
+        parsed.load(cookie)
+    except CookieError:
+        # Generated values may render a header the stdlib parser rejects; the raw header stays in `headers`.
+        return
     for name, data in parsed.items():
         yield harfile.Cookie(
             name=name,
