@@ -436,6 +436,35 @@ def map_body(context, body):
     )
 
 
+def test_replay_sends_supplied_credentials_in_place_of_masked_ones(ctx, cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": -1}
+        """
+    )
+    headers = ["-H", "Authorization: Bearer secret", "-H", "token-bin: U0VDUkVU"]
+    cli.main(
+        "run",
+        server.target,
+        "--include-name=pkg.Users/GetUser",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        *headers,
+        hooks=module,
+    )
+    server.calls.clear()
+
+    result = cli.main("replay", "--keep", *headers)
+
+    assert ("ERROR" in result.output, "1 failed" in result.output) == (False, True), result.output
+    assert {(dict(call.metadata)["authorization"], dict(call.metadata)["token-bin"]) for call in server.calls} == {
+        ("Bearer secret", b"SECRET")
+    }
+
+
 def test_methods_with_side_effects_run_last(ctx, cli, tmp_path):
     server = ctx.grpc.apps.side_effects()
     write_descriptor_set(tmp_path, side_effects_descriptor_set())
