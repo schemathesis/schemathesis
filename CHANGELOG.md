@@ -23,6 +23,8 @@
 - connect-go request decoding failures not reported as ST119.
 - gRPC responses, output and reports showing HTTP status codes instead of gRPC statuses.
 - Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.
+- `st replay` reporting stateful cases as fixed while resending stale values from earlier responses.
+- Stateful reproductions omitting earlier steps on the same resource, such as a preceding `DELETE`.
 - gRPC Channelz, CSDS and health services tested as part of the API.
 
 ## [4.33.0](https://github.com/schemathesis/schemathesis/compare/v4.32.7...v4.33.0) - 2026-11-01

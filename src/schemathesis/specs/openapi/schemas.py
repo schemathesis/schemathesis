@@ -64,7 +64,7 @@ from ...hooks import (
     dispatch_before_process_path,
 )
 from ...schemas import APIOperation, APIOperationMap, BaseSchema
-from . import checks
+from . import checks, expressions
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
@@ -95,7 +95,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.coverage import GenerationSession
     from schemathesis.generation.hypothesis.reporting import SlowParameter, UnsatisfiableParameter
     from schemathesis.generation.stateful import APIStateMachine
-    from schemathesis.generation.stateful.state_machine import StepInput
+    from schemathesis.generation.stateful.state_machine import StepInput, StepOutput
     from schemathesis.specs.openapi.adapter import OpenApiResponses
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
     from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
@@ -479,6 +479,10 @@ class OpenApiSchema(BaseSchema):
         from schemathesis.specs.openapi.stateful.link_calibration import record_link_outcome
 
         record_link_outcome(calibration, response, observations, step_input, recorder)
+
+    @override
+    def resolve_link_value(self, definition: object, output: StepOutput, recorded: object) -> object:
+        return expressions.prefer_recorded(expressions.evaluate_wildcard(definition, output), recorded)
 
     @override
     def iter_link_candidates(

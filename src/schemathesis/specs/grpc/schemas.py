@@ -47,7 +47,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone
 from schemathesis.core.transport import CallOutcome, Response, StatusClass
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.filters import FilterUsage, OperationContext
@@ -85,6 +85,7 @@ from schemathesis.specs.grpc.stateful import (
     create_state_machine,
     infer_links,
     link_candidates,
+    response_value,
     with_value,
 )
 from schemathesis.specs.grpc.status import (
@@ -112,7 +113,7 @@ if TYPE_CHECKING:
     from schemathesis.filters import FilterSet
     from schemathesis.generation.case import Case
     from schemathesis.generation.coverage import GenerationSession
-    from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.generation.stateful.state_machine import APIStateMachine, StepOutput
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ResourcePool
     from schemathesis.transport.grpc import GrpcTransport
@@ -654,6 +655,11 @@ class GrpcSchema(BaseSchema):
         return link_candidates(
             self._links_by_source.get(operation.label, []), case, response, operations_by_label, excluded_labels
         )
+
+    @override
+    def resolve_link_value(self, definition: object, output: StepOutput, recorded: object) -> object:
+        assert isinstance(definition, str)
+        return response_value(output.case.operation, output.response, definition) or UNRESOLVABLE
 
     @override
     def create_extra_data_source(self) -> None:

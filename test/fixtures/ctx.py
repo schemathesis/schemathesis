@@ -241,6 +241,14 @@ class OpenAPIApps:
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
 
+    def replay_inferred_list_link(
+        self, *, item_ids: list[int], failing: bool, consumer: Literal["path", "body"] = "path"
+    ) -> OpenAPIServer:
+        return _start(
+            self.parent,
+            openapi_stateful.replay_inferred_list_link(item_ids=item_ids, failing=failing, consumer=consumer),
+        )
+
     def flaky_branch_blocks(self) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.flaky_branch_blocks())
 
@@ -525,6 +533,9 @@ class GraphQLApps:
     def use_after_create(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.use_after_create())
 
+    def unknown_id_failure(self, *, fixed: bool) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.unknown_id_failure(fixed=fixed))
+
     def generic_id_pool(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.generic_id_pool())
 
@@ -630,10 +641,10 @@ class GrpcApps:
 
         return self._serve(side_effects())
 
-    def library(self) -> GrpcServer:
+    def library(self, *, fixed: bool = False) -> GrpcServer:
         from test.apps.catalog.grpc.users import library
 
-        return self._serve(library())
+        return self._serve(library(fixed=fixed))
 
     def envelope(self) -> GrpcServer:
         from test.apps.catalog.grpc.users import envelope

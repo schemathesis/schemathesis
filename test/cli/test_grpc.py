@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -429,6 +430,35 @@ def map_body(context, body):
     )
 
 
+def test_replay_sends_supplied_credentials_in_place_of_masked_ones(ctx, cli):
+    server = ctx.grpc.apps.users()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def map_body(context, body):
+    return {"userId": -1}
+        """
+    )
+    headers = ["-H", "Authorization: Bearer secret", "-H", "token-bin: U0VDUkVU"]
+    cli.main(
+        "run",
+        server.target,
+        "--include-name=pkg.Users/GetUser",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        *headers,
+        hooks=module,
+    )
+    server.calls.clear()
+
+    result = cli.main("replay", "--keep", *headers)
+
+    assert ("ERROR" in result.output, "1 failed" in result.output) == (False, True), result.output
+    assert {(dict(call.metadata)["authorization"], dict(call.metadata)["token-bin"]) for call in server.calls} == {
+        ("Bearer secret", b"SECRET")
+    }
+
+
 def test_methods_with_side_effects_run_last(ctx, cli, tmp_path):
     server = ctx.grpc.apps.side_effects()
     write_descriptor_set(tmp_path, side_effects_descriptor_set())
@@ -465,6 +495,29 @@ def test_fuzz_follows_links(ctx, cli, snapshot_cli, include):
     server = ctx.grpc.apps.library()
     # The run ends at the first failure; the time limit only stops a regression from hanging the test.
     assert cli.main("fuzz", server.target, "--max-time=60", *include) == snapshot_cli
+
+
+@pytest.mark.parametrize(("fixed", "expected"), [(False, "x FAILED"), (True, "+ FIXED")], ids=["buggy", "fixed"])
+def test_replay_reextracts_created_names_on_fresh_server(ctx, cli, tmp_path, fixed, expected):
+    server = ctx.grpc.apps.library()
+    cli.run(
+        server.target,
+        "--include-name=library.Library/CreateBook",
+        "--include-name=library.Library/GetBook",
+        "--phases=stateful",
+        "--max-examples=10",
+        "--seed=1",
+    )
+    crash_files = sorted(crash_cache_dir(tmp_path).glob("library*.json"))
+    # A fresh server knows none of the recorded names, so only a name taken from its own response reaches the bug.
+    fresh = ctx.grpc.apps.library(fixed=fixed)
+
+    result = cli.main("replay", f"--url={fresh.target}")
+
+    assert (
+        re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE),
+        [path.exists() for path in crash_files],
+    ) == ([expected], [not fixed]), result.output
 
 
 def test_unique_inputs_send_a_repeated_message_once(ctx, cli):

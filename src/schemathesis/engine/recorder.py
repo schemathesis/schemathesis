@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import itertools
 import time
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
@@ -9,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from schemathesis.config._output import MAX_RECORDED_PAYLOAD_SIZE
 from schemathesis.core.failures import Failure
-from schemathesis.core.transport import Headers, Response
+from schemathesis.core.transport import SAFE_METHODS, Headers, Response
 from schemathesis.engine import Status
 from schemathesis.generation.case import Case
 
@@ -326,7 +327,8 @@ class ScenarioRecorder:
         """Iterate over cases needed to reproduce a failure, in execution order.
 
         Yields the failing case's parent chain plus any explicitly-referenced cases
-        (e.g. a sibling DELETE for `use_after_free`) and their ancestors.
+        (e.g. a sibling DELETE for `use_after_free`) and their ancestors, and the earlier
+        writes that used a value from the same parent, as they may have changed the server state.
         """
         interesting: set[str] = set()
 
@@ -342,6 +344,14 @@ class ScenarioRecorder:
         walk(case_id)
         for related_id in related_case_ids:
             walk(related_id)
+
+        earlier = itertools.takewhile(lambda item: item[0] != case_id, self.cases.items())
+        siblings = [
+            node_id
+            for node_id, node in earlier
+            if node.parent_id in interesting and not node.is_probe and node.value.method.upper() not in SAFE_METHODS
+        ]
+        interesting.update(siblings)
 
         for case_id, node in self.cases.items():
             if case_id in interesting:

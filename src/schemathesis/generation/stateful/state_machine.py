@@ -97,6 +97,7 @@ class Transition:
 class ExtractedParam:
     """Result of parameter extraction."""
 
+    # Where the value comes from, such as a runtime expression; `NOT_SET` when replay cannot take it again.
     definition: Any
     value: Result[Any, Exception]
     is_required: bool
@@ -530,19 +531,23 @@ class BundleStateMachine(RecordingStateMachine):
         *,
         rule_name: str,
         parent_id: str | None,
-        applied_parameters: list[tuple[ParameterLocation, str | None]] | None,
+        linked: dict[str, ExtractedParam] | None,
     ) -> StepOutput | None:
-        """Send `case` as one step; `None` when an identical input already passed and the step is skipped."""
+        """Send `case` as one step; `None` when an identical input already passed and the step is skipped.
+
+        `linked` maps each body field the step filled from its parent's response to how it got the value.
+        """
         __tracebackhide__ = True
+        linked = linked or {}
         if parent_id is not None:
             transition: Transition | None = Transition(
                 id=rule_name,
                 parent_id=parent_id,
                 is_inferred=False,
-                parameters={},
+                parameters={"body": linked},
                 request_body=None,
             )
-            applied = applied_parameters or []
+            applied: list[tuple[ParameterLocation, str | None]] = [(ParameterLocation.BODY, name) for name in linked]
             step_input = StepInput(case=case, transition=transition, applied_parameters=applied)
         else:
             transition = None
@@ -551,7 +556,7 @@ class BundleStateMachine(RecordingStateMachine):
             parent_id=parent_id,
             case=case,
             transition=transition,
-            is_transition_applied=bool(applied_parameters),
+            is_transition_applied=bool(linked),
         )
         self.control.record_step(step_input, self.recorder)
         return APIStateMachine._step(self, input=step_input)

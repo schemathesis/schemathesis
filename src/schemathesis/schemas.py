@@ -84,7 +84,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.hypothesis.reporting import FilterCaseTracker, SlowParameter, UnsatisfiableParameter
-    from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput
+    from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool
 
@@ -695,6 +695,10 @@ class BaseSchema(Mapping):
         recorder: ScenarioRecorder,
     ) -> None:
         """Score the link a stateful step followed by how the step went; a no-op for specs without links."""
+
+    def resolve_link_value(self, definition: object, output: StepOutput, recorded: object) -> object:
+        """Take a linked value from `output` again, or `UNRESOLVABLE`; of several matches, `recorded` wins if present."""
+        raise NotImplementedError
 
     def iter_schema_warnings(self) -> list[SchemaWarning]:
         """Return spec-level static-analysis warnings collected from the schema."""

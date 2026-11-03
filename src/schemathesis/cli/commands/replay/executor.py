@@ -169,7 +169,16 @@ def _replay_with_retries(
 
 
 def _unverified_without_recorded_values(outcome: ReplayOutcome, *, unrestorable: bool) -> ReplayOutcome:
-    """A pass without the values the recorded request carried proves nothing, so it never counts as fixed."""
+    """A pass without the values the recorded request carried, or with stale linked values, never counts as fixed."""
+    stale = next(
+        (
+            (number, value.name)
+            for number, step in enumerate(outcome.step_outcomes, start=1)
+            for value in step.links
+            if value.fresh is UNRESOLVABLE
+        ),
+        None,
+    )
     if outcome.unsupplied_masked:
         message = _missing_credentials_message(outcome.unsupplied_masked)
         note = f"{_masked_names(outcome.unsupplied_masked)} masked in the crash file"
@@ -182,6 +191,13 @@ def _unverified_without_recorded_values(outcome: ReplayOutcome, *, unrestorable:
             "record it with `output.sanitization.enabled = false` to replay it"
         )
         note = "masked values in the crash file"
+    elif stale is not None:
+        number, name = stale
+        message = (
+            f"`{name}` at step {number} was sent as recorded, not re-extracted from an earlier response; "
+            "a passing replay does not show the bug is fixed"
+        )
+        note = "linked value not re-extracted"
     else:
         return outcome
     if outcome.status is ReplayStatus.FIXED:
@@ -309,7 +325,7 @@ def _replay_sequence(
         if (
             parent_output is not None
             and step.link is not None
-            and (step.link.parameters or step.link.request_body is not None)
+            and (step.link.parameters or step.link.request_body is not None or step.link.recorded_values)
         ):
             try:
                 links = _apply_link_parameters(case, step.link, parent_output)
@@ -411,15 +427,16 @@ def _send_as(case: Case, identities: EscalatingAuthProvider, name: str) -> None:
 
 
 def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> list[LinkedValue]:
-    from schemathesis.specs.openapi.expressions import body_pointers, evaluate
+    from schemathesis.specs.openapi.expressions import body_pointers
 
+    schema = case.operation.schema
     linked: list[LinkedValue] = []
     # Re-extract each link parameter from the previous response into its container.
     for key, expression in link.parameters.items():
         location, _, name = key.partition(".")
         container = case.get_container(ParameterLocation(location))
         assert isinstance(container, MutableMapping)
-        value = evaluate(expression, previous_step_output)
+        value = schema.resolve_link_value(expression, previous_step_output, container.get(name, NOT_SET))
         linked.append(
             LinkedValue(
                 location=location,
@@ -434,9 +451,14 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
             continue
         container[name] = value
 
+    for key, value in link.recorded_values.items():
+        location, _, name = key.partition(".")
+        # The recorded request already carries the value, and there is no expression to re-extract it with.
+        linked.append(LinkedValue(location=location, name=name, recorded=value, fresh=UNRESOLVABLE))
+
     if link.request_body is not None:
         # Re-extract the body from the previous response, merging into the recorded one.
-        body = evaluate(link.request_body, previous_step_output, evaluate_nested=True)
+        body = schema.resolve_link_value(link.request_body, previous_step_output, case.body)
         if isinstance(body, dict) and isinstance(case.body, dict) and isinstance(link.request_body, dict):
             recorded_body = case.body
             linked.extend(

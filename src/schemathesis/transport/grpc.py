@@ -94,6 +94,9 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         if timeout is None:
             timeout = settings.network_timeout
         base_url = base_url or case.operation.base_url
+        if session is not None and session.headers:
+            # Headers from config and CLI options override the case's own, so they replace values a crash file masked.
+            headers = {**session.headers, **(headers or {})}
         request_headers = request_metadata(case, headers)
         auth = (
             session.auth if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2 else None
