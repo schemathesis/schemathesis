@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias, cast
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import JsonSchema, get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.transforms import decode_pointer, encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -667,6 +667,7 @@ def _collect_properties(schema: Mapping[str, Any], resolver: Resolver) -> Proper
 def _collect_inherited_properties(
     schema: Mapping[str, Any], resolver: Resolver, seen: frozenset[str], cache: PropertiesCache
 ) -> tuple[Properties, frozenset[str]]:
+    resolver = resolver.enter(cast(JsonSchemaObject, schema))
     # Properties inherited through `allOf` belong to the resource as much as its own ones.
     properties: Properties = {}
     own = schema.get("properties")
