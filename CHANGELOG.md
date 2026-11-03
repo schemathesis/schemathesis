@@ -26,6 +26,7 @@
 - gRPC TLS failures reported as connection failures on grpcio 1.72 to 1.76.
 - `--auth-wfc` and `--report wfc` silently misbehaving with gRPC schemas.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
+- `st replay` sending masked gRPC metadata instead of credentials from `-H` or config.
 - Explicit links in path items from external files not selected and duplicated by inference.
 - `response.json()` failing on gRPC responses in custom checks.
 - connect-go request decoding failures not reported as ST119.
