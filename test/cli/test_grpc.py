@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -501,6 +502,29 @@ def test_fuzz_follows_links(ctx, cli, snapshot_cli, include):
     server = ctx.grpc.apps.library()
     # The run ends at the first failure; the time limit only stops a regression from hanging the test.
     assert cli.main("fuzz", server.target, "--max-time=60", *include) == snapshot_cli
+
+
+@pytest.mark.parametrize(("fixed", "expected"), [(False, "x FAILED"), (True, "+ FIXED")], ids=["buggy", "fixed"])
+def test_replay_reextracts_created_names_on_fresh_server(ctx, cli, tmp_path, fixed, expected):
+    server = ctx.grpc.apps.library()
+    cli.run(
+        server.target,
+        "--include-name=library.Library/CreateBook",
+        "--include-name=library.Library/GetBook",
+        "--phases=stateful",
+        "--max-examples=10",
+        "--seed=1",
+    )
+    crash_files = sorted(crash_cache_dir(tmp_path).glob("library*.json"))
+    # A fresh server knows none of the recorded names, so only a name taken from its own response reaches the bug.
+    fresh = ctx.grpc.apps.library(fixed=fixed)
+
+    result = cli.main("replay", f"--url={fresh.target}")
+
+    assert (
+        re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE),
+        [path.exists() for path in crash_files],
+    ) == ([expected], [not fixed]), result.output
 
 
 def test_unique_inputs_send_a_repeated_message_once(ctx, cli):

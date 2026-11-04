@@ -30,6 +30,7 @@
 - `st replay` sending masked gRPC metadata instead of credentials from `-H` or config.
 - Explicit links in path items from external files not selected and duplicated by inference.
 - `response.json()` failing on gRPC responses in custom checks.
+- `st replay` resending recorded gRPC values instead of taking them again from earlier responses.
 - connect-go request decoding failures not reported as ST119.
 - gRPC responses, output and reports showing HTTP status codes instead of gRPC statuses.
 - Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.

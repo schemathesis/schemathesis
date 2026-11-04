@@ -638,10 +638,10 @@ class GrpcApps:
 
         return self._serve(side_effects())
 
-    def library(self) -> GrpcServer:
+    def library(self, *, fixed: bool = False) -> GrpcServer:
         from test.apps.catalog.grpc.users import library
 
-        return self._serve(library())
+        return self._serve(library(fixed=fixed))
 
     def envelope(self) -> GrpcServer:
         from test.apps.catalog.grpc.users import envelope
