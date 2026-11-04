@@ -26,7 +26,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import split_body_path
+from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer, split_body_path
 from schemathesis.core.transport import CallOutcome, is_uninformative_status
 from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
@@ -61,7 +61,12 @@ from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
 from .ordering import compute_graphql_layers
 from .scalars import UnknownScalar, scalar_strategies, unsupported_scalar_name
-from .substitution import SUBSTITUTION_PROBABILITY, substitute_constants, substitute_pool_values
+from .substitution import (
+    SUBSTITUTION_PROBABILITY,
+    replace_string_literals,
+    substitute_constants,
+    substitute_pool_values,
+)
 from .validation import is_client_error, parse_payload, validate_data, validate_graphql_response
 
 if TYPE_CHECKING:
@@ -77,7 +82,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
     from schemathesis.engine.observations import Observations
     from schemathesis.generation.dictionaries import DictionaryDraw
-    from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.generation.stateful.state_machine import APIStateMachine, StepOutput
     from schemathesis.python._constants.pool import ConstantDraw
     from schemathesis.resources import ResourcePool
 
@@ -191,6 +196,25 @@ class GraphQLSchema(BaseSchema):
         return GraphQLResourcePool(
             client_schema=self.client_schema, handles=self.analysis.handles, index=self.analysis.schema_index
         )
+
+    @override
+    def read_link_value(
+        self, case: Case, location: ParameterLocation, name: str, definition: object, parent_body: str
+    ) -> object:
+        # Ids go into the query as literals, so the recorded one is read from where the parent's response had it.
+        value = _response_value(parent_body, definition)
+        return NOT_SET if value is UNRESOLVABLE else value
+
+    @override
+    def resolve_link_value(self, definition: object, output: StepOutput, recorded: object) -> object:
+        return _response_value(output.response.content, definition)
+
+    @override
+    def write_link_value(
+        self, case: Case, location: ParameterLocation, name: str, recorded: object, value: object
+    ) -> None:
+        assert isinstance(case.body, str) and isinstance(recorded, str) and isinstance(value, str)
+        case.body = replace_string_literals(case.body, recorded, value)
 
     @override
     def build_request_url(self, case: Case, base_url: str) -> str:
@@ -447,6 +471,17 @@ class GraphQLSchema(BaseSchema):
         # Only this check reports `data` mismatches, so the walk over `data` runs once per response.
         validate_data(case, response)
         return None
+
+
+def _response_value(body: str | bytes, pointer: object) -> object:
+    """The string at `pointer` in a GraphQL response body, or `UNRESOLVABLE`."""
+    assert isinstance(pointer, str)
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return UNRESOLVABLE
+    value = resolve_pointer(payload, pointer)
+    return value if isinstance(value, str) else UNRESOLVABLE
 
 
 def _response_failure(case: Case, response: Response) -> Failure | None:

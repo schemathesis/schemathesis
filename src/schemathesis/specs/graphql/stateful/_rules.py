@@ -24,7 +24,7 @@ from hypothesis.stateful import Bundle, consumes, multiple, precondition, rule
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation.meta import TestPhase
-from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE
+from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE, ExtractedParam
 from schemathesis.specs.graphql._helpers import _unwrap, replace_node, replace_selections, resource_type
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.inference import OperationRole, RootType, classify_operation
@@ -230,11 +230,16 @@ def _bundle_substituter(
     bundle_args: dict[str, Any],
     *,
     exploration_rate: float,
+    sent: set[Handle],
 ) -> Callable[[graphql.OperationDefinitionNode, Random], graphql.OperationDefinitionNode]:
-    """Build the `mutate_ast` callback that swaps strategy-generated id literals with bundle values."""
+    """Build the `mutate_ast` callback that swaps strategy-generated id literals with bundle values.
+
+    `sent` holds the handles whose bundle values the last built query carries.
+    """
     bundle_values = {consumed[argument]: bundle_args[argument] for argument in bundle_args}
 
     def mutate(operation_node: graphql.OperationDefinitionNode, random: Random) -> graphql.OperationDefinitionNode:
+        sent.clear()
         return substitute_bundle_values(
             operation_node=operation_node,
             client_schema=schema.client_schema,
@@ -242,9 +247,22 @@ def _bundle_substituter(
             random=random,
             exploration_rate=exploration_rate,
             schema_index=schema.analysis.schema_index,
+            sent=sent,
         )
 
     return mutate
+
+
+def _linked_ids(
+    machine: Any, consumed: dict[str, Handle], bundle_args: dict[str, Any], sent: set[Handle], parent_id: str | None
+) -> dict[str, ExtractedParam]:
+    """Arguments carrying an id from the parent step's response, with where in that response it is."""
+    linked = {}
+    for argument, value in bundle_args.items():
+        key = (consumed[argument], value)
+        if consumed[argument] in sent and parent_id is not None and machine._id_origins.get(key) == parent_id:
+            linked[argument] = ExtractedParam(definition=machine._id_pointers[key], value=Ok(value), is_required=True)
+    return linked
 
 
 def _make_producer_rule(
@@ -272,17 +290,17 @@ def _make_producer_rule(
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
         if output is None:
             return multiple()
-        values = [
-            value
-            for _field, value in iter_handle_values(
-                output.response.content, field_name=field_name, handle_fields=frozenset({"id"}), path=record_path
-            )
-        ]
+        handle = Handle(return_type_name, "id")
+        values = []
+        for _field, value, pointer in iter_handle_values(
+            output.response.content, field_name=field_name, handle_fields=frozenset({"id"}), path=record_path
+        ):
+            values.append(value)
+            self._id_origins[(handle, value)] = case.id
+            self._id_pointers[(handle, value)] = pointer
         if not values:
             return multiple()
         self.control.record_productive_root(producer_label)
-        for value in values:
-            self._id_origins[(Handle(return_type_name, "id"), value)] = case.id
         return multiple(*values)
 
     def _root_precondition(self: Any, _label: str = producer_label) -> bool:
@@ -366,19 +384,16 @@ def _make_handle_producer_rule(
         output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
         if output is None:
             return multiple()
-        values = [
-            value
-            for _field, value in iter_handle_values(
-                output.response.content,
-                field_name=field_name,
-                handle_fields=frozenset({handle.field_name}),
-                path=record_path,
-            )
-        ]
-        if not values:
-            return multiple()
-        for value in values:
+        values = []
+        for _field, value, pointer in iter_handle_values(
+            output.response.content,
+            field_name=field_name,
+            handle_fields=frozenset({handle.field_name}),
+            path=record_path,
+        ):
+            values.append(value)
             self._id_origins[(handle, value)] = case.id
+            self._id_pointers[(handle, value)] = pointer
         return multiple(*values)
 
     body.__name__ = rule_name
@@ -409,12 +424,13 @@ def _make_consumer_rule(
     def body(self: Any, data: st.DataObject, **bundle_args: Any) -> None:
 
         operation = self.schema[root_label][field_name]
+        sent: set[Handle] = set()
         case = data.draw(
             graphql_cases(
                 operation=operation,
                 phase=TestPhase.STATEFUL,
                 mutate_ast=_bundle_substituter(
-                    self.schema, consumed, bundle_args, exploration_rate=BASE_EXPLORATION_RATE
+                    self.schema, consumed, bundle_args, exploration_rate=BASE_EXPLORATION_RATE, sent=sent
                 ),
             )
         )
@@ -424,6 +440,7 @@ def _make_consumer_rule(
             rule_name=rule_name,
             parent_id=parent_id,
             applied_parameters=[(ParameterLocation.BODY, name) for name in bundle_args],
+            linked=_linked_ids(self, consumed, bundle_args, sent, parent_id),
         )
 
     def _consumer_precondition(
@@ -480,11 +497,12 @@ def _make_lifecycle_rule(
     def body(self: Any, data: st.DataObject, **bundle_args: Any) -> Any:
 
         operation = self.schema[root_label][field_name]
+        sent: set[Handle] = set()
         case = data.draw(
             graphql_cases(
                 operation=operation,
                 phase=TestPhase.STATEFUL,
-                mutate_ast=_bundle_substituter(self.schema, consumed, bundle_args, exploration_rate=0.0),
+                mutate_ast=_bundle_substituter(self.schema, consumed, bundle_args, exploration_rate=0.0, sent=sent),
             )
         )
         primary_id = bundle_args[primary_argument]
@@ -494,6 +512,7 @@ def _make_lifecycle_rule(
             rule_name=rule_name,
             parent_id=parent_id,
             applied_parameters=[(ParameterLocation.BODY, name) for name in bundle_args],
+            linked=_linked_ids(self, consumed, bundle_args, sent, parent_id),
         )
         if track_deletion:
             # Track the deleted id's origin so use-after-delete probes can stitch parentage.

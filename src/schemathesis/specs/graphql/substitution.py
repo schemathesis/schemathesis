@@ -106,20 +106,34 @@ def substitute_bundle_values(
     random: Random,
     exploration_rate: float = 0.0,
     schema_index: SchemaIndex | None = None,
+    sent: set[Handle],
 ) -> graphql.OperationDefinitionNode:
     """Replace handle-typed argument literals with values from the given handle to value mapping.
 
     `exploration_rate` is the per-argument probability of leaving the
     strategy-generated value in place, forcing discovery of bugs reachable only
-    via unknown ids.
+    via unknown ids. `sent` collects the handles whose values the result carries.
     """
 
     def provider(handle: Handle, random: Random) -> str | None:
         if exploration_rate > 0.0 and random.random() < exploration_rate:
             return None
-        return bundle_values.get(handle)
+        value = bundle_values.get(handle)
+        if value is not None:
+            sent.add(handle)
+        return value
 
     return _substitute(operation_node, client_schema, provider, random, schema_index)
+
+
+def replace_string_literals(query: str, old: str, new: str) -> str:
+    """Replace every string literal `old` in `query` with `new`."""
+
+    class Replace(graphql.Visitor):
+        def enter_string_value(self, node: graphql.StringValueNode, *_: object) -> graphql.StringValueNode | None:
+            return graphql.StringValueNode(value=new) if node.value == old else None
+
+    return graphql.print_ast(graphql.visit(graphql.parse(query), Replace()))
 
 
 def substitute_constants(

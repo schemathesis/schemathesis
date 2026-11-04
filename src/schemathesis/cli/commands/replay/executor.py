@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from collections.abc import MutableMapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -304,6 +303,7 @@ def _replay_sequence(
                 parent_output = step_outputs[step.parent_index]
         elif step_outputs:
             parent_output = step_outputs[-1]
+        parent_index = step.parent_index if step.parent_index is not None else index - 1
 
         links: list[LinkedValue] = []
         if (
@@ -312,7 +312,7 @@ def _replay_sequence(
             and (step.link.parameters or step.link.request_body is not None)
         ):
             try:
-                links = _apply_link_parameters(case, step.link, parent_output)
+                links = _apply_link_parameters(case, step.link, parent_output, sequence[parent_index].response_body)
             except (KeyError, ValueError) as exc:
                 return _errored_outcome(
                     f"extraction failed at step {index + 1} - {exc}",
@@ -410,7 +410,9 @@ def _send_as(case: Case, identities: EscalatingAuthProvider, name: str) -> None:
     case._auth_identity = name
 
 
-def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> list[LinkedValue]:
+def _apply_link_parameters(
+    case: Case, link: CrashLink, previous_step_output: StepOutput, parent_body: str
+) -> list[LinkedValue]:
     from schemathesis.specs.openapi.expressions import body_pointers
 
     schema = case.operation.schema
@@ -418,14 +420,13 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
     # Re-extract each link parameter from the previous response into its container.
     for key, expression in link.parameters.items():
         location, _, name = key.partition(".")
-        container = case.get_container(ParameterLocation(location))
-        assert isinstance(container, MutableMapping)
-        value = schema.resolve_link_value(expression, previous_step_output, container.get(name, NOT_SET))
+        recorded = schema.read_link_value(case, ParameterLocation(location), name, expression, parent_body)
+        value = schema.resolve_link_value(expression, previous_step_output, recorded)
         linked.append(
             LinkedValue(
                 location=location,
                 name=name,
-                recorded=container.get(name, NOT_SET),
+                recorded=recorded,
                 fresh=value,
                 pointers=body_pointers(expression),
             )
@@ -433,7 +434,7 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
         if value is UNRESOLVABLE:
             # Re-extraction failed; reuse the value captured at the original failure.
             continue
-        container[name] = value
+        schema.write_link_value(case, ParameterLocation(location), name, recorded, value)
 
     if link.request_body is not None:
         # Re-extract the body from the previous response, merging into the recorded one.
