@@ -533,8 +533,8 @@ class GraphQLApps:
     def use_after_create(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.use_after_create())
 
-    def generic_id_pool(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.generic_id_pool())
+    def generic_id_pool(self, *, fixed: bool = False) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.generic_id_pool(fixed=fixed))
 
     def input_object_pool(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.input_object_pool())
@@ -550,6 +550,9 @@ class GraphQLApps:
 
     def relay_connection(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.relay_connection())
+
+    def unknown_id_failure(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.unknown_id_failure())
 
     def tombstone_pool(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.tombstone_pool())

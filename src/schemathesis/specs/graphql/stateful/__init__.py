@@ -30,6 +30,8 @@ class GraphQLStateMachine(BundleStateMachine):
                 "(a mutation returning an Object type with an `id` field)."
             )
         self._id_origins: dict[tuple[Handle, str], str] = {}
+        # JSON Pointer to each id in the response of the step that produced it.
+        self._id_pointers: dict[tuple[Handle, str], str] = {}
         self._deleted_id_origins: dict[tuple[Handle, str], str] = {}
         super().__init__()
 

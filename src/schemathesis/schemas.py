@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Callable, Generator, Iterator, Mapping
+from collections.abc import Callable, Generator, Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache, wraps
 from inspect import iscoroutinefunction
@@ -699,6 +699,22 @@ class BaseSchema(Mapping):
     def resolve_link_value(self, definition: object, output: StepOutput, recorded: object) -> object:
         """Take a linked value from `output` again, or `UNRESOLVABLE`; of several matches, `recorded` wins if present."""
         raise NotImplementedError
+
+    def read_link_value(
+        self, case: Case, location: ParameterLocation, name: str, definition: object, parent_body: str
+    ) -> object:
+        """The value a link put at `name` in the recorded `case`, or `NOT_SET`; `parent_body` is the recorded parent response."""
+        container = case.get_container(location)
+        assert isinstance(container, MutableMapping)
+        return container.get(name, NOT_SET)
+
+    def write_link_value(
+        self, case: Case, location: ParameterLocation, name: str, recorded: object, value: object
+    ) -> None:
+        """Send `value` at `name` in place of `recorded`."""
+        container = case.get_container(location)
+        assert isinstance(container, MutableMapping)
+        cast("MutableMapping[str, object]", container)[name] = value
 
     def iter_schema_warnings(self) -> list[SchemaWarning]:
         """Return spec-level static-analysis warnings collected from the schema."""

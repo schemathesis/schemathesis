@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 import strawberry
-from flask import Response, jsonify, request
+from flask import Flask, Response, jsonify, request
 from rich.console import Console
 
 import schemathesis
@@ -735,6 +735,54 @@ def test_replay_graphql_stateful_crash(cli, ctx, tmp_path):
     result = cli.main("replay", crash["case_id"], "--keep")
 
     assert (result.exit_code, "ERROR" in result.output, "1 failed" in result.output) == (1, False, True), result.output
+
+
+@pytest.mark.parametrize(("fixed", "expected"), [(False, "x FAILED"), (True, "+ FIXED")], ids=["buggy", "fixed"])
+def test_replay_graphql_reextracts_created_ids_on_fresh_server(cli, ctx, tmp_path, fixed, expected):
+    api = ctx.graphql.apps.generic_id_pool()
+    cli.run(api.schema_url, "--max-examples=20", "--phases=stateful", "--mode=positive", "--seed=42")
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
+    # A fresh server knows none of the recorded ids, so only an id taken from its own response reaches the bug.
+    fresh = ctx.graphql.apps.generic_id_pool(fixed=fixed)
+
+    result = cli.main("replay", f"--url={fresh.schema_url}")
+
+    assert (
+        re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE),
+        [path.exists() for path in crash_files],
+    ) == ([expected] * 2, [not fixed] * 2), result.output
+
+
+def test_replay_graphql_sends_recorded_id_without_json_response(cli, ctx, app_runner, tmp_path):
+    api = ctx.graphql.apps.generic_id_pool()
+    cli.run(api.schema_url, "--max-examples=20", "--phases=stateful", "--mode=positive", "--seed=42")
+    elsewhere = Flask(__name__)
+
+    @elsewhere.route("/graphql", methods=["POST"])
+    def graphql():
+        if request.json["query"].startswith("mutation"):
+            return "unavailable"
+        return jsonify({"data": None, "errors": [{"message": "planted", "path": ["user"]}]})
+
+    port = app_runner.run_flask_app(elsewhere)
+
+    result = cli.main("replay", f"--url=http://127.0.0.1:{port}/graphql", "--keep")
+
+    assert re.findall(r'^ +2  POST  /graphql  200  ~  (\w+) = "[^"]+" \((.+)\)$', result.stdout, re.MULTILINE) == [
+        ("authorId", "recorded, not re-extracted"),
+        ("id", "recorded, not re-extracted"),
+    ], result.output
+
+
+def test_replay_graphql_lists_no_link_for_explored_id(cli, ctx, tmp_path):
+    api = ctx.graphql.apps.unknown_id_failure()
+    cli.run(api.schema_url, "--max-examples=20", "--phases=stateful", "--mode=positive", "--seed=42")
+
+    result = cli.main("replay", "--keep")
+
+    # The failing step sends a generated id instead of the one its parent created.
+    steps = re.findall(r"^ +\d+  POST  /graphql  200(.*)$", result.stdout, re.MULTILINE)
+    assert ["from step 1" in step for step in steps] == [False, True, True, False], result.output
 
 
 def test_graphql_crash_url_template_is_endpoint_url(cli, ctx, tmp_path):

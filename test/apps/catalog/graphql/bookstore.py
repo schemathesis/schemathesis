@@ -179,6 +179,33 @@ def _make_use_after_create() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation, config=_book_id_config())
 
 
+def _make_unknown_id_failure() -> strawberry.Schema:
+    @strawberry.type
+    class Note:
+        id: strawberry.ID
+        text: str
+
+    notes: dict[str, Note] = {}
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def note(self, id: strawberry.ID) -> Note | None:
+            if notes and id not in notes:
+                raise RuntimeError("planted: unknown-id")
+            return notes.get(id)
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def addNote(self, text: str) -> Note:
+            note = Note(id=strawberry.ID(str(uuid.uuid4())), text=text)
+            notes[note.id] = note
+            return note
+
+    return strawberry.Schema(Query, Mutation)
+
+
 def _make_tombstone() -> strawberry.Schema:
     books: dict[str, Book] = {}
 
@@ -300,7 +327,7 @@ def _make_double_delete() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation, config=_book_id_config())
 
 
-def _make_generic_id() -> strawberry.Schema:
+def _make_generic_id(*, fixed: bool) -> strawberry.Schema:
     @strawberry.type
     class User:
         id: strawberry.ID
@@ -323,13 +350,13 @@ def _make_generic_id() -> strawberry.Schema:
     class Query:
         @strawberry.field
         def user(self, id: strawberry.ID) -> User | None:
-            if id in users:
+            if id in users and not fixed:
                 raise RuntimeError("planted: use-user-after-create")
-            return None
+            return users.get(id)
 
         @strawberry.field
         def postsByAuthor(self, authorId: strawberry.ID) -> list[Post]:
-            if authorId in authors:
+            if authorId in authors and not fixed:
                 raise RuntimeError("planted: posts-by-author")
             return []
 
@@ -556,6 +583,10 @@ def use_after_create(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_use_after_create(), endpoint, "flask")
 
 
+def unknown_id_failure(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_unknown_id_failure(), endpoint, "flask")
+
+
 def tombstone_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_tombstone(), endpoint, "flask")
 
@@ -572,8 +603,8 @@ def double_delete(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_double_delete(), endpoint, "flask")
 
 
-def generic_id_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_generic_id(), endpoint, "flask")
+def generic_id_pool(*, fixed: bool = False, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_generic_id(fixed=fixed), endpoint, "flask")
 
 
 def input_object_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
