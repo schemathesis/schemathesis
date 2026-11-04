@@ -4,41 +4,58 @@
 
 ### :bug: Fixed
 
-- Traceback when `--tls-verify` points to a missing CA bundle.
-- Crash in the examples phase on `$ref` Example Objects inside a schema's `examples` map.
-- Unserved operations counted as tested and passed.
-- `st fuzz` and stateful testing counting requests unanswered after an API outage as errored.
-- Missing inferred stateful links for resources whose schemas reference `$defs` under a nested `$id`.
-- `st replay` resending recorded ids for inferred links that pick an item from a list response.
-- Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
+#### gRPC
+
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
-- Schema error for security schemes defined through a chain of `$ref`s.
-- `st replay` resending recorded GraphQL ids instead of taking them again from earlier responses.
 - gRPC services in files another package imports skipped silently and unselectable with `--include-name`.
-- Missing parameters when a cross-file `$ref` chain repeats the same pointer in different files.
-- False positive `positive_data_acceptance` for `dependentRequired` objects behind `$ref` in coverage. [#5898](https://github.com/schemathesis/schemathesis/issues/5898)
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
-- Stateful reproductions omitting earlier writes to the same resource, such as a preceding `DELETE`.
-- `RecursionError` during generation for self-referencing arrays with `prefixItems` or `contains`.
-- No API operations found when a path item `$ref` points to another `$ref`.
-- Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.
-- Crash writing the HAR report for `Cookie` headers the cookie parser rejects.
+- gRPC responses, output and reports showing HTTP status codes instead of gRPC statuses.
+- `response.json()` failing on gRPC responses in custom checks.
+- Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.
+- `--auth-wfc` and `--report wfc` silently misbehaving with gRPC schemas.
+- connect-go request decoding failures not reported as ST119.
+- gRPC Channelz, CSDS and health services tested as part of the API.
 - Coverage phase for gRPC skipping later `oneof` branches, non-finite floats and length boundaries.
 - gRPC values violating empty protovalidate ranges such as `gt: 5, lt: 5`.
 - Coverage phase crash on gRPC messages whose required `oneof` refers to itself.
 - gRPC `UNAVAILABLE` response times inflated by a server reachability check.
 - gRPC connection errors hiding details for HTTP/1 servers and missing client certificates.
 - gRPC TLS failures reported as connection failures on grpcio 1.72 to 1.76.
-- `--auth-wfc` and `--report wfc` silently misbehaving with gRPC schemas.
 - Misleading gRPC reflection errors for rejected credentials, timeouts and servers without user services.
-- `st replay` sending masked gRPC metadata instead of credentials from `-H` or config.
-- Explicit links in path items from external files not selected and duplicated by inference.
-- `response.json()` failing on gRPC responses in custom checks.
+
+#### `st replay`
+
+- `st replay` resending recorded ids for inferred links that pick an item from a list response.
+- `st replay` resending recorded GraphQL ids instead of taking them again from earlier responses.
 - `st replay` resending recorded gRPC values instead of taking them again from earlier responses.
-- connect-go request decoding failures not reported as ST119.
-- gRPC responses, output and reports showing HTTP status codes instead of gRPC statuses.
-- Unclear errors from `case.as_curl_command()` and `case.as_transport_kwargs()` on gRPC cases.
-- gRPC Channelz, CSDS and health services tested as part of the API.
+- `st replay` sending masked gRPC metadata instead of credentials from `-H` or config.
+
+#### Stateful testing
+
+- Missing inferred stateful links for resources whose schemas reference `$defs` under a nested `$id`.
+- Explicit links in path items from external files not selected and duplicated by inference.
+- Stateful reproductions omitting earlier writes to the same resource, such as a preceding `DELETE`.
+- `st fuzz` and stateful testing counting requests unanswered after an API outage as errored.
+
+#### Schema loading
+
+- Schema error for security schemes defined through a chain of `$ref`s.
+- Missing parameters when a cross-file `$ref` chain repeats the same pointer in different files.
+- No API operations found when a path item `$ref` points to another `$ref`.
+- Traceback when loading descriptor sets with other extensions, or non-UTF-8 schema files.
+
+#### Data generation
+
+- Crash in the examples phase on `$ref` Example Objects inside a schema's `examples` map.
+- Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
+- `RecursionError` during generation for self-referencing arrays with `prefixItems` or `contains`.
+- False positive `positive_data_acceptance` for `dependentRequired` objects behind `$ref` in coverage. [#5898](https://github.com/schemathesis/schemathesis/issues/5898)
+
+#### Others
+
+- Traceback when `--tls-verify` points to a missing CA bundle.
+- Unserved operations counted as tested and passed.
+- Crash writing the HAR report for `Cookie` headers the cookie parser rejects.
 
 ## [4.33.0](https://github.com/schemathesis/schemathesis/compare/v4.32.7...v4.33.0) - 2026-11-01
 
