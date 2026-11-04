@@ -1604,6 +1604,38 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
     assert received == ["recorded"]
 
 
+@pytest.mark.parametrize("consumer", ["path", "body"])
+@pytest.mark.parametrize("fresh_ids", [[1, 2], [3, 4]], ids=["recorded-match", "first-match"])
+def test_replay_inferred_list_link_uses_live_wildcard_match(cli, ctx, tmp_path, fresh_ids, consumer):
+    api = ctx.openapi.apps.replay_inferred_list_link(item_ids=[1, 2], failing=True, consumer=consumer)
+    cli.run(api.schema_url, "--phases=stateful", "--max-examples=10", "--seed=1")
+    crash_dir = crash_cache_dir(tmp_path)
+    [crash_file] = _list_crash_files(crash_dir)
+    crash = json.loads(crash_file.read_text())
+    assert crash["sequence"][0]["response"]["body"] == '{"data":[{"id":1},{"id":2}]}\n'
+    target = crash["sequence"][1]
+    recorded_id = (
+        target["path_parameters"]["itemId"]
+        if consumer == "path"
+        else target["case_body"]["value"]["lines"][0]["itemId"]
+    )
+    fresh = ctx.openapi.apps.replay_inferred_list_link(item_ids=fresh_ids, failing=False, consumer=consumer)
+
+    result = cli.main("replay", f"--url={fresh.base_url}")
+
+    sent = [
+        int(request.path.rsplit("/", 1)[1]) if consumer == "path" else request.json()["lines"][0]["itemId"]
+        for request in fresh.requests
+        if request.path != "/items"
+    ]
+    expected_id = recorded_id if recorded_id in fresh_ids else fresh_ids[0]
+    assert (
+        re.findall(r"^  ([+x!] [A-Z]+)", result.stdout, re.MULTILINE),
+        sent,
+        len(_list_crash_files(crash_dir)),
+    ) == (["+ FIXED"], [expected_id] * 3, 0), result.output
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_reruns_recorded_check_disabled_in_config(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # A recorded check is re-run on replay even when the current config disables it.

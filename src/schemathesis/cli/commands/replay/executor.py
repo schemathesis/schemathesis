@@ -411,15 +411,16 @@ def _send_as(case: Case, identities: EscalatingAuthProvider, name: str) -> None:
 
 
 def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> list[LinkedValue]:
-    from schemathesis.specs.openapi.expressions import body_pointers, evaluate
+    from schemathesis.specs.openapi.expressions import body_pointers
 
+    schema = case.operation.schema
     linked: list[LinkedValue] = []
     # Re-extract each link parameter from the previous response into its container.
     for key, expression in link.parameters.items():
         location, _, name = key.partition(".")
         container = case.get_container(ParameterLocation(location))
         assert isinstance(container, MutableMapping)
-        value = evaluate(expression, previous_step_output)
+        value = schema.resolve_link_value(expression, previous_step_output, container.get(name, NOT_SET))
         linked.append(
             LinkedValue(
                 location=location,
@@ -436,7 +437,7 @@ def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: St
 
     if link.request_body is not None:
         # Re-extract the body from the previous response, merging into the recorded one.
-        body = evaluate(link.request_body, previous_step_output, evaluate_nested=True)
+        body = schema.resolve_link_value(link.request_body, previous_step_output, case.body)
         if isinstance(body, dict) and isinstance(case.body, dict) and isinstance(link.request_body, dict):
             recorded_body = case.body
             linked.extend(
