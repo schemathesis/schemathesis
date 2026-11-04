@@ -7,6 +7,7 @@
 - Traceback when `--tls-verify` points to a missing CA bundle.
 - Crash in the examples phase on `$ref` Example Objects inside a schema's `examples` map.
 - Unserved operations counted as tested and passed.
+- `st fuzz` and stateful testing counting requests unanswered after an API outage as errored.
 - Missing inferred stateful links for resources whose schemas reference `$defs` under a nested `$id`.
 - `st replay` resending recorded ids for inferred links that pick an item from a list response.
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
