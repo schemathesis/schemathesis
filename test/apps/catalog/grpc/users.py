@@ -484,10 +484,11 @@ def side_effects() -> GrpcApp:
     )
 
 
-def library() -> GrpcApp:
+def library(*, fixed: bool = False) -> GrpcApp:
     """`library.Library` with two bugs that only real values from earlier responses reach.
 
-    `CreateBook` answers `books/<random hex>`, or INVALID_ARGUMENT without a title; `GetBook` fails on a created name and answers NOT_FOUND otherwise.
+    `CreateBook` answers `books/<random hex>`, or INVALID_ARGUMENT without a title; `GetBook` fails on a created name
+    (answers the book when `fixed`) and answers NOT_FOUND otherwise.
     `ListBooks` pages through two books; a page token it issued fails, any other non-empty token is INVALID_ARGUMENT.
     """
     database = descriptor_database.DescriptorDatabase()
@@ -513,6 +514,8 @@ def library() -> GrpcApp:
     def get_book(payload: bytes, context: grpc.ServicerContext) -> bytes:
         name = message_class("GetBookRequest").FromString(payload).name
         if name in created:
+            if fixed:
+                return book_class(name=name).SerializeToString()
             context.abort(grpc.StatusCode.INTERNAL, "cannot load a created book")
         context.abort(grpc.StatusCode.NOT_FOUND, "no such book")
 

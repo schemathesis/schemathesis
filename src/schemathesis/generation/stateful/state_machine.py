@@ -530,19 +530,24 @@ class BundleStateMachine(RecordingStateMachine):
         *,
         rule_name: str,
         parent_id: str | None,
-        applied_parameters: list[tuple[ParameterLocation, str | None]] | None,
+        applied_parameters: list[tuple[ParameterLocation, str | None]] | None = None,
+        linked: dict[str, ExtractedParam] | None = None,
     ) -> StepOutput | None:
-        """Send `case` as one step; `None` when an identical input already passed and the step is skipped."""
+        """Send `case` as one step; `None` when an identical input already passed and the step is skipped.
+
+        `linked` maps each body field the step took from its parent's response to where it came from, so replay
+        can take it again.
+        """
         __tracebackhide__ = True
+        applied = applied_parameters or [(ParameterLocation.BODY, name) for name in linked or {}]
         if parent_id is not None:
             transition: Transition | None = Transition(
                 id=rule_name,
                 parent_id=parent_id,
                 is_inferred=False,
-                parameters={},
+                parameters={"body": linked} if linked else {},
                 request_body=None,
             )
-            applied = applied_parameters or []
             step_input = StepInput(case=case, transition=transition, applied_parameters=applied)
         else:
             transition = None
@@ -551,7 +556,7 @@ class BundleStateMachine(RecordingStateMachine):
             parent_id=parent_id,
             case=case,
             transition=transition,
-            is_transition_applied=bool(applied_parameters),
+            is_transition_applied=bool(applied),
         )
         self.control.record_step(step_input, self.recorder)
         return APIStateMachine._step(self, input=step_input)
