@@ -14,6 +14,7 @@
 - Schema error for security schemes defined through a chain of `$ref`s.
 - gRPC services in files another package imports skipped silently and unselectable with `--include-name`.
 - Missing parameters when a cross-file `$ref` chain repeats the same pointer in different files.
+- False positive `positive_data_acceptance` for `dependentRequired` objects behind `$ref` in coverage. [#5898](https://github.com/schemathesis/schemathesis/issues/5898)
 - `expected-statuses` rejecting gRPC status names such as `UNAVAILABLE`.
 - Stateful reproductions omitting earlier writes to the same resource, such as a preceding `DELETE`.
 - `RecursionError` during generation for self-referencing arrays with `prefixItems` or `contains`.

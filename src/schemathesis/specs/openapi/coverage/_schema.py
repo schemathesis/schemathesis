@@ -3776,7 +3776,7 @@ def _positive_object(
     # drop any candidate the full schema rejects.
     enforce_dependencies = any(key in schema for key in ("dependentRequired", "dependencies", "dependentSchemas"))
     for generated in _iter_positive_object(ctx, schema, template):
-        if not enforce_dependencies or is_valid(generated.value, schema):
+        if not enforce_dependencies or _is_valid_with_formats(generated.value, schema, ctx):
             yield generated
 
 
