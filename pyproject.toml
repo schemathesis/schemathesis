@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "schemathesis"
-version = "4.33.0"
+version = "4.33.1"
 description = "Adaptive API testing for OpenAPI, GraphQL, and gRPC"
 keywords = ["pytest", "hypothesis", "openapi", "graphql", "grpc", "testing", "fuzzing", "adaptive"]
 authors = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
