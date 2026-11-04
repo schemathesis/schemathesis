@@ -403,9 +403,8 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
     # Urlencoded names round-trip exactly, while multipart escapes some characters in part names.
     names_are_exact = media_types.is_form_urlencoded(media_type)
     try:
-        validator = make_validator(
-            alternative.optimized_schema, _get_openapi_schema(case).adapter.jsonschema_validator_cls
-        )
+        validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
+        validator = make_validator(alternative.optimized_schema, validator_cls)
         # A field missing from the wire was never received; empty lists and objects send nothing at all.
         sent: dict[str, object] = {
             name: value
@@ -424,7 +423,8 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
                 (reading for reading in readings if not _has_errors_at(validator, {**sent, name: reading}, name)),
                 readings[0],
             )
-        return validator.is_valid(sent)
+        properties = alternative.optimized_schema.get("properties", {})
+        return validator.is_valid(_fold_bracketed_names(sent, properties, validator_cls))
     except Exception:
         # Schemas the validator cannot read - can't tell whether the sent body is valid
         return False
@@ -767,8 +767,12 @@ def _query_as_sent(
         if name not in sent_values:
             continue
         texts = sent_values[name]
+        if name not in properties:
+            # Undeclared names, e.g. `deepObject` members, are read as the text sent.
+            sent[name] = texts[0] if len(texts) == 1 else texts
+            continue
         # Other types keep their generated value, as the server parses the text back into it.
-        schema = properties.get(name, {})
+        schema = properties[name]
         is_string = _declares_type(schema, "string")
         # Frameworks read a blank non-string value as an absent one, which an optional parameter allows.
         if texts == [""] and not is_string and name not in required:
@@ -779,7 +783,37 @@ def _query_as_sent(
             sent[name] = string_to_boolean(texts[0])
         else:
             sent[name] = value
-    return sent
+    validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
+    querystring = next(
+        (parameter.name for parameter in case.operation.query if parameter.definition.get("in") == "querystring"), None
+    )
+    if querystring is not None:
+        # The whole query is the one `querystring` parameter, read as a form.
+        form = properties.get(querystring)
+        inner = form.get("properties", {}) if isinstance(form, dict) else {}
+        return {querystring: _fold_bracketed_names(sent, inner, validator_cls)}
+    return _fold_bracketed_names(sent, properties, validator_cls)
+
+
+def _fold_bracketed_names(
+    values: dict[str, object], properties: Mapping[str, JsonSchema], validator_cls: type[jsonschema_rs.Validator]
+) -> dict[str, object]:
+    """Read `name[key]` back into the object property `name`, as `deepObject` sends each member under such a name."""
+    folded: dict[str, object] = {}
+    for wire_name, value in values.items():
+        name, bracket, rest = wire_name.partition("[")
+        if bracket and rest.endswith("]") and wire_name not in properties and name in properties:
+            members = folded.setdefault(name, {})
+            if isinstance(members, dict):
+                key = rest[:-1]
+                if isinstance(value, list):
+                    # Servers read one of the repeated values.
+                    validator = make_validator(properties[name], validator_cls)
+                    value = next((item for item in value if not _has_errors_at(validator, {key: item}, key)), value)
+                members[key] = value
+                continue
+        folded[wire_name] = value
+    return folded
 
 
 def _headers_as_read(headers: Mapping[str, object]) -> dict[str, object]:

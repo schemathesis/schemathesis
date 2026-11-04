@@ -1425,6 +1425,113 @@ def test_negative_data_rejection_validates_query_and_headers_as_sent(ctx, respon
     _assert_rejection(case, response, reported=reported)
 
 
+DEEP_OBJECT_FIELDS = {"type": "object", "additionalProperties": {"type": "string", "maxLength": 5}}
+DEEP_OBJECT_MEMBERS = pytest.mark.parametrize(
+    ("member", "reported"),
+    [(None, False), (True, False), (12, False), (2.7270633252329124e16, True)],
+    ids=["null", "boolean", "number", "too-long"],
+)
+
+
+def _additional_properties_mutation(location, path, pointer, parameter=None):
+    return Mutation(
+        path=path,
+        parameter_location=location,
+        schema_pointer=pointer,
+        channel=MutationChannel.SCHEMA,
+        operator=OperatorKind.NEGATE_CONSTRAINTS,
+        keywords=("additionalProperties",),
+        parameter=parameter,
+        original_value=None,
+        new_value=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("parameter", "path", "pointer"),
+    [
+        (
+            {"in": "query", "name": "fields", "style": "deepObject", "explode": True, "schema": DEEP_OBJECT_FIELDS},
+            ("fields",),
+            "/properties/fields",
+        ),
+        (
+            {
+                "in": "querystring",
+                "name": "query",
+                "content": {
+                    "application/x-www-form-urlencoded": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"fields": DEEP_OBJECT_FIELDS},
+                            "additionalProperties": False,
+                        },
+                        "encoding": {"fields": {"style": "deepObject"}},
+                    }
+                },
+            },
+            ("query", "fields"),
+            "/properties/query/properties/fields",
+        ),
+    ],
+    ids=["query", "querystring"],
+)
+@pytest.mark.parametrize(
+    ("member", "reported"),
+    [
+        (None, False),
+        (True, False),
+        (12, False),
+        (2.7270633252329124e16, True),
+        (["far too long", "ok"], False),
+        (["far too long", "also too long"], True),
+    ],
+    ids=["null", "boolean", "number", "too-long", "repeated", "repeated-too-long"],
+)
+def test_negative_data_rejection_reads_deep_object_query_members_as_sent(
+    ctx, response_factory, parameter, path, pointer, member, reported
+):
+    operation = ctx.openapi.load_operation(
+        "GET /items", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version="3.2.0"
+    )
+    query = {"V": member}
+    for name in reversed(path):
+        query = {name: query}
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(_additional_properties_mutation(ParameterLocation.QUERY, path, pointer, "fields"),),
+        ),
+        query=operation.get_parameter_serializer("query")(query),
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    _assert_rejection(case, response, reported=reported)
+
+
+def test_negative_data_rejection_reports_deep_object_sent_with_plain_value(ctx, response_factory):
+    parameter = {"in": "query", "name": "fields", "style": "deepObject", "explode": True, "schema": DEEP_OBJECT_FIELDS}
+    operation = ctx.openapi.load_operation(
+        "GET /items", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version="3.2.0"
+    )
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(
+                _additional_properties_mutation(ParameterLocation.QUERY, ("fields",), "/properties/fields", "fields"),
+            ),
+        ),
+        query={"fields": "plain", "fields[V]": "ok"},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    _assert_rejection(case, response, reported=True)
+
+
 def test_negative_data_rejection_reports_invalid_query_beside_negated_path(ctx, response_factory):
     operation = ctx.openapi.load_operation(
         "GET /items",
@@ -2610,6 +2717,50 @@ def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
     )
     with pytest.raises(AcceptedNegativeData):
         negative_data_rejection(check_context(), case.call(), case)
+
+
+@DEEP_OBJECT_MEMBERS
+def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app_runner, member, reported):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            URLENCODED: {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"fields": DEEP_OBJECT_FIELDS},
+                                    "additionalProperties": False,
+                                },
+                                "encoding": {"fields": {"style": "deepObject", "explode": True}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify({})
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/items"]["POST"]
+    case = operation.Case(
+        _meta=build_metadata(
+            body=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(_additional_properties_mutation(ParameterLocation.BODY, (), ""),),
+        ),
+        body={"fields": {"V": member}},
+        media_type=URLENCODED,
+    )
+
+    _assert_rejection(case, case.call(), reported=reported)
 
 
 def test_negative_data_rejection_reports_form_body_with_undeclared_media_type(ctx, app_runner):
