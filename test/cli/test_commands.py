@@ -4410,6 +4410,8 @@ def test_server_stops_accepting_connections_in_generated_phases(subprocess_runne
     )
     assert result == snapshot_cli
     assert "🚫 server stopped responding" in result.stdout.partition("ERRORS")[0]
+    # Requests the dead server never answered say nothing about the API.
+    assert "errored" not in result.stdout.partition("Test cases:\n")[2], result.stdout
     # Generated bodies differ across Python versions; the listed request must still be the one that crashed it.
     assert int(re.findall(r"""'\{"size": (\d+)\}'""", result.stdout.split("before it went away:")[1])[0]) > 50000
 
@@ -4435,15 +4437,17 @@ def test_crash_found_before_the_outage_is_still_reported_per_operation(subproces
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
 @pytest.mark.parametrize(
-    ("mode", "crasher_position", "errors"),
+    ("mode", "crasher_position", "errors", "cases"),
     [
-        ("refuse", 0, "  🚫 Server Unavailable: 1"),
+        ("refuse", 0, "  🚫 Server Unavailable: 1", "N generated, N passed"),
         # The request the dying server reset leads the list and is also its operation's error.
-        ("reset", 1, "  🚫 Network Error: 1\n  🚫 Server Unavailable: 1"),
+        ("reset", 1, "  🚫 Network Error: 1\n  🚫 Server Unavailable: 1", "N generated, N passed, 1 errored"),
     ],
     ids=["refused", "reset-then-refused"],
 )
-def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, cli, mode, crasher_position, errors):
+def test_fuzz_stops_when_server_stops_accepting_connections(
+    subprocess_runner, cli, mode, crasher_position, errors, cases
+):
     port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": mode, "CRASH_AFTER": "5"})
     result = cli.main(
         "fuzz",
@@ -4454,6 +4458,8 @@ def test_fuzz_stops_when_server_stops_accepting_connections(subprocess_runner, c
     )
     assert "Stop reason: Server stopped responding" in result.stdout, result.stdout
     assert result.stdout.partition("Errors:\n")[2].partition("\n\n")[0] == errors, result.stdout
+    summary = result.stdout.partition("Test cases:\n  ")[2].partition("\n")[0]
+    assert re.sub(r"\d+ (generated|passed)", r"N \1", summary) == cases, result.stdout
     listed = result.stdout.split("before it went away:\n\n")[1].split("\n\n")
     assert int(re.findall(r"""'\{"size": (\d+)\}'""", listed[crasher_position])[0]) > 50000
 

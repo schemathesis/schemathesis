@@ -304,10 +304,13 @@ def _send_step(
     )
 
 
-def _detect_outage(exc: Exception, engine: EngineContext) -> bool:
+def _detect_outage(exc: Exception, case: Case, engine: EngineContext, recorder: ScenarioRecorder) -> bool:
     """Whether the server went away; an error that only hit the already dead server stops the scenario at once."""
     outage = isinstance(exc, requests.ConnectionError) and engine.detect_server_outage(exc)
     if outage and engine.server.is_after_outage(exc):
+        # A check's own request may be the refused one; the step itself was answered then.
+        if recorder.find_response(case_id=case.id) is None:
+            recorder.forget_case(case_id=case.id)
         raise ServerWentAway from None
     return outage
 
@@ -501,9 +504,9 @@ def _run_step(
         ctx.current_step_status = Status.FAILURE
         raise
     except Exception as exc:
+        outage = _detect_outage(exc, case, engine, machine.recorder)
         if isinstance(exc, TRANSPORT_ERRORS):
             machine.recorder.record_network_error(case_id=case.id, error=exc)
-        outage = _detect_outage(exc, engine)
         _record_network_error(exc, case=case, engine=engine, ctx=ctx, state=state, event_queue=event_queue)
         ctx.current_step_status = Status.ERROR
         if outage:
