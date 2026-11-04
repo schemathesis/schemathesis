@@ -1324,7 +1324,9 @@ def test(case):
 def test_config_using_headers(testdir):
     testdir.make_test(
         """
-raw_schema = make_openapi_schema(
+from test.apps.builders import build_schema
+
+raw_schema = build_schema(
     {
         "/bookings": {
             "post": {
@@ -1357,7 +1359,9 @@ def test(case):
 def test_config_using_auth(testdir):
     testdir.make_test(
         """
-raw_schema = make_openapi_schema(
+from test.apps.builders import build_schema
+
+raw_schema = build_schema(
     {
         "/bookings": {
             "post": {
@@ -1391,7 +1395,9 @@ def test_config_generation(testdir):
     MAX_EXAMPLES_B = 42
     testdir.make_test(
         f"""
-raw_schema = make_openapi_schema(
+from test.apps.builders import build_schema
+
+raw_schema = build_schema(
     {{
         "/bookings": {{
             "post": {{
@@ -1600,9 +1606,9 @@ def test_urlencoded_type_mutations_should_not_cause_false_positives(testdir):
         test_case="""
 import schemathesis
 from hypothesis import settings
-from test.utils import make_openapi_schema
+from test.apps.builders import build_schema
 
-raw_schema = make_openapi_schema(
+raw_schema = build_schema(
     {
         "/success": {
             "post": {
@@ -1724,15 +1730,17 @@ def test_pytest_parametrize_multiple_schemas(testdir):
         """
 import asyncio
 
+from test.apps.builders import build_schema
+
 users_schema = schemathesis.openapi.from_dict(
-    make_openapi_schema(
+    build_schema(
         {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
         version="3.0.0",
         info={"title": "Users", "description": "", "version": "0.1.0"},
     )
 )
 orders_schema = schemathesis.openapi.from_dict(
-    make_openapi_schema(
+    build_schema(
         {"/orders": {"get": {"responses": {"200": {"description": "OK"}}}}},
         version="3.0.0",
         info={"title": "Orders", "description": "", "version": "0.1.0"},

@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 
 import grpc
 import trustme
-from google.protobuf import any_pb2, descriptor_database, descriptor_pb2, descriptor_pool, message_factory
+from google.protobuf import any_pb2, descriptor_pb2, descriptor_pool, message_factory
 from google.rpc import error_details_pb2, status_pb2
 from grpc_reflection.v1alpha import reflection, reflection_pb2
 
@@ -22,6 +22,7 @@ from test.apps.catalog.grpc.descriptors import (
     accounts_descriptor_set,
     all_types_descriptor_set,
     library_descriptor_set,
+    load_pool,
     side_effects_descriptor_set,
     users_descriptor_set,
     write_descriptor_set,
@@ -254,16 +255,11 @@ def users(
     `google.rpc.BadRequest` details next to a detail of a type clients do not know.
     """
     descriptor_set = users_descriptor_set(annotated=annotated)
-    database = descriptor_database.DescriptorDatabase()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(descriptor_set).file:
-        database.Add(file)
-    pool = descriptor_pool.DescriptorPool(database)
+    pool = load_pool(descriptor_set)
     request_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.GetUserRequest"))
     user_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("pkg.User"))
     operation_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("google.longrunning.Operation"))
-    accounts_pool = descriptor_pool.DescriptorPool()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(accounts_descriptor_set()).file:
-        accounts_pool.Add(file)
+    accounts_pool = load_pool(accounts_descriptor_set())
     account_request_class = message_factory.GetMessageClass(
         accounts_pool.FindMessageTypeByName("pkg.CreateAccountRequest")
     )
@@ -452,6 +448,12 @@ def crashing_users(how: str, directory: Path) -> CrashingGrpcServer:
     )
 
 
+def _start(server: grpc.Server, descriptor_set: bytes, calls: list[GrpcCall]) -> GrpcApp:
+    port = server.add_insecure_port("127.0.0.1:0")
+    server.start()
+    return GrpcApp(server=server, port=port, calls=calls, reflection_calls=[], descriptor_set=descriptor_set)
+
+
 class AnswerEmpty(grpc.GenericRpcHandler):
     def __init__(self, calls: list[GrpcCall]) -> None:
         self.calls = calls
@@ -477,11 +479,7 @@ def side_effects() -> GrpcApp:
     calls: list[GrpcCall] = []
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     server.add_generic_rpc_handlers((AnswerEmpty(calls),))
-    port = server.add_insecure_port("127.0.0.1:0")
-    server.start()
-    return GrpcApp(
-        server=server, port=port, calls=calls, reflection_calls=[], descriptor_set=side_effects_descriptor_set()
-    )
+    return _start(server, side_effects_descriptor_set(), calls)
 
 
 def library(*, fixed: bool = False) -> GrpcApp:
@@ -491,10 +489,7 @@ def library(*, fixed: bool = False) -> GrpcApp:
     (answers the book when `fixed`) and answers NOT_FOUND otherwise.
     `ListBooks` pages through two books; a page token it issued fails, any other non-empty token is INVALID_ARGUMENT.
     """
-    database = descriptor_database.DescriptorDatabase()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(library_descriptor_set()).file:
-        database.Add(file)
-    pool = descriptor_pool.DescriptorPool(database)
+    pool = load_pool(library_descriptor_set())
 
     def message_class(name: str) -> type:
         return message_factory.GetMessageClass(pool.FindMessageTypeByName(f"library.{name}"))
@@ -542,9 +537,7 @@ def library(*, fixed: bool = False) -> GrpcApp:
         )
     )
     serve_reflection(server, "v1alpha", pool, services=("library.Library",))
-    port = server.add_insecure_port("127.0.0.1:0")
-    server.start()
-    return GrpcApp(server=server, port=port, calls=[], reflection_calls=[], descriptor_set=library_descriptor_set())
+    return _start(server, library_descriptor_set(), [])
 
 
 def envelope() -> GrpcApp:
@@ -552,9 +545,7 @@ def envelope() -> GrpcApp:
 
     It answers with an empty `types.Envelope`. Reflection describes `types.Types`.
     """
-    pool = descriptor_pool.DescriptorPool()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(all_types_descriptor_set()).file:
-        pool.Add(file)
+    pool = load_pool(all_types_descriptor_set())
     envelope_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("types.Envelope"))
 
     def handle(payload: bytes, context: grpc.ServicerContext) -> bytes:
@@ -572,6 +563,4 @@ def envelope() -> GrpcApp:
         )
     )
     serve_reflection(server, "v1alpha", pool, services=("types.Types",))
-    port = server.add_insecure_port("127.0.0.1:0")
-    server.start()
-    return GrpcApp(server=server, port=port, calls=[], reflection_calls=[], descriptor_set=all_types_descriptor_set())
+    return _start(server, all_types_descriptor_set(), [])

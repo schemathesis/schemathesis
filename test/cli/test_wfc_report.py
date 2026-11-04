@@ -17,8 +17,8 @@ from schemathesis.core.failures import (
     ResponseTimeExceeded,
     ServerError,
 )
+from schemathesis.core.transport import http_status_class
 from schemathesis.engine.events import ScenarioFinished
-from schemathesis.grpc.checks import UndecodableGrpcRequest
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     EnsureResourceAvailability,
@@ -28,7 +28,6 @@ from schemathesis.openapi.checks import (
     UnsupportedMethodResponse,
     UseAfterFree,
 )
-from test.apps.catalog.grpc.descriptors import load_descriptor_set, users_descriptor_set
 
 WFC_DATA = resources.files("webfuzzing_commons").joinpath("data")
 WFC_REPORT_SCHEMA = yaml.safe_load(WFC_DATA.joinpath("report.yaml").read_text(encoding="utf-8"))
@@ -491,40 +490,24 @@ OPERATION = "GET /users/{id}"
     ids=lambda value: type(value).__name__ if not isinstance(value, int) else str(value),
 )
 def test_fault_category(failure, code):
-    assert fault_category(failure)[0] == code
+    assert fault_category(failure, http_status_class)[0] == code
 
 
 def test_object_level_authorization_context_names_both_peers():
-    assert fault_category(BOLA) == (
+    assert fault_category(BOLA, http_status_class) == (
         906,
         "ObjectLevelAuthorizationViolation: Object-level authorization bypass (bob read an object alice owns)",
     )
-
-
-@pytest.mark.parametrize(
-    ("failure", "description"),
-    [
-        (
-            ServerError(operation=OPERATION, status_code=15, status_name="DATA_LOSS"),
-            "ServerError: Server error (status 15 DATA_LOSS)",
-        ),
-        (
-            UndecodableGrpcRequest(operation=OPERATION, status_code=13, status_name="INTERNAL"),
-            "UndecodableGrpcRequest: Server could not decode the request (status 13 INTERNAL)",
-        ),
-    ],
-    ids=["server-error", "undecodable-grpc-request"],
-)
-def test_server_error_context_names_the_protocol_status(tmp_path, failure, description):
-    schema = load_descriptor_set(tmp_path, users_descriptor_set())
-    assert fault_category(failure, schema.classify_status) == (100, description)
 
 
 def test_declared_auth_not_enforced_context_names_the_scenario():
     failure = IgnoredAuth(
         operation=OPERATION, message="", scenario=AuthScenario.INVALID_AUTH, title="API accepts invalid authentication"
     )
-    assert fault_category(failure) == (311, "IgnoredAuth: API accepts invalid authentication (invalid_auth)")
+    assert fault_category(failure, http_status_class) == (
+        311,
+        "IgnoredAuth: API accepts invalid authentication (invalid_auth)",
+    )
 
 
 def test_fault_category_ids_match_wfc():

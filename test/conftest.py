@@ -29,7 +29,7 @@ from schemathesis.core import storage
 from schemathesis.core.transport import Response
 from schemathesis.python._constants.registry import default_registry
 
-from .utils import make_schema, profile_max_examples
+from .utils import ignored_warning_filters, make_schema, profile_max_examples
 
 pytest_plugins = [
     "pytester",
@@ -305,7 +305,7 @@ def pytester(request, pytester, monkeypatch):
 
 
 @pytest.fixture
-def testdir(testdir):
+def testdir(testdir, pytestconfig):
     def maker(
         content,
         pytest_plugins=(),
@@ -356,30 +356,8 @@ def testdir(testdir):
         pytest_plugins = {pytest_plugins}
         def pytest_configure(config):
             config.HYPOTHESIS_CASES = 0
-            config.addinivalue_line(
-                "filterwarnings",
-                "ignore:Unclosed <MemoryObject.*:ResourceWarning",
-            )
-            config.addinivalue_line(
-                "filterwarnings",
-                "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
-            )
-            config.addinivalue_line(
-                "filterwarnings",
-                "ignore:Exception ignored in.*<function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
-            )
-            config.addinivalue_line(
-                "filterwarnings",
-                "ignore:Exception ignored in.*<socket.socket.*:pytest.PytestUnraisableExceptionWarning",
-            )
-            config.addinivalue_line(
-                "filterwarnings",
-                "ignore:Exception ignored while finalizing socket <socket.socket.*:pytest.PytestUnraisableExceptionWarning",
-            )
-            config.addinivalue_line(
-                "filterwarnings",
-                "ignore:unclosed <socket.socket.*:ResourceWarning",
-            )
+            for warning_filter in {ignored_warning_filters(pytestconfig)!r}:
+                config.addinivalue_line("filterwarnings", warning_filter)
         def pytest_unconfigure(config):
             print(f"Hypothesis calls: {{config.HYPOTHESIS_CASES}}")
         """

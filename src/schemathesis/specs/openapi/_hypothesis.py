@@ -1253,17 +1253,8 @@ def _canonical_strategy(
         format_lengths=format_lengths_for(formats),
         alphabet=alphabet,
         # Every other carrier renders the value as text, where `2.0` is a different string than `2`.
-        whole_floats=_carries_json(media_type),
+        whole_floats=media_types.is_json_lenient(media_type),
     )
-
-
-def _carries_json(media_type: str | None) -> bool:
-    if media_type is None:
-        return False
-    try:
-        return media_types.is_json(media_type)
-    except MalformedMediaType:
-        return False
 
 
 def _build_header_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:

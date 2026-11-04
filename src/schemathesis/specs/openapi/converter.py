@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any, TypeGuard, overload
 
-from schemathesis.core.jsonschema import DRAFT_03_DIALECT, is_unsatisfiable
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema import DRAFT_03_DIALECT, bundled_name, is_unsatisfiable
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.numeric import INT32_RANGE, INT64_RANGE, is_numeric_bound
 from schemathesis.core.jsonschema.patterns import (
     enforced_pattern,
@@ -290,20 +290,13 @@ def _forbidden_in_allof_branches(schema: dict[str, Any], read_only_bundle: Mappi
                     read_only_bundle is not None and is_read_only(subschema, read_only_bundle)
                 ):
                     forbidden.add(name)
-        name = _bundled_name(branch.get("$ref"))
+        name = bundled_name(branch.get("$ref"))
         if read_only_bundle is not None and name is not None:
             pending.append(read_only_bundle.get(name))
         nested = branch.get("allOf")
         if isinstance(nested, list):
             pending.extend(nested)
     return forbidden
-
-
-def _bundled_name(reference: object) -> str | None:
-    """Name of the bundled schema `reference` points to, e.g. `schema1` for `#/x-bundled/schema1`."""
-    if isinstance(reference, str) and reference.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
-        return reference[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
-    return None
 
 
 def _pin_discriminator_property(
@@ -343,9 +336,9 @@ def _pin_discriminator_property(
                 continue
             # Resolve bundled ref (e.g. "#/x-bundled/schema1") back to original URI for schema name extraction
             resolved_ref = ref
-            bundled_name = _bundled_name(ref)
-            if name_to_uri and bundled_name is not None:
-                original_uri = name_to_uri.get(bundled_name, "")
+            branch_name = bundled_name(ref)
+            if name_to_uri and branch_name is not None:
+                original_uri = name_to_uri.get(branch_name, "")
                 if "#" in original_uri:
                     resolved_ref = "#" + original_uri.split("#", 1)[1]
                 elif original_uri:
@@ -390,7 +383,7 @@ def branch_tag_values(
     ref: str, property_name: str, bundle: dict[str, Any] | None, seen: set[str] | None = None
 ) -> set[str] | None:
     """Literal values the branch itself allows for the discriminator property, or `None` when unconstrained."""
-    name = _bundled_name(ref)
+    name = bundled_name(ref)
     if bundle is None or name is None:
         return None
     seen = seen if seen is not None else set()
@@ -449,7 +442,7 @@ def _tag_literals(schema: JsonSchema | None) -> set[str] | None:
 
 
 def _branch_is_polymorphic(ref: str, bundle: dict[str, Any] | None) -> bool:
-    name = _bundled_name(ref)
+    name = bundled_name(ref)
     if bundle is None or name is None:
         return False
     bundled = bundle.get(name)
@@ -733,7 +726,7 @@ def _has_annotation(schema: object, bundle: Mapping[str, Any] | None, keywords: 
         seen.add(id(node))
         if any(node.get(keyword) for keyword in keywords):
             return True
-        name = _bundled_name(node.get("$ref"))
+        name = bundled_name(node.get("$ref"))
         if bundle is not None and name is not None:
             pending.append(bundle.get(name))
         all_of = node.get("allOf")

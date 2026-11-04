@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 from schemathesis.core.transport import CallOutcome, StatusClass
-
-if TYPE_CHECKING:
-    from schemathesis.core.transport import Response
 
 
 class GrpcStatus(NamedTuple):
@@ -57,15 +54,6 @@ LIBRARY_DECODE_ERRORS = {
         "Error deserializing request: ",
     ),
 }
-
-
-def grpc_status(response: Response) -> int:
-    return int(response.headers["grpc-status"][0])
-
-
-def is_library_decode_error(response: Response) -> bool:
-    prefixes = LIBRARY_DECODE_ERRORS.get(grpc_status(response), ())
-    return response.headers.get("grpc-message", [""])[0].startswith(prefixes)
 
 
 def starts_with_verb(name: str, verbs: tuple[str, ...]) -> bool:

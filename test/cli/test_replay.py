@@ -29,6 +29,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import ServerError
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.reporting.crashes import MANIFEST_FILENAME, CrashCheck, CrashFile, CrashLink, CrashStep, CrashWriter
+from schemathesis.schemas import BaseSchema
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.catalog.openapi.modifiers.stateful import IndependentInternalError
 from test.apps.catalog.openapi.modifiers.under_declared_security import (
@@ -1318,7 +1319,7 @@ def test_replay_interrupt_exit_code(cli, app_runner, ctx, crash_factory, tmp_pat
     assert (result.exit_code, crash_file.exists()) == (130, True), result.output
 
 
-def test_summary_not_green_when_no_outcomes_ran():
+def test_summary_not_green_when_no_outcomes_ran(ctx):
     console = Console(file=io.StringIO(), force_terminal=True, color_system="standard", width=100)
     render_replay(
         crashes=[],
@@ -1327,6 +1328,7 @@ def test_summary_not_green_when_no_outcomes_ran():
         base_url=None,
         duration_ms=10,
         output_config=OutputConfig(),
+        schema=ctx.openapi.load_schema({}),
         incompatible_count=2,
         console=console,
     )
@@ -1336,6 +1338,7 @@ def test_summary_not_green_when_no_outcomes_ran():
 
 def _capture_render(
     *,
+    schema: BaseSchema,
     crashes: list[CrashFile],
     outcomes: list[ReplayOutcome],
     source: str = ".schemathesis/crashes/",
@@ -1355,13 +1358,14 @@ def _capture_render(
             base_url=base_url,
             duration_ms=duration_ms,
             output_config=OutputConfig(),
+            schema=schema,
             removal_count=removal_count,
             console=console,
         )
     return buffer.getvalue()
 
 
-def test_render_unit_fixed(snapshot, crash_factory):
+def test_render_unit_fixed(ctx, snapshot, crash_factory):
     crashes = [
         crash_factory.single(
             path="/users",
@@ -1371,10 +1375,10 @@ def test_render_unit_fixed(snapshot, crash_factory):
         )
     ]
     outcomes = [ReplayOutcome(status=ReplayStatus.FIXED, duration_ms=142)]
-    assert _capture_render(crashes=crashes, outcomes=outcomes) == snapshot
+    assert _capture_render(schema=ctx.openapi.load_schema({}), crashes=crashes, outcomes=outcomes) == snapshot
 
 
-def test_render_error_outcome(snapshot, crash_factory):
+def test_render_error_outcome(ctx, snapshot, crash_factory):
     crashes = [
         crash_factory.single(
             path="/accounts/{id}/verify",
@@ -1390,10 +1394,10 @@ def test_render_error_outcome(snapshot, crash_factory):
             error_message="extraction failed at step 2 - $response.body#/id not found",
         )
     ]
-    assert _capture_render(crashes=crashes, outcomes=outcomes) == snapshot
+    assert _capture_render(schema=ctx.openapi.load_schema({}), crashes=crashes, outcomes=outcomes) == snapshot
 
 
-def test_render_removal_notice(snapshot, crash_factory):
+def test_render_removal_notice(ctx, snapshot, crash_factory):
     crashes = [
         crash_factory.single(
             path="/users",
@@ -1403,10 +1407,13 @@ def test_render_removal_notice(snapshot, crash_factory):
         )
     ]
     outcomes = [ReplayOutcome(status=ReplayStatus.FIXED, duration_ms=142)]
-    assert _capture_render(crashes=crashes, outcomes=outcomes, removal_count=5) == snapshot
+    assert (
+        _capture_render(schema=ctx.openapi.load_schema({}), crashes=crashes, outcomes=outcomes, removal_count=5)
+        == snapshot
+    )
 
 
-def test_render_step_chain(snapshot, crash_factory, response_factory):
+def test_render_step_chain(ctx, snapshot, crash_factory, response_factory):
     # Step rows colour each status and flag a body change even when the recorded body is invalid JSON.
     crash = crash_factory.chain(
         steps=[
@@ -1441,7 +1448,7 @@ def test_render_step_chain(snapshot, crash_factory, response_factory):
             ],
         )
     ]
-    assert _capture_render(crashes=crashes, outcomes=outcomes) == snapshot
+    assert _capture_render(schema=ctx.openapi.load_schema({}), crashes=crashes, outcomes=outcomes) == snapshot
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

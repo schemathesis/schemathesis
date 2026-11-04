@@ -20,12 +20,11 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_one
-from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo, uniform_metadata
 from schemathesis.specs.grpc.constraints import ConstraintReader
 from schemathesis.specs.grpc.converter import is_well_known, map_entry, message_schema, request_message
-from schemathesis.specs.grpc.formats import grpc_formats
+from schemathesis.specs.grpc.formats import message_values
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor
@@ -148,14 +147,7 @@ class _Values:
             try:
                 value = next((value for value in self._candidates(schema) if self.is_valid(schema, value)), MISSING)
                 if value is MISSING:
-                    value = generate_one(
-                        build(
-                            {**schema, "$defs": self.definitions},
-                            draft=jsonschema_rs.Draft202012,
-                            formats=grpc_formats(),
-                            alphabet=self.alphabet,
-                        )
-                    )
+                    value = generate_one(message_values({**schema, "$defs": self.definitions}, self.alphabet))
             finally:
                 if definition is not None:
                     self.building.remove(definition)
@@ -343,12 +335,7 @@ class _Values:
                 exact = {keywords[0]: value, keywords[1]: value}
                 try:
                     generated = generate_one(
-                        build(
-                            {"allOf": [schema, source, exact], "$defs": self.definitions},
-                            draft=jsonschema_rs.Draft202012,
-                            formats=grpc_formats(),
-                            alphabet=self.alphabet,
-                        )
+                        message_values({"allOf": [schema, source, exact], "$defs": self.definitions}, self.alphabet)
                     )
                 except Unsatisfiable:
                     continue

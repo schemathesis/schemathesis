@@ -2,6 +2,7 @@ from pathlib import Path
 
 from google.protobuf import (
     any_pb2,
+    descriptor_database,
     descriptor_pb2,
     descriptor_pool,
     duration_pb2,
@@ -32,6 +33,14 @@ def load_descriptor_set(directory: Path, data: bytes, **config):
     return schemathesis.grpc.from_path(
         write_descriptor_set(directory, data), config=SchemathesisConfig.from_dict(config) if config else None
     )
+
+
+def load_pool(descriptor_set: bytes) -> descriptor_pool.DescriptorPool:
+    # Files load on first lookup, so the set may list a file before its imports.
+    database = descriptor_database.DescriptorDatabase()
+    for file in descriptor_pb2.FileDescriptorSet.FromString(descriptor_set).file:
+        database.Add(file)
+    return descriptor_pool.DescriptorPool(database)
 
 
 def load(server, **config):

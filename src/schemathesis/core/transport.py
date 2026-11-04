@@ -290,16 +290,12 @@ def is_uninformative_status(status_code: int) -> bool:
 
 
 class Response:
-    """HTTP response wrapper that normalizes different transport implementations.
-
-    Provides a consistent interface for accessing response data whether the request
-    was made via HTTP, ASGI, or WSGI transports.
-    """
+    """Response from any transport (HTTP, ASGI, WSGI or gRPC) in one shape."""
 
     status_code: int
-    """HTTP status code (e.g., 200, 404, 500)."""
+    """Status code in the protocol's own numbering (e.g., HTTP 404, gRPC 5)."""
     headers: Headers
-    """Response headers with lowercase keys and list values."""
+    """Headers, or gRPC metadata, with lowercase keys and list values."""
     content: bytes
     """Raw response body as bytes, or its leading bytes when the body was kept only in part."""
     content_size: int
@@ -311,9 +307,9 @@ class Response:
     verify: bool
     """Whether TLS verification was enabled for the request."""
     message: str
-    """HTTP status message (e.g., "OK", "Not Found")."""
+    """Status text (e.g., "Not Found" for HTTP, "NOT_FOUND" for gRPC)."""
     http_version: str
-    """HTTP protocol version ("1.0" or "1.1")."""
+    """HTTP version the response arrived over (e.g., "1.1", or "2" for gRPC)."""
     encoding: str | None
     """Character encoding for text content, if detected."""
     stream_cut_short: bool

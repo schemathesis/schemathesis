@@ -38,13 +38,10 @@ class UndecodableGrpcRequest(ServerError):
 
     __slots__ = ()
 
-    def __init__(
-        self, *, operation: str, status_code: int, status_name: str | None = None, case_id: str | None = None
-    ) -> None:
+    def __init__(self, *, operation: str, status_code: int, case_id: str | None = None) -> None:
         super().__init__(
             operation=operation,
             status_code=status_code,
-            status_name=status_name,
             message="The gRPC library rejected the request before any handler ran. The server's message type accepts "
             "less than the schema declares, such as a fixed-length `bytes` ID.",
             case_id=case_id,

@@ -20,7 +20,7 @@ from schemathesis.core.failures import (
     ServerError,
 )
 from schemathesis.core.shell import ShellType, detect_shell
-from schemathesis.core.transport import StatusClass, http_status_class
+from schemathesis.core.transport import StatusClass
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import EngineFinished, EngineStarted, ScenarioFinished
 from schemathesis.engine.summary import running_time
@@ -99,15 +99,12 @@ def _case_operation_id(case: Case) -> str:
 _SERVER_ERROR_FAULTS = {StatusClass.INTERNAL_ERROR: 100, StatusClass.NOT_IMPLEMENTED: 205}
 
 
-def fault_category(
-    failure: Failure, classify_status: Callable[[int], StatusClass] = http_status_class
-) -> tuple[int, str] | None:
+def fault_category(failure: Failure, classify_status: Callable[[int], StatusClass]) -> tuple[int, str] | None:
     """WFC fault code and a description of the failure, or `None` when WFC has nothing for it."""
     description = f"{type(failure).__name__}: {failure.title}"
     if isinstance(failure, ServerError):
         code = _SERVER_ERROR_FAULTS.get(classify_status(failure.status_code), 121)
-        status = f"{failure.status_code} {failure.status_name}" if failure.status_name else str(failure.status_code)
-        return code, f"{description} (status {status})"
+        return code, f"{description} (status {failure.status_code})"
     if isinstance(failure, VALIDATION_FAILURES):
         return 200, description
     if isinstance(failure, AllowHeaderMismatch):

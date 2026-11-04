@@ -32,7 +32,7 @@ from schemathesis.engine.summary import SummaryData, WarningData
 from test.apps.fragments import handlers
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import linked_users, null_name_response, null_name_responses
-from test.utils import allure_results, assert_cli_snapshot
+from test.utils import allure_results, assert_cli_snapshot, load_ndjson
 
 
 class _RaisingEngine:
@@ -709,7 +709,7 @@ def test_fuzz_custom_handler_and_reports(cli, app_runner, ctx, tmp_path, snapsho
     ElementTree.parse(tmp_path / "junit.xml")
     assert "http_interactions" in yaml.safe_load((tmp_path / "cassette.yaml").read_text())
     assert "log" in json.loads((tmp_path / "recording.har").read_text())
-    assert [json.loads(line) for line in (tmp_path / "events.ndjson").read_text().splitlines() if line]
+    assert load_ndjson(tmp_path / "events.ndjson")
     assert any((tmp_path / "allure-results").glob("*-result.json"))
 
 

@@ -23,38 +23,28 @@ _TOKEN_CONVERSION_ERROR = (
 REQUIRED_FIELDS: tuple[str, ...] = ("email", "username", "password")
 
 
-def planted_bug() -> OpenAPIApp:
-    # 4xx required-fields gate hides a planted 500 until feedback fills the body.
-    spec = build_schema(
-        {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "description": {"type": "string"},
-                                        "tags": {"type": "array", "items": {"type": "string"}},
-                                        "active": {"type": "boolean"},
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {
-                        "400": {"description": "Bad"},
-                        "500": {"description": "Server Error"},
-                    },
-                }
+def _string_fields_body(
+    properties: dict[str, object], *, required: list[str] | None = None, example: dict[str, str] | None = None
+) -> dict[str, object]:
+    # `POST /users` taking a JSON object; a 400 rejects the body, a 500 is the planted bug.
+    schema: dict[str, object] = {"type": "object", "properties": properties}
+    if required is not None:
+        schema["required"] = required
+    media_type: dict[str, object] = {"schema": schema}
+    if example is not None:
+        media_type["example"] = example
+    return {
+        "/users": {
+            "post": {
+                "requestBody": {"required": True, "content": {"application/json": media_type}},
+                "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
             }
         }
-    )
-    app = make_flask_app_from_schema(spec)
+    }
 
+
+def _register_required_fields_handler(app: Flask) -> None:
+    # Rejects a body with a blank email, username or password, and fails with a 500 otherwise.
     @app.route("/users", methods=["POST"])
     def create_user() -> Any:
         body = request.get_json(silent=True)
@@ -69,6 +59,21 @@ def planted_bug() -> OpenAPIApp:
             return jsonify({"messages": missing}), 400
         return "", 500
 
+
+def _planted_bug_properties() -> dict[str, object]:
+    return {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "active": {"type": "boolean"},
+    }
+
+
+def planted_bug() -> OpenAPIApp:
+    # 4xx required-fields gate hides a planted 500 until feedback fills the body.
+    spec = build_schema(_string_fields_body(_planted_bug_properties()))
+    app = make_flask_app_from_schema(spec)
+    _register_required_fields_handler(app)
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
@@ -76,27 +81,7 @@ def planted_bug_with_quiet_operation() -> OpenAPIApp:
     # `POST /users` teaches the parsers; `GET /health` never errors, so it learns nothing.
     spec = build_schema(
         {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "description": {"type": "string"},
-                                        "tags": {"type": "array", "items": {"type": "string"}},
-                                        "active": {"type": "boolean"},
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
-                }
-            },
+            **_string_fields_body(_planted_bug_properties()),
             "/health": {
                 "get": {
                     "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
@@ -106,20 +91,7 @@ def planted_bug_with_quiet_operation() -> OpenAPIApp:
         }
     )
     app = make_flask_app_from_schema(spec)
-
-    @app.route("/users", methods=["POST"])
-    def create_user() -> Any:
-        body = request.get_json(silent=True)
-        if not isinstance(body, dict):
-            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
-        missing = [
-            f"{name} - must not be blank"
-            for name in REQUIRED_FIELDS
-            if not isinstance(body.get(name), str) or not body[name].strip()
-        ]
-        if missing:
-            return jsonify({"messages": missing}), 400
-        return "", 500
+    _register_required_fields_handler(app)
 
     @app.route("/health", methods=["GET"])
     def health() -> Any:
@@ -131,73 +103,22 @@ def planted_bug_with_quiet_operation() -> OpenAPIApp:
 def planted_bug_taught_by_examples() -> OpenAPIApp:
     # The declared example trips the 400 gate, so the parsers learn before the coverage pass generates.
     spec = build_schema(
-        {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "description": {"type": "string"},
-                                    },
-                                },
-                                "example": {"name": "", "description": ""},
-                            }
-                        },
-                    },
-                    "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
-                }
-            }
-        }
+        _string_fields_body(
+            {"name": {"type": "string"}, "description": {"type": "string"}},
+            example={"name": "", "description": ""},
+        )
     )
     app = make_flask_app_from_schema(spec)
-
-    @app.route("/users", methods=["POST"])
-    def create_user() -> Any:
-        body = request.get_json(silent=True)
-        if not isinstance(body, dict):
-            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
-        missing = [
-            f"{name} - must not be blank"
-            for name in REQUIRED_FIELDS
-            if not isinstance(body.get(name), str) or not body[name].strip()
-        ]
-        if missing:
-            return jsonify({"messages": missing}), 400
-        return "", 500
-
+    _register_required_fields_handler(app)
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 def two_stage_planted_bug() -> OpenAPIApp:
     # The second constraint is only revealed once the first is satisfied, so one repeat cannot reach the bug.
     spec = build_schema(
-        {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "description": {"type": "string"},
-                                        "contact": {"type": "string"},
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
-                }
-            }
-        }
+        _string_fields_body(
+            {"name": {"type": "string"}, "description": {"type": "string"}, "contact": {"type": "string"}}
+        )
     )
     app = make_flask_app_from_schema(spec)
 
@@ -279,33 +200,15 @@ SIZE_BOUNDED_FIELDS: tuple[tuple[str, int, int], ...] = (
 def size_bound_planted_bug() -> OpenAPIApp:
     # Multiple bounded fields so observations cross the calibration threshold during coverage.
     spec = build_schema(
-        {
-            "/users": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "username": {"type": "string"},
-                                        "title": {"type": "string"},
-                                        "description": {"type": "string"},
-                                        "tags": {"type": "array", "items": {"type": "string"}},
-                                    },
-                                    "required": [field for field, _, _ in SIZE_BOUNDED_FIELDS],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {
-                        "400": {"description": "Bad"},
-                        "500": {"description": "Server Error"},
-                    },
-                }
-            }
-        }
+        _string_fields_body(
+            {
+                "username": {"type": "string"},
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+            },
+            required=[field for field, _, _ in SIZE_BOUNDED_FIELDS],
+        )
     )
     app = make_flask_app_from_schema(spec)
 

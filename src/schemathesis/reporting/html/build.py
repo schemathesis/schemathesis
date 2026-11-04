@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core.failures import group_failures, reproducible_by_identity
 from schemathesis.core.output import format_response_payload
-from schemathesis.core.transport import StatusClass, http_status_class
+from schemathesis.core.transport import StatusClass
 from schemathesis.reporting.html.model import Command, FailingCase, FailureEntry, OperationStatus, split_label
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ def failing_case(
     *,
     config: OutputConfig,
     replay: str | None,
-    classify_status: Callable[[int], StatusClass] = http_status_class,
+    classify_status: Callable[[int], StatusClass],
 ) -> FailingCase:
     response = group.response
     return FailingCase(

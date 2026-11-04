@@ -9,7 +9,8 @@ import jsonschema_rs
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, SchemaLocation
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX, unbundle_path
+from schemathesis.core.jsonschema import bundled_name
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, unbundle_path
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.transport import Response, response_content_type
 from schemathesis.openapi.checks import (
@@ -271,8 +272,9 @@ def _check_discriminator(
             continue
         seen.add(key)
         reference = schema.get("$ref")
-        if isinstance(reference, str) and reference.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
-            stack.append((bundle.get(reference[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]), value))
+        target_name = bundled_name(reference)
+        if target_name is not None:
+            stack.append((bundle.get(target_name), value))
         if isinstance(value, dict):
             failure = _discriminator_failure(operation, schema, value, resolved.name_to_uri, bundle, known_values)
             if failure is not None:
@@ -340,17 +342,17 @@ def _known_discriminator_values(
             if not isinstance(item, dict):
                 continue
             ref = item.get("$ref", "")
-            if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+            if not isinstance(ref, str) or (name := bundled_name(ref)) is None:
                 continue
-            known_values.update(_branch_discriminator_values(ref, property_name, name_to_uri, bundle))
+            known_values.update(_branch_discriminator_values(ref, name, property_name, name_to_uri, bundle))
     return known_values
 
 
 def _branch_discriminator_values(
-    ref: str, property_name: str, name_to_uri: dict[str, str], bundle: dict[str, JsonSchema]
+    ref: str, name: str, property_name: str, name_to_uri: dict[str, str], bundle: dict[str, JsonSchema]
 ) -> set[str]:
     """Values that select a bundled branch: its schema name and every value it pins for the property."""
-    schema_name = get_implicit_discriminator_value(name_to_uri.get(ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :], ""))
+    schema_name = get_implicit_discriminator_value(name_to_uri.get(name, ""))
     tag_values = branch_tag_values(ref, property_name, bundle) or set()
     return {value for value in (schema_name, *tag_values) if value}
 

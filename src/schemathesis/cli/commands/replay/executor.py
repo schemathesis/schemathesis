@@ -617,8 +617,8 @@ def _missing_credentials_message(missing: list[tuple[ParameterLocation, str]]) -
     return f"{names} were masked in the crash file; provide them via config, -H, --auth or an auth hook"
 
 
-def status_label(schema: BaseSchema | None, status_code: int) -> str:
-    name = schema.status_name_for_code(status_code) if schema is not None else None
+def status_label(schema: BaseSchema, status_code: int) -> str:
+    name = schema.status_name_for_code(status_code)
     return name or str(status_code)
 
 

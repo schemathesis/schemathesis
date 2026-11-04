@@ -21,7 +21,7 @@ from schemathesis.wfc.escalation import escalating_provider, identity_assignment
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
-from test.utils import allure_results, refusing_url, silent_url
+from test.utils import allure_results, load_ndjson, refusing_url, silent_url
 
 CREDENTIALS = {
     "username": WFC_USERNAME,
@@ -1384,9 +1384,8 @@ def test_ndjson_records_the_identity(cli, ctx, tmp_path):
 
     identities = {
         node.get("value", {}).get("auth_identity")
-        for line in report.read_text().splitlines()
-        if line
-        for node in json.loads(line).get("ScenarioFinished", {}).get("recorder", {}).get("cases", {}).values()
+        for event in load_ndjson(report)
+        for node in event.get("ScenarioFinished", {}).get("recorder", {}).get("cases", {}).values()
     }
     assert "admin" in identities
     seen = [
