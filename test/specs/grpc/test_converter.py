@@ -1,11 +1,11 @@
 import sys
 
 import pytest
-from google.protobuf import descriptor_pb2, descriptor_pool
 
 from schemathesis.specs.grpc.converter import ConvertedMessage, float32_values, message_schema
 from test.apps.catalog.grpc.descriptors import (
     all_types_descriptor_set,
+    load_pool,
     old_protovalidate_descriptor_set,
     validated_descriptor_set,
 )
@@ -41,13 +41,6 @@ BASE64 = "[A-Za-z0-9+/]"
 WHOLE_GROUPS = f"^(?:{BASE64}{{4}})*$"
 ONE_BYTE_LEFT = f"^(?:{BASE64}{{4}})*{BASE64}[AQgw]==$"
 TWO_BYTES_LEFT = f"^(?:{BASE64}{{4}})*{BASE64}{{2}}[AEIMQUYcgkosw048]=$"
-
-
-def load_pool(data):
-    pool = descriptor_pool.DescriptorPool()
-    for file in descriptor_pb2.FileDescriptorSet.FromString(data).file:
-        pool.Add(file)
-    return pool
 
 
 @pytest.fixture(scope="module")

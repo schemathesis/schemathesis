@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
 import schemathesis
 from schemathesis.specs.graphql.ordering import compute_graphql_layers
+from test.utils import load_ndjson
 
 
 @pytest.fixture
@@ -40,7 +39,5 @@ def test_operation_ordering_none_keeps_schema_order(ctx, cli, tmp_path):
         config={"phases": {"fuzzing": {"operation-ordering": "none"}}},
     )
     assert [
-        json.loads(line)["ScenarioFinished"]["recorder"]["label"]
-        for line in report.read_text().splitlines()
-        if line.startswith('{"ScenarioFinished"')
+        event["ScenarioFinished"]["recorder"]["label"] for event in load_ndjson(report) if "ScenarioFinished" in event
     ] == ["Query.getBooks", "Query.getAuthors", "Mutation.addBook", "Mutation.addAuthor"]

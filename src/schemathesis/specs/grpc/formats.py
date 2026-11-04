@@ -6,8 +6,15 @@ from datetime import datetime
 from functools import cache
 from typing import TYPE_CHECKING
 
+import jsonschema_rs
+
+from schemathesis.generation.jsonschema.builder import build
+
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
+
+    from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+    from schemathesis.generation.jsonschema.context import Alphabet
 
 # Longest `google.protobuf.Duration`, about 10000 years.
 MAX_DURATION_SECONDS = 315_576_000_000
@@ -46,3 +53,8 @@ def grpc_formats() -> dict[str, SearchStrategy[str]]:
         "uri-reference": hostname.map("https://{}".format),
         "uuid": st.uuids().map(str),
     }
+
+
+def message_values(schema: JsonSchema, alphabet: Alphabet | None = None) -> SearchStrategy[JsonValue]:
+    """Values a message schema admits, in the formats the JSON mapping parses."""
+    return build(schema, draft=jsonschema_rs.Draft202012, formats=grpc_formats(), alphabet=alphabet)

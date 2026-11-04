@@ -12,19 +12,12 @@ from _pytest.main import ExitCode
 from flask import Response, jsonify, request
 
 from schemathesis.cli.commands.run.handlers.base import WriterWorker
+from test.utils import load_ndjson
 
 
 @pytest.fixture
 def ndjson_path(tmp_path):
     return tmp_path / "output.ndjson"
-
-
-def load_ndjson(path):
-    events = []
-    with path.open(encoding="utf-8") as fd:
-        for line in fd:
-            events.append(json.loads(line))
-    return events
 
 
 def get_event_type(event):

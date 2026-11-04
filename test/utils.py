@@ -29,7 +29,6 @@ from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalErro
 from schemathesis.engine.recorder import Interaction
 from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine
-from test.apps import builders
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -102,12 +101,6 @@ def to_float32(value: float) -> float:
 
 
 SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
-
-
-def make_openapi_schema(
-    paths: dict[str, Any] | None = None, *, version: str = "3.0.2", **kwargs: Any
-) -> dict[str, Any]:
-    return builders.build_schema(paths, version=version, **kwargs)
 
 
 def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
@@ -186,6 +179,14 @@ def load_yaml_or_fail(path: str | os.PathLike, *, context: str = "") -> dict:
         f"File size: {len(raw)} bytes.{_format_context(context)}\n--- raw ---\n{raw}\n--- end raw ---"
     )
     return parsed
+
+
+def ignored_warning_filters(config: pytest.Config) -> list[str]:
+    return [line for line in config.getini("filterwarnings") if line.startswith("ignore:")]
+
+
+def load_ndjson(path: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
 def load_json_or_fail(path: str | os.PathLike, *, context: str = "") -> Any:

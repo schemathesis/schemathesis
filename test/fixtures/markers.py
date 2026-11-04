@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+from test.utils import ignored_warning_filters
+
 
 def pytest_collection_modifyitems(session, config, items):
     # Keep globally ignored teardown noise ignored when a test opts into `filterwarnings("error")`.
-    ignored_warnings = [line for line in config.getini("filterwarnings") if line.startswith("ignore:")]
+    ignored_warnings = ignored_warning_filters(config)
     # During scheduled CI runs we select hypothesis_nested-marked tests and bump max_examples.
     for item in items:
         if isinstance(item, pytest.Function) and "hypothesis_max_examples" in item.fixturenames:

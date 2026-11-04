@@ -19,7 +19,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.reporting.har import _cookie_to_har
 from schemathesis.reporting.vcr import write_double_quoted
 from test.apps.catalog.openapi.modifiers.stateful import SlowOperations
-from test.utils import load_json_or_fail, load_yaml_or_fail
+from test.utils import load_json_or_fail, load_ndjson, load_yaml_or_fail
 
 
 @pytest.fixture
@@ -128,10 +128,7 @@ def test_store_timeout(ctx, cli, cassette_path, format):
         assert data["log"]["entries"][1]["response"]["bodySize"] == -1
     else:
         # ndjson format (externally tagged)
-        events = []
-        with cassette_path.open(encoding="utf-8") as fd:
-            for line in fd:
-                events.append(json.loads(line))
+        events = load_ndjson(cassette_path)
         assert "Initialize" in events[0]
         assert events[0]["Initialize"]["seed"] == 1
 

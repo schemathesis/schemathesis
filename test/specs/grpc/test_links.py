@@ -2,8 +2,6 @@ import pytest
 from google.protobuf import descriptor_pb2, json_format, message_factory
 from hypothesis.stateful import RULE_MARKER
 
-import schemathesis
-from schemathesis.config import SchemathesisConfig
 from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup, ServerError
@@ -12,7 +10,7 @@ from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema
 from schemathesis.specs.grpc.stateful import GrpcLink, infer_links, response_value
-from test.apps.catalog.grpc.descriptors import library_descriptor_set, write_descriptor_set
+from test.apps.catalog.grpc.descriptors import library_descriptor_set, load_descriptor_set
 from test.utils import saved_example_keys
 
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
@@ -125,8 +123,8 @@ def load(tmp_path, mutate=None, mutate_files=None, server=None):
         mutate(files.file[0])
     if mutate_files is not None:
         mutate_files(files)
-    config = None if server is None else SchemathesisConfig.from_dict({"base-url": server.target})
-    return schemathesis.grpc.from_path(write_descriptor_set(tmp_path, files.SerializeToString()), config=config)
+    config = {} if server is None else {"base-url": server.target}
+    return load_descriptor_set(tmp_path, files.SerializeToString(), **config)
 
 
 @pytest.mark.parametrize(

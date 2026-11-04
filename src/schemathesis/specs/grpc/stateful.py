@@ -29,7 +29,7 @@ from schemathesis.generation.stateful.control import (
 )
 from schemathesis.generation.stateful.state_machine import BundleStateMachine, normalize_name, unique_rule_name
 from schemathesis.specs.grpc.converter import decode_body, json_fields
-from schemathesis.specs.grpc.status import OK, grpc_status, starts_with_verb
+from schemathesis.specs.grpc.status import OK, starts_with_verb
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor
@@ -112,7 +112,7 @@ def _string_field(descriptor: Descriptor, name: str) -> FieldDescriptor | None:
 
 def response_value(operation: APIOperation, response: Response, field: str) -> str:
     """The string `field` of a successful response; empty when the call failed or the body does not decode."""
-    if grpc_status(response) != OK:
+    if response.status_code != OK:
         return ""
     message_class = message_factory.GetMessageClass(operation.definition.raw.output_type)
     try:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import platform
 import sys
@@ -10,6 +9,7 @@ import pytest
 
 from schemathesis.core.cache import Entry, Kind, Manifest, Request, load, write
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+from test.utils import load_ndjson
 
 
 def _seed(directory: Path, entries: list[Entry]) -> None:
@@ -91,7 +91,7 @@ def test_cache_row_shows_replayed_count(ctx, cli, snapshot_cli, tmp_path):
         )
         == snapshot_cli
     )
-    events = [json.loads(line) for line in ndjson_path.read_text(encoding="utf-8").splitlines()]
+    events = load_ndjson(ndjson_path)
     (probing,) = [
         event["PhaseFinished"]["payload"]["cache"]
         for event in events

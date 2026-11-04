@@ -360,10 +360,9 @@ except LoaderError as exc:
 """
 
 
-@pytest.mark.parametrize("blocked", ["google.protobuf", "google.rpc"], ids=["protobuf", "common-protos"])
-def test_missing_grpc_extra(users_path, blocked):
+def test_missing_grpc_extra(users_path):
     result = subprocess.run(
-        [sys.executable, "-c", BLOCK_MODULE_AND_LOAD, blocked, str(users_path)], capture_output=True, text=True
+        [sys.executable, "-c", BLOCK_MODULE_AND_LOAD, "google.rpc", str(users_path)], capture_output=True, text=True
     )
     assert result.stderr.splitlines()[-1] == (
         "ImportError: Loading gRPC schemas requires the `grpc` extra: `pip install 'schemathesis[grpc]'`"

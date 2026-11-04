@@ -81,33 +81,6 @@ def test_request_body_relative_reference_to_declared_id(ctx, identifier, referen
     assert [body for body in bodies if not validator.is_valid(body)] == []
 
 
-@pytest.mark.hypothesis_nested
-def test_request_body_reference_into_fragment_of_declared_id(ctx):
-    operation = ctx.openapi.load_operation(
-        "POST /items",
-        {
-            "requestBody": {
-                "required": True,
-                "content": {"application/json": {"schema": {"$ref": "https://example.invalid/text.json#/$defs/Code"}}},
-            },
-            "responses": {"200": {"description": "OK"}},
-        },
-        version="3.1.0",
-        components={
-            "schemas": {
-                "Text": {
-                    "$id": "https://example.invalid/text.json",
-                    "$defs": {"Code": {"type": "string", "enum": ["alpha"]}},
-                }
-            }
-        },
-    )
-
-    @run_given(case=operation.as_strategy(), max_examples=3)
-    def test(case):
-        assert case.body == "alpha"
-
-
 def _object_with_own_code(uri, code):
     return {
         "$id": uri,
@@ -164,8 +137,19 @@ def _object_with_own_code(uri, code):
             },
             {"a": {"code": "alpha"}, "b": {"code": "beta"}},
         ),
+        (
+            "3.1.0",
+            {"$ref": "https://example.invalid/text.json#/$defs/Code"},
+            {
+                "Text": {
+                    "$id": "https://example.invalid/text.json",
+                    "$defs": {"Code": {"type": "string", "enum": ["alpha"]}},
+                }
+            },
+            "alpha",
+        ),
     ],
-    ids=["defs", "draft-4-definitions", "nested-resource", "named-resources"],
+    ids=["defs", "draft-4-definitions", "nested-resource", "named-resources", "fragment-of-named-resource"],
 )
 def test_request_body_reference_into_own_definitions_of_declared_id(ctx, version, schema, schemas, expected):
     operation = ctx.openapi.load_operation(

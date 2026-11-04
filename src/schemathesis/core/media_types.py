@@ -108,6 +108,16 @@ def is_json(value: str) -> bool:
     return is_json_parts(parse(value))
 
 
+def is_json_lenient(value: str | None) -> bool:
+    """Detect a JSON-compatible content type, treating a missing or malformed one as not JSON."""
+    if value is None:
+        return False
+    try:
+        return is_json(value)
+    except MalformedMediaType:
+        return False
+
+
 _YAML_MEDIA_TYPE_PARTS: frozenset[tuple[str, str]] = frozenset(parse(media_type) for media_type in YAML_MEDIA_TYPES)
 
 

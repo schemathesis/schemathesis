@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, NoReturn, Self, cast
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
-import jsonschema_rs
 from google.protobuf import (
     descriptor_pb2,
     descriptor_pool,
@@ -54,7 +53,7 @@ from schemathesis.filters import FilterUsage, OperationContext
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
 from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema
-from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import (
     PhaseInfo,
@@ -78,7 +77,7 @@ from schemathesis.specs.grpc.converter import (
     request_message,
     rewrite_json,
 )
-from schemathesis.specs.grpc.formats import grpc_formats
+from schemathesis.specs.grpc.formats import message_values
 from schemathesis.specs.grpc.stateful import (
     GrpcLink,
     LinkedValue,
@@ -91,9 +90,8 @@ from schemathesis.specs.grpc.status import (
     GRPC_STATUS_CODES_BY_CLASS,
     GRPC_STATUS_CODES_BY_NAME,
     GRPC_STATUSES,
+    LIBRARY_DECODE_ERRORS,
     OK,
-    grpc_status,
-    is_library_decode_error,
     starts_with_verb,
 )
 
@@ -349,7 +347,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def is_response_status_expected(self, response: Response, expected_statuses: list[str]) -> bool:
-        status = grpc_status(response)
+        status = response.status_code
         # The default names HTTP status classes; listed gRPC status names are allowed on top of every non-server error.
         invalid = [
             expected
@@ -381,7 +379,7 @@ class GrpcSchema(BaseSchema):
     def classify_call_outcome(self, case: Case, response: Response) -> CallOutcome:
         if _is_library_decode_error(case, response):
             return CallOutcome.UNINFORMATIVE
-        return GRPC_STATUSES[grpc_status(response)].outcome
+        return GRPC_STATUSES[response.status_code].outcome
 
     @override
     def evaluate_server_error(self, case: Case, response: Response) -> None:
@@ -390,17 +388,13 @@ class GrpcSchema(BaseSchema):
 
     @override
     def server_error(self, case: Case, response: Response) -> ServerError:
-        status = grpc_status(response)
-        name = GRPC_STATUSES[status].name
         if _is_library_decode_error(case, response):
-            return UndecodableGrpcRequest(
-                operation=case.operation.label, status_code=response.status_code, status_name=name
-            )
-        return ServerError(operation=case.operation.label, status_code=response.status_code, status_name=name)
+            return UndecodableGrpcRequest(operation=case.operation.label, status_code=response.status_code)
+        return ServerError(operation=case.operation.label, status_code=response.status_code)
 
     @override
     def validate_response(self, operation: APIOperation, response: Response, *, case: Case | None = None) -> None:
-        if grpc_status(response) == OK:
+        if response.status_code == OK:
             output_type = operation.definition.raw.output_type
             decoded = _decode(operation, message_factory.GetMessageClass(output_type), response.content, "response")
             undeclared = dict.fromkeys(_undeclared_fields(operation, decoded, output_type, "response"))
@@ -419,7 +413,7 @@ class GrpcSchema(BaseSchema):
 
     @override
     def evaluate_auth(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        if grpc_status(response) != OK:
+        if response.status_code != OK:
             return True
         label = case.operation.label
         if AUTH_METADATA not in response.request.headers:
@@ -447,7 +441,7 @@ class GrpcSchema(BaseSchema):
         kwargs.pop("auth", None)
         probe_response = ctx.internals.send_probe(case, probe, kwargs)
         # Without declared security, other errors may come from the anonymous caller's data, not from ignored auth.
-        if grpc_status(probe_response) == OK:
+        if probe_response.status_code == OK:
             raise _ignored_auth(label, probe.id)
         if enforced is not None:
             enforced.add(label)
@@ -582,11 +576,8 @@ class GrpcSchema(BaseSchema):
                         operation_label=operation.label, location=ParameterLocation.BODY
                     ),
                 )
-            bodies: SearchStrategy[Body] = build(
-                schema,
-                draft=jsonschema_rs.Draft202012,
-                formats=grpc_formats(),
-                alphabet=Alphabet(allow_x00=generation.allow_x00, codec=generation.codec),
+            bodies: SearchStrategy[Body] = message_values(
+                schema, Alphabet(allow_x00=generation.allow_x00, codec=generation.codec)
             ).map(lambda generated: float32_values(generated, input_type))
             if isinstance(body, LinkedValue):
                 bodies = bodies.map(lambda generated: with_value(operation, generated, body.field, body.value))
@@ -882,7 +873,10 @@ def _drop_unknown_fields(decoded: message.Message) -> bool:
 
 def _is_library_decode_error(case: Case, response: Response) -> bool:
     # Raw bytes are sent unchanged, so a decode failure there is the input's fault, not the message type's.
-    return not isinstance(case.body, bytes) and is_library_decode_error(response)
+    if isinstance(case.body, bytes):
+        return False
+    prefixes = LIBRARY_DECODE_ERRORS.get(response.status_code, ())
+    return response.headers.get("grpc-message", [""])[0].startswith(prefixes)
 
 
 def _decode(

@@ -4,7 +4,6 @@ import base64
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, cast
 
-import jsonschema_rs
 from google.protobuf import message
 
 # googleapis-common-protos ships no type information.
@@ -13,9 +12,9 @@ from google.rpc import error_details_pb2, status_pb2  # type: ignore[import-unty
 from schemathesis.core.error_feedback import Observation, ObservationKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
-from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.specs.grpc.converter import body_message, json_fields, require_set
-from schemathesis.specs.grpc.formats import grpc_formats
+from schemathesis.specs.grpc.formats import message_values
 
 if TYPE_CHECKING:
     from google.protobuf.descriptor import Descriptor, FieldDescriptor
@@ -71,7 +70,7 @@ def require_fields(schema: JsonSchemaObject, descriptor: Descriptor, observation
             require_set(required_schema, field)
             # Requiring a field that holds only its zero value would leave nothing to generate.
             candidate = {**required_schema, "$defs": definitions}
-            if build(candidate, draft=jsonschema_rs.Draft202012, formats=grpc_formats()) is EMPTY_STRATEGY:
+            if message_values(candidate) is EMPTY_STRATEGY:
                 break
             properties[name] = required_schema
             oneof = field.containing_oneof

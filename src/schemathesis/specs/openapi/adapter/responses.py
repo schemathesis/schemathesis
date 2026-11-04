@@ -738,13 +738,6 @@ def _media_type_schema(
     return schema
 
 
-def _is_json_media_type(value: str) -> bool:
-    try:
-        return media_types.is_json(value)
-    except MalformedMediaType:
-        return False
-
-
 @dataclass(slots=True)
 class OpenApiResponseHeaders:
     """Collection of OpenAPI response header definitions."""
@@ -792,7 +785,7 @@ class OpenApiResponseHeader:
     def is_json(self) -> bool:
         """Whether the header value is a JSON document, as declared by its `content` media type."""
         content = _header_content(self.definition)
-        return content is not None and _is_json_media_type(content[0])
+        return content is not None and media_types.is_json_lenient(content[0])
 
     def _get_bundle(self) -> Bundle:
         """Get the bundled schema for this header."""

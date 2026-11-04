@@ -27,7 +27,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import case_header, format_failures
 from schemathesis.core.output import pluralize, truncate_text
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.transport import StatusClass, http_status_class
+from schemathesis.core.transport import StatusClass
 from schemathesis.generation.meta import report_label
 from schemathesis.reporting.crashes import CrashFile, CrashStep
 
@@ -83,7 +83,7 @@ def render_replay(
     base_url: str | None,
     duration_ms: int,
     output_config: OutputConfig,
-    schema: BaseSchema | None = None,
+    schema: BaseSchema,
     removal_count: int = 0,
     incompatible_count: int = 0,
     interrupted: bool = False,
@@ -230,7 +230,7 @@ def _print_step_chain(
     *,
     sequence: list[CrashStep],
     outcome: ReplayOutcome,
-    schema: BaseSchema | None,
+    schema: BaseSchema,
 ) -> None:
     from rich.text import Text
 
@@ -242,7 +242,7 @@ def _print_step_chain(
     paths = [truncate_text(_step_path(step), path_limit) for step in sequence]
     operation_labels: list[str | None] = []
     for step in sequence:
-        label = schema.operation_label_for_display(step.operation) if schema is not None else None
+        label = schema.operation_label_for_display(step.operation)
         operation_labels.append(truncate_text(label, path_limit) if label is not None else None)
     method_column = max(len(step.method) for step in sequence)
     path_column = max(len(label or path) for label, path in zip(operation_labels, paths, strict=True))
@@ -419,8 +419,8 @@ def _step_path(step: CrashStep) -> str:
     return urlparse(raw).path
 
 
-def _status_style(schema: BaseSchema | None, status_code: int) -> str:
-    status_class = schema.classify_status(status_code) if schema is not None else http_status_class(status_code)
+def _status_style(schema: BaseSchema, status_code: int) -> str:
+    status_class = schema.classify_status(status_code)
     if status_class is StatusClass.SUCCESS:
         return "green"
     if status_class.is_client_error:

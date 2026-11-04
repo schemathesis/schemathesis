@@ -15,6 +15,7 @@ from google.protobuf import message, message_factory
 from typing_extensions import override
 
 from schemathesis.core import Body
+from schemathesis.core.errors import read_timeout_error
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
@@ -143,8 +144,7 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             # Errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
             # Servers send DEADLINE_EXCEEDED with any text too; only one arriving at the timeout is a read timeout.
             if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout - DEADLINE_CLOCK_SLACK:
-                timed_out = TimeoutError(f"{base_url}: Read timed out. (read timeout={timeout})")
-                raise requests.exceptions.ReadTimeout(timed_out, request=request) from error
+                raise read_timeout_error(base_url, timeout, request) from error
             if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):
                 details = outcome.details() or ""
                 failed_to_connect = "failed to connect" in details.lower()

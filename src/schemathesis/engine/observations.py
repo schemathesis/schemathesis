@@ -86,7 +86,7 @@ class Observations:
         if len(entries) >= MAX_BODY_URL_SAMPLES or fruitless >= MAX_FRUITLESS_BODY_SCANS:
             return
         content_type = response_content_type(response)
-        if not content_type or not _is_json(content_type):
+        if not content_type or not media_types.is_json_lenient(content_type):
             return
         try:
             # Not `response.json()`: its cache was cleared after checks and would pin the parsed body in memory again
@@ -105,13 +105,6 @@ class Observations:
             if len(entries) >= MAX_BODY_URL_SAMPLES:
                 break
         self.fruitless_body_scans[operation] = 0 if len(entries) > found else fruitless + 1
-
-
-def _is_json(content_type: str) -> bool:
-    try:
-        return media_types.is_json(content_type)
-    except ValueError:
-        return False
 
 
 def _iter_strings(document: object) -> Iterator[tuple[str, str]]:

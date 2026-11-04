@@ -799,14 +799,13 @@ def message_to_json(message: Message, pool: DescriptorPool) -> JsonValue:
     nested: dict[str, JsonValue] = {}
     for field, value in message.ListFields():
         item_type = field.message_type
-        is_map = False
-        if item_type is not None and item_type.GetOptions().map_entry:
-            is_map = True
-            item_type = item_type.fields_by_name["value"].message_type
+        entry = map_entry(field)
+        if entry is not None:
+            item_type = entry.fields_by_name["value"].message_type
         # Extensions render with the plain fields, as only regular fields can be cleared by name.
         if item_type is None or field.is_extension:
             continue
-        if is_map:
+        if entry is not None:
             # JSON spells boolean map keys in lowercase.
             nested[field.json_name] = {
                 str(key).lower() if isinstance(key, bool) else str(key): message_to_json(item, pool)
@@ -859,11 +858,11 @@ def rewrite_json(
     rewritten = {}
     for key, item in value.items():
         member = fields.get(key) or _extension(message_type, key)
-        nested = None if member is None else member.message_type
+        entry = None if member is None else map_entry(member)
         if member is None:
             rewritten[key] = item
-        elif nested is not None and nested.GetOptions().map_entry and isinstance(item, dict):
-            values = nested.fields_by_name["value"]
+        elif entry is not None and isinstance(item, dict):
+            values = entry.fields_by_name["value"]
             rewritten[key] = {name: _rewrite_field(entry, values, leaf, depth) for name, entry in item.items()}
         elif member.is_repeated and isinstance(item, list):
             rewritten[key] = [_rewrite_field(entry, member, leaf, depth) for entry in item]

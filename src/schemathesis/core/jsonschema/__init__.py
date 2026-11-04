@@ -383,6 +383,13 @@ def resolve_with_root_bundle(schema: dict[str, Any], root_schema: dict[str, Any]
     return maybe_resolve_bundled(cast("dict[str, Any]", schema_with_bundle(schema, root_schema)))
 
 
+def bundled_name(reference: object) -> str | None:
+    """Name of the bundled schema `reference` points to, e.g. `schema1` for `#/x-bundled/schema1`."""
+    if isinstance(reference, str) and reference.startswith(_REFERENCE_INTO_BUNDLE):
+        return reference[len(_REFERENCE_INTO_BUNDLE) :]
+    return None
+
+
 def resolve_bundled_ref(schema: dict[str, Any], bundled: object) -> dict[str, Any]:
     """Follow `$ref` chains into the `bundled` map; return `schema` as-is when it does not point into it."""
     ref = schema.get("$ref")
@@ -448,6 +455,7 @@ __all__ = [
     "is_valid",
     "make_validator",
     "make_validator_for",
+    "bundled_name",
     "maybe_resolve_bundled",
     "resolve_bundled_ref",
     "resolve_bundled_root",
