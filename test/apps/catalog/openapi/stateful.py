@@ -72,6 +72,82 @@ def flaky_branch_blocks() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def replay_inferred_list_link(
+    *, item_ids: list[int], failing: bool, consumer: Literal["path", "body"] = "path"
+) -> OpenAPIApp:
+    item = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+    items = {"type": "object", "properties": {"data": {"type": "array", "items": item}}, "required": ["data"]}
+    responses = {"200": {"description": "OK"}, "500": {"description": "Failure"}}
+    consumers = {
+        "path": {
+            "/items/{itemId}": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": responses,
+                }
+            }
+        },
+        "body": {
+            "/orders": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "lines": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "maxItems": 1,
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {"itemId": {"type": "integer"}},
+                                                "required": ["itemId"],
+                                                "additionalProperties": False,
+                                            },
+                                        }
+                                    },
+                                    "required": ["lines"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": responses,
+                }
+            }
+        },
+    }
+    spec = build_schema(
+        {
+            "/items": {
+                "get": {
+                    "responses": {"200": {"description": "Items", "content": {"application/json": {"schema": items}}}}
+                }
+            },
+            **consumers[consumer],
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+    status = 500 if failing else 200
+
+    @app.route("/items")
+    def list_items():
+        return jsonify({"data": [{"id": item_id} for item_id in item_ids]})
+
+    @app.route("/items/<int:item_id>")
+    def get_item(item_id):
+        return jsonify({"id": item_id}), status
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        return jsonify({}), status
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def _build_stateful_schema() -> dict:
     post_links = {
         "GetUser": {

@@ -8,6 +8,7 @@
 - Crash in the examples phase on `$ref` Example Objects inside a schema's `examples` map.
 - Unserved operations counted as tested and passed.
 - Missing inferred stateful links for resources whose schemas reference `$defs` under a nested `$id`.
+- `st replay` resending recorded ids for inferred links that pick an item from a list response.
 - Fuzzing failing the `filter_too_much` health check when ids reused from responses contain `/`.
 - Raw `ModuleNotFoundError` from `schemathesis.grpc.from_path` and the pytest plugin without the `grpc` extra.
 - Schema error for security schemes defined through a chain of `$ref`s.
