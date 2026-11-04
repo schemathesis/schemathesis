@@ -1312,6 +1312,35 @@ def test_positive_objects_honor_dependencies(ctx, body):
     collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
 
 
+def test_positive_objects_honor_dependencies_behind_references(ctx):
+    # The dependent object comes through a reference and holds a referenced property itself.
+    schemas = {
+        "Change": {
+            "type": "object",
+            "required": ["attributes"],
+            "properties": {"attributes": {"$ref": "#/components/schemas/Attributes"}},
+        },
+        "Attributes": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "translations": {"type": "object"},
+                "kind": {"$ref": "#/components/schemas/Kind"},
+            },
+            "dependentRequired": {"translations": ["name"]},
+        },
+        "Kind": {"enum": ["a", "b"]},
+    }
+    body = {"$ref": "#/components/schemas/Change"}
+    operation = body_operation(ctx, body, version="3.1.0", components={"schemas": schemas})
+    validator = jsonschema_rs.Draft202012Validator({**body, "components": {"schemas": schemas}})
+
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET]
+
+    assert bodies, "No positive bodies generated"
+    assert [value for value in bodies if not validator.is_valid(value)] == []
+
+
 @pytest.mark.parametrize(
     ("version", "status"),
     [
