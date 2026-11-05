@@ -2,6 +2,8 @@ import os
 import platform
 import socket
 import ssl
+import subprocess
+import sys
 from collections.abc import Callable
 from http.client import RemoteDisconnected
 
@@ -130,3 +132,10 @@ def test_dropped_before_response(reason_type):
 )
 def test_not_dropped_before_response(error):
     assert not _is_dropped_before_response(error)
+
+
+# Workers pick the transport on their first call; a concurrent first import of an unused async stack can fail.
+def test_http_transport_does_not_import_asgi_client():
+    probe = "import sys, schemathesis.transport; schemathesis.transport.get(None); print('anyio' in sys.modules)"
+    output = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True).stdout
+    assert output.strip() == "False"

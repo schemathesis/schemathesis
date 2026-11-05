@@ -22,14 +22,16 @@ def is_asgi_app(app: object) -> bool:
 
 def get(app: object) -> BaseTransport:
     """Get transport to send the data to the application."""
-    from schemathesis.transport.asgi import ASGI_TRANSPORT
-    from schemathesis.transport.requests import REQUESTS_TRANSPORT
-    from schemathesis.transport.wsgi import WSGI_TRANSPORT
-
     if app is None:
+        from schemathesis.transport.requests import REQUESTS_TRANSPORT
+
         return REQUESTS_TRANSPORT
     if is_asgi_app(app):
+        from schemathesis.transport.asgi import ASGI_TRANSPORT
+
         return ASGI_TRANSPORT
+    from schemathesis.transport.wsgi import WSGI_TRANSPORT
+
     return WSGI_TRANSPORT
 
 
