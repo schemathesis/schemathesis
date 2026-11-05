@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
+- Sporadic `BlockingIOError` runtime errors with multiple workers on free-threaded Python.
 
 ## [4.33.1](https://github.com/schemathesis/schemathesis/compare/v4.33.0...v4.33.1) - 2026-11-04
 
