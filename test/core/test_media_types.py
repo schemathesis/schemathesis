@@ -40,7 +40,7 @@ def test_parse_content_type_malformed(value):
         ("application/problem+json", True),
         ("application/json", True),
         ("application/jose+jwe", True),
-        ("application/jwt", True),
+        ("application/jwt", False),
         ("application/x-json", True),
         ("text/json", True),
         ("application/xml", False),
