@@ -561,9 +561,13 @@ class JSONString(Prefixed):
         return json.loads(unquote(value))
 
 
-def test_content_serialization(ctx):
+JSON_MEDIA_TYPES = ["application/json", "application/json; charset=utf-8", "application/vnd.api+json"]
+
+
+@pytest.mark.parametrize("media_type", JSON_MEDIA_TYPES)
+def test_content_serialization(ctx, media_type):
     raw_schema = make_openapi_schema(
-        {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
+        {"in": "query", "name": "filter", "required": True, "content": {media_type: {"schema": OBJECT_SCHEMA}}}
     )
     assert_generates(ctx, raw_schema, ({"filter": JSONString('{"r": "100", "g": "200", "b": "150"}')},), "query")
 
@@ -690,10 +694,8 @@ def test_urlencoded_body_with_media_type_parameters(ctx, declared_media_type):
     assert sorted(prepared.body.split("&")) == ["b=true", "x=1"]
 
 
-@pytest.mark.hypothesis_nested
-@given(st.data())
-@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
-def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
+@pytest.mark.parametrize("media_type", JSON_MEDIA_TYPES)
+def test_querystring_json_serialization_is_sent_as_raw_query(ctx, media_type):
     # Example from OAS 3.2: {"numbers":[1,2],"flag":null}
     # -> %7B%22numbers%22%3A%5B1%2C2%5D%2C%22flag%22%3Anull%7D
     operation = ctx.openapi.load_operation(
@@ -705,7 +707,7 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
                     "in": "querystring",
                     "required": True,
                     "content": {
-                        "application/json": {
+                        media_type: {
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -723,10 +725,11 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
         },
         version="3.2.0",
     )
-    case = data.draw(operation.as_strategy())
-    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
-    decoded = json.loads(unquote(kwargs["params"]))
-    assert decoded == {"numbers": [1, 2], "flag": None}
+
+    @run_given(case=operation.as_strategy(), max_examples=5)
+    def test(case):
+        kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+        assert json.loads(unquote(kwargs["params"])) == {"numbers": [1, 2], "flag": None}
 
 
 # A `querystring` parameter may legitimately generate no query pairs at all (e.g. an empty string payload).

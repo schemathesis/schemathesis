@@ -66,7 +66,7 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 # https://swagger.io/docs/specification/describing-parameters/#schema-vs-content
                 options = iter(definition["content"].keys())
                 media_type = next(options, None)
-                if media_type == "application/json":
+                if media_types.is_json_lenient(media_type):
                     yield to_json(name)
         else:
             # Simple serialization
@@ -203,7 +203,7 @@ def _serialize_querystring_other_media_type(name: str, media_type: str) -> Calla
             return item
 
         serialized: str | bytes
-        if media_type == "application/json":
+        if media_types.is_json_lenient(media_type):
             serialized = json.dumps(payload, separators=(",", ":"))
         elif isinstance(payload, Binary):
             serialized = payload.data

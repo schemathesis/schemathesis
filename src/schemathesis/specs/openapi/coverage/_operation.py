@@ -810,7 +810,7 @@ def _coverage_context(
 
 def _json_media_type(parameter: OpenApiParameter) -> tuple[str, str] | None:
     """The media type of a parameter that travels as JSON text rather than in its location's own style."""
-    if parameter.content_media_type == "application/json":
+    if media_types.is_json_lenient(parameter.content_media_type):
         return ("application", "json")
     return None
 

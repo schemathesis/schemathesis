@@ -3077,8 +3077,11 @@ def test_optional_null_header_is_sent(ctx):
     assert [case.headers for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"X-Limit": "null"}]
 
 
+@pytest.mark.parametrize(
+    "media_type", ["application/json", "application/json; charset=utf-8", "application/vnd.api+json"]
+)
 @pytest.mark.parametrize("location", ["header", "cookie", "query"])
-def test_json_content_parameter_keeps_nested_types(ctx, location):
+def test_json_content_parameter_keeps_nested_types(ctx, location, media_type):
     schema = {
         "type": "object",
         "properties": {"a": {"type": "integer"}, "b": {"type": "boolean"}},
@@ -3087,9 +3090,7 @@ def test_json_content_parameter_keeps_nested_types(ctx, location):
     }
     operation = load_schema(
         ctx,
-        parameters=[
-            {"in": location, "name": "X-F", "required": True, "content": {"application/json": {"schema": schema}}}
-        ],
+        parameters=[{"in": location, "name": "X-F", "required": True, "content": {media_type: {"schema": schema}}}],
         method="get",
     )["/foo"]["GET"]
     container = LOCATION_TO_CONTAINER[location]
