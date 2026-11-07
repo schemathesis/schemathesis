@@ -62,13 +62,13 @@ def resolve_example_references(definition: Mapping[str, Any], resolver: Resolver
     for keyword in ("examples", "x-examples"):
         container = definition.get(keyword)
         if isinstance(container, dict):
-            updated[keyword] = {name: _resolve_example(example, resolver) for name, example in container.items()}
+            updated[keyword] = {name: resolve_example(example, resolver) for name, example in container.items()}
         elif isinstance(container, list):
-            updated[keyword] = [_resolve_example(example, resolver) for example in container]
+            updated[keyword] = [resolve_example(example, resolver) for example in container]
     return updated
 
 
-def _resolve_example(example: object, resolver: Resolver) -> object:
+def resolve_example(example: object, resolver: Resolver) -> object:
     seen: set[str] = set()
     while isinstance(example, dict) and isinstance(reference := example.get("$ref"), str):
         try:

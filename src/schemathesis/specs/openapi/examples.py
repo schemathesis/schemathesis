@@ -51,7 +51,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     _deep_merge_overlay,
     example_is_valid,
 )
-from schemathesis.specs.openapi.adapter.references import example_object_value
+from schemathesis.specs.openapi.adapter.references import example_object_value, resolve_example
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from schemathesis.specs.openapi.formats import format_lengths_for
 
@@ -676,6 +676,10 @@ def _merge_all_of(
 
 def _unpack_example_object(example: dict[str, Any], resolver: Resolver) -> Generator[Any, None, None]:
     """Extract the value from a single OAS3 Example Object."""
+    target = resolve_example(example, resolver)
+    if isinstance(target, dict):
+        example = target
+    # A chain that ends on a bare value names that value as the example
     if "$ref" in example:
         _, example = resolve_reference(resolver, example["$ref"])
     value = example_object_value(example) if isinstance(example, dict) else NOT_SET
