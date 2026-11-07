@@ -17,7 +17,7 @@ YAML_MEDIA_TYPES: tuple[str, ...] = (
     "application/yaml",
 )
 JSON_MEDIA_TYPES: frozenset[tuple[str, str]] = frozenset(
-    {("application", "jose+jwe"), ("application", "jwt"), ("application", "x-json"), ("text", "json")}
+    {("application", "jose+jwe"), ("application", "x-json"), ("text", "json")}
 )
 
 FORM_MEDIA_TYPES: frozenset[str] = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
@@ -182,6 +182,12 @@ def is_json_parts(media_type: tuple[str, str]) -> bool:
         return True
     main, sub = media_type
     return main == "application" and (sub == "json" or sub.endswith("+json"))
+
+
+def is_jwt_parts(media_type: tuple[str, str]) -> bool:
+    """Detect `application/jwt` and `+jwt` media types, whose bodies are compact tokens, not JSON."""
+    main, sub = media_type
+    return main == "application" and (sub == "jwt" or sub.endswith("+jwt"))
 
 
 def is_xml(value: str) -> bool:

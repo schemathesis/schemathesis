@@ -3650,6 +3650,24 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.colno == 2
 
 
+def test_compact_jwt_response_is_not_parsed_as_json(ctx, response_factory):
+    operation = ctx.openapi.load_operation(
+        "GET /token",
+        {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/jwt": {"schema": {"type": "string"}}},
+                }
+            }
+        },
+    )
+    response = response_factory.requests(content=b"eyJhbGciOiJIUzI1NiJ9.e30.c2ln", content_type="application/jwt")
+    response = Response.from_requests(response, True)
+
+    assert response_schema_conformance(check_context(), response, operation.Case()) is None
+
+
 def test_response_validation_reports_surrogate_returned_by_deserializer(ctx, response_factory):
     @schemathesis.deserializer("application/vnd.surrogate")
     def deserialize(_ctx, response):
