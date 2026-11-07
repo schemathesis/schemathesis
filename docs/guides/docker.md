@@ -92,4 +92,4 @@ Then run the Allure CLI on your host to generate the HTML report. See [Allure In
 
 **Connection refused when the API runs on the host.** `localhost` inside the container is the container itself. Use `host.docker.internal` (Docker Desktop) or `--network host` (Linux).
 
-**The hooks file is not loaded.** Mount it at `/app/hooks.py`, or set `-e SCHEMATHESIS_HOOKS=/path/in/container.py` to the path you mounted it at.
+**The hooks file is not loaded.** Mount it at `/app/hooks.py`, or name the path you mounted it at in the `hooks` option of `schemathesis.toml`. Setting `SCHEMATHESIS_HOOKS` to your file replaces the built-in hooks, which turns off schema coverage.
