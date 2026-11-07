@@ -414,6 +414,7 @@ def _apply_link_parameters(
     case: Case, link: CrashLink, previous_step_output: StepOutput, parent_body: str
 ) -> list[LinkedValue]:
     from schemathesis.specs.openapi.expressions import body_pointers
+    from schemathesis.specs.openapi.stateful import merge_link_body
 
     schema = case.operation.schema
     linked: list[LinkedValue] = []
@@ -451,7 +452,7 @@ def _apply_link_parameters(
                 )
                 for name, value in body.items()
             )
-            case.body = {**recorded_body, **body}
+            case.body = merge_link_body(recorded_body, body)
         else:
             linked.append(
                 LinkedValue(

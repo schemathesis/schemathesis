@@ -620,8 +620,14 @@ def test_replay_applies_non_path_link_parameter(cli, app_runner, ctx, tmp_path, 
         ({"token": "fresh"}, {"token": "$response.body#/token"}, {"token": "stale"}, {"token": "fresh"}),
         ({"other": "no token here"}, "$response.body#/token", {"token": "recorded"}, {"token": "recorded"}),
         ({"token": "fresh"}, "$response.body", NOT_SET, {"token": "fresh"}),
+        (
+            {"token": "fresh"},
+            {"user": {"id": "$response.body#/token"}},
+            {"user": {"id": "stale", "name": "kept"}, "a": 1},
+            {"user": {"id": "fresh", "name": "kept"}, "a": 1},
+        ),
     ],
-    ids=["re-extract-field", "unresolvable-keeps-recorded", "wholesale"],
+    ids=["re-extract-field", "unresolvable-keeps-recorded", "wholesale", "nested-keeps-recorded-siblings"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_request_body_link(
