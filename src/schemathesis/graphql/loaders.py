@@ -7,6 +7,7 @@ from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, NoReturn, TypeVar, cast
 
+from schemathesis import wfc
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
@@ -17,6 +18,7 @@ from schemathesis.python import django, wsgi
 if TYPE_CHECKING:
     from graphql import DocumentNode
 
+    from schemathesis.config import ProjectConfig
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
 
@@ -261,7 +263,13 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
 
     if "data" in schema:
         schema = schema["data"]
-    return load_with_hooks(schema, config, lambda project_config: GraphQLSchema(schema, config=project_config))
+
+    def build(project_config: ProjectConfig) -> GraphQLSchema:
+        instance = GraphQLSchema(schema, config=project_config)
+        wfc.setup_auth(instance, project_config, LoaderErrorKind.GRAPHQL_INVALID_SCHEMA)
+        return instance
+
+    return load_with_hooks(schema, config, build)
 
 
 def _introspect(fetch: Callable[[dict[str, Any]], Any], kwargs: dict[str, Any]) -> Any:

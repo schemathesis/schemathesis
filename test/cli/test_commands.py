@@ -2615,6 +2615,31 @@ def test_graphql_url(ctx, cli, endpoint, args, snapshot_cli):
     assert cli.run(api.schema_url, "--max-examples=5", "--mode=positive", *args) == snapshot_cli
 
 
+def test_graphql_auth_wfc(ctx, cli, tmp_path):
+    api = ctx.graphql.apps.books()
+    headers = []
+
+    # Schema introspection and capability probes carry no auth.
+    @api.wsgi_app.before_request
+    def capture():
+        if request.method == "POST" and "__schema" not in request.get_data(as_text=True):
+            headers.append(request.headers.get("X-Api-Key"))
+
+    auth = tmp_path / "auth.json"
+    auth.write_text(json.dumps({"auth": [{"name": "u", "fixedHeaders": [{"name": "X-Api-Key", "value": "static"}]}]}))
+
+    assert cli.run(api.schema_url, f"--auth-wfc={auth}", "--max-examples=2", "--phases=fuzzing").exit_code == 0
+    assert headers
+    assert set(headers) == {"static"}
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_graphql_wfc_report_refused(ctx, cli, snapshot_cli):
+    api = ctx.graphql.apps.books()
+
+    assert cli.run(api.schema_url, "--report=wfc", "--max-examples=1") == snapshot_cli
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_graphql_schema_violation(ctx, cli, snapshot_cli):
     # Every case hits the same broken field, so the run must report one finding rather than one per case.

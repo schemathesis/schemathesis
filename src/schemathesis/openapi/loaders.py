@@ -8,6 +8,7 @@ from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
+from schemathesis import wfc
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
@@ -254,17 +255,7 @@ def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, str
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         instance = OpenApiSchema(raw_schema=schema, config=project_config)
-        if project_config.auth.wfc is not None:
-            from schemathesis.wfc.errors import WFCError
-            from schemathesis.wfc.integration import register_wfc_auth
-
-            try:
-                register_wfc_auth(instance, project_config.auth.wfc)
-            except WFCError as exc:
-                raise LoaderError(
-                    LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
-                    f"Failed to load Web Fuzzing Commons authentication: {exc}",
-                ) from exc
+        wfc.setup_auth(instance, project_config, LoaderErrorKind.OPEN_API_INVALID_SCHEMA)
         return instance
 
     return load_with_hooks(schema, config, build)
