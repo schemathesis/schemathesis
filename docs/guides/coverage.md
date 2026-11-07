@@ -141,6 +141,8 @@ def before_generate_query(context, strategy): ...
 
 `SCHEMATHESIS_COVERAGE=false` applies only to the built-in hooks file. With your own hooks file, remove the TraceCov lines to disable coverage.
 
+To keep the built-in file instead, mount your hooks elsewhere and name them in the `hooks` option of `schemathesis.toml`. Schemathesis loads both.
+
 ## Troubleshooting
 
 **`ModuleNotFoundError: No module named 'tracecov'`** when loading hooks: TraceCov is not in the environment that runs Schemathesis. With `uvx`, add `--with tracecov`; a separate `uv pip install tracecov` or `pipx install tracecov` does not reach the `uvx` environment.

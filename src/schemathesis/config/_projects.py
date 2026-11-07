@@ -162,10 +162,9 @@ class ProjectConfig(DiffBase):
         self.origin = origin
         self.headers = headers
         self.hooks = hooks_
+        hooks.load_from_env()
         if hooks_:
             hooks.load_from_path(hooks_)
-        else:
-            hooks.load_from_env()
         if isinstance(workers, int):
             self.workers = workers
         else:
