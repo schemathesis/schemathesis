@@ -1342,6 +1342,50 @@ def test_positive_objects_honor_dependencies_behind_references(ctx):
 
 
 @pytest.mark.parametrize(
+    "target",
+    [
+        {"properties": {"x": {"type": "integer"}}, "required": ["x"], "additionalProperties": False},
+        {"anyOf": [{"type": "integer"}, {"type": "string", "minLength": 2}]},
+        {
+            "type": "object",
+            "properties": {"a": {"type": "string"}, "b": {"type": "string"}},
+            "dependentRequired": {"a": ["b"]},
+        },
+    ],
+    ids=["implied-object", "any-of", "dependent-required"],
+)
+def test_positive_bodies_through_alias_components(ctx, target):
+    # A component that only points at another one generates exactly what the target generates.
+    def positive_bodies(name, schemas):
+        body = {
+            "type": "object",
+            "properties": {
+                "p": {"$ref": f"#/components/schemas/{name}"},
+                "q": {"anyOf": [{"$ref": f"#/components/schemas/{name}"}, {"type": "boolean"}]},
+            },
+            "required": ["p"],
+        }
+        operation = body_operation(ctx, body, version="3.1.0", components={"schemas": schemas})
+        return {
+            json.dumps(case.body, sort_keys=True)
+            for case in collect_cases(operation, GenerationMode.POSITIVE)
+            if case.body is not NOT_SET
+        }
+
+    assert positive_bodies("Alias", {"Target": target, "Alias": {"$ref": "#/components/schemas/Target"}}) == (
+        positive_bodies("Target", {"Target": target})
+    )
+
+
+def test_positive_bodies_through_cyclic_alias_components(ctx):
+    schemas = {"A": {"$ref": "#/components/schemas/B"}, "B": {"$ref": "#/components/schemas/A"}}
+    body = {"type": "object", "properties": {"p": {"$ref": "#/components/schemas/A"}}, "required": ["p"]}
+    operation = body_operation(ctx, body, version="3.1.0", components={"schemas": schemas})
+
+    assert [case.body for case in collect_cases(operation, GenerationMode.POSITIVE)] == [{"p": None}]
+
+
+@pytest.mark.parametrize(
     ("version", "status"),
     [
         ("3.1.0", {"type": ["string", "null"], "enum": ["active", "archived"]}),
