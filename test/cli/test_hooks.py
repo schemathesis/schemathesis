@@ -216,6 +216,47 @@ def before_call(context, case, **kwargs):
     assert len(calls.read_text()) == len(api_calls)
 
 
+def test_env_hooks_extend_cli_when_config_sets_hooks(ctx, cli):
+    api = ctx.openapi.apps.success()
+    env_hooks = ctx.write_pymodule(
+        """
+from schemathesis import cli, engine
+
+cli.add_group("Env group").add_option("--env-flag", type=int)
+
+
+@cli.handler()
+class EnvHandler(cli.EventHandler):
+    def __init__(self, *args, **params):
+        self.value = params["env_flag"]
+
+    def handle_event(self, ctx, event) -> None:
+        if isinstance(event, engine.events.EngineFinished):
+            ctx.add_summary_line(f"Env flag: {self.value}")
+""",
+        filename="env_hooks",
+    )
+    config_hooks = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, **kwargs):
+    note("Config hook called")
+""",
+        filename="config_hooks",
+    )
+    result = cli.run(
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=1",
+        "--env-flag=7",
+        config={"hooks": config_hooks},
+        hooks=env_hooks,
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "Env flag: 7" in result.stdout
+    assert "Config hook called" in result.stdout
+
+
 def test_hooks_file_path_unloadable(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
     # When SCHEMATHESIS_HOOKS points to a file path with an unknown extension
