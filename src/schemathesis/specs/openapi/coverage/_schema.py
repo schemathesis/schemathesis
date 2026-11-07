@@ -76,7 +76,7 @@ from schemathesis.core.jsonschema.patterns import (
     pattern_requires_literal,
     pin_pattern_length,
 )
-from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference_with_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type, to_json_type_name
 from schemathesis.core.parameters import EXTRA_PROPERTY_LOCATIONS, HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
@@ -592,8 +592,19 @@ class CoverageContext:
         return self._resolver
 
     def resolve_ref(self, ref: str) -> dict | bool:
-        """Resolve a $ref to its schema definition."""
-        _, resolved = resolve_reference(self.resolver, ref)
+        """Resolve a $ref to its schema definition, going through schemas that only point at another one."""
+        uri, resolver, resolved = resolve_reference_with_uri(self.resolver, ref)
+        seen = {uri}
+        while (
+            isinstance(resolved, dict)
+            and "$ref" in resolved
+            and ANNOTATION_KEYWORDS.issuperset(resolved.keys() - {"$ref"})
+        ):
+            uri, resolver, target = resolve_reference_with_uri(resolver.enter(resolved), resolved["$ref"])
+            if uri in seen:
+                break
+            seen.add(uri)
+            resolved = target
         return resolved
 
     def schema_key(self, schema: JsonSchema) -> tuple[object, ...]:
