@@ -1598,7 +1598,15 @@ def test_example_reference_chains(ctx, components, expected):
     assert [examples.generate_one(strategy).body for strategy in operation.get_strategies_from_examples()] == expected
 
 
-def test_example_reference_in_schema_examples(ctx):
+@pytest.mark.parametrize(
+    "components",
+    [
+        {"A": {"value": "alice"}},
+        {"A": {"$ref": "#/components/examples/B"}, "B": {"value": "alice"}},
+    ],
+    ids=["direct", "chain"],
+)
+def test_example_reference_in_schema_examples(ctx, components):
     schema = {"$ref": "#/components/schemas/Name"}
     operation = ctx.openapi.load_operation(
         "POST /items",
@@ -1609,7 +1617,7 @@ def test_example_reference_in_schema_examples(ctx):
         },
         components={
             "schemas": {"Name": {"type": "string", "examples": {"a": {"$ref": "#/components/examples/A"}}}},
-            "examples": {"A": {"value": "alice"}},
+            "examples": components,
         },
     )
     assert [example_to_dict(example) for example in extract_top_level(operation)] == [

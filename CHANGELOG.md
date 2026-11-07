@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
