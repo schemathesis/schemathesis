@@ -3413,6 +3413,163 @@ def test_resource_naming_its_own_document_keeps_fields_and_link(ctx, order):
     ]
 
 
+ORDER_IN_OTHER_FILE = ref("common.json#/components/schemas/Order")
+
+
+def read_order_link(pointer):
+    return {
+        "operationRef": "#/paths/~1orders~1{orderId}/get",
+        "x-schemathesis": {"is_inferred": True},
+        "parameters": {"path.orderId": f"$response.body#{pointer}"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("method", "status", "response_schema", "pointer"),
+    [
+        ("post", "201", ORDER_IN_OTHER_FILE, "/id"),
+        (
+            "post",
+            "201",
+            {"type": "object", "properties": {"data": ORDER_IN_OTHER_FILE, "meta": {"type": "object"}}},
+            "/data/id",
+        ),
+        ("post", "201", {"type": "object", "properties": {"order": ORDER_IN_OTHER_FILE}}, "/order/id"),
+        ("get", "200", {"type": "array", "items": ORDER_IN_OTHER_FILE}, "/*/id"),
+        (
+            "get",
+            "200",
+            {
+                "type": "object",
+                "properties": {"data": {"type": "array", "items": ORDER_IN_OTHER_FILE}, "total": {"type": "integer"}},
+            },
+            "/data/*/id",
+        ),
+        (
+            "get",
+            "200",
+            {
+                "type": "object",
+                "properties": {"items": ref("common.json#/components/schemas/Orders"), "count": {"type": "integer"}},
+            },
+            "/items/*/id",
+        ),
+        (
+            "get",
+            "200",
+            {
+                "type": "object",
+                "properties": {
+                    "_embedded": {
+                        "type": "object",
+                        "properties": {"orders": {"type": "array", "items": ORDER_IN_OTHER_FILE}},
+                    },
+                    "_links": {"type": "object"},
+                },
+            },
+            "/_embedded/orders/*/id",
+        ),
+    ],
+    ids=["direct", "envelope", "external-tag", "array", "pagination", "pagination-referenced-list", "hal"],
+)
+def test_resource_in_other_file_referring_to_sibling_definition(ctx, method, status, response_schema, pointer):
+    ctx.makefile(
+        {
+            "components": {
+                "schemas": {
+                    "Order": {
+                        "allOf": [
+                            component_ref("OrderBase"),
+                            {"type": "object", "properties": {"total": {"type": "integer"}}},
+                        ]
+                    },
+                    "OrderBase": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+                    "Orders": {"type": "array", "items": component_ref("Order")},
+                }
+            }
+        },
+        filename="common",
+    )
+    root = ctx.openapi.write_schema(
+        {
+            **operation(method, "/orders", status, response_schema),
+            **operation("get", "/orders/{orderId}", "200", ORDER_IN_OTHER_FILE, parameters=[path_param("orderId")]),
+        }
+    )
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == [
+        [f"#/paths/~1orders/{method}", status, read_order_link(pointer)]
+    ]
+
+
+ADDRESS = {"type": "object", "properties": {"street": {"type": "string"}}}
+
+
+@pytest.mark.parametrize(
+    ("address", "common_schemas", "root_schemas"),
+    [
+        (component_ref("Address"), {"Address": ADDRESS}, {}),
+        (
+            ref("schema.json#/components/schemas/Addresses"),
+            {},
+            {"Addresses": {"type": "array", "items": component_ref("Address")}, "Address": ADDRESS},
+        ),
+    ],
+    ids=["object", "array"],
+)
+def test_nested_field_in_other_file_referring_to_sibling_definition(ctx, address, common_schemas, root_schemas):
+    customer = {"type": "object", "properties": {"address": address}}
+    ctx.makefile({"components": {"schemas": {"Customer": customer, **common_schemas}}}, filename="common")
+    order = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "customer": ref("common.json#/components/schemas/Customer")},
+    }
+    root = ctx.openapi.write_schema(
+        {
+            **operation("post", "/orders", "201", component_ref("Order")),
+            **operation("get", "/orders/{orderId}", "200", component_ref("Order"), parameters=[path_param("orderId")]),
+        },
+        components={"schemas": {"Order": order, **root_schemas}},
+    )
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == [
+        ["#/paths/~1orders/post", "201", read_order_link("/id")]
+    ]
+
+
+def test_same_reference_text_in_another_file_names_a_different_schema(ctx):
+    base = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    order_list = {
+        "allOf": [{"type": "object", "properties": {"data": {"type": "array", "items": component_ref("Base")}}}]
+    }
+    ctx.makefile(
+        {
+            "components": {
+                "responses": {"Listed": response("200", component_ref("Order"))["responses"]["200"]},
+                "schemas": {"Order": order_list, "Base": base},
+            }
+        },
+        filename="common",
+    )
+    root = ctx.openapi.write_schema(
+        {
+            "/archive": {"get": {"responses": {"200": ref("common.json#/components/responses/Listed")}}},
+            **operation("post", "/orders", "201", component_ref("Order")),
+            **operation("get", "/orders/{orderId}", "200", component_ref("Order"), parameters=[path_param("orderId")]),
+        },
+        components={"schemas": {"Order": {"allOf": [component_ref("Base"), {"type": "object"}]}, "Base": base}},
+    )
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == [
+        [
+            "#/paths/~1orders/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders~1{orderId}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.orderId": "$response.body#/id"},
+            },
+        ]
+    ]
+
+
 @pytest.mark.parametrize(
     "response_schema",
     [

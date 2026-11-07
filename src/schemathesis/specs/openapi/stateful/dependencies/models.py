@@ -636,22 +636,24 @@ def extract_nested_fk_fields(
             continue  # Don't recurse into FK fields
 
         # Resolve nested schema
-        _, resolved_field = maybe_resolve_with_resolver(field_schema, resolver)
+        field_resolver, resolved_field = maybe_resolve_with_resolver(field_schema, resolver)
         field_type = resolved_field.get("type")
 
         # Recurse into nested objects
         if field_type == "object" or "properties" in resolved_field:
-            result.extend(extract_nested_fk_fields(resolved_field, resolver, field_pointer, max_depth - 1))
+            result.extend(extract_nested_fk_fields(resolved_field, field_resolver, field_pointer, max_depth - 1))
 
         # Recurse into array items
         elif field_type == "array":
             items = resolved_field.get("items")
             if isinstance(items, dict):
-                _, resolved_items = maybe_resolve_with_resolver(items, resolver)
+                items_resolver, resolved_items = maybe_resolve_with_resolver(items, field_resolver)
                 if isinstance(resolved_items, dict):
                     # Use /* to fan out across every array element
                     items_pointer = f"{field_pointer}/*"
-                    result.extend(extract_nested_fk_fields(resolved_items, resolver, items_pointer, max_depth - 1))
+                    result.extend(
+                        extract_nested_fk_fields(resolved_items, items_resolver, items_pointer, max_depth - 1)
+                    )
 
     return result
 
