@@ -8,6 +8,7 @@
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
+- No inferred links for responses whose schema lives in another file and references its siblings.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
 - False positive `negative_data_rejection` for string bodies with text media types other than `text/plain`.

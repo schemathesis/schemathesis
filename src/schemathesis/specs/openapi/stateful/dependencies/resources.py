@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
-from schemathesis.core.jsonschema.resolver import Resolver
+from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.transforms import decode_pointer, encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
@@ -187,7 +187,9 @@ def iter_resources_from_response(
                 return None
 
     parent_ref = schema.get("$ref")
-    _, resolved = maybe_resolve_with_resolver(schema, current_resolver, allow_boolean=True)
+    # The same `$ref` text names different schemas in different documents.
+    parent_uri = resolve_reference_uri(current_resolver.base_uri, parent_ref) if isinstance(parent_ref, str) else None
+    current_resolver, resolved = maybe_resolve_with_resolver(schema, current_resolver, allow_boolean=True)
 
     # Sometimes data is wrapped in a wrapper field, optionally next to request metadata
     # Common patterns: {data: {...}}, {result: {...}, status: ..., time: ...}
@@ -215,13 +217,14 @@ def iter_resources_from_response(
             # The wrapped schema names the resource and may hold a nested page (`{response: Page, status}`),
             # which the steps below only see once resolved.
             parent_ref = resolved["$ref"]
-            _, resolved = maybe_resolve_with_resolver(resolved, current_resolver)
+            parent_uri = resolve_reference_uri(current_resolver.base_uri, parent_ref)
+            current_resolver, resolved = maybe_resolve_with_resolver(resolved, current_resolver)
 
     resolved = try_unwrap_composition(resolved, current_resolver)
 
     if "allOf" in resolved:
-        if parent_ref is not None and parent_ref in canonicalization_cache:
-            canonicalized = canonicalization_cache[parent_ref]
+        if parent_uri is not None and parent_uri in canonicalization_cache:
+            canonicalized = canonicalization_cache[parent_uri]
         else:
             try:
                 canonicalized = canonicalize(
@@ -231,8 +234,8 @@ def iter_resources_from_response(
                 )
             except BundleError:
                 canonicalized = resolved
-            if parent_ref is not None:
-                canonicalization_cache[parent_ref] = canonicalized
+            if parent_uri is not None:
+                canonicalization_cache[parent_uri] = canonicalized
     else:
         canonicalized = resolved
 
@@ -254,7 +257,7 @@ def iter_resources_from_response(
         path=path,
         resources=resources,
         updated_resources=updated_resources,
-        resolver=current_resolver,
+        resolver=unwrapped.resolver,
         parent_ref=recovered_ref or unwrapped.ref or parent_ref,
     )
 
@@ -282,10 +285,11 @@ def iter_resources_from_response(
         # Look for sub-resources. When the unwrapped schema is an array (MANY producer),
         # descend into `items` so we examine the per-element object's properties.
         sub_search_schema: Mapping[str, Any] = unwrapped.schema
+        sub_search_resolver = unwrapped.resolver
         if cardinality == Cardinality.MANY:
             items = sub_search_schema.get("items")
             if isinstance(items, dict):
-                _, sub_search_schema = maybe_resolve_with_resolver(items, current_resolver)
+                sub_search_resolver, sub_search_schema = maybe_resolve_with_resolver(items, sub_search_resolver)
         properties = sub_search_schema.get("properties")
         if isinstance(properties, dict):
             for field, subschema in properties.items():
@@ -302,7 +306,7 @@ def iter_resources_from_response(
                             path=path,
                             resources=resources,
                             updated_resources=updated_resources,
-                            resolver=current_resolver,
+                            resolver=sub_search_resolver,
                             parent_ref=reference,
                         )
                         if sub_result is not None:
@@ -318,9 +322,9 @@ def iter_resources_from_response(
                             # `CustomResponse{response: {content: [...]}}`), descend one more level
                             # so the leaf array of resource items enters the pool, not the envelope.
                             if sub_cardinality == Cardinality.ONE:
-                                _, resolved_sub = maybe_resolve_with_resolver(subschema, current_resolver)
+                                sub_resolver, resolved_sub = maybe_resolve_with_resolver(subschema, sub_search_resolver)
                                 sub_unwrapped = unwrap_schema(
-                                    schema=resolved_sub, path=path, parent_ref=reference, resolver=current_resolver
+                                    schema=resolved_sub, path=path, parent_ref=reference, resolver=sub_resolver
                                 )
                                 if sub_unwrapped.pointer != ROOT_POINTER:
                                     inner_result = _extract_resource_and_cardinality(
@@ -328,7 +332,7 @@ def iter_resources_from_response(
                                         path=path,
                                         resources=resources,
                                         updated_resources=updated_resources,
-                                        resolver=current_resolver,
+                                        resolver=sub_unwrapped.resolver,
                                         parent_ref=sub_unwrapped.ref or reference,
                                     )
                                     if inner_result is not None:
@@ -525,7 +529,7 @@ def _extract_resource_and_cardinality(
             return None
 
         # Resolve items if it's a $ref
-        _, resolved_items = maybe_resolve_with_resolver(items, resolver)
+        items_resolver, resolved_items = maybe_resolve_with_resolver(items, resolver)
 
         # Extract resource from items
         resource = _extract_resource_from_schema(
@@ -533,7 +537,7 @@ def _extract_resource_and_cardinality(
             path=path,
             resources=resources,
             updated_resources=updated_resources,
-            resolver=resolver,
+            resolver=items_resolver,
             # Prefer items $ref for name
             parent_ref=items.get("$ref") or parent_ref,
         )
@@ -541,7 +545,7 @@ def _extract_resource_and_cardinality(
         if resource is None:
             return None
 
-        return resource, Cardinality.MANY, _declared_fields(resolved_items, resolver)
+        return resource, Cardinality.MANY, _declared_fields(resolved_items, items_resolver)
 
     # Single object
     resource = _extract_resource_from_schema(

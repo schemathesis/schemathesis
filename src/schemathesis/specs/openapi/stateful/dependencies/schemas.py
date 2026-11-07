@@ -291,12 +291,14 @@ class UnwrappedSchema:
     pointer: str
     schema: Mapping[str, Any]
     ref: str | None
+    # Resolves references inside `schema`, which may live in another document than the response.
+    resolver: Resolver
 
 
 def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, resolver: Resolver) -> UnwrappedSchema:
     # Array at root
     if schema.get("type") == "array":
-        return UnwrappedSchema(pointer="/", schema=schema, ref=None)
+        return UnwrappedSchema(pointer="/", schema=schema, ref=None, resolver=resolver)
 
     properties = schema.get("properties", {})
 
@@ -304,19 +306,22 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
     hal_field = _detect_hal_embedded(schema)
     if hal_field:
         embedded_schema = properties["_embedded"]
-        _, resolved_embedded = maybe_resolve_with_resolver(embedded_schema, resolver)
+        embedded_resolver, resolved_embedded = maybe_resolve_with_resolver(embedded_schema, resolver)
         resource_schema = resolved_embedded.get("properties", {}).get(hal_field, {})
-        _, resolved_resource = maybe_resolve_with_resolver(resource_schema, resolver)
+        resource_resolver, resolved_resource = maybe_resolve_with_resolver(resource_schema, embedded_resolver)
 
         return UnwrappedSchema(
-            pointer=f"/_embedded/{encode_pointer(hal_field)}", schema=resolved_resource, ref=resource_schema.get("$ref")
+            pointer=f"/_embedded/{encode_pointer(hal_field)}",
+            schema=resolved_resource,
+            ref=resource_schema.get("$ref"),
+            resolver=resource_resolver,
         )
 
     # Pagination wrapper
     array_field = _is_pagination_wrapper(schema=schema, path=path, parent_ref=parent_ref, resolver=resolver)
     if array_field:
         array_schema = properties[array_field]
-        _, resolved = maybe_resolve_with_resolver(array_schema, resolver)
+        unwrapped_resolver, resolved = maybe_resolve_with_resolver(array_schema, resolver)
         pointer = f"/{encode_pointer(array_field)}"
         ref = array_schema.get("$ref")
 
@@ -324,29 +329,29 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
         if resolved.get("type") == "array" or "items" in resolved:
             nested_items = resolved.get("items")
             if isinstance(nested_items, dict):
-                _, resolved_items = maybe_resolve_with_resolver(nested_items, resolver)
+                items_resolver, resolved_items = maybe_resolve_with_resolver(nested_items, unwrapped_resolver)
                 external_tag = _detect_externally_tagged_pattern(resolved_items, path, parent_ref)
                 if external_tag:
                     external_tag_, uses_parent_ref = external_tag
                     nested_properties = resolved_items["properties"][external_tag_]
-                    _, resolved = maybe_resolve_with_resolver(nested_properties, resolver)
-                    resolved = try_unwrap_composition(resolved, resolver)
+                    unwrapped_resolver, resolved = maybe_resolve_with_resolver(nested_properties, items_resolver)
+                    resolved = try_unwrap_composition(resolved, unwrapped_resolver)
                     if uses_parent_ref:
                         ref = parent_ref
                     else:
                         ref = resolved.get("$ref") or nested_properties.get("$ref") or ref
-                    _, resolved = maybe_resolve_with_resolver(resolved, resolver)
+                    unwrapped_resolver, resolved = maybe_resolve_with_resolver(resolved, unwrapped_resolver)
                     # Every list element carries its own tagged resource.
                     pointer += f"/*/{encode_pointer(external_tag_)}"
 
-        return UnwrappedSchema(pointer=pointer, schema=resolved, ref=ref)
+        return UnwrappedSchema(pointer=pointer, schema=resolved, ref=ref, resolver=unwrapped_resolver)
 
     # External tag
     external_tag = _detect_externally_tagged_pattern(schema, path, parent_ref)
     if external_tag:
         external_tag_, uses_parent_ref = external_tag
         tagged_schema = properties[external_tag_]
-        _, resolved_tagged = maybe_resolve_with_resolver(tagged_schema, resolver)
+        tagged_resolver, resolved_tagged = maybe_resolve_with_resolver(tagged_schema, resolver)
 
         resolved = try_unwrap_all_of(resolved_tagged)
         ref = (
@@ -355,11 +360,13 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
             else resolved.get("$ref") or resolved_tagged.get("$ref") or tagged_schema.get("$ref")
         )
 
-        _, resolved = maybe_resolve_with_resolver(resolved, resolver)
-        return UnwrappedSchema(pointer=f"/{encode_pointer(external_tag_)}", schema=resolved, ref=ref)
+        tagged_resolver, resolved = maybe_resolve_with_resolver(resolved, tagged_resolver)
+        return UnwrappedSchema(
+            pointer=f"/{encode_pointer(external_tag_)}", schema=resolved, ref=ref, resolver=tagged_resolver
+        )
 
     # No wrapper - single object at root
-    return UnwrappedSchema(pointer="/", schema=schema, ref=schema.get("$ref"))
+    return UnwrappedSchema(pointer="/", schema=schema, ref=schema.get("$ref"), resolver=resolver)
 
 
 def _detect_hal_embedded(schema: Mapping[str, Any]) -> str | None:
