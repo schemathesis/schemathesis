@@ -95,6 +95,9 @@ class CommandWithGroupedOptions(click.Command):
             return text
 
         for param in self.get_params(ctx):
+            # Positional arguments are already shown in the usage line
+            if not isinstance(param, click.Option):
+                continue
             rv = param.get_help_record(ctx)
             if rv is not None:
                 option_repr, message = rv
