@@ -43,7 +43,7 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json \
   --report junit
 ```
 
-Report formats for HTTP APIs are `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `pytest`, `allure`, and `html`. gRPC targets do not support HAR, VCR, WFC, or pytest reports. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
+Report formats for HTTP APIs are `junit`, `vcr`, `har`, `ndjson`, `json`, `wfc`, `pytest`, `allure`, and `html`. WFC reports are available only for Open API schemas; gRPC targets also do not support HAR, VCR, or pytest reports. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
 
 ## 3. Put the settings in a config file
 

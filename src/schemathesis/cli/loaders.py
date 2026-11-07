@@ -19,6 +19,7 @@ from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.validation import validate_tls_verify
 from schemathesis.config import ProjectConfig, ReportFormat
+from schemathesis.core import SpecificationKind
 from schemathesis.core.errors import HookExecutionError, IncorrectUsage, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
@@ -36,6 +37,7 @@ GRPC_HTTP_REPORTS_MESSAGE = (
 GRPC_WFC_AUTH_MESSAGE = (
     "Web Fuzzing Commons authentication (`--auth-wfc`, `[auth.wfc]`) is not available for gRPC targets"
 )
+WFC_REPORT_MESSAGE = "WFC reports describe REST endpoints and are only available for Open API schemas"
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
 TEXT_SCHEMA_EXTENSIONS = (".json", ".yaml", ".yml")
 PROTO_FILE_MESSAGE = f"Schemathesis reads descriptor sets, not `.proto` files. {BUILD_HINT} and run `schemathesis run api.binpb --url URL`"
@@ -81,6 +83,8 @@ def _event_stream(
 
     try:
         schema = load_schema(location=location, config=config)
+        if config.reports.wfc.enabled and schema.specification.kind != SpecificationKind.OPENAPI:
+            raise click.UsageError(WFC_REPORT_MESSAGE)
         # An explicitly configured base URL carries its own path, so the origin only applies without one.
         if schema.config.origin is not None and schema.config.base_url is None:
             schema.config.base_url = schema.config.origin.rstrip("/") + schema.base_path.rstrip("/")
