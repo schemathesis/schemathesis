@@ -314,11 +314,11 @@ def response_schema_conformance(ctx: CheckContext, response: Response, case: Cas
 def _is_stringifying_media_type(media_type: str) -> bool:
     """Check if media type serializes all values to strings.
 
-    Media types like text/plain and application/octet-stream convert any value
+    Textual media types and application/octet-stream convert any value
     to a string representation during serialization (via str(value)).
     This means negative-generated non-string values become valid strings after serialization.
     """
-    return media_types.is_plain_text(media_type) or media_type == "application/octet-stream"
+    return media_types.is_sent_as_text_parts(media_types.parse(media_type)) or media_type == "application/octet-stream"
 
 
 def _declared_parameters_are_valid(case: Case, location: ParameterLocation) -> bool:

@@ -109,7 +109,7 @@ class BaseTransport(Generic[S]):
                 elif media_types.matches_parts((main, sub), (target_main, target_sub)):
                     matched = True
                     yield registered_media_type, serializer
-            if not matched and not is_range and (main == "text" or media_types.is_jwt_parts((main, sub))):
+            if not matched and not is_range and media_types.is_sent_as_text_parts((main, sub)):
                 # Any other textual subtype goes on the wire as text, under the media type the schema declares
                 plain_text = self._serializers.get("text/plain")
                 if plain_text is not None:

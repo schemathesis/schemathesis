@@ -2484,6 +2484,32 @@ def test_body_negation_becomes_valid_after_serialization(
     assert _body_negation_becomes_valid_after_serialization(response_factory.requests(), case) is expected
 
 
+# A non-string body sent as text becomes a valid string on the wire.
+@pytest.mark.parametrize(
+    ("media_type", "reported"),
+    [
+        ("text/plain", False),
+        ("text/csv", False),
+        ("application/jwt", False),
+        ("text/json", True),
+    ],
+)
+def test_negative_data_rejection_string_body_sent_as_text(ctx, response_factory, media_type, reported):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"required": True, "content": {media_type: {"schema": {"type": "string"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(
+        body=118,
+        media_type=media_type,
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+    )
+    _assert_rejection(case, response_factory.requests(), reported=reported)
+
+
 @pytest.mark.parametrize(
     ("query", "headers", "expected"),
     [

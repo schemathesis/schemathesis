@@ -190,6 +190,13 @@ def is_jwt_parts(media_type: tuple[str, str]) -> bool:
     return main == "application" and (sub == "jwt" or sub.endswith("+jwt"))
 
 
+def is_sent_as_text_parts(media_type: tuple[str, str]) -> bool:
+    """Detect media types whose bodies go on the wire as plain text, e.g. `text/csv` or `application/jwt`."""
+    if is_json_parts(media_type) or is_xml_parts(media_type) or media_type in _YAML_MEDIA_TYPE_PARTS:
+        return False
+    return media_type[0] == "text" or is_jwt_parts(media_type)
+
+
 def is_xml(value: str) -> bool:
     """Detect variations of the ``application/xml`` media type."""
     _, sub = parse(value)
