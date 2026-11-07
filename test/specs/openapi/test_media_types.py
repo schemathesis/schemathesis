@@ -176,8 +176,10 @@ YAML_SCALAR_END = "" if yaml.__with_libyaml__ else "...\n"
         ("application/yaml", "hello", f"hello\n{YAML_SCALAR_END}"),
         ("application/yaml", 42, f"42\n{YAML_SCALAR_END}"),
         ("application/xml", b"<a>1</a>", b"<a>1</a>"),
+        ("application/jwt", "eyJhbGciOiJIUzI1NiJ9.e30.c2ln", b"eyJhbGciOiJIUzI1NiJ9.e30.c2ln"),
+        ("application/statuslist+jwt", "eyJhbGciOiJIUzI1NiJ9.e30.c2ln", b"eyJhbGciOiJIUzI1NiJ9.e30.c2ln"),
     ],
-    ids=["yaml-string", "yaml-integer", "xml-bytes"],
+    ids=["yaml-string", "yaml-integer", "xml-bytes", "jwt-token", "jwt-suffix-token"],
 )
 def test_transport_data_for_scalar_yaml_and_bytes_xml_bodies(ctx, media_type, body, expected):
     operation = ctx.openapi.load_operation(
@@ -187,6 +189,8 @@ def test_transport_data_for_scalar_yaml_and_bytes_xml_bodies(ctx, media_type, bo
                 "content": {
                     "application/yaml": {"schema": {"type": "string"}},
                     "application/xml": {"schema": {"type": "string"}},
+                    "application/jwt": {"schema": {"type": "string"}},
+                    "application/statuslist+jwt": {"schema": {"type": "string"}},
                 }
             },
             "responses": {"200": {"description": "OK"}},
