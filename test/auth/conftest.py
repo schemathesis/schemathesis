@@ -1,5 +1,3 @@
-import socket
-
 import pytest
 from flask import Response, jsonify
 
@@ -71,12 +69,3 @@ def auth_operation(ctx, app_runner):
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     return schema["/data"]["GET"]
-
-
-@pytest.fixture
-def silent_url():
-    # A listening socket that never accepts completes the handshake, then never answers.
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        sock.listen()
-        yield f"http://127.0.0.1:{sock.getsockname()[1]}"

@@ -431,7 +431,7 @@ def test_collector_records_observations_from_400(case_factory, response_factory)
     assert sorted(o.parameter_path for o in out) == [("city",), ("zipcode",)]
 
 
-@pytest.mark.parametrize("status_code", [200, 401, 403, 500, 503])
+@pytest.mark.parametrize("status_code", [200, 201, 302, 401, 403, 500, 503])
 def test_collector_skips_non_4xx_and_auth_failures(status_code, case_factory, response_factory):
     store, case = _drive_collector(
         case_factory=case_factory,

@@ -16,7 +16,7 @@ from hypothesis.vendor.pretty import pretty
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import merge_at
@@ -959,3 +959,22 @@ def test_parameter_containers_for_locations_without_parameters(ctx):
         operation.get_parameter_set(ParameterLocation.BODY)
     assert operation.Case().get_container(ParameterLocation.UNKNOWN) is None
     assert list(operation.get_bodies_for_media_type("application/json")) == []
+
+
+def test_formatted_path(ctx):
+    operation = ctx.openapi.load_operation("GET /users/{name}", {"responses": {"200": {"description": "OK"}}})
+    case = operation.Case(path_parameters={"name": "test"})
+    assert case.formatted_path == "/users/test"
+
+
+def test_formatted_path_missing_parameter(ctx):
+    operation = ctx.openapi.load_operation(
+        "GET /users/{name}",
+        {
+            "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    case = operation.Case(path_parameters={})
+    with pytest.raises(InvalidSchema, match="^Path parameter 'name' is not defined$"):
+        assert case.formatted_path

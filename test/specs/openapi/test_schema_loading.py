@@ -1,10 +1,13 @@
+import io
 import json
 import platform
 
 import jsonschema_rs
 import pytest
 import requests
-from flask import Flask, jsonify
+import yaml
+from fastapi import FastAPI
+from flask import Flask, Response, jsonify
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
@@ -15,7 +18,7 @@ from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
 from schemathesis.specs.openapi import adapter
-from test.utils import run_given
+from test.utils import make_schema, run_given
 
 
 @pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
@@ -745,3 +748,310 @@ def test_from_url_survives_bad_charset(ctx, app_runner, charset):
 
     loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     assert loaded.raw_schema == schema_dict
+
+
+def test_openapi_asgi_loader():
+    # When an ASGI app is loaded via `from_asgi`
+    app = FastAPI()
+
+    @app.get("/users")
+    async def users():
+        return {"success": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    strategy = schema["/users"]["GET"].as_strategy()
+
+    # Then it should successfully make calls
+    @run_given(strategy, max_examples=1)
+    def test(case):
+        assert case.call().status_code == 200
+
+
+def test_openapi_asgi_loader_starts_lifespan():
+    # A schema route may only be able to answer once the application has started.
+    spec = {
+        "openapi": "3.0.2",
+        "info": {"title": "t", "version": "1"},
+        "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    }
+
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    scope["state"]["spec"] = spec
+                    await send({"type": "lifespan.startup.complete"})
+                else:
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+        body = json.dumps(scope["state"]["spec"]).encode()
+        await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": body})
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    operations = [result.ok() for result in schema.get_all_operations()]
+    assert [f"{operation.method.upper()} {operation.path}" for operation in operations] == ["GET /users"]
+
+
+def test_openapi_wsgi_loader(ctx):
+    # When a WSGI app is loaded via `from_wsgi`
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    strategy = schema["/api/success"]["GET"].as_strategy()
+
+    # Then it should successfully make calls
+    @run_given(strategy, max_examples=1)
+    def test(case):
+        assert case.call().status_code == 200
+
+
+def test_openapi_wsgi_loader_plain_application(ctx):
+    spec = json.dumps(ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}))
+
+    def app(environ, start_response):
+        start_response("200 OK", [("Content-Type", "application/json")])
+        return [spec.encode() if environ["PATH_INFO"] == "/openapi.json" else b'{"success": true}']
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    assert schema["/users"]["GET"].Case().call().json() == {"success": True}
+
+
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [
+        ("4.0.0", "The provided schema uses Open API 4.0.0, which is currently not supported."),
+        ("3.1", 'The `openapi` field must be a string, got 3.1. Quote the full version, e.g. `openapi: "3.1.0"`.'),
+        ("3", 'The `openapi` field must be a string, got 3. Quote the full version, e.g. `openapi: "3.1.0"`.'),
+    ],
+    ids=["unsupported", "unquoted-float", "unquoted-int"],
+)
+def test_unsupported_openapi_version(version, expected):
+    with pytest.raises(LoaderError, match=expected):
+        schemathesis.openapi.from_file(f"openapi: {version}")
+
+
+def test_unquoted_swagger_version():
+    # Swagger has a single version, so a YAML number is unambiguous and stays accepted.
+    schema = schemathesis.openapi.from_file("swagger: 2.0\ninfo: {title: t, version: '1'}")
+    assert schema.specification.version == "2.0"
+    (result,) = schema.get_all_operations()
+    assert '"paths" is a required property' in str(result.err())
+
+
+def test_number_deserializing(ctx, testdir):
+    # Scientific-notation numbers without a dot (via json.dumps) must round-trip through the YAML loader.
+    schema = ctx.openapi.build_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "summary": "Test",
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "number", "multipleOf": 0.00001},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+
+    schema_path = testdir.makefile(".yaml", schema=json.dumps(schema))
+    # Then yaml loader should parse them without schema validation errors
+    parsed = schemathesis.openapi.from_path(str(schema_path))
+    # and the value should be a number
+    value = parsed.raw_schema["paths"]["/teapot"]["get"]["parameters"][0]["schema"]["multipleOf"]
+    assert isinstance(value, float)
+
+
+def test_from_dict_yaml_aliases_with_non_string_keys():
+    raw_schema = yaml.safe_load("""
+openapi: 3.0.2
+info: {title: t, version: "1"}
+paths:
+  /a:
+    get:
+      parameters: &parameters
+        - {name: q, in: query, schema: {type: string}}
+      responses: &responses
+        200: {description: OK}
+  /b:
+    get:
+      parameters: *parameters
+      responses: *responses
+""")
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    assert [schema[p]["GET"].definition.raw for p in ("/a", "/b")] == [
+        {
+            "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    ] * 2
+
+
+def test_yaml_binary_values_load_as_their_text(tmp_path):
+    # JSON Schema has no bytes type, so `!!binary` stays the base64 text written in the document.
+    path = tmp_path / "openapi.yaml"
+    path.write_text("""
+openapi: 3.0.2
+info: {title: t, version: "1"}
+paths:
+  /items:
+    get:
+      parameters:
+        - {name: q, in: query, schema: {type: string, default: !!binary enp6, enum: [!!binary eA==, plain]}}
+      responses: {"200": {description: OK}}
+""")
+    schema = schemathesis.openapi.from_path(path)
+    assert schema.raw_schema["paths"]["/items"]["get"]["parameters"][0]["schema"] == {
+        "type": "string",
+        "default": "enp6",
+        "enum": ["eA==", "plain"],
+    }
+
+
+def test_split_file_schema_with_uri_reserved_path_chars(tmp_path):
+    # Split-file OpenAPI layouts mirror path templates; refs like './paths/{id}/op.yaml' must resolve.
+    target_dir = tmp_path / "paths" / "{id}"
+    target_dir.mkdir(parents=True)
+    (target_dir / "op.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        )
+    )
+    root = tmp_path / "openapi.yaml"
+    root.write_text(
+        yaml.safe_dump(
+            {
+                "openapi": "3.0.0",
+                "info": {"title": "repro", "version": "1.0"},
+                "paths": {"/items/{id}": {"$ref": "./paths/{id}/op.yaml"}},
+            }
+        )
+    )
+
+    schema = schemathesis.openapi.from_path(str(root))
+    operation = schema["/items/{id}"]["GET"]
+
+    assert operation.label == "GET /items/{id}"
+    assert operation.definition.raw["operationId"] == "getItem"
+    assert [(p.name, p.location) for p in operation.iter_parameters()] == [("id", "path")]
+
+
+def test_unsupported_type():
+    # When Schemathesis can't detect the Open API spec version
+    with pytest.raises(
+        LoaderError, match="Unable to determine the Open API version as it's not specified in the document."
+    ):
+        # Then it raises an error
+        schemathesis.openapi.from_dict({})
+
+
+if platform.python_implementation() == "PyPy":
+    JSON_ERROR = ["Key name must be string at char: line 1 column 2 (char 1)"]
+else:
+    JSON_ERROR = ["Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"]
+YAML_ERROR = [
+    f"unacceptable character #x0080: {'control' if yaml.__with_libyaml__ else 'special'} characters are not allowed",
+    '  in "<unicode string>", position 2',
+]
+
+
+@pytest.mark.parametrize(
+    ("schema_url", "content_type", "payload", "expected"),
+    [
+        ("openapi.json", "application/json", b"{1", JSON_ERROR),
+        ("openapi.yaml", "text/yaml", b'{"\x80": 1}', YAML_ERROR),
+    ],
+)
+def test_parsing_errors_uri(schema_url, content_type, payload, expected, app_runner):
+    app = Flask("test_app")
+
+    @app.route(f"/{schema_url}")
+    def schema():
+        return Response(payload, content_type=content_type)
+
+    port = app_runner.run_flask_app(app)
+
+    with pytest.raises(LoaderError) as exc:
+        schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/{schema_url}")
+    assert exc.value.extras == expected
+
+
+def test_unknown_content_type_retry_yaml(app_runner):
+    payload = make_schema("simple_openapi.yaml")
+    payload = yaml.safe_dump(payload)
+
+    app = Flask("test_app")
+
+    @app.route("/schema")
+    def schema():
+        return Response(payload, content_type="application/vnd.oai.openapi; charset=utf-8")
+
+    port = app_runner.run_flask_app(app)
+
+    schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/schema")
+
+
+def test_malformed_content_type_falls_back_to_parsing(ctx, app_runner):
+    raw_schema = ctx.openapi.build_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    app = Flask("test_app")
+
+    @app.route("/openapi.json")
+    def schema():
+        return Response(json.dumps(raw_schema), content_type="json")
+
+    assert schemathesis.openapi.from_url(app_runner.openapi_url(app)).raw_schema == raw_schema
+
+
+@pytest.mark.parametrize(
+    ("schema_path", "payload", "expected"),
+    [
+        ("openapi.json", "{1", JSON_ERROR),
+        ("openapi.yaml", '{"\x80": 1}', YAML_ERROR),
+    ],
+)
+def test_parsing_errors_path(testdir, schema_path, payload, expected):
+    name, ext = schema_path.split(".")
+    schema_file = testdir.makefile(f".{ext}", **{name: payload})
+
+    with pytest.raises(LoaderError) as exc:
+        schemathesis.openapi.from_path(str(schema_file))
+
+    assert exc.value.extras == expected
+
+
+@pytest.mark.parametrize(
+    "data",
+    ['{"openapi": "3.0.0"}', "openapi: 3.0.0"],
+)
+def test_from_file(data) -> None:
+    for input_data in (data, io.StringIO(data)):
+        assert schemathesis.openapi.from_file(input_data).raw_schema == {"openapi": "3.0.0"}
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        "{invalid json",
+        "invalid: yaml:\nindentation",
+        "",
+        "   \n  \t  ",
+    ],
+)
+def test_from_file_invalid_input(data: str) -> None:
+    for input_data in (data, io.StringIO(data)):
+        with pytest.raises(LoaderError):
+            schemathesis.openapi.from_file(input_data)
