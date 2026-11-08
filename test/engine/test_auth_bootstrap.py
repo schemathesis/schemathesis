@@ -26,31 +26,41 @@ def _statuses(stream, label):
 
 
 @pytest.mark.parametrize("transport", ["http", "wsgi"])
-def test_signed_up_session_authenticates_protected_operations(ctx, transport):
+def test_sign_up_and_login_authenticate_protected_operations(ctx, transport):
     api = ctx.openapi.apps.sign_up_and_login()
     if transport == "http":
         schema = schemathesis.openapi.from_url(api.schema_url)
     else:
         schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
     stream = _run(schema)
-    assert (_bootstrap(stream).status, _bootstrap(stream).payload.failure_stage) == (Status.SUCCESS, None)
-    assert 200 in _statuses(stream, "GET /orders")
+    sign_up = next(request.json() for request in api.requests if request.path == "/auth/register")
+    assert {
+        "bootstrap": (_bootstrap(stream).status, _bootstrap(stream).payload.failure_stage),
+        "scenarios": [
+            (
+                event.label,
+                event.status,
+                [interaction.response.status_code for interaction in event.recorder.interactions.values()],
+            )
+            for event in stream.find_all(events.ScenarioFinished, phase=PhaseName.AUTH_BOOTSTRAP)
+        ],
+        "sign_up": (sorted(sign_up), bool(sign_up["firstName"].strip())),
+        "orders_authenticated": 200 in _statuses(stream, "GET /orders"),
+    } == {
+        "bootstrap": (Status.SUCCESS, None),
+        "scenarios": [
+            ("POST /auth/register", Status.SUCCESS, [201]),
+            ("POST /auth/login", Status.SUCCESS, [200]),
+        ],
+        "sign_up": (["email", "firstName", "password", "role", "username"], True),
+        "orders_authenticated": True,
+    }
 
 
 def test_fuzzed_login_reuses_signed_up_credentials(ctx):
     api = ctx.openapi.apps.sign_up_and_login()
     stream = _run(schemathesis.openapi.from_url(api.schema_url), modes=[GenerationMode.POSITIVE], seed=1)
     assert 200 in _statuses(stream, "POST /auth/login")
-
-
-def test_sign_up_sends_every_profile_field(ctx):
-    api = ctx.openapi.apps.sign_up_and_login()
-    _run(schemathesis.openapi.from_url(api.schema_url))
-    sign_up = next(request.json() for request in api.requests if request.path == "/auth/register")
-    assert (sorted(sign_up), bool(sign_up["firstName"].strip())) == (
-        ["email", "firstName", "password", "role", "username"],
-        True,
-    )
 
 
 # Operations an ordinary account may not touch open up only to the most privileged role the sign-up offers.
@@ -66,23 +76,6 @@ def test_sign_up_keeps_generated_role_when_no_privileged_role_is_offered(ctx):
     _run(schemathesis.openapi.from_url(api.schema_url))
     sign_up = next(request.json() for request in api.requests if request.path == "/auth/register")
     assert sign_up["role"] == "MEMBER"
-
-
-def test_register_and_login_are_reported_as_scenarios(ctx):
-    api = ctx.openapi.apps.sign_up_and_login()
-    stream = _run(schemathesis.openapi.from_url(api.schema_url))
-    scenarios = stream.find_all(events.ScenarioFinished, phase=PhaseName.AUTH_BOOTSTRAP)
-    assert [
-        (
-            event.label,
-            event.status,
-            [interaction.response.status_code for interaction in event.recorder.interactions.values()],
-        )
-        for event in scenarios
-    ] == [
-        ("POST /auth/register", Status.SUCCESS, [201]),
-        ("POST /auth/login", Status.SUCCESS, [200]),
-    ]
 
 
 def _configure_scheme(schema):

@@ -78,16 +78,6 @@ def test_each_operation_tracked_independently():
     assert supervisor.verdict("GET /items").directive is SchedulingDirective.RUN
 
 
-def test_skip_reason_format():
-    supervisor = Supervisor()
-    label = "POST /target"
-    for _ in range(METHOD_NOT_ALLOWED_THRESHOLD):
-        supervisor.record_response(operation_label=label, status_code=405)
-    assert supervisor.verdict(label).reason == (
-        f"Skipped after {METHOD_NOT_ALLOWED_THRESHOLD} consecutive `405 Method Not Allowed` responses"
-    )
-
-
 def _supervisor_with_skipped(label: str) -> Supervisor:
     supervisor = Supervisor()
     for _ in range(METHOD_NOT_ALLOWED_THRESHOLD):

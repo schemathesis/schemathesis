@@ -206,11 +206,22 @@ def test_required_null_query_parameter_is_sent(ctx):
         assert case.query == {"limit": "null"}
 
 
-def test_optional_false_query_parameter_is_sent(ctx):
+@pytest.mark.parametrize(
+    ("parameter", "expected"),
+    [
+        ({"name": "flag", "schema": {"enum": [False]}}, {"flag": "false"}),
+        (
+            {"name": "ids", "schema": {"type": "array", "items": {"type": "null"}, "minItems": 1, "maxItems": 1}},
+            {"ids": ["null"]},
+        ),
+    ],
+    ids=["optional-false", "null-inside-array"],
+)
+def test_optional_query_parameter_is_sent(ctx, parameter, expected):
     operation = ctx.openapi.load_operation(
         "GET /data",
         {
-            "parameters": [{"in": "query", "name": "flag", "required": False, "schema": {"enum": [False]}}],
+            "parameters": [{"in": "query", "required": False, **parameter}],
             "responses": {"200": {"description": "OK"}},
         },
         version="3.1.0",
@@ -223,34 +234,7 @@ def test_optional_false_query_parameter_is_sent(ctx):
         if case.query not in seen:
             seen.append(case.query)
 
-    assert sorted(seen, key=len) == [{}, {"flag": "false"}]
-
-
-def test_null_inside_query_array_is_sent(ctx):
-    operation = ctx.openapi.load_operation(
-        "GET /data",
-        {
-            "parameters": [
-                {
-                    "in": "query",
-                    "name": "ids",
-                    "required": False,
-                    "schema": {"type": "array", "items": {"type": "null"}, "minItems": 1, "maxItems": 1},
-                }
-            ],
-            "responses": {"200": {"description": "OK"}},
-        },
-        version="3.1.0",
-    )
-
-    seen = []
-
-    @run_given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), max_examples=10)
-    def test(case):
-        if case.query not in seen:
-            seen.append(case.query)
-
-    assert sorted(seen, key=len) == [{}, {"ids": ["null"]}]
+    assert sorted(seen, key=len) == [{}, expected]
 
 
 def test_null_path_parameter_is_sent(ctx):

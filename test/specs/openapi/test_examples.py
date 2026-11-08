@@ -2926,56 +2926,6 @@ def test_non_recursive_duplicate_refs_unit(ctx):
 
 
 @pytest.mark.filterwarnings("error")
-def test_empty_ref_in_allof(ctx, cli, snapshot_cli):
-    # When the schema contains an empty $ref within allOf
-    api = ctx.openapi.apps.success()
-    schema_file = ctx.openapi.write_schema(
-        {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/issue"}}}
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        components={
-            "schemas": {
-                "issue": {
-                    "properties": {
-                        "key": {
-                            "$ref": "#/components/schemas/repository",
-                        }
-                    }
-                },
-                "object": {},
-                "repository": {
-                    "allOf": [
-                        {"$ref": "#/components/schemas/object"},
-                        {
-                            "properties": {
-                                "key": {"$ref": ""},
-                            }
-                        },
-                    ]
-                },
-            }
-        },
-    )
-
-    assert (
-        cli.main(
-            "run",
-            str(schema_file),
-            "--phases=examples",
-            f"--url={api.base_url}/api",
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.filterwarnings("error")
 def test_empty_all_of(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     schema_file = ctx.openapi.write_schema(

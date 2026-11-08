@@ -21,30 +21,21 @@ def _rate_limited(retry_after="0"):
 _FUZZING_ARGS = ("--rate-limit=auto", "--phases=fuzzing", "--max-examples=1", "--checks=not_a_server_error")
 
 
-def test_auto_exhausts_retries_on_persistent_429(ctx, cli):
+# A persistent 429 is retried until the retry budget runs out; without `Retry-After` it is the final response.
+@pytest.mark.parametrize(
+    ("headers", "expected_calls"),
+    [({"Retry-After": "0"}, RATE_LIMIT_AUTO_MAX_RETRIES + 1), ({}, 1)],
+    ids=["exhausts-retries-on-persistent-429", "no-retry-without-retry-after"],
+)
+def test_auto_retries_persistent_429(ctx, cli, headers, expected_calls):
     calls = {"n": 0}
 
     def users():
         calls["n"] += 1
-        return _rate_limited()
+        return make_response("", 429, headers)
 
     result = cli.run_openapi_app(_users_app(ctx, users), *_FUZZING_ARGS)
-    assert result.exit_code == 0, result.stdout
-    # One case: the initial call plus RATE_LIMIT_AUTO_MAX_RETRIES retries, then it gives up.
-    assert calls["n"] == RATE_LIMIT_AUTO_MAX_RETRIES + 1, calls["n"]
-
-
-def test_auto_no_retry_without_retry_after(ctx, cli):
-    calls = {"n": 0}
-
-    def users():
-        calls["n"] += 1
-        return make_response("", 429)
-
-    result = cli.run_openapi_app(_users_app(ctx, users), *_FUZZING_ARGS)
-    assert result.exit_code == 0, result.stdout
-    # A 429 without a `Retry-After` header can't be retried, so it's treated as the final response.
-    assert calls["n"] == 1, calls["n"]
+    assert (result.exit_code, calls["n"]) == (0, expected_calls), result.stdout
 
 
 def test_auto_reports_long_wait(ctx, cli, monkeypatch):

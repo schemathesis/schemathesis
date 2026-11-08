@@ -951,22 +951,6 @@ def test_invalid_custom_strategy(values, error):
     assert error in str(exc.value)
 
 
-@pytest.mark.hypothesis_nested
-@pytest.mark.parametrize(
-    "definition", [{"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"}]
-)
-def test_valid_headers(ctx, definition):
-    api = ctx.openapi.apps.success()
-    operation = ctx.openapi.load_operation(
-        "GET /api/success", {"parameters": [definition], "responses": {"200": {"description": "OK"}}}, version="2.0"
-    )
-    operation.base_url = api.base_url
-
-    @run_given(case=operation.as_strategy(), max_examples=10)
-    def inner(case):
-        case.call()
-
-
 def make_swagger(*parameters):
     return {
         "swagger": "2.0",

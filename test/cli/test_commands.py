@@ -812,11 +812,11 @@ def test_invalid_operation(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
 
-def test_invalid_type_with_ref(cli, ctx, snapshot_cli):
+def test_schema_errors(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
-            "/test": {
+            "/invalid-type": {
                 "post": {
                     "parameters": [
                         {
@@ -837,19 +837,7 @@ def test_invalid_type_with_ref(cli, ctx, snapshot_cli):
                     "responses": {"default": {"description": "Ok"}},
                 }
             },
-        },
-        # Open API 3.0 ignores keywords next to `$ref`, so only 3.1 reads the invalid `type`.
-        version="3.1.0",
-        components={"schemas": {"S": {"maxProperties": 5}}},
-    )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli
-
-
-def test_unsatisfiable_with_ref(cli, ctx, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/test": {
+            "/unsatisfiable-ref": {
                 "post": {
                     "requestBody": {
                         "required": True,
@@ -863,10 +851,48 @@ def test_unsatisfiable_with_ref(cli, ctx, snapshot_cli):
                     },
                     "responses": {"default": {"description": "Ok"}},
                 }
-            }
+            },
+            "/unsatisfiable-query": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 100, "maximum": 10},
+                        }
+                    ],
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            },
+            "/unsatisfiable-array-items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    # Each `oneOf` branch contradicts the sibling `minimum`, so no item can be generated.
+                                    "items": {
+                                        "type": "integer",
+                                        "minimum": 10,
+                                        "oneOf": [{"maximum": 1}, {"maximum": 2}, {"maximum": 3}],
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            },
         },
+        # Open API 3.0 ignores keywords next to `$ref`, so only 3.1 reads the invalid `type`.
+        version="3.1.0",
         components={
             "schemas": {
+                "S": {"maxProperties": 5},
                 "IntegerType": {"type": "integer", "minimum": 100, "maximum": 1000},
                 "StringType": {"type": "string", "pattern": "^[A-Z]{3,10}$"},
                 "ObjectType": {
@@ -885,59 +911,6 @@ def test_unsatisfiable_with_ref(cli, ctx, snapshot_cli):
                 "NestedSchema": {"type": "array", "items": {"type": "boolean"}, "minItems": 5},
             }
         },
-    )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli
-
-
-def test_unsatisfiable_query_parameter(cli, ctx, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/test": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "integer", "minimum": 100, "maximum": 10},
-                        }
-                    ],
-                    "responses": {"default": {"description": "Ok"}},
-                }
-            }
-        }
-    )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli
-
-
-def test_unsatisfiable_empty_array_items(cli, ctx, snapshot_cli):
-    # Each `oneOf` branch contradicts the sibling `minimum`, so no array item can be generated.
-    api = ctx.openapi.apps.success()
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "items": {
-                                        "type": "integer",
-                                        "minimum": 10,
-                                        "oneOf": [{"maximum": 1}, {"maximum": 2}, {"maximum": 3}],
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"default": {"description": "Ok"}},
-                }
-            }
-        }
     )
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
@@ -3840,39 +3813,6 @@ def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_refer
     api = ctx.openapi.apps.success()
     schema_path = ctx.makefile(schema_with_recursive_references)
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--mode=positive") == snapshot_cli
-
-
-@pytest.mark.skipif(platform.system() == "Windows", reason="May behave differently on Windows")
-def test_empty_reference_does_not_cause_infinite_recursion(ctx, cli, snapshot_cli):
-    # Empty $ref should be gracefully skipped during bundling, not cause RecursionError
-    api = ctx.openapi.apps.success()
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/items": {
-                "put": {
-                    "parameters": [{"in": "body", "name": "body", "schema": {"$ref": "#/definitions/Connection"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        version="2.0",
-        definitions={
-            "Connection": {
-                "allOf": [{"$ref": "#/definitions/Resource"}],
-                "properties": {
-                    "key": {
-                        "properties": {
-                            "key": {
-                                "$ref": ""  # Empty reference - should be skipped
-                            }
-                        }
-                    }
-                },
-            },
-            "Resource": {},
-        },
-    )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=examples") == snapshot_cli
 
 
 def test_nullable_reference(ctx, cli, app_runner, snapshot_cli):

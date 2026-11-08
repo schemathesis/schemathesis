@@ -178,7 +178,12 @@ def test_valid_class_is_accepted(methods):
     assert "Valid" in RunChecks.from_registry(_EMPTY_CONFIG).instances
 
 
-def test_check_receives_config_kwargs():
+@pytest.mark.parametrize(
+    ("config", "expected"),
+    [({"Configurable": {"threshold": 0.9}}, 0.9), ({}, 0.1)],
+    ids=["receives-config-kwargs", "uses-default-when-no-config-kwargs"],
+)
+def test_check_init_kwargs(config, expected):
     received = {}
 
     @schemathesis.check
@@ -189,24 +194,8 @@ def test_check_receives_config_kwargs():
         def after_run(self, ctx):
             pass
 
-    config = ChecksConfig.from_dict({"Configurable": {"threshold": 0.9}})
-    RunChecks.from_registry(config=config)
-    assert received["threshold"] == 0.9
-
-
-def test_check_uses_default_when_no_config_kwargs():
-    received = {}
-
-    @schemathesis.check
-    class Configurable:
-        def __init__(self, *, threshold: float = 0.1):
-            received["threshold"] = threshold
-
-        def after_run(self, ctx):
-            pass
-
-    RunChecks.from_registry(_EMPTY_CONFIG)
-    assert received["threshold"] == 0.1
+    RunChecks.from_registry(config=ChecksConfig.from_dict(config))
+    assert received["threshold"] == expected
 
 
 def test_disabled_check_is_not_instantiated():
