@@ -2474,10 +2474,23 @@ def _negative_max_items(
             except (InvalidArgument, Unsatisfiable):
                 return
 
-        # Extend the array to be of length value + 1 by repeating its own elements
-        diff = value + 1 - len(array_value)
-        if diff > 0 and array_value:
-            array_value += array_value * (diff // len(array_value)) + array_value[: diff % len(array_value)]
+        # Extend the array to be of length value + 1 by repeating its own elements.
+        # One oversized string is enough to probe size limits; repeating it inflates the body by orders of magnitude
+        head: list = []
+        filler: list = []
+        has_oversized = False
+        for item in array_value:
+            if _holds_oversized_string(item):
+                if not has_oversized:
+                    has_oversized = True
+                    head.append(item)
+            else:
+                head.append(item)
+                filler.append(item)
+        filler = filler or head
+        diff = value + 1 - len(head)
+        if diff > 0 and filler:
+            array_value = head + filler * (diff // len(filler)) + filler[: diff % len(filler)]
         if seen.insert(array_value):
             yield NegativeValue(
                 array_value,
@@ -3763,6 +3776,16 @@ def _positive_array(
                     deduplication_key=deduplication_key,
                     canonical=canonical,
                 )
+
+
+def _holds_oversized_string(value: Any) -> bool:
+    if isinstance(value, str):
+        return value == OVERSIZED_STRING
+    if isinstance(value, list):
+        return any(_holds_oversized_string(item) for item in value)
+    if isinstance(value, dict):
+        return any(_holds_oversized_string(item) for item in value.values())
+    return False
 
 
 def _nested_scenario(nested: GeneratedValue, container: CoverageScenario) -> CoverageScenario:

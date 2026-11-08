@@ -331,6 +331,25 @@ def test_negative_maxitems_when_unique_items_exhaust_enum(nctx):
     assert all(item in schema["items"]["enum"] for v in above_max for item in v)
 
 
+@pytest.mark.parametrize(
+    "items",
+    [
+        {"type": "string"},
+        {"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "string"}}},
+        {"type": "array", "maxItems": 100, "items": {"type": "string"}},
+    ],
+    ids=["strings", "objects", "nested-arrays"],
+)
+def test_negative_maxitems_sends_one_oversized_string(ctx_factory, items):
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    schema = {"type": "array", "maxItems": 4000, "items": items}
+    [value] = [
+        value for value in scenario_values(ctx, schema, CoverageScenario.ARRAY_ABOVE_MAX_ITEMS) if len(value) == 4001
+    ]
+    copies = json.dumps(value).count(OVERSIZED)
+    assert copies == 1
+
+
 def test_negative_pattern_for_header_with_permissive_pattern(ctx_factory):
     # `^[A-Z0-9_]*$` accepts the empty string; the negative emitter must still find one
     # header-safe value that violates the pattern.
