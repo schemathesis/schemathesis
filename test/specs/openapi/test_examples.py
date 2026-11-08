@@ -4851,6 +4851,27 @@ def test_mutually_recursive_allof_refs(ctx):
     assert [example.value for example in extract_from_schemas(operation)] == [{"Name": "rate-limit", "Scope": {}}]
 
 
+def test_empty_all_of_beside_property_examples(ctx):
+    operation = _json_body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Payload"},
+        components={
+            "schemas": {
+                "Payload": {
+                    "type": "object",
+                    "allOf": [],
+                    "properties": {
+                        "name": {"type": "string", "example": "n"},
+                        "child": {"$ref": "#/components/schemas/Payload"},
+                    },
+                }
+            }
+        },
+    )
+
+    assert [example.value for example in extract_from_schemas(operation)] == [{"name": "n"}]
+
+
 def test_boolean_property_subschema_alongside_a_cycle(ctx):
     # The cycle keeps the body bundled, and a boolean subschema has to survive that.
     operation = _json_body_operation(

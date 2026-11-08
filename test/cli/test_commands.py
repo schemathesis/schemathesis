@@ -812,7 +812,8 @@ def test_invalid_operation(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
 
-def test_schema_errors(cli, ctx, snapshot_cli):
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_schema_errors(cli, ctx, snapshot_cli, version):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
@@ -889,7 +890,7 @@ def test_schema_errors(cli, ctx, snapshot_cli):
             },
         },
         # Open API 3.0 ignores keywords next to `$ref`, so only 3.1 reads the invalid `type`.
-        version="3.1.0",
+        version=version,
         components={
             "schemas": {
                 "S": {"maxProperties": 5},
@@ -912,7 +913,12 @@ def test_schema_errors(cli, ctx, snapshot_cli):
             }
         },
     )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli
+    assert (
+        cli.run(
+            str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive", "--max-examples=10"
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.parametrize("workers", [1, 2])

@@ -17,7 +17,7 @@ from schemathesis.cli.output import DEFAULT_INTERNAL_ERROR_MESSAGE
 )
 def test_lone_surrogate_in_check_message(cli, ctx, exception, prefix):
     # `response.json()` decodes the server's ASCII `\uXXXX` escape into a real lone surrogate; the FAILURES and
-    # ERRORS renderers must not crash on it when writing to a UTF-8 terminal.
+    # ERRORS renderers show it escaped instead of crashing or replacing it when writing to a UTF-8 terminal.
     app, _ = ctx.openapi.make_flask_app({"/echo": {"post": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/echo", methods=["POST"])
@@ -33,7 +33,7 @@ def test_lone_surrogate_in_check_message(cli, ctx, exception, prefix):
 
     assert result.exception is None or isinstance(result.exception, SystemExit), result.exception
     assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
-    assert f"{prefix} rejected:" in result.stdout, result.stdout
+    assert f"{prefix} rejected: \\udc4b" in result.stdout, result.stdout
 
 
 @pytest.mark.parametrize("value", ["ok", "쑅"], ids=["ascii", "non-ascii"])
