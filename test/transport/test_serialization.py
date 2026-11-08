@@ -21,11 +21,11 @@ from schemathesis.core.errors import (
     SerializationError,
     SerializationNotPossible,
 )
-from schemathesis.core.parameters import RAW_QUERY_STRING_KEY
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, EncodedPath
 from schemathesis.core.transforms import deepclone
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
-from schemathesis.transport.serialization import Binary, contains_binary
+from schemathesis.transport.serialization import Binary, contains_binary, quote_all
 from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
 from test.utils import assert_requests_call, run_given
 
@@ -3165,3 +3165,24 @@ def test_multipart_parts_follow_body_for_case_media_type(ctx):
     )
     case = operation.Case(body={"file": b"data"}, media_type="multipart/form-data")
     assert case.as_transport_kwargs(base_url="http://127.0.0.1")["files"] == [("file", ("file", b"data"))]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (".", "%2E"),
+        ("..", "%2E%2E"),
+        (".foo", ".foo"),
+        ("%2E", "%2E"),
+        ("%2e", "%2E"),
+        ("%2E%2E", "%2E%2E"),
+        ("%2e%2e", "%2E%2E"),
+        # Spaces in path segments must percent-encode, not form-encode (GH-4252)
+        ("2 m above gnd", "2%20m%20above%20gnd"),
+        ("a+b", "a%2Bb"),
+        ("a/b", "a%2Fb"),
+    ],
+)
+def test_path_parameters_quotation(value, expected):
+    # See GH-1036
+    assert quote_all({"encoded": EncodedPath("a%2C"), "foo": value}) == {"encoded": "a%2C", "foo": expected}
