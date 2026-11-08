@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, quote_plus, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, Body, media_types
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, media_types
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -155,11 +155,6 @@ def base_url_from_request_url(case: Case, url: str) -> str:
     path_segments = prepare_path(case.path, case.path_parameters).lstrip("/").split("/")
     base_path = "/".join(parts.path.split("/")[: -len(path_segments)])
     return urlunsplit((parts.scheme, parts.netloc, base_path, "", ""))
-
-
-def prepare_body(case: Case) -> Body:
-    """Prepare body via the schema's spec-aware override."""
-    return case.operation.schema.prepare_request_body(case)
 
 
 @lru_cache(maxsize=128)

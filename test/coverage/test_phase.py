@@ -1030,17 +1030,15 @@ def test_binary_array_near_max_items_does_not_break_coverage(ctx, app_runner, bo
     schema.config.phases.update(phases=["coverage"])
     cases = []
 
-    with ctx.restore_hooks():
+    @schemathesis.hook
+    def before_call(context, case, **kwargs):
+        cases.append(case)
 
-        @schemathesis.hook
-        def before_call(context, case, **kwargs):
-            cases.append(case)
-
-        errors = [
-            event.value
-            for event in schemathesis.engine.from_schema(schema).execute()
-            if isinstance(event, schemathesis.engine.events.NonFatalError)
-        ]
+    errors = [
+        event.value
+        for event in schemathesis.engine.from_schema(schema).execute()
+        if isinstance(event, schemathesis.engine.events.NonFatalError)
+    ]
     assert errors == []
     assert cases
 
@@ -4816,14 +4814,13 @@ def coverage_phase_cases(ctx, app_runner, raw_schema, mode):
     schema.config.generation.update(modes=[mode])
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     cases = []
-    with ctx.restore_hooks():
 
-        @schemathesis.hook
-        def before_call(context, case, **kwargs):
-            cases.append(case)
+    @schemathesis.hook
+    def before_call(context, case, **kwargs):
+        cases.append(case)
 
-        for _ in schemathesis.engine.from_schema(schema).execute():
-            pass
+    for _ in schemathesis.engine.from_schema(schema).execute():
+        pass
     return cases
 
 

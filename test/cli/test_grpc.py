@@ -18,6 +18,16 @@ from test.utils import crash_cache_dir, refusing_url
 pytest.importorskip("grpc", reason="grpcio has no free-threaded build")
 
 
+def pinned_user(ctx, user_id: int, extra: str = "") -> str:
+    return ctx.write_pymodule(
+        f"""
+@schemathesis.hook
+def map_body(context, body):
+    return {{"userId": {user_id}}}
+{extra}"""
+    )
+
+
 @pytest.mark.parametrize("source", ["reflection", "descriptor-set"])
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_grpc_run_finds_server_error(ctx, cli, tmp_path, snapshot_cli, source):
@@ -35,13 +45,7 @@ def test_grpc_run_finds_server_error(ctx, cli, tmp_path, snapshot_cli, source):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_expected_status_name(ctx, cli, snapshot_cli, user_id):
     server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        f"""
-@schemathesis.hook
-def map_body(context, body):
-    return {{"userId": {user_id}}}
-        """
-    )
+    module = pinned_user(ctx, user_id)
     assert (
         cli.main(
             "run",
@@ -124,13 +128,7 @@ def test_proto_file_refused(cli, tmp_path, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_ignored_auth(ctx, cli, snapshot_cli, phase, user_id, sent):
     server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        f"""
-@schemathesis.hook
-def map_body(context, body):
-    return {{"userId": {user_id}}}
-        """
-    )
+    module = pinned_user(ctx, user_id)
     assert (
         cli.main(
             "run",
@@ -151,13 +149,7 @@ def map_body(context, body):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_ignored_auth_replay(ctx, cli, tmp_path, snapshot_cli):
     server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def map_body(context, body):
-    return {"userId": 1}
-        """
-    )
+    module = pinned_user(ctx, 1)
     cli.main(
         "run",
         server.target,
@@ -416,13 +408,7 @@ def test_unreachable_descriptor_set_target(cli, tmp_path, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_get_user_status(ctx, cli, snapshot_cli, user_id, extra):
     server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        f"""
-@schemathesis.hook
-def map_body(context, body):
-    return {{"userId": {user_id}}}
-        """
-    )
+    module = pinned_user(ctx, user_id)
     assert (
         cli.main(
             "run",
@@ -439,13 +425,7 @@ def map_body(context, body):
 
 def test_replay_sends_supplied_credentials_in_place_of_masked_ones(ctx, cli):
     server = ctx.grpc.apps.users()
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def map_body(context, body):
-    return {"userId": -1}
-        """
-    )
+    module = pinned_user(ctx, -1)
     headers = ["-H", "Authorization: Bearer secret", "-H", "token-bin: U0VDUkVU"]
     cli.main(
         "run",
@@ -530,16 +510,14 @@ def test_replay_reextracts_created_names_on_fresh_server(ctx, cli, tmp_path, fix
 def test_unique_inputs_send_a_repeated_message_once(ctx, cli):
     server = ctx.grpc.apps.users()
     # The hook changes every case the same way after the run decides whether it was already sent.
-    module = ctx.write_pymodule(
-        """
-@schemathesis.hook
-def map_body(context, body):
-    return {"userId": 1}
-
+    module = pinned_user(
+        ctx,
+        1,
+        extra="""
 @schemathesis.hook
 def before_call(context, case, kwargs):
     case.body["userId"] = 3
-        """
+""",
     )
     cli.main(
         "run",

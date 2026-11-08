@@ -287,7 +287,7 @@ def _make_producer_rule(
                 mutate_ast=_inject_field(field_name, (*record_path, "id")),
             )
         )
-        output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
+        output = self._run_case(case, rule_name=rule_name, parent_id=None)
         if output is None:
             return multiple()
         handle = Handle(return_type_name, "id")
@@ -381,7 +381,7 @@ def _make_handle_producer_rule(
                 mutate_ast=_inject_field(field_name, (*record_path, handle.field_name)),
             )
         )
-        output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
+        output = self._run_case(case, rule_name=rule_name, parent_id=None)
         if output is None:
             return multiple()
         values = []

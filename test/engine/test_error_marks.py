@@ -76,10 +76,7 @@ def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
         },
         components={"securitySchemes": {"bearer": {"type": "http", "scheme": "bearer"}}},
     )
-    try:
-        stream = examples_only(loaded)
-    finally:
-        schemathesis.auths.unregister()
+    stream = examples_only(loaded)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, AuthenticationError) for event in errors), [
@@ -99,15 +96,12 @@ def test_stateful_auth_provider_failure_surfaces_as_authentication_error(ctx):
         def set(self, case, data, context):
             pass
 
-    try:
-        stream = EventStream(
-            schemathesis.openapi.from_url(api.schema_url),
-            phases=[PhaseName.STATEFUL_TESTING],
-            max_examples=10,
-            seed=1,
-        ).execute()
-    finally:
-        schemathesis.auths.unregister()
+    stream = EventStream(
+        schemathesis.openapi.from_url(api.schema_url),
+        phases=[PhaseName.STATEFUL_TESTING],
+        max_examples=10,
+        seed=1,
+    ).execute()
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.STATEFUL_TESTING)
     assert [str(event.value).splitlines()[0].partition(";")[0] for event in errors] == [

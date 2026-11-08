@@ -181,51 +181,47 @@ def _build_operation(ctx, operation_id, path):
 
 # Each hook registered with a different apply_to filter must receive its own filter_set
 def test_multiple_apply_to_have_distinct_filters(ctx):
-    with ctx.restore_hooks():
+    @schemathesis.hook.apply_to(operation_id="operationA")
+    def before_call(context, case, **kwargs):
+        pass
 
-        @schemathesis.hook.apply_to(operation_id="operationA")
-        def before_call(context, case, **kwargs):
-            pass
+    hook_a = before_call
 
-        hook_a = before_call
+    @schemathesis.hook.apply_to(operation_id="operationB")
+    def before_call(context, case, **kwargs):  # noqa: F811
+        pass
 
-        @schemathesis.hook.apply_to(operation_id="operationB")
-        def before_call(context, case, **kwargs):  # noqa: F811
-            pass
+    hook_b = before_call
 
-        hook_b = before_call
+    assert hook_a.filter_set is not hook_b.filter_set
 
-        assert hook_a.filter_set is not hook_b.filter_set
+    ctx_a = HookContext(operation=_build_operation(ctx, "operationA", "/a"))
+    ctx_b = HookContext(operation=_build_operation(ctx, "operationB", "/b"))
+    ctx_other = HookContext(operation=_build_operation(ctx, "operationC", "/c"))
 
-        ctx_a = HookContext(operation=_build_operation(ctx, "operationA", "/a"))
-        ctx_b = HookContext(operation=_build_operation(ctx, "operationB", "/b"))
-        ctx_other = HookContext(operation=_build_operation(ctx, "operationC", "/c"))
-
-        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_a)) == [hook_a]
-        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_b)) == [hook_b]
-        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_other)) == []
+    assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_a)) == [hook_a]
+    assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_b)) == [hook_b]
+    assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_other)) == []
 
 
 # Mixing apply_to and skip_for across multiple hooks must keep filters independent
 def test_multiple_apply_to_with_skip_for(ctx):
-    with ctx.restore_hooks():
+    @schemathesis.hook.apply_to(operation_id="opInclude")
+    def before_call(context, case, **kwargs):
+        pass
 
-        @schemathesis.hook.apply_to(operation_id="opInclude")
-        def before_call(context, case, **kwargs):
-            pass
+    hook_include = before_call
 
-        hook_include = before_call
+    @schemathesis.hook.skip_for(operation_id="opExclude")
+    def before_call(context, case, **kwargs):  # noqa: F811
+        pass
 
-        @schemathesis.hook.skip_for(operation_id="opExclude")
-        def before_call(context, case, **kwargs):  # noqa: F811
-            pass
+    hook_exclude = before_call
 
-        hook_exclude = before_call
+    ctx_include = HookContext(operation=_build_operation(ctx, "opInclude", "/include"))
+    ctx_exclude = HookContext(operation=_build_operation(ctx, "opExclude", "/exclude"))
+    ctx_other = HookContext(operation=_build_operation(ctx, "opOther", "/other"))
 
-        ctx_include = HookContext(operation=_build_operation(ctx, "opInclude", "/include"))
-        ctx_exclude = HookContext(operation=_build_operation(ctx, "opExclude", "/exclude"))
-        ctx_other = HookContext(operation=_build_operation(ctx, "opOther", "/other"))
-
-        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_include)) == [hook_include, hook_exclude]
-        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_exclude)) == []
-        assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_other)) == [hook_exclude]
+    assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_include)) == [hook_include, hook_exclude]
+    assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_exclude)) == []
+    assert list(GLOBAL_HOOK_DISPATCHER.applicable("before_call", ctx_other)) == [hook_exclude]

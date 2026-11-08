@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import json
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -20,7 +19,7 @@ from schemathesis.core.failures import (
     ServerError,
 )
 from schemathesis.core.shell import ShellType, detect_shell
-from schemathesis.core.transport import StatusClass
+from schemathesis.core.transport import StatusClass, http_status_class
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import EngineFinished, EngineStarted, ScenarioFinished
 from schemathesis.engine.summary import running_time
@@ -99,11 +98,11 @@ def _case_operation_id(case: Case) -> str:
 _SERVER_ERROR_FAULTS = {StatusClass.INTERNAL_ERROR: 100, StatusClass.NOT_IMPLEMENTED: 205}
 
 
-def fault_category(failure: Failure, classify_status: Callable[[int], StatusClass]) -> tuple[int, str] | None:
+def fault_category(failure: Failure) -> tuple[int, str] | None:
     """WFC fault code and a description of the failure, or `None` when WFC has nothing for it."""
     description = f"{type(failure).__name__}: {failure.title}"
     if isinstance(failure, ServerError):
-        code = _SERVER_ERROR_FAULTS.get(classify_status(failure.status_code), 121)
+        code = _SERVER_ERROR_FAULTS.get(http_status_class(failure.status_code), 121)
         return code, f"{description} (status {failure.status_code})"
     if isinstance(failure, VALIDATION_FAILURES):
         return 200, description
@@ -137,12 +136,12 @@ def fault_category(failure: Failure, classify_status: Callable[[int], StatusClas
 
 
 def _case_faults(
-    case_id: str, endpoint: str, failures: list[Failure], classify_status: Callable[[int], StatusClass]
+    case_id: str, endpoint: str, failures: list[Failure]
 ) -> list[tuple[tuple[int, str], dict[str, object]]]:
     faults: list[tuple[tuple[int, str], dict[str, object]]] = []
     seen: set[tuple[int, str]] = set()
     for failure in failures:
-        category = fault_category(failure, classify_status)
+        category = fault_category(failure)
         if category is None:
             continue
         code, description = category
@@ -178,7 +177,6 @@ def export_failures(
     endpoints: dict[str, tuple[str, str]],
     config: OutputConfig,
     file_name: str,
-    classify_status: Callable[[int], StatusClass],
 ) -> ExportedFailures:
     """The failures the CLI reports: a shell script reproducing them, their WFC test cases and found faults."""
     lines = [f"#!/usr/bin/env {'fish' if detect_shell() is ShellType.FISH else 'bash'}"]
@@ -191,7 +189,7 @@ def export_failures(
             if group.case_id is None or group.code_sample is None:
                 continue
             endpoint, sent_as = endpoints[group.case_id]
-            faults = _case_faults(group.case_id, endpoint, group.failures, classify_status)
+            faults = _case_faults(group.case_id, endpoint, group.failures)
             if not faults:
                 continue
             found_faults.extend(fault for _, fault in faults)
@@ -277,9 +275,7 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         elapsed = running_time(self.started_at, self.finished) or 0.0
         script_path = self.output.with_suffix(".sh")
-        exported = export_failures(
-            ctx.statistic, self.failing_endpoints, ctx.config.output, script_path.name, ctx.classify_status
-        )
+        exported = export_failures(ctx.statistic, self.failing_endpoints, ctx.config.output, script_path.name)
         document = {
             "schemaVersion": SCHEMA_VERSION,
             "toolName": "Schemathesis",

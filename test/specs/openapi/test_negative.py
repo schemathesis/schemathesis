@@ -1686,19 +1686,17 @@ def test_negative_data_rejection_array_path_param_hook_rewrite_no_false_positive
             return jsonify({"error": "invalid"}), 422
         return jsonify({"ok": True}), 200
 
-    with ctx.restore_hooks():
+    @schemathesis.hook
+    def before_call(context, case, kwargs):
+        case.path_parameters = {"projects": "hello"}
 
-        @schemathesis.hook
-        def before_call(context, case, kwargs):
-            case.path_parameters = {"projects": "hello"}
-
-        cli.run_and_assert(
-            app_runner.openapi_url(app),
-            "--checks=negative_data_rejection",
-            "--mode=all",
-            "--phases=coverage",
-            exit_code=ExitCode.OK,
-        )
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=negative_data_rejection",
+        "--mode=all",
+        "--phases=coverage",
+        exit_code=ExitCode.OK,
+    )
 
 
 NEGATABLE_SCHEMAS = [
