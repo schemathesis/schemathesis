@@ -1,6 +1,0 @@
-# Valid dynamic apiKey auth (header extraction)
-[auth.dynamic.openapi.ApiKey]
-path = "/api/token"
-method = "GET"
-extract_from = "header"
-extract_selector = "X-Auth-Token"

@@ -1,5 +1,0 @@
-[dictionaries.x]
-values = [1]
-
-[generation.dictionaries]
-boolean = { dictionary = "x", probability = 0.5 }

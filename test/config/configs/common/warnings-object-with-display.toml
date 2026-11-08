@@ -1,2 +1,0 @@
-[warnings]
-display = ["missing_auth", "validation_mismatch"]

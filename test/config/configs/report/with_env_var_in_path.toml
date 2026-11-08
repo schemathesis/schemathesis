@@ -1,3 +1,0 @@
-[reports.junit]
-enabled = true
-path = "${TEST_STRING_1}"
