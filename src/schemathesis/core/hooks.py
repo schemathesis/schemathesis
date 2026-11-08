@@ -20,7 +20,10 @@ def load_from_path(module_path: str) -> None:
         if os.sep in module_path or module_path.endswith(".py"):
             _load_from_file(module_path)
         else:
-            sys.path.append(os.getcwd())  # fix ModuleNotFoundError module in cwd
+            # Hooks modules may live in the working directory, which is not always importable
+            cwd = os.getcwd()
+            if cwd not in sys.path:
+                sys.path.append(cwd)
             __import__(module_path)
     except Exception as exc:
         raise HookError(module_path) from exc
