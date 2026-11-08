@@ -2855,9 +2855,12 @@ def _merge_parameters_to_object_schema(
                 subschema = {**subschema, "format": format_key}
 
             # Path parameters: ensure string types have minLength >= 1
-            elif location == ParameterLocation.PATH and subschema.get("type") == "string":
-                if "minLength" not in subschema:
-                    subschema = {**subschema, "minLength": 1}
+            elif (
+                location == ParameterLocation.PATH
+                and subschema.get("type") == "string"
+                and "minLength" not in subschema
+            ):
+                subschema = {**subschema, "minLength": 1}
 
         if location == ParameterLocation.HEADER:
             canonical = canonical_by_lower.setdefault(name.lower(), name)
