@@ -673,6 +673,9 @@ def _char_class_excludes_all(items: list[_Node], allowed_codes: frozenset[int]) 
 @lru_cache
 def update_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
     """Update the quantifier of a regular expression based on given min and max lengths."""
+    # Regex repeats cannot express bounds this large, so they mean no limit.
+    if max_length is not None and max_length >= MAXREPEAT:
+        max_length = None
     if not pattern or (min_length in (None, 0) and max_length is None):
         return pattern
 
