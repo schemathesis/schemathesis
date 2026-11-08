@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     import requests.auth
     from werkzeug.datastructures import Headers
 
+    from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.python.asgi import ASGIApp
@@ -693,6 +694,50 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
     # 4. Global auth (fallback)
     if GLOBAL_AUTH_STORAGE.is_defined and not case.operation.schema.is_security_param_negated(case):
         GLOBAL_AUTH_STORAGE.set(case, context)
+
+
+def set_learned_on_case(case: Case) -> None:
+    """Attach credentials for security the schema learned after `case` was generated.
+
+    Values already on the case win: if the credentials would replace any of them, the case is left unchanged.
+    """
+    if case._has_explicit_auth:
+        return
+    schema = case.operation.schema
+    # These sources take precedence over the schema's security and were already applied at generation time.
+    if schema.config.auth_for(operation=case.operation) is not None or schema.auth.is_defined:
+        return
+    before = _credential_containers(case)
+    if not schema.apply_auth(case, AuthContext(operation=case.operation, app=case.operation.app)):
+        return
+    with_auth = _credential_containers(case)
+    _fill_credential_containers(case, before)
+    if any(
+        with_auth[location].get(name) != value for location, values in before.items() for name, value in values.items()
+    ):
+        case._has_explicit_auth = False
+        return
+    # Edits made after generation must still count as edits once the credentials are added.
+    case._check_modifications()
+    _fill_credential_containers(case, with_auth)
+    case._sync_validated_hashes()
+
+
+def _credential_containers(case: Case) -> dict[ParameterLocation, dict[str, JsonValue]]:
+    containers = {}
+    for location in (ParameterLocation.HEADER, ParameterLocation.QUERY, ParameterLocation.COOKIE):
+        container = case.get_container(location)
+        if isinstance(container, MutableMapping):
+            containers[location] = dict(container)
+    return containers
+
+
+def _fill_credential_containers(case: Case, containers: dict[ParameterLocation, dict[str, JsonValue]]) -> None:
+    for location, values in containers.items():
+        container = case.get_container(location)
+        assert isinstance(container, MutableMapping)
+        container.clear()
+        container.update(values)
 
 
 # Global auth API

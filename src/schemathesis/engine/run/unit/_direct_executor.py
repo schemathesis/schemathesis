@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from schemathesis.auths import set_learned_on_case
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import Status, StopReason, events
@@ -81,6 +82,8 @@ def run_driver(
                 # One snapshot: reading the clock twice lets the deadline pass in between and turn a
                 # spent budget into a phantom interrupt.
                 raise_if_stopped(ctx.stop_reason)
+                # Cases are generated before any is sent, so security learned from an earlier response is added here.
+                set_learned_on_case(case)
                 any_case_ran = True
                 try:
                     run_one_case(case=case, ctx=ctx, scenario=scenario, errors=errors, pending_events=pending_events)
