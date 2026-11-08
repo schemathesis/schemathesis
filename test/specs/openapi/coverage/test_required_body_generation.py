@@ -1,5 +1,5 @@
 from schemathesis import GenerationMode
-from test.coverage.helpers import assert_bodies, body_operation, iter_cases, load_schema
+from test.specs.openapi.coverage.helpers import assert_bodies, body_operation, iter_cases, load_schema
 
 # Malformed regex - bad character range `\\-.`
 MALFORMED_REGEX = "^[A-Za-z0-9 \\\\-.'À-ÿ]+$"
