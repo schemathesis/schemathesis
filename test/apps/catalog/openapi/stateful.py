@@ -5,7 +5,7 @@ from typing import Literal
 
 from flask import Flask, abort, jsonify, request
 
-from test.apps.builders import build_schema, make_flask_app_from_schema
+from test.apps.builders import build_schema, flask_app, make_flask_app_from_schema
 from test.apps.fragments import handlers, schemas
 from test.apps.runtime import Modifier, OpenAPIApp
 
@@ -66,10 +66,7 @@ def stateful_users(*modifiers: Modifier[UserStore]) -> OpenAPIApp:
 
 # Served from the root, not `/api`: tests pin a seed and a baseline label that depend on the paths.
 def flaky_branch_blocks() -> OpenAPIApp:
-    spec = build_schema(schemas.flaky_branch_blocks())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_flaky_branch_blocks(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.flaky_branch_blocks(), handlers.register_flaky_branch_blocks)
 
 
 def replay_inferred_list_link(

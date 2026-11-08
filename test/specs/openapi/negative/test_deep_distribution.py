@@ -11,6 +11,7 @@ import schemathesis
 from schemathesis.core.jsonschema import _is_valid_uuid
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.generation.meta import FuzzingPhaseData
+from test.apps.catalog.openapi import nested
 from test.utils import run_given
 
 
@@ -70,7 +71,7 @@ def test_negative_fuzzing_spreads_mutations_across_depths_and_operators(ctx):
 
 def test_value_channel_produces_format_uuid_near_miss(ctx):
     # 300 examples with continue_on_failure: value channel fires ~15%, picking format:uuid ~1/14 times.
-    api = ctx.openapi.apps.additional_properties_bug()
+    api = ctx.openapi.serve(nested.additional_properties_bug())
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.seed = 42
     schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
@@ -138,16 +139,13 @@ def test_additional_properties_negation_stays_invalid(ctx):
 
 
 @pytest.mark.parametrize(
-    "factory_name",
-    [
-        "header_constraint_bug",
-        "one_of_branch_bug",
-        "additional_properties_bug",
-    ],
+    "factory",
+    [nested.header_constraint_bug, nested.one_of_branch_bug, nested.additional_properties_bug],
+    ids=["header_constraint_bug", "one_of_branch_bug", "additional_properties_bug"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
-def test_secondary_planted_bug_detected(cli, ctx, snapshot_cli, factory_name):
-    api = getattr(ctx.openapi.apps, factory_name)()
+def test_secondary_planted_bug_detected(cli, ctx, snapshot_cli, factory):
+    api = ctx.openapi.serve(factory())
     result = cli.run(
         api.schema_url,
         "--mode=negative",

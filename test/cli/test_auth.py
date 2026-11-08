@@ -1,5 +1,7 @@
 import pytest
 
+from test.apps.catalog.openapi import basic
+
 TOKEN = "FOO"
 AUTH_PROVIDER_MODULE_CODE = f"""
 import schemathesis
@@ -103,7 +105,7 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, app_runner, snaps
 
 
 def test_multiple_threads(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.success_and_custom_format()
+    api = ctx.openapi.serve(basic.success_and_custom_format())
     module = ctx.write_pymodule(
         f"""
     import time

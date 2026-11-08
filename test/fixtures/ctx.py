@@ -20,7 +20,6 @@ from test.apps.catalog.openapi import nested as openapi_nested
 from test.apps.catalog.openapi import sign_up as openapi_sign_up
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
-from test.apps.catalog.openapi import swagger_v2 as openapi_swagger_v2
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi import wfc as openapi_wfc
@@ -74,9 +73,6 @@ class OpenAPIApps:
     def success(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success())
 
-    def per_path_servers(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.per_path_servers())
-
     def failure(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.failure())
 
@@ -104,62 +100,14 @@ class OpenAPIApps:
     def ignored_auth(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.ignored_auth())
 
-    def form(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.form())
-
     def upload_file(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.upload_file())
 
     def always_incorrect(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.always_incorrect())
 
-    def success_and_upload_file(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.success_and_upload_file())
-
-    def upload_file_and_custom_format(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.upload_file_and_custom_format())
-
-    def success_and_custom_format(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.success_and_custom_format())
-
-    def success_failure_unsatisfiable_empty_string(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.success_failure_unsatisfiable_empty_string())
-
-    def empty(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.empty())
-
-    def no_operations(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.no_operations())
-
-    def empty_string(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.empty_string())
-
-    def recursive(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.recursive())
-
-    def invalid_response(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.invalid_response())
-
-    def invalid_path_parameter(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.invalid_path_parameter())
-
     def missing_path_parameter(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.missing_path_parameter())
-
-    def reserved(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.reserved())
-
-    def conformance(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.conformance())
-
-    def cp866(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.cp866())
-
-    def read_only(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.read_only())
-
-    def write_only(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.write_only())
 
     def text(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.text())
@@ -178,9 +126,6 @@ class OpenAPIApps:
 
     def success_and_text(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_text())
-
-    def success_text_and_write_only(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.success_text_and_write_only())
 
     def slow(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.slow())
@@ -203,35 +148,17 @@ class OpenAPIApps:
     def success_and_failure(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_failure())
 
-    def success_failure_multiple_failures_custom_format(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.success_failure_multiple_failures_custom_format())
-
-    def array_path_variable(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.array_path_variable())
-
     def path_variable_and_custom_format(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.path_variable_and_custom_format())
 
     def basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.basic())
 
-    def basic_with_query(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.basic_with_query())
-
     def success_and_basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_basic())
 
-    def sessions_and_log_event(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.sessions_and_log_event())
-
-    def kitchen_sink(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.kitchen_sink())
-
     def rails_planted_bug(self, *, envelope: openapi_envelopes.RailsEnvelope) -> OpenAPIServer:
         return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.RAILS[envelope]))
-
-    def laravel_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.LARAVEL))
 
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
@@ -250,20 +177,11 @@ class OpenAPIApps:
     def users_crud(self) -> OpenAPIServer:
         return _start(self.parent, openapi_users.crud())
 
-    def users_create_only(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_users.create_user_only())
-
     def users_crud_with_success(self) -> OpenAPIServer:
         return _start(self.parent, openapi_users.crud_with_success())
 
-    def users_crud_with_failure(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_users.crud_with_failure())
-
     def linked_users(self) -> OpenAPIServer:
         return _start(self.parent, openapi_users.linked_users())
-
-    def aspnet_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.ASPNET))
 
     def under_declared_security(
         self, *modifiers: Modifier[openapi_under_declared_security.UnderDeclaredSecurityStore]
@@ -273,38 +191,17 @@ class OpenAPIApps:
     def sign_up_and_login(self, behavior: openapi_sign_up.SignUpBehavior = "ok") -> OpenAPIServer:
         return _start(self.parent, openapi_sign_up.sign_up_and_login(behavior))
 
-    def zod_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.ZOD))
-
     def unimplemented_method(self) -> OpenAPIServer:
         return _start(self.parent, openapi_supervisor.unimplemented_method())
 
-    def linked_with_unimplemented_method(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_supervisor.linked_with_unimplemented_method())
-
     def wfc_login(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_login())
-
-    def wfc_expiring_token(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_expiring_token())
-
-    def wfc_login_failing(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_login_failing())
 
     def wfc_login_plain(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_login_plain())
 
     def wfc_role_gated(self, deny_status: int = 403) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_role_gated(deny_status=deny_status))
-
-    def wfc_role_gated_401_when_anonymous(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_role_gated_401_when_anonymous())
-
-    def wfc_credentials_rejected(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_credentials_rejected())
-
-    def wfc_accounts_seeded_later(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_accounts_seeded_later())
 
     def wfc_owned_orders(
         self, policy: str, listing: str | None = None, writes: bool = False, security: str = "declared"
@@ -314,188 +211,11 @@ class OpenAPIApps:
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())
 
-    def collection_with_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.collection_with_planted_bug())
-
-    def undocumented_collection_with_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.undocumented_collection_with_planted_bug())
-
-    def vocabulary_path_with_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_basic.vocabulary_path_with_planted_bug())
-
-    def planted_bug_with_quiet_operation(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.planted_bug_with_quiet_operation())
-
-    def planted_bug_taught_by_examples(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.planted_bug_taught_by_examples())
-
-    def two_stage_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.two_stage_planted_bug())
-
-    def endlessly_novel_feedback(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.endlessly_novel_feedback())
-
-    def nested_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.nested_planted_bug())
-
-    def size_bound_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.size_bound_planted_bug())
-
-    def malformed_content_type_rejection(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.malformed_content_type_rejection())
-
-    def format_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.format_planted_bug())
-
-    def numeric_bound_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.numeric_bound_planted_bug())
-
-    def positive_numeric_gate_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.positive_numeric_gate_planted_bug())
-
-    def unrecognized_property_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.unrecognized_property_planted_bug())
-
-    def pattern_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.pattern_planted_bug())
-
-    def jackson_typed_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.jackson_typed_planted_bug())
-
-    def jackson_typed_planted_bug_ref_bundled(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.jackson_typed_planted_bug_ref_bundled())
-
-    def jackson_overflow_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.jackson_overflow_planted_bug())
-
-    def jackson_enum_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.jackson_enum_planted_bug())
-
-    def missing_query_param_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.missing_query_param_planted_bug())
-
-    def missing_request_body_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.missing_request_body_planted_bug())
-
-    def pydantic_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.pydantic_planted_bug())
-
-    def commit_date_with_example(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.commit_date_with_example())
-
-    def commit_date_with_examples(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.commit_date_with_examples())
-
-    def commit_date_with_property_example(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.commit_date_with_property_example())
-
-    def commit_date_with_link(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.commit_date_with_link())
-
-    def token_with_example(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.token_with_example())
-
-    def token_with_examples(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.token_with_examples())
-
-    def ajv_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.AJV))
-
-    def go_validator_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.GO_VALIDATOR))
-
-    def symfony_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.SYMFONY))
-
-    def marshmallow_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.MARSHMALLOW))
-
-    def confluent_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.confluent_planted_bug())
-
-    def flask_rest_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.FLASK_REST))
-
-    def litestar_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.LITESTAR))
-
-    def restler_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_error_feedback.restler_planted_bug())
-
-    def swagger_v2_baseline(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.baseline())
-
-    def swagger_v2_formdata(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.formdata())
-
-    def swagger_v2_collection_format(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.collection_format())
-
-    def swagger_v2_security(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.security())
-
-    def swagger_v2_nullable(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.nullable())
-
-    def swagger_v2_examples(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.examples())
-
-    def swagger_v2_default_response(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.default_response())
-
-    def swagger_v2_array_path_parameter(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.array_path_parameter())
-
-    def swagger_v2_injected_path_parameter(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.injected_path_parameter())
-
-    def swagger_v2_all_locations(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.all_locations())
-
-    def swagger_v2_oauth2_security(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.oauth2_security())
-
-    def swagger_v2_no_response_body(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.no_response_body())
-
-    def swagger_v2_native_response_examples(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.native_response_examples())
-
-    def swagger_v2_parameter_ref(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.parameter_ref())
-
-    def swagger_v2_path_level_parameters(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.path_level_parameters())
-
-    def swagger_v2_form_urlencoded(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.form_urlencoded())
-
-    def swagger_v2_multi_path_parameter(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.multi_path_parameter())
-
-    def swagger_v2_diverse_response_headers(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.diverse_response_headers())
-
-    def swagger_v2_array_response_header(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.array_response_header())
-
-    def swagger_v2_and_security(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_swagger_v2.and_security())
-
     def deep_leaf_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_nested.deep_leaf_bug())
 
     def header_constraint_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_nested.header_constraint_bug())
-
-    def one_of_branch_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_nested.one_of_branch_bug())
-
-    def additional_properties_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_nested.additional_properties_bug())
-
-    def languages_with_codes(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_nested.languages_with_codes())
 
 
 @dataclass(slots=True)
@@ -507,12 +227,6 @@ class GraphQLApps:
 
     def federated_subgraph(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.federated_subgraph())
-
-    def coverage_inputs(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.coverage_inputs())
-
-    def lenient(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.lenient())
 
     def from_schema(
         self, schema, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask"
@@ -528,35 +242,8 @@ class GraphQLApps:
     def generic_id_pool(self, *, fixed: bool = False) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.generic_id_pool(fixed=fixed))
 
-    def input_object_pool(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.input_object_pool())
-
-    def list_argument_pool(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.list_argument_pool())
-
     def non_id_pool(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.non_id_pool())
-
-    def bare_slug(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.bare_slug())
-
-    def relay_connection(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.relay_connection())
-
-    def unknown_id_failure(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.unknown_id_failure())
-
-    def tombstone_pool(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.tombstone_pool())
-
-    def use_after_delete(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.use_after_delete())
-
-    def slow_mutation(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.slow_mutation())
-
-    def double_delete(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.double_delete())
 
 
 @dataclass
@@ -566,6 +253,9 @@ class GraphQLContext:
     @property
     def apps(self) -> GraphQLApps:
         return GraphQLApps(parent=self.parent)
+
+    def serve(self, app: GraphQLApp) -> GraphQLServer:
+        return _start(self.parent, app)
 
     def load_sdl(self, sdl: str, *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
         return schemathesis.graphql.from_file(sdl, config=config)
@@ -673,6 +363,9 @@ class OpenApiContext:
     @property
     def apps(self) -> OpenAPIApps:
         return OpenAPIApps(parent=self.parent)
+
+    def serve(self, app: OpenAPIApp) -> OpenAPIServer:
+        return _start(self.parent, app)
 
     def build_schema(
         self, paths: dict[str, Any] | None, *, version: str = "3.0.2", **kwargs: dict[str, Any]

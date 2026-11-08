@@ -10,7 +10,7 @@ from flask import Flask, Response, jsonify, request
 from pydantic import BaseModel, Field
 
 from schemathesis.core.jsonschema import is_valid
-from test.apps.builders import build_schema, make_flask_app_from_schema
+from test.apps.builders import build_schema, flask_app, make_flask_app_from_schema
 from test.apps.runtime import OpenAPIApp
 
 _TOPIC_NAME = re.compile(r"^[a-zA-Z0-9._-]+$")
@@ -72,10 +72,7 @@ def _planted_bug_properties() -> dict[str, object]:
 
 def planted_bug() -> OpenAPIApp:
     # 4xx required-fields gate hides a planted 500 until feedback fills the body.
-    spec = build_schema(_string_fields_body(_planted_bug_properties()))
-    app = make_flask_app_from_schema(spec)
-    _register_required_fields_handler(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(_string_fields_body(_planted_bug_properties()), _register_required_fields_handler)
 
 
 def planted_bug_with_quiet_operation() -> OpenAPIApp:
@@ -103,15 +100,13 @@ def planted_bug_with_quiet_operation() -> OpenAPIApp:
 
 def planted_bug_taught_by_examples() -> OpenAPIApp:
     # The declared example trips the 400 gate, so the parsers learn before the coverage pass generates.
-    spec = build_schema(
+    return flask_app(
         _string_fields_body(
             {"name": {"type": "string"}, "description": {"type": "string"}},
             example={"name": "", "description": ""},
-        )
+        ),
+        _register_required_fields_handler,
     )
-    app = make_flask_app_from_schema(spec)
-    _register_required_fields_handler(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 def two_stage_planted_bug() -> OpenAPIApp:
@@ -583,7 +578,7 @@ def _register_jackson_typed_handler(app: Flask) -> None:
 
 def jackson_typed_planted_bug() -> OpenAPIApp:
     # Multiple Jackson-typed fields so observations cross the threshold during coverage.
-    spec = build_schema(
+    return flask_app(
         {
             "/users": {
                 "post": {
@@ -606,11 +601,9 @@ def jackson_typed_planted_bug() -> OpenAPIApp:
                     },
                 }
             }
-        }
+        },
+        _register_jackson_typed_handler,
     )
-    app = make_flask_app_from_schema(spec)
-    _register_jackson_typed_handler(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 def jackson_typed_planted_bug_ref_bundled() -> OpenAPIApp:

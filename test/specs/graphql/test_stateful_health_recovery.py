@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import pytest
 
+from test.apps.catalog.graphql import bookstore
+
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
 
 # Need enough scenarios to exercise the per-operation demote path while other resolvers stay healthy.
 def test_one_slow_resolver_does_not_abort_stateful_phase(ctx, cli):
-    api = ctx.graphql.apps.slow_mutation()
+    api = ctx.graphql.serve(bookstore.slow_mutation())
     result = cli.run(
         api.schema_url,
         "--phases=stateful",

@@ -278,7 +278,7 @@ def test_wfc_login_custom_headers(cli, ctx, tmp_path):
 
 
 def test_wfc_login_non_2xx(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.wfc_login_failing()
+    api = ctx.openapi.serve(wfc_apps.wfc_login_failing())
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=_token())}]})
 
     result = _run_wfc(cli, api, auth, max_examples=1)
@@ -1183,7 +1183,7 @@ def test_escalating_provider_exposes_its_caching_providers(ctx, tmp_path):
 def test_expired_token_is_refreshed_for_a_multi_user_document(cli, ctx, tmp_path):
     # The identity stays valid; only its token dies. Without reactive reauth the run replays the dead
     # token for the rest of the budget instead of logging in again.
-    api = ctx.openapi.apps.wfc_expiring_token()
+    api = ctx.openapi.serve(wfc_apps.wfc_expiring_token())
     auth = _write(tmp_path, EXPIRING_AUTH)
 
     cli.run(api.schema_url, f"--auth-wfc={auth}", "--phases=examples")
@@ -1291,7 +1291,7 @@ def test_case_without_credentials_does_not_move_the_identity(ctx, app_runner, tm
 
 def test_identity_refused_before_accounts_exist_is_retried(cli, ctx, tmp_path):
     # An API may create its accounts mid-run, so a 401 from before then says nothing about the identity.
-    api = ctx.openapi.apps.wfc_accounts_seeded_later()
+    api = ctx.openapi.serve(wfc_apps.wfc_accounts_seeded_later())
     auth = _write(tmp_path, {"auth": [ROLE_AUTH["auth"][2], ROLE_AUTH["auth"][0], ROLE_AUTH["auth"][1]]})
 
     cli.run(
@@ -1427,7 +1427,7 @@ def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
 
 def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path):
     # A 403 reached authorization; dropping credentials only earns a 401, so it is not an improvement.
-    api = ctx.openapi.apps.wfc_role_gated_401_when_anonymous()
+    api = ctx.openapi.serve(wfc_apps.wfc_role_gated_401_when_anonymous())
     auth = _write(tmp_path, ROLE_AUTH)
 
     cli.run(api.schema_url, "--max-examples=12", "--phases=fuzzing", f"--auth-wfc={auth}", "-c", "not_a_server_error")
@@ -1443,7 +1443,7 @@ def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path
 
 def test_credentials_that_never_work_reach_anonymous_early(cli, ctx, tmp_path):
     # Walking every identity first spends a short run discovering what the second request could show.
-    api = ctx.openapi.apps.wfc_credentials_rejected()
+    api = ctx.openapi.serve(wfc_apps.wfc_credentials_rejected())
     auth = _write(tmp_path, ROLE_AUTH)
 
     cli.run(api.schema_url, "--max-examples=2", f"--auth-wfc={auth}", "--phases=fuzzing")

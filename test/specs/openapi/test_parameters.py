@@ -17,6 +17,7 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
+from test.apps.catalog.openapi import basic
 from test.utils import assert_requests_call, run_given
 
 
@@ -430,7 +431,7 @@ def test_null_body(ctx):
 
 def test_read_only(ctx):
     # When API operation has `readOnly` properties
-    api = ctx.openapi.apps.read_only()
+    api = ctx.openapi.serve(basic.read_only())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     @run_given(case=schema["/api/read_only"]["GET"].as_strategy(), max_examples=1)
@@ -443,7 +444,7 @@ def test_read_only(ctx):
 
 def test_write_only(ctx):
     # When API operation has `writeOnly` properties
-    api = ctx.openapi.apps.write_only()
+    api = ctx.openapi.serve(basic.write_only())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     @run_given(case=schema["/api/write_only"]["POST"].as_strategy(), max_examples=1)

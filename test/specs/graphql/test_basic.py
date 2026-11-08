@@ -46,6 +46,7 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.transport.prepare import get_default_headers
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
+from test.apps.catalog.graphql import bookstore
 from test.utils import assert_requests_call, check_context, run_given
 
 
@@ -779,7 +780,7 @@ def test_ignored_checks(ctx, check):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_phase_cli(ctx, cli, snapshot_cli):
-    api = ctx.graphql.apps.coverage_inputs()
+    api = ctx.graphql.serve(bookstore.coverage_inputs())
     assert cli.run(api.schema_url, "--phases=coverage", "--checks=all") == snapshot_cli
 
 

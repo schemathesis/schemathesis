@@ -6,6 +6,7 @@ import pytest
 from flask import jsonify, request
 
 from schemathesis.generation.modes import GenerationMode
+from test.apps.catalog.openapi import basic
 from test.pytest.utils import has_hypothesis_failure_header
 
 
@@ -1254,7 +1255,7 @@ def test(case):
     ),
 )
 def test_filter_combination(ctx, testdir, filter, expected):
-    api = ctx.openapi.apps.success_text_and_write_only()
+    api = ctx.openapi.serve(basic.success_text_and_write_only())
     testdir.make_test(f"""
 config = schemathesis.Config.from_dict({{
     "operations": [{{

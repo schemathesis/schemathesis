@@ -3,6 +3,8 @@ import uuid
 import pytest
 from flask import abort, jsonify, request
 
+from test.apps.catalog.openapi import basic
+
 
 def _object_schema(properties, *, required=None, **extra):
     schema = {"type": "object", "properties": properties, **extra}
@@ -529,7 +531,7 @@ def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_cli, ctx):
     # Pool-seeded body with only a subset of required fields must not trigger positive_data_acceptance.
-    api = ctx.openapi.apps.sessions_and_log_event()
+    api = ctx.openapi.serve(basic.sessions_and_log_event())
 
     assert (
         cli.run(

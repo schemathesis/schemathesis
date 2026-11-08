@@ -25,6 +25,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.run import relay_events
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
+from test.apps.catalog.openapi import basic
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
 
@@ -271,10 +272,10 @@ def _fail_generation(case):
 
 
 @pytest.mark.parametrize(
-    ("app", "transform", "expected"),
+    ("factory", "transform", "expected"),
     [
         (
-            "success_and_failure",
+            basic.success_and_failure,
             _reject,
             [
                 events.NonFatalError(error=Unsatisfiable(), phase=None, label=label, related_to_operation=True)
@@ -282,7 +283,7 @@ def _fail_generation(case):
             ],
         ),
         (
-            "path_variable",
+            basic.path_variable,
             _fail_generation,
             [
                 events.NonFatalError(
@@ -296,8 +297,8 @@ def _fail_generation(case):
     ],
     ids=["unsatisfiable", "generation-error"],
 )
-def test_fuzz_preflight_excludes_all_operations(ctx, app, transform, expected):
-    api = getattr(ctx.openapi.apps, app)()
+def test_fuzz_preflight_excludes_all_operations(ctx, factory, transform, expected):
+    api = ctx.openapi.serve(factory())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     @schema.hook

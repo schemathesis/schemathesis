@@ -12,6 +12,7 @@ from schemathesis.core.errors import InvalidRegexPattern, InvalidRegexType, Inva
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.checks import negative_data_rejection
+from test.apps.catalog.openapi import basic
 from test.engine.helpers import (
     raise_invalid_argument,
     raise_keyboard_interrupt,
@@ -447,7 +448,7 @@ def test_coverage_phase_negative_multiple_of_with_float_bounds(ctx, app_runner):
 
 
 def test_coverage_phase_negative_empty_array_path_parameter(ctx):
-    api = ctx.openapi.apps.array_path_variable()
+    api = ctx.openapi.serve(basic.array_path_variable())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     stream = EventStream(

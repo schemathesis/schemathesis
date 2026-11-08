@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from test.apps.catalog.graphql import bookstore
+
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
 
@@ -75,7 +77,7 @@ def test_generic_id_planted_bug_findability(ctx, cli, snapshot_cli, filter_args,
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_input_object_planted_bug_findability(ctx, cli, snapshot_cli, config):
-    api = ctx.graphql.apps.input_object_pool()
+    api = ctx.graphql.serve(bookstore.input_object_pool())
     assert (
         cli.run(
             api.schema_url,
@@ -99,7 +101,7 @@ def test_input_object_planted_bug_findability(ctx, cli, snapshot_cli, config):
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_list_argument_planted_bug_findability(ctx, cli, snapshot_cli, config):
-    api = ctx.graphql.apps.list_argument_pool()
+    api = ctx.graphql.serve(bookstore.list_argument_pool())
     assert (
         cli.run(
             api.schema_url,
@@ -144,7 +146,7 @@ def test_non_id_pool_planted_bug_findability(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_tombstone_planted_bug_findability(ctx, cli, snapshot_cli, config):
     # Tombstones evict deleted ids so updateBook draws from still-existing books and finds the planted bug.
-    api = ctx.graphql.apps.tombstone_pool()
+    api = ctx.graphql.serve(bookstore.tombstone_pool())
     assert (
         cli.run(
             api.schema_url,
