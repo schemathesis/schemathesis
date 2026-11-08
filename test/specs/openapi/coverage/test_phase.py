@@ -7850,7 +7850,9 @@ def test_coverage_array_above_max_items_with_draft_mismatch_sibling(ctx):
         },
         path="/r",
     )["/r"]["post"]
-    for case in scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.ARRAY_ABOVE_MAX_ITEMS):
+    cases = scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.ARRAY_ABOVE_MAX_ITEMS)
+    assert cases
+    for case in cases:
         body_t = case.body.get("t") if isinstance(case.body, dict) else None
         assert body_t is not None and len(body_t) > 3, (
             f"ARRAY_ABOVE_MAX_ITEMS mutation produced a body within bounds: {case.body!r}"
