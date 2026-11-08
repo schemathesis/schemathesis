@@ -24,14 +24,12 @@ def test_lone_surrogate_in_check_message(cli, ctx, exception, prefix):
     def echo():
         return Response(json.dumps({"error": "rejected: \udc4b"}), status=400, content_type="application/json")
 
-    with ctx.restore_checks():
+    @schemathesis.check
+    def surface_rejected_value(ctx, response, case):
+        if response.status_code >= 400:
+            raise exception(f"{prefix} {response.json()['error']}")
 
-        @schemathesis.check
-        def surface_rejected_value(ctx, response, case):
-            if response.status_code >= 400:
-                raise exception(f"{prefix} {response.json()['error']}")
-
-        result = cli.run_openapi_app(app, "--checks=surface_rejected_value", "--max-examples=5")
+    result = cli.run_openapi_app(app, "--checks=surface_rejected_value", "--max-examples=5")
 
     assert result.exception is None or isinstance(result.exception, SystemExit), result.exception
     assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
@@ -39,7 +37,7 @@ def test_lone_surrogate_in_check_message(cli, ctx, exception, prefix):
 
 
 @pytest.mark.parametrize("value", ["ok", "쑅"], ids=["ascii", "non-ascii"])
-def test_output_on_cp1252_stdout(ctx, app_runner, value):
+def test_output_on_cp1252_stdout(ctx, app_runner, tmp_path, value):
     # A stdout that cannot represent the output is normal on Windows and when piping to a file.
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -61,6 +59,7 @@ def test_output_on_cp1252_stdout(ctx, app_runner, value):
 
     result = subprocess.run(
         [sys.executable, "-m", "schemathesis.cli", "run", app_runner.openapi_url(app), "--max-examples=1"],
+        cwd=tmp_path,
         capture_output=True,
         text=True,
         encoding="cp1252",

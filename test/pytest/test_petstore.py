@@ -23,7 +23,7 @@ def testdir(request, testdir):
     return testdir
 
 
-@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_pet(testdir):
     testdir.make_petstore_test(
         """

@@ -1,7 +1,5 @@
 import pytest
 
-from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
-
 _ENSURE_REACHABILITY = """
 @schemathesis.check
 class EnsureReachability:
@@ -23,8 +21,8 @@ class EnsureReachability:
 
 
 @pytest.fixture
-def ensure_reachability_module(ctx, restore_checks):
-    yield ctx.write_pymodule(_ENSURE_REACHABILITY)
+def ensure_reachability_module(ctx):
+    return ctx.write_pymodule(_ENSURE_REACHABILITY)
 
 
 _UNSORTED_RUN_CHECK_FAILURES = """
@@ -56,10 +54,21 @@ class ARunCheck:
 
 
 @pytest.fixture
-def unsorted_run_check_failures_module(ctx, restore_checks):
-    yield ctx.write_pymodule(_UNSORTED_RUN_CHECK_FAILURES)
+def unsorted_run_check_failures_module(ctx):
+    return ctx.write_pymodule(_UNSORTED_RUN_CHECK_FAILURES)
 
 
 @pytest.fixture
-def reset_feedback_pipeline():
-    _reset_pipeline_for_tests()
+def with_error(ctx):
+    return ctx.write_pymodule(
+        """
+@schemathesis.check
+def with_error(ctx, response, case):
+    1 / 0
+"""
+    )
+
+
+@pytest.fixture
+def cassette_path(tmp_path):
+    return tmp_path / "output.yaml"

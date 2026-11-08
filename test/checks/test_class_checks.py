@@ -40,14 +40,14 @@ def _register(name, methods):
     ],
     ids=["both", "response-only", "run-only"],
 )
-def test_classification(restore_checks, methods, as_response, as_run):
+def test_classification(methods, as_response, as_run):
     _register("Check", methods)
     run_checks = RunChecks.from_registry(_EMPTY_CONFIG)
     assert [name for name, *_ in run_checks.for_responses()] == (["Check"] if as_response else [])
     assert [name for name, _ in run_checks.for_run()] == (["Check"] if as_run else [])
 
 
-def test_after_run_failures_are_distinct_per_check(ctx, restore_checks):
+def test_after_run_failures_are_distinct_per_check(ctx):
     @schemathesis.check
     class CheckA:
         def after_run(self, ctx):
@@ -71,7 +71,7 @@ def test_after_run_failures_are_distinct_per_check(ctx, restore_checks):
     [({"X-Token": "secret"}, {"x-token": "secret"}), (None, None)],
     ids=["headers-configured", "no-headers"],
 )
-def test_after_run_receives_run_settings(ctx, restore_checks, headers, expected_headers):
+def test_after_run_receives_run_settings(ctx, headers, expected_headers):
     received = []
 
     @schemathesis.check
@@ -88,7 +88,7 @@ def test_after_run_receives_run_settings(ctx, restore_checks, headers, expected_
     assert received == [(("user", "pass"), expected_headers, {"timeout": 5})]
 
 
-def test_after_run_errors_become_failures(ctx, restore_checks):
+def test_after_run_errors_become_failures(ctx):
     @schemathesis.check
     class Broken:
         def after_run(self, ctx):
@@ -109,13 +109,13 @@ def test_after_run_errors_become_failures(ctx, restore_checks):
     ]
 
 
-def test_reregistering_check_from_same_module_is_allowed(restore_checks):
+def test_reregistering_check_from_same_module_is_allowed():
     schemathesis.check(type("Dup", (), {"__module__": "pkg_a", "after_run": lambda self, ctx: None}))
     schemathesis.check(type("Dup", (), {"__module__": "pkg_a", "after_run": lambda self, ctx: None}))
     assert "Dup" in RunChecks.from_registry(_EMPTY_CONFIG).instances
 
 
-def test_check_name_collision_with_builtin_raises(restore_checks):
+def test_check_name_collision_with_builtin_raises():
     with pytest.raises(IncorrectUsage, match="already registered"):
         schemathesis.check(type("not_a_server_error", (), {"after_response": lambda self, c, r, ca: None}))
 
@@ -126,13 +126,13 @@ def test_get_by_name_does_not_mutate_unknown():
     assert "SomeClassCheck" not in config._unknown
 
 
-def test_unknown_check_name_in_config_raises(restore_checks):
+def test_unknown_check_name_in_config_raises():
     config = ChecksConfig.from_dict({"DefinitelyNotARegisteredCheck": {"threshold": 0.5}})
     with pytest.raises(ConfigError, match="DefinitelyNotARegisteredCheck"):
         RunChecks.from_registry(config)
 
 
-def test_function_check_is_not_instantiated(restore_checks):
+def test_function_check_is_not_instantiated():
     @schemathesis.check
     def plain(ctx, response, case):
         return None
@@ -159,7 +159,7 @@ def test_function_check_is_not_instantiated(restore_checks):
     ],
     ids=["unknown-method", "no-method", "wrong-arity"],
 )
-def test_invalid_class_is_rejected(restore_checks, methods, match):
+def test_invalid_class_is_rejected(methods, match):
     with pytest.raises(IncorrectUsage, match=re.escape(match)):
         _register("Invalid", methods)
 
@@ -173,12 +173,12 @@ def test_invalid_class_is_rejected(restore_checks, methods, match):
     ],
     ids=["var-positional", "var-keyword", "non-callable-after-attribute"],
 )
-def test_valid_class_is_accepted(restore_checks, methods):
+def test_valid_class_is_accepted(methods):
     _register("Valid", methods)
     assert "Valid" in RunChecks.from_registry(_EMPTY_CONFIG).instances
 
 
-def test_check_receives_config_kwargs(restore_checks):
+def test_check_receives_config_kwargs():
     received = {}
 
     @schemathesis.check
@@ -194,7 +194,7 @@ def test_check_receives_config_kwargs(restore_checks):
     assert received["threshold"] == 0.9
 
 
-def test_check_uses_default_when_no_config_kwargs(restore_checks):
+def test_check_uses_default_when_no_config_kwargs():
     received = {}
 
     @schemathesis.check
@@ -209,7 +209,7 @@ def test_check_uses_default_when_no_config_kwargs(restore_checks):
     assert received["threshold"] == 0.1
 
 
-def test_disabled_check_is_not_instantiated(restore_checks):
+def test_disabled_check_is_not_instantiated():
     @schemathesis.check
     class Disabled:
         def __init__(self):
@@ -225,7 +225,7 @@ def test_disabled_check_is_not_instantiated(restore_checks):
     assert "Disabled" not in run_checks.instances
 
 
-def test_check_init_unknown_kwargs_raise_error(restore_checks):
+def test_check_init_unknown_kwargs_raise_error():
     @schemathesis.check
     class NoKwargs:
         def __init__(self):
@@ -245,7 +245,7 @@ def test_check_init_unknown_kwargs_raise_error(restore_checks):
         RunChecks.from_registry(config=config)
 
 
-def test_check_with_var_kwargs_accepts_any_config_kwargs(restore_checks):
+def test_check_with_var_kwargs_accepts_any_config_kwargs():
     received = {}
 
     @schemathesis.check
@@ -261,7 +261,7 @@ def test_check_with_var_kwargs_accepts_any_config_kwargs(restore_checks):
     assert received == {"threshold": 0.5, "extra": "yes"}
 
 
-def test_check_init_unknown_key_with_one_known_shows_singular(restore_checks):
+def test_check_init_unknown_key_with_one_known_shows_singular():
     @schemathesis.check
     class OneKnown:
         def __init__(self, *, threshold: float = 0.1):
@@ -275,7 +275,7 @@ def test_check_init_unknown_key_with_one_known_shows_singular(restore_checks):
         RunChecks.from_registry(config=config)
 
 
-def test_check_init_unknown_key_with_multiple_known_shows_plural(restore_checks):
+def test_check_init_unknown_key_with_multiple_known_shows_plural():
     @schemathesis.check
     class TwoKnown:
         def __init__(self, *, min_count: int = 1, threshold: float = 0.1):
@@ -289,12 +289,12 @@ def test_check_init_unknown_key_with_multiple_known_shows_plural(restore_checks)
         RunChecks.from_registry(config=config)
 
 
-def test_custom_kwargs_populated_from_checks_config_from_dict(restore_checks):
+def test_custom_kwargs_populated_from_checks_config_from_dict():
     config = ChecksConfig.from_dict({"MyCheck": {"threshold": 0.9, "enabled": True}})
     assert config.custom_kwargs == {"MyCheck": {"threshold": 0.9}}
 
 
-def test_check_init_exception_wrapped_in_config_error(restore_checks):
+def test_check_init_exception_wrapped_in_config_error():
     @schemathesis.check
     class Broken:
         def __init__(self):
@@ -307,7 +307,7 @@ def test_check_init_exception_wrapped_in_config_error(restore_checks):
         RunChecks.from_registry(_EMPTY_CONFIG)
 
 
-def test_standalone_validation_passes_case_phase_to_class_check(ctx, response_factory, restore_checks):
+def test_standalone_validation_passes_case_phase_to_class_check(ctx, response_factory):
     seen_phases = []
 
     @schemathesis.check
@@ -337,7 +337,7 @@ def test_standalone_validation_passes_case_phase_to_class_check(ctx, response_fa
     assert seen_phases == [PhaseName.FUZZING]
 
 
-def test_class_based_check_fires_exactly_once_in_validate_response(ctx, response_factory, restore_checks):
+def test_class_based_check_fires_exactly_once_in_validate_response(ctx, response_factory):
     call_count = []
 
     @schemathesis.check
@@ -366,7 +366,7 @@ def test_max_response_time_runs_in_validate_response(ctx, response_factory):
     assert any(isinstance(failure, ResponseTimeExceeded) for failure in exc.value.exceptions)
 
 
-def test_disabled_class_based_check_skipped_in_validate_response(ctx, response_factory, restore_checks):
+def test_disabled_class_based_check_skipped_in_validate_response(ctx, response_factory):
     called = []
 
     @schemathesis.check

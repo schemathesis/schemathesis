@@ -9,13 +9,10 @@ from types import SimpleNamespace
 
 import pytest
 from flask import Response, jsonify, request
-from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.checks import CHECKS
 from schemathesis.cli.constants import ExitCode
 from schemathesis.engine import events
-from schemathesis.graphql import nodes
 from schemathesis.reporting.html.model import PhaseSpan
 from schemathesis.reporting.html.render import humanize_duration
 from schemathesis.reporting.html.timeline import (
@@ -33,7 +30,6 @@ from schemathesis.reporting.html.timeline import (
     short_duration,
     tick_groups,
 )
-from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
 from test.apps.catalog.openapi.modifiers.stateful import FailAfterRequests
 
 
@@ -689,10 +685,6 @@ def checks_with_similar_names():
     def bad__body(ctx, response, case):
         raise AssertionError("bad")
 
-    yield
-    CHECKS.unregister("bad_body")
-    CHECKS.unregister("bad__body")
-
 
 @pytest.mark.usefixtures("checks_with_similar_names")
 def test_html_report_failure_kinds_with_similar_titles(ctx, cli, report_dir):
@@ -1151,17 +1143,9 @@ def test_html_report_ignored_auth(ctx, cli, app_runner, report_dir, snapshot_htm
     assert html == snapshot_html
 
 
-def test_html_report_timeout_error(ctx, cli, app_runner, report_dir, snapshot_html):
-    app, _ = ctx.openapi.make_flask_app({"/api/slow": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    @app.route("/api/slow")
-    def slow():
-        time.sleep(1)
-        return jsonify({})
-
-    html = run_with_report(
-        cli, report_dir, app_runner.openapi_url(app), "--request-timeout=0.1", exit_code=ExitCode.FAILURES
-    )
+def test_html_report_timeout_error(ctx, cli, report_dir, snapshot_html):
+    api = ctx.openapi.apps.slow()
+    html = run_with_report(cli, report_dir, api.schema_url, "--request-timeout=0.1", exit_code=ExitCode.FAILURES)
     assert html == snapshot_html
 
 
@@ -1189,13 +1173,6 @@ def test_html_report_multiline_warning_tip(ctx, cli, report_dir, snapshot_html):
     html = run_with_report(cli, report_dir, api.schema_url, "--checks=not_a_server_error", phases="examples,fuzzing")
     assert html == snapshot_html
     assert "white-space:pre-wrap" in re.search(r"\.w-tip\{([^}]*)\}", html).group(1)
-
-
-@pytest.fixture
-def book_id_scalar():
-    schemathesis.graphql.scalar("BookID", st.uuids().map(str).map(nodes.String))
-    yield
-    CUSTOM_SCALARS.clear()
 
 
 # Generated titles differ between runs, so only the step labels are compared.

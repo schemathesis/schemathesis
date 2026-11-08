@@ -92,16 +92,6 @@ def test_junitxml_file(ctx, cli, hypothesis_max_examples, tmp_path, path, in_con
     )
 
 
-@pytest.fixture
-def with_error(ctx):
-    with ctx.check("""
-@schemathesis.check
-def with_error(ctx, response, case):
-    1 / 0
-""") as module:
-        yield module
-
-
 @pytest.mark.skipif(
     platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",

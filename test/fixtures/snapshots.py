@@ -69,14 +69,6 @@ def _collapse_tracebacks(data: str) -> str:
 @dataclass
 class CliSnapshotConfig:
     request: FixtureRequest
-    replace_server_host: bool = True
-    replace_tmp_dir: bool = True
-    replace_duration: bool = True
-    replace_error_codes: bool = True
-    replace_test_case_id: bool = True
-    replace_uuid: bool = True
-    replace_response_time: bool = True
-    replace_seed: bool = True
     replace_reproduce_with: bool = False
     replace_test_cases: bool = True
     replace_generated: bool = False
@@ -111,9 +103,9 @@ class CliSnapshotConfig:
         flagged = [
             (self.replace_test_cases, _mask_test_cases),
             (self.replace_generated, _mask_generated),
-            (self.replace_server_host, self._mask_server_host),
+            (True, self._mask_tmp_dir_uri),
             (True, _mask_local_ports),
-            (self.replace_tmp_dir, self._mask_tmp_dir),
+            (True, self._mask_tmp_dir),
             (True, _mask_config_path),
             (True, _mask_environment),
             (True, _mask_fuzz_counters),
@@ -122,14 +114,14 @@ class CliSnapshotConfig:
             (True, partial(_mask_stateful_counts, links=self.replace_stateful_statistic)),
             (self.replace_traceback, _collapse_tracebacks),
             (True, _drop_traceback_noise),
-            (self.replace_error_codes, normalize_connection_errors),
-            (self.replace_duration, _mask_durations),
+            (True, normalize_connection_errors),
+            (True, _mask_durations),
             (self.remove_last_line, _drop_last_line),
-            (self.replace_test_case_id, _mask_test_case_ids),
+            (True, _mask_test_case_ids),
             # A seed can be 32 decimal digits, which also reads as a hex UUID.
-            (self.replace_seed, _mask_seed),
-            (self.replace_uuid, _mask_uuids),
-            (self.replace_response_time, _mask_slow_response_time),
+            (True, _mask_seed),
+            (True, _mask_uuids),
+            (True, _mask_slow_response_time),
             (True, _mask_random_values),
             (self.replace_invalid_component, _mask_invalid_component),
             (self.replace_reproduce_with, _mask_reproduce_commands),
@@ -137,12 +129,7 @@ class CliSnapshotConfig:
         ]
         return [step for enabled, step in flagged if enabled]
 
-    def _mask_server_host(self, data: str) -> str:
-        if "server_host" in self.request.fixturenames:
-            try:
-                data = data.replace(self.request.getfixturevalue("server_host"), "127.0.0.1")
-            except LookupError:
-                pass
+    def _mask_tmp_dir_uri(self, data: str) -> str:
         with keep_cwd():
             return data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
 
@@ -345,7 +332,7 @@ def _mask_invalid_component(data: str) -> str:
 
 def _mask_reproduce_commands(data: str) -> str:
     # One placeholder per run of curl lines and the identity labels above them: a stateful reproduction
-    # has a varying number of steps. The `st replay <id>` line is masked separately by `replace_test_case_id`.
+    # has a varying number of steps. The `st replay <id>` line is masked separately.
     lines = []
     seen = False
     # Blank lines after a command, held back until the next line shows whether the run goes on.

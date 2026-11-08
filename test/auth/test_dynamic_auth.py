@@ -29,7 +29,7 @@ from schemathesis.specs.openapi.auths import (
     DynamicTokenAuthProvider,
     HttpBearerAuthProvider,
 )
-from test.utils import refusing_url, silent_url
+from test.utils import refusing_url
 
 OAUTH2_SCHEME = {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}}
 
@@ -283,13 +283,12 @@ def test_fetch_http_goes_through_configured_proxy(ctx, app_runner):
         assert _token_provider().get(operation.Case(), AuthContext(operation=operation, app=None)) == "test-token"
 
 
-def test_fetch_http_times_out_without_configured_timeout(ctx):
+def test_fetch_http_times_out_without_configured_timeout(ctx, silent_url):
     schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
     operation = schema["/data"]["GET"]
-    with silent_url() as url:
-        schema.config.update(base_url=url)
-        with pytest.raises(AuthenticationError, match="Read timed out"):
-            _token_provider().get(operation.Case(), AuthContext(operation=operation, app=None))
+    schema.config.update(base_url=silent_url)
+    with pytest.raises(AuthenticationError, match="Read timed out"):
+        _token_provider().get(operation.Case(), AuthContext(operation=operation, app=None))
 
 
 @pytest.mark.parametrize(

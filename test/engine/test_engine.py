@@ -1032,7 +1032,7 @@ def test_stateful_cycles_release_their_state_machines(ctx):
     assert ([cycle.status for cycle in cycles], machines) == ([Status.SUCCESS, Status.SUCCESS], [])
 
 
-def test_max_time_keeps_operation_errors_visible(ctx, restore_checks):
+def test_max_time_keeps_operation_errors_visible(ctx):
     # Running out of the operation's share does not undo the errors it already produced.
     @schemathesis.check
     def boom(ctx, response, case):
@@ -1313,7 +1313,6 @@ def test_graphql(ctx):
             assert case.value.operation.label == expected
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_interrupted_in_test(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -1929,7 +1928,6 @@ def test_max_time_stops_reserving_for_a_phase_that_only_skips(ctx):
     assert [event.status for event in stateful].count(Status.SKIP) <= 1, len(stateful)
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runner):
     # Workers finish moments apart; the one that lands after the deadline is still work that happened.
     app, _ = ctx.openapi.make_flask_app(
@@ -2010,7 +2008,6 @@ def test_max_failures_counts_a_repeated_failure_once(ctx):
     assert stream.finished.stop_reason == StopReason.MAX_TIME
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
     # Ctrl-C and a spent budget both stop the run; only the budget is a planned finish.
     @schemathesis.check
@@ -2310,7 +2307,6 @@ def test_max_time_stops_reserving_once_stateful_proves_idle(ctx, app_runner):
     assert len(fuzzing) <= 3, len(fuzzing)
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner):
     # A retry that starts with the budget already gone issues no request, so it vouches for nothing.
     app, _ = ctx.openapi.make_flask_app(linked_users())

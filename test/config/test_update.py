@@ -56,7 +56,7 @@ def test_non_integer_max_examples_rejected(config):
     )
 
 
-def test_included_check_names_disables_unlisted_custom_checks(config, restore_checks):
+def test_included_check_names_disables_unlisted_custom_checks(config):
     @schemathesis.check
     def custom_check_a(ctx, response, case):
         pass

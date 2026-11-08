@@ -325,7 +325,7 @@ def test_violations_in_one_response_are_one_fault_per_check(ctx, cli, tmp_path):
     ]
 
 
-def test_failures_without_wfc_category_are_left_out(ctx, cli, tmp_path, restore_checks):
+def test_failures_without_wfc_category_are_left_out(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
         """

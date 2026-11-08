@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import queue
 import threading
 import time
 import uuid
@@ -26,7 +27,6 @@ from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
-from test.engine._late_put import attach_late_put
 
 
 def _make_flaky_repro_schema(ctx):
@@ -488,7 +488,6 @@ def test_fuzz_multiple_workers_emit_distinct_worker_ids(ctx):
     assert worker_ids == {0, 1}
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_fuzz_scenario_interrupted_status(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -501,7 +500,6 @@ def test_fuzz_scenario_interrupted_status(ctx):
     assert _finished_scenarios(collected, status=Status.INTERRUPTED)
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_fuzz_scenario_error_status(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -654,7 +652,6 @@ def test_fuzz_exception_thrown_into_stream_stops_workers(ctx):
     assert raised == [error]
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_fuzz_runs_class_based_checks(ctx):
     seen = []
 
@@ -902,7 +899,21 @@ def test_relay_events_drains_event_put_right_before_worker_exit():
     exited.join()
     event_queue: Queue = Queue()
     late_event = events.EngineStarted()
-    attach_late_put(event_queue, late_event)
+    original_get = event_queue.get
+    planted = []
+
+    # The worker's final put lands right after `get(timeout=...)` gave up with Empty.
+    def get(block: bool = True, timeout: float | None = None) -> events.EngineEvent:
+        try:
+            return original_get(block, timeout)
+        except queue.Empty:
+            if not planted:
+                planted.append(late_event)
+                event_queue.put(late_event)
+            raise
+
+    # Replacing a bound method on one instance is the only way to hook into this exact moment.
+    event_queue.get = get  # type: ignore[method-assign]
 
     assert list(relay_events(event_queue, [exited], timeout=0.01)) == [late_event]
 

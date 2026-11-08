@@ -1712,7 +1712,6 @@ def test_replay_reruns_recorded_check_disabled_in_config(cli, app_runner, ctx, c
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.usefixtures("restore_checks")
 def test_replay_check_raising_unexpected_error_is_errored_not_crash(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):

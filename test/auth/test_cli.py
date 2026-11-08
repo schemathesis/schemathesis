@@ -173,7 +173,7 @@ def after_call(context, case, response):
 
 @pytest.fixture
 def verify_auth(ctx):
-    with ctx.check("""
+    return ctx.write_pymodule("""
 @schemathesis.check
 def verify_auth(ctx, response, case):
     request_authorization = response.request.headers.get("Authorization")
@@ -182,15 +182,14 @@ def verify_auth(ctx, response, case):
     if case.operation.path == "/api/success":
         expected = f"Bearer {TOKEN_2}"
     assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
-    """) as module:
-        yield module
+    """)
 
 
 @pytest.mark.usefixtures("verify_auth")
 def test_conditional(ctx, cli, snapshot_cli):
     # When the user sets up multiple auths applied to different API operations
     api = ctx.openapi.apps.success_and_text()
-    with ctx.check("""
+    module = ctx.write_pymodule("""
 TOKEN_1 = "ABC"
 
 @schemathesis.auth().apply_to(method="GET", path="/api/text")
@@ -221,9 +220,9 @@ def verify_auth(ctx, response, case):
     if case.operation.path == "/api/success":
         expected = f"Bearer {TOKEN_2}"
     assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
-    """) as module:
-        # Then all auths should be properly applied
-        assert cli.main("run", api.schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
+    """)
+    # Then all auths should be properly applied
+    assert cli.main("run", api.schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
 
 
 @pytest.mark.filterwarnings("error")

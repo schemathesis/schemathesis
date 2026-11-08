@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -12,15 +11,12 @@ import yaml
 from flask import Flask
 
 import schemathesis
-from schemathesis.checks import CHECKS
 from test.apps import builders
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
-from test.apps.catalog.openapi import confluent as openapi_confluent
 from test.apps.catalog.openapi import envelopes as openapi_envelopes
 from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import nested as openapi_nested
-from test.apps.catalog.openapi import restler as openapi_restler
 from test.apps.catalog.openapi import sign_up as openapi_sign_up
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
@@ -298,11 +294,8 @@ class OpenAPIApps:
     def wfc_login_plain(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_login_plain())
 
-    def wfc_role_gated(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_role_gated())
-
-    def wfc_role_gated_401(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_wfc.wfc_role_gated_401())
+    def wfc_role_gated(self, deny_status: int = 403) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_role_gated(deny_status=deny_status))
 
     def wfc_role_gated_401_when_anonymous(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_role_gated_401_when_anonymous())
@@ -418,7 +411,7 @@ class OpenAPIApps:
         return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.MARSHMALLOW))
 
     def confluent_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_confluent.planted_bug())
+        return _start(self.parent, openapi_error_feedback.confluent_planted_bug())
 
     def flask_rest_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.FLASK_REST))
@@ -427,7 +420,7 @@ class OpenAPIApps:
         return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.LITESTAR))
 
     def restler_planted_bug(self) -> OpenAPIServer:
-        return _start(self.parent, openapi_restler.planted_bug())
+        return _start(self.parent, openapi_error_feedback.restler_planted_bug())
 
     def swagger_v2_baseline(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.baseline())
@@ -785,31 +778,6 @@ class Context:
         pkgroot = module.dirpath()
         module._ensuresyspath(True, pkgroot)
         return module.purebasename
-
-    @contextmanager
-    def check(self, content: str):
-        with self.restore_checks():
-            yield self.write_pymodule(content)
-
-    @contextmanager
-    def restore_checks(self):
-        names = set(CHECKS.get_all_names())
-        try:
-            yield
-        finally:
-            new_names = set(CHECKS.get_all_names()) - names
-            for name in new_names:
-                CHECKS.unregister(name)
-
-    @contextmanager
-    def hook(self, content: str):
-        yield self.write_pymodule(content)
-
-
-@pytest.fixture
-def restore_checks(ctx):
-    with ctx.restore_checks():
-        yield
 
 
 @pytest.fixture

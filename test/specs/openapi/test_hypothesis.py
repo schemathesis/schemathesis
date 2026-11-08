@@ -13,7 +13,6 @@ from jsonschema_rs import Draft4Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
-from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -25,21 +24,23 @@ from test.utils import assert_requests_call, run_given, to_float32
 
 
 @pytest.fixture
-def operation(ctx, make_openapi_3_schema):
-    raw_schema = make_openapi_3_schema(
-        body={
-            "required": True,
-            "content": {"application/json": {"schema": {"type": "string"}}},
+def operation(ctx):
+    return ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "string"}}},
+            },
+            "parameters": [
+                {"in": "path", "name": "p1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
+                {"in": "header", "name": "h1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
+                {"in": "cookie", "name": "c1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
+                {"in": "query", "name": "q1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
+            ],
+            "responses": {"200": {"description": "OK"}},
         },
-        parameters=[
-            {"in": "path", "name": "p1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
-            {"in": "header", "name": "h1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
-            {"in": "cookie", "name": "c1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
-            {"in": "query", "name": "q1", "required": True, "schema": {"type": "string", "enum": ["FOO"]}},
-        ],
     )
-    schema = ctx.openapi.load_schema(raw_schema["paths"])
-    return schema["/users"]["POST"]
 
 
 @pytest.mark.parametrize(
@@ -679,12 +680,6 @@ def test_no_much_filtering_in_headers():
         pass
 
 
-@pytest.fixture
-def clear_caches():
-    yield
-    load_file.cache_clear()
-
-
 def _remote_schema(testdir):
     testdir.makefile(".json", bar='{"bar": {"type": "integer"}}')
 
@@ -731,7 +726,6 @@ def _scoped_remote_schema(testdir):
     (subsub / "foo.json").write_text('{"foo": {"type": "integer"}}', "utf8")
 
 
-@pytest.mark.usefixtures("clear_caches")
 @pytest.mark.parametrize(
     ("setup", "check"),
     [

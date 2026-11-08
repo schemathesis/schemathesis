@@ -9,7 +9,7 @@ import schemathesis
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.graphql import nodes
-from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
+from schemathesis.specs.graphql.scalars import UnknownScalar
 from test.utils import run_given
 
 UNSUPPORTED_SCALAR_SDL = """
@@ -19,12 +19,6 @@ type Query {
   search(term: FooBar!, limit: Int!, offset: Int!, page: Int!): Int!
 }
 """
-
-
-@pytest.fixture(autouse=True)
-def clear_custom_scalars():
-    yield
-    CUSTOM_SCALARS.clear()
 
 
 def test_custom_scalar_graphql(ctx):

@@ -5,7 +5,6 @@ from collections.abc import Callable
 import hypothesis
 import hypothesis.errors
 import jsonschema_rs
-import pytest
 
 import schemathesis
 from schemathesis.core.errors import InvalidRegexPattern, InvalidRegexType, InvalidSchema, SerializationNotPossible
@@ -293,7 +292,6 @@ def test_examples_phase_fill_missing_fallback_defers_unsatisfiable(ctx):
     assert any(event.status == Status.ERROR for event in finished), [event.status for event in finished]
 
 
-@pytest.mark.usefixtures("clean_constants_registry")
 def test_examples_phase_fill_missing_does_not_draw_constants(ctx):
     @schemathesis.python.constants
     def source():

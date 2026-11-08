@@ -7,7 +7,7 @@ from test.utils import EventStream
 
 
 @pytest.mark.parametrize("method_name", ["after_run", "after_response"])
-def test_disabled_check_does_not_execute(ctx, restore_checks, method_name):
+def test_disabled_check_does_not_execute(ctx, method_name):
     called = []
 
     if method_name == "after_run":
@@ -29,7 +29,7 @@ def test_disabled_check_does_not_execute(ctx, restore_checks, method_name):
     assert not called
 
 
-def test_after_run_flags_operations_without_success(ctx, restore_checks):
+def test_after_run_flags_operations_without_success(ctx):
     @schemathesis.check
     class RequireSuccess:
         def __init__(self):
@@ -54,7 +54,7 @@ def test_after_run_flags_operations_without_success(ctx, restore_checks):
     assert not any("/api/success" in message for message in messages), messages
 
 
-def test_after_run_error_is_reported_not_crash(ctx, restore_checks):
+def test_after_run_error_is_reported_not_crash(ctx):
     @schemathesis.check
     class BoomAfterRun:
         def after_run(self, ctx):
@@ -69,7 +69,7 @@ def test_after_run_error_is_reported_not_crash(ctx, restore_checks):
     assert any("boom" in (failure.message or "") for failure in finished.failures), finished.failures
 
 
-def test_after_run_skipped_when_run_aborts(ctx, restore_checks):
+def test_after_run_skipped_when_run_aborts(ctx):
     @schemathesis.check
     class FailFast:
         def after_response(self, ctx, response, case):
@@ -91,7 +91,7 @@ def test_after_run_skipped_when_run_aborts(ctx, restore_checks):
     )
 
 
-def test_check_build_error_surfaces_as_event_not_crash(ctx, restore_checks):
+def test_check_build_error_surfaces_as_event_not_crash(ctx):
     @schemathesis.check
     class BadInit:
         def __init__(self):
@@ -108,7 +108,7 @@ def test_check_build_error_surfaces_as_event_not_crash(ctx, restore_checks):
     assert any("BadInit" in str(error.value) for error in errors), errors
 
 
-def test_class_check_lifecycle(ctx, restore_checks):
+def test_class_check_lifecycle(ctx):
     instances = []
     seen_phases = set()
     captured = {}
@@ -143,7 +143,7 @@ def test_class_check_lifecycle(ctx, restore_checks):
     assert captured["transport"] is not None
 
 
-def test_after_response_observes_stateful_phase(ctx, restore_checks):
+def test_after_response_observes_stateful_phase(ctx):
     seen_phases = set()
 
     @schemathesis.check
@@ -163,7 +163,7 @@ def test_after_response_observes_stateful_phase(ctx, restore_checks):
     assert PhaseName.STATEFUL_TESTING in seen_phases, seen_phases
 
 
-def test_after_run_runs_when_the_clock_ends_the_run(ctx, restore_checks):
+def test_after_run_runs_when_the_clock_ends_the_run(ctx):
     # Spending the whole budget is how a timed run is meant to end, not an abort that voids the checks.
     called = []
 

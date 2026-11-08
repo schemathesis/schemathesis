@@ -262,7 +262,7 @@ def test_missing_grpc_extra(tmp_path, blocked, command, source):
     assert not (tmp_path / "schemathesis-report").exists()
 
 
-def test_grpc_library_logs_kept_out_of_output(ctx):
+def test_grpc_library_logs_kept_out_of_output(ctx, tmp_path):
     server = ctx.grpc.apps.users()
     tls_target = server.target.replace("grpc://", "grpcs://")
     env = {key: value for key, value in os.environ.items() if key != "GRPC_VERBOSITY"}
@@ -278,6 +278,7 @@ def test_grpc_library_logs_kept_out_of_output(ctx):
             "--phases=fuzzing",
             "--max-examples=1",
         ],
+        cwd=tmp_path,
         env=env,
         capture_output=True,
         text=True,

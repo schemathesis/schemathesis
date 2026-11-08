@@ -4,7 +4,7 @@ Run a single catalog factory on a chosen port for manual debugging:
 
     python -m test.apps 8080 success
     python -m test.apps 8080 success_and_failure
-    python -m test.apps 8080 users_crud
+    python -m test.apps 8080 users.crud
     python -m test.apps 8080 envelopes.ajv
     python -m test.apps 8080 graphql.books
 
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import inspect
 import pkgutil
 import sys
 from functools import partial
@@ -42,22 +43,16 @@ _ENVELOPE_FACTORIES = {
     **{f"rails_{variant}": partial(envelopes.planted_bug, value) for variant, value in envelopes.RAILS.items()},
 }
 
+# Factories that need no arguments; the rest get explicit entries.
 _GRAPHQL_FACTORIES = {
-    "books": graphql_bookstore.books,
-    "federated_subgraph": graphql_bookstore.federated_subgraph,
-    "use_after_create": graphql_bookstore.use_after_create,
-    "tombstone_pool": graphql_bookstore.tombstone_pool,
-    "use_after_delete": graphql_bookstore.use_after_delete,
-    "slow_mutation": graphql_bookstore.slow_mutation,
-    "double_delete": graphql_bookstore.double_delete,
-    "generic_id_pool": graphql_bookstore.generic_id_pool,
-    "input_object_pool": graphql_bookstore.input_object_pool,
-    "list_argument_pool": graphql_bookstore.list_argument_pool,
-    "non_id_pool": graphql_bookstore.non_id_pool,
-    "bare_slug": graphql_bookstore.bare_slug,
-    "relay_connection": graphql_bookstore.relay_connection,
-    "lenient": graphql_bookstore.lenient,
-    "coverage_inputs": graphql_bookstore.coverage_inputs,
+    **{
+        name: value
+        for name, value in vars(graphql_bookstore).items()
+        if inspect.isfunction(value)
+        and value.__module__ == graphql_bookstore.__name__
+        and not name.startswith("_")
+        and all(parameter.default is not parameter.empty for parameter in inspect.signature(value).parameters.values())
+    },
     # Answers every query with no data, the shape of a server that never serves the query.
     "canned_response": partial(graphql_bookstore.canned_response, {"data": None}),
 }
@@ -114,7 +109,7 @@ def main() -> None:
         "factory",
         nargs="?",
         default="success_and_failure",
-        help="Factory name (e.g. 'success', 'users_crud', 'graphql.books').",
+        help="Factory name (e.g. 'success', 'users.crud', 'graphql.books').",
     )
     parser.add_argument("--list", action="store_true", help="List available factories and exit.")
     args = parser.parse_args()

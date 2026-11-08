@@ -1,7 +1,6 @@
 import pytest
 from _pytest.main import ExitCode
 from flask import jsonify
-from hypothesis import settings
 
 
 def test_before_call_no_kwargs_unpacking(ctx, cli):
@@ -61,16 +60,6 @@ def after_call(context, case, response):
     )
     # Then the tests should fail
     assert cli.main("run", api.schema_url, "-c", "all", hooks=module) == snapshot_cli
-
-
-@pytest.fixture
-def restore_hypothesis_profile():
-    # Hooks in these tests register and load their own profiles; later tests must keep the suite's one.
-    active = settings.get_current_profile_name()
-    original = settings.get_profile("default")
-    yield
-    settings.register_profile("default", original)
-    settings.load_profile(active)
 
 
 @pytest.mark.usefixtures("restore_hypothesis_profile")

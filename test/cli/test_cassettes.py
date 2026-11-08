@@ -22,11 +22,6 @@ from test.apps.catalog.openapi.modifiers.stateful import SlowOperations
 from test.utils import load_json_or_fail, load_ndjson, load_yaml_or_fail
 
 
-@pytest.fixture
-def cassette_path(tmp_path):
-    return tmp_path / "output.yaml"
-
-
 def load_cassette(path):
     return load_yaml_or_fail(path)
 

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("reset_feedback_pipeline")
-
 VALID_TOKEN = "real-token"
 
 

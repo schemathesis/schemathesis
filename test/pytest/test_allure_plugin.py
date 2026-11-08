@@ -3,7 +3,8 @@ from xml.etree import ElementTree
 
 import pytest
 
-from test.utils import allure_outcomes, allure_results, make_pytest_outcome_test
+from test.pytest.utils import allure_outcomes, make_pytest_outcome_test
+from test.utils import allure_results
 
 
 def _make_allure_xdist_test(testdir, *, schema_dict, base_url, reports_config, body="case.call()", imports=()):

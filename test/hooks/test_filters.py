@@ -84,7 +84,7 @@ def test_simple_filter(ctx, is_include):
 def test_map_case_filter(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # All these hooks should not be called because of the applied filter
-    with ctx.hook(
+    module = ctx.write_pymodule(
         r"""
 @schemathesis.hook.apply_to(path_regex=r"/fake/path")
 def map_case(ctx, case):
@@ -110,8 +110,8 @@ try:
 except:
     pass
 """
-    ) as module:
-        assert cli.main("run", api.schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
+    )
+    assert cli.main("run", api.schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
 
 
 def multiple_skip_for(schema):
