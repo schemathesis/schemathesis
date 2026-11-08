@@ -345,6 +345,8 @@ from test.utils import run_given
         (r"^geo:\w*\*?$", None, 10, r"^geo:\w{0,6}\*{0,1}$"),
         (r"^[a-z]{1,3}[0-9]+$", 5, 10, r"^[a-z]{1,3}[0-9]{2,9}$"),
         (r"^(a?)+b+c+$", 7, 12, r"^(a{0,1}){1,}b{1,11}c{1,11}$"),
+        # A `maxLength` at or above the regex repeat limit is no limit at all.
+        ("^a{1,5}b{1,5}$", 11, 4294967295, "^a{1,5}b{1,5}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
