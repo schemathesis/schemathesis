@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind, TypeMismatchPayload
 from schemathesis.core.error_feedback.field_inference import infer_path_from_request
 from schemathesis.core.parameters import ParameterLocation
+from test.core.error_feedback.helpers import record_400
 
 
 def _nested(value: object, depth: int, *, as_list: bool = False) -> object:
@@ -121,3 +123,151 @@ def test_attributes_matching_slot(case_factory, case_kwargs, rejected_value, exp
 def test_query_attribution_depends_on_remaining_walk_budget(case_factory, body, query, expected):
     case = case_factory(body=body, query={**query, "name": "QUERY-VALUE-2026"})
     assert infer_path_from_request(case=case, rejected_value="QUERY-VALUE-2026") == expected
+
+
+@pytest.mark.parametrize(
+    ("operation_path", "case_kwargs", "rejected_value", "type_name", "expected_location", "expected_path"),
+    [
+        # Two body fields share the rejected value -> ambiguous, no observation.
+        (
+            "/api/items",
+            {"body": {"identifier": "DELTA-2026-XYZ", "fallback_id": "DELTA-2026-XYZ", "count": 99}, "method": "POST"},
+            "DELTA-2026-XYZ",
+            "java.time.LocalDate",
+            ParameterLocation.BODY,
+            None,
+        ),
+        # Rejected value lives in a query parameter, not the body.
+        (
+            "/api/reports",
+            {"query": {"from": "dd-MM-yyyy-HHmm", "limit": "10"}, "method": "GET"},
+            "dd-MM-yyyy-HHmm",
+            "java.time.LocalDateTime",
+            ParameterLocation.QUERY,
+            ("from",),
+        ),
+        # Rejected value isn't in the request — likely a server-side default.
+        (
+            "/api/users",
+            {"body": {"name": "alice", "score": 42}, "method": "POST"},
+            "2024-01-15",
+            "java.time.LocalDate",
+            ParameterLocation.BODY,
+            None,
+        ),
+        # Nested ambiguity: same value in both `shipping.trackingNumber` and `items[0].sku`.
+        (
+            "/api/orders",
+            {
+                "body": {"shipping": {"trackingNumber": "TRK-2026-AABB"}, "items": [{"sku": "TRK-2026-AABB"}]},
+                "method": "POST",
+            },
+            "TRK-2026-AABB",
+            "java.time.LocalDate",
+            ParameterLocation.BODY,
+            None,
+        ),
+        # Distinct nested match — only one candidate.
+        (
+            "/api/orders",
+            {
+                "body": {"shipping": {"trackingNumber": "TRK-2026-AABB"}, "items": [{"sku": "DIFFERENT-VALUE"}]},
+                "method": "POST",
+            },
+            "TRK-2026-AABB",
+            "java.time.LocalDate",
+            ParameterLocation.BODY,
+            ("shipping", "trackingNumber"),
+        ),
+    ],
+    ids=[
+        "ambiguous-flat-body",
+        "query-attribution",
+        "value-not-in-request",
+        "ambiguous-nested",
+        "distinct-nested",
+    ],
+)
+def test_field_inference_attribution_through_pipeline(
+    make_operation,
+    case_factory,
+    response_factory,
+    operation_path,
+    case_kwargs,
+    rejected_value,
+    type_name,
+    expected_location,
+    expected_path,
+):
+    method = case_kwargs["method"]
+    operation = make_operation(method=method.lower(), path=operation_path)
+    case = case_factory(operation=operation, **case_kwargs)
+    response_body = {"message": f'Cannot deserialize value of type `{type_name}` from String "{rejected_value}"'}
+
+    store = ErrorFeedbackStore()
+    for _ in range(2):
+        record_400(store, operation=operation, case=case, body=response_body, response_factory=response_factory)
+
+    expected: tuple[Observation, ...] = (
+        ()
+        if expected_path is None
+        else (
+            Observation(
+                operation_label=operation.label,
+                location=expected_location,
+                parameter_path=expected_path,
+                kind=ObservationKind.TYPE_MISMATCH,
+                raw_message=response_body["message"],
+                payload=TypeMismatchPayload(type_name=type_name),
+            ),
+        )
+    )
+    assert store.observations(operation_label=operation.label, location=expected_location) == expected
+
+
+# Realistic Jackson 400 envelopes for typical Spring deployments without `INCLUDE_FIELD_PATH_IN_ERRORS`.
+_JACKSON_NO_REFERENCE_CHAIN_CASES: tuple[dict, ...] = (
+    {
+        "id": "localdate-dash-format",
+        "method": "POST",
+        "path": "/api/records",
+        "body": {"employeeId": 7, "projectId": 12, "commitDate": "dd-MM-yyyy", "comment": "x", "billable": True},
+        "response": {
+            "message": 'JSON parse error: Cannot deserialize value of type `java.time.LocalDate` from String "dd-MM-yyyy"'
+        },
+        "expected_path": ("commitDate",),
+        "expected_payload": TypeMismatchPayload(type_name="java.time.LocalDate"),
+    },
+    {
+        "id": "localdate-slash-format",
+        "method": "POST",
+        "path": "/api/profiles",
+        "body": {"name": "Alice", "hireDate": "MM/dd/yyyy", "departmentId": 3},
+        "response": {"message": 'Cannot deserialize value of type `java.time.LocalDate` from String "MM/dd/yyyy"'},
+        "expected_path": ("hireDate",),
+        "expected_payload": TypeMismatchPayload(type_name="java.time.LocalDate"),
+    },
+)
+
+
+@pytest.mark.parametrize("payload", _JACKSON_NO_REFERENCE_CHAIN_CASES, ids=lambda p: p["id"])
+def test_field_inference_jackson_envelopes_without_reference_chain(
+    payload, make_operation, case_factory, response_factory
+):
+    operation = make_operation(method=payload["method"].lower(), path=payload["path"])
+    case = case_factory(operation=operation, body=payload["body"], method=payload["method"])
+
+    store = ErrorFeedbackStore()
+    for _ in range(2):
+        record_400(store, operation=operation, case=case, body=payload["response"], response_factory=response_factory)
+
+    assert store.observations(operation_label=operation.label, location=ParameterLocation.BODY) == (
+        Observation(
+            operation_label=operation.label,
+            location=ParameterLocation.BODY,
+            parameter_path=payload["expected_path"],
+            kind=ObservationKind.TYPE_MISMATCH,
+            raw_message=payload["response"]["message"],
+            payload=payload["expected_payload"],
+        ),
+    )

@@ -28,14 +28,6 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.case import Case
-from schemathesis.generation.meta import (
-    CaseMetadata,
-    FuzzingPhaseData,
-    GenerationInfo,
-    PhaseInfo,
-    TestPhase,
-)
 from schemathesis.specs.openapi._hypothesis import _body_required_per_feedback
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.error_feedback import (
@@ -50,7 +42,8 @@ from schemathesis.specs.openapi.error_feedback import (
     UnexpectedPropertyAdjustment,
     apply_adjustments,
 )
-from test.core.error_feedback.parsers.helpers import DRF_DETAIL_WRAPPED_BODY, SPRING_MESSAGES, drf_obs
+from test.core.error_feedback.helpers import meta_for, record_400
+from test.core.error_feedback.parsers.helpers import DRF_DETAIL_WRAPPED_BODY, drf_obs
 
 # Schema Object meta-validators for each supported spec version. Adjustments must
 # produce schemas that satisfy these so downstream Hypothesis draws against the
@@ -204,23 +197,6 @@ def test_drf_detail_envelope_refines_declared_query_parameter(ctx, case_factory)
     }
 
 
-def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, response_factory):
-    case = case_factory()
-    response = Response.from_any(
-        response_factory.requests(
-            content=SPRING_MESSAGES,
-            content_type="application/json",
-            status_code=400,
-        )
-    )
-    obs = FeedbackPipeline.from_registry().parse(
-        operation=case.operation,
-        case=case,
-        response=response,
-    )
-    assert [o.parameter_path for o in obs] == [("zipcode",), ("city",)]
-
-
 def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, response_factory):
     operation = ctx.openapi.load_operation(
         "POST /api/items",
@@ -234,7 +210,7 @@ def test_pipeline_locates_aspnet_post_errors_in_declared_query_parameters(ctx, r
             "responses": {"200": {"description": "OK"}},
         },
     )
-    case = operation.Case(query={"limit": 100}, body={"name": "item"}, _meta=_meta_for(GenerationMode.POSITIVE))
+    case = operation.Case(query={"limit": 100}, body={"name": "item"}, _meta=meta_for(GenerationMode.POSITIVE))
     response = Response.from_any(
         response_factory.requests(
             content=json.dumps(
@@ -342,121 +318,6 @@ def test_pipeline_prefers_sent_body_field_over_declared_path_parameter(
         (observation.location, observation.parameter_path, observation.kind)
         for observation in parse_observations(operation=operation, case=case, response=response)
     ] == [(ParameterLocation.PATH, ("id",), kind) for kind in expected_kinds]
-
-
-def test_pipeline_skips_responses_with_no_known_deserializer(case_factory, response_factory):
-    case = case_factory()
-    response = Response.from_any(
-        response_factory.requests(
-            content=b"\x00\x01\x02",
-            content_type="application/octet-stream",
-            status_code=400,
-        )
-    )
-    assert (
-        FeedbackPipeline.from_registry().parse(
-            operation=case.operation,
-            case=case,
-            response=response,
-        )
-        == ()
-    )
-
-
-def test_pipeline_returns_empty_when_no_parser_matches(case_factory, response_factory):
-    case = case_factory()
-    response = Response.from_any(
-        response_factory.requests(
-            content=b'{"random": "shape"}',
-            content_type="application/json",
-            status_code=400,
-        )
-    )
-    assert (
-        FeedbackPipeline.from_registry().parse(
-            operation=case.operation,
-            case=case,
-            response=response,
-        )
-        == ()
-    )
-
-
-def _meta_for(mode: GenerationMode) -> CaseMetadata:
-    return CaseMetadata(
-        generation=GenerationInfo(time=0.0, mode=mode),
-        components={},
-        phase=PhaseInfo(
-            name=TestPhase.FUZZING,
-            data=FuzzingPhaseData(
-                description="",
-                parameter=None,
-                parameter_location=None,
-                location=None,
-            ),
-        ),
-    )
-
-
-def _drive_collector(
-    *,
-    case_factory,
-    response_factory,
-    status_code: int = 400,
-    body: bytes = SPRING_MESSAGES,
-    mode: GenerationMode = GenerationMode.POSITIVE,
-    times: int = 1,
-):
-    case = case_factory(_meta=_meta_for(mode))
-    response = Response.from_any(
-        response_factory.requests(
-            content=body,
-            content_type="application/json",
-            status_code=status_code,
-        )
-    )
-    store = ErrorFeedbackStore()
-    for _ in range(times):
-        record_response(store=store, operation=case.operation, case=case, response=response)
-    return store, case
-
-
-def test_collector_records_observations_from_400(case_factory, response_factory):
-    store, case = _drive_collector(
-        case_factory=case_factory,
-        response_factory=response_factory,
-        status_code=400,
-    )
-    out = store.observations(operation_label=case.operation.label, location=ParameterLocation.BODY)
-    assert sorted(o.parameter_path for o in out) == [("city",), ("zipcode",)]
-
-
-@pytest.mark.parametrize("status_code", [200, 201, 302, 401, 403, 500, 503])
-def test_collector_skips_non_4xx_and_auth_failures(status_code, case_factory, response_factory):
-    store, case = _drive_collector(
-        case_factory=case_factory,
-        response_factory=response_factory,
-        status_code=status_code,
-    )
-    out = store.observations(
-        operation_label=case.operation.label,
-        location=ParameterLocation.BODY,
-    )
-    assert out == ()
-
-
-def test_collector_skips_negative_mode_cases(case_factory, response_factory):
-    store, case = _drive_collector(
-        case_factory=case_factory,
-        response_factory=response_factory,
-        status_code=400,
-        mode=GenerationMode.NEGATIVE,
-    )
-    out = store.observations(
-        operation_label=case.operation.label,
-        location=ParameterLocation.BODY,
-    )
-    assert out == ()
 
 
 def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...]:
@@ -2283,7 +2144,7 @@ def test_additional_properties_adjustment_preserves_allof_ref_properties(ctx, ca
         components={"schemas": schemas},
     )
     store = ErrorFeedbackStore()
-    _record(
+    record_400(
         store,
         operation=operation,
         case=case_factory(operation=operation, body={"name": "rex", "zzz": 1}),
@@ -2323,186 +2184,6 @@ def test_additional_properties_adjustment_skips_unreachable_targets(input_schema
     )
     assert (
         _apply_body_adjustment(AdditionalPropertiesAdjustment(), input_schema, (observation,), case_factory) == expected
-    )
-
-
-def test_pipeline_forwards_case_to_parser(case_factory, response_factory):
-    received: list[Case] = []
-
-    class _RecordingSpringParser(SpringParser):
-        def parse(self, *, operation, body, case):
-            received.append(case)
-            return super().parse(operation=operation, body=body, case=case)
-
-    pipeline = FeedbackPipeline([_RecordingSpringParser()])
-    case = case_factory()
-    response = Response.from_any(
-        response_factory.requests(
-            content=SPRING_MESSAGES,
-            content_type="application/json",
-            status_code=400,
-        )
-    )
-    pipeline.parse(operation=case.operation, case=case, response=response)
-    assert received == [case]
-
-
-def _record(store, *, operation, case, body, response_factory):
-    response = Response.from_any(
-        response_factory.requests(
-            content=json.dumps(body).encode(),
-            content_type="application/json",
-            status_code=400,
-        )
-    )
-    record_response(store=store, operation=operation, case=case, response=response)
-
-
-@pytest.mark.parametrize(
-    ("operation_path", "case_kwargs", "rejected_value", "type_name", "expected_location", "expected_path"),
-    [
-        # Two body fields share the rejected value -> ambiguous, no observation.
-        (
-            "/api/items",
-            {"body": {"identifier": "DELTA-2026-XYZ", "fallback_id": "DELTA-2026-XYZ", "count": 99}, "method": "POST"},
-            "DELTA-2026-XYZ",
-            "java.time.LocalDate",
-            ParameterLocation.BODY,
-            None,
-        ),
-        # Rejected value lives in a query parameter, not the body.
-        (
-            "/api/reports",
-            {"query": {"from": "dd-MM-yyyy-HHmm", "limit": "10"}, "method": "GET"},
-            "dd-MM-yyyy-HHmm",
-            "java.time.LocalDateTime",
-            ParameterLocation.QUERY,
-            ("from",),
-        ),
-        # Rejected value isn't in the request — likely a server-side default.
-        (
-            "/api/users",
-            {"body": {"name": "alice", "score": 42}, "method": "POST"},
-            "2024-01-15",
-            "java.time.LocalDate",
-            ParameterLocation.BODY,
-            None,
-        ),
-        # Nested ambiguity: same value in both `shipping.trackingNumber` and `items[0].sku`.
-        (
-            "/api/orders",
-            {
-                "body": {"shipping": {"trackingNumber": "TRK-2026-AABB"}, "items": [{"sku": "TRK-2026-AABB"}]},
-                "method": "POST",
-            },
-            "TRK-2026-AABB",
-            "java.time.LocalDate",
-            ParameterLocation.BODY,
-            None,
-        ),
-        # Distinct nested match — only one candidate.
-        (
-            "/api/orders",
-            {
-                "body": {"shipping": {"trackingNumber": "TRK-2026-AABB"}, "items": [{"sku": "DIFFERENT-VALUE"}]},
-                "method": "POST",
-            },
-            "TRK-2026-AABB",
-            "java.time.LocalDate",
-            ParameterLocation.BODY,
-            ("shipping", "trackingNumber"),
-        ),
-    ],
-    ids=[
-        "ambiguous-flat-body",
-        "query-attribution",
-        "value-not-in-request",
-        "ambiguous-nested",
-        "distinct-nested",
-    ],
-)
-def test_field_inference_attribution_through_pipeline(
-    make_operation,
-    case_factory,
-    response_factory,
-    operation_path,
-    case_kwargs,
-    rejected_value,
-    type_name,
-    expected_location,
-    expected_path,
-):
-    method = case_kwargs["method"]
-    operation = make_operation(method=method.lower(), path=operation_path)
-    case = case_factory(operation=operation, **case_kwargs)
-    response_body = {"message": f'Cannot deserialize value of type `{type_name}` from String "{rejected_value}"'}
-
-    store = ErrorFeedbackStore()
-    for _ in range(2):
-        _record(store, operation=operation, case=case, body=response_body, response_factory=response_factory)
-
-    expected: tuple[Observation, ...] = (
-        ()
-        if expected_path is None
-        else (
-            Observation(
-                operation_label=operation.label,
-                location=expected_location,
-                parameter_path=expected_path,
-                kind=ObservationKind.TYPE_MISMATCH,
-                raw_message=response_body["message"],
-                payload=TypeMismatchPayload(type_name=type_name),
-            ),
-        )
-    )
-    assert store.observations(operation_label=operation.label, location=expected_location) == expected
-
-
-# Realistic Jackson 400 envelopes for typical Spring deployments without `INCLUDE_FIELD_PATH_IN_ERRORS`.
-_JACKSON_NO_REFERENCE_CHAIN_CASES: tuple[dict, ...] = (
-    {
-        "id": "localdate-dash-format",
-        "method": "POST",
-        "path": "/api/records",
-        "body": {"employeeId": 7, "projectId": 12, "commitDate": "dd-MM-yyyy", "comment": "x", "billable": True},
-        "response": {
-            "message": 'JSON parse error: Cannot deserialize value of type `java.time.LocalDate` from String "dd-MM-yyyy"'
-        },
-        "expected_path": ("commitDate",),
-        "expected_payload": TypeMismatchPayload(type_name="java.time.LocalDate"),
-    },
-    {
-        "id": "localdate-slash-format",
-        "method": "POST",
-        "path": "/api/profiles",
-        "body": {"name": "Alice", "hireDate": "MM/dd/yyyy", "departmentId": 3},
-        "response": {"message": 'Cannot deserialize value of type `java.time.LocalDate` from String "MM/dd/yyyy"'},
-        "expected_path": ("hireDate",),
-        "expected_payload": TypeMismatchPayload(type_name="java.time.LocalDate"),
-    },
-)
-
-
-@pytest.mark.parametrize("payload", _JACKSON_NO_REFERENCE_CHAIN_CASES, ids=lambda p: p["id"])
-def test_field_inference_jackson_envelopes_without_reference_chain(
-    payload, make_operation, case_factory, response_factory
-):
-    operation = make_operation(method=payload["method"].lower(), path=payload["path"])
-    case = case_factory(operation=operation, body=payload["body"], method=payload["method"])
-
-    store = ErrorFeedbackStore()
-    for _ in range(2):
-        _record(store, operation=operation, case=case, body=payload["response"], response_factory=response_factory)
-
-    assert store.observations(operation_label=operation.label, location=ParameterLocation.BODY) == (
-        Observation(
-            operation_label=operation.label,
-            location=ParameterLocation.BODY,
-            parameter_path=payload["expected_path"],
-            kind=ObservationKind.TYPE_MISMATCH,
-            raw_message=payload["response"]["message"],
-            payload=payload["expected_payload"],
-        ),
     )
 
 
@@ -2670,7 +2351,7 @@ def test_jackson_unrecognized_field_closes_body(ctx, case_factory, response_fact
         },
     )
     store = ErrorFeedbackStore()
-    _record(
+    record_400(
         store,
         operation=operation,
         case=case_factory(operation=operation),

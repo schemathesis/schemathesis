@@ -1110,6 +1110,23 @@ def test_rate_limited_operation_warning(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--max-examples=10", "-c not_a_server_error") == snapshot_cli
 
 
+@pytest.mark.parametrize("extra", [[], ["--checks=not_a_server_error"]], ids=["all-checks", "passing-checks"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli, extra):
+    api = ctx.openapi.apps.unimplemented_method()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=10",
+            "--phases=examples,coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+            *extra,
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_method_not_allowed_warning_hidden_when_not_displayed(cli, ctx, snapshot_cli):
     api = ctx.openapi.apps.unimplemented_method()
