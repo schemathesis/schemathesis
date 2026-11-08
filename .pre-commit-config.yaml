@@ -32,14 +32,14 @@ repos:
         additional_dependencies: [shellcheck-py==0.11.0.1]
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.31.1
+    rev: v1.32.0
     hooks:
       - id: zizmor
         # Offline keeps the hook deterministic; online audits would need a GitHub token.
         args: [--no-progress, --offline]
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.51.1
+    rev: v1.52.0
     hooks:
       - id: typos
         # Report, don't rewrite
@@ -57,7 +57,7 @@ repos:
         exclude: ^(docs/|test/|test-corpus/|examples/|benches/).*$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.3
+    rev: v0.17.4
     hooks:
       - id: ruff-format
       - id: ruff-check
