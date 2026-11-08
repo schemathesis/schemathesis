@@ -9,7 +9,7 @@ from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.coverage._schema import OVERSIZED_STRING_LENGTH
 from test.apps.fragments.handlers import null_name_lookup
 from test.apps.fragments.schemas import null_name_responses
-from test.coverage.helpers import iter_cases, make_request_body
+from test.specs.openapi.coverage.helpers import iter_cases, make_request_body
 from test.utils import objects_at
 
 OVERSIZED = "a" * OVERSIZED_STRING_LENGTH

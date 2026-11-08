@@ -34,7 +34,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     _positive_string,
     cover_schema_iter,
 )
-from test.coverage.helpers import scenario_values
+from test.specs.openapi.coverage.helpers import scenario_values
 from test.utils import to_float32
 
 OVERSIZED = "a" * OVERSIZED_STRING_LENGTH

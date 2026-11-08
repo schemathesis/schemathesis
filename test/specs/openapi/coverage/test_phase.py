@@ -40,7 +40,7 @@ from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import Binary
-from test.coverage.helpers import (
+from test.specs.openapi.coverage.helpers import (
     ALL_MODES,
     DEFAULT_RESPONSES,
     assert_bodies,
