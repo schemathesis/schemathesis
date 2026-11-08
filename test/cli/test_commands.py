@@ -33,6 +33,7 @@ from schemathesis.engine import Status, control, events
 from schemathesis.engine.run import Phase, PhaseName
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.catalog.openapi import stateful
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import PAYLOAD_SCHEMA, linked_users
 from test.fixtures.app_runner import accept_connections, wait_for_port
@@ -353,16 +354,16 @@ ALL_HEALTH_CHECKS = sorted(check.name for check in hypothesis.HealthCheck)
 @pytest.mark.usefixtures("hypothesis_ci_profile")
 @pytest.mark.parametrize("deterministic", [False, True])
 @pytest.mark.parametrize(
-    ("command", "app", "suppressed"),
+    ("command", "factory", "suppressed"),
     [
-        (("run", "--phases=fuzzing", "--max-examples=2"), "success", []),
-        (("run", "--phases=stateful", "--max-examples=2"), "stateful_users", ALL_HEALTH_CHECKS),
-        (("fuzz", "--max-time=1"), "success", []),
+        (("run", "--phases=fuzzing", "--max-examples=2"), openapi_basic.success, []),
+        (("run", "--phases=stateful", "--max-examples=2"), stateful.stateful_users, ALL_HEALTH_CHECKS),
+        (("fuzz", "--max-time=1"), openapi_basic.success, []),
     ],
     ids=["run-fuzzing", "run-stateful", "fuzz"],
 )
-def test_cli_ignores_hypothesis_ci_profile(ctx, cli, settings_recorder, command, app, suppressed, deterministic):
-    api = getattr(ctx.openapi.apps, app)()
+def test_cli_ignores_hypothesis_ci_profile(ctx, cli, settings_recorder, command, factory, suppressed, deterministic):
+    api = ctx.openapi.serve(factory())
     result = cli.main(
         command[0],
         api.schema_url,
@@ -452,7 +453,7 @@ def test_openapi_auth_skips_malformed_security_requirements(cli, ctx):
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_cli_run_output_empty(ctx, cli, workers):
-    api = ctx.openapi.apps.no_operations()
+    api = ctx.openapi.serve(openapi_basic.no_operations())
     result = cli.run_and_assert(api.schema_url, f"--workers={workers}", exit_code=ExitCode.INTERRUPTED)
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -1969,7 +1970,7 @@ def test_nested_binary_in_yaml(ctx, cli, app_runner, snapshot_cli):
 def test_urlencoded_form(ctx, cli):
     # When the API operation accepts application/x-www-form-urlencoded
     # Then Schemathesis should generate appropriate payload
-    api = ctx.openapi.apps.form()
+    api = ctx.openapi.serve(openapi_basic.form())
     cli.run_and_assert(api.schema_url, "--mode=positive")
 
 
@@ -2081,7 +2082,7 @@ def test_filter_case_sensitivity(ctx, cli, snapshot_cli):
 
 @pytest.mark.parametrize("value", ["--include-by=/x-property == 42", "--exclude-by=/x-property != 42"])
 def test_filter_by(ctx, cli, snapshot_cli, value):
-    api = ctx.openapi.apps.upload_file_and_custom_format()
+    api = ctx.openapi.serve(openapi_basic.upload_file_and_custom_format())
     assert cli.run(api.schema_url, "--mode=positive", "--max-examples=1", value) == snapshot_cli
 
 
@@ -2538,7 +2539,7 @@ def test_response_payload_encoding(ctx, cli, snapshot_cli):
     # See GH-1073
     # When the "failed" response has non UTF-8 encoding
     # Then it should be displayed according its actual encoding
-    api = ctx.openapi.apps.cp866()
+    api = ctx.openapi.serve(openapi_basic.cp866())
     assert cli.run(api.schema_url) == snapshot_cli
 
 
@@ -2548,7 +2549,7 @@ def test_response_schema_conformance_deduplication(ctx, cli, snapshot_cli):
     # When the "response_schema_conformance" check is present
     # And the app return different error messages caused by the same validator
     # Then the errors should be deduplicated
-    api = ctx.openapi.apps.conformance()
+    api = ctx.openapi.serve(openapi_basic.conformance())
     assert cli.run(api.schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
 
@@ -2648,11 +2649,13 @@ def test_graphql_data_mismatch(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.parametrize("app", ["generic_id_pool", "non_id_pool"], ids=["id-handles", "non-id-handles"])
+@pytest.mark.parametrize(
+    "factory", [graphql_bookstore.generic_id_pool, graphql_bookstore.non_id_pool], ids=["id-handles", "non-id-handles"]
+)
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_graphql_stateful_unique_inputs(ctx, cli, snapshot_cli, app):
+def test_graphql_stateful_unique_inputs(ctx, cli, snapshot_cli, factory):
     # Scenarios repeat inputs that already passed; those steps are skipped, not crashed on.
-    api = getattr(ctx.graphql.apps, app)()
+    api = ctx.graphql.serve(factory())
     assert (
         cli.run(
             api.schema_url,

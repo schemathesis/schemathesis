@@ -18,6 +18,7 @@ from hypothesis import strategies as st
 from schemathesis.generation import GenerationMode
 from schemathesis.reporting.har import _cookie_to_har
 from schemathesis.reporting.vcr import write_double_quoted
+from test.apps.catalog.openapi import basic
 from test.apps.catalog.openapi.modifiers.stateful import SlowOperations
 from test.utils import load_json_or_fail, load_ndjson, load_yaml_or_fail
 
@@ -36,7 +37,7 @@ def load_response_body(cassette, idx):
 @pytest.mark.parametrize("mode", [m.value for m in list(GenerationMode)] + ["all"])
 @pytest.mark.parametrize("args", [(), ("--report-preserve-bytes",)], ids=("plain", "base64"))
 def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, mode):
-    api = ctx.openapi.apps.success_and_upload_file()
+    api = ctx.openapi.serve(basic.success_and_upload_file())
     hypothesis_max_examples = hypothesis_max_examples or 2
     cli.run_and_assert(
         api.schema_url,

@@ -6,6 +6,7 @@ import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
+from test.apps.catalog.openapi import basic
 
 
 @pytest.mark.parametrize(
@@ -218,7 +219,7 @@ def test_find_operation_by_reference_returns_per_op_base_url(ctx):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_engine_routes_per_path(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.per_path_servers()
+    api = ctx.openapi.serve(basic.per_path_servers())
     assert cli.run(api.schema_url, "--max-examples=2") == snapshot_cli
     assert api.calls_under("/zone-a/api/admin"), "Engine did not route /api/admin to its per-path server"
     assert api.calls_under("/zone-b/api/public"), "Engine did not route /api/public to its per-path server"

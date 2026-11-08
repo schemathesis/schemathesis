@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from flask import jsonify
+from flask import Response, jsonify, request
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
@@ -13,11 +13,43 @@ from schemathesis.specs.openapi.checks import (
     response_headers_conformance,
     response_schema_conformance,
 )
+from test.apps.runtime import OpenAPIApp
 from test.utils import EventStream
+
+SECURITY_DEFINITIONS = {
+    "api_key": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
+    "basic_auth": {"type": "basic"},
+}
+OK_RESPONSE = {"200": {"description": "OK"}}
 
 
 def test_baseline_e2e(ctx):
-    api = ctx.openapi.apps.swagger_v2_baseline()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/baseline": {
+                "get": {
+                    "produces": ["application/json"],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {
+                                "type": "object",
+                                "properties": {"ok": {"type": "boolean"}},
+                                "required": ["ok"],
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/baseline")
+    def baseline():
+        return jsonify({"ok": True})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, checks=[response_schema_conformance], max_examples=3).execute()
 
@@ -27,7 +59,28 @@ def test_baseline_e2e(ctx):
 
 
 def test_formdata_serialised_as_multipart(ctx):
-    api = ctx.openapi.apps.swagger_v2_formdata()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "consumes": ["multipart/form-data"],
+                    "produces": ["application/json"],
+                    "parameters": [
+                        {"name": "title", "in": "formData", "type": "string", "required": True, "minLength": 1},
+                        {"name": "file", "in": "formData", "type": "file", "required": True},
+                    ],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/upload", methods=["POST"])
+    def upload():
+        return jsonify({"title": request.form.get("title"), "files": list(request.files.keys())})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
@@ -38,14 +91,48 @@ def test_formdata_serialised_as_multipart(ctx):
 
 
 def test_collection_format_serialization(ctx):
-    api = ctx.openapi.apps.swagger_v2_collection_format()
+    delimiters = {"csv": ",", "ssv": " ", "tsv": "\t", "pipes": "|"}
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/search": {
+                "get": {
+                    "produces": ["application/json"],
+                    "parameters": [
+                        {
+                            "name": name,
+                            "in": "query",
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "collectionFormat": name,
+                            "required": True,
+                        }
+                        for name in [*delimiters, "multi"]
+                    ],
+                    "responses": {
+                        "200": {"description": "OK", "schema": {"type": "array", "items": {"type": "string"}}}
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/search")
+    def search():
+        return jsonify(
+            {
+                "csv": request.query_string.decode().split("&"),
+                "raw": {key: request.args.getlist(key) for key in delimiters},
+            }
+        )
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=20, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
     captured = api.calls_to("/api/search")
     assert captured
 
-    delimiters = {"csv": ",", "ssv": " ", "tsv": "\t", "pipes": "|"}
     seen = dict.fromkeys(delimiters, False)
     for call in captured:
         for name, delimiter in delimiters.items():
@@ -59,8 +146,29 @@ def test_collection_format_serialization(ctx):
 
 
 def test_security_credentials_propagate(ctx):
-    api = ctx.openapi.apps.swagger_v2_security()
-    schema = schemathesis.openapi.from_url(api.schema_url).include(path_regex="^/private/(api-key|basic)$")
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/private/api-key": {
+                "get": {"security": [{"api_key": []}], "produces": ["application/json"], "responses": OK_RESPONSE}
+            },
+            "/private/basic": {
+                "get": {"security": [{"basic_auth": []}], "produces": ["application/json"], "responses": OK_RESPONSE}
+            },
+        },
+        version="2.0",
+        securityDefinitions=SECURITY_DEFINITIONS,
+    )
+
+    @app.route("/api/private/api-key")
+    def api_key():
+        return jsonify({"key": request.headers.get("X-API-Key", "")})
+
+    @app.route("/api/private/basic")
+    def basic():
+        return jsonify({"auth": request.headers.get("Authorization", "")})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, headers={"X-API-Key": "secret"}, auth=("user", "pass")).execute()
 
     # Engine also drives auth-omitted negatives; require at least one positive carry per scheme.
@@ -69,7 +177,32 @@ def test_security_credentials_propagate(ctx):
 
 
 def test_oauth2_definition_loads(ctx):
-    api = ctx.openapi.apps.swagger_v2_oauth2_security()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/oauth-protected": {
+                "get": {
+                    "security": [{"oauth2_implicit": ["read"]}],
+                    "produces": ["application/json"],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+        securityDefinitions={
+            "oauth2_implicit": {
+                "type": "oauth2",
+                "flow": "implicit",
+                "authorizationUrl": "https://example.com/oauth/authorize",
+                "scopes": {"read": "Read access"},
+            },
+        },
+    )
+
+    @app.route("/api/oauth-protected")
+    def oauth_protected():
+        return jsonify({})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     operations = list(schema.get_all_operations())
     assert all(not isinstance(op, Err) for op in operations)
@@ -77,14 +210,79 @@ def test_oauth2_definition_loads(ctx):
 
 
 def test_nullable_response_passes_validation(ctx):
-    api = ctx.openapi.apps.swagger_v2_nullable()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/nullable/{id}": {
+                "get": {
+                    "produces": ["application/json"],
+                    "parameters": [{"name": "id", "in": "path", "type": "string", "required": True}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "tag": {"type": "string", "x-nullable": True},
+                                },
+                                "required": ["name", "tag"],
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/nullable/<id>")
+    def nullable(id):
+        return jsonify({"name": id, "tag": None})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_schema_conformance], max_examples=3).execute()
     stream.assert_no_failures()
 
 
 def test_examples_phase_uses_x_example(ctx):
-    api = ctx.openapi.apps.swagger_v2_examples()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/examples": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "produces": ["application/json"],
+                    "parameters": [
+                        {
+                            "name": "body",
+                            "in": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {"name": {"type": "string"}},
+                                "required": ["name"],
+                                "x-example": {"name": "from-x-example"},
+                            },
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {"type": "object"},
+                            "x-examples": {"default": {"summary": "Default", "value": {"echo": "hi"}}},
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/examples", methods=["POST"])
+    def examples():
+        return jsonify({"echo": "hi"})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, phases=[PhaseName.EXAMPLES]).execute()
 
@@ -136,7 +334,32 @@ def test_response_header_validation_only_complains_about_headers(ctx, app_runner
 
 
 def test_default_response_used_when_status_undocumented(ctx):
-    api = ctx.openapi.apps.swagger_v2_default_response()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/errors": {
+                "get": {
+                    "produces": ["application/json"],
+                    "responses": {
+                        "default": {
+                            "description": "Error",
+                            "schema": {
+                                "type": "object",
+                                "properties": {"code": {"type": "integer"}, "message": {"type": "string"}},
+                                "required": ["code", "message"],
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/errors")
+    def errors():
+        return Response('{"code": 418, "message": "I am a teapot"}', status=418, content_type="application/json")
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_schema_conformance], max_examples=3).execute()
     stream.assert_no_failures()
@@ -144,15 +367,41 @@ def test_default_response_used_when_status_undocumented(ctx):
     assert any(i.response.status_code == 418 for i in interactions)
 
 
-PATH_PARAMETER_FACTORIES = [
-    pytest.param("swagger_v2_array_path_parameter", "/api/items/", id="declared-array"),
-    pytest.param("swagger_v2_injected_path_parameter", "/api/auto/", id="undeclared-injected"),
+PATH_PARAMETER_CASES = [
+    pytest.param(
+        {
+            "/items/{ids}": {
+                "parameters": [
+                    {
+                        "name": "ids",
+                        "in": "path",
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "collectionFormat": "csv",
+                        "required": True,
+                    }
+                ],
+                "get": {"produces": ["application/json"], "responses": OK_RESPONSE},
+            }
+        },
+        "/api/items/",
+        id="declared-array",
+    ),
+    # `{name}` is in the path template but not declared in `parameters`.
+    pytest.param(
+        {"/auto/{name}": {"get": {"produces": ["application/json"], "responses": OK_RESPONSE}}},
+        "/api/auto/",
+        id="undeclared-injected",
+    ),
 ]
 
 
-@pytest.mark.parametrize(("factory_name", "path_prefix"), PATH_PARAMETER_FACTORIES)
-def test_path_parameter_reaches_endpoint(ctx, factory_name, path_prefix):
-    api = getattr(ctx.openapi.apps, factory_name)()
+@pytest.mark.parametrize(("paths", "path_prefix"), PATH_PARAMETER_CASES)
+def test_path_parameter_reaches_endpoint(ctx, paths, path_prefix):
+    app, spec = ctx.openapi.make_flask_app(paths, version="2.0")
+    app.add_url_rule(f"{path_prefix}<value>", view_func=lambda value: jsonify({"value": value}))
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
     assert api.calls_under(path_prefix)
@@ -160,7 +409,40 @@ def test_path_parameter_reaches_endpoint(ctx, factory_name, path_prefix):
 
 def test_all_parameter_locations_resolve(ctx):
     # Path + query + header + body ($ref'd) must all generate and reach the server in one shot.
-    api = ctx.openapi.apps.swagger_v2_all_locations()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/all/{path_param}": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "produces": ["application/json"],
+                    "parameters": [
+                        {"name": "path_param", "in": "path", "type": "string", "required": True},
+                        {"name": "query_param", "in": "query", "type": "integer", "required": True},
+                        {"name": "X-Header-Param", "in": "header", "type": "string", "required": True, "minLength": 1},
+                        {"name": "body", "in": "body", "required": True, "schema": {"$ref": "#/definitions/Payload"}},
+                    ],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+        definitions={
+            "Payload": {"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"]}
+        },
+    )
+
+    @app.route("/api/all/<path_param>", methods=["POST"])
+    def all_locations(path_param):
+        return jsonify(
+            {
+                "path": path_param,
+                "query": request.args.get("query_param"),
+                "header": request.headers.get("X-Header-Param"),
+                "body": request.get_json(silent=True),
+            }
+        )
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
@@ -205,7 +487,20 @@ def test_invalid_schema_surfaces_invalid_schema_error(ctx, raw):
 
 
 def test_no_response_body_validation_passes(ctx):
-    api = ctx.openapi.apps.swagger_v2_no_response_body()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/no-content": {
+                "delete": {"produces": ["application/json"], "responses": {"204": {"description": "No Content"}}}
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/no-content", methods=["DELETE"])
+    def no_content():
+        return Response(status=204)
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_schema_conformance], max_examples=3).execute()
     stream.assert_no_failures()
@@ -213,15 +508,50 @@ def test_no_response_body_validation_passes(ctx):
 
 
 def test_native_examples_phase_loads(ctx):
-    api = ctx.openapi.apps.swagger_v2_native_response_examples()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "produces": ["application/json"],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {
+                                "type": "array",
+                                "items": {"type": "object", "properties": {"id": {"type": "integer"}}},
+                            },
+                            "examples": {"application/json": [{"id": 1}, {"id": 2}]},
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/items")
+    def items():
+        return jsonify([{"id": 1}, {"id": 2}])
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, phases=[PhaseName.EXAMPLES, PhaseName.FUZZING], max_examples=3).execute()
     assert api.calls_to("/api/items")
 
 
 def test_optional_security_does_not_require_credentials(ctx):
-    api = ctx.openapi.apps.swagger_v2_security()
-    schema = schemathesis.openapi.from_url(api.schema_url).include(path="/private/optional")
+    app, spec = ctx.openapi.make_flask_app(
+        {"/private/optional": {"get": {"security": [], "produces": ["application/json"], "responses": OK_RESPONSE}}},
+        version="2.0",
+        securityDefinitions=SECURITY_DEFINITIONS,
+    )
+
+    @app.route("/api/private/optional")
+    def optional():
+        return jsonify({"auth": request.headers.get("Authorization", "")})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3).execute()
 
     optional_calls = api.calls_to("/api/private/optional")
@@ -230,7 +560,25 @@ def test_optional_security_does_not_require_credentials(ctx):
 
 
 def test_parameter_ref_resolves(ctx):
-    api = ctx.openapi.apps.swagger_v2_parameter_ref()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/listing": {
+                "get": {
+                    "produces": ["application/json"],
+                    "parameters": [{"$ref": "#/parameters/Pagination"}],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+        parameters={"Pagination": {"name": "page", "in": "query", "type": "integer", "minimum": 1, "required": True}},
+    )
+
+    @app.route("/api/listing")
+    def listing():
+        return jsonify({"page": request.args.get("page")})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
@@ -241,7 +589,25 @@ def test_parameter_ref_resolves(ctx):
 
 def test_path_level_parameters_apply_to_each_operation(ctx):
     # Path-item-level `parameters` are inherited by every operation under the path.
-    api = ctx.openapi.apps.swagger_v2_path_level_parameters()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/path-shared/{token}": {
+                "parameters": [
+                    {"name": "token", "in": "path", "type": "string", "required": True, "minLength": 1},
+                    {"name": "trace", "in": "query", "type": "string", "required": True, "minLength": 1},
+                ],
+                "get": {"produces": ["application/json"], "responses": OK_RESPONSE},
+                "post": {"produces": ["application/json"], "responses": OK_RESPONSE},
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/path-shared/<token>", methods=["GET", "POST"])
+    def path_shared(token):
+        return jsonify({"token": token, "trace": request.args.get("trace")})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
@@ -252,7 +618,28 @@ def test_path_level_parameters_apply_to_each_operation(ctx):
 
 
 def test_form_urlencoded_body_uses_urlencoding(ctx):
-    api = ctx.openapi.apps.swagger_v2_form_urlencoded()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/form-urlencoded": {
+                "post": {
+                    "consumes": ["application/x-www-form-urlencoded"],
+                    "produces": ["application/json"],
+                    "parameters": [
+                        {"name": "field_a", "in": "formData", "type": "string", "required": True, "minLength": 1},
+                        {"name": "field_b", "in": "formData", "type": "integer", "required": True},
+                    ],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/form-urlencoded", methods=["POST"])
+    def form_urlencoded():
+        return jsonify({"field_a": request.form.get("field_a"), "field_b": request.form.get("field_b")})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
@@ -263,7 +650,27 @@ def test_form_urlencoded_body_uses_urlencoding(ctx):
 
 
 def test_multiple_path_parameters_resolve(ctx):
-    api = ctx.openapi.apps.swagger_v2_multi_path_parameter()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/orgs/{org_id}/users/{user_id}": {
+                "get": {
+                    "produces": ["application/json"],
+                    "parameters": [
+                        {"name": "org_id", "in": "path", "type": "string", "required": True, "minLength": 1},
+                        {"name": "user_id", "in": "path", "type": "string", "required": True, "minLength": 1},
+                    ],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/orgs/<org_id>/users/<user_id>")
+    def org_user(org_id, user_id):
+        return jsonify({"org_id": org_id, "user_id": user_id})
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
@@ -278,7 +685,37 @@ def test_multiple_path_parameters_resolve(ctx):
 
 def test_diverse_response_headers_accepted(ctx):
     # Integer / boolean / date-time string headers all validate cleanly.
-    api = ctx.openapi.apps.swagger_v2_diverse_response_headers()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/diverse-headers": {
+                "get": {
+                    "produces": ["application/json"],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {"type": "object"},
+                            "headers": {
+                                "X-Rate-Limit-Remaining": {"type": "integer", "minimum": 0},
+                                "X-Deprecated": {"type": "boolean"},
+                                "X-Timestamp": {"type": "string", "format": "date-time"},
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/diverse-headers")
+    def diverse_headers():
+        response = jsonify({})
+        response.headers["X-Rate-Limit-Remaining"] = "42"
+        response.headers["X-Deprecated"] = "false"
+        response.headers["X-Timestamp"] = "2026-01-01T00:00:00Z"
+        return response
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_headers_conformance], max_examples=3).execute()
     stream.assert_no_failures()
@@ -287,7 +724,33 @@ def test_diverse_response_headers_accepted(ctx):
 def test_array_response_header_with_collection_format(ctx):
     # Swagger 2.0 array response header serialised via collectionFormat: csv —
     # the validator must split on the delimiter before evaluating against `type: array`.
-    api = ctx.openapi.apps.swagger_v2_array_response_header()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/array-header": {
+                "get": {
+                    "produces": ["application/json"],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {"type": "object"},
+                            "headers": {
+                                "X-Tags": {"type": "array", "items": {"type": "string"}, "collectionFormat": "csv"}
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/array-header")
+    def array_header():
+        response = jsonify({})
+        response.headers["X-Tags"] = "alpha,beta"
+        return response
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_headers_conformance], max_examples=3).execute()
     stream.assert_no_failures()
@@ -317,7 +780,27 @@ def test_array_response_header_unknown_collection_format_passthrough():
 
 def test_and_security_carries_both_credentials(ctx):
     # `security: [{api_key: [], basic_auth: []}]` requires both schemes on a single request.
-    api = ctx.openapi.apps.swagger_v2_and_security()
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/private/and": {
+                "get": {
+                    "security": [{"api_key": [], "basic_auth": []}],
+                    "produces": ["application/json"],
+                    "responses": OK_RESPONSE,
+                }
+            }
+        },
+        version="2.0",
+        securityDefinitions=SECURITY_DEFINITIONS,
+    )
+
+    @app.route("/api/private/and")
+    def private_and():
+        return jsonify(
+            {"api_key": request.headers.get("X-API-Key", ""), "auth": request.headers.get("Authorization", "")}
+        )
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, headers={"X-API-Key": "k"}, auth=("u", "p"), max_examples=3).execute()
 

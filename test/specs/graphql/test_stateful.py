@@ -3,6 +3,7 @@ import pytest
 import strawberry
 
 import schemathesis
+from test.apps.catalog.graphql import bookstore
 
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
@@ -27,19 +28,14 @@ def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.parametrize(
-    "make_api",
-    [
-        lambda apps: apps.bare_slug(),
-        lambda apps: apps.relay_connection(),
-        lambda apps: apps.use_after_delete(),
-        lambda apps: apps.double_delete(),
-    ],
+    "factory",
+    [bookstore.bare_slug, bookstore.relay_connection, bookstore.use_after_delete, bookstore.double_delete],
     ids=["bare-slug-arg", "relay-connection-producer", "use-after-delete", "double-delete"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_captured_value_bug(ctx, cli, snapshot_cli, make_api):
+def test_stateful_finds_captured_value_bug(ctx, cli, snapshot_cli, factory):
     # Bare `slug` resolves via the enclosing return type; tombstones expose reads and deletes of a deleted resource.
-    api = make_api(ctx.graphql.apps)
+    api = ctx.graphql.serve(factory())
     assert (
         cli.run(
             api.schema_url,

@@ -10,6 +10,7 @@ from schemathesis.engine.run import PhaseName
 from schemathesis.engine.supervisor import METHOD_NOT_ALLOWED_THRESHOLD
 from schemathesis.generation import GenerationMode
 from test.apps.catalog.grpc.descriptors import load
+from test.apps.catalog.openapi import supervisor
 
 
 def method_not_allowed_schema(ctx):
@@ -118,7 +119,7 @@ def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli, extra)
 def test_stateful_skips_supervisor_blocked_operations(ctx):
     # Stateful's `TransitionController` must reject rules whose target operation
     # has a SKIP verdict so the dead op is never selected as a transition.
-    api = ctx.openapi.apps.linked_with_unimplemented_method()
+    api = ctx.openapi.serve(supervisor.linked_with_unimplemented_method())
     store = api.wsgi_app.config["store"]
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["not_a_server_error"])

@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, request
 import schemathesis
 from schemathesis.cli.commands.run.warnings import auth_flow_suggestion
 from schemathesis.core.transforms import deepclone
+from test.apps.catalog.openapi import basic
 
 
 def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
@@ -318,7 +319,7 @@ def test_warning_on_all_not_found(ctx, cli, snapshot_cli, args, kwargs):
 
 
 def test_warning_on_many_operations(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.success_failure_multiple_failures_custom_format()
+    api = ctx.openapi.serve(basic.success_failure_multiple_failures_custom_format())
     assert (
         cli.run(
             api.schema_url,

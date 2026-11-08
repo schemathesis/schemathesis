@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Query
 from flask import Flask, jsonify, request
 from pydantic import BaseModel, ConfigDict, Field
 
-from test.apps.builders import build_schema, make_flask_app_from_schema
+from test.apps.builders import build_schema, flask_app, make_flask_app_from_schema
 from test.apps.fragments import handlers, schemas
 from test.apps.runtime import OpenAPIApp
 
@@ -190,25 +190,21 @@ def create_user_only() -> OpenAPIApp:
 
 
 def crud_with_success() -> OpenAPIApp:
-    spec = build_schema(
+    return flask_app(
         {**_build_users_schema()["paths"], **schemas.success()},
+        _register_users_handlers,
+        handlers.register_success,
         components=_build_users_schema().get("components", {}),
     )
-    app = make_flask_app_from_schema(spec)
-    _register_users_handlers(app)
-    handlers.register_success(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 def crud_with_failure() -> OpenAPIApp:
-    spec = build_schema(
+    return flask_app(
         {**_build_users_schema()["paths"], **schemas.failure()},
+        _register_users_handlers,
+        handlers.register_failure,
         components=_build_users_schema().get("components", {}),
     )
-    app = make_flask_app_from_schema(spec)
-    _register_users_handlers(app)
-    handlers.register_failure(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 class _CreateUser(BaseModel):
@@ -256,7 +252,4 @@ def crud_asgi() -> OpenAPIApp:
 
 
 def linked_users() -> OpenAPIApp:
-    spec = build_schema(schemas.linked_users())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_linked_users(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.linked_users(), handlers.register_linked_users)

@@ -34,6 +34,7 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from test.apps.catalog.openapi import basic, error_feedback
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
 from test.utils import EventStream
@@ -182,7 +183,7 @@ def test_wsgi_interactions(ctx):
 
 
 def test_empty_response_interaction(ctx):
-    api = ctx.openapi.apps.empty()
+    api = ctx.openapi.serve(basic.empty())
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When there is a GET request and a response that doesn't return content (e.g. 204)
     stream = EventStream(schema).execute()
@@ -254,7 +255,7 @@ def test_response_under_recorded_payload_limit_is_kept_intact(ctx, app_runner):
 
 
 def test_empty_string_response_interaction(ctx):
-    api = ctx.openapi.apps.empty_string()
+    api = ctx.openapi.serve(basic.empty_string())
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When there is a response that returns payload of length 0
     stream = EventStream(schema).execute()
@@ -443,7 +444,7 @@ def test_known_content_type(ctx):
 
 
 def test_response_conformance_invalid(ctx):
-    api = ctx.openapi.apps.invalid_response()
+    api = ctx.openapi.serve(basic.invalid_response())
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
@@ -504,7 +505,7 @@ def test_response_conformance_valid(ctx):
 
 
 def test_response_conformance_recursive_valid(ctx):
-    api = ctx.openapi.apps.recursive()
+    api = ctx.openapi.serve(basic.recursive())
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation contains a response that have recursive references
     # And "response_schema_conformance" is specified
@@ -804,7 +805,7 @@ def test_plain_text_body(ctx):
 
 
 def test_invalid_path_parameter(ctx):
-    api = ctx.openapi.apps.invalid_path_parameter()
+    api = ctx.openapi.serve(basic.invalid_path_parameter())
     # When a path parameter is marked as not required
     # And schema validation is disabled
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -1201,7 +1202,7 @@ def test_connection_error(ctx):
 
 def test_reserved_characters_in_operation_name(ctx):
     # See GH-992
-    api = ctx.openapi.apps.reserved()
+    api = ctx.openapi.serve(basic.reserved())
     schema = schemathesis.openapi.from_url(api.schema_url)
 
     def check(ctx, response, case):
@@ -1801,7 +1802,7 @@ def test_max_time_keeps_coverage_single_pass_without_feedback(ctx):
 
 def test_max_time_coverage_rerun_is_scoped_to_taught_operations(ctx):
     # An operation that taught nothing would regenerate identical cases, so the repeat skips it.
-    api = ctx.openapi.apps.planted_bug_with_quiet_operation()
+    api = ctx.openapi.serve(error_feedback.planted_bug_with_quiet_operation())
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
     passes: list[list[str]] = []
@@ -1866,7 +1867,7 @@ def test_max_time_skips_coverage_rerun_for_feedback_that_cannot_change_generatio
 
 def test_max_time_skips_coverage_rerun_when_feedback_predates_the_pass(ctx):
     # The examples phase already taught the parsers, so no scoped repeat follows the two full passes.
-    api = ctx.openapi.apps.planted_bug_taught_by_examples()
+    api = ctx.openapi.serve(error_feedback.planted_bug_taught_by_examples())
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(
         schema,
@@ -1880,7 +1881,7 @@ def test_max_time_skips_coverage_rerun_when_feedback_predates_the_pass(ctx):
 
 def test_max_time_repeats_coverage_until_feedback_stops_arriving(ctx):
     # Satisfying the first constraint reveals a second one, which only another pass can act on.
-    api = ctx.openapi.apps.two_stage_planted_bug()
+    api = ctx.openapi.serve(error_feedback.two_stage_planted_bug())
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
 
@@ -1992,7 +1993,7 @@ def test_max_time_stops_generating_once_the_budget_is_gone(ctx, app_runner):
 
 def test_max_time_bounds_coverage_repeats_when_feedback_never_settles(ctx):
     # An API that never stops teaching would otherwise spend the whole budget on coverage.
-    api = ctx.openapi.apps.endlessly_novel_feedback()
+    api = ctx.openapi.serve(error_feedback.endlessly_novel_feedback())
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_time=1, max_examples=100_000, phases=[PhaseName.COVERAGE])
 
@@ -2338,16 +2339,16 @@ def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner
 
 # Each planted 500 sits behind a value only a listing response carries, so generation cannot invent it.
 @pytest.mark.parametrize(
-    "app",
+    "factory",
     [
-        "collection_with_planted_bug",
-        "undocumented_collection_with_planted_bug",
-        "vocabulary_path_with_planted_bug",
+        basic.collection_with_planted_bug,
+        basic.undocumented_collection_with_planted_bug,
+        basic.vocabulary_path_with_planted_bug,
     ],
     ids=["id-only-the-listing-carries", "undocumented-collection", "vocabulary-path-parameter"],
 )
-def test_planted_bug_behind_a_value_only_the_listing_carries(ctx, app):
-    api = getattr(ctx.openapi.apps, app)()
+def test_planted_bug_behind_a_value_only_the_listing_carries(ctx, factory):
+    api = ctx.openapi.serve(factory())
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(
         schema,

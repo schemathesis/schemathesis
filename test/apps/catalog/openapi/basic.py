@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from flask import jsonify, request
 from starlette.types import Receive, Scope, Send
 
-from test.apps.builders import build_schema, make_flask_app_from_schema
+from test.apps.builders import build_schema, flask_app, make_flask_app_from_schema
 from test.apps.fragments import handlers, schemas
 from test.apps.runtime import OpenAPIApp
 
@@ -16,118 +16,76 @@ _HEISEN_AUTH_SCHEME = {"securitySchemes": {"heisenAuth": {"type": "http", "schem
 
 
 def success() -> OpenAPIApp:
-    spec = build_schema(schemas.success())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.success(), handlers.register_success)
 
 
 def per_path_servers() -> OpenAPIApp:
-    spec = build_schema(schemas.per_path_servers())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_per_path_servers(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.per_path_servers(), handlers.register_per_path_servers)
 
 
 def failure() -> OpenAPIApp:
-    spec = build_schema(schemas.failure())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_failure(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.failure(), handlers.register_failure)
 
 
 def multiple_failures() -> OpenAPIApp:
-    spec = build_schema(schemas.multiple_failures())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_multiple_failures(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.multiple_failures(), handlers.register_multiple_failures)
 
 
 def custom_format() -> OpenAPIApp:
-    spec = build_schema(schemas.custom_format())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_custom_format(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.custom_format(), handlers.register_custom_format)
 
 
 def payload() -> OpenAPIApp:
-    spec = build_schema(schemas.payload())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_payload(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.payload(), handlers.register_payload)
 
 
 def unsatisfiable() -> OpenAPIApp:
-    spec = build_schema(schemas.unsatisfiable())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_unsatisfiable(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.unsatisfiable(), handlers.register_unsatisfiable)
 
 
 def success_and_failure() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.failure()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_failure(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app({**schemas.success(), **schemas.failure()}, handlers.register_success, handlers.register_failure)
 
 
 def success_failure_multiple_failures_custom_format() -> OpenAPIApp:
-    spec = build_schema(
-        {**schemas.success(), **schemas.failure(), **schemas.multiple_failures(), **schemas.custom_format()}
+    return flask_app(
+        {**schemas.success(), **schemas.failure(), **schemas.multiple_failures(), **schemas.custom_format()},
+        handlers.register_success,
+        handlers.register_failure,
+        handlers.register_multiple_failures,
+        handlers.register_custom_format,
     )
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_failure(app)
-    handlers.register_multiple_failures(app)
-    handlers.register_custom_format(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 def failure_multiple_failures_unsatisfiable() -> OpenAPIApp:
-    spec = build_schema({**schemas.failure(), **schemas.multiple_failures(), **schemas.unsatisfiable()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_failure(app)
-    handlers.register_multiple_failures(app)
-    handlers.register_unsatisfiable(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.failure(), **schemas.multiple_failures(), **schemas.unsatisfiable()},
+        handlers.register_failure,
+        handlers.register_multiple_failures,
+        handlers.register_unsatisfiable,
+    )
 
 
 def multipart() -> OpenAPIApp:
-    spec = build_schema(schemas.multipart())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_multipart(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.multipart(), handlers.register_multipart)
 
 
 def csv_payload() -> OpenAPIApp:
-    spec = build_schema(schemas.csv_payload())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_csv_payload(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.csv_payload(), handlers.register_csv_payload)
 
 
 def identical_query_parameters() -> OpenAPIApp:
-    spec = build_schema(schemas.identical_query_parameters())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_identical_query_parameters(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.identical_query_parameters(), handlers.register_identical_query_parameters)
 
 
 def flaky() -> OpenAPIApp:
-    spec = build_schema(schemas.flaky())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_flaky(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.flaky(), handlers.register_flaky)
 
 
 def ignored_auth() -> OpenAPIApp:
     # Endpoint declares heisenAuth but the handler ignores it; used to verify the
     # `ignored_auth` check fires when the server doesn't actually require declared credentials.
-    spec = build_schema(schemas.ignored_auth(), components=_HEISEN_AUTH_SCHEME)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_ignored_auth(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.ignored_auth(), handlers.register_ignored_auth, components=_HEISEN_AUTH_SCHEME)
 
 
 _NODE_DEFINITION = {
@@ -138,65 +96,49 @@ _NODE_DEFINITION = {
 
 
 def form() -> OpenAPIApp:
-    spec = build_schema(schemas.form())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_form(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.form(), handlers.register_form)
 
 
 def upload_file() -> OpenAPIApp:
-    spec = build_schema(schemas.upload_file())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_upload_file(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.upload_file(), handlers.register_upload_file)
 
 
 def always_incorrect() -> OpenAPIApp:
-    spec = build_schema(schemas.always_incorrect())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_always_incorrect(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.always_incorrect(), handlers.register_always_incorrect)
 
 
 def success_and_upload_file() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.upload_file()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_upload_file(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.success(), **schemas.upload_file()}, handlers.register_success, handlers.register_upload_file
+    )
 
 
 def upload_file_and_custom_format() -> OpenAPIApp:
-    spec = build_schema({**schemas.upload_file(), **schemas.custom_format()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_upload_file(app)
-    handlers.register_custom_format(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.upload_file(), **schemas.custom_format()},
+        handlers.register_upload_file,
+        handlers.register_custom_format,
+    )
 
 
 def success_and_custom_format() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.custom_format()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_custom_format(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.success(), **schemas.custom_format()}, handlers.register_success, handlers.register_custom_format
+    )
 
 
 def success_failure_unsatisfiable_empty_string() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.failure(), **schemas.unsatisfiable(), **schemas.empty_string()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_failure(app)
-    handlers.register_unsatisfiable(app)
-    handlers.register_empty_string(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.success(), **schemas.failure(), **schemas.unsatisfiable(), **schemas.empty_string()},
+        handlers.register_success,
+        handlers.register_failure,
+        handlers.register_unsatisfiable,
+        handlers.register_empty_string,
+    )
 
 
 def empty() -> OpenAPIApp:
-    spec = build_schema(schemas.empty())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_empty(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.empty(), handlers.register_empty)
 
 
 def no_operations() -> OpenAPIApp:
@@ -206,10 +148,7 @@ def no_operations() -> OpenAPIApp:
 
 
 def empty_string() -> OpenAPIApp:
-    spec = build_schema(schemas.empty_string())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_empty_string(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.empty_string(), handlers.register_empty_string)
 
 
 def recursive() -> OpenAPIApp:
@@ -220,17 +159,11 @@ def recursive() -> OpenAPIApp:
 
 
 def invalid_response() -> OpenAPIApp:
-    spec = build_schema(schemas.invalid_response())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_invalid_response(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.invalid_response(), handlers.register_invalid_response)
 
 
 def invalid_path_parameter() -> OpenAPIApp:
-    spec = build_schema(schemas.invalid_path_parameter())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_invalid_path_parameter(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.invalid_path_parameter(), handlers.register_invalid_path_parameter)
 
 
 def missing_path_parameter() -> OpenAPIApp:
@@ -241,73 +174,43 @@ def missing_path_parameter() -> OpenAPIApp:
 
 
 def reserved() -> OpenAPIApp:
-    spec = build_schema(schemas.reserved())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_reserved(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.reserved(), handlers.register_reserved)
 
 
 def conformance() -> OpenAPIApp:
-    spec = build_schema(schemas.conformance())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_conformance(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.conformance(), handlers.register_conformance)
 
 
 def cp866() -> OpenAPIApp:
-    spec = build_schema(schemas.cp866())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_cp866(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.cp866(), handlers.register_cp866)
 
 
 def read_only() -> OpenAPIApp:
-    spec = build_schema(schemas.read_only(), components=schemas.READ_WRITE_COMPONENTS)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_read_only(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.read_only(), handlers.register_read_only, components=schemas.READ_WRITE_COMPONENTS)
 
 
 def write_only() -> OpenAPIApp:
-    spec = build_schema(schemas.write_only(), components=schemas.READ_WRITE_COMPONENTS)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_write_only(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.write_only(), handlers.register_write_only, components=schemas.READ_WRITE_COMPONENTS)
 
 
 def text() -> OpenAPIApp:
-    spec = build_schema(schemas.text())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_text(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.text(), handlers.register_text)
 
 
 def plain_text_body() -> OpenAPIApp:
-    spec = build_schema(schemas.plain_text_body())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_plain_text_body(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.plain_text_body(), handlers.register_plain_text_body)
 
 
 def teapot() -> OpenAPIApp:
-    spec = build_schema(schemas.teapot())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_teapot(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.teapot(), handlers.register_teapot)
 
 
 def malformed_json() -> OpenAPIApp:
-    spec = build_schema(schemas.malformed_json())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_malformed_json(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.malformed_json(), handlers.register_malformed_json)
 
 
 def invalid() -> OpenAPIApp:
-    spec = build_schema(schemas.invalid())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_invalid(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.invalid(), handlers.register_invalid)
 
 
 def success_text_and_write_only() -> OpenAPIApp:
@@ -327,78 +230,54 @@ def success_text_and_write_only() -> OpenAPIApp:
 
 
 def success_and_text() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.text()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_text(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app({**schemas.success(), **schemas.text()}, handlers.register_success, handlers.register_text)
 
 
 def slow() -> OpenAPIApp:
-    spec = build_schema(schemas.slow())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_slow(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.slow(), handlers.register_slow)
 
 
 def headers() -> OpenAPIApp:
-    spec = build_schema(schemas.headers(), components=_API_KEY_SCHEME)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_headers(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.headers(), handlers.register_headers, components=_API_KEY_SCHEME)
 
 
 def path_variable() -> OpenAPIApp:
-    spec = build_schema(schemas.path_variable())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_path_variable(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.path_variable(), handlers.register_path_variable)
 
 
 def array_path_variable() -> OpenAPIApp:
-    spec = build_schema(schemas.array_path_variable())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_array_path_variable(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.array_path_variable(), handlers.register_array_path_variable)
 
 
 def path_variable_and_custom_format() -> OpenAPIApp:
-    spec = build_schema({**schemas.path_variable(), **schemas.custom_format()})
-    app = make_flask_app_from_schema(spec)
-    handlers.register_path_variable(app)
-    handlers.register_custom_format(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.path_variable(), **schemas.custom_format()},
+        handlers.register_path_variable,
+        handlers.register_custom_format,
+    )
 
 
 def basic() -> OpenAPIApp:
     # 401 is intentionally undocumented so test cases hitting the endpoint without
     # auth surface as response-validation failures.
-    spec = build_schema(schemas.basic(), components=_BASIC_AUTH_SCHEME)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_basic(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.basic(), handlers.register_basic, components=_BASIC_AUTH_SCHEME)
 
 
 def basic_with_query() -> OpenAPIApp:
-    spec = build_schema(schemas.basic_with_query(), components=_BASIC_AUTH_SCHEME)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_basic_with_query(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.basic_with_query(), handlers.register_basic_with_query, components=_BASIC_AUTH_SCHEME)
 
 
 def success_and_basic() -> OpenAPIApp:
-    spec = build_schema({**schemas.success(), **schemas.basic()}, components=_BASIC_AUTH_SCHEME)
-    app = make_flask_app_from_schema(spec)
-    handlers.register_success(app)
-    handlers.register_basic(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(
+        {**schemas.success(), **schemas.basic()},
+        handlers.register_success,
+        handlers.register_basic,
+        components=_BASIC_AUTH_SCHEME,
+    )
 
 
 def sessions_and_log_event() -> OpenAPIApp:
-    spec = build_schema(schemas.sessions_and_log_event())
-    app = make_flask_app_from_schema(spec)
-    handlers.register_sessions_and_log_event(app)
-    return OpenAPIApp(spec=spec, server=app, kind="flask")
+    return flask_app(schemas.sessions_and_log_event(), handlers.register_sessions_and_log_event)
 
 
 # Every fragment in `test/apps/fragments/schemas.py`, including deliberately-broken ones.

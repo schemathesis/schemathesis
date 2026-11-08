@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from flask import Flask, jsonify, request
 
 from schemathesis.engine.run.probes import HEADER_NAME
-from test.apps.runtime import CapturedRequest
+from test.apps.runtime import CapturedRequest, OpenAPIApp
 
 
 def build_schema(paths: dict[str, Any] | None, *, version: str = "3.0.2", **kwargs: Any) -> dict[str, Any]:
@@ -75,6 +76,16 @@ def make_flask_app_from_schema(schema: dict[str, Any]) -> Flask:
 def make_flask_app(paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: Any) -> tuple[Flask, dict[str, Any]]:
     schema = build_schema(paths, version=version, **kwargs)
     return make_flask_app_from_schema(schema), schema
+
+
+def flask_app(
+    paths: dict[str, Any], *registers: Callable[[Flask], None], version: str = "3.0.2", **kwargs: Any
+) -> OpenAPIApp:
+    spec = build_schema(paths, version=version, **kwargs)
+    app = make_flask_app_from_schema(spec)
+    for register in registers:
+        register(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
 _HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]

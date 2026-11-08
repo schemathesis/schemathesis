@@ -7,6 +7,7 @@ import pytest
 from _pytest.main import ExitCode
 from flask import jsonify, request
 
+from test.apps.catalog.openapi import users
 from test.apps.catalog.openapi.modifiers.stateful import (
     InvalidParameter,
     OmitRequiredField,
@@ -52,7 +53,7 @@ def test_sanitization(ctx, cli, tmp_path):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.flaky(reruns=4)
 def test_max_failures(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.users_crud_with_failure()
+    api = ctx.openapi.serve(users.crud_with_failure())
     assert (
         cli.run(
             api.schema_url,
@@ -192,7 +193,7 @@ def test_stateful_only_without_links(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_link(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.users_create_only()
+    api = ctx.openapi.serve(users.create_user_only())
     assert cli.run(api.schema_url, "--phases=stateful") == snapshot_cli
 
 

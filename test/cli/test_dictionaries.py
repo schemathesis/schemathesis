@@ -1,10 +1,12 @@
 import pytest
 from flask import jsonify
 
+from test.apps.catalog.openapi import nested
+
 
 def test_parameter_dictionary_wins_over_values_captured_from_responses(ctx, cli):
     # `GET /languages/` hands `en` to the resource pool; the binding still decides `code`.
-    api = ctx.openapi.apps.languages_with_codes()
+    api = ctx.openapi.serve(nested.languages_with_codes())
 
     cli.run(
         api.schema_url,

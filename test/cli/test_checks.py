@@ -8,6 +8,7 @@ from _pytest.main import ExitCode
 from flask import Response, jsonify, redirect, request
 
 import schemathesis
+from test.apps.catalog.openapi import basic
 from test.utils import to_float32
 
 
@@ -2307,7 +2308,7 @@ def test_alternative_security_requirements_should_not_trigger_negative_data_reje
 
 def test_ignored_auth_probes_each_operation_until_enforcement_is_confirmed(ctx, cli):
     # Every successful case used to trigger its own unauthenticated requests; one confirmation is enough.
-    api = ctx.openapi.apps.basic_with_query()
+    api = ctx.openapi.serve(basic.basic_with_query())
 
     cli.run(
         api.schema_url,
