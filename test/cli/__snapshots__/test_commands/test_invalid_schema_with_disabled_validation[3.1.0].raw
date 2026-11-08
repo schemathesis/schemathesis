@@ -38,8 +38,8 @@ Location:
 
 Problematic definition:
     {
-        "bearerFormat": "uuid",
-        "scheme": "bearer"
+        "scheme": "bearer",
+        "bearerFormat": "uuid"
     }
 
 Error details:

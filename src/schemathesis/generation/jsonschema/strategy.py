@@ -34,6 +34,7 @@ from schemathesis.core.jsonschema import (
     matches_pattern,
     pattern_matcher,
 )
+from schemathesis.core.jsonschema.numeric import json_number
 from schemathesis.core.jsonschema.patterns import (
     anchor_end_of_string,
     compile_ecma_pattern,
@@ -1035,7 +1036,7 @@ def json_identity(value: JsonValue) -> object:
     # Numbers compare by value, so `1` and `1.0` are one element. Exact rationals, since rounding
     # to a float would merge distinct numbers that happen to share one.
     if isinstance(value, (int, float)):
-        return ("number", _spelled(value))
+        return ("number", json_number(value))
     # A binary payload keeps its bytes outside the string, and every one of them compares equal as a `str`.
     if isinstance(value, Binary):
         return ("binary", value.data)
@@ -1398,7 +1399,7 @@ def _as_whole_float(value: JsonValue) -> JsonValue:
 
 def _barred_divisors(values: list[Numeric]) -> list[Fraction]:
     # Exact rationals, for the reason `_combined_multiple_of` needs them.
-    return [Fraction(str(value)) for value in values]
+    return [json_number(value) for value in values]
 
 
 def _every_step_is_barred(step: Fraction, barred: list[Fraction]) -> bool:
@@ -1411,7 +1412,7 @@ def _outside_divisors(strategy: SearchStrategy[JsonValue], barred: list[Fraction
         return strategy
 
     def is_admitted(value: JsonValue) -> bool:
-        spelled = Fraction(str(value))
+        spelled = json_number(cast("int | float", value))
         return all(spelled % divisor != 0 for divisor in barred)
 
     return strategy.filter(is_admitted)
@@ -1455,8 +1456,8 @@ def _grid_check(
     view: jsonschema_rs.canonical.NumberView, multiple_of: Fraction
 ) -> Callable[[int | float | _Unrepresentable], TypeGuard[int | float]]:
     """Accept only what every reading of the emitted number clears."""
-    minimum = None if view.minimum is None else _spelled(view.minimum)
-    maximum = None if view.maximum is None else _spelled(view.maximum)
+    minimum = None if view.minimum is None else json_number(view.minimum)
+    maximum = None if view.maximum is None else json_number(view.maximum)
     exclusive_minimum = view.exclusive_minimum
     exclusive_maximum = view.exclusive_maximum
 
@@ -1464,7 +1465,7 @@ def _grid_check(
         if value is _UNREPRESENTABLE:
             return False
         number = cast("int | float", value)
-        spelled = _spelled(number)
+        spelled = json_number(number)
         if spelled % multiple_of != 0:
             return False
         for reading in _readings(number, spelled):
@@ -1505,12 +1506,7 @@ def _upper_step(bound: Numeric | None, exclusive: bool, step_size: Fraction) -> 
 
 
 def _quotient(bound: Numeric, step_size: Fraction) -> Fraction:
-    return _spelled(bound) / step_size
-
-
-def _spelled(value: Numeric) -> Fraction:
-    # `str` first: a JSON number means the decimal it spells, not the binary float storing it.
-    return Fraction(str(value))
+    return json_number(bound) / step_size
 
 
 def _fraction_to_json_number(value: Fraction) -> int | float | _Unrepresentable:
@@ -1534,8 +1530,8 @@ def _representable_float_bounds(
             low = float(view.minimum)
             # An exclusive bound rules out its own rounding; an inclusive one only rules out a float
             # landing under it.
-            minimum = _spelled(view.minimum)
-            if view.exclusive_minimum or any(reading < minimum for reading in _readings(low, _spelled(low))):
+            minimum = json_number(view.minimum)
+            if view.exclusive_minimum or any(reading < minimum for reading in _readings(low, json_number(low))):
                 low = math.nextafter(low, math.inf)
 
     high = None
@@ -1544,8 +1540,8 @@ def _representable_float_bounds(
             return None
         if view.maximum <= sys.float_info.max:
             high = float(view.maximum)
-            maximum = _spelled(view.maximum)
-            if view.exclusive_maximum or any(reading > maximum for reading in _readings(high, _spelled(high))):
+            maximum = json_number(view.maximum)
+            if view.exclusive_maximum or any(reading > maximum for reading in _readings(high, json_number(high))):
                 high = math.nextafter(high, -math.inf)
 
     if low is not None and high is not None and low > high:
@@ -1561,7 +1557,7 @@ def _combined_multiple_of(values: list[Numeric]) -> Fraction | None:
     # divisors admit exactly the multiples of their least common multiple.
     combined = None
     for value in values:
-        candidate = Fraction(str(value))
+        candidate = json_number(value)
         if combined is None:
             combined = candidate
         else:

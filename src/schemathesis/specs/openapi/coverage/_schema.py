@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass, replace
-from decimal import Decimal
 from fractions import Fraction
 from functools import cache, partial
 from hashlib import blake2b
@@ -33,6 +32,7 @@ from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 from schemathesis.core.jsonschema.numeric import (
     bounds_are_unsatisfiable,
     is_numeric_bound,
+    json_number,
     next_float32,
     resolve_inclusive_bounds,
 )
@@ -3416,18 +3416,13 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         )
 
 
-def _rational(value: int | float) -> Fraction:
-    """A number as the decimal its JSON text spells, which is what the validator computes with."""
-    return Fraction(value) if isinstance(value, int) else Fraction(str(value))
-
-
 def _as_number(value: Fraction) -> int | float:
     """A rational as JSON spells it: an integer where it is whole, since past 2**53 a float may not be able to."""
     return int(value) if value.denominator == 1 else float(value)
 
 
 def _spelled_multiple(candidate: Fraction, step: Fraction, *, going_up: bool) -> int | float | None:
-    """The candidate where a float's JSON text spells it exactly, else the nearest multiple past it one does."""
+    """The candidate where a float reads back as it exactly, else the nearest multiple past it one does."""
     integer_step = step.numerator
     integer_candidate = (ceil(candidate / integer_step) if going_up else floor(candidate / integer_step)) * integer_step
     # Multiples of an awkward step can miss every float for a stretch; a few floats on is as far as it is worth going.
@@ -3435,9 +3430,9 @@ def _spelled_multiple(candidate: Fraction, step: Fraction, *, going_up: bool) ->
         number = _as_number(candidate)
         if isinstance(number, int) or isinf(number):
             return None if isinstance(number, float) else number
-        if Fraction(str(number)) == candidate:
+        if json_number(number) == candidate:
             return number
-        edge = _rational(nextafter(number, inf if going_up else -inf))
+        edge = json_number(nextafter(number, inf if going_up else -inf))
         quotient, remainder = divmod(edge, step)
         candidate = edge if remainder == 0 else step * (quotient + 1 if going_up else quotient)
     return integer_candidate
@@ -3447,27 +3442,24 @@ def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float
     """Find the closest multiple of X that is greater than Y."""
     if isinstance(y, int) and isinstance(x, int):
         return y if y % x == 0 else y + x - y % x
-    step = _rational(x)
-    quotient, remainder = divmod(_rational(y), step)
-    return _spelled_multiple(_rational(y) if remainder == 0 else step * (quotient + 1), step, going_up=True)
+    step = json_number(x)
+    quotient, remainder = divmod(json_number(y), step)
+    return _spelled_multiple(json_number(y) if remainder == 0 else step * (quotient + 1), step, going_up=True)
 
 
 def _shift_by_multiple(value: int | float, step: int | float, *, direction: int) -> int | float | None:
     if isinstance(value, int) and isinstance(step, int):
         return value + direction * step
-    return _spelled_multiple(_rational(value) + direction * _rational(step), _rational(step), going_up=direction > 0)
+    return _spelled_multiple(
+        json_number(value) + direction * json_number(step), json_number(step), going_up=direction > 0
+    )
 
 
 def _largest_multiple_within(value: int | float, step: int | float) -> int | float | None:
     if isinstance(value, int) and isinstance(step, int):
         return value - (value % step)
-    rational, rational_step = _rational(value), _rational(step)
+    rational, rational_step = json_number(value), json_number(step)
     return _spelled_multiple(rational - rational % rational_step, rational_step, going_up=False)
-
-
-def _exact(bound: int | float) -> int | Decimal:
-    """A float bound as the decimal its JSON text spells, which is what the validator compares against."""
-    return bound if isinstance(bound, int) else Decimal(str(bound))
 
 
 def _adjust_numeric_bound(
@@ -3475,7 +3467,7 @@ def _adjust_numeric_bound(
 ) -> int | float:
     if is_integer:
         # Stepped in integer arithmetic: a unit step vanishes on a float past 2**53.
-        return floor(_exact(value)) + 1 if going_up else ceil(_exact(value)) - 1
+        return floor(value) + 1 if going_up else ceil(value) - 1
     if is_float32:
         return next_float32(value, going_up=going_up)
     return nextafter(float(value), inf if going_up else -inf)
@@ -3489,7 +3481,7 @@ def _just_past(schema: JsonSchemaObject, bound: int | float, *, going_up: bool) 
     direction = 1 if going_up else -1
     declared = schema.get("type")
     if "integer" in (declared if isinstance(declared, list) else [declared]):
-        return (floor(_exact(bound)) if going_up else ceil(_exact(bound))) + direction
+        return (floor(bound) if going_up else ceil(bound)) + direction
     if schema.get("format") == "float":
         # A single-precision reader narrows the value, so the step reaches at least the next single.
         edge = next_float32(bound, going_up=going_up)
@@ -3516,9 +3508,9 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     is_float32 = not is_integer and schema.get("format") == "float"
     if is_integer:
         # Draft 4 reads `1.0` as a number, so an integer's boundary is the nearest integer inside the bound; rounded
-        # first, in decimal, so it compares with a stepped exclusive bound the way the validator reads both.
+        # first, so it compares with a stepped exclusive bound the way the validator does.
         rounded = {
-            key: int(rounding(_exact(schema[key])))
+            key: rounding(schema[key])
             for key, rounding in (("minimum", ceil), ("maximum", floor))
             if is_numeric_bound(schema.get(key))
         }
@@ -3535,16 +3527,14 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     multiple_of = schema.get("multipleOf")
     if is_integer and multiple_of is not None and not isinstance(multiple_of, int):
         # Integer multiples of `p/q` are exactly the multiples of `p`.
-        multiple_of = Fraction(Decimal(str(multiple_of))).numerator
+        multiple_of = json_number(multiple_of).numerator
     seen = HashSet()
 
     def _within_adjusted_bounds(value: object) -> bool:
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             return False
-        # Read in decimal, the way the validator reads both the value and the bound: past 2**53 a
-        # multiple that fits the bound's text can still compare outside the float that spells it.
-        exact = _exact(value)
-        return (minimum is None or exact >= _exact(minimum)) and (maximum is None or exact <= _exact(maximum))
+        # Native comparison is exact, which is how the validator reads a float past 2**53.
+        return (minimum is None or value >= minimum) and (maximum is None or value <= maximum)
 
     if not _SPEC_HINT_KEYS.isdisjoint(schema):
         yield from _spec_hint_values(
