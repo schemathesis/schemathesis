@@ -3487,12 +3487,12 @@ def test_cookie_value_barred_from_every_printable_character_is_empty(ctx):
     [
         # The nearest float to the folded bound spells the excluded bound back.
         (
-            {"type": "number", "multipleOf": 1e-20, "exclusiveMinimum": 10**25, "maximum": 1e308},
+            {"type": "number", "multipleOf": 1e-20, "exclusiveMinimum": int(1e25), "maximum": 1e308},
             1e25,
         ),
-        # The nearest float to the maximum spells a decimal above it.
+        # The nearest float to the maximum holds an integer above it.
         (
-            {"type": "number", "minimum": 0.1, "maximum": 123456789012345678901234567890},
+            {"type": "number", "minimum": 0.1, "maximum": int(1.2345678901234568e29) - 1},
             1.2345678901234568e29,
         ),
     ],

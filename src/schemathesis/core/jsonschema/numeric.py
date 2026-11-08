@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import struct
 from collections.abc import Callable
-from math import inf
+from decimal import Decimal
+from fractions import Fraction
+from math import inf, isfinite
 from typing import Any, TypeGuard
 
 # Largest finite float32
@@ -42,6 +44,19 @@ def next_float32(value: int | float, *, going_up: bool) -> float:
     if not going_up and rounded < value:
         return rounded
     return _float32_neighbor(rounded, going_up=going_up)
+
+
+# From here up every float is whole, and the validator reads it as the integer it holds.
+_WHOLE_FLOATS_FROM = 2**53
+
+
+def json_number(value: int | float | Decimal) -> Fraction:
+    """A JSON number as the validator reads it: the decimal its shortest text spells, or a whole float's exact value."""
+    if isinstance(value, int):
+        return Fraction(value)
+    if isinstance(value, float) and isfinite(value) and abs(value) >= _WHOLE_FLOATS_FROM:
+        return Fraction(int(value))
+    return Fraction(str(value))
 
 
 def is_numeric_bound(value: Any) -> TypeGuard[int | float]:
