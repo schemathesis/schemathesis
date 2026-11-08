@@ -151,28 +151,27 @@ def test_global_query_hook(ctx):
 def test_case_hook(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
-    with ctx.restore_hooks():
-        dispatcher = HookDispatcher(scope=HookScope.TEST)
+    dispatcher = HookDispatcher(scope=HookScope.TEST)
 
-        @dispatcher.hook
-        def map_case(context, case):
-            case.body["extra"] = 42
-            return case
+    @dispatcher.hook
+    def map_case(context, case):
+        case.body["extra"] = 42
+        return case
 
-        @schemathesis.hook
-        def map_case(context, case):  # noqa: F811
-            case.body["first_name"] = case.body["last_name"]
-            return case
+    @schemathesis.hook
+    def map_case(context, case):  # noqa: F811
+        case.body["first_name"] = case.body["last_name"]
+        return case
 
-        strategy = schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
+    strategy = schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
 
-        @given(case=strategy)
-        @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
-        def test(case):
-            assert case.body["first_name"] == case.body["last_name"]
-            assert case.body["extra"] == 42
+    @given(case=strategy)
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    def test(case):
+        assert case.body["first_name"] == case.body["last_name"]
+        assert case.body["extra"] == 42
 
-        test()
+    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -584,26 +583,24 @@ def test_after_validate_hook(ctx):
     api_schema = schemathesis.openapi.from_url(api.schema_url)
     results = []
 
-    with ctx.restore_hooks():
+    @schemathesis.hook
+    def after_validate(context, case, response, check_results):
+        results.extend(check_results)
 
-        @schemathesis.hook
-        def after_validate(context, case, response, check_results):
-            results.extend(check_results)
+    @given(case=api_schema["/api/success"]["GET"].as_strategy())
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    def test_success(case):
+        case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
 
-        @given(case=api_schema["/api/success"]["GET"].as_strategy())
-        @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
-        def test_success(case):
+    test_success()
+
+    @given(case=api_schema["/api/failure"]["GET"].as_strategy())
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    def test_failure(case):
+        with pytest.raises(FailureGroup):
             case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
 
-        test_success()
-
-        @given(case=api_schema["/api/failure"]["GET"].as_strategy())
-        @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
-        def test_failure(case):
-            with pytest.raises(FailureGroup):
-                case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
-
-        test_failure()
+    test_failure()
 
     assert [(r.name, r.status) for r in results] == [
         ("not_a_server_error", Status.SUCCESS),

@@ -13,7 +13,6 @@ from flask import Flask
 
 import schemathesis
 from schemathesis.checks import CHECKS
-from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
@@ -804,16 +803,7 @@ class Context:
 
     @contextmanager
     def hook(self, content: str):
-        with self.restore_hooks():
-            yield self.write_pymodule(content)
-
-    @contextmanager
-    def restore_hooks(self):
-        before = GLOBAL_HOOK_DISPATCHER.get_all()
-        try:
-            yield
-        finally:
-            GLOBAL_HOOK_DISPATCHER._hooks = before
+        yield self.write_pymodule(content)
 
 
 @pytest.fixture

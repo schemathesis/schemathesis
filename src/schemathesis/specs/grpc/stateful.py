@@ -249,7 +249,7 @@ def _root_rule(
 
     def body(self: GrpcStateMachine, data: st.DataObject) -> MultipleResults[Produced]:
         case = data.draw(strategy)
-        output = self._run_case(case, rule_name=rule_name, parent_id=None, applied_parameters=None)
+        output = self._run_case(case, rule_name=rule_name, parent_id=None)
         result = self._produce(output, fields)
         if result.values:
             self.control.record_productive_root(label)

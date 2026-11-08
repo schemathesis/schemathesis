@@ -146,25 +146,14 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout - DEADLINE_CLOCK_SLACK:
                 raise read_timeout_error(base_url, timeout, request) from error
             if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):
-                details = outcome.details() or ""
-                failed_to_connect = "failed to connect" in details.lower()
-                if any(marker in details for marker in TLS_FAILURE_MARKERS):
-                    failure = ConnectionError(TLS_FAILED.format(address=address, details=details))
-                    raise requests.exceptions.ConnectionError(failure, request=request) from failure
-                # Once the server has answered, a call that did not fail on reconnecting reached it and may be
-                # what brought it down; gRPC's own message is the only sign of a call retried on a new connection.
-                if channel in self._answered and not failed_to_connect:
-                    aborted = ConnectionAbortedError(f"Connection aborted. {details}")
-                    raise requests.exceptions.ConnectionError(aborted, request=request) from aborted
-                # A port proxy accepts the connection even when the server behind it is gone, then resets it.
-                if failed_to_connect and "connection reset by peer" in details.lower():
-                    reset = ConnectionResetError(f"Connection reset. {details}")
-                    raise requests.exceptions.ConnectionError(reset, request=request) from reset
-                if hint := connection_configuration_hint(address, tls, details):
-                    mismatch = ConnectionError(f"{details}. {hint}")
-                    raise requests.exceptions.ConnectionError(mismatch, request=request) from mismatch
-                refused = ConnectionRefusedError(f"Failed to connect to {base_url}: {details}")
-                raise requests.exceptions.ConnectionError(refused, request=request) from refused
+                cause = _unavailable_error(
+                    outcome.details() or "",
+                    address=address,
+                    tls=tls,
+                    base_url=base_url,
+                    answered=channel in self._answered,
+                )
+                raise requests.exceptions.ConnectionError(cause, request=request) from cause
             content = b""
         else:
             elapsed = started_at.elapsed
@@ -275,6 +264,23 @@ def accepts_tls(address: str) -> bool:
     except (OSError, ValueError):
         return False
     return True
+
+
+def _unavailable_error(details: str, *, address: str, tls: bool, base_url: str, answered: bool) -> OSError:
+    """Why a call to a server that is not there failed, as the network error `requests` would wrap."""
+    failed_to_connect = "failed to connect" in details.lower()
+    if any(marker in details for marker in TLS_FAILURE_MARKERS):
+        return ConnectionError(TLS_FAILED.format(address=address, details=details))
+    # Once the server has answered, a call that did not fail on reconnecting reached it and may be
+    # what brought it down; gRPC's own message is the only sign of a call retried on a new connection.
+    if answered and not failed_to_connect:
+        return ConnectionAbortedError(f"Connection aborted. {details}")
+    # A port proxy accepts the connection even when the server behind it is gone, then resets it.
+    if failed_to_connect and "connection reset by peer" in details.lower():
+        return ConnectionResetError(f"Connection reset. {details}")
+    if hint := connection_configuration_hint(address, tls, details):
+        return ConnectionError(f"{details}. {hint}")
+    return ConnectionRefusedError(f"Failed to connect to {base_url}: {details}")
 
 
 def connection_configuration_hint(address: str, tls: bool, details: str) -> str | None:

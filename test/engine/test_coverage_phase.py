@@ -78,10 +78,7 @@ def test_coverage_phase_authentication_error_emits_non_fatal_error(ctx):
         def set(self, case, data, context):
             pass
 
-    try:
-        stream = _coverage_only(schema)
-    finally:
-        schemathesis.auths.unregister()
+    stream = _coverage_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert errors, "expected at least one non-fatal error from auth failure"
@@ -110,13 +107,11 @@ def test_coverage_phase_drains_deduplicated_errors(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    with ctx.restore_hooks():
+    @schemathesis.hook
+    def before_call(context, case, **kwargs):
+        raise RuntimeError("kaboom")
 
-        @schemathesis.hook
-        def before_call(context, case, **kwargs):
-            raise RuntimeError("kaboom")
-
-        stream = _coverage_only(schema)
+    stream = _coverage_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert any("kaboom" in str(event.value) for event in errors), [str(e.value) for e in errors]
@@ -265,10 +260,7 @@ def test_coverage_phase_applies_override_when_container_is_absent(ctx, app_runne
     port = app_runner.run_flask_app(app)
     schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
 
-    try:
-        EventStream(schema, phases=[PhaseName.COVERAGE], parameters={"tag": "fixed"}).execute()
-    finally:
-        schemathesis.auths.unregister()
+    EventStream(schema, phases=[PhaseName.COVERAGE], parameters={"tag": "fixed"}).execute()
 
     calls = [request for request in app.config["captured_requests"] if request.path == "/items"]
     assert calls

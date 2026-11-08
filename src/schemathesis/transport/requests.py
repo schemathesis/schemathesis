@@ -33,7 +33,6 @@ from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import (
     get_exclude_headers,
-    prepare_body,
     prepare_cookies,
     prepare_headers,
     prepare_url,
@@ -156,7 +155,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         # transports pick one of `data` and `json` when given both, which can drop the caller's body.
         if serializer is not None and not replaces_body(kwargs):
             context = SerializationContext(case=case)
-            extra = serializer(context, prepare_body(case))
+            extra = serializer(context, case.operation.schema.prepare_request_body(case))
         else:
             extra = {}
 

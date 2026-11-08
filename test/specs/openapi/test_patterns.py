@@ -1880,15 +1880,14 @@ def test_coverage_phase_header_values_match_pattern(ctx, app_runner, pattern, me
     schema.config.phases.update(phases=["coverage"])
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     values = []
-    with ctx.restore_hooks():
 
-        @schemathesis.hook
-        def before_call(context, case, **kwargs):
-            if case.meta.generation.mode == GenerationMode.POSITIVE:
-                values.append(case.headers["X-Key"])
+    @schemathesis.hook
+    def before_call(context, case, **kwargs):
+        if case.meta.generation.mode == GenerationMode.POSITIVE:
+            values.append(case.headers["X-Key"])
 
-        for _ in from_schema(schema).execute():
-            pass
+    for _ in from_schema(schema).execute():
+        pass
     validator = jsonschema_rs.validator_for({"type": "string", "pattern": meaning})
     assert values
     assert all(validator.is_valid(value) for value in values), values

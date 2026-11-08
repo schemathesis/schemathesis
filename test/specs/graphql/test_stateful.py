@@ -201,17 +201,16 @@ def test_hooks_apply_once_to_stateful_cases(ctx):
     def before_call(context, case, kwargs):
         seen.add((case.headers["X-Global"], case.headers["X-Schema"]))
 
-    with ctx.restore_hooks():
-        schemathesis.hook(before_call)
-        schemathesis.hook("map_headers")(increment("X-Global"))
-        schema.hook("map_headers")(increment("X-Schema"))
-        schema.as_state_machine().run(
-            settings=hypothesis.settings(
-                max_examples=5,
-                deadline=None,
-                database=None,
-                phases=[hypothesis.Phase.generate],
-                suppress_health_check=list(hypothesis.HealthCheck),
-            )
+    schemathesis.hook(before_call)
+    schemathesis.hook("map_headers")(increment("X-Global"))
+    schema.hook("map_headers")(increment("X-Schema"))
+    schema.as_state_machine().run(
+        settings=hypothesis.settings(
+            max_examples=5,
+            deadline=None,
+            database=None,
+            phases=[hypothesis.Phase.generate],
+            suppress_health_check=list(hypothesis.HealthCheck),
         )
+    )
     assert seen == {("1", "1")}

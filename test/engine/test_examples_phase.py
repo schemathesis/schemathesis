@@ -150,13 +150,11 @@ def test_examples_phase_translates_generation_exception(ctx):
 def test_examples_phase_drains_deduplicated_errors(ctx):
     schema = _example_schema(ctx)
 
-    with ctx.restore_hooks():
+    @schemathesis.hook
+    def before_call(context, case, **kwargs):
+        raise RuntimeError("kaboom")
 
-        @schemathesis.hook
-        def before_call(context, case, **kwargs):
-            raise RuntimeError("kaboom")
-
-        stream = examples_only(schema)
+    stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any("kaboom" in str(event.value) for event in errors), [str(e.value) for e in errors]

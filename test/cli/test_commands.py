@@ -31,7 +31,6 @@ from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.shell import ShellType
 from schemathesis.engine import Status, control, events
 from schemathesis.engine.run import Phase, PhaseName
-from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.fragments import handlers
@@ -1120,7 +1119,7 @@ def test_proxy_error(ctx, cli, snapshot_cli):
 
 @pytest.fixture
 def digits_format(ctx):
-    module = ctx.write_pymodule(
+    return ctx.write_pymodule(
         """
     import string
     from hypothesis import strategies as st
@@ -1137,8 +1136,6 @@ def digits_format(ctx):
     )
     """
     )
-    yield module
-    unregister_string_format("digits")
 
 
 def test_hooks_valid(ctx, cli, digits_format):
