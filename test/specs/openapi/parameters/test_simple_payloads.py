@@ -8,6 +8,12 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import PayloadAlternatives
 from schemathesis.specs.openapi.adapter import v2, v3_0
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
+from test.specs.openapi.parameters.conftest import (
+    OPEN_API_2_USER_IN_BODY,
+    OPEN_API_3_USER,
+    USER_JSONSCHEMA,
+    assert_parameters,
+)
 
 
 @pytest.mark.parametrize(
@@ -20,19 +26,16 @@ from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 )
 def test_payload_open_api_2(
     consumes,
-    assert_parameters,
     make_openapi_2_schema,
-    open_api_2_user_in_body,
-    user_jsonschema,
 ):
     # A single "body" parameter is used for all payload variants
-    schema = make_openapi_2_schema(consumes, [open_api_2_user_in_body])
+    schema = make_openapi_2_schema(consumes, [OPEN_API_2_USER_IN_BODY])
     assert_parameters(
         schema,
         PayloadAlternatives(
             [
                 OpenApiBody.from_definition(
-                    definition=open_api_2_user_in_body,
+                    definition=OPEN_API_2_USER_IN_BODY,
                     is_required=False,
                     media_type=value,
                     resource_name=None,
@@ -43,7 +46,7 @@ def test_payload_open_api_2(
             ]
         ),
         # For each one the schema is extracted from the parameter definition and transformed to the proper JSON Schema
-        [user_jsonschema] * len(consumes),
+        [USER_JSONSCHEMA] * len(consumes),
     )
 
 
@@ -57,11 +60,11 @@ def test_payload_open_api_2(
         ["application/x-www-form-urlencoded", "multipart/form-data"],
     ],
 )
-def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schema, open_api_3_user, user_jsonschema):
+def test_payload_open_api_3(media_types, make_openapi_3_schema):
     schema = make_openapi_3_schema(
         {
             "required": True,
-            "content": {media_type: {"schema": open_api_3_user} for media_type in media_types},
+            "content": {media_type: {"schema": OPEN_API_3_USER} for media_type in media_types},
         }
     )
     assert_parameters(
@@ -69,7 +72,7 @@ def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schem
         PayloadAlternatives(
             [
                 OpenApiBody.from_definition(
-                    definition={"schema": open_api_3_user},
+                    definition={"schema": OPEN_API_3_USER},
                     media_type=media_type,
                     is_required=True,
                     resource_name=None,
@@ -81,7 +84,7 @@ def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schem
         ),
         # The converted schema should correspond the schema in the relevant "requestBody" part
         # In this case they are the same
-        [user_jsonschema] * len(media_types),
+        [USER_JSONSCHEMA] * len(media_types),
     )
 
 

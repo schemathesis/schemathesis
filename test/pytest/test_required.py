@@ -2,7 +2,9 @@ import pytest
 
 from schemathesis.generation.modes import GenerationMode
 
-from ..utils import as_param
+
+def as_param(*parameters):
+    return {"paths": {"/users": {"get": {"parameters": list(parameters), "responses": {"200": {"description": "OK"}}}}}}
 
 
 def test_required_parameters(testdir):

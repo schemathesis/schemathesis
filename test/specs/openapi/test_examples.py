@@ -518,13 +518,12 @@ def before_generate_case(context, strategy):
 
 @pytest.fixture
 def explicit_header(ctx):
-    with ctx.check("""
+    return ctx.write_pymodule("""
 @schemathesis.check
 def explicit_header(ctx, response, case):
     assert case.headers["anyKey"] == "OVERRIDE"
     assert case.query["id"] == "OVERRIDE"
-""") as module:
-        yield module
+""")
 
 
 def test_parameter_override(ctx, cli, snapshot_cli, explicit_header):

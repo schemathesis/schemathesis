@@ -8,11 +8,10 @@ import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.link_calibration import LinkCalibrationState
-from schemathesis.engine.run import stateful
+from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.generation.modes import GenerationMode
 from test.apps.catalog.openapi.stateful import UserStore
 from test.apps.runtime import Modifier
-from test.utils import stateful_phase
 
 
 class CalibrationObserver(LinkCalibrationState):
@@ -44,6 +43,7 @@ def _build_stateful_engine_ctx(
     max_response_time=None,
     headers=None,
     link_calibration: LinkCalibrationState | None = None,
+    include=None,
 ):
     api = ctx.openapi.apps.stateful_users(*modifiers)
     config = SchemathesisConfig()
@@ -64,23 +64,19 @@ def _build_stateful_engine_ctx(
     )
     config.projects.override.update(headers=headers)
     schema = schemathesis.openapi.from_url(api.schema_url, config=config)
+    if include is not None:
+        schema = schema.include(**include)
     engine_ctx = EngineContext(schema=schema, stop_event=stop_event)
     if link_calibration is not None:
         engine_ctx.link_calibration = link_calibration
-    return api, schema, engine_ctx
+    return api, engine_ctx
 
 
 @pytest.fixture
-def engine_factory(ctx, app_runner, stop_event):
-    def _engine_factory(
-        *modifiers: Modifier[UserStore],
-        include=None,
-        **kwargs,
-    ):
-        _, schema, engine_ctx = _build_stateful_engine_ctx(ctx, stop_event, *modifiers, **kwargs)
-        if include is not None:
-            schema = schema.include(**include)
-        return stateful.execute(engine=engine_ctx, phase=stateful_phase())
+def engine_factory(ctx, stop_event):
+    def _engine_factory(*modifiers: Modifier[UserStore], **kwargs):
+        _, engine_ctx = _build_stateful_engine_ctx(ctx, stop_event, *modifiers, **kwargs)
+        return stateful.execute(engine=engine_ctx, phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True))
 
     return _engine_factory
 
@@ -91,10 +87,10 @@ def calibration_engine_factory(ctx, stop_event):
 
     def _factory(*modifiers: Modifier[UserStore], max_examples: int = 15) -> CalibrationObserver:
         observer = CalibrationObserver()
-        api, _, engine_ctx = _build_stateful_engine_ctx(
+        api, engine_ctx = _build_stateful_engine_ctx(
             ctx, stop_event, *modifiers, max_examples=max_examples, link_calibration=observer
         )
-        list(stateful.execute(engine=engine_ctx, phase=stateful_phase()))
+        list(stateful.execute(engine=engine_ctx, phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)))
         observer.target_request_count = api.wsgi_app.config["target_request_count"]["count"]
         return observer
 

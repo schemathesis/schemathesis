@@ -758,7 +758,7 @@ def test_(case):
     assert "timed out" in result.stdout.str()
 
 
-@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_settings_database_from_profile(testdir):
     # When a hypothesis profile with a custom database is loaded
     # And @schema.parametrize() is used
@@ -792,7 +792,7 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_settings_decorator_database(testdir):
     # When @settings decorator with a custom database is applied to a test
     # And @schema.parametrize() is used
@@ -857,7 +857,7 @@ LARGE_MINIMUM_BODY_PATHS = {
 }
 
 
-@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 @pytest.mark.parametrize(
     "setup",
     [
@@ -894,7 +894,7 @@ def test_suppress_health_check_under_ci_profile(ctx, testdir, setup):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_configured_database_under_ci_profile(testdir):
     testdir.make_test(
         """
@@ -918,7 +918,7 @@ def verify_settings_after_collection(request):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.usefixtures("restore_hypothesis_profile")
 @pytest.mark.parametrize(
     ("config", "setting", "expected"),
     [

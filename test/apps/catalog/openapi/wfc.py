@@ -217,10 +217,6 @@ def wfc_role_gated(deny_status: int = 403) -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
-def wfc_role_gated_401() -> OpenAPIApp:
-    return wfc_role_gated(deny_status=401)
-
-
 def wfc_expiring_token() -> OpenAPIApp:
     """Login issues a token that dies after `TOKEN_USES` requests; re-login mints a fresh one."""
     # Schema examples give the operation a fixed number of requests, so the token expires regardless

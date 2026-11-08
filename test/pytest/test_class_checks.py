@@ -33,7 +33,7 @@ def test_api(case):
     ],
     ids=["from_fixture", "schema_parametrize", "pytest_parametrize"],
 )
-def test_after_run_failure_reported(testdir, restore_checks, test_body):
+def test_after_run_failure_reported(testdir, test_body):
     testdir.make_test(_ALWAYS_FAIL_CHECK + test_body)
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
@@ -48,14 +48,14 @@ def test_api(case):
 """
 
 
-def test_after_run_skipped_on_collect_only(testdir, restore_checks):
+def test_after_run_skipped_on_collect_only(testdir):
     testdir.make_test(_ALWAYS_FAIL_CHECK + _SCHEMA_PARAMETRIZE_BODY)
     result = testdir.runpytest("--collect-only")
     # No tests ran, so after_run checks must not run and must not fail the session.
     assert result.ret == 0, result.stdout.str()
 
 
-def test_after_run_failure_reported_without_terminal(testdir, restore_checks):
+def test_after_run_failure_reported_without_terminal(testdir):
     testdir.make_test(_ALWAYS_FAIL_CHECK + _SCHEMA_PARAMETRIZE_BODY)
     result = testdir.runpytest("-p", "no:terminal")
     assert result.ret != 0
@@ -63,7 +63,7 @@ def test_after_run_failure_reported_without_terminal(testdir, restore_checks):
     assert "always fails in after_run" in (result.stderr.str() + result.stdout.str())
 
 
-def test_after_run_fires_once_per_test_function(testdir, restore_checks):
+def test_after_run_fires_once_per_test_function(testdir):
     counter_path = str(testdir.tmpdir.join("after_run_count.txt"))
     testdir.make_test(
         f"""
@@ -93,7 +93,7 @@ def test_two(case):
     assert int(pathlib.Path(counter_path).read_text()) == 2
 
 
-def test_after_run_failure_alongside_failed_test(testdir, restore_checks):
+def test_after_run_failure_alongside_failed_test(testdir):
     testdir.make_test(
         _ALWAYS_FAIL_CHECK
         + """

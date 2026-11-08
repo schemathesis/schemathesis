@@ -9,8 +9,6 @@ from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
 from test.apps.catalog.openapi import error_feedback as error_feedback_apps
 
-pytestmark = pytest.mark.usefixtures("reset_feedback_pipeline")
-
 
 def _run_feedback(cli, api, max_examples=10, **kwargs):
     return cli.run(

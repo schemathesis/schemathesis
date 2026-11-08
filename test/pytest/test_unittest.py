@@ -3,7 +3,8 @@ import sys
 
 import pytest
 
-from ..utils import HERE, has_hypothesis_failure_header
+from test.pytest.utils import has_hypothesis_failure_header
+from test.utils import HERE
 
 
 @pytest.fixture(autouse=True)

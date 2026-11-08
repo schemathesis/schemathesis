@@ -3266,7 +3266,7 @@ def test_unspecified_http_methods(ctx, cli, snapshot_cli):
     assert methods == {"DELETE", "PUT"}
 
     schema_path = ctx.openapi.write_schema(raw_schema)
-    with ctx.check(
+    module = ctx.write_pymodule(
         """
 import schemathesis
 
@@ -3275,22 +3275,22 @@ def failed(ctx, response, case):
     if case.meta and getattr(case.meta.phase.data, "description", "") == "Unspecified HTTP method: DELETE":
         raise AssertionError(f"Should be {case.meta.phase.data.description}")
 """
-    ) as module:
-        assert (
-            cli.main(
-                "run",
-                str(schema_path),
-                "-c",
-                "failed,unsupported_method",
-                "--include-method=POST",
-                f"--url={api.base_url}/api",
-                "--mode=negative",
-                "--max-examples=10",
-                "--continue-on-failure",
-                hooks=module,
-            )
-            == snapshot_cli
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "-c",
+            "failed,unsupported_method",
+            "--include-method=POST",
+            f"--url={api.base_url}/api",
+            "--mode=negative",
+            "--max-examples=10",
+            "--continue-on-failure",
+            hooks=module,
         )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -3321,7 +3321,7 @@ def test_unspecified_http_methods_stay_negative_with_form_body(ctx, cli, snapsho
     def items():
         return jsonify({})
 
-    with ctx.check(
+    module = ctx.write_pymodule(
         """
 import schemathesis
 from schemathesis.generation.meta import CoverageScenario
@@ -3331,13 +3331,13 @@ def probe_mode(ctx, response, case):
     if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD and case.meta.generation.mode.is_positive:
         raise AssertionError(f"Positive mode: {case.meta.phase.data.description}")
 """
-    ) as module:
-        assert (
-            cli.run_openapi_app(
-                app, "--phases=coverage", "--mode=negative", "--max-examples=1", "-c", "probe_mode", hooks=module
-            )
-            == snapshot_cli
+    )
+    assert (
+        cli.run_openapi_app(
+            app, "--phases=coverage", "--mode=negative", "--max-examples=1", "-c", "probe_mode", hooks=module
         )
+        == snapshot_cli
+    )
 
 
 def test_content_type_probes(ctx):

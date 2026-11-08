@@ -27,15 +27,10 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.recorder import Interaction
-from schemathesis.engine.run import Phase, PhaseName
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-
-# Hypothesis renamed this header in 6.159.0 ("Falsifying example" -> "Failing test case"). Tests that
-# assert the header is *present* fail loudly on a future rename, which is what keeps the tests asserting
-# its absence from silently passing against a string Hypothesis no longer emits.
-HYPOTHESIS_FAILURE_HEADERS = ("Failing test case", "Falsifying example")
 
 
 def profile_max_examples() -> int | None:
@@ -84,10 +79,6 @@ def objects_at(value: Any, path: Sequence[str]) -> list[Any]:
     return objects_at(value[head], rest) if isinstance(value, dict) and head in value else []
 
 
-def has_hypothesis_failure_header(text: str, test_name: str = "") -> bool:
-    return any(f"{header}: {test_name}" in text for header in HYPOTHESIS_FAILURE_HEADERS)
-
-
 def get_schema_path(schema_name: str) -> str:
     return os.path.join(HERE, "data", schema_name)
 
@@ -98,9 +89,6 @@ def to_float32(value: float) -> float:
         return struct.unpack("<f", struct.pack("<f", value))[0]
     except OverflowError:
         return float("inf") if value > 0 else float("-inf")
-
-
-SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 
 
 def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
@@ -132,10 +120,6 @@ def integer(**kwargs: Any) -> dict[str, Any]:
     return {"type": "integer", "in": "query", **kwargs}
 
 
-def as_param(*parameters: Any) -> dict[str, Any]:
-    return {"paths": {"/users": {"get": {"parameters": list(parameters), "responses": {"200": {"description": "OK"}}}}}}
-
-
 def noop(value: Any) -> bool:
     return True
 
@@ -162,12 +146,6 @@ def assert_requests_call(case: Case):
     with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
         # On Windows it may take time to get the connection error, hence we set a timeout
         case.call(base_url="http://127.0.0.1:1", timeout=0.001)
-
-
-def assert_cli_snapshot(result: Any, snapshot: Any) -> None:
-    """Match a CLI Result against ``snapshot_cli``; show un-normalised stdout on failure."""
-    raw_stdout = getattr(result, "stdout", "") or ""
-    assert result == snapshot, f"\n--- raw stdout ---\n{raw_stdout}\n--- end ---"
 
 
 def load_yaml_or_fail(path: str | os.PathLike, *, context: str = "") -> dict:
@@ -337,84 +315,6 @@ def check_context(config=None, *, recorder=None, override=None, headers=None, tr
     )
 
 
-def make_pytest_outcome_test(testdir: Any, ctx: Any, outcome: str, report_config: str, *, lazy: bool = False) -> str:
-    """Write a one-operation pytest test that ends with `outcome` and return its operation label."""
-    marker = ""
-    config = ""
-    if outcome == "check_failure":
-        api = ctx.openapi.apps.failure()
-        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
-        body = "case.call_and_validate()"
-        label = "GET /api/failure"
-    elif outcome == "unsatisfiable":
-        api = ctx.openapi.apps.unsatisfiable()
-        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
-        config = "schema.config.generation.update(modes=[GenerationMode.POSITIVE])"
-        body = "case.call_and_validate()"
-        label = "POST /api/unsatisfiable"
-    elif outcome == "network_error":
-        schema_dict = ctx.openapi.build_schema({"/network": {"get": {"responses": {"200": {"description": "OK"}}}}})
-        schema = f"schemathesis.openapi.from_dict({schema_dict!r})"
-        config = 'schema.config.update(base_url="http://127.0.0.1:1")'
-        body = "case.call()"
-        label = "GET /network"
-    elif outcome == "schema_error":
-        schema_dict = ctx.openapi.build_schema(
-            {
-                "/invalid": {
-                    "get": {
-                        "parameters": [{"$ref": "#/components/parameters/Missing"}],
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-            }
-        )
-        schema = f"schemathesis.openapi.from_dict({schema_dict!r})"
-        body = "case.call()"
-        label = "GET /invalid"
-    else:
-        api = ctx.openapi.apps.success()
-        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
-        body = {
-            "assertion": 'case.call(); assert False, "boom"',
-            "runtime_error": 'case.call(); raise RuntimeError("bug")',
-            "skip": 'pytest.skip("why")',
-            "mark_skip": "case.call()",
-        }[outcome]
-        if outcome == "mark_skip":
-            marker = '@pytest.mark.skip(reason="why")'
-        label = "GET /api/success"
-    if lazy:
-        setup = "\n    ".join(line for line in (f"schema = {schema}", config, report_config, "return schema") if line)
-        source = f"""
-@pytest.fixture
-def api_schema():
-    {setup}
-
-lazy_schema = schemathesis.pytest.from_fixture("api_schema")
-
-{marker}
-@lazy_schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    {body}
-"""
-    else:
-        source = f"""
-schema = {schema}
-{config}
-{report_config}
-
-{marker}
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    {body}
-"""
-    testdir.make_test(source)
-    return label
-
-
 @contextmanager
 def refusing_url() -> Iterator[str]:
     # A bound socket that never listens refuses every connection, and no other server can take its port meanwhile.
@@ -423,30 +323,10 @@ def refusing_url() -> Iterator[str]:
         yield f"http://127.0.0.1:{sock.getsockname()[1]}"
 
 
-@contextmanager
-def silent_url() -> Iterator[str]:
-    # A listening socket that never accepts completes the handshake, then never answers.
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        sock.listen()
-        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
-
-
 def allure_results(allure_dir: str | os.PathLike) -> list[Any]:
     result_files = list(Path(allure_dir).glob("*-result.json"))
     assert result_files
     return [load_json_or_fail(path) for path in result_files]
-
-
-def allure_outcomes(allure_dir: str | os.PathLike) -> dict[str, tuple[str, str]]:
-    outcomes = {}
-    for result in allure_results(allure_dir):
-        raw_message = result.get("statusDetails", {}).get("message", "")
-        message = raw_message.splitlines()[0] if raw_message else ""
-        if message.startswith("ConnectionError: "):
-            message = "ConnectionError"
-        outcomes[result["name"]] = (result["status"], message)
-    return outcomes
 
 
 def crash_cache_dir(tmp_path: Path) -> Path:
@@ -459,10 +339,6 @@ def openapi_url(ctx):
 
 def graphql_url(ctx):
     return ctx.graphql.apps.books().schema_url
-
-
-def stateful_phase() -> Phase:
-    return Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)
 
 
 def saved_example_keys(state_machine: type[APIStateMachine]) -> set[bytes]:

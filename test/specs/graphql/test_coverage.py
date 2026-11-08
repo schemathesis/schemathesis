@@ -11,7 +11,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import CoverageScenario, PhaseInfo
 from schemathesis.graphql import nodes
-from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
+from schemathesis.specs.graphql.scalars import UnknownScalar
 from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
     positive_data_acceptance,
@@ -61,12 +61,6 @@ ORACLE_SCHEMAS = [
     "type Query { f(id: ID!): Named }",
 ]
 ORACLE_IDS = ["builtin", "custom-scalar", "objects", "recursive", "selection"]
-
-
-@pytest.fixture(autouse=True)
-def clear_custom_scalars():
-    yield
-    CUSTOM_SCALARS.clear()
 
 
 def register_scalars():

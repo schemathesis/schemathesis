@@ -11,10 +11,10 @@ from flask import Flask, Response
 
 import schemathesis
 from schemathesis.core.errors import LoaderError
-from test.utils import make_schema
+from test.utils import make_schema, run_given
 
 
-def test_openapi_asgi_loader(run_test):
+def test_openapi_asgi_loader():
     # When an ASGI app is loaded via `from_asgi`
     app = FastAPI()
 
@@ -24,8 +24,11 @@ def test_openapi_asgi_loader(run_test):
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     strategy = schema["/users"]["GET"].as_strategy()
+
     # Then it should successfully make calls
-    run_test(strategy)
+    @run_given(strategy, max_examples=1)
+    def test(case):
+        assert case.call().status_code == 200
 
 
 def test_openapi_asgi_loader_starts_lifespan():
@@ -55,13 +58,16 @@ def test_openapi_asgi_loader_starts_lifespan():
     assert [f"{operation.method.upper()} {operation.path}" for operation in operations] == ["GET /users"]
 
 
-def test_openapi_wsgi_loader(ctx, run_test):
+def test_openapi_wsgi_loader(ctx):
     # When a WSGI app is loaded via `from_wsgi`
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
     strategy = schema["/api/success"]["GET"].as_strategy()
+
     # Then it should successfully make calls
-    run_test(strategy)
+    @run_given(strategy, max_examples=1)
+    def test(case):
+        assert case.call().status_code == 200
 
 
 def test_openapi_wsgi_loader_plain_application(ctx):

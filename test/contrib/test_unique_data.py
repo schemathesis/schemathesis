@@ -76,7 +76,7 @@ def raw_schema(ctx, request):
 
 @pytest.fixture
 def unique_hook(ctx):
-    with ctx.check(
+    return ctx.write_pymodule(
         """
 @schemathesis.check
 def unique_test_cases(ctx, response, case):
@@ -86,8 +86,7 @@ def unique_test_cases(ctx, response, case):
     assert command not in case.operation.schema.seen, f"Test case already seen! {command}"
     case.operation.schema.seen.add(command)
 """
-    ) as module:
-        yield module
+    )
 
 
 def run(ctx, cli, unique_hook, schema, base_url, hypothesis_max_examples, *args):
@@ -289,15 +288,14 @@ def test_sensitive_parameter_values_are_distinct_inputs(ctx, cli):
 def test_replayed_error_keeps_original_traceback(ctx):
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    with ctx.restore_checks():
 
-        @schemathesis.check
-        def broken_check(ctx, response, case):
-            raise ZeroDivisionError("boom")
+    @schemathesis.check
+    def broken_check(ctx, response, case):
+        raise ZeroDivisionError("boom")
 
-        stream = EventStream(schema, checks=[broken_check], phases=[PhaseName.FUZZING], max_examples=10)
-        schema.config.generation.update(unique_inputs=True)
-        stream.execute()
+    stream = EventStream(schema, checks=[broken_check], phases=[PhaseName.FUZZING], max_examples=10)
+    schema.config.generation.update(unique_inputs=True)
+    stream.execute()
     [error] = stream.find_all(events.NonFatalError)
     frames = [line for line in error.info.traceback.splitlines() if line.lstrip().startswith("File ")]
     assert len(frames) == len(set(frames)), error.info.traceback

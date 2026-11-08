@@ -14,11 +14,7 @@ from strawberry.flask.views import GraphQLView
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types.scalar import ScalarDefinition
 
-try:
-    from test.apps.runtime import GraphQLApp
-except ImportError:
-    # Script-mode launcher (test/apps/__init__.py invoked directly) puts test/apps on sys.path.
-    from runtime import GraphQLApp
+from test.apps.runtime import GraphQLApp
 
 logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
 

@@ -667,7 +667,6 @@ def test_missing_test_data_advice_grouped_by_cause(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.usefixtures("clean_constants_registry")
 def test_constants_extraction_warning_displayed(cli, ctx):
     @schemathesis.python.constants
     def broken_source():

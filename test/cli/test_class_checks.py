@@ -14,7 +14,7 @@ from test.utils import allure_results
     ],
     ids=["single-worker", "multiple-workers"],
 )
-def test_class_response_check_fails_run(ctx, cli, restore_checks, make_app, flags, message):
+def test_class_response_check_fails_run(ctx, cli, make_app, flags, message):
     api = make_app(ctx.openapi.apps)
     module = ctx.write_pymodule(
         f'''

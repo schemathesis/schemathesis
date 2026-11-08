@@ -8,7 +8,6 @@ from _pytest.main import ExitCode
 from flask import Response, jsonify, redirect, request
 
 import schemathesis
-from schemathesis.checks import CHECKS
 from test.utils import to_float32
 
 
@@ -18,9 +17,7 @@ def new_check():
     def check_function(ctx, response, case):
         pass
 
-    yield check_function
-
-    CHECKS.unregister(check_function.__name__)
+    return check_function
 
 
 def test_register_returns_a_value(new_check):

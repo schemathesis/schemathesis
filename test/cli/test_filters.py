@@ -28,11 +28,6 @@ SCHEMA = {
 }
 
 
-@pytest.fixture
-def cassette_path(tmp_path):
-    return tmp_path / "output.yaml"
-
-
 @pytest.mark.parametrize(
     ["args", "expected"],
     (

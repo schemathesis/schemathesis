@@ -148,11 +148,9 @@ def test_crash_file_written_on_failure(cli, ctx, tmp_path):
 
 def test_crash_file_written_for_failures_in_errored_scenario(cli, ctx, tmp_path):
     # Checks that failed before a scenario errored still get crash files, so the replay hints resolve.
-    app, _ = ctx.openapi.make_flask_app(
-        {"/api/missing_path_parameter/{id}": {"get": {"responses": {"200": {"description": "OK"}}}}}
-    )
+    api = ctx.openapi.apps.missing_path_parameter()
 
-    cli.run_openapi_app(app, "--max-examples=5")
+    cli.run(api.schema_url, "--max-examples=5")
 
     crash_files = _crash_files(crash_cache_dir(tmp_path))
     checks = {

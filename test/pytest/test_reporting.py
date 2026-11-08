@@ -4,7 +4,8 @@ from xml.etree import ElementTree
 
 import pytest
 
-from test.utils import allure_outcomes, allure_results, load_json_or_fail, load_yaml_or_fail, make_pytest_outcome_test
+from test.pytest.utils import allure_outcomes, make_pytest_outcome_test
+from test.utils import allure_results, load_json_or_fail, load_yaml_or_fail
 
 
 def _make_xdist_test(ctx, testdir, content, base_url, paths=None):

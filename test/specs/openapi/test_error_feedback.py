@@ -21,7 +21,7 @@ from schemathesis.core.error_feedback import (
 from schemathesis.core.error_feedback.collector import parse_observations, record_response
 from schemathesis.core.error_feedback.parsers.drf import DRFParser
 from schemathesis.core.error_feedback.parsers.spring import SpringParser
-from schemathesis.core.error_feedback.pipeline import FeedbackPipeline, _reset_pipeline_for_tests
+from schemathesis.core.error_feedback.pipeline import FeedbackPipeline
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, resolve_bundled_ref
 from schemathesis.core.jsonschema.patterns import normalize_regex
 from schemathesis.core.parameters import ParameterLocation
@@ -407,7 +407,6 @@ def _drive_collector(
     mode: GenerationMode = GenerationMode.POSITIVE,
     times: int = 1,
 ):
-    _reset_pipeline_for_tests()
     case = case_factory(_meta=_meta_for(mode))
     response = Response.from_any(
         response_factory.requests(
@@ -2349,7 +2348,6 @@ def test_pipeline_forwards_case_to_parser(case_factory, response_factory):
 
 
 def _record(store, *, operation, case, body, response_factory):
-    _reset_pipeline_for_tests()
     response = Response.from_any(
         response_factory.requests(
             content=json.dumps(body).encode(),

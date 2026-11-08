@@ -17,6 +17,7 @@ import requests
 import rich._windows  # noqa: F401
 import yaml
 from hypothesis import settings
+from hypothesis import strategies as st
 from urllib3 import HTTPResponse
 from werkzeug import Request
 from werkzeug.datastructures import Headers
@@ -27,7 +28,7 @@ import schemathesis.specs.openapi.schemas  # noqa: F401
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
 from schemathesis.core.transport import Response
-from schemathesis.python._constants.registry import default_registry
+from schemathesis.graphql import nodes
 
 from .utils import ignored_warning_filters, make_schema, profile_max_examples
 
@@ -78,12 +79,24 @@ def hypothesis_max_examples():
 
 
 @pytest.fixture
-def hypothesis_ci_profile():
-    previous = settings.get_current_profile_name()
+def restore_hypothesis_profile():
+    # Tests that register or load profiles must leave the suite's one active.
+    active = settings.get_current_profile_name()
+    original = settings.get_profile("default")
+    yield
+    settings.register_profile("default", original)
+    settings.load_profile(active)
+
+
+@pytest.fixture
+def hypothesis_ci_profile(restore_hypothesis_profile):
     # The same profile Hypothesis loads on import when the `CI` environment variable is set.
     settings.load_profile("ci")
-    yield
-    settings.load_profile(previous)
+
+
+@pytest.fixture
+def book_id_scalar():
+    schemathesis.graphql.scalar("BookID", st.uuids().map(str).map(nodes.String))
 
 
 @pytest.fixture(autouse=True)
@@ -367,13 +380,6 @@ def testdir(testdir, pytestconfig):
 
     testdir.make_test = maker
 
-    def run_and_assert(*args, **kwargs):
-        result = testdir.runpytest(*args)
-        result.assert_outcomes(**kwargs)
-        return result
-
-    testdir.run_and_assert = run_and_assert
-
     return testdir
 
 
@@ -517,13 +523,6 @@ def case_factory(swagger_20):
         return operation.Case(**kwargs)
 
     return factory
-
-
-@pytest.fixture
-def clean_constants_registry():
-    default_registry().clear()
-    yield
-    default_registry().clear()
 
 
 @pytest.fixture

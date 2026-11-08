@@ -1,7 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.usefixtures("clean_constants_registry")
-
 
 @pytest.mark.parametrize(
     "schema_definition",

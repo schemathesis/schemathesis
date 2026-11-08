@@ -21,7 +21,7 @@ from schemathesis.wfc.escalation import escalating_provider, identity_assignment
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
-from test.utils import allure_results, load_ndjson, refusing_url, silent_url
+from test.utils import allure_results, load_ndjson, refusing_url
 
 CREDENTIALS = {
     "username": WFC_USERNAME,
@@ -383,14 +383,13 @@ def test_wfc_http_login_goes_through_configured_proxy(ctx, app_runner):
     assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
 
 
-def test_wfc_http_login_times_out_without_configured_timeout(ctx):
+def test_wfc_http_login_times_out_without_configured_timeout(ctx, silent_url):
     schema = ctx.openapi.load_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
     operation = schema["/api/protected"]["GET"]
     provider = _provider_for(_login(token=_token()))
-    with silent_url() as url:
-        schema.config.update(base_url=url)
-        with pytest.raises(WFCLoginError, match="Read timed out"):
-            provider.get(operation.Case(), AuthContext(operation=operation, app=None))
+    schema.config.update(base_url=silent_url)
+    with pytest.raises(WFCLoginError, match="Read timed out"):
+        provider.get(operation.Case(), AuthContext(operation=operation, app=None))
 
 
 def _redirect_login_app(ctx) -> Flask:
@@ -1198,7 +1197,7 @@ def test_expired_token_is_refreshed_for_a_multi_user_document(cli, ctx, tmp_path
 
 def test_escalation_walks_the_chain_on_401(cli, ctx, tmp_path):
     # A 401 that survives the reauth replay means the identity is wrong, not that its token expired.
-    api = ctx.openapi.apps.wfc_role_gated_401()
+    api = ctx.openapi.apps.wfc_role_gated(deny_status=401)
     auth = _write(tmp_path, ROLE_AUTH)
 
     cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")

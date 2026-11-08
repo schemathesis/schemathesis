@@ -18,17 +18,20 @@ def analyzer_ndjson(app_runner, tmp_path_factory) -> Path:
     make_fixture_app.attach_handlers(app)
     port = app_runner.run_flask_app(app)
 
-    out = tmp_path_factory.mktemp("analyzer") / "run.ndjson"
-    CliRunner().invoke(
-        schemathesis.cli.schemathesis,
-        [
-            "run",
-            f"http://127.0.0.1:{port}/openapi.json",
-            f"--report-ndjson-path={out}",
-            "--max-examples=8",
-            "--seed=1",
-            "--mode=all",
-            "--generation-database=none",
-        ],
-    )
+    directory = tmp_path_factory.mktemp("analyzer")
+    out = directory / "run.ndjson"
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.chdir(directory)
+        CliRunner().invoke(
+            schemathesis.cli.schemathesis,
+            [
+                "run",
+                f"http://127.0.0.1:{port}/openapi.json",
+                f"--report-ndjson-path={out}",
+                "--max-examples=8",
+                "--seed=1",
+                "--mode=all",
+                "--generation-database=none",
+            ],
+        )
     return out

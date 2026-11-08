@@ -110,7 +110,6 @@ def stop_engine(e):
 
 
 @pytest.mark.parametrize("func", [keyboard_interrupt, stop_engine])
-@pytest.mark.usefixtures("restore_checks")
 def test_stop_in_check(engine_factory, func, stop_event):
     @schemathesis.check
     def stop_immediately(*args, **kwargs):
@@ -147,7 +146,6 @@ def test_exception_thrown_into_phase_stops_state_machines(engine_factory, stop_e
     assert stop_event.is_set()
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_stop_outside_of_state_machine_execution(engine_factory, stop_event):
     # The stop arrives with a failure, so it is first seen between suites rather than inside a scenario.
     @schemathesis.check
@@ -164,7 +162,6 @@ def test_stop_outside_of_state_machine_execution(engine_factory, stop_event):
     "kwargs",
     [{}, {"unique_inputs": True}],
 )
-@pytest.mark.usefixtures("restore_checks")
 def test_internal_error_in_check(engine_factory, kwargs):
     @schemathesis.check
     def bugged_check(*args, **kwargs):
@@ -176,7 +173,6 @@ def test_internal_error_in_check(engine_factory, kwargs):
     assert isinstance(result.errors[0].value, ZeroDivisionError)
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_assumption_in_check_skips_step(engine_factory):
     @schemathesis.check
     def skip_reads(ctx, response, case):
@@ -187,7 +183,6 @@ def test_assumption_in_check_skips_step(engine_factory):
 
 
 @pytest.mark.parametrize("exception_args", [(), ("Oops!",)])
-@pytest.mark.usefixtures("restore_checks")
 def test_custom_assertion_in_check(engine_factory, exception_args):
     @schemathesis.check
     def custom_check(*args, **kwargs):
@@ -205,7 +200,6 @@ def test_custom_assertion_in_check(engine_factory, exception_args):
         assert failure.failure_info.failure.message == "Oops!"
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_custom_assertion_with_random_message(engine_factory):
     counter = 0
 
@@ -223,7 +217,6 @@ def test_custom_assertion_with_random_message(engine_factory):
     assert failure.failure_info.failure.title == "Custom check failed: `custom_check`"
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_distinct_assertions(engine_factory):
     counter = 0
 
@@ -256,7 +249,6 @@ def test_distinct_assertions(engine_factory):
     "kwargs",
     [{}, {"max_failures": 1}],
 )
-@pytest.mark.usefixtures("restore_checks")
 def test_flaky_assertions(engine_factory, kwargs):
     counter = 0
 
@@ -285,7 +277,6 @@ def test_flaky_assertions(engine_factory, kwargs):
         assert "Second" in messages
 
 
-@pytest.mark.usefixtures("restore_checks")
 def test_failure_hidden_behind_another_failure(engine_factory):
     # The same API operation fails in two ways, and the second one is checked only after the first is found,
     # so it surfaces in a later test suite
@@ -438,7 +429,6 @@ def test_no_false_positive_ensure_resource_availability_when_id_reused(engine_fa
     "kwargs",
     [{"max_failures": None}, {"max_failures": 1}],
 )
-@pytest.mark.usefixtures("restore_checks")
 def test_flaky(engine_factory, kwargs):
     found = False
 
@@ -1034,6 +1024,12 @@ def test_link_subset(engine_factory):
     engine = engine_factory(include={"method_regex": "POST|GET"}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
+    assert {
+        node.value.operation.method.upper()
+        for event in result.events
+        if isinstance(event, events.ScenarioFinished)
+        for node in event.recorder.cases.values()
+    } == {"POST", "GET"}
 
 
 def test_duplicate_operation_links(engine_factory):

@@ -6,7 +6,7 @@ import pytest
 from flask import jsonify, request
 
 from schemathesis.generation.modes import GenerationMode
-from test.utils import has_hypothesis_failure_header
+from test.pytest.utils import has_hypothesis_failure_header
 
 
 def test_missing_base_url_error_message(testdir):
