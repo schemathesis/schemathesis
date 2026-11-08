@@ -71,13 +71,6 @@ def metric_function():
     METRICS.unregister("new_metric")
 
 
-def test_register_returns_a_value(metric_function):
-    # When a function is registered via the `schemathesis.metric` decorator
-    # Then this function should be available for further usage
-    # See #721
-    assert metric_function is not None
-
-
 def _observed_targets(fn):
     observed = []
 

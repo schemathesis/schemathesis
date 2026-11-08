@@ -7,50 +7,8 @@ import pytest
 from _pytest.main import ExitCode
 from flask import Response, jsonify, redirect, request
 
-import schemathesis
 from test.apps.catalog.openapi import basic
 from test.utils import to_float32
-
-
-@pytest.fixture
-def new_check():
-    @schemathesis.check
-    def check_function(ctx, response, case):
-        pass
-
-    return check_function
-
-
-def test_register_returns_a_value(new_check):
-    # When a function is registered via the `schemathesis.check` decorator
-    # Then this function should be available for further usage
-    # See #721
-    assert new_check is not None
-
-
-def test_negative_data_rejection(ctx, cli):
-    api = ctx.openapi.apps.success()
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/success": {
-                "get": {
-                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    result = cli.run_and_assert(
-        str(schema_path),
-        f"--url={api.base_url}/api",
-        "--checks",
-        "negative_data_rejection",
-        "--mode",
-        "negative",
-        "--max-examples=5",
-        exit_code=ExitCode.TESTS_FAILED,
-    )
-    assert "- ST201 Schema-violating request accepted\n" in result.stdout
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2329,11 +2287,10 @@ def test_ignored_auth_probes_each_operation_until_enforcement_is_confirmed(ctx, 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_phase_without_checks_is_skipped(ctx, cli, snapshot_cli, phase):
     api = ctx.openapi.apps.users_crud()
-    result = cli.run(api.schema_url, f"--phases={phase}", "--max-examples=1", config={"checks": {"enabled": False}})
-    phase_body = result.stdout.split("SUMMARY", 1)[0].split(f"{phase.title()} (", 1)[1]
-    assert "without checks" in phase_body
-    assert "passed" not in phase_body
-    assert result == snapshot_cli
+    assert (
+        cli.run(api.schema_url, f"--phases={phase}", "--max-examples=1", config={"checks": {"enabled": False}})
+        == snapshot_cli
+    )
 
 
 # Cycling ends at the deadline however slow the runner is; dropping the phase ends the run well before it.

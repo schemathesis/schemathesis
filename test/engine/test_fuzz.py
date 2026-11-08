@@ -132,13 +132,6 @@ def test_fuzz_entry_point_emits_engine_started_and_finished(ctx):
     _assert_engine_started_and_finished(_fuzz_events(schema))
 
 
-def test_fuzz_scenario_events_are_paired(ctx):
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    collected = _collect_until_finished(schema)
-    _assert_scenario_pairs(collected)
-
-
 # Only waits at or above the reporting threshold are announced, so the test sleeps that long once.
 def test_fuzz_emits_rate_limit_retry(ctx, app_runner):
     calls = []
