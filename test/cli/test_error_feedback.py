@@ -31,16 +31,6 @@ def test_feedback_toggles_planted_bug_visibility(ctx, cli, snapshot_cli, extra_k
     assert _run_feedback(cli, ctx.openapi.apps.planted_bug(), **extra_kwargs) == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_dotted_path(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.nested_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_size_bound(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.size_bound_planted_bug())) == snapshot_cli
-
-
 # A malformed `Content-Type` on a rejection is the server's fault, not the schema's.
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_feedback_ignores_rejection_with_malformed_content_type(ctx, cli, snapshot_cli):
@@ -55,30 +45,6 @@ def test_feedback_ignores_rejection_with_malformed_content_type(ctx, cli, snapsh
             "--mode=positive",
         )
         == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_format(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.format_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_numeric_bound(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.numeric_bound_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_positive_numeric_gate(ctx, cli, snapshot_cli):
-    assert (
-        _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.positive_numeric_gate_planted_bug())) == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_unrecognized_property(ctx, cli, snapshot_cli):
-    assert (
-        _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.unrecognized_property_planted_bug())) == snapshot_cli
     )
 
 
@@ -102,106 +68,58 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_pattern(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.pattern_planted_bug())) == snapshot_cli
+@pytest.mark.parametrize(
+    ("factory", "max_examples"),
+    [
+        (error_feedback_apps.nested_planted_bug, 10),
+        (error_feedback_apps.size_bound_planted_bug, 10),
+        (error_feedback_apps.format_planted_bug, 10),
+        (error_feedback_apps.numeric_bound_planted_bug, 10),
+        (error_feedback_apps.positive_numeric_gate_planted_bug, 10),
+        (error_feedback_apps.unrecognized_property_planted_bug, 10),
+        (error_feedback_apps.pattern_planted_bug, 10),
+        (error_feedback_apps.jackson_typed_planted_bug, 10),
+        (error_feedback_apps.jackson_typed_planted_bug_ref_bundled, 30),
+        (error_feedback_apps.jackson_overflow_planted_bug, 10),
+        (error_feedback_apps.jackson_enum_planted_bug, 10),
+        (error_feedback_apps.missing_query_param_planted_bug, 10),
+        (error_feedback_apps.pydantic_planted_bug, 10),
+        (error_feedback_apps.confluent_planted_bug, 10),
+        (error_feedback_apps.restler_planted_bug, 10),
+    ],
+    ids=[
+        "via_dotted_path",
+        "via_size_bound",
+        "via_format",
+        "via_numeric_bound",
+        "via_positive_numeric_gate",
+        "via_unrecognized_property",
+        "via_pattern",
+        "via_type_mismatch",
+        "via_type_mismatch_ref_bundled",
+        "via_jackson_numeric_overflow",
+        "via_enum",
+        "via_missing_query_parameter",
+        "via_pydantic_dropped_constraints",
+        "via_confluent_envelope",
+        "via_restler_envelope",
+    ],
+)
+def test_feedback_unmasks_planted_bug(ctx, cli, snapshot_cli, factory, max_examples):
+    assert _run_feedback(cli, ctx.openapi.serve(factory()), max_examples) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_type_mismatch(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.jackson_typed_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_type_mismatch_ref_bundled(ctx, cli, snapshot_cli):
-    # Adjustment must reach the body schema even when bundled behind $ref / x-bundled.
-    assert (
-        _run_feedback(
-            cli, ctx.openapi.serve(error_feedback_apps.jackson_typed_planted_bug_ref_bundled()), max_examples=30
-        )
-        == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_jackson_numeric_overflow(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.jackson_overflow_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_enum(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.jackson_enum_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_missing_query_parameter(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.missing_query_param_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_recovers_constraints_dropped_from_pydantic_schema(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.pydantic_planted_bug())) == snapshot_cli
+@pytest.mark.parametrize(
+    ("envelope", "max_examples"),
+    [(envelopes.LARAVEL, 30), (envelopes.AJV, 10)],
+    ids=["laravel", "ajv"],
+)
+def test_feedback_unmasks_planted_bug_via_envelope(ctx, cli, snapshot_cli, envelope, max_examples):
+    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelope)), max_examples) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("envelope", ["legacy", "modern", "wrapped"])
 def test_feedback_unmasks_planted_bug_via_rails_envelope(ctx, cli, envelope, snapshot_cli):
     assert _run_feedback(cli, ctx.openapi.apps.rails_planted_bug(envelope=envelope), max_examples=30) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_laravel_envelope(ctx, cli, snapshot_cli):
-    assert (
-        _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.LARAVEL)), max_examples=30) == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_aspnet_envelope(ctx, cli, snapshot_cli):
-    assert (
-        _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.ASPNET)), max_examples=30) == snapshot_cli
-    )
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_zod_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.ZOD)), max_examples=30) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_ajv_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.AJV))) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_go_validator_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.GO_VALIDATOR))) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_symfony_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.SYMFONY))) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_confluent_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.confluent_planted_bug())) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_marshmallow_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.MARSHMALLOW))) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_flask_rest_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.FLASK_REST))) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_litestar_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(envelopes.planted_bug(envelopes.LITESTAR))) == snapshot_cli
-
-
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_restler_envelope(ctx, cli, snapshot_cli):
-    assert _run_feedback(cli, ctx.openapi.serve(error_feedback_apps.restler_planted_bug())) == snapshot_cli

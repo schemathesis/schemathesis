@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 import schemathesis
@@ -18,33 +16,544 @@ from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.errors import HookError
 from schemathesis.filters import FilterSet
 
-CONFIGS_DIR = Path(__file__).parent / "configs"
+CONFIGS = {
+    "common.auth-dynamic-openapi-api-key": """
+        # Valid dynamic apiKey auth (header extraction)
+        [auth.dynamic.openapi.ApiKey]
+        path = "/api/token"
+        method = "GET"
+        extract_from = "header"
+        extract_selector = "X-Auth-Token"
+    """,
+    "common.auth-dynamic-openapi-bearer": """
+        # Valid dynamic bearer auth
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        extract_selector = "/access_token"
+    """,
+    "common.auth-dynamic-openapi-form-payload": """
+        # Dynamic auth with form-urlencoded payload
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/auth/token"
+        payload = { grant_type = "password", username = "${TEST_STRING_1}", password = "${TEST_STRING_2}" }
+        payload_content_type = "application/x-www-form-urlencoded"
+        extract_selector = "/access_token"
+    """,
+    "common.auth-dynamic-openapi-payload": """
+        # Valid dynamic auth with env-var payload
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        payload = { username = "${TEST_STRING_1}", password = "${TEST_STRING_2}" }
+        extract_selector = "/access_token"
+    """,
+    "common.auth-dynamic-openapi-retry-on-disabled": """
+        # Dynamic auth with reactive refresh disabled
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        extract_selector = "/access_token"
+        retry_on = []
+    """,
+    "common.auth-dynamic-openapi-retry-on": """
+        # Dynamic auth with explicit reactive-refresh statuses
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        extract_selector = "/access_token"
+        retry_on = [401, 419]
+    """,
+    "common.auth-openapi-api-key": """
+        # Valid API Key auth
+        [auth.openapi.ApiKeyAuth]
+        api_key = "${TEST_STRING_1}"
+    """,
+    "common.auth-openapi-basic": """
+        # Valid HTTP Basic auth
+        [auth.openapi.BasicAuth]
+        username = "${TEST_STRING_1}"
+        password = "${TEST_STRING_2}"
+    """,
+    "common.auth-openapi-bearer": """
+        # Valid HTTP Bearer token auth
+        [auth.openapi.BearerAuth]
+        bearer = "${TEST_STRING_1}"
+    """,
+    "common.generation-mode-negative": """
+        [generation]
+        mode = "negative"
+    """,
+    "common.incorrect-auth-basic-non-latin1": """
+        [auth]
+        basic = { "username" = "user", "password" = "Česko" }
+    """,
+    "common.incorrect-auth-basic": """
+        [auth]
+        basic = { "username" = "user" }  # Missing required "password" field
+    """,
+    "common.incorrect-auth-dynamic-openapi-bad-extract-from": """
+        # extract_from must be "body", "header" or "cookie"
+        [auth.dynamic.openapi.ApiKey]
+        path = "/api/auth"
+        extract_from = "query"
+        extract_selector = "token"
+    """,
+    "common.incorrect-auth-dynamic-openapi-bad-method": """
+        # method must be a valid HTTP method
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/token"
+        extract_selector = "/access_token"
+        method = "FETCH"
+    """,
+    "common.incorrect-auth-dynamic-openapi-bad-path": """
+        # path must start with /
+        [auth.dynamic.openapi.BearerAuth]
+        path = "api/auth"
+        extract_selector = "/access_token"
+    """,
+    "common.incorrect-auth-dynamic-openapi-bad-selector": """
+        # extract_selector for body extraction must be a JSON Pointer (start with /)
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        extract_from = "body"
+        extract_selector = "access_token"
+    """,
+    "common.incorrect-auth-dynamic-openapi-basic-conflict": """
+        # basic auth and dynamic openapi auth are mutually exclusive
+        [auth]
+        basic = { username = "user", password = "pass" }
 
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        extract_selector = "/access_token"
+    """,
+    "common.incorrect-auth-dynamic-openapi-conflict": """
+        # Same scheme name in both static and dynamic auth
+        [auth.openapi.BearerAuth]
+        bearer = "static-token"
 
-def get_all_config_files(*subdirectories: str) -> dict[str, Path]:
-    """Discover all TOML config files."""
-    result = {}
-    for subdir in subdirectories:
-        directory = CONFIGS_DIR / subdir
-        for f in directory.glob("*.toml"):
-            result[f"{subdir}.{f.stem}"] = f
-    return result
+        [auth.dynamic.openapi.BearerAuth]
+        path = "/api/auth"
+        extract_selector = "/access_token"
+    """,
+    "common.incorrect-auth-mixed-basic-openapi": """
+        # Cannot mix generic basic auth with OpenAPI-aware auth
+        [auth.basic]
+        username = "user"
+        password = "pass"
 
+        [auth.openapi.ApiKeyAuth]
+        api_key = "${TEST_STRING_1}"
+    """,
+    "common.incorrect-auth-openapi-basic-missing-password": """
+        # HTTP Basic auth missing password
+        [auth.openapi.BasicAuth]
+        username = "user"
+    """,
+    "common.incorrect-auth-openapi-empty-table": """
+        [auth.openapi]
+    """,
+    "common.incorrect-auth-openapi-empty": """
+        [auth.openapi.EmptyAuth]
+    """,
+    "common.incorrect-auth-openapi-mixed-api-key-basic": """
+        # Mixed: has api_key and username but missing password
+        [auth.openapi.Auth2]
+        api_key = "key123"
+        username = "user"
+    """,
+    "common.incorrect-auth-openapi-mixed-bearer-basic": """
+        # Mixed: has bearer and password but missing username
+        [auth.openapi.Auth3]
+        bearer = "token123"
+        password = "secret"
+    """,
+    "common.incorrect-auth-openapi-not-table": """
+        [auth.openapi]
+        ApiKeyAuth = "secret"
+    """,
+    "common.incorrect-auth-openapi-only-password": """
+        # Has password field only, missing username (detects as Basic auth attempt)
+        [auth.openapi.Auth1]
+        password = "secret"
+    """,
+    "common.incorrect-auth-openapi-wrong-scheme": """
+        # Invalid field - 'scheme'
+        [auth.openapi.DigestAuth]
+        scheme = "digest"
+        username = "user"
+        password = "pass"
+    """,
+    "common.incorrect-auth-openapi-wrong-type": """
+        # Invalid property name - should be "api_key"
+        [auth.openapi.ApiKeyAuth]
+        value = "${TEST_STRING_1}"
+    """,
+    "common.incorrect-headers": """
+        headers = ["X-API-Key", "API_KEY"]
+    """,
+    "common.incorrect-health-check-close-match": """
+        suppress-health-check = ["data_too_lar"]
+    """,
+    "common.incorrect-health-check": """
+        suppress-health-check = ["wrong value", "data_too_large"]
+    """,
+    "common.incorrect-origin-with-base-url": """
+        base-url = "https://api.example.com/api"
+        origin = "https://api.example.com"
+    """,
+    "common.incorrect-phase-coverage-unexpected-method": """
+        # unexpected-methods entries must be valid HTTP methods
+        [phases.coverage]
+        unexpected-methods = ["FETCH"]
+    """,
+    "common.incorrect-placeholder": """
+        base-url = "${TEST_STRING_1"
+    """,
+    "common.incorrect-project": """
+        [[project]]
+    """,
+    "common.incorrect-rate-limit": """
+        rate-limit = "wrong"
+    """,
+    "common.incorrect-request-retries-array": """
+        request-retries = [3]
+    """,
+    "common.incorrect-request-retries-bool": """
+        request-retries = true
+    """,
+    "common.incorrect-request-retries-empty-table": """
+        request-retries = {}
+    """,
+    "common.incorrect-request-retries-negative": """
+        request-retries = -1
+    """,
+    "common.incorrect-request-retries-string": """
+        request-retries = "3"
+    """,
+    "common.incorrect-request-timeout-negative": """
+        request-timeout = -1
+    """,
+    "common.incorrect-request-timeout": """
+        request-timeout = "not a number"
+    """,
+    "common.incorrect-tls-verify": """
+        tls-verify = [true, false]
+    """,
+    "common.incorrect-workers": """
+        workers = "foo"
+    """,
+    "common.request-retries-integer": """
+        request-retries = 3
+    """,
+    "common.request-retries-table": """
+        request-retries = { max-attempts = 3 }
+    """,
+    "common.root": """
+        color = true
+        suppress-health-check = ["too_slow", "data_too_large"]
+        max-failures = 42
+        base-url = "https://api.example.com"
+    """,
+    "common.warnings-fail-on-all": """
+        [warnings]
+        fail-on = true
+    """,
+    "common.warnings-fail-on-specific": """
+        [warnings]
+        fail-on = ["validation_mismatch"]
+    """,
+    "common.warnings-object-complex": """
+        [warnings]
+        display = ["missing_auth", "validation_mismatch"]
+        fail-on = ["validation_mismatch"]
+    """,
+    "common.warnings-object-with-display": """
+        [warnings]
+        display = ["missing_auth", "validation_mismatch"]
+    """,
+    "common.warnings-off": """
+        warnings = false
+    """,
+    "common.warnings-on": """
+        warnings = true
+    """,
+    "common.warnings-selection": """
+        warnings = ["missing_auth"]
+    """,
+    "report.all_enabled": """
+        [reports]
+        directory = "reports"
+        preserve-bytes = true
 
-ALL_CONFIGS = get_all_config_files("common", "report", "cache", "parameters", "operations", "fuzz", "dictionaries")
+        [reports.junit]
+        enabled = true
+        path = "./test-reports/schemathesis-results.xml"
+
+        [reports.vcr]
+        enabled = true
+        path = "cassettes/api"
+
+        [reports.har]
+        enabled = true
+    """,
+    "report.incorrect_section_type": """
+        reports = 42
+    """,
+    "report.incorrect_types": """
+        [reports]
+        preserve-bytes = "yes"  # should be boolean
+    """,
+    "report.incorrect_types_in_vcr": """
+        [reports.junit]
+        enabled = 1  # should be boolean
+    """,
+    "report.invalid_format_names": """
+        [reports]
+        directory = "reports"
+
+        [reports.junitxml]  # should be "junit"
+        enabled = true
+
+        [reports.csv]  # unsupported format
+        enabled = true
+
+        [reports.vcr]
+        enabled = true
+    """,
+    "report.one_enabled": """
+        [reports.har]
+        enabled = true
+    """,
+    "report.unknown_keyword_vcr": """
+        [reports.junit]
+        foo = 1
+    """,
+    "report.unknown_keywords": """
+        [reports]
+        directory = "reports"
+        # Unknown keyword
+        output_format = "pretty"
+        # Typo
+        preserve_byte = false
+
+        [reports.junit]
+        enabled = true
+    """,
+    "report.with_env_var": """
+        [reports]
+        directory = "${TEST_STRING_1}"
+    """,
+    "report.with_env_var_in_path": """
+        [reports.junit]
+        enabled = true
+        path = "${TEST_STRING_1}"
+    """,
+    "report.with_env_var_missing": """
+        [reports]
+        directory = "${TEST_STRING_NOT_PRESENT}"
+    """,
+    "cache.disabled": """
+        [cache]
+        enabled = false
+    """,
+    "cache.with_directory": """
+        [cache]
+        directory = "/var/cache/schemathesis"
+    """,
+    "parameters.basic": """
+        [parameters]
+        api_version = "v2"
+    """,
+    "parameters.mixed": """
+        parameters = { user_id = 42 }
+
+        [[operations]]
+        include-name = "GET /users/{used_id}"
+        parameters = { user_id = "${TEST_STRING_1}"}
+    """,
+    "parameters.with_locations": """
+        parameters = { "path.user_id" = 42, "query.user_id" = 100 }
+    """,
+    "operations.basic": """
+        [[operations]]
+        include-name = "GET /users/{user_id}"
+        parameters = { user_id = "${TEST_STRING_1}"}
+    """,
+    "operations.complex_many": """
+        [[operations]]
+        include-name-regex = ".+/users/.+"
+        exclude-method = ["POST", "PUT"]
+        parameters = { user_id = "${TEST_STRING_1}"}
+
+        [[operations]]
+        include-name = "GET /users/"
+        exclude-by = "/x-prop == 42"
+        parameters = { user_id = "${TEST_STRING_1}"}
+    """,
+    "operations.incorrect-exclude-tag-type": """
+        [[operations]]
+        exclude-tag = true
+    """,
+    "operations.incorrect-include-method-item-type": """
+        [[operations]]
+        include-method = ["GET", 1]
+    """,
+    "operations.incorrect-include-path-type": """
+        [[operations]]
+        include-path = 1
+    """,
+    "operations.missing_config_options": """
+        [[operations]]
+        # It does not change anything
+        include-name = "GET /users/{user_id}"
+    """,
+    "operations.operation_openapi_auth_forbidden": """
+        [[operations]]
+        include-path = "/api"
+
+        [operations.auth.openapi.ApiKeyHeader]
+        api_key = "${TEST_STRING_1}"
+    """,
+    "operations.warnings-off": """
+        [[operations]]
+        include-name = "GET /users/{user_id}"
+        warnings = false
+    """,
+    "operations.warnings-on": """
+        [[operations]]
+        include-name = "GET /users/{user_id}"
+        warnings = true
+    """,
+    "fuzz.basic": """
+        [fuzz]
+        max-time = 3600
+    """,
+    "fuzz.incorrect-max-time": """
+        [fuzz]
+        max-time = "one hour"
+    """,
+    "dictionaries.basic": """
+        [dictionaries.users]
+        values = [42, 100, 9999]
+
+        [dictionaries.edge]
+        values = ["admin", "root", "' OR 1=1--"]
+    """,
+    "dictionaries.error_combining_values_and_from_file": """
+        [dictionaries.x]
+        values = [1]
+        from-file = "x.dict"
+    """,
+    "dictionaries.error_empty_from_file": """
+        [dictionaries.names]
+        from-file = ""
+    """,
+    "dictionaries.error_empty_values": """
+        [dictionaries.names]
+        values = []
+    """,
+    "dictionaries.error_neither_values_nor_from_file": """
+        [dictionaries.x]
+    """,
+    "dictionaries.error_parameter_unknown_dictionary": """
+        [parameters]
+        user_id = { dictionary = "missing" }
+    """,
+    "dictionaries.error_parameter_unknown_location_prefix": """
+        [dictionaries.ids]
+        values = [1]
+
+        [parameters]
+        "foo.bar" = { dictionary = "ids" }
+    """,
+    "dictionaries.error_type_wide_missing_probability": """
+        [dictionaries.x]
+        values = [1]
+
+        [generation.dictionaries]
+        integer = { dictionary = "x" }
+    """,
+    "dictionaries.error_type_wide_probability_above_one": """
+        [dictionaries.x]
+        values = [1]
+
+        [generation.dictionaries]
+        integer = { dictionary = "x", probability = 1.5 }
+    """,
+    "dictionaries.error_type_wide_probability_zero": """
+        [dictionaries.x]
+        values = [1]
+
+        [generation.dictionaries]
+        integer = { dictionary = "x", probability = 0 }
+    """,
+    "dictionaries.error_type_wide_unknown_dictionary": """
+        [dictionaries.x]
+        values = [1]
+
+        [generation.dictionaries]
+        integer = { dictionary = "missing", probability = 0.5 }
+    """,
+    "dictionaries.error_type_wide_zero_eligible": """
+        [dictionaries.x]
+        values = ["abc", "def"]
+
+        [generation.dictionaries]
+        integer = { dictionary = "x", probability = 0.5 }
+    """,
+    "dictionaries.error_unsupported_type_key": """
+        [dictionaries.x]
+        values = [1]
+
+        [generation.dictionaries]
+        boolean = { dictionary = "x", probability = 0.5 }
+    """,
+    "dictionaries.object_override_passthrough": """
+        [parameters]
+        "query.filter" = { kind = "active", limit = 10 }
+    """,
+    "dictionaries.parameter_specific_binding": """
+        [dictionaries.ids]
+        values = [1, 2, 3]
+
+        [parameters]
+        "path.user_id" = { dictionary = "ids" }
+        "query.q" = { dictionary = "ids", probability = 0.25 }
+    """,
+    "dictionaries.scalar_and_binding_overrides": """
+        [dictionaries.x]
+        values = [1]
+
+        [parameters]
+        api_version = "v2"
+        "query.q" = { dictionary = "x" }
+    """,
+    "dictionaries.type_wide_binding": """
+        [dictionaries.edge]
+        values = ["admin", "root"]
+
+        [dictionaries.ids]
+        values = [1, 2, 3]
+
+        [generation.dictionaries]
+        string = { dictionary = "edge", probability = 0.1 }
+        integer = { dictionary = "ids", probability = 0.5 }
+    """,
+    "dictionaries.type_wide_eligibility": """
+        [dictionaries.mixed]
+        values = ["1", "2", "not-a-number"]
+
+        [generation.dictionaries]
+        integer = { dictionary = "mixed", probability = 0.5 }
+    """,
+}
 WARNING_NAMES = [warning.value for warning in SchemathesisWarning]
 
 
-@pytest.mark.parametrize(
-    "path",
-    list(ALL_CONFIGS.values()),
-    ids=list(ALL_CONFIGS),
-)
-def test_configs(monkeypatch, path, snapshot_config):
+@pytest.mark.parametrize("source", list(CONFIGS.values()), ids=list(CONFIGS))
+def test_configs(monkeypatch, source, snapshot_config):
     monkeypatch.setenv("TEST_STRING_1", "foo")
     monkeypatch.setenv("TEST_STRING_2", "bar")
     try:
-        assert SchemathesisConfig.from_path(path) == snapshot_config
+        assert SchemathesisConfig.from_str(source) == snapshot_config
     except ConfigError as exc:
         assert str(exc) == snapshot_config
     except HookError as exc:
