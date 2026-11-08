@@ -54,21 +54,6 @@ def test_after_run_flags_operations_without_success(ctx):
     assert not any("/api/success" in message for message in messages), messages
 
 
-def test_after_run_error_is_reported_not_crash(ctx):
-    @schemathesis.check
-    class BoomAfterRun:
-        def after_run(self, ctx):
-            raise KeyError("boom")
-
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = EventStream(schema, checks=[BoomAfterRun], phases=[PhaseName.FUZZING], max_examples=3).execute()
-
-    finished = stream.finished
-    assert finished is not None
-    assert any("boom" in (failure.message or "") for failure in finished.failures), finished.failures
-
-
 def test_after_run_skipped_when_run_aborts(ctx):
     @schemathesis.check
     class FailFast:

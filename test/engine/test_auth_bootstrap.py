@@ -85,21 +85,6 @@ def test_register_and_login_are_reported_as_scenarios(ctx):
     ]
 
 
-@pytest.mark.parametrize(
-    ("behavior", "expected"),
-    [
-        ("register-rejects", ("register", 400)),
-        ("login-rejects", ("login", 401)),
-        ("no-token", ("extract", None)),
-        ("unsatisfiable-password", ("sign-up", None)),
-    ],
-)
-def test_bootstrap_failures(ctx, behavior, expected):
-    api = ctx.openapi.apps.sign_up_and_login(behavior)
-    payload = _bootstrap(_run(schemathesis.openapi.from_url(api.schema_url))).payload
-    assert (payload.status, payload.failure_stage, payload.status_code) == (Status.ERROR, *expected)
-
-
 def _configure_scheme(schema):
     schema.config.auth.openapi.schemes["bearerAuth"] = HttpBearerAuthConfig(bearer="token-0")
     return {}

@@ -51,10 +51,6 @@ SCHEMA = {
             {"exclude-tag": "Example"},
             ["GET /c"],
         ),
-        (
-            {"exclude-tag": "Example"},
-            ["GET /c"],
-        ),
     ),
 )
 def test_filters_with_cli_options(ctx, cli, args, expected, cassette_path):

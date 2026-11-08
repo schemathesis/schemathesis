@@ -335,3 +335,12 @@ def app_runner():
         run_asgi_app=run_asgi_app,
         openapi_url=openapi_url,
     )
+
+
+@pytest.fixture
+def silent_url():
+    # A listening socket that never accepts completes the handshake, then never answers.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen()
+        yield f"http://127.0.0.1:{sock.getsockname()[1]}"

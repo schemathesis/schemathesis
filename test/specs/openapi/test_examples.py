@@ -5600,3 +5600,11 @@ def test_examples_phase_drops_incomplete_body_example_with_non_json_value(ctx, a
         )
         == []
     )
+
+
+def test_fills_missing_examples(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.run(api.schema_url, "--phases=examples", config={"phases": {"examples": {"fill-missing": True}}})
+        == snapshot_cli
+    )
