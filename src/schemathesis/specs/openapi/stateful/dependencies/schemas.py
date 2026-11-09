@@ -330,7 +330,7 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
             nested_items = resolved.get("items")
             if isinstance(nested_items, dict):
                 items_resolver, resolved_items = maybe_resolve_with_resolver(nested_items, unwrapped_resolver)
-                external_tag = _detect_externally_tagged_pattern(resolved_items, path, parent_ref)
+                external_tag = _detect_externally_tagged_pattern(resolved_items, path, parent_ref, items_resolver)
                 if external_tag:
                     external_tag_, uses_parent_ref = external_tag
                     nested_properties = resolved_items["properties"][external_tag_]
@@ -347,7 +347,7 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
         return UnwrappedSchema(pointer=pointer, schema=resolved, ref=ref, resolver=unwrapped_resolver)
 
     # External tag
-    external_tag = _detect_externally_tagged_pattern(schema, path, parent_ref)
+    external_tag = _detect_externally_tagged_pattern(schema, path, parent_ref, resolver)
     if external_tag:
         external_tag_, uses_parent_ref = external_tag
         tagged_schema = properties[external_tag_]
@@ -530,7 +530,7 @@ def _is_pagination_wrapper(
 
 
 def _detect_externally_tagged_pattern(
-    schema: Mapping[str, Any], path: str, parent_ref: str | None
+    schema: Mapping[str, Any], path: str, parent_ref: str | None, resolver: Resolver
 ) -> tuple[str, bool] | None:
     """Detect externally tagged resource pattern.
 
@@ -570,7 +570,16 @@ def _detect_externally_tagged_pattern(
         if name.lower() not in possible_names:
             continue
 
-        if isinstance(subschema, dict) and "object" in get_type(subschema):
+        if isinstance(subschema, dict) and "object" in get_type(subschema) and not _is_map(subschema, resolver):
             return name, name.lower() in parent_names
 
     return None
+
+
+def _is_map(schema: Mapping[str, Any], resolver: Resolver) -> bool:
+    # `{additionalProperties: X}` holds arbitrary keys, never a resource's fields.
+    schema_resolver, resolved = maybe_resolve_with_resolver(schema, resolver)
+    _, resolved = maybe_resolve_with_resolver(try_unwrap_all_of(resolved), schema_resolver)
+    return "additionalProperties" in resolved and not any(
+        keyword in resolved for keyword in ("properties", "allOf", "oneOf", "anyOf")
+    )
