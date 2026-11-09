@@ -9461,6 +9461,77 @@ def test_put_with_post_creator_stays_an_updater(ctx):
     ]
 
 
+ORDER_TOTAL = {"type": "object", "properties": {"total": {"type": "integer"}}}
+ORDER_WITH_TOTAL = {"type": "object", "properties": {"id": {"type": "string"}, "total": {"type": "integer"}}}
+ORDERS_COLLECTION = operation_with_body("post", "/orders", "201", ORDER_TOTAL, ORDER_WITH_TOTAL)["/orders"]
+ORDERS_LIST = operation("get", "/orders", "200", {"type": "array", "items": ORDER_WITH_TOTAL})["/orders"]
+ORDER_ITEM = {
+    **operation_with_body("put", "/orders/{orderId}", "204", ORDER_TOTAL, parameters=[path_param("orderId")])[
+        "/orders/{orderId}"
+    ],
+    **operation("get", "/orders/{orderId}", "200", ORDER_WITH_TOTAL, [path_param("orderId")])["/orders/{orderId}"],
+}
+
+
+def update_order_link(pointer):
+    return {
+        "operationRef": "#/paths/~1orders~1{orderId}/put",
+        "parameters": {"path.orderId": f"$response.body#{pointer}"},
+        "x-schemathesis": {"is_inferred": True},
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "collection", "components"),
+    [
+        ("/orders", ORDERS_COLLECTION, {}),
+        ("/orders/", ORDERS_COLLECTION, {}),
+        ("/orders", ref("#/components/pathItems/Orders"), {"pathItems": {"Orders": ORDERS_COLLECTION}}),
+        ("/orders", ref("paths.json#/orders"), {}),
+    ],
+    ids=["inline", "trailing-slash", "components-path-item", "external-path-item"],
+)
+def test_put_with_referenced_post_creator_stays_an_updater(ctx, path, collection, components):
+    ctx.makefile({"orders": ORDERS_COLLECTION}, filename="paths")
+    root = ctx.openapi.write_schema(
+        {path: collection, "/orders/{orderId}": ORDER_ITEM}, version="3.1.0", components=components
+    )
+    create_order = f"#/paths/{path.replace('/', '~1')}/post"
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == [
+        [create_order, "201", update_order_link("/id")],
+        [create_order, "201", read_order_link("/id")],
+        ["#/paths/~1orders~1{orderId}/get", "200", update_order_link("/id")],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("collection", "components"),
+    [
+        (ORDERS_LIST, {}),
+        (ref("#/components/pathItems/Orders"), {"pathItems": {"Orders": ORDERS_LIST}}),
+    ],
+    ids=["inline", "components-path-item"],
+)
+def test_put_creates_resource_when_referenced_collection_has_no_post(ctx, collection, components):
+    _, graph = analyze_dependencies(
+        ctx, {"/orders": collection, "/orders/{orderId}": ORDER_ITEM}, version="3.1.0", components=components
+    )
+    assert inferred_links(graph) == [
+        ["#/paths/~1orders/get", "200", update_order_link("/*/id")],
+        ["#/paths/~1orders/get", "200", read_order_link("/*/id")],
+        [
+            "#/paths/~1orders~1{orderId}/put",
+            "204",
+            {
+                "operationRef": "#/paths/~1orders~1{orderId}/get",
+                "parameters": {"path.orderId": "$request.path.orderId"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        ["#/paths/~1orders~1{orderId}/get", "200", update_order_link("/id")],
+    ]
+
+
 def test_self_referencing_component_terminates(ctx):
     # A component that refers to itself must not send reference resolution into infinite recursion.
     node = {
