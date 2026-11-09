@@ -9476,6 +9476,431 @@ def test_scalar_body_field_named_after_object_collection(ctx, item, language, ex
     assert inferred_links(graph) == expected
 
 
+def keyed(**fields):
+    return {"type": "object", "properties": {"pk": {"type": "integer", "readOnly": True}, **fields}}
+
+
+INTEGER = {"type": "integer"}
+
+
+NAMED = keyed(name={"type": "string"})
+PART_DETAIL = {"allOf": [component_ref("PartBrief")], "readOnly": True}
+
+
+@pytest.mark.parametrize(
+    ["collections", "consumer", "body", "created", "expected"],
+    [
+        pytest.param(
+            {"Part": NAMED, "SupplierPart": NAMED},
+            "/stock",
+            {"part": INTEGER, "quantity": INTEGER},
+            keyed(part=INTEGER, part_detail=PART_DETAIL),
+            [("parts", "part")],
+            id="detail-object-picks-collection",
+        ),
+        pytest.param(
+            {"LabelTemplate": NAMED, "ParameterTemplate": NAMED},
+            "/parameters",
+            {"template": INTEGER},
+            keyed(),
+            [("parametertemplates", "template")],
+            id="path-picks-collection",
+        ),
+        pytest.param(
+            {"LabelTemplate": NAMED, "ParameterTemplate": NAMED},
+            "/labels/parameters",
+            {"template": INTEGER},
+            keyed(),
+            [],
+            id="path-names-several",
+        ),
+        pytest.param({"LabelTemplate": NAMED}, "/stock", {"template": INTEGER}, keyed(), [], id="path-names-none"),
+        pytest.param(
+            {"LabelTemplate": NAMED, "ReportTemplate": NAMED},
+            "/labels/print",
+            {"template": INTEGER},
+            keyed(template=INTEGER),
+            [("labeltemplates", "template")],
+            id="path-picks-a-field-it-echoes",
+        ),
+        pytest.param(
+            {"EventType": NAMED, "OperationType": NAMED},
+            "/eventlog",
+            {"type": INTEGER},
+            keyed(),
+            [],
+            id="path-word-not-substring",
+        ),
+        pytest.param(
+            {"Role": NAMED, "DeviceRole": NAMED},
+            "/virtual-machines",
+            {"role": INTEGER},
+            keyed(role=component_ref("NestedDeviceRole")),
+            [("deviceroles", "role")],
+            id="response-picks-collection",
+        ),
+        pytest.param(
+            {"Role": NAMED, "DeviceRole": NAMED},
+            "/virtual-machines",
+            {"role": INTEGER},
+            keyed(role=component_ref("DeviceRole")),
+            [("deviceroles", "role")],
+            id="response-returns-the-collection",
+        ),
+        pytest.param(
+            {"Part": NAMED, "SupplierPart": NAMED},
+            "/order-lines",
+            {"part": {"type": "integer", "title": "Supplier Part"}},
+            keyed(),
+            [("supplierparts", "part")],
+            id="title-picks-collection",
+        ),
+        pytest.param(
+            {"Part": NAMED, "SupplierPart": NAMED},
+            "/price-breaks",
+            {"part": INTEGER},
+            keyed(part=INTEGER),
+            [],
+            id="nothing-picks-among-several",
+        ),
+        pytest.param(
+            {"Part": NAMED, "SupplierPart": NAMED},
+            "/price-breaks",
+            {"part": {"type": "integer", "title": "Part"}},
+            keyed(),
+            [],
+            id="title-repeats-the-name",
+        ),
+        pytest.param(
+            {"Part": NAMED, "SupplierPart": NAMED},
+            "/price-breaks",
+            {"part": {"type": "integer", "title": "Base Part"}},
+            keyed(),
+            [],
+            id="title-names-no-collection",
+        ),
+        pytest.param(
+            {"Version": NAMED}, "/documents", {"version": INTEGER}, keyed(version=INTEGER), [], id="bare-name"
+        ),
+        pytest.param(
+            {"Part": NAMED, "ManufacturerPart": NAMED},
+            "/manufacturer-parts",
+            {"part": INTEGER},
+            component_ref("ManufacturerPart"),
+            [],
+            id="not-its-own-collection",
+        ),
+        pytest.param(
+            {"Part": NAMED},
+            "/stock",
+            {"part": {"type": "string"}},
+            keyed(part_detail=PART_DETAIL),
+            [],
+            id="string-field",
+        ),
+        pytest.param(
+            {"Part": NAMED},
+            "/stock",
+            {"part": {"type": "integer", "enum": [1, 2]}},
+            keyed(part_detail=PART_DETAIL),
+            [],
+            id="enum-field",
+        ),
+        pytest.param(
+            {"Part": {"type": "object", "properties": {"id": {"type": "string"}}}},
+            "/stock",
+            {"part": INTEGER},
+            keyed(part_detail=PART_DETAIL),
+            [],
+            id="string-key",
+        ),
+        pytest.param({"Template": NAMED}, "/stock", {"part": INTEGER}, keyed(), [], id="unlisted-name"),
+    ],
+)
+def test_integer_body_field_named_after_collection_takes_its_key(ctx, collections, consumer, body, created, expected):
+    # Django REST Framework writes a reference as the bare `pk` of the object, under the name of its model.
+    paths = {}
+    for name in collections:
+        paths.update(operation("get", f"/{name.lower()}s", "200", {"type": "array", "items": component_ref(name)}))
+    paths.update(operation_with_body("post", consumer, "201", {"type": "object", "properties": body}, created))
+    schemas = {**collections, "NestedDeviceRole": keyed(), "PartBrief": NAMED, "ManufacturerPart": keyed(part=INTEGER)}
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+
+    assert [
+        (link[0], link[2]["requestBody"]) for link in inferred_links(graph) if link[2]["operationRef"].endswith("/post")
+    ] == [(f"#/paths/~1{listing}/get", {field: "$response.body#/*/pk"}) for listing, field in expected]
+
+
+def issue_and_pull_paths(field):
+    # Issues and pull requests share `{index}` by name, but an issue's index is not a pull request's.
+    repository = [path_param("owner"), path_param("repo")]
+    item = [*repository, path_param("index", "integer")]
+    return {
+        **operation(
+            "get",
+            "/repos/{owner}/{repo}/milestones",
+            "200",
+            {"type": "array", "items": component_ref("Milestone")},
+            repository,
+        ),
+        **operation("get", "/repos/{owner}/{repo}/issues/{index}", "200", component_ref("Issue"), item),
+        **operation_with_body(
+            "patch",
+            "/repos/{owner}/{repo}/pulls/{index}",
+            "200",
+            {"type": "object", "properties": {field: INTEGER}},
+            component_ref("PullRequest"),
+            parameters=item,
+        ),
+    }
+
+
+ISSUE_AND_PULL_SCHEMAS = {
+    "Milestone": {"type": "object", "properties": {"id": INTEGER, "title": {"type": "string"}}},
+    "Issue": {"type": "object", "properties": {"number": INTEGER, "milestone": component_ref("Milestone")}},
+    "PullRequest": {"type": "object", "properties": {"number": INTEGER, "milestone": component_ref("Milestone")}},
+}
+
+
+def test_field_named_after_collection_forwards_only_keys_under_the_same_parents(ctx):
+    _, graph = analyze_dependencies(
+        ctx, issue_and_pull_paths("milestone"), components={"schemas": ISSUE_AND_PULL_SCHEMAS}
+    )
+
+    repository = {"path.owner": "$request.path.owner", "path.repo": "$request.path.repo"}
+    assert [(link[0], link[2]["parameters"], link[2]["requestBody"]) for link in inferred_links(graph)] == [
+        ("#/paths/~1repos~1{owner}~1{repo}~1milestones/get", repository, {"milestone": "$response.body#/*/id"}),
+        (
+            "#/paths/~1repos~1{owner}~1{repo}~1issues~1{index}/get",
+            repository,
+            {"milestone": "$response.body#/milestone/id"},
+        ),
+    ]
+
+
+def test_suffixed_foreign_key_keeps_forwarding_path_parameters(ctx):
+    _, graph = analyze_dependencies(
+        ctx, issue_and_pull_paths("milestone_id"), components={"schemas": ISSUE_AND_PULL_SCHEMAS}
+    )
+
+    repository = {"path.owner": "$request.path.owner", "path.repo": "$request.path.repo"}
+    assert [(link[0], link[2]["parameters"], link[2]["requestBody"]) for link in inferred_links(graph)] == [
+        ("#/paths/~1repos~1{owner}~1{repo}~1milestones/get", repository, {"milestone_id": "$response.body#/*/id"}),
+        (
+            "#/paths/~1repos~1{owner}~1{repo}~1issues~1{index}/get",
+            {**repository, "path.index": "$request.path.index"},
+            {"milestone_id": "$response.body#/milestone/id"},
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ["version", "part"],
+    [("3.0.2", {"type": "integer", "nullable": True}), ("3.1.0", {"type": ["integer", "null"]})],
+    ids=["nullable", "type-list"],
+)
+def test_nullable_integer_body_field_named_after_collection_takes_its_key(ctx, version, part):
+    paths = {
+        **operation("get", "/parts", "200", {"type": "array", "items": component_ref("Part")}),
+        **operation_with_body(
+            "post", "/stock", "201", {"type": "object", "properties": {"part": part}}, keyed(part_detail=PART_DETAIL)
+        ),
+    }
+
+    _, graph = analyze_dependencies(
+        ctx, paths, version=version, components={"schemas": {"Part": NAMED, "PartBrief": NAMED}}
+    )
+
+    assert [(link[0], link[2]["requestBody"]) for link in inferred_links(graph)] == [
+        ("#/paths/~1parts/get", {"part": "$response.body#/*/pk"})
+    ]
+
+
+@pytest.mark.parametrize(
+    ["location", "parameter", "items", "expected"],
+    [
+        ("query", INTEGER, keyed(part=INTEGER), [("#/paths/~1parts/get", {"query.part": "$response.body#/*/pk"})]),
+        ("query", {"type": "string"}, keyed(part=INTEGER), []),
+        ("query", INTEGER, keyed(text={"type": "string"}), []),
+        ("header", INTEGER, keyed(part=INTEGER), []),
+    ],
+    ids=["query", "string-query", "filters-no-field-of-the-items", "header"],
+)
+def test_integer_query_parameter_named_after_collection_takes_its_key(ctx, location, parameter, items, expected):
+    paths = {
+        **operation("get", "/parts", "200", {"type": "array", "items": component_ref("Part")}),
+        **operation(
+            "get",
+            "/builds",
+            "200",
+            {"type": "array", "items": items},
+            parameters=[{"name": "part", "in": location, "schema": parameter}],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Part": NAMED}})
+
+    assert [(link[0], link[2]["parameters"]) for link in inferred_links(graph)] == expected
+
+
+PAGINATION_NAMES = [
+    "page",
+    "page_size",
+    "per_page",
+    "size",
+    "limit",
+    "offset",
+    "cursor",
+    "start",
+    "skip",
+    "top",
+    "after",
+    "before",
+    "since",
+    "count",
+    "first",
+    "last",
+    "page_number",
+    "pageIndex",
+    "page_no",
+    "pagenum",
+]
+
+
+@pytest.mark.parametrize("name", PAGINATION_NAMES)
+def test_pagination_parameter_is_not_bound_to_a_same_named_collection(ctx, name):
+    # The listed items may carry a field of that name too (`Comment.page`); the parameter still pages.
+    item = keyed(text={"type": "string"}, **{name: INTEGER})
+    paths = {
+        **operation("get", f"/{name}s", "200", {"type": "array", "items": component_ref(naming.to_pascal_case(name))}),
+        **operation(
+            "get",
+            "/comments",
+            "200",
+            {"type": "object", "properties": {"count": INTEGER, "results": {"type": "array", "items": item}}},
+            parameters=[{"name": name, "in": "query", "schema": INTEGER}],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {naming.to_pascal_case(name): NAMED}})
+
+    assert inferred_links(graph) == []
+
+
+VERSIONED_DOCUMENT = {"type": "object", "properties": {"id": INTEGER, "title": {"type": "string"}, "version": INTEGER}}
+DOCUMENT_ECHOES = ["#/paths/~1documents/post", "#/paths/~1documents~1{id}/get"]
+
+
+@pytest.mark.parametrize(
+    ["parameter", "method", "status", "returned", "expected"],
+    [
+        ("id", "put", "200", "Document", DOCUMENT_ECHOES),
+        ("document_id", "put", "200", "Document", DOCUMENT_ECHOES),
+        ("document_id", "put", "204", None, DOCUMENT_ECHOES),
+        ("document_id", "patch", "200", "DocumentSummary", DOCUMENT_ECHOES),
+    ],
+    ids=["same-parameter", "named-parameter", "no-content", "summary"],
+)
+def test_lock_counter_keeps_its_echo_instead_of_a_versions_collection(
+    ctx, parameter, method, status, returned, expected
+):
+    # `version` guards concurrent updates; the `DocumentVersion` items under the document are not what it takes.
+    paths = {
+        **operation_with_body(
+            "post",
+            "/documents",
+            "201",
+            {"type": "object", "properties": {"title": {"type": "string"}}},
+            component_ref("Document"),
+        ),
+        "/documents/{id}": {
+            **operation("get", "/documents/{id}", "200", component_ref("Document"), [path_param("id", "integer")])[
+                "/documents/{id}"
+            ],
+            **operation_with_body(
+                method,
+                "/documents/{id}",
+                status,
+                {"type": "object", "properties": {"title": {"type": "string"}, "version": INTEGER}},
+                component_ref(returned) if returned else None,
+                parameters=[path_param("id", "integer")],
+            )["/documents/{id}"],
+        },
+        **operation(
+            "get",
+            f"/documents/{{{parameter}}}/versions",
+            "200",
+            {"type": "array", "items": component_ref("DocumentVersion")},
+            [path_param(parameter, "integer")],
+        ),
+    }
+    schemas = {
+        "Document": VERSIONED_DOCUMENT,
+        "DocumentSummary": {"type": "object", "properties": {"id": INTEGER, "title": {"type": "string"}}},
+        "DocumentVersion": NAMED,
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+
+    assert (
+        sorted(
+            link[0]
+            for link in inferred_links(graph)
+            if link[2]["operationRef"] == f"#/paths/~1documents~1{{id}}/{method}"
+            and link[2].get("requestBody", {}).get("version") == "$response.body#/version"
+        )
+        == expected
+    )
+    assert [
+        link[0] for link in inferred_links(graph) if link[0] == f"#/paths/~1documents~1{{{parameter}}}~1versions/get"
+    ] == []
+
+
+@pytest.mark.parametrize(
+    ["location", "path"],
+    [("body", "/documents"), ("query", "/documents")],
+    ids=["create", "filter"],
+)
+def test_counter_named_after_the_items_own_subcollection_is_not_bound(ctx, location, path):
+    # `DocumentVersion` items live under `/documents/{id}`, so a `version` on documents themselves is a counter.
+    paths = {
+        **operation(
+            "get",
+            "/documents/{document_id}/versions",
+            "200",
+            {"type": "array", "items": component_ref("DocumentVersion")},
+            [path_param("document_id", "integer")],
+        ),
+    }
+    if location == "body":
+        paths.update(
+            operation_with_body(
+                "post",
+                path,
+                "201",
+                {"type": "object", "properties": {"title": {"type": "string"}, "version": INTEGER}},
+                {"type": "object", "properties": {"id": INTEGER}},
+            )
+        )
+    else:
+        paths.update(
+            operation(
+                "get",
+                path,
+                "200",
+                {"type": "array", "items": component_ref("Document")},
+                parameters=[{"name": "version", "in": "query", "schema": INTEGER}],
+            )
+        )
+
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"Document": VERSIONED_DOCUMENT, "DocumentVersion": NAMED}}
+    )
+
+    assert [link for link in inferred_links(graph) if link[0].endswith("~1versions/get")] == []
+
+
 def test_second_consumer_of_a_foreign_key_gets_its_own_link(ctx):
     # Two reads of the same resource are distinct destinations, not one.
     order = {
@@ -9622,6 +10047,161 @@ def test_bare_pk_or_identifier_parameter_links_to_id_field(ctx, name, fields, ex
         ]
     ]
     assert inferred_links(graph) == (links if expected else [])
+
+
+PRIMARY_KEYED_PART = {
+    "type": "object",
+    "properties": {"pk": {"type": "integer", "readOnly": True}, "name": {"type": "string"}},
+    "required": ["pk", "name"],
+}
+
+
+def test_identifier_parameters_take_primary_key_field(ctx):
+    # Django REST Framework serializers name the key `pk` while paths and foreign keys say `id`.
+    paths = {
+        **operation("post", "/parts", "201", component_ref("Part")),
+        **operation("post", "/parts/{id}/copy", "200", parameters=[path_param("id", "integer")]),
+        **operation_with_body(
+            "post", "/stock", "201", {"type": "object", "properties": {"part_id": {"type": "integer"}}}
+        ),
+        **operation(
+            "get",
+            "/builds",
+            "200",
+            parameters=[{"name": "part_id", "in": "query", "schema": {"type": "integer"}}],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Part": PRIMARY_KEYED_PART}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1parts/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1parts~1{id}~1copy/post",
+                "parameters": {"path.id": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1parts/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1stock/post",
+                "requestBody": {"part_id": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ],
+        [
+            "#/paths/~1parts/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1builds/get",
+                "parameters": {"query.part_id": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+def test_primary_key_does_not_join_resources_that_share_a_word(ctx):
+    # `/build/item/{id}` names a `BuildItem`; the `BomItem` registered first also ends in `Item` and declares `pk`.
+    item = {
+        "type": "object",
+        "properties": {"pk": {"type": "integer", "readOnly": True}, "quantity": {"type": "number"}},
+        "required": ["pk", "quantity"],
+    }
+    write = {"type": "object", "properties": {"quantity": {"type": "number"}}, "required": ["quantity"]}
+    paths = {
+        **operation_with_body("post", "/bom", "201", write, component_ref("BomItem")),
+        **operation_with_body(
+            "put", "/bom/{id}", "200", write, component_ref("BomItem"), parameters=[path_param("id", "integer")]
+        ),
+        **operation_with_body("post", "/build/item", "201", write, component_ref("BuildItem")),
+        **operation_with_body(
+            "put",
+            "/build/item/{id}",
+            "200",
+            write,
+            component_ref("BuildItem"),
+            parameters=[path_param("id", "integer")],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"BomItem": item, "BuildItem": item}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1bom/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1bom~1{id}/put",
+                "parameters": {"path.id": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1build~1item/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1build~1item~1{id}/put",
+                "parameters": {"path.id": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+def test_string_partition_key_is_not_an_identifier(ctx):
+    # A string `pk` next to a sort key `sk` partitions a table; it is not what `{id}` takes.
+    order = {
+        "type": "object",
+        "properties": {"pk": {"type": "string"}, "sk": {"type": "string"}, "total": {"type": "number"}},
+    }
+    paths = {
+        **operation("post", "/orders", "201", component_ref("Order")),
+        **operation("get", "/orders/{id}", "200", component_ref("Order"), parameters=[path_param("id")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Order": order}})
+
+    assert inferred_links(graph) == []
+
+
+def test_named_primary_key_parameter_takes_the_key_of_a_prefixed_schema(ctx):
+    # Nested routers name the parent key `{part_pk}` while the serializer is `PartDetail`.
+    paths = {
+        **operation("post", "/parts", "201", component_ref("PartDetail")),
+        **operation("get", "/parts/{part_pk}/stock", "200", parameters=[path_param("part_pk", "integer")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"PartDetail": PRIMARY_KEYED_PART}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1parts/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1parts~1{part_pk}~1stock/get",
+                "parameters": {"path.part_pk": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_named_primary_key_parameter_takes_a_string_key(ctx):
+    # `{part_pk}` names the key itself, so a UUID `pk` is the one it takes.
+    part = {"type": "object", "properties": {"pk": {"type": "string", "format": "uuid", "readOnly": True}}}
+    paths = {
+        **operation("post", "/parts", "201", component_ref("PartDetail")),
+        **operation("get", "/parts/{part_pk}/stock", "200", parameters=[path_param("part_pk")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"PartDetail": part}})
+
+    assert [link[2]["parameters"] for link in inferred_links(graph)] == [{"path.part_pk": "$response.body#/pk"}]
 
 
 PRODUCT_NAME_BODY = {"type": "object", "properties": {"productName": {"type": "string"}}, "required": ["productName"]}
@@ -11511,6 +12091,166 @@ def test_listed_identifier_does_not_forward_a_parent_key_as_a_child_key(ctx):
     assert [link[2]["parameters"] for link in inferred_links(graph) if link[2]["operationRef"] == bins] == [
         {"path.warehouse": "$response.body#/items/*/name"},
         {"path.warehouse": "$response.body#/name"},
+    ]
+
+
+def test_generic_key_is_not_forwarded_to_another_collection(ctx):
+    # A customer's `{id}` is not the `{id}` of an order, though both paths call it that.
+    customer = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+    paths = {
+        **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+        **operation_with_body(
+            "patch",
+            "/orders/{id}",
+            "200",
+            {"type": "object", "properties": {"customer_id": {"type": "string"}}},
+            parameters=[path_param("id")],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Customer": customer}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1customers~1{id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders~1{id}/patch",
+                "requestBody": {"customer_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
+def test_id_is_not_forwarded_where_it_names_another_namespace(ctx):
+    # `/suppliers/parts/{id}` takes a supplier's part, which the `{id}` of `/parts/{id}` is not.
+    part = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+    paths = {
+        **operation("get", "/parts/{id}", "200", component_ref("Part"), [path_param("id")]),
+        **operation_with_body(
+            "patch",
+            "/suppliers/parts/{id}",
+            "200",
+            {"type": "object", "properties": {"part_id": {"type": "string"}}},
+            parameters=[path_param("id")],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Part": part}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1parts~1{id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1suppliers~1parts~1{id}/patch",
+                "requestBody": {"part_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
+@pytest.mark.parametrize(
+    ["summary", "forwarded"],
+    [("Patient", {"path.id": "$request.path.id"}), ("PatientSummary", {})],
+    ids=["same-items", "different-items"],
+)
+def test_generic_key_is_forwarded_between_views_of_the_same_items(ctx, summary, forwarded):
+    # `/patients_summary/{id}` takes the `{id}` of `/patients/{id}` only when it returns the same items.
+    patient = {"type": "object", "properties": {"id": {"type": "integer"}, "first_name": {"type": "string"}}}
+    first_name = {"name": "first_name", "in": "query", "schema": {"type": "string"}}
+    paths = {
+        **operation("get", "/patients/{id}", "200", component_ref("Patient"), [path_param("id", "integer")]),
+        **operation("post", "/patients_summary", "201", component_ref("Patient")),
+        **operation(
+            "get",
+            "/patients_summary/{id}",
+            "200",
+            component_ref(summary),
+            [path_param("id", "integer"), first_name],
+        ),
+        **operation("get", "/reports", "200", {"type": "object", "properties": {"data": component_ref("Patient")}}),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Patient": patient, "PatientSummary": patient}})
+
+    assert [link[2]["parameters"] for link in inferred_links(graph) if link[0] == "#/paths/~1patients~1{id}/get"] == [
+        {"query.first_name": "$response.body#/first_name", **forwarded}
+    ]
+
+
+@pytest.mark.parametrize(
+    ["producer", "consumer", "forwarded"],
+    [
+        (
+            ["teams", "{team}", "invoices", "{id}"],
+            ["{owner}", "invoices", "{id}"],
+            {"path.id": "$request.path.id"},
+        ),
+        (
+            ["sites", "{site}", "slots", "{slot}", "invoices", "{id}"],
+            ["sites", "{site}", "instances", "{instance}", "invoices", "{id}"],
+            {"path.site": "$request.path.site"},
+        ),
+        (["invoices", "{id}"], ["teams", "{team}", "invoices", "{id}"], {}),
+    ],
+    ids=["unlabeled-parent", "differently-labeled-parent", "extra-parent"],
+)
+def test_item_key_is_forwarded_under_a_parent_that_may_be_the_same(ctx, producer, consumer, forwarded):
+    # A bare `{owner}` may name the team `/teams/{team}` names; `slots/{slot}` and `instances/{instance}` differ.
+    invoice = {"type": "object", "properties": {"id": {"type": "string"}, "amount": INTEGER}}
+    producer_path = "/" + "/".join(producer)
+    consumer_path = "/" + "/".join(consumer)
+    paths = {
+        **operation(
+            "get",
+            producer_path,
+            "200",
+            component_ref("Invoice"),
+            [path_param(segment[1:-1]) for segment in producer if segment.startswith("{")],
+        ),
+        **operation_with_body(
+            "put",
+            consumer_path,
+            "200",
+            {"type": "object", "properties": {"amount": INTEGER}, "required": ["amount"]},
+            component_ref("Invoice"),
+            parameters=[path_param(segment[1:-1]) for segment in consumer if segment.startswith("{")],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Invoice": invoice}})
+
+    assert [
+        (link[2].get("parameters", {}), link[2]["requestBody"])
+        for link in inferred_links(graph)
+        if link[2]["operationRef"].endswith("/put")
+    ] == [(forwarded, {"amount": "$response.body#/amount"})]
+
+
+def test_generic_key_is_forwarded_within_its_collection(ctx):
+    order = {"type": "object", "properties": {"id": {"type": "string"}, "total": {"type": "number"}}}
+    paths = {
+        **operation("post", "/stores/{name}/orders", "201", component_ref("Order"), [path_param("name")]),
+        **operation(
+            "get", "/stores/{name}/orders/{order_id}", "200", parameters=[path_param("name"), path_param("order_id")]
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Order": order}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1stores~1{name}~1orders/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1stores~1{name}~1orders~1{order_id}/get",
+                "parameters": {"path.order_id": "$response.body#/id", "path.name": "$request.path.name"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
     ]
 
 

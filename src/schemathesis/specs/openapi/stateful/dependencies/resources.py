@@ -738,6 +738,33 @@ def write_only_fields(response: OpenApiResponse, resolver: Resolver) -> set[str]
     return fields
 
 
+def referenced_schema_names(response: OpenApiResponse, pointer: str) -> dict[str, str]:
+    """Schema each field of the object at `pointer` (of each item, for a list) refers to: `role` -> `NestedRole`."""
+    schema = response.get_raw_schema()
+    # The output at `pointer` was extracted from this schema, so its references resolve.
+    current_resolver, current = maybe_resolve_with_resolver(
+        schema if isinstance(schema, dict) else {}, response.resolver
+    )
+    for name in (decode_pointer(part) for part in pointer.split("/") if part):
+        entry_resolver, subschema = _collect_properties(current, current_resolver).get(name, (current_resolver, {}))
+        current_resolver, current = maybe_resolve_with_resolver(
+            subschema if isinstance(subschema, dict) else {}, entry_resolver
+        )
+    items = current.get("items")
+    if isinstance(items, dict):
+        current_resolver, current = maybe_resolve_with_resolver(items, current_resolver)
+    names = {}
+    for name, (_, subschema) in _collect_properties(current, current_resolver).items():
+        field = subschema if isinstance(subschema, dict) else {}
+        branches = field.get("allOf")
+        # Django REST Framework wraps a read-only nested object as `allOf: [{$ref}]`.
+        wrapped = branches[0] if isinstance(branches, list) and len(branches) == 1 else {}
+        reference = field.get("$ref", wrapped.get("$ref") if isinstance(wrapped, dict) else None)
+        if isinstance(reference, str):
+            names[name] = resource_name_from_ref(reference)
+    return names
+
+
 def declared_field_values(response: OpenApiResponse, pointer: str, field: str, resolver: Resolver) -> list[Any] | None:
     """Values the response allows for `field` of the object at `pointer`; `None` when it does not list them."""
     schema = response.get_raw_schema()

@@ -11,6 +11,9 @@
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
 - No inferred links for responses whose schema lives in another file and references its siblings.
+- Missing links for body fields and query filters named after a resource, e.g. `part`, `?company=`.
+- Missing links for responses naming the resource id `pk`, as in Django REST Framework.
+- Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
 - Coverage and examples phases sending requests without credentials learned by auth inference.
