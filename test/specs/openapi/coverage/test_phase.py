@@ -7444,6 +7444,31 @@ def test_negative_data_rejection_no_false_positive_for_nullable_binary_multipart
         )
 
 
+@pytest.mark.parametrize(
+    ("text_branch", "expected"),
+    [
+        ({"type": "string", "pattern": "^[0-9]+$"}, [{"f": [""]}]),
+        ({"type": "string", "pattern": "^[0-9]+$", "nullable": True}, [{"f": [""]}]),
+        ({"enum": ["4"]}, []),
+    ],
+    ids=["string", "nullable-string", "untyped-enum"],
+)
+def test_negative_multipart_array_items_skip_values_another_branch_accepts_as_text(ctx, text_branch, expected):
+    # Each array item travels as its own text part, so `4` arrives as "4" and matches the text branch.
+    items = {"anyOf": [{"type": "integer", "minimum": 5}, text_branch]}
+    operation = body_operation(
+        ctx,
+        {"type": "object", "properties": {"f": {"type": "array", "items": items}}},
+        media_type="multipart/form-data",
+    )
+
+    assert [
+        case.body
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.scenario in (CoverageScenario.VALUE_BELOW_MINIMUM, CoverageScenario.INVALID_PATTERN)
+    ] == expected
+
+
 def test_negative_data_rejection_no_false_positive_for_multipart_body_type_mutations(ctx, response_factory):
     # Non-dict body values render as malformed multipart that lenient servers accept.
     operation = body_operation(ctx, NULLABLE_BINARY_MULTIPART_SCHEMA, media_type="multipart/form-data", path="/upload")

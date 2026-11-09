@@ -6,6 +6,7 @@
 
 - Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
 - Missing links for fields inherited through `allOf` chains reusing a schema name across files.
+- False positive `negative_data_rejection` for form body values another `anyOf` branch accepts as text.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
