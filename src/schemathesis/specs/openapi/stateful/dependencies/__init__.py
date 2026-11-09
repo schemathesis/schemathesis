@@ -49,7 +49,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     ResourceMap,
     path_shape,
 )
-from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
+from schemathesis.specs.openapi.stateful.dependencies.outputs import collections_with_post, extract_outputs
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
     InferenceState,
     referenced_schema_names,
@@ -81,6 +81,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Declared types of each operation's path parameters, so a bound value can be checked against them
     path_parameter_types: dict[str, dict[str, list[str]]] = {}
+    post_collections = collections_with_post(schema)
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
@@ -91,7 +92,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             }
             bindings = DeferredBindings()
             inputs = list(extract_inputs(operation=operation, state=state, deferred=bindings))
-            outputs = extract_outputs(operation=operation, inputs=inputs, state=state)
+            outputs = extract_outputs(
+                operation=operation, inputs=inputs, state=state, post_collections=post_collections
+            )
             operations[operation.label] = OperationNode(
                 method=operation.method,
                 path=operation.path,

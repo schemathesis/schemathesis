@@ -6,6 +6,7 @@
 
 - Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
+- Links treating `PUT` updaters as creators when the collection's `POST` is a path item `$ref`.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.

@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
+from schemathesis.specs.openapi.operations import SCHEMA_PARSING_ERRORS, resolve_path_item
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import assigns_identifier
 from schemathesis.specs.openapi.stateful.dependencies.models import (
@@ -18,7 +19,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import (
 )
 
 if TYPE_CHECKING:
-    from schemathesis.specs.openapi.schemas import APIOperation
+    from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
 # HTTP methods whose 2xx response confirms a newly-created resource keyed by
@@ -32,6 +33,7 @@ def extract_outputs(
     operation: APIOperation,
     inputs: list[InputSlot],
     state: InferenceState,
+    post_collections: frozenset[str],
 ) -> Iterator[OutputSlot]:
     """Extract resources from API operation's responses."""
     extracted_resource_names: set[str] = set()
@@ -52,6 +54,7 @@ def extract_outputs(
         operation=operation,
         inputs=inputs,
         already_extracted=extracted_resource_names,
+        post_collections=post_collections,
     )
 
     yield from _body_keyed_outputs(
@@ -66,6 +69,7 @@ def _path_keyed_outputs(
     operation: APIOperation,
     inputs: list[InputSlot],
     already_extracted: set[str],
+    post_collections: frozenset[str],
 ) -> Iterator[OutputSlot]:
     """Emit a synthetic output for path-keyed creators with no body schema.
 
@@ -80,7 +84,7 @@ def _path_keyed_outputs(
 
     method = operation.method.lower()
     if method not in _PATH_KEYED_PRODUCER_METHODS and not (
-        method == "put" and not _has_post_creator(operation, trailing)
+        method == "put" and not _has_post_creator(operation, trailing, post_collections)
     ):
         return
 
@@ -104,11 +108,22 @@ def _path_keyed_outputs(
     )
 
 
-def _has_post_creator(operation: APIOperation, trailing: str) -> bool:
+def _has_post_creator(operation: APIOperation, trailing: str, post_collections: frozenset[str]) -> bool:
     # With a `POST` on the parent collection, `PUT` on the item is an updater; without one, it is the creator.
-    parent = operation.path.rstrip("/")[: -len(f"/{{{trailing}}}")]
-    paths = operation.schema.raw_schema.get("paths", {})
-    return any("post" in item for path, item in paths.items() if path.rstrip("/") == parent)
+    return operation.path.rstrip("/")[: -len(f"/{{{trailing}}}")] in post_collections
+
+
+def collections_with_post(schema: OpenApiSchema) -> frozenset[str]:
+    """Paths declaring a `POST`, including those behind a path item reference."""
+    collections = set()
+    for path, path_item in (schema.raw_schema.get("paths") or {}).items():
+        try:
+            _, path_item = resolve_path_item(schema.root_resolver, path_item)
+        except SCHEMA_PARSING_ERRORS:
+            continue
+        if isinstance(path_item, dict) and "post" in path_item:
+            collections.add(path.rstrip("/"))
+    return frozenset(collections)
 
 
 def _body_keyed_outputs(
