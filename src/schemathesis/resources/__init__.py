@@ -125,8 +125,8 @@ def record_interaction(source: ResourceRecorder, case: Case, response: Response)
 
 
 def record_delete_attempt(source: ResourceRecorder, case: Case, status_code: int) -> None:
-    """Count a DELETE that succeeded or found nothing, so later draws stop reusing the same resource."""
-    if 200 <= status_code < 300 or status_code == 404:
+    """Record a DELETE that succeeded, so later draws stop reusing the deleted resource."""
+    if 200 <= status_code < 300:
         source.record_successful_delete(operation=case.operation, case=case)
 
 

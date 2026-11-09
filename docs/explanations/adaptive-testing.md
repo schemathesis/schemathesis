@@ -10,7 +10,7 @@ Once a test starts, Schemathesis watches what the API returns and updates its pl
 Four kinds of runtime signal feed adaptation.
 
 - **Schema constraints from error responses:** rejected positive-mode 4xx responses (other than 401 and 403) with a recognized framework envelope yield validation rules (required fields, formats, bounds, enums, patterns, type mismatches, unknown-property rejections) that get applied to the operation's schema. A single rejection is enough; the rule applies from the next checkpoint, which is when Schemathesis next starts testing that operation in a phase, or starts the next stateful suite.
-- **Resource lifecycle** — successful 2xx responses populate a per-resource pool that later operations draw on; successful and "not-found" deletes mark ids as gone so they're less likely to be redrawn. A separate use-after-free check looks at the recorded scenario, independent of pool state.
+- **Resource lifecycle** — successful 2xx responses populate a per-resource pool that later operations draw on; successful deletes mark ids as gone so they're less likely to be redrawn. A separate use-after-free check looks at the recorded scenario, independent of pool state.
 - **Authentication** — a 401 or 403 on a public operation produces an inferred auth requirement; if credentials are configured for a declared scheme, subsequent calls retry with them automatically.
 - **Operation health and budget allocation** — operations that don't produce useful signal (undocumented method-not-allowed responses, repeated transport timeouts in the stateful phase) get de-prioritized or skipped so budget shifts elsewhere. Connection-level failures (resets, premature disconnects) surface immediately as scenario errors.
 
