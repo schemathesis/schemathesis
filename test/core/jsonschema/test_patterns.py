@@ -420,6 +420,8 @@ def test_update_quantifier_unanchored_multi_enforces_min(pattern, min_length, ma
         (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" * 128),
         (r"^[a-z]{1,3}[0-9]+$", None, 10, "a" + "0" * 9),
         (r"^[a-z]{1,3}[0-9]+$", 1, 10, "a" + "0" * 9),
+        # Matches every string, so it gets a narrower rewrite that must still let the digits fill the budget.
+        (r"^(\+\d{1,3})?\d*", None, 10, "1234567890"),
     ],
 )
 def test_update_quantifier_admits_uneven_slot_distributions(pattern, min_length, max_length, value):
