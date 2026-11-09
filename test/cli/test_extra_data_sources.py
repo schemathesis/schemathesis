@@ -4,6 +4,7 @@ import pytest
 from flask import abort, jsonify, request
 
 from test.apps.catalog.openapi import basic
+from test.apps.runtime import OpenAPIApp
 
 
 def _object_schema(properties, *, required=None, **extra):
@@ -1200,6 +1201,86 @@ def test_pool_captures_subresources_from_every_parent(
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    ("booking_properties", "parameter", "item_properties", "wrapped"),
+    [
+        ({"firstname": {"type": "string"}}, "id", None, True),
+        ({"id": {"type": "string"}, "firstname": {"type": "string"}}, "id", None, False),
+        (
+            {"firstname": {"type": "string"}},
+            "name",
+            {"name": {"type": "string"}, "firstname": {"type": "string"}},
+            True,
+        ),
+        ({"id": {"type": "string"}, "firstname": {"type": "string"}}, "id", None, True),
+    ],
+    ids=[
+        "identifier-next-to-resource",
+        "identifier-inside-resource",
+        "name-only-in-item-response",
+        "declared-id-next-to-identifier",
+    ],
+)
+def test_pool_reuses_created_identifiers(cli, ctx, booking_properties, parameter, item_properties, wrapped):
+    bookings: dict[str, dict] = {}
+    booking_ids: set[str] = set()
+    booking_ref = {"$ref": "#/components/schemas/Booking"}
+    item_schema = booking_ref if item_properties is None else _object_schema(item_properties, required=item_properties)
+    created_schema = booking_ref
+    if wrapped:
+        created_schema = _object_schema(
+            {"bookingid": {"type": "string"}, "booking": booking_ref}, required=["bookingid", "booking"]
+        )
+    app, spec = ctx.openapi.make_flask_app(
+        {
+            "/bookings": {
+                "post": {
+                    "operationId": "createBooking",
+                    "requestBody": _json_request_body(booking_ref),
+                    "responses": {"200": _json_response(created_schema)},
+                }
+            },
+            f"/bookings/{{{parameter}}}": {
+                "get": {
+                    "operationId": "getBooking",
+                    "parameters": [_path_param(parameter)],
+                    "responses": {"200": _json_response(item_schema), "404": {"description": "Not found"}},
+                }
+            },
+        },
+        components={"schemas": {"Booking": _object_schema(booking_properties, required=booking_properties)}},
+    )
+
+    @app.route("/bookings", methods=["POST"])
+    def create_booking():
+        number = 7_000_001 + len(bookings)
+        booking_id = f"booking-{number}"
+        item = {field: f"{field}-{number}" for field in item_properties or booking_properties}
+        bookings[item.get(parameter, booking_id)] = item
+        booking = {field: item[field] for field in booking_properties}
+        if not wrapped:
+            return jsonify(booking)
+        booking_ids.add(booking_id)
+        return jsonify({"bookingid": booking_id, "booking": booking})
+
+    @app.route("/bookings/<key>", methods=["GET"])
+    def get_booking(key):
+        if key not in bookings:
+            return "", 404
+        return jsonify(bookings[key])
+
+    api = ctx.openapi.serve(OpenAPIApp(spec=spec, server=app))
+    cli.run(api.schema_url, "--phases=fuzzing", "--max-examples=10", "--mode=positive", "-c not_a_server_error")
+
+    requested = {call.path for call in api.calls_under("/bookings/", method="GET")}
+    created = {f"/bookings/{key}" for key in bookings}
+    # Only item responses carry the name, so nothing captures one to reuse.
+    if item_properties is None:
+        assert requested & created, f"No created booking requested: {requested}"
+    misplaced = {f"/bookings/{booking_id}" for booking_id in booking_ids} - created
+    assert requested & misplaced == set(), f"Envelope identifier sent as `{parameter}`"
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

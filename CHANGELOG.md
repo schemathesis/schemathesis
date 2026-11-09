@@ -19,6 +19,7 @@
 - Coverage and examples phases sending requests without credentials learned by auth inference.
 - False positive `negative_data_rejection` for string bodies with text media types other than `text/plain`.
 - False `JSON deserialization error` for `application/jwt` responses; send `+jwt` request bodies as text.
+- Fuzzing not reusing ids returned next to the resource, e.g. `{bookingid, booking}`.
 - `--auth-wfc` ignored and `--report wfc` writing an empty report for GraphQL schemas.
 - Sporadic `BlockingIOError` runtime errors with multiple workers on free-threaded Python.
 
