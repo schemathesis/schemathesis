@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, sleep
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 import trustme
@@ -89,17 +89,6 @@ def wait_for_port(port: int, *, timeout: float = 5.0, interval: float = 0.01) ->
     raise RuntimeError(f"Server on port {port} failed to start within {timeout}s")
 
 
-def run(target: Callable, wait: bool = True, **kwargs: Any) -> int:
-    """Start a daemon thread running the given server target on a free port."""
-    port = unused_port()
-    server_thread = threading.Thread(target=target, kwargs={"port": port, **kwargs})
-    server_thread.daemon = True
-    server_thread.start()
-    if wait:
-        wait_for_port(port)
-    return port
-
-
 class SubprocessRunner:
     def __init__(self, tmp_path: Path):
         self.tmp_path = tmp_path
@@ -166,12 +155,17 @@ def subprocess_runner(tmp_path):
     runner.cleanup()
 
 
-def run_flask_app(app: Flask, wait: bool = True) -> int:
-    """Start a thread with the given Flask application."""
-    if not wait:
-        return run(app.run, wait=wait)
-    # Binding port 0 inside the server leaves no window for another socket to take a pre-picked port.
-    return _serve(make_server("127.0.0.1", 0, app, threaded=True))
+def run_flask_app(app: Flask, *, delay: float = 0.0) -> int:
+    """Start a thread with the given Flask application, `delay` seconds from now."""
+    if not delay:
+        # Binding port 0 inside the server leaves no window for another socket to take a pre-picked port.
+        return _serve(make_server("127.0.0.1", 0, app, threaded=True))
+    # Until the server starts, its port refuses connections, as the port of a server still booting does.
+    port = unused_port()
+    timer = threading.Timer(delay, lambda: _serve(make_server("127.0.0.1", port, app, threaded=True)))
+    timer.daemon = True
+    timer.start()
+    return port
 
 
 def run_https_flask_app(app: Flask) -> int:
@@ -291,9 +285,9 @@ def run_port_proxy(port: int) -> int:
     return listener.getsockname()[1]
 
 
-def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
+def openapi_url(app: Flask, *, path: str = "/openapi.json", delay: float = 0.0) -> str:
     """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
-    port = run_flask_app(app, wait=wait)
+    port = run_flask_app(app, delay=delay)
     return f"http://127.0.0.1:{port}{path}"
 
 

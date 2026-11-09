@@ -2921,15 +2921,7 @@ def test_multiple_generation_modes(ctx, cli, data_generation_check):
 )
 def test_wait_for_schema(cli, app_runner, schema_path, make_app):
     # When Schemathesis is asked to wait for API schema to become available
-    app = make_app()
-    original_run = app.run
-
-    def run_with_delay(*args, **kwargs):
-        time.sleep(0.1)
-        return original_run(*args, **kwargs)
-
-    app.run = run_with_delay
-    schema_url = app_runner.openapi_url(app, path=f"/{schema_path}", wait=False)
+    schema_url = app_runner.openapi_url(make_app(), path=f"/{schema_path}", delay=0.1)
     cli.run_and_assert(schema_url, "--wait-for-schema=1", "--max-examples=1", "--mode=positive")
 
 

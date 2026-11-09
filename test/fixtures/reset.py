@@ -8,9 +8,11 @@ from schemathesis.cli.commands import fuzz as fuzz_command
 from schemathesis.cli.commands import run as run_command
 from schemathesis.cli.ext.groups import GROUPS, GroupedOption
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core import deserialization
 from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
 from schemathesis.core.jsonschema.resolver import _REMOTE_FAILURES, _load_remote_uri, load_file, load_file_uri
+from schemathesis.generation.metrics import METRICS
 from schemathesis.python._constants.registry import default_registry
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
 from schemathesis.specs.openapi import media_types
@@ -22,6 +24,8 @@ from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
 TRANSPORTS = (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT)
+# A test may register new entries or override built-in ones; each is restored to its built-in entries.
+REGISTRIES = (CHECKS, METRICS)
 
 # Global state a test may fill in, emptied after every test.
 CLEARS = (
@@ -46,19 +50,22 @@ CLEARS = (
 
 @pytest.fixture(autouse=True)
 def reset_global_state():
-    builtin_checks = CHECKS.get_all()
+    builtin_entries = [(registry, registry.get_all()) for registry in REGISTRIES]
     builtin_deserializers = dict(deserialization._DESERIALIZERS)
     builtin_string_formats = set(STRING_FORMATS)
     builtin_groups = set(GROUPS)
     # Registering a media type overwrites a transport's serializer for it, built-in ones included.
     builtin_serializers = [(transport, dict(transport._serializers)) for transport in TRANSPORTS]
+    # Under pytest-xdist every worker shares one seed; each test (and each rerun) needs its own.
+    SchemathesisConfig.shared_seed = None
     yield
-    builtin_check_names = {check.__name__ for check in builtin_checks}
-    for name in CHECKS.get_all_names():
-        if name not in builtin_check_names:
-            CHECKS.unregister(name)
-    for check in builtin_checks:
-        CHECKS.register(check)
+    for registry, entries in builtin_entries:
+        builtin_names = {entry.__name__ for entry in entries}
+        for name in registry.get_all_names():
+            if name not in builtin_names:
+                registry.unregister(name)
+        for entry in entries:
+            registry.register(entry)
     deserialization._DESERIALIZERS.clear()
     deserialization._DESERIALIZERS.update(builtin_deserializers)
     for transport, serializers in builtin_serializers:

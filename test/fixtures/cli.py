@@ -8,7 +8,6 @@ from _pytest.main import ExitCode
 from click.testing import CliRunner
 
 import schemathesis.cli
-from schemathesis.config import SchemathesisConfig
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 
 _DEFAULT_GENERATION_DATABASE_ARGUMENT = "--generation-database=none"
@@ -59,8 +58,6 @@ def cli(request, tmp_path, app_runner, monkeypatch):
     and do not bleed across runs.
     """
     monkeypatch.chdir(tmp_path)
-    # Under pytest-xdist every worker shares one seed; each CLI run (and each rerun) needs its own.
-    monkeypatch.setattr(SchemathesisConfig, "shared_seed", None)
     cli_runner = CliRunner()
     invocations = request.node.stash.setdefault(CLI_INVOCATIONS, [])
 

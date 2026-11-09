@@ -105,9 +105,10 @@ class CliSnapshotConfig:
             (self.replace_generated, _mask_generated),
             (True, self._mask_tmp_dir_uri),
             (True, _mask_local_ports),
+            # A checkout under a temporary directory must lose its package root before temporary paths get rewritten.
+            (True, _mask_environment),
             (True, self._mask_tmp_dir),
             (True, _mask_config_path),
-            (True, _mask_environment),
             (True, _mask_fuzz_counters),
             (self.replace_phase_statistic, _mask_phase_errors),
             (self.replace_cycle_metrics, _mask_cycle_metrics),

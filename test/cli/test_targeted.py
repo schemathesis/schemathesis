@@ -5,12 +5,12 @@ from hypothesis import strategies as st
 from hypothesis.control import current_build_context
 
 import schemathesis
-from schemathesis.generation.metrics import METRICS, MetricCollector, maximize
+from schemathesis.generation.metrics import MetricCollector, maximize
 
 
 @pytest.fixture
-def new_metric(ctx, cli):
-    module = ctx.write_pymodule(
+def new_metric(ctx):
+    return ctx.write_pymodule(
         """
 import click
 
@@ -21,10 +21,6 @@ def new_metric(ctx) -> float:
     return float(len(ctx.response.content))
 """
     )
-    yield module
-    METRICS.unregister("new_metric")
-    # To verify that "new_metric" is unregistered
-    assert "new_metric" not in cli.run("--help").stdout
 
 
 @pytest.mark.usefixtures("new_metric")
@@ -66,9 +62,7 @@ def metric_function():
     def new_metric(context):
         return 0.5
 
-    yield new_metric
-
-    METRICS.unregister("new_metric")
+    return new_metric
 
 
 def _observed_targets(fn):
