@@ -16,6 +16,7 @@
 - Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
+- Stateful phase skipping operations with optional filters or body fields like `groupId` as starting points.
 - Coverage and examples phases sending requests without credentials learned by auth inference.
 - False positive `negative_data_rejection` for string bodies with text media types other than `text/plain`.
 - False `JSON deserialization error` for `application/jwt` responses; send `+jwt` request bodies as text.
