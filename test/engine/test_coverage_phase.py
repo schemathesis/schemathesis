@@ -166,7 +166,7 @@ def test_coverage_phase_runs_when_error_feedback_disabled(ctx):
     stream = _coverage_only(schema)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.COVERAGE)
-    assert all(event.status == Status.SUCCESS for event in finished), [event.status for event in finished]
+    assert [event.status for event in finished] == [Status.SUCCESS]
 
 
 def test_examples_and_coverage_phases_apply_parameter_and_header_overrides(ctx, app_runner):

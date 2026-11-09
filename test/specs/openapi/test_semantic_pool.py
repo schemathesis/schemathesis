@@ -1763,9 +1763,9 @@ def test_record_draw_uses_name_bucket_when_only_name_is_provided():
 
 
 def test_record_draw_is_noop_when_no_bucket_matches():
-    SemanticValueIndex().record_draw(
-        type_token="string", format_token=None, pattern_hash=None, normalized_name=None, value="anything"
-    )
+    index = SemanticValueIndex()
+    index.record_draw(type_token="string", format_token=None, pattern_hash=None, normalized_name=None, value="anything")
+    assert (index.by_format, index.by_pattern, index.by_name) == ({}, {}, {})
 
 
 def test_walker_handles_ref_pointing_to_non_dict():

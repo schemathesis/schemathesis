@@ -3293,50 +3293,28 @@ def failed(ctx, response, case):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unspecified_http_methods_stay_negative_with_form_body(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
+def test_unspecified_http_method_stays_negative_after_body_edit(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /items",
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/x-www-form-urlencoded": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/x-www-form-urlencoded": {
+                        "schema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
     )
+    [case] = [case for case in _unspecified_method_cases(operation) if case.method == "PATCH"]
 
-    @app.route("/items", methods=["POST"])
-    def items():
-        return jsonify({})
+    case.body = {"name": "edited"}
 
-    module = ctx.write_pymodule(
-        """
-import schemathesis
-from schemathesis.generation.meta import CoverageScenario
-
-@schemathesis.check
-def probe_mode(ctx, response, case):
-    if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD and case.meta.generation.mode.is_positive:
-        raise AssertionError(f"Positive mode: {case.meta.phase.data.description}")
-"""
-    )
-    assert (
-        cli.run_openapi_app(
-            app, "--phases=coverage", "--mode=negative", "--max-examples=1", "-c", "probe_mode", hooks=module
-        )
-        == snapshot_cli
+    assert (case.meta.components, case.meta.generation.mode) == (
+        {ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.POSITIVE)},
+        GenerationMode.NEGATIVE,
     )
 
 

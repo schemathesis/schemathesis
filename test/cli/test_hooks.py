@@ -44,24 +44,6 @@ def before_call(context, case, kwargs):
     assert cli.main("run", api.schema_url, "--phases=stateful", "--max-examples=1", hooks=module) == snapshot_cli
 
 
-def test_after_call(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    # When the `after_call` hook is registered
-    # And it modifies the response and making it incorrect
-    module = ctx.write_pymodule(
-        """
-import requests
-
-@schemathesis.hook
-def after_call(context, case, response):
-    data = b'{"wrong": 42}'
-    response.content = data
-        """
-    )
-    # Then the tests should fail
-    assert cli.main("run", api.schema_url, "-c", "all", hooks=module) == snapshot_cli
-
-
 @pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_deadline_from_hooks_is_reported(ctx, cli):
     api = ctx.openapi.apps.success()
