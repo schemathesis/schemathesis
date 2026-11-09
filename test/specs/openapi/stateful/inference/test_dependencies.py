@@ -3535,6 +3535,36 @@ def test_nested_field_in_other_file_referring_to_sibling_definition(ctx, address
     ]
 
 
+@pytest.mark.parametrize("common_base", ["Base", "Core"], ids=["same-reference-text", "other-reference-text"])
+def test_inherited_fields_through_other_file_reusing_reference_text(ctx, common_base):
+    ctx.makefile(
+        {
+            "components": {
+                "schemas": {
+                    "Entity": {"allOf": [component_ref(common_base)]},
+                    common_base: {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+                }
+            }
+        },
+        filename="common",
+    )
+    order = {"allOf": [component_ref("Base"), {"type": "object", "properties": {"total": {"type": "integer"}}}]}
+    root = ctx.openapi.write_schema(
+        {
+            "/orders": {
+                "post": response("201", component_ref("Order")),
+                "get": response("200", {"type": "array", "items": component_ref("Order")}),
+            },
+            **operation("get", "/orders/{orderId}", "200", component_ref("Order"), parameters=[path_param("orderId")]),
+        },
+        components={"schemas": {"Order": order, "Base": {"allOf": [ref("common.json#/components/schemas/Entity")]}}},
+    )
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == [
+        ["#/paths/~1orders/post", "201", read_order_link("/id")],
+        ["#/paths/~1orders/get", "200", read_order_link("/*/id")],
+    ]
+
+
 def test_same_reference_text_in_another_file_names_a_different_schema(ctx):
     base = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
     order_list = {

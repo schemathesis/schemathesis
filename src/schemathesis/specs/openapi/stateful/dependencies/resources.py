@@ -690,8 +690,10 @@ def _collect_inherited_properties(
         else:
             if not isinstance(reference, str):
                 continue
-            consulted.add(reference)
-            if reference in seen:
+            # The same `$ref` text names different schemas in different documents.
+            uri = resolve_reference_uri(resolver.base_uri, reference)
+            consulted.add(uri)
+            if uri in seen:
                 continue
             key = (resolver.base_uri, reference)
             cached = cache.get(key)
@@ -704,7 +706,7 @@ def _collect_inherited_properties(
                 except (RefResolutionError, InvalidSchema):
                     continue
                 branch_properties, branch_consulted = _collect_inherited_properties(
-                    resolved, branch_resolver, seen | {reference}, cache
+                    resolved, branch_resolver, seen | {uri}, cache
                 )
                 if seen.isdisjoint(branch_consulted):
                     cache[key] = (branch_properties, branch_consulted)
