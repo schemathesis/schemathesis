@@ -204,6 +204,7 @@ def _make_unknown_id_failure() -> strawberry.Schema:
 
 def _make_tombstone() -> strawberry.Schema:
     books: dict[str, Book] = {}
+    deleted: set[str] = set()
 
     @strawberry.type
     class Query:
@@ -222,7 +223,10 @@ def _make_tombstone() -> strawberry.Schema:
 
         @strawberry.mutation
         def deleteBook(self, id: BookID) -> bool:
-            books.pop(id, None)
+            if id in deleted:
+                raise RuntimeError("planted: delete-after-delete")
+            if books.pop(id, None) is not None:
+                deleted.add(id)
             return True
 
         @strawberry.mutation

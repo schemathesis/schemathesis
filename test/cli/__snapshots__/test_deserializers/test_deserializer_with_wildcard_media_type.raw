@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 1
 ---
 Stdout:
 Schemathesis dev
@@ -19,24 +19,43 @@ Schemathesis dev
 
      ⏭  2 skipped
 
- ✅  Coverage (in 0.00s)
+ ❌  Coverage (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 1 passed  ❌ 1 failed
 
- ✅  Fuzzing (in 0.00s)
+ ❌  Fuzzing (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 1 passed  ❌ 1 failed
 
-=================================== WARNINGS ===================================
+=================================== FAILURES ===================================
+__________________________________ GET /data2 __________________________________
+1. Test Case ID: <PLACEHOLDER>
 
-Schema validation skipped: 2 operations cannot validate responses in 2 media types due to missing deserializers
+- ST108 Response violates schema
 
-application/vnd.api+custom (1 operation):
-  - GET /data1 (200)
-application/vnd.other+custom (1 operation):
-  - GET /data2 (200)
+    "2" is not of type "integer"
 
-💡 Register a deserializer with `@schemathesis.deserializer()` to enable validation
+    Validated against the response schema for status code 200.
+
+    Schema at /properties/id:
+
+        {
+            "type": "integer"
+        }
+
+    Value:
+
+        "2"
+
+[200] OK:
+
+    `2`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 
@@ -46,16 +65,18 @@ API Operations:
 
 Test Phases:
   ⏭  Examples
-  ✅ Coverage
-  ✅ Fuzzing
+  ❌ Coverage
+  ❌ Fuzzing
   ⏭  Stateful (not applicable)
 
-Warnings:
-  ⚠️ Schema validation skipped: 2 operations cannot validate responses in 2 media types
+Failures:
+  ❌ ST108 Response violates schema: 1
+
+For more information, run `st explain ST108`.
 
 Test cases:
-  N generated, N passed
+  N generated, N found N unique failures
 
 Seed: 42
 
-============================== 1 warning in 1.00s ==============================
+============================== 1 failure in 1.00s ==============================

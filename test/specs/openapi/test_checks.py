@@ -5699,6 +5699,10 @@ PAGE_SIZE = {"type": "integer", "minimum": 1, "maximum": 100}
             False,
             id="query_object_mutation_with_numeric_key",
         ),
+        # A string `"7"` sends the same URL as the integer `7`.
+        pytest.param(
+            ParameterLocation.PATH, {"type": "integer"}, "7", True, False, id="path_numeric_string_for_integer"
+        ),
         # Encoded `+1` decodes back to an integer-like value accepted by many servers.
         pytest.param(
             ParameterLocation.PATH, {"type": "integer"}, "%2B1", True, False, id="path_string_numeric_serialization"

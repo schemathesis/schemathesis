@@ -7,9 +7,7 @@ from schemathesis.core.error_feedback import (
     RequiresAuthPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.engine import events
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.auth_inference import record_auth_inference
 from test.apps.catalog.openapi.modifiers.stateful import RequireBearerAuth
 from test.apps.catalog.openapi.modifiers.under_declared_security import (
@@ -311,20 +309,12 @@ def test_stateful_phase_attaches_token_after_inference(ctx):
     schema.config.phases.fuzzing.enabled = False
     schema.config.generation.update(max_examples=5)
 
-    saw_2xx_in_stateful_phase = False
-    for event in schemathesis.engine.from_schema(schema).execute():
-        if not isinstance(event, events.ScenarioFinished):
-            continue
-        if event.phase != PhaseName.STATEFUL_TESTING:
-            continue
-        for interaction in event.recorder.interactions.values():
-            if interaction.response is None:
-                continue
-            if 200 <= interaction.response.status_code < 300:
-                saw_2xx_in_stateful_phase = True
-                break
+    for _ in schemathesis.engine.from_schema(schema).execute():
+        pass
 
-    assert saw_2xx_in_stateful_phase, "expected at least one 2xx during stateful phase after inference"
+    credentials = [request.headers.get("Authorization") for request in api.requests]
+    # An operation goes out without credentials only until a rejection is retried with them.
+    assert credentials.count(f"Bearer {VALID_TOKEN}") > credentials.count(None), credentials
 
 
 def test_send_with_scheme_forwards_wsgi_app_to_retry(ctx):

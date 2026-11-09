@@ -82,40 +82,6 @@ def test_negative_data_rejection_displays_all_cases(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_negative_data_rejection_path_parameter_type_mutation(ctx, cli, snapshot_cli):
-    # String value for an integer path parameter serializes to the same URL as the integer.
-    # E.g., string "7" becomes /api/run/7 - indistinguishable from integer 7.
-    app, raw_schema = ctx.openapi.make_flask_app(
-        {
-            "/api/run/{id}": {
-                "post": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "Success"}},
-                }
-            }
-        }
-    )
-
-    @app.route("/api/run/<path:id>", methods=["POST"])
-    def run_endpoint(id):
-        if re.fullmatch(r"[+-]?[0-9]+", id):
-            return "", 200
-        return "", 400
-
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--checks=negative_data_rejection",
-            "--mode=negative",
-            "--phases=fuzzing",
-            # The mutation behind the false positive is rare, so the run needs many cases to reach it.
-            "--max-examples=200",
-        )
-        == snapshot_cli
-    )
-
-
 @pytest.mark.parametrize(
     ("version", "path", "parameter"),
     [
