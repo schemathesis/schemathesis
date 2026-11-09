@@ -27,8 +27,11 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     OutputSlot,
     ResourceDefinition,
     ResourceMap,
+    declared_types,
     find_input,
+    holds_only_arrays,
     infer_fk_target,
+    iter_all_of_chain,
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
     InferenceState,
@@ -211,6 +214,7 @@ def _resolve_parameter_dependency(
         resource_field=field,
         parameter_name=parameter_name,
         parameter_location=parameter_location,
+        takes_array=_takes_array(parameter_schema),
         is_suffix_matched=is_suffix_matched,
     )
 
@@ -428,6 +432,13 @@ def _resolve_body_dependencies(
             and resource_name not in candidate_resource_names
         )
         if resource_name is not None and not gated:
+            fk_info = infer_fk_target(property_name)
+            if (
+                fk_info is not None
+                and not fk_info[2]
+                and holds_only_arrays(iter_all_of_chain(subschema, bundled, _resolve_bundled))
+            ):
+                deferred.identifier_array_fields.add(property_name)
             resource = resources.get(resource_name)
             if resource is None:
                 resource = ResourceDefinition.inferred_from_parameter(
@@ -594,11 +605,14 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
             for name, subschema in _flatten_composition(schema, scan.bundled)[0].items()
             if isinstance(subschema, dict) and not is_read_only(subschema, scan.bundled)
         }
-    for name in properties:
+    for name, field_schema in properties.items():
         fk_info = infer_fk_target(name)
         if fk_info is None:
             continue
-        target_resource_name, target_field, _ = fk_info
+        target_resource_name, target_field, is_array = fk_info
+        # A singular name on an array holds no single identifier to send.
+        if not is_array and holds_only_arrays(iter_all_of_chain(field_schema, scan.bundled, _resolve_bundled)):
+            continue
         fields.append(((name,), target_resource_name, target_field))
 
     if max_depth > 1:
@@ -609,6 +623,58 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
                     for suffix, resource, field in _container_fk_fields(subschema, scan, max_depth - 1)
                 )
     return fields
+
+
+def _takes_array(schema: JsonSchema) -> bool:
+    """Whether `schema` takes arrays: every type on its `$ref`/`allOf` chain includes array.
+
+    A chain declaring no type takes arrays only when one of its `anyOf`/`oneOf` branches does.
+    """
+    if not isinstance(schema, dict):
+        return False
+    bundled = schema.get(BUNDLE_STORAGE_KEY, {})
+    pending: list[object] = [schema]
+    # Branches may refer back to a schema already checked.
+    seen: set[int] = set()
+    while pending:
+        candidate = pending.pop()
+        if not isinstance(candidate, dict) or id(candidate) in seen:
+            continue
+        seen.add(id(candidate))
+        chain = list(iter_all_of_chain(candidate, bundled, _resolve_bundled))
+        declared = [types for types in map(declared_types, chain) if types is not None]
+        if not declared:
+            pending.extend(
+                branch
+                for node in chain
+                for keyword in ("anyOf", "oneOf")
+                if isinstance(node.get(keyword), list)
+                for branch in node[keyword]
+            )
+        elif all("array" in types for types in declared):
+            return True
+    return False
+
+
+def _resolve_bundled(schema: dict[str, Any], bundled: dict[str, Any]) -> tuple[dict[str, Any], object] | None:
+    reference = schema["$ref"]
+    return (bundled, bundled.get(reference.rsplit("/", 1)[-1])) if isinstance(reference, str) else None
+
+
+def unbind_single_values_from_array_fields(operations: OperationMap, deferred: dict[str, DeferredBindings]) -> None:
+    """Unbind body fields named after one identifier but taking arrays from resource fields holding one value."""
+    for label, bindings in deferred.items():
+        fields = bindings.identifier_array_fields
+        if not fields:
+            continue
+        node = operations[label]
+        node.inputs = [
+            slot
+            for slot in node.inputs
+            if slot.parameter_location != ParameterLocation.BODY
+            or slot.parameter_name not in fields
+            or (slot.resource_field is not None and "array" in slot.resource.types.get(slot.resource_field, ()))
+        ]
 
 
 def rebind_inherited_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:

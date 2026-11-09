@@ -611,7 +611,7 @@ def _extract_resource_from_schema(
             inherited_fields = frozenset(properties) - frozenset(own if isinstance(own, dict) else ())
             source = DefinitionSource.SCHEMA_WITH_PROPERTIES
             # Pre-compute FK fields for efficient link generation
-            fk_fields = extract_fk_fields(fields)
+            fk_fields = extract_fk_fields(properties)
             # Extract nested FK fields from the schema, including the ones under inherited properties
             nested_fk_fields = [
                 nested

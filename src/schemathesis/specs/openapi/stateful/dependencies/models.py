@@ -4,11 +4,12 @@ import difflib
 import enum
 import re
 from collections import defaultdict
-from collections.abc import Collection, Iterable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from dataclasses import asdict, dataclass
 from functools import lru_cache
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, TypeVar
 
+from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation, iter_path_parameters
@@ -48,6 +49,7 @@ class DependencyGraph:
             del operation["path"]
             for input in operation["inputs"]:
                 input["resource"] = input["resource"]["name"]
+                del input["takes_array"]
                 if not input["echoes_response"]:
                     del input["echoes_response"]
                 if not input["is_listed_identifier"]:
@@ -70,6 +72,8 @@ class DependencyGraph:
             del resource["name"]
             del resource["source"]
             del resource["inherited_fields"]
+            for fk_field in [*resource["fk_fields"], *resource["nested_fk_fields"]]:
+                del fk_field["holds_array"]
             # Simplify FK fields for readability
             if not resource["fk_fields"]:
                 del resource["fk_fields"]
@@ -408,6 +412,9 @@ class DependencyGraph:
                         consumer_path = encoded_paths[consumer_id]
 
                         for input_slot in input_slots:
+                            # A whole array of identifiers fits only a parameter taking an array.
+                            if fk_field.holds_array and not input_slot.takes_array:
+                                continue
                             # Build the body pointer to the FK field
                             if fk_field.is_array:
                                 # For array FK, fan out across every element: /data/*/site_ids/*
@@ -456,6 +463,8 @@ class DependencyGraph:
                         consumer_path = encoded_paths[consumer_id]
 
                         for input_slot in input_slots:
+                            if nested_fk.holds_array and not input_slot.takes_array:
+                                continue
                             # Build pointer: output_slot.pointer + nested_fk.pointer
                             if output_slot.cardinality == Cardinality.MANY:
                                 base = output_slot.pointer.rstrip("/") + "/*"
@@ -595,23 +604,79 @@ def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
     return None
 
 
-def extract_fk_fields(fields: list[str]) -> list[FKField]:
-    """Extract FK fields from a list of field names.
+def declared_types(schema: Mapping[str, Any]) -> frozenset[str] | None:
+    """Types the `type` keyword of `schema` lists; `None` without one."""
+    declared = schema.get("type")
+    if isinstance(declared, str):
+        return frozenset((declared,))
+    if isinstance(declared, list):
+        return frozenset(item for item in declared if isinstance(item, str))
+    return None
+
+
+def holds_only_arrays(schemas: Iterable[Mapping[str, Any]]) -> bool:
+    """Whether one of `schemas` declares arrays and maybe `null`, nothing else."""
+    return any(
+        types is not None and "array" in types and types <= {"array", "null"} for types in map(declared_types, schemas)
+    )
+
+
+Scope = TypeVar("Scope")
+
+
+def iter_all_of_chain(
+    schema: object, scope: Scope, resolve: Callable[[dict[str, Any], Scope], tuple[Scope, object] | None]
+) -> Iterator[dict[str, Any]]:
+    """`schema`, its references and its `allOf` parents: the schemas every value of `schema` matches.
+
+    `resolve` follows a `$ref` from the scope it appears in to the target and the target's scope.
+    """
+    pending: list[tuple[Scope, object]] = [(scope, schema)]
+    # `allOf` chains may be recursive.
+    seen: set[int] = set()
+    while pending:
+        current_scope, node = pending.pop()
+        if not isinstance(node, dict) or id(node) in seen:
+            continue
+        seen.add(id(node))
+        yield node
+        if "$ref" in node:
+            target = resolve(node, current_scope)
+            if target is not None:
+                pending.append(target)
+        branches = node.get("allOf")
+        if isinstance(branches, list):
+            pending.extend((current_scope, branch) for branch in branches)
+
+
+def _resolve_reference(schema: dict[str, Any], resolver: Resolver) -> tuple[Resolver, Mapping[str, Any]] | None:
+    try:
+        return maybe_resolve_with_resolver(schema, resolver)
+    except (RefResolutionError, InvalidSchema):
+        # An unusable reference declares nothing.
+        return None
+
+
+def extract_fk_fields(properties: Mapping[str, tuple[Resolver, JsonSchema]]) -> list[FKField]:
+    """Extract FK fields from the properties of a resource schema.
 
     Pre-computes FK information once during resource creation
     to avoid repeated inference during link generation.
     """
     result = []
-    for field in fields:
+    for field in sorted(properties):
         fk_info = infer_fk_target(field)
         if fk_info is not None:
             target_resource, target_field, is_array = fk_info
+            field_resolver, subschema = properties[field]
             result.append(
                 FKField(
                     field_name=field,
                     target_resource=target_resource,
                     target_field=target_field,
                     is_array=is_array,
+                    holds_array=not is_array
+                    and holds_only_arrays(iter_all_of_chain(subschema, field_resolver, _resolve_reference)),
                 )
             )
     return result
@@ -664,6 +729,8 @@ def extract_nested_fk_fields(
                         target_resource=target_resource,
                         target_field=target_field,
                         is_array=is_array,
+                        holds_array=not is_array
+                        and holds_only_arrays(iter_all_of_chain(field_schema, resolver, _resolve_reference)),
                     )
                 )
             continue  # Don't recurse into FK fields
@@ -888,6 +955,8 @@ class DeferredBindings:
     field_named_path_parameters: list[tuple[str, str]]
     # Body fields a client may send.
     writable_body_fields: dict[str, JsonSchema]
+    # Body fields named after one identifier that take only arrays (`customer_id: [1, 2]`).
+    identifier_array_fields: set[str]
 
     def __init__(self) -> None:
         self.nested_fks = []
@@ -896,6 +965,7 @@ class DeferredBindings:
         self.body_fields = []
         self.field_named_path_parameters = []
         self.writable_body_fields = {}
+        self.identifier_array_fields = set()
 
 
 @dataclass(slots=True)
@@ -911,6 +981,8 @@ class InputSlot:
     # Integer means index in an array (only single items are supported)
     parameter_name: str | int
     parameter_location: ParameterLocation
+    # Whether a parameter takes an array of values, e.g. `?ids=1&ids=2`
+    takes_array: bool = False
     # Whether this input was matched via suffix matching (e.g., "file_name" -> "BackupFile")
     # Suffix-matched inputs can be upgraded by merge_related_resources if a producer exists
     is_suffix_matched: bool = False
@@ -985,6 +1057,8 @@ class FKField:
     target_field: str
     # Whether the FK field is an array (e.g., site_ids)
     is_array: bool
+    # Whether a singular name holds a whole array of identifiers, e.g. `site_id: [1, 2]`
+    holds_array: bool = False
 
 
 @dataclass(slots=True)
@@ -1001,6 +1075,8 @@ class NestedFKField:
     target_field: str
     # Whether the FK field is an array (e.g., site_ids)
     is_array: bool
+    # Whether a singular name holds a whole array of identifiers, e.g. `site_id: [1, 2]`
+    holds_array: bool = False
 
 
 @dataclass(slots=True)
