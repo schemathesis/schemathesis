@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any, TypeGuard, overload
+from typing import Any, TypeGuard, TypeVar, overload
 
 from schemathesis.core.jsonschema import DRAFT_03_DIALECT, bundled_name, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
@@ -703,8 +703,11 @@ def permit_forbidden_properties(schema: object) -> bool:
     return changed
 
 
+WRITE_ONLY_KEYWORDS = ("writeOnly", "x-writeOnly")
+
+
 def is_write_only(schema: object, bundle: Mapping[str, Any] | None = None) -> TypeGuard[dict[str, Any]]:
-    return _has_annotation(schema, bundle, ("writeOnly", "x-writeOnly"))
+    return has_annotation(schema, WRITE_ONLY_KEYWORDS, bundle, _follow_bundled_reference)
 
 
 def is_read_only(schema: object, bundle: Mapping[str, Any] | None) -> bool:
@@ -713,29 +716,52 @@ def is_read_only(schema: object, bundle: Mapping[str, Any] | None) -> bool:
     Any applicable declaration counts: on the schema itself, behind a bundled `$ref`, in an `allOf` branch,
     or on the non-null side of a nullable union.
     """
-    return _has_annotation(schema, bundle, ("readOnly",))
+    return has_annotation(schema, ("readOnly",), bundle, _follow_bundled_reference)
 
 
-def _has_annotation(schema: object, bundle: Mapping[str, Any] | None, keywords: tuple[str, ...]) -> bool:
-    pending: list[object] = [schema]
+def _follow_bundled_reference(
+    bundle: Mapping[str, Any] | None, node: Mapping[str, Any]
+) -> tuple[Mapping[str, Any] | None, object] | None:
+    name = bundled_name(node.get("$ref"))
+    if bundle is None or name is None:
+        return None
+    return bundle, bundle.get(name)
+
+
+Scope = TypeVar("Scope")
+
+
+def has_annotation(
+    schema: object,
+    keywords: tuple[str, ...],
+    scope: Scope,
+    follow_reference: Callable[[Scope, Mapping[str, Any]], tuple[Scope, object] | None],
+) -> bool:
+    """Whether a truthy annotation from `keywords` applies to `schema`.
+
+    `follow_reference` gives the target of a `$ref` node within `scope`, with the scope for references inside it,
+    or `None` when the reference does not resolve.
+    """
+    pending: list[tuple[Scope, object]] = [(scope, schema)]
     seen: set[int] = set()
     while pending:
-        node = pending.pop()
+        current_scope, node = pending.pop()
         if not isinstance(node, dict) or id(node) in seen:
             continue
         seen.add(id(node))
         if any(node.get(keyword) for keyword in keywords):
             return True
-        name = bundled_name(node.get("$ref"))
-        if bundle is not None and name is not None:
-            pending.append(bundle.get(name))
+        if "$ref" in node:
+            target = follow_reference(current_scope, node)
+            if target is not None:
+                pending.append(target)
         all_of = node.get("allOf")
         if isinstance(all_of, list):
-            pending.extend(all_of)
+            pending.extend((current_scope, branch) for branch in all_of)
         for keyword in ("anyOf", "oneOf"):
             variants = node.get(keyword)
             if isinstance(variants, list):
                 non_null = [variant for variant in variants if variant != {"type": "null"}]
                 if len(non_null) == 1:
-                    pending.append(non_null[0])
+                    pending.append((current_scope, non_null[0]))
     return False

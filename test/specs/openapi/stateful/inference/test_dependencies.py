@@ -3814,7 +3814,7 @@ SHIPMENTS_LISTING = {
 }
 
 
-def warehouse_shipment_paths(parameter="warehouseId", parameter_schema=None):
+def warehouse_shipment_paths(parameter="warehouseId", parameter_schema=None, item=None):
     parameters = [{"name": parameter, "in": "path", "required": True, "schema": parameter_schema or {"type": "string"}}]
     return {
         **operation("get", "/shipments", "200", SHIPMENTS_LISTING),
@@ -3823,7 +3823,7 @@ def warehouse_shipment_paths(parameter="warehouseId", parameter_schema=None):
             "get",
             f"/warehouses/{{{parameter}}}/shipments/{{shipmentId}}",
             "200",
-            component_ref("Shipment"),
+            item or component_ref("Shipment"),
             [*parameters, path_param("shipmentId")],
         ),
     }
@@ -3890,9 +3890,8 @@ def test_parent_path_param_without_producer_is_filled_from_item_carrying_it(ctx,
         ("warehouseId", None, {"type": "array", "items": {"type": "string"}}),
         ("warehouse", None, {"type": "object", "properties": {"id": {"type": "string"}}}),
         ("warehouseId", {"type": "string", "format": "uuid"}, {"type": "integer"}),
-        ("warehouseId", None, {"type": "string", "writeOnly": True}),
     ],
-    ids=["array", "object", "integer-into-uuid", "write-only"],
+    ids=["array", "object", "integer-into-uuid"],
 )
 def test_parent_path_param_is_not_filled_from_item_field_of_another_type(ctx, parameter, parameter_schema, field):
     shipment = {"type": "object", "properties": {**SHIPMENT_FIELDS, parameter: field}}
@@ -3901,6 +3900,97 @@ def test_parent_path_param_is_not_filled_from_item_field_of_another_type(ctx, pa
     _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Shipment": shipment}})
 
     assert inferred_links(graph) == warehouse_shipment_links(parameter, None)
+
+
+@pytest.mark.parametrize("write_only", [True, False], ids=["write-only", "readable"])
+@pytest.mark.parametrize(
+    ("keyword", "field", "version"),
+    [
+        ("writeOnly", lambda key: key, "3.0.2"),
+        ("x-writeOnly", lambda key: key, "3.0.2"),
+        ("writeOnly", lambda key: component_ref("Key"), "3.0.2"),
+        ("writeOnly", lambda key: {"allOf": [key]}, "3.0.2"),
+        ("writeOnly", lambda key: {"allOf": [component_ref("Key")]}, "3.0.2"),
+        ("writeOnly", lambda key: {"anyOf": [component_ref("Key"), {"type": "null"}]}, "3.1.0"),
+    ],
+    ids=["inline", "extension", "reference", "all-of", "all-of-reference", "nullable-reference"],
+)
+def test_parent_path_param_is_filled_only_from_readable_item_field(ctx, write_only, keyword, field, version):
+    key = {"type": "string", keyword: write_only}
+    shipment = {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": field(key)}}
+
+    _, graph = analyze_dependencies(
+        ctx, warehouse_shipment_paths(), version=version, components={"schemas": {"Shipment": shipment, "Key": key}}
+    )
+
+    parent = None if write_only else "$response.body#/shipments/*/warehouseId"
+    assert inferred_links(graph) == warehouse_shipment_links("warehouseId", parent)
+
+
+BROKEN_DETAILS = {"type": "object", "properties": {"note": component_ref("Missing")}}
+
+
+def shipment_detail(key, details):
+    return {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": key, "details": details}}
+
+
+@pytest.mark.parametrize("write_only", [True, False], ids=["write-only", "readable"])
+@pytest.mark.parametrize(
+    "detail",
+    [
+        lambda key: (shipment_detail(key, BROKEN_DETAILS), {}),
+        lambda key: (component_ref("ShipmentDetail"), {"ShipmentDetail": shipment_detail(key, BROKEN_DETAILS)}),
+        lambda key: (shipment_detail(key, component_ref("Details")), {"Details": BROKEN_DETAILS}),
+        lambda key: (shipment_detail(key, component_ref("Missing")), {}),
+        lambda key: (
+            {"allOf": [component_ref("Shipment"), {"properties": {"details": component_ref("Details")}}]},
+            {"Details": BROKEN_DETAILS},
+        ),
+        lambda key: (
+            shipment_detail(component_ref("Key"), {"type": "object"}),
+            {"Key": {**key, "not": component_ref("Missing")}},
+        ),
+        lambda key: (
+            shipment_detail({"allOf": [component_ref("Key")]}, {"type": "object"}),
+            {"Key": {**key, "not": component_ref("Missing")}},
+        ),
+        lambda key: (
+            shipment_detail({"allOf": [component_ref("Key"), component_ref("Missing")]}, {"type": "object"}),
+            {"Key": key},
+        ),
+    ],
+    ids=[
+        "inline",
+        "reference",
+        "sibling-reference",
+        "dangling-sibling",
+        "inherited",
+        "inside-field",
+        "inside-all-of-branch",
+        "beside-all-of-branch",
+    ],
+)
+def test_parent_path_param_is_filled_only_from_readable_item_field_beside_broken_reference(ctx, write_only, detail):
+    key = {"type": "string", "writeOnly": write_only}
+    item, schemas = detail(key)
+    shipment = {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": key}}
+
+    _, graph = analyze_dependencies(
+        ctx, warehouse_shipment_paths(item=item), components={"schemas": {"Shipment": shipment, **schemas}}
+    )
+
+    parent = None if write_only else "$response.body#/shipments/*/warehouseId"
+    assert inferred_links(graph) == warehouse_shipment_links("warehouseId", parent)
+
+
+def test_parent_path_param_is_filled_from_item_field_when_item_response_does_not_resolve(ctx):
+    shipment = {"type": "object", "properties": {**SHIPMENT_FIELDS, "warehouseId": {"type": "string"}}}
+
+    _, graph = analyze_dependencies(
+        ctx, warehouse_shipment_paths(item=component_ref("Missing")), components={"schemas": {"Shipment": shipment}}
+    )
+
+    assert inferred_links(graph) == warehouse_shipment_links("warehouseId", "$response.body#/shipments/*/warehouseId")
 
 
 def parent_key_link(target, parameters):

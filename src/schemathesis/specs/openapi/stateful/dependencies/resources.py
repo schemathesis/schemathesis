@@ -11,6 +11,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get
 from schemathesis.core.transforms import decode_pointer, encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
+from schemathesis.specs.openapi.converter import WRITE_ONLY_KEYWORDS, has_annotation
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
@@ -722,20 +723,22 @@ def write_only_fields(response: OpenApiResponse, resolver: Resolver) -> set[str]
     current_resolver = response.resolver if response.resolver is not None else resolver
     try:
         schema_resolver, resolved = maybe_resolve_with_resolver(schema, current_resolver)
-        fields = set()
-        for name, (field_resolver, subschema) in _collect_properties(resolved, schema_resolver).items():
-            if not isinstance(subschema, dict):
-                continue
-            _, field = maybe_resolve_with_resolver(subschema, field_resolver)
-            branches = field.get("allOf")
-            if any(
-                isinstance(node, dict) and node.get("writeOnly") is True
-                for node in (subschema, field, *(branches if isinstance(branches, list) else ()))
-            ):
-                fields.add(name)
+        properties = _collect_properties(resolved, schema_resolver)
     except (RefResolutionError, InvalidSchema):
         return set()
-    return fields
+    return {
+        name
+        for name, (field_resolver, field) in properties.items()
+        if has_annotation(field, WRITE_ONLY_KEYWORDS, field_resolver, _follow_reference)
+    }
+
+
+def _follow_reference(resolver: Resolver, node: Mapping[str, Any]) -> tuple[Resolver, object] | None:
+    try:
+        return maybe_resolve_with_resolver(node, resolver)
+    except (RefResolutionError, InvalidSchema):
+        # A broken reference hides only the annotations behind it
+        return None
 
 
 def referenced_schema_names(response: OpenApiResponse, pointer: str) -> dict[str, str]:
