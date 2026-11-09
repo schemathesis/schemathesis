@@ -48,6 +48,7 @@ from schemathesis.specs.openapi.checks import (
     _is_prefix_operation,
     allow_header_conformance,
     content_type_conformance,
+    ensure_resource_availability,
     has_only_additional_properties_in_non_body_parameters,
     missing_required_header,
     negative_data_rejection,
@@ -5103,7 +5104,7 @@ _USER_PROFILE_SCHEMA = {
 }
 
 
-def _build_user_profile_chain(ctx, response_factory, *, delete_status: int, get_headers=None):
+def _build_user_profile_chain(ctx, response_factory, *, delete_status: int, post_status: int = 201, get_headers=None):
     schema = ctx.openapi.load_schema(_USER_PROFILE_SCHEMA)
     post_operation = schema["/users"]["POST"]
     delete_operation = schema["/users/{userId}"]["DELETE"]
@@ -5113,7 +5114,7 @@ def _build_user_profile_chain(ctx, response_factory, *, delete_status: int, get_
     delete_case = delete_operation.Case(path_parameters={"userId": "alice"})
     get_case = get_operation.Case(path_parameters={"userId": "alice"})
 
-    post_response = Response.from_requests(response_factory.requests(status_code=201), True)
+    post_response = Response.from_requests(response_factory.requests(status_code=post_status), True)
     delete_response = Response.from_requests(response_factory.requests(status_code=delete_status), True)
     get_response = Response.from_requests(response_factory.requests(status_code=200, headers=get_headers), True)
 
@@ -5128,11 +5129,16 @@ def _build_user_profile_chain(ctx, response_factory, *, delete_status: int, get_
     return check_context(recorder=recorder), get_case, get_response
 
 
-@pytest.mark.parametrize("delete_status", [500, 404], ids=["server-crash", "not-found"])
-def test_use_after_free_skips_when_delete_failed(ctx, response_factory, delete_status):
-    # When DELETE returns 5xx (server crash) or 404 (nothing to free), the resource was never
-    # actually deleted, so a subsequent 2xx read is not a use-after-free.
-    context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=delete_status)
+@pytest.mark.parametrize(
+    ("post_status", "delete_status"),
+    [(201, 500), (201, 404), (500, 204)],
+    ids=["server-crash", "not-found", "create-failed"],
+)
+def test_use_after_free_skips_when_create_or_delete_failed(ctx, response_factory, post_status, delete_status):
+    # A failed POST created nothing, and a DELETE returning 5xx or 404 freed nothing, so a later 2xx read is fine.
+    context, get_case, get_response = _build_user_profile_chain(
+        ctx, response_factory, post_status=post_status, delete_status=delete_status
+    )
     assert use_after_free(context, get_response, get_case) is None
 
 
@@ -5140,6 +5146,22 @@ def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
     context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=204)
     with pytest.raises(UseAfterFree):
         use_after_free(context, get_response, get_case)
+
+
+def test_ensure_resource_availability_skips_when_create_failed(ctx, response_factory):
+    schema = ctx.openapi.load_schema(_USER_PROFILE_SCHEMA)
+    post_case = schema["/users"]["POST"].Case(body={"name": "alice"})
+    get_case = schema["/users/{userId}/profile"]["GET"].Case(path_parameters={"userId": "alice"})
+    post_response = Response.from_requests(response_factory.requests(status_code=500), True)
+    get_response = Response.from_requests(response_factory.requests(status_code=404), True)
+
+    recorder = ScenarioRecorder(label="resource-availability-test")
+    recorder.record_case(parent_id=None, case=post_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=post_case.id, response=post_response)
+    recorder.record_case(parent_id=post_case.id, case=get_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=get_case.id, response=get_response)
+
+    assert ensure_resource_availability(check_context(recorder=recorder), get_response, get_case) is None
 
 
 @pytest.mark.parametrize(

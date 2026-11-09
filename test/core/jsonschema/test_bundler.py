@@ -513,9 +513,7 @@ def test_bundle_infinite_recursive_required_cycle_message():
     }
 
 
-def test_bundle_self_recursion_through_pattern_properties_is_breakable():
-    # An object `{}` validates against `A`, so the cycle through `patternProperties`
-    # is structurally optional and should not raise.
+def test_bundle_keeps_self_recursion_through_pattern_properties():
     schema = {"$ref": "#/definitions/A"}
     store = {
         "definitions": {
@@ -529,7 +527,16 @@ def test_bundle_self_recursion_through_pattern_properties_is_breakable():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver)
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {
+                "type": "object",
+                "patternProperties": {".*": {"$ref": "#/x-bundled/schema000001"}},
+                "additionalProperties": False,
+            }
+        },
+    }
 
 
 def test_bundle_self_cycle_through_dead_definitions_block():
@@ -555,12 +562,25 @@ def test_bundle_self_cycle_through_dead_definitions_block():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver)
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {
+                "type": "object",
+                "definitions": {
+                    "schemaArray": {"type": "array", "minItems": 1, "items": {"$ref": "#/x-bundled/schema000001"}}
+                },
+                "properties": {
+                    "allOf": {"$ref": "#/x-bundled/schema000002"},
+                    "items": {"$ref": "#/x-bundled/schema000001"},
+                },
+            },
+            "schema000002": {"type": "array", "minItems": 1, "items": {"$ref": "#/x-bundled/schema000001"}},
+        },
+    }
 
 
-def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
-    # An `oneOf` variant whose body cycles back through a deeper required path is
-    # breakable when at least one terminating variant remains.
+def test_bundle_oneof_keeps_indirectly_recursive_branch():
     schema = {"$ref": "#/definitions/Types"}
     store = {
         "definitions": {
@@ -587,11 +607,23 @@ def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver)
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {"oneOf": [{"$ref": "#/x-bundled/schema000002"}, {"$ref": "#/x-bundled/schema000003"}]},
+            "schema000002": {"type": "string", "enum": ["int", "string"]},
+            "schema000003": {
+                "type": "object",
+                "required": ["fields"],
+                "properties": {
+                    "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/x-bundled/schema000001"}}
+                },
+            },
+        },
+    }
 
 
-def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
-    # `oneOf` with a non-recursive variant alongside a self-`$ref` is breakable.
+def test_bundle_oneof_keeps_self_ref_branch():
     schema = {"$ref": "#/definitions/configItemsType"}
     store = {
         "definitions": {
@@ -613,12 +645,22 @@ def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver)
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                    "type": {"oneOf": [{"$ref": "#/x-bundled/schema000002"}, {"$ref": "#/x-bundled/schema000001"}]}
+                },
+            },
+            "schema000002": {"type": "string"},
+        },
+    }
 
 
-def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
-    # A self-`$ref` in the schema's own top-level `allOf` is trivially satisfied,
-    # so it should not turn the schema into an unbreakable cycle.
+def test_bundle_allof_keeps_self_ref():
     schema = {"$ref": "#/definitions/Node"}
     store = {
         "definitions": {
@@ -634,12 +676,18 @@ def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver)
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {
+                "type": "object",
+                "allOf": [{"$ref": "#/x-bundled/schema000001"}, {"properties": {"name": {"type": "string"}}}],
+            }
+        },
+    }
 
 
-def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
-    # Mutual cycle terminated by an empty object that satisfies `patternProperties`
-    # (no `minProperties`) and an `oneOf` branch that doesn't recurse.
+def test_bundle_keeps_mutual_cycle_through_pattern_properties():
     schema = {"$ref": "#/definitions/KitNode"}
     store = {
         "definitions": {
@@ -671,7 +719,29 @@ def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver)
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema000001",
+        "x-bundled": {
+            "schema000001": {"oneOf": [{"$ref": "#/x-bundled/schema000002"}, {"$ref": "#/x-bundled/schema000003"}]},
+            "schema000002": {
+                "type": "object",
+                "required": ["children"],
+                "properties": {
+                    "children": {
+                        "type": "object",
+                        "patternProperties": {".*": {"$ref": "#/x-bundled/schema000001"}},
+                        "additionalProperties": False,
+                    }
+                },
+                "additionalProperties": False,
+            },
+            "schema000003": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "additionalProperties": False,
+            },
+        },
+    }
 
 
 def test_unbundle_decodes_pointer_escaping_in_definition_names():

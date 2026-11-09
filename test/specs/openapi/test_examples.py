@@ -4245,8 +4245,7 @@ def test_unsatisfiable_property_schema_does_not_crash(ctx):
 
 
 def test_assembled_body_missing_required_field_is_not_yielded(ctx):
-    # When `required` lists a field absent from `properties`, no property-level example
-    # can provide it; every assembled body will be schema-invalid and must not be yielded.
+    # A required field absent from `properties` has no example to take, so a generated value completes the body.
     operation = _json_body_operation(
         ctx,
         {
@@ -4258,11 +4257,9 @@ def test_assembled_body_missing_required_field_is_not_yielded(ctx):
             "required": ["name", "port", "listener_key"],
         },
     )
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    for example in extract_from_schemas(operation):
-        assert isinstance(example, BodyExample)
-        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+    assert list(extract_from_schemas(operation)) == [
+        BodyExample(value={"name": "proxy", "port": 8080, "listener_key": False}, media_type="application/json")
+    ]
 
 
 def test_response_derived_parameter_example_violating_schema_is_skipped(ctx):
@@ -4396,11 +4393,7 @@ def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx)
             "required": ["name", "count"],
         },
     )
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    for example in extract_from_schemas(operation):
-        assert isinstance(example, BodyExample)
-        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+    assert list(extract_from_schemas(operation)) == []
 
 
 def test_allof_example_violating_anyof_in_parameter_is_not_yielded(ctx):
@@ -4444,11 +4437,7 @@ def test_allof_example_violating_anyof_in_parameter_is_not_yielded(ctx):
             }
         },
     )
-    param_schema = next(p.optimized_schema for p in operation.iter_parameters() if p.name == "filters")
-    validator = jsonschema_rs.validator_for(param_schema)
-    for example in extract_from_schemas(operation):
-        assert isinstance(example, ParameterExample)
-        assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
+    assert list(extract_from_schemas(operation)) == []
 
 
 def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
@@ -4495,11 +4484,10 @@ def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    param_schema = next(p.optimized_schema for p in operation.iter_parameters() if p.name == "filters")
-    validator = jsonschema_rs.validator_for(param_schema)
-    for example in extract_from_schemas(operation):
-        assert isinstance(example, ParameterExample)
-        assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
+    assert list(extract_from_schemas(operation)) == [
+        ParameterExample(container="query", name="filters", value=[{"filter": {"category": "online"}}]),
+        ParameterExample(container="query", name="filters", value=[{"filter": {"value": 100}}]),
+    ]
 
 
 def test_parameter_example_with_wrong_type_is_not_yielded(ctx):
@@ -4555,11 +4543,7 @@ def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx
             "responses": {"200": {"description": "OK"}},
         },
     )
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    for example in extract_from_schemas(operation):
-        assert isinstance(example, BodyExample)
-        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+    assert list(extract_from_schemas(operation)) == []
 
 
 def test_content_encoded_header_parameter_example_is_valid(ctx):
@@ -4594,11 +4578,9 @@ def test_content_encoded_header_parameter_example_is_valid(ctx):
             }
         },
     )
-    param = next(p for p in operation.iter_parameters() if p.name == "x-metadata")
-    validator = jsonschema_rs.validator_for(param.optimized_schema)
-    for example in extract_from_schemas(operation):
-        assert isinstance(example, ParameterExample)
-        assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
+    assert list(extract_from_schemas(operation)) == [
+        ParameterExample(container="headers", name="x-metadata", value={"name": "Documents", "parent_id": "1234"})
+    ]
 
 
 def test_get_strategies_with_binary_body_and_pool_does_not_crash(ctx):

@@ -368,24 +368,7 @@ def test_dependency_layers_with_links(ctx):
         }
     )
 
-    # Dependency graph should show POST -> GET relationship
-    graph = loaded.analysis.dependency_graph
-    layers = compute_dependency_layers(graph)
-
-    if layers:
-        # POST should be in earlier layer than GET
-        post_layer = None
-        get_layer = None
-
-        for idx, layer in enumerate(layers):
-            for label in layer:
-                if "POST" in label and "/users/{id}" not in label:
-                    post_layer = idx
-                elif "GET" in label and "/users/{id}" in label:
-                    get_layer = idx
-
-        if post_layer is not None and get_layer is not None:
-            assert post_layer < get_layer
+    assert compute_dependency_layers(loaded.analysis.dependency_graph) == [["POST /users"], ["GET /users/{id}"]]
 
 
 def _make_operation(op_id, path, method="get", param="id", links=None, request_body_schema=None):

@@ -92,7 +92,7 @@ def test_recorded_failure_does_not_fail_the_run_with_continue_on_failure(ctx, cl
 
 
 def test_new_failure_fails_alongside_a_known_one(ctx, cli, tmp_path):
-    write_baseline(tmp_path, SERVER_ERROR)
+    write_baseline(tmp_path, {**SERVER_ERROR, "operation": "GET /api/multiple_failures"})
 
     result = run(
         cli,
