@@ -102,7 +102,7 @@ def prepare_response_payload(payload: str, *, config: OutputConfig) -> str:
 
 def format_response_payload(response: Response, *, config: OutputConfig) -> str:
     """Response body as failure output shows it: `<EMPTY>`, `<BINARY>`, or the decoded and truncated text."""
-    if not response.content:
+    if not response.content and response.render_content is None:
         return EMPTY_PAYLOAD
     text = decode_response_text(response)
     if text is None:

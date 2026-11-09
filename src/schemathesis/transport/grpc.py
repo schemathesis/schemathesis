@@ -11,7 +11,10 @@ from urllib.parse import urlsplit
 
 import grpc
 import requests
-from google.protobuf import message, message_factory
+from google.protobuf import json_format, message, message_factory
+
+# googleapis-common-protos ships no type information.
+from google.rpc import status_pb2  # type: ignore[import-untyped]
 from typing_extensions import override
 
 from schemathesis.core import Body
@@ -181,6 +184,19 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                     return json.dumps(rendered, indent=2, ensure_ascii=False)
                 except message.DecodeError:
                     # Shown as binary; response conformance reports the message or packed value that does not decode.
+                    return None
+
+        elif "grpc-status-details-bin" in response_headers:
+            encoded = response_headers["grpc-status-details-bin"][0]
+
+            # An error carries no message, so its status details show in its place.
+            def render_content(content: bytes) -> str | None:
+                try:
+                    status = status_pb2.Status.FromString(base64.b64decode(encoded))
+                    rendered = message_to_json(status, status.DESCRIPTOR.file.pool)
+                    return json.dumps(rendered, indent=2, ensure_ascii=False)
+                except (message.DecodeError, json_format.Error, ValueError):
+                    # Shown as binary when the details do not decode or hold a value JSON cannot express.
                     return None
 
         return Response(
