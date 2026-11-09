@@ -5,12 +5,13 @@ Infers which operations must run before others by tracking resource creation and
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
-from schemathesis.core.jsonschema.types import JsonSchema, get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import format_body_key
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
@@ -43,11 +44,15 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     NormalizedLink,
     OperationMap,
     OperationNode,
+    OutputSlot,
     ResourceDefinition,
+    ResourceMap,
+    path_shape,
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
 from schemathesis.specs.openapi.stateful.dependencies.resources import (
     InferenceState,
+    referenced_schema_names,
     remove_unused_resources,
 )
 from schemathesis.specs.openapi.stateful.links import find_link_target
@@ -120,7 +125,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             owner = resources.get(resource_name)
             if owner is None or owner.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
                 continue
-            field = naming.find_matching_field(parameter=parameter_name, resource=owner.name, fields=owner.fields)
+            field = naming.find_matching_field(
+                parameter=parameter_name, resource=owner.name, fields=owner.fields, types=owner.types
+            )
             # `{project_key}` under `/project-members` names a project, not the member's `key`.
             if field is None or not naming.parameter_names_resource_field(
                 parameter=parameter_name, field=field, resource=owner.name
@@ -171,6 +178,50 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 )
             )
             bound.add(property_name)
+
+    # An integer field named after a listed collection of integer-keyed objects holds one of their keys (`part` <- the
+    # `pk` of a `Part`) when the response, the field's title or the path says which collection it is.
+    collections = _listed_collections(operations)
+    for label, bindings in deferred.items():
+        node = operations[label]
+        taken = {(slot.parameter_location, slot.parameter_name) for slot in node.inputs}
+        candidates = [(name, field_schema, ParameterLocation.BODY) for _, name, field_schema in bindings.named_scalars]
+        candidates.extend(
+            (name, field_schema, ParameterLocation.QUERY) for name, field_schema in bindings.named_query_parameters
+        )
+        references: dict[str, str] | None = None
+        for name, field_schema, location in candidates:
+            if (
+                (location, name) in taken
+                or not _is_plain_integer(field_schema)
+                or naming.normalize_for_matching(name) in naming.PAGINATION_FIELDS
+            ):
+                continue
+            # A list filter selects by a field of the items it lists; `?page=` and `?limit=` select by none.
+            if location == ParameterLocation.QUERY and not any(
+                name in (output.resource.fields if output.response_fields is None else output.response_fields)
+                for output in _main_outputs(node)
+                if output.cardinality == Cardinality.MANY
+            ):
+                continue
+            if references is None:
+                references = _referenced_schemas(schema, label, node)
+            collection = _collection_named_by(name, field_schema, location, node, references, collections, resources)
+            if collection is None:
+                continue
+            key = next((key for key in ("id", "pk") if key in collection.fields), None)
+            if key is None or collection.types.get(key) != {"integer"}:
+                continue
+            node.inputs.append(
+                InputSlot(
+                    resource=collection,
+                    resource_field=key,
+                    parameter_name=name,
+                    parameter_location=location,
+                    is_named_after_collection=True,
+                )
+            )
+            taken.add((location, name))
 
     rebind_inherited_suffix_matches(operations, resources)
 
@@ -224,6 +275,132 @@ def _accepts_code(schema: JsonSchema, resource: ResourceDefinition) -> bool:
     # Listed objects are passed around by their plain `code` (`language` <- `GET /languages[*].code`). Ids, slugs
     # and formatted strings are not: fields named after a collection often take URLs or unrelated enums instead.
     return isinstance(schema, dict) and "format" not in schema and resource.types.get("code") == set(get_type(schema))
+
+
+def _is_plain_integer(schema: JsonSchema) -> TypeGuard[JsonSchemaObject]:
+    return (
+        isinstance(schema, dict)
+        and [kind for kind in get_type(schema) if kind != "null"] == ["integer"]
+        and "enum" not in schema
+        and "const" not in schema
+    )
+
+
+def _listed_collections(operations: OperationMap) -> dict[str, set[str]]:
+    # What list operations return as their items, with the paths listing them; not arrays nested inside one object
+    # (`tags: [NestedTag]`).
+    listed: dict[str, set[str]] = {}
+    for node in operations.values():
+        if node.method != "get" or naming.trailing_path_parameter(node.path) is not None:
+            continue
+        for output in node.outputs:
+            if (
+                output.cardinality == Cardinality.MANY
+                and "*" not in output.pointer
+                and not output.is_primitive_identifier
+            ):
+                listed.setdefault(output.resource.name, set()).add(node.path)
+    return listed
+
+
+def _main_outputs(node: OperationNode) -> list[OutputSlot]:
+    # The objects the operation returns, not the ones nested inside them.
+    return [
+        output
+        for output in node.outputs
+        if not any(
+            other is not output and output.pointer.startswith(other.pointer.rstrip("/") + "/") for other in node.outputs
+        )
+    ]
+
+
+def _referenced_schemas(schema: OpenApiSchema, label: str, node: OperationNode) -> dict[str, str]:
+    operation = schema.find_operation_by_label(label)
+    assert operation is not None
+    references: dict[str, str] = {}
+    for output in _main_outputs(node):
+        # Outputs come from the operation's own responses.
+        response = operation.responses.get(output.status_code)
+        assert response is not None
+        references.update(referenced_schema_names(response, output.pointer))
+    return references
+
+
+def _collection_named_by(
+    field: str,
+    field_schema: JsonSchemaObject,
+    location: ParameterLocation,
+    node: OperationNode,
+    references: dict[str, str],
+    collections: dict[str, set[str]],
+    resources: ResourceMap,
+) -> ResourceDefinition | None:
+    word = naming.to_pascal_case(field)
+    # The operation's own objects are not what its fields point to: `part` on manufacturer parts is not one of them.
+    own = {output.resource.name for output in _main_outputs(node)}
+    named = [name for name in collections if name.endswith(word) and name not in own]
+    if not named:
+        return None
+    # The response returns the referenced object for it: `role` as a `NestedDeviceRole` or `rear_port` as a
+    # `FrontPortRearPort` (a name ending in the collection), else `part_detail` as a `PartBrief` (starting with it).
+    referenced = references.get(field) or references.get(f"{field}_detail")
+    if referenced is not None:
+        related = [name for name in collections if referenced.endswith(name) and name not in own] or [
+            name for name in collections if _starts_with_word(referenced, name) and name not in own
+        ]
+        return resources[max(related, key=lambda name: (name == referenced, len(name)))] if related else None
+    # Its title names one of them: `part` titled "Supplier Part".
+    title = field_schema.get("title")
+    if isinstance(title, str):
+        normalized_title = naming.normalize_for_matching(title.replace(" ", ""))
+        if normalized_title != naming.normalize_for_matching(field):
+            titled = [name for name in named if naming.normalize_for_matching(name) == normalized_title]
+            if titled:
+                return resources[titled[0]]
+    # The path picks one by whole words: `template` on `/parameters` is a `ParameterTemplate`, `type` on `/eventlog`
+    # is no `EventType`. Not a collection kept under the operation's own items: `version` on documents is their
+    # counter, not one of the `DocumentVersion` items under `/documents/{id}/versions`.
+    own_collection = (
+        naming.collection_path(node.path) if naming.trailing_path_parameter(node.path) else node.path.rstrip("/")
+    )
+    own_items = path_shape(own_collection) + "/{}/"
+    words = _path_words(node.path)
+    specific = [
+        name
+        for name in named
+        if name != word
+        and _is_word_run(naming.normalize_for_matching(name[: -len(word)]), words)
+        and not any(path_shape(listing).startswith(own_items) for listing in collections[name])
+    ]
+    if len(specific) == 1:
+        return resources[specific[0]]
+    # A list filter on a field of its items may take the only collection of that name; a body field needs the
+    # evidence above, as names like `version` hold counters, not keys.
+    if not specific and location == ParameterLocation.QUERY and named == [word]:
+        return resources[word]
+    return None
+
+
+def _starts_with_word(schema_name: str, collection: str) -> bool:
+    # `PartBrief` is a view of `Part`; `Partition` is not.
+    return schema_name.startswith(collection) and (
+        len(schema_name) == len(collection) or schema_name[len(collection)].isupper()
+    )
+
+
+def _path_words(path: str) -> list[str]:
+    return [
+        naming.normalize_for_matching(naming.to_singular(word))
+        for segment in path.split("/")
+        if "{" not in segment
+        for word in re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+", segment)
+    ]
+
+
+def _is_word_run(text: str, words: list[str]) -> bool:
+    return any(
+        "".join(words[start:end]) == text for start in range(len(words)) for end in range(start + 1, len(words) + 1)
+    )
 
 
 def inject_links(schema: OpenApiSchema) -> int:

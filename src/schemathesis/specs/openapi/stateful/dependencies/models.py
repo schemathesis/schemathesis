@@ -25,6 +25,7 @@ from schemathesis.specs.openapi.stateful.dependencies.naming import (
     from_path,
     key_kind,
     normalize_for_matching,
+    owning_resource,
     parameter_names_source,
     strip_version_prefix,
     trailing_path_parameter,
@@ -53,6 +54,7 @@ class DependencyGraph:
                     del input["is_listed_identifier"]
                 if not input["is_parent_key"]:
                     del input["is_parent_key"]
+                del input["is_named_after_collection"]
                 del input["body_path"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
@@ -116,6 +118,9 @@ class DependencyGraph:
                     consumers_by_resource[resource_id][consumer_id] = (consumer, [])
                 consumers_by_resource[resource_id][consumer_id][1].append(input_slot)
 
+        # Resources each path returns as a whole; only keys crossing collections need it, so it is built on demand
+        returned_by_path: dict[str, set[int]] | None = None
+
         path_identifiers: dict[str, set[str]] = {}
         for operation in self.operations.values():
             for input_slot in operation.inputs:
@@ -138,6 +143,10 @@ class DependencyGraph:
 
                     consumer_path = encoded_paths[consumer_id]
                     links: dict[str, LinkDefinition] = {}
+                    # Keys this consumer gives to another namespace's items, so the producer's own are not forwarded
+                    foreign_keys: set[str | int] = set()
+                    # Links with a binding other than a field named after a collection
+                    forwarding: set[str] = set()
 
                     for input_slot in input_slots:
                         if confirmed is not None and not _takes_confirmed_value(input_slot, confirmed):
@@ -169,6 +178,7 @@ class DependencyGraph:
                                     and not producer_collection.startswith(consumer_collection_prefix)
                                     and not producer_collection.endswith(consumer_collection)
                                 ):
+                                    foreign_keys.add(input_slot.parameter_name)
                                     continue
 
                         if output_slot.path_parameter is not None:
@@ -272,6 +282,8 @@ class DependencyGraph:
                             parameters = {
                                 f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": value_expr,
                             }
+                        if not input_slot.is_named_after_collection:
+                            forwarding.add(link_name)
                         existing = links.get(link_name)
                         if existing is not None:
                             existing.parameters.update(parameters)
@@ -289,18 +301,45 @@ class DependencyGraph:
                     if links:
                         producer_fields = template_fields[producer_id]
                         listed_identifier = any(slot.is_listed_identifier for slot in input_slots)
-                        shared_params = [
-                            name
-                            for name in template_fields[consumer_id]
-                            if name in producer_fields
-                            and not (listed_identifier and _keys_different_items(producer, consumer, name))
-                        ]
+                        shared_params = []
+                        for name in template_fields[consumer_id]:
+                            if name not in producer_fields or (
+                                listed_identifier and _keys_different_items(producer, consumer, name)
+                            ):
+                                continue
+                            if _keys_different_collections(producer, consumer, name) or (
+                                name in foreign_keys and not _same_parents(producer.path, consumer.path)
+                            ):
+                                # Both paths return the producer's items, so a key the consumer takes for them is the
+                                # same value in a view of that collection (`/patients/{id}`, `/patients_summary/{id}`).
+                                if (
+                                    output_slot.pointer != "/"
+                                    or not _collection_view(producer, consumer, name)
+                                    or not any(
+                                        slot.parameter_location == ParameterLocation.PATH
+                                        and slot.parameter_name == name
+                                        for slot in input_slots
+                                    )
+                                ):
+                                    continue
+                                if returned_by_path is None:
+                                    returned_by_path = _returned_by_path(self.operations.values())
+                                if id(output_slot.resource) not in returned_by_path.get(consumer.path, ()):
+                                    continue
+                            shared_params.append(name)
 
-                        for link_def in links.values():
+                        # A link bound only by field names forwards the keys both paths reach through the same
+                        # parents (`{owner}`, `{repo}`), not the item keys of their different collections (`{index}`).
+                        parent_params = (
+                            [name for name in shared_params if not _keys_different_items(producer, consumer, name)]
+                            if not forwarding.issuperset(links)
+                            else []
+                        )
+                        for link_name, link_def in links.items():
                             # Find which path parameters are already mapped
                             mapped_params = {name for name, _ in iter_path_parameters(link_def.parameters)}
                             # Add $request.path.X for shared params not already mapped
-                            for param in shared_params:
+                            for param in shared_params if link_name in forwarding else parent_params:
                                 if param in mapped_params:
                                     continue
                                 link_def.parameters[f"path.{param}"] = f"$request.path.{param}"
@@ -847,6 +886,8 @@ class DeferredBindings:
     nested_fks: list[tuple[str, str, BodyPath]]
     # Scalar body fields that may name the collection listing their values (`country` <- `GET /countries`).
     named_scalars: list[tuple[str, str, JsonSchema]]
+    # Query parameters that may name the collection listing their values (`?part=` <- `GET /parts`).
+    named_query_parameters: list[tuple[str, JsonSchema]]
     # Required scalar body fields.
     body_fields: list[tuple[str, JsonSchema]]
     # `(resource, parameter)` for path parameters named after a field of their owning resource (`/projects/{code}`).
@@ -857,6 +898,7 @@ class DeferredBindings:
     def __init__(self) -> None:
         self.nested_fks = []
         self.named_scalars = []
+        self.named_query_parameters = []
         self.body_fields = []
         self.field_named_path_parameters = []
         self.writable_body_fields = {}
@@ -886,6 +928,8 @@ class InputSlot:
     is_parent_key: bool = False
     # Where a nested body field lands, e.g. `("items", 0, "product_id")`; empty for a top-level parameter
     body_path: BodyPath = ()
+    # Whether only the field's name ties it to the collection (`part`), not an identifier suffix (`part_id`)
+    is_named_after_collection: bool = False
 
 
 @dataclass(slots=True)
@@ -1029,15 +1073,96 @@ ResourceMap: TypeAlias = dict[str, ResourceDefinition]
 CanonicalizationCache: TypeAlias = dict[str, Mapping[str, Any]]
 
 
+def _returned_by_path(operations: Iterable[OperationNode]) -> dict[str, set[int]]:
+    returned: dict[str, set[int]] = {}
+    for operation in operations:
+        for output_slot in operation.outputs:
+            if output_slot.pointer == "/":
+                returned.setdefault(operation.path, set()).add(id(output_slot.resource))
+    return returned
+
+
 def _keys_different_items(producer: OperationNode, consumer: OperationNode, parameter: str) -> bool:
     """Whether `{parameter}` sits under different parents, so each operation names a different item with it.
 
     `/warehouses/{name}` and `/warehouses/{warehouse}/shelves/{name}/bins` share `{name}`, but one is a warehouse
     and the other a shelf.
     """
+    return _parents_differ(producer.path, consumer.path, parameter)
+
+
+@lru_cache(maxsize=4096)
+def _parents_differ(producer_path: str, consumer_path: str, parameter: str) -> bool:
     placeholder = "/{" + parameter + "}"
-    return _shape(producer.path.split(placeholder, 1)[0]) != _shape(consumer.path.split(placeholder, 1)[0])
+    return path_shape(producer_path.split(placeholder, 1)[0]) != path_shape(consumer_path.split(placeholder, 1)[0])
 
 
-def _shape(path: str) -> str:
-    return re.sub(r"\{[^}]*\}", "{}", path)
+_GENERIC_KEYS = frozenset({"id", "ids", "pk", "uuid", "guid", "uid", "name"})
+
+
+def _keys_different_collections(producer: OperationNode, consumer: OperationNode, parameter: str) -> bool:
+    """Whether a generic `{parameter}` follows different collections, so each operation names a different item with it.
+
+    `/customers/{id}` and `/orders/{id}` share `{id}`, but one is a customer and the other an order.
+    """
+    if normalize_for_matching(parameter) not in _GENERIC_KEYS:
+        return False
+    producer_owner = owning_resource(parameter, producer.path)
+    consumer_owner = owning_resource(parameter, consumer.path)
+    return (
+        producer_owner is not None
+        and consumer_owner is not None
+        and normalize_for_matching(producer_owner) != normalize_for_matching(consumer_owner)
+    )
+
+
+def _same_parents(producer_path: str, consumer_path: str) -> bool:
+    """Whether two paths may address the same item: equal static segments, and parameters at the same places.
+
+    A parameter's label must match unless one side leaves it bare: `/teams/{team}/invoices/{id}` and
+    `/{owner}/invoices/{id}` may name one team, `/slots/{slot}/...` and `/instances/{instance}/...` do not.
+    """
+    producer_segments = _labeled_segments(producer_path)
+    consumer_segments = _labeled_segments(consumer_path)
+    return len(producer_segments) == len(consumer_segments) and all(
+        left == right or (left[0] == right[0] == "" and "" in (left[1], right[1]))
+        for left, right in zip(producer_segments, consumer_segments, strict=True)
+    )
+
+
+@lru_cache(maxsize=1024)
+def _labeled_segments(path: str) -> tuple[tuple[str, str], ...]:
+    # `("", label)` for a parameter and the static segment naming it, `(segment, "")` for any other static segment.
+    segments = [segment for segment in strip_version_prefix(path).split("/") if segment]
+    labeled: list[tuple[str, str]] = []
+    for index, segment in enumerate(segments):
+        if segment.startswith("{"):
+            label = segments[index - 1] if index > 0 and not segments[index - 1].startswith("{") else ""
+            labeled.append(("", label))
+        elif index + 1 == len(segments) or not segments[index + 1].startswith("{"):
+            labeled.append((segment, ""))
+    return tuple(labeled)
+
+
+def _collection_view(producer: OperationNode, consumer: OperationNode, parameter: str) -> bool:
+    """Whether one collection holding `{parameter}` is named as a view of the other (`patients_summary`, `patients`).
+
+    Collections with the same name under different parents (`/targets/{target_id}/webhooks`, `/webhooks`) often hold
+    different items even when they share a schema.
+    """
+    producer_name = normalize_for_matching(owning_resource(parameter, producer.path) or "")
+    consumer_name = normalize_for_matching(owning_resource(parameter, consumer.path) or "")
+    return (
+        bool(producer_name)
+        and bool(consumer_name)
+        and producer_name != consumer_name
+        and (producer_name.startswith(consumer_name) or consumer_name.startswith(producer_name))
+    )
+
+
+_PATH_PARAMETER = re.compile(r"\{[^}]*\}")
+
+
+@lru_cache(maxsize=4096)
+def path_shape(path: str) -> str:
+    return _PATH_PARAMETER.sub("{}", path)

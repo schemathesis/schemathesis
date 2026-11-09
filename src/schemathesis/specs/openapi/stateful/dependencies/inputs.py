@@ -87,6 +87,8 @@ def extract_inputs(
             owner = naming.owning_resource(param.name, operation.path)
             if owner is not None:
                 deferred.field_named_path_parameters.append((owner, param.name))
+        elif param.location == ParameterLocation.QUERY:
+            deferred.named_query_parameters.append((param.name, _parameter_schema(param)))
 
     json_bodies = []
     form_bodies = []
@@ -197,7 +199,7 @@ def _resolve_parameter_dependency(
             field = parameter_name
     else:
         field = _prefer_string_identifier(
-            _match_field(parameter_name, resource_name, resource.fields),
+            _match_field(parameter_name, resource_name, resource),
             resource,
             parameter_name,
             parameter_schema,
@@ -280,8 +282,13 @@ def _iter_suffix_matches(
             parameter=parameter_name,
             resource=candidate_name,
             fields=candidate_resource.fields,
+            types=candidate_resource.types,
         )
-        if matched_field is not None:
+        # Every object of a framework that keys on `pk` declares one, so a bare `{id}` cannot tell `BuildItem` from
+        # `BomItem` by it; `{part_pk}` names its resource itself.
+        if matched_field is not None and (
+            matched_field != "pk" or naming.normalize_for_matching(parameter_name) not in ("id", "ids", "identifier")
+        ):
             yield candidate_resource, matched_field
 
 
@@ -434,6 +441,7 @@ def _resolve_body_dependencies(
                         parameter=property_name,
                         resource=resource_name,
                         fields=resource.fields,
+                        types=resource.types,
                     )
                     or "id"
                 )
@@ -626,7 +634,7 @@ def rebind_inherited_suffix_matches(operations: OperationMap, resources: Resourc
             named = resources.get(resource_name)
             if named is not None and named.source != DefinitionSource.PARAMETER_INFERENCE and resource_name in produced:
                 input_slot.resource = named
-                input_slot.resource_field = _match_field(parameter_name, resource_name, named.fields)
+                input_slot.resource_field = _match_field(parameter_name, resource_name, named)
                 input_slot.is_suffix_matched = False
                 continue
             parameter_normalized = naming.normalize_for_matching(parameter_name)
@@ -639,9 +647,12 @@ def rebind_inherited_suffix_matches(operations: OperationMap, resources: Resourc
                     break
 
 
-def _match_field(parameter_name: str, resource_name: str, fields: list[str]) -> str:
+def _match_field(parameter_name: str, resource_name: str, resource: ResourceDefinition) -> str:
     # Match parameter to resource field (`userId` -> `id`, `Id` -> `ChannelId`, etc.)
-    matched = naming.find_matching_field(parameter=parameter_name, resource=resource_name, fields=fields)
+    fields = resource.fields
+    matched = naming.find_matching_field(
+        parameter=parameter_name, resource=resource_name, fields=fields, types=resource.types
+    )
     if matched is not None:
         return matched
     # Conventional fallback: `<resource>Id` parameters point at the resource's `id` field. A name is never an `id`.
@@ -702,6 +713,7 @@ def update_input_field_bindings(resource_names: set[str], operations: OperationM
                 parameter=input_slot.parameter_name,
                 resource=input_slot.resource.name,
                 fields=input_slot.resource.fields,
+                types=input_slot.resource.types,
             )
             if new_field is not None:
                 input_slot.resource_field = new_field
@@ -965,6 +977,7 @@ def disambiguate_module_variants(operations: OperationMap, resources: ResourceMa
                     parameter=input_slot.parameter_name if isinstance(input_slot.parameter_name, str) else "",
                     resource=new_resource.name,
                     fields=new_resource.fields,
+                    types=new_resource.types,
                 )
                 or input_slot.resource_field
             )
@@ -1384,6 +1397,7 @@ def try_merge_input_resource(
                 parameter=param_name,
                 resource=resource_name,
                 fields=producer_resource.fields,
+                types=producer_resource.types,
             )
 
             if matched_field is not None:

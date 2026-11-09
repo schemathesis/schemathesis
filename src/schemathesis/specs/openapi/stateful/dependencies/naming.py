@@ -564,8 +564,36 @@ def to_plural(word: str) -> str:
 # Common identifier field names in priority order
 ID_FIELD_NAMES = ["id", "uuid", "guid", "uid"]
 
+# Request fields that page through a list (page-number, limit-offset and cursor pagination); never references.
+PAGINATION_FIELDS = frozenset(
+    {
+        "page",
+        "pagesize",
+        "perpage",
+        "size",
+        "limit",
+        "offset",
+        "cursor",
+        "start",
+        "skip",
+        "top",
+        "after",
+        "before",
+        "since",
+        "count",
+        "first",
+        "last",
+        "pagenumber",
+        "pageindex",
+        "pageno",
+        "pagenum",
+    }
+)
 
-def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> str | None:
+
+def find_matching_field(
+    *, parameter: str, resource: str, fields: list[str], types: Mapping[str, set[str]] | None = None
+) -> str | None:
     """Find which resource field matches the parameter name."""
     if not fields:
         return None
@@ -575,6 +603,14 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
     prefix, suffix = _split_parameter_name(parameter)
     for strategy in _FIELD_MATCHING_STRATEGIES:
         field = strategy(fields, parameter, prefix, suffix, resource_normalized)
+        # Only an integer `pk` is a primary key; a string one partitions a table next to a sort key.
+        if (
+            field == "pk"
+            and types is not None
+            and types.get("pk") != {"integer"}
+            and not normalize_for_matching(parameter).endswith("pk")
+        ):
+            continue
         if field is not None:
             return field
     return None
@@ -648,7 +684,7 @@ def _match_identifier_synonym(
     elif suffix_normalized in ("identifier", "pk"):
         names = ["id"]
     elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
-        names = ID_FIELD_NAMES
+        names = [*ID_FIELD_NAMES, "pk"]
     else:
         return None
     for name in names:
