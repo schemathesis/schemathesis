@@ -242,20 +242,14 @@ class DependencyGraph:
                             ):
                                 continue
                             # A pointer to an undeclared response field always resolves to nothing.
-                            declared: Collection[str] = (
-                                output_slot.resource.fields
-                                if output_slot.response_fields is None
-                                else output_slot.response_fields
-                            )
                             if (
                                 output_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES
-                                and input_slot.resource_field not in declared
+                                and input_slot.resource_field not in output_slot.declared_fields
                             ):
-                                if output_slot.identifier_pointer is None or not _names_identifier(
-                                    input_slot.resource_field, output_slot.resource.name
-                                ):
+                                identifier_pointer = output_slot.identifier_pointer_for(input_slot.resource_field)
+                                if identifier_pointer is None:
                                     continue
-                                value_expr = f"$response.body#{output_slot.identifier_pointer}"
+                                value_expr = f"$response.body#{identifier_pointer}"
                             else:
                                 body_pointer = extend_pointer(
                                     output_slot.pointer, input_slot.resource_field, output_slot.cardinality
@@ -963,6 +957,20 @@ class OutputSlot:
     # Envelope field identifying the resource when the resource itself declares no identifier
     # (`/bookingid` in `{bookingid: 1, booking: {...}}`).
     identifier_pointer: str | None = None
+
+    @property
+    def declared_fields(self) -> Collection[str]:
+        return self.resource.fields if self.response_fields is None else self.response_fields
+
+    def identifier_pointer_for(self, field: str) -> str | None:
+        """Envelope pointer holding `field`, when `field` is the resource's own identifier and the resource lacks it."""
+        if (
+            self.identifier_pointer is None
+            or field in self.declared_fields
+            or not _names_identifier(field, self.resource.name)
+        ):
+            return None
+        return self.identifier_pointer
 
 
 @dataclass(slots=True)

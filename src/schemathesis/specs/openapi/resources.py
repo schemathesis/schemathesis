@@ -41,26 +41,46 @@ def build_descriptors(schema: OpenApiSchema) -> Sequence[ResourceDescriptor]:
             return identifier_by_path[key]
         return identifier_fallback.get(resource_name, "id")
 
-    return tuple(
-        ResourceDescriptor(
-            resource_name=output.resource.name,
-            operation=label,
-            status_code=output.status_code,
-            pointer=output.pointer,
-            cardinality=output.cardinality,
-            is_primitive_identifier=output.is_primitive_identifier,
-            identifier_field=get_identifier_field(label, output.resource.name)
-            if output.is_primitive_identifier or output.extract_object_keys
-            else None,
-            extract_object_keys=output.extract_object_keys,
-        )
-        for label, operation in graph.operations.items()
-        for output in operation.outputs
-        # Path-keyed and body-keyed outputs only inform link inference - they
-        # have no response body to extract resource instances from.
-        if output.path_parameter is None
-        and output.body_field is None
-        # Skip resources nothing reads - the captured instances would land in a bucket
-        # that no parameter requirement queries.
-        and output.resource.name in consumed_resources
-    )
+    descriptors: list[ResourceDescriptor] = []
+    for label, operation in graph.operations.items():
+        for output in operation.outputs:
+            if (
+                # Path-keyed and body-keyed outputs only inform link inference - they
+                # have no response body to extract resource instances from.
+                output.path_parameter is not None
+                or output.body_field is not None
+                # Skip resources nothing reads - the captured instances would land in a bucket
+                # that no parameter requirement queries.
+                or output.resource.name not in consumed_resources
+            ):
+                continue
+            identifier_field = get_identifier_field(label, output.resource.name)
+            descriptors.append(
+                ResourceDescriptor(
+                    resource_name=output.resource.name,
+                    operation=label,
+                    status_code=output.status_code,
+                    pointer=output.pointer,
+                    cardinality=output.cardinality,
+                    is_primitive_identifier=output.is_primitive_identifier,
+                    identifier_field=identifier_field
+                    if output.is_primitive_identifier or output.extract_object_keys
+                    else None,
+                    extract_object_keys=output.extract_object_keys,
+                )
+            )
+            # `{bookingid: 1, booking: {...}}`: the identifier sits next to the wrapped resource.
+            identifier_pointer = output.identifier_pointer_for(identifier_field)
+            if identifier_pointer is not None:
+                descriptors.append(
+                    ResourceDescriptor(
+                        resource_name=output.resource.name,
+                        operation=label,
+                        status_code=output.status_code,
+                        pointer=identifier_pointer,
+                        cardinality=output.cardinality,
+                        is_primitive_identifier=True,
+                        identifier_field=identifier_field,
+                    )
+                )
+    return tuple(descriptors)
