@@ -5085,6 +5085,325 @@ def test_nested_body_fk_links_from_producer_next_to_boolean_schema_reference(ctx
     ]
 
 
+CUSTOMER_IDS = {"type": "array", "items": {"type": "integer"}}
+CUSTOMER_COMPONENTS = {
+    "schemas": {
+        "Customer": {"type": "object", "properties": {"id": {"type": "integer"}}},
+        "CustomerIds": CUSTOMER_IDS,
+        "RecursiveId": {"type": "integer", "allOf": [component_ref("RecursiveId")]},
+        "CustomerIdsOrNull": {"anyOf": [component_ref("CustomerIds"), {"type": "null"}]},
+        "RecursiveIdsOrNull": {"anyOf": [component_ref("RecursiveIdsOrNull"), {"type": "null"}]},
+    }
+}
+CREATE_CUSTOMER = operation("post", "/customers", "201", component_ref("Customer"))
+CREATED_CUSTOMER_TO_READ = [
+    "#/paths/~1customers/post",
+    "201",
+    {
+        "operationRef": "#/paths/~1customers~1{id}/get",
+        "parameters": {"path.id": "$response.body#/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+
+
+def order_to_customer(pointer):
+    return [
+        "#/paths/~1orders~1{order_id}/get",
+        "200",
+        {
+            "operationRef": "#/paths/~1customers~1{id}/get",
+            "parameters": {"path.id": f"$response.body#{pointer}"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ["order", "expected"],
+    [
+        ({"customer_id": CUSTOMER_IDS}, [CREATED_CUSTOMER_TO_READ]),
+        ({"customer_id": component_ref("CustomerIds")}, [CREATED_CUSTOMER_TO_READ]),
+        ({"customer_id": {"type": ["array", "null"], "items": {"type": "integer"}}}, [CREATED_CUSTOMER_TO_READ]),
+        ({"shipping": nested_object("customer_id", CUSTOMER_IDS)}, [CREATED_CUSTOMER_TO_READ]),
+        ({"shipping": nested_object("customer_id", component_ref("CustomerIds"))}, [CREATED_CUSTOMER_TO_READ]),
+        ({"customer_id": {"allOf": [CUSTOMER_IDS]}}, [CREATED_CUSTOMER_TO_READ]),
+        ({"customer_id": {"allOf": [component_ref("CustomerIds")]}}, [CREATED_CUSTOMER_TO_READ]),
+        ({"shipping": nested_object("customer_id", {"allOf": [CUSTOMER_IDS]})}, [CREATED_CUSTOMER_TO_READ]),
+        (
+            {"shipping": nested_object("customer_id", {"allOf": [component_ref("CustomerIds")]})},
+            [CREATED_CUSTOMER_TO_READ],
+        ),
+        ({"customer_ids": CUSTOMER_IDS}, [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_ids/*")]),
+        (
+            {"shipping": nested_object("customer_ids", CUSTOMER_IDS)},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/shipping/customer_ids/*")],
+        ),
+        ({"customer_id": {"type": "integer"}}, [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id")]),
+        (
+            {"shipping": nested_object("customer_id", {"type": "integer"})},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/shipping/customer_id")],
+        ),
+        (
+            {"shipping": nested_object("customer_id", component_ref("Missing"))},
+            [CREATED_CUSTOMER_TO_READ, order_to_customer("/shipping/customer_id")],
+        ),
+        ({"customer_id": component_ref("RecursiveId")}, [CREATED_CUSTOMER_TO_READ, order_to_customer("/customer_id")]),
+    ],
+    ids=[
+        "array",
+        "array-ref",
+        "nullable-array",
+        "nested-array",
+        "nested-array-ref",
+        "array-all-of",
+        "array-all-of-ref",
+        "nested-array-all-of",
+        "nested-array-all-of-ref",
+        "plural-array",
+        "nested-plural-array",
+        "integer",
+        "nested-integer",
+        "nested-unresolvable-ref",
+        "recursive-ref",
+    ],
+)
+def test_singular_fk_response_field_holding_an_array_does_not_fill_scalar_parameters(ctx, order, expected):
+    paths = {
+        **CREATE_CUSTOMER,
+        **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id", "integer")]),
+        **operation(
+            "get",
+            "/orders/{order_id}",
+            "200",
+            {"type": "object", "properties": order},
+            [path_param("order_id", "integer")],
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=CUSTOMER_COMPONENTS)
+    assert inferred_links(graph) == expected
+
+
+LISTED_CUSTOMER_TO_READ = [
+    "#/paths/~1customers/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1customers~1{id}/get",
+        "parameters": {"path.id": "$response.body#/*/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+
+READ_CUSTOMER_TO_LIST = [
+    "#/paths/~1customers~1{id}/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1customers/get",
+        "parameters": {"query.ids": "$response.body#/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+
+
+def order_to_listed_customers(pointer):
+    return [
+        "#/paths/~1orders~1{order_id}/get",
+        "200",
+        {
+            "operationRef": "#/paths/~1customers/get",
+            "parameters": {"query.ids": f"$response.body#{pointer}"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ["order", "ids", "expected"],
+    [
+        ({"customer_id": CUSTOMER_IDS}, CUSTOMER_IDS, [order_to_listed_customers("/customer_id")]),
+        ({"customer_id": CUSTOMER_IDS}, component_ref("CustomerIds"), [order_to_listed_customers("/customer_id")]),
+        ({"customer_id": CUSTOMER_IDS}, {"allOf": [CUSTOMER_IDS]}, [order_to_listed_customers("/customer_id")]),
+        (
+            {"customer_id": CUSTOMER_IDS},
+            {"allOf": [component_ref("CustomerIds")]},
+            [order_to_listed_customers("/customer_id")],
+        ),
+        (
+            {"customer_id": CUSTOMER_IDS},
+            {"type": ["array", "string"], "items": {"type": "integer"}},
+            [order_to_listed_customers("/customer_id")],
+        ),
+        (
+            {"shipping": nested_object("customer_id", CUSTOMER_IDS)},
+            CUSTOMER_IDS,
+            [order_to_listed_customers("/shipping/customer_id")],
+        ),
+        (
+            {"customer_id": CUSTOMER_IDS},
+            {"anyOf": [CUSTOMER_IDS, {"type": "null"}]},
+            [order_to_listed_customers("/customer_id")],
+        ),
+        (
+            {"customer_id": CUSTOMER_IDS},
+            {"oneOf": [CUSTOMER_IDS, {"type": "integer"}]},
+            [order_to_listed_customers("/customer_id")],
+        ),
+        (
+            {"customer_id": CUSTOMER_IDS},
+            {"anyOf": [component_ref("CustomerIds"), {"type": "string"}]},
+            [order_to_listed_customers("/customer_id")],
+        ),
+        (
+            {"customer_id": CUSTOMER_IDS},
+            component_ref("CustomerIdsOrNull"),
+            [order_to_listed_customers("/customer_id")],
+        ),
+        ({"customer_id": CUSTOMER_IDS}, {"type": "integer"}, []),
+        ({"customer_id": CUSTOMER_IDS}, {"anyOf": [{"type": "integer"}, {"type": "null"}]}, []),
+        ({"customer_id": CUSTOMER_IDS}, {"type": "integer", "oneOf": [CUSTOMER_IDS, {"type": "integer"}]}, []),
+        ({"customer_id": CUSTOMER_IDS}, component_ref("RecursiveIdsOrNull"), []),
+        ({"customer_id": CUSTOMER_IDS}, {}, []),
+        ({"customer_id": CUSTOMER_IDS}, True, []),
+        ({"shipping": nested_object("customer_id", CUSTOMER_IDS)}, {"type": "integer"}, []),
+        (
+            {"customer_ids": CUSTOMER_IDS},
+            CUSTOMER_IDS,
+            [order_to_listed_customers("/customer_ids/*"), order_to_customer("/customer_ids/*")],
+        ),
+    ],
+    ids=[
+        "array",
+        "array-ref",
+        "array-all-of",
+        "array-all-of-ref",
+        "array-or-string",
+        "nested-array",
+        "any-of-array-or-null",
+        "one-of-array-or-integer",
+        "any-of-array-ref-or-string",
+        "any-of-ref",
+        "scalar",
+        "any-of-without-array",
+        "integer-with-array-one-of",
+        "recursive-any-of",
+        "untyped",
+        "boolean",
+        "nested-scalar",
+        "plural-array",
+    ],
+)
+def test_singular_fk_response_field_holding_an_array_fills_array_parameters(ctx, order, ids, expected):
+    paths = {
+        **operation(
+            "get",
+            "/customers",
+            "200",
+            {"type": "array", "items": component_ref("Customer")},
+            [{"name": "ids", "in": "query", "schema": ids}],
+        ),
+        **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id", "integer")]),
+        **operation(
+            "get",
+            "/orders/{order_id}",
+            "200",
+            {"type": "object", "properties": order},
+            [path_param("order_id", "integer")],
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=CUSTOMER_COMPONENTS)
+    assert inferred_links(graph) == [LISTED_CUSTOMER_TO_READ, READ_CUSTOMER_TO_LIST, *expected]
+
+
+def customer_to_order(body):
+    return [
+        "#/paths/~1customers/post",
+        "201",
+        {
+            "operationRef": "#/paths/~1orders/post",
+            "requestBody": body,
+            "x-schemathesis": {"is_inferred": True, "merge_body": True},
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ["body", "expected"],
+    [
+        (nested_object("customer_id", CUSTOMER_IDS), []),
+        (nested_object("customer_id", component_ref("CustomerIds")), []),
+        (nested_object("customer_id", {"allOf": [CUSTOMER_IDS]}), []),
+        (nested_object("customer_id", {"allOf": [component_ref("CustomerIds")]}), []),
+        (
+            nested_object("customer_id", {"type": "integer"}),
+            [customer_to_order({"customer_id": "$response.body#/id"})],
+        ),
+        (
+            nested_object("customer_id", component_ref("RecursiveId")),
+            [customer_to_order({"customer_id": "$response.body#/id"})],
+        ),
+        (nested_object("shipping", nested_object("customer_id", CUSTOMER_IDS)), []),
+        (nested_object("shipping", nested_object("customer_id", component_ref("CustomerIds"))), []),
+        (nested_object("shipping", nested_object("customer_id", {"allOf": [CUSTOMER_IDS]})), []),
+        (nested_object("shipping", nested_object("customer_id", {"allOf": [component_ref("CustomerIds")]})), []),
+        (
+            nested_object("shipping", nested_object("customer_id", {"type": "integer"})),
+            [customer_to_order({"shipping": {"customer_id": "$response.body#/id"}})],
+        ),
+    ],
+    ids=[
+        "array",
+        "array-ref",
+        "array-all-of",
+        "array-all-of-ref",
+        "integer",
+        "recursive-ref",
+        "nested-array",
+        "nested-array-ref",
+        "nested-array-all-of",
+        "nested-array-all-of-ref",
+        "nested-integer",
+    ],
+)
+def test_singular_fk_body_field_holding_an_array_gets_no_link(ctx, body, expected):
+    paths = {**CREATE_CUSTOMER, **operation_with_body("post", "/orders", "201", body)}
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=CUSTOMER_COMPONENTS)
+    assert inferred_links(graph) == expected
+
+
+@pytest.mark.parametrize(
+    "customer_id",
+    [CUSTOMER_IDS, component_ref("CustomerIds"), {"allOf": [CUSTOMER_IDS]}, {"allOf": [component_ref("CustomerIds")]}],
+    ids=["array", "array-ref", "array-all-of", "array-all-of-ref"],
+)
+def test_singular_fk_body_field_holding_an_array_takes_the_same_array_field(ctx, customer_id):
+    order = {"type": "object", "properties": {"id": {"type": "integer"}, "customer_id": customer_id}}
+    paths = {
+        **operation_with_body("post", "/orders", "201", nested_object("customer_id", customer_id), order),
+        **operation("get", "/orders/{order_id}", "200", order, [path_param("order_id", "integer")]),
+    }
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=CUSTOMER_COMPONENTS)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1orders/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders~1{order_id}/get",
+                "parameters": {"path.order_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1orders~1{order_id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "requestBody": {"customer_id": "$response.body#/customer_id"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ],
+    ]
+
+
 def test_nested_fk_inference_drops_slot_when_target_never_registered(ctx):
     # A nested FK whose target resource is never declared anywhere stays dropped:
     # the replay loop sees `resources.get(target) is None` and skips it.
