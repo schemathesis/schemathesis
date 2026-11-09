@@ -221,6 +221,7 @@ def iter_resources_from_response(
             current_resolver, resolved = maybe_resolve_with_resolver(resolved, current_resolver)
 
     resolved = try_unwrap_composition(resolved, current_resolver)
+    current_resolver = current_resolver.enter(cast(JsonSchemaObject, resolved))
 
     if "allOf" in resolved:
         if parent_uri is not None and parent_uri in canonicalization_cache:

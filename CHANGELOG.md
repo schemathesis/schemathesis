@@ -11,6 +11,7 @@
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
 - No inferred links for responses whose schema lives in another file and references its siblings.
+- Missing links and an internal error for response schemas with their own `$id` and `$defs`.
 - Missing links for body fields and query filters named after a resource, e.g. `part`, `?company=`.
 - Missing links for responses naming the resource id `pk`, as in Django REST Framework.
 - Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.

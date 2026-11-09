@@ -3413,6 +3413,77 @@ def test_resource_naming_its_own_document_keeps_fields_and_link(ctx, order):
     ]
 
 
+ORDERS_IN_OWN_DOCUMENT = {
+    "$id": "https://example.com/orders",
+    "$defs": {"Order": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
+    "type": "array",
+    "items": {"$ref": "#/$defs/Order"},
+}
+
+
+def orders_page(orders):
+    return {"type": "object", "properties": {"data": orders, "total": {"type": "integer"}}}
+
+
+@pytest.mark.parametrize(
+    ("orders", "pointer"),
+    [
+        (ORDERS_IN_OWN_DOCUMENT, "/*/id"),
+        (component_ref("OrderList"), "/*/id"),
+        ({"allOf": [ORDERS_IN_OWN_DOCUMENT]}, "/*/id"),
+        ({"allOf": [component_ref("OrderList")]}, "/*/id"),
+        ({"oneOf": [ORDERS_IN_OWN_DOCUMENT, {"type": "null"}]}, "/*/id"),
+        ({"oneOf": [{"type": "array", "items": component_ref("Order")}, {"type": "null"}]}, "/*/id"),
+        ({"anyOf": [ORDERS_IN_OWN_DOCUMENT]}, "/*/id"),
+        ({"anyOf": [{"type": "array", "items": component_ref("Order")}]}, "/*/id"),
+        ({"type": "array", "items": component_ref("Order")}, "/*/id"),
+        (orders_page(ORDERS_IN_OWN_DOCUMENT), "/data/*/id"),
+        (orders_page(component_ref("OrderList")), "/data/*/id"),
+        (orders_page({"type": "array", "items": component_ref("Order")}), "/data/*/id"),
+    ],
+    ids=[
+        "inline",
+        "ref",
+        "all-of",
+        "all-of-ref",
+        "one-of",
+        "one-of-components",
+        "any-of",
+        "any-of-components",
+        "components",
+        "paginated-inline",
+        "paginated-ref",
+        "paginated-components",
+    ],
+)
+def test_list_items_defined_in_their_own_document_link_to_read(ctx, orders, pointer):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("get", "/orders", "200", orders),
+            **operation("get", "/orders/{orderId}", "200", component_ref("Order"), parameters=[path_param("orderId")]),
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Order": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+                "OrderList": ORDERS_IN_OWN_DOCUMENT,
+            }
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1orders/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders~1{orderId}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.orderId": f"$response.body#{pointer}"},
+            },
+        ]
+    ]
+
+
 ORDER_IN_OTHER_FILE = ref("common.json#/components/schemas/Order")
 
 

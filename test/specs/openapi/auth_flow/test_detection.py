@@ -59,11 +59,11 @@ def _flow(
     }
 
 
-def _detect(ctx, paths, schemes=BEARER, schemas=None):
+def _detect(ctx, paths, schemes=BEARER, schemas=None, version="3.0.2"):
     components = {"securitySchemes": schemes} if schemes else {}
     if schemas:
         components["schemas"] = schemas
-    return detect_auth_flow(ctx.openapi.load_schema(paths, components=components))
+    return detect_auth_flow(ctx.openapi.load_schema(paths, version=version, components=components))
 
 
 def test_detects_sign_up_and_login(ctx):
@@ -136,6 +136,26 @@ def test_token_behind_chained_references(ctx):
         "AuthData": TOKEN_RESPONSE,
     }
     assert _detect(ctx, flow, schemas=schemas).token_pointer == "/data/access_token"
+
+
+TOKEN_IN_OWN_DOCUMENT = {
+    "$id": "https://example.com/token",
+    "$defs": {"Token": {"type": "string"}},
+    "type": "object",
+    "properties": {"access_token": {"$ref": "#/$defs/Token"}},
+}
+
+
+@pytest.mark.parametrize(
+    ("token_schema", "pointer"),
+    [
+        (TOKEN_IN_OWN_DOCUMENT, "/access_token"),
+        ({"type": "object", "properties": {"auth": TOKEN_IN_OWN_DOCUMENT}}, "/auth/access_token"),
+    ],
+    ids=["response", "nested"],
+)
+def test_token_behind_references_into_its_own_document(ctx, token_schema, pointer):
+    assert _detect(ctx, _flow(token_schema=token_schema), version="3.1.0").token_pointer == pointer
 
 
 @pytest.mark.parametrize(
