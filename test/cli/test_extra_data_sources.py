@@ -137,6 +137,72 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
     )
 
 
+def test_pool_captures_response_only_under_its_documented_status(cli, ctx):
+    string = {"type": "string"}
+    orders: list[str] = []
+    jobs: list[str] = []
+    order_lookups: list[str] = []
+    job_lookups: list[str] = []
+
+    def lookup(name):
+        return {
+            "get": {
+                "parameters": [_path_param(f"{name}_id")],
+                "responses": {
+                    "200": _json_response({"$ref": f"#/components/schemas/{name.capitalize()}"}),
+                    "404": {"description": "Not found"},
+                },
+            }
+        }
+
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/orders": {
+                "post": {
+                    "requestBody": _json_request_body(_object_schema({"item": string}, required=["item"])),
+                    "responses": {
+                        "201": _json_response({"$ref": "#/components/schemas/Order"}, description="Created"),
+                        "202": _json_response({"$ref": "#/components/schemas/Job"}, description="Accepted"),
+                    },
+                }
+            },
+            "/orders/{order_id}": lookup("order"),
+            "/jobs/{job_id}": lookup("job"),
+        },
+        components={
+            "schemas": {
+                "Order": _object_schema({"id": string, "item": string}, required=["id", "item"]),
+                "Job": _object_schema({"id": string, "state": string}, required=["id", "state"]),
+            }
+        },
+    )
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        if len(orders) <= len(jobs):
+            orders.append(f"order-{uuid.uuid4().hex}")
+            return jsonify({"id": orders[-1], "item": "book"}), 201
+        jobs.append(f"job-{uuid.uuid4().hex}")
+        return jsonify({"id": jobs[-1], "state": "queued"}), 202
+
+    @app.route("/orders/<order_id>", methods=["GET"])
+    def get_order(order_id):
+        order_lookups.append(order_id)
+        return (jsonify({"id": order_id, "item": "book"}), 200) if order_id in orders else ("", 404)
+
+    @app.route("/jobs/<job_id>", methods=["GET"])
+    def get_job(job_id):
+        job_lookups.append(job_id)
+        return (jsonify({"id": job_id, "state": "queued"}), 200) if job_id in jobs else ("", 404)
+
+    cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=10", "-c not_a_server_error", "--mode=positive")
+
+    assert not set(job_lookups) & set(orders), f"Order ids sent as job ids: {job_lookups}"
+    assert not set(order_lookups) & set(jobs), f"Job ids sent as order ids: {order_lookups}"
+    assert set(job_lookups) & set(jobs)
+    assert set(order_lookups) & set(orders)
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("config_enabled", [False, True])
 def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config_enabled):

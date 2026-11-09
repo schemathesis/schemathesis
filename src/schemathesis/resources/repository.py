@@ -136,14 +136,28 @@ class ResourceRepository:
         identity: str | None = None,
         query: dict[str, Any] | None = None,
         referenced: frozenset[str] = frozenset(),
+        documented_status: str | None = None,
     ) -> None:
-        """Capture resources from an API response based on configured descriptors."""
+        """Capture resources from an API response based on configured descriptors.
+
+        `documented_status` is the schema's response key for `status_code`; without it, or with no descriptor for it,
+        any 2xx descriptor matches.
+        """
         descriptors = self._descriptors_by_operation.get(operation, [])
+        if documented_status is not None and all(
+            descriptor.status_code != documented_status for descriptor in descriptors
+        ):
+            # A status schema nothing reads is often the operation's resource under another name, e.g. `OrderCreated`.
+            documented_status = None
 
         for descriptor in descriptors:
+            if documented_status is not None:
+                # Another documented 2xx response may describe a different resource.
+                if descriptor.status_code != documented_status:
+                    continue
             # Match if exact status code matches OR both are 2xx
             # This handles cases where schema says "200" but server returns "201"
-            if not status_code_matches(descriptor.status_code, status_code) and not (
+            elif not status_code_matches(descriptor.status_code, status_code) and not (
                 str(descriptor.status_code).startswith("2") and str(status_code).startswith("2")
             ):
                 continue
