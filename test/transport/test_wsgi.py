@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from flask import Flask, abort, got_request_exception, jsonify
+from flask import Flask, Response, abort, got_request_exception, jsonify
 from werkzeug.exceptions import HTTPException
 
 from test.utils import run_given
@@ -40,6 +40,19 @@ def test_wsgi_server_exception_keeps_its_own_notes(ctx):
         "Raised by the app",
         "\nReproduce with:\n\n    curl -X GET http://localhost/api/crash",
     ]
+
+
+def test_wsgi_response_decodes_declared_charset(ctx):
+    app = Flask(__name__)
+
+    @app.route("/api/text", methods=["GET"])
+    def text():
+        return Response("café".encode("latin-1"), content_type="text/plain; charset=latin-1")
+
+    operation = ctx.openapi.load_operation("GET /api/text", {"responses": {"200": {"description": "OK"}}})
+    response = operation.Case().call(app=app)
+
+    assert (response.message, response.encoding, response.text) == ("OK", "latin-1", "café")
 
 
 def test_wsgi_returns_response_for_handled_http_exception(ctx):
