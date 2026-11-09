@@ -123,7 +123,7 @@ def test_deserializer_with_wildcard_media_type(ctx, cli, snapshot_cli):
                             "description": "OK",
                             "content": {
                                 "application/vnd.other+custom": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
                                 }
                             },
                         }
@@ -144,9 +144,8 @@ def test_deserializer_with_wildcard_media_type(ctx, cli, snapshot_cli):
     def get_data2():
         return Response("2", content_type="application/vnd.other+custom")
 
-    # Register deserializer with wildcard - should match both endpoints
     hooks_module = ctx.write_pymodule("""
-@schemathesis.deserializer("application/vnd.*+custom")
+@schemathesis.deserializer("application/*")
 def deserialize_custom(ctx, response):
     return {"id": response.content.decode("utf-8")}
 """)

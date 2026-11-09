@@ -145,13 +145,14 @@ def test_non_id_pool_planted_bug_findability(ctx, cli, snapshot_cli):
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_tombstone_planted_bug_findability(ctx, cli, snapshot_cli, config):
-    # Tombstones evict deleted ids so updateBook draws from still-existing books and finds the planted bug.
+    # Deleted ids leave the pool, so later deleteBook cases never hit the planted double-delete bug.
     api = ctx.graphql.serve(bookstore.tombstone_pool())
     assert (
         cli.run(
             api.schema_url,
             "--no-shrink",
             "--max-examples=50",
+            "--phases=fuzzing",
             "-m",
             "positive",
             "-c",
