@@ -9346,6 +9346,84 @@ def test_envelope_around_object_without_properties_kept_whole(ctx, data):
     ]
 
 
+TAGS_MAP = {"type": "object", "additionalProperties": {"type": "string"}}
+TAG_SCHEMA = {
+    "type": "object",
+    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+    "required": ["id"],
+}
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [TAGS_MAP, component_ref("Tags"), {"allOf": [component_ref("Tags")]}],
+    ids=["inline", "ref", "all-of"],
+)
+def test_map_named_after_path_segment_is_not_an_envelope(ctx, tags):
+    order = {"type": "object", "properties": {"id": {"type": "string"}, "tags": tags}, "required": ["id"]}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("patch", "/orders/{order_id}/tags", "200", component_ref("Order"), [path_param("order_id")]),
+            **operation("get", "/orders/{order_id}", "200", component_ref("Order"), [path_param("order_id")]),
+        },
+        components={"schemas": {"Order": order, "Tags": TAGS_MAP}},
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1orders~1{order_id}~1tags/patch",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders~1{order_id}/get",
+                "parameters": {"path.order_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1orders~1{order_id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1orders~1{order_id}~1tags/patch",
+                "parameters": {"path.order_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        TAG_SCHEMA,
+        {**TAG_SCHEMA, "additionalProperties": False},
+        component_ref("Tag"),
+        {"allOf": [component_ref("Tag")]},
+    ],
+    ids=["inline", "closed", "ref", "all-of"],
+)
+def test_resource_named_after_path_segment_is_an_envelope(ctx, tag):
+    tagged = {"type": "object", "properties": {"tag": tag}}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/tags", "201", tagged),
+            **operation("get", "/tags/{tag_id}", "200", tagged, [path_param("tag_id")]),
+        },
+        components={"schemas": {"Tag": TAG_SCHEMA}},
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1tags/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1tags~1{tag_id}/get",
+                "parameters": {"path.tag_id": "$response.body#/tag/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
 def test_fk_link_requires_field_in_producer_response(ctx):
     # The full order has `customer_id`, but the create response only returns `id`:
     # a link reading `customer_id` from it would always resolve to nothing.

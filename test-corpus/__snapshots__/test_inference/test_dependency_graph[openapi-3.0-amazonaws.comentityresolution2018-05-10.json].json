@@ -164,8 +164,8 @@
           "cardinality": "ONE",
           "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/tags",
-          "resource": "TagMap",
+          "pointer": "/",
+          "resource": "ListTagsForResource",
           "status_code": "200"
         }
       ]
@@ -813,6 +813,21 @@
         ]
       }
     },
+    "ListTagsForResource": {
+      "fields": [
+        "tags"
+      ],
+      "types": {
+        "tags": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
     "Role": {
       "fields": [
         "roleArn"
@@ -852,10 +867,6 @@
       "fields": [
         "resourceArn"
       ],
-      "types": {}
-    },
-    "TagMap": {
-      "fields": [],
       "types": {}
     },
     "TagResource": {
