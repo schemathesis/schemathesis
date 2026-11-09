@@ -10148,6 +10148,45 @@ def test_identifier_parameters_take_primary_key_field(ctx):
     ]
 
 
+@pytest.mark.parametrize(
+    ("name", "schema", "expected"),
+    [
+        ("id", {"type": "integer"}, True),
+        ("groupId", {"type": "integer"}, True),
+        ("uuid", {"type": "string", "format": "uuid"}, False),
+        ("uid", {"type": "string", "format": "uuid"}, False),
+        ("groupUuid", {"type": "string", "format": "uuid"}, False),
+        ("groupGuid", {"type": "string", "format": "uuid"}, False),
+    ],
+    ids=["id", "prefixed-id", "uuid", "uid", "prefixed-uuid", "prefixed-guid"],
+)
+def test_only_id_parameters_take_integer_primary_key(ctx, name, schema, expected):
+    paths = {
+        **operation("post", "/groups", "201", component_ref("Group")),
+        **operation(
+            "get",
+            f"/groups/{{{name}}}",
+            "200",
+            parameters=[{"name": name, "in": "path", "required": True, "schema": schema}],
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Group": PRIMARY_KEYED_PART}})
+
+    links = [
+        [
+            "#/paths/~1groups/post",
+            "201",
+            {
+                "operationRef": f"#/paths/~1groups~1{{{name}}}/get",
+                "parameters": {f"path.{name}": "$response.body#/pk"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (links if expected else [])
+
+
 def test_primary_key_does_not_join_resources_that_share_a_word(ctx):
     # `/build/item/{id}` names a `BuildItem`; the `BomItem` registered first also ends in `Item` and declares `pk`.
     item = {

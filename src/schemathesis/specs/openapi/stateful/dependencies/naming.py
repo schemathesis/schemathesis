@@ -683,8 +683,10 @@ def _match_identifier_synonym(
         names = [*ID_FIELD_NAMES, "slug"]
     elif suffix_normalized in ("identifier", "pk"):
         names = ["id"]
-    elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
+    elif suffix_normalized in ("id", "ids"):
         names = [*ID_FIELD_NAMES, "pk"]
+    elif suffix_normalized in ID_FIELD_NAMES:
+        names = ID_FIELD_NAMES
     else:
         return None
     for name in names:
