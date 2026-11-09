@@ -15,7 +15,7 @@ from google.protobuf import message, message_factory
 from typing_extensions import override
 
 from schemathesis.core import Body
-from schemathesis.core.errors import read_timeout_error
+from schemathesis.core.errors import IncorrectUsage, read_timeout_error
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
@@ -101,9 +101,12 @@ class GrpcTransport(BaseTransport["requests.Session"]):
             # Headers from config and CLI options override the case's own, so they replace values a crash file masked.
             headers = {**session.headers, **(headers or {})}
         request_headers = request_metadata(case, headers)
-        auth = (
-            session.auth if session is not None and isinstance(session.auth, tuple) and len(session.auth) == 2 else None
-        )
+        auth = case._auth or (session.auth if session is not None else None)
+        if auth is not None and not isinstance(auth, tuple):
+            raise IncorrectUsage(
+                "`requests` auth objects are not supported for gRPC targets; "
+                "pass credentials as headers, basic auth or an `@schemathesis.auth()` class"
+            )
         address, tls = prepare_target(
             base_url, verify, request_headers, uses_proxy=bool(proxies or settings.proxy), auth=auth
         )

@@ -14,6 +14,7 @@
 - False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Missing links for fields inside request body arrays behind components that only reference another.
+- Silently unauthenticated gRPC calls with `auth.set_from_requests`; report it as unsupported.
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
 - No inferred links for responses whose schema lives in another file and references its siblings.

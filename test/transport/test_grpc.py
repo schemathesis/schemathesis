@@ -10,6 +10,7 @@ import pytest
 import requests
 from google.protobuf import json_format, message_factory
 from google.rpc import error_details_pb2
+from requests.auth import HTTPBasicAuth
 
 import schemathesis
 from schemathesis.config import OutputConfig
@@ -220,6 +221,24 @@ def test_basic_auth_from_session(ctx):
     session.auth = ("user", "pass")
     get_user(server, 7, session=session)
     assert ("authorization", "Basic dXNlcjpwYXNz") in server.calls[-1].metadata
+
+
+@pytest.mark.parametrize(
+    ("schema_auth", "session_auth"),
+    [(HTTPBasicAuth("user", "pass"), None), (None, HTTPBasicAuth("user", "pass"))],
+    ids=["set-from-requests", "session"],
+)
+def test_requests_auth_object_is_rejected(ctx, schema_auth, session_auth):
+    server = ctx.grpc.apps.users()
+    schema = load(server)
+    if schema_auth is not None:
+        schema.auth.set_from_requests(schema_auth)
+    session = requests.Session()
+    session.auth = session_auth
+    (case,) = generate_many(schema["pkg.Users"]["GetUser"].as_strategy(), 1)
+    with pytest.raises(IncorrectUsage, match="`requests` auth objects are not supported for gRPC targets"):
+        case.call(session=session)
+    assert server.calls == []
 
 
 def test_deadline_raises_timeout(ctx):
