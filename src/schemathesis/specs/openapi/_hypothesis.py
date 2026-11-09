@@ -603,13 +603,19 @@ def _build_form_strategy_with_encoding(
 
     # Encoded properties take their values from the media type strategy; whether they are present, and every other
     # property and object-level keyword, still follows the schema.
-    base_schema = {
-        **schema,
-        "properties": {
-            name: {} if name in property_with_content_type_strategies else subschema
-            for name, subschema in properties.items()
-        },
-    }
+    if generation_mode.is_positive:
+        # The drawn values of encoded properties are discarded, but their subschemas keep them named: an empty
+        # subschema is dropped as redundant, and an optional property is then never generated.
+        base_schema = schema
+    else:
+        # A violation drawn inside an encoded property would be overwritten by the media type data.
+        base_schema = {
+            **schema,
+            "properties": {
+                name: {} if name in property_with_content_type_strategies else subschema
+                for name, subschema in properties.items()
+            },
+        }
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
     body_strategy = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode](
         base_schema,

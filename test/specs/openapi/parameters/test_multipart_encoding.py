@@ -471,6 +471,10 @@ def test_negative_body_violations_with_encoding(ctx):
     # Missing required properties, extra properties and non-object bodies are violations too.
     assert any(not isinstance(body, dict) or set(body) != {"file", "age"} for body in bodies)
     assert all(body["file"] == b"<xml/>" for body in bodies if isinstance(body, dict) and "file" in body)
+    # The media type data replaces `file`, so a violation drawn there would leave a valid body.
+    assert [
+        body for body in bodies if isinstance(body, dict) and set(body) == {"file", "age"} and type(body["age"]) is int
+    ] == []
 
 
 def test_empty_encoding_object(ctx):
@@ -556,9 +560,7 @@ def test_multipart_comma_separated_without_custom_strategy(ctx):
 
 
 def test_multipart_optional_encoding_not_always_present(ctx):
-    # Optional fields with custom encoding should not always be present
-    xml_strategy = st.just(b"<data/>")
-    schemathesis.openapi.media_type("text/xml", xml_strategy)
+    schemathesis.openapi.media_type("text/xml", st.just(b"<data/>"))
 
     operation = make_operation(
         ctx,
@@ -574,12 +576,14 @@ def test_multipart_optional_encoding_not_always_present(ctx):
             "encoding": {"optional_file": {"contentType": "text/xml"}},
         },
     )
+    seen = set()
 
-    @run_given(case=operation.as_strategy(), max_examples=100)
+    @run_given(case=operation.as_strategy(), max_examples=10)
     def test(case):
-        # Required field must always be present
         assert "required_field" in case.body
-        # Optional field may or may not be present - both are valid
+        seen.add((case.body.get("optional_file"), tuple((case.multipart_content_types or {}).items())))
+
+    assert seen == {(None, ()), (b"<data/>", (("optional_file", "text/xml"),))}
 
 
 def test_multipart_json_encoding_serializes_object_field(ctx):
