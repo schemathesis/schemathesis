@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import maybe_resolve_bundled
+from schemathesis.core.jsonschema import maybe_resolve_bundled, resolve_bundled_ref
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
@@ -561,16 +561,16 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
     scan.by_schema[key] = fields
     reference = schema.get("$ref")
     if isinstance(reference, str):
-        bundled_name = reference.rsplit("/", 1)[-1]
-        target = scan.bundled.get(bundled_name)
-        uri = scan.name_to_uri.get(bundled_name)
+        # Follows alias chains; returns the schema itself when its reference does not resolve.
+        target = resolve_bundled_ref(schema, scan.bundled)
+        uri = scan.name_to_uri.get(reference.rsplit("/", 1)[-1])
         # A bare reference finds the same FK fields in every body that bundles its target.
-        if len(schema) == 1 and uri is not None and isinstance(target, dict):
+        if len(schema) == 1 and uri is not None and target is not schema:
             shared = scan.by_reference.setdefault((uri, max_depth), fields)
             if shared is not fields:
                 scan.by_schema[key] = shared
                 return shared
-        if isinstance(target, dict) and target.get("type") == "array":
+        if target is not schema and target.get("type") == "array":
             # Each followed reference spends depth, so an array whose items point back at it terminates.
             if max_depth <= 1:
                 return fields

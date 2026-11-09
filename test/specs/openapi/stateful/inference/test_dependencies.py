@@ -4658,6 +4658,7 @@ def nested_object(name, schema):
 
 
 LINES_COMPONENTS = {"schemas": {"Lines": {"type": "array", "items": nested_object("warehouse_id", {"type": "string"})}}}
+ALIASED_LINES_COMPONENTS = {"schemas": {**LINES_COMPONENTS["schemas"], "LinesAlias": component_ref("Lines")}}
 RECURSIVE_LINES_COMPONENTS = {
     "schemas": {
         "Lines": {
@@ -4693,6 +4694,11 @@ RECURSIVE_LINES_COMPONENTS = {
             {"lines": [{"warehouse_id": "$response.body#/id"}]},
         ),
         (
+            nested_object("lines", component_ref("LinesAlias")),
+            ALIASED_LINES_COMPONENTS,
+            {"lines": [{"warehouse_id": "$response.body#/id"}]},
+        ),
+        (
             nested_object("shipping", nested_object("lines", component_ref("Lines"))),
             LINES_COMPONENTS,
             {"shipping": {"lines": [{"warehouse_id": "$response.body#/id"}]}},
@@ -4703,7 +4709,14 @@ RECURSIVE_LINES_COMPONENTS = {
             {"lines": [{"warehouse_id": "$response.body#/id", "children": [{"warehouse_id": "$response.body#/id"}]}]},
         ),
     ],
-    ids=["object-in-object", "array-in-object", "array-ref", "array-ref-in-object", "recursive-array-ref"],
+    ids=[
+        "object-in-object",
+        "array-in-object",
+        "array-ref",
+        "array-alias-ref",
+        "array-ref-in-object",
+        "recursive-array-ref",
+    ],
 )
 def test_nested_body_fk_links_from_producer(ctx, body, components, expected):
     paths = {
