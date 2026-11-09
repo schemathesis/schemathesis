@@ -8,6 +8,7 @@
 - Missing links for fields inherited through `allOf` chains reusing a schema name across files.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
+- Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Missing links for fields inside request body arrays behind components that only reference another.
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.

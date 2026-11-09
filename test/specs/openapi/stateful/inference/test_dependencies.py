@@ -3600,6 +3600,171 @@ def test_same_reference_text_in_another_file_names_a_different_schema(ctx):
     ]
 
 
+def listed_in_operation(collection, keyword):
+    return ref(
+        f"#/paths/~1{collection}/get/responses/200/content/application~1json/schema/properties/{collection}/{keyword}"
+    )
+
+
+def read_purchase_link(method, pointer):
+    return {
+        "operationRef": f"#/paths/~1orders~1{{purchase_id}}/{method}",
+        "x-schemathesis": {"is_inferred": True},
+        "parameters": {"path.purchase_id": f"$response.body#{pointer}"},
+    }
+
+
+def warehouses_and_orders(listing, listed):
+    paths = {
+        f"/{collection}": {
+            "get": response("200", {"type": "object", "properties": {collection: listing(collection)}}),
+            "post": response("201", {"type": "object", "properties": {item: listed(collection)}}),
+        }
+        for collection, item in (("warehouses", "warehouse"), ("orders", "order"))
+    }
+    paths["/orders/{purchase_id}"] = {
+        "get": {
+            **response("200", {"type": "object", "properties": {"order": listed("orders")}}),
+            "parameters": [path_param("purchase_id", "integer")],
+        }
+    }
+    return paths
+
+
+def collection_item(collection):
+    field = {"warehouses": "city", "orders": "total"}[collection]
+    return {"type": "object", "properties": {"id": {"type": "integer"}, field: {"type": "string"}}}
+
+
+LIST_TO_PURCHASE = ["#/paths/~1orders/get", "200", read_purchase_link("get", "/orders/*/id")]
+CREATE_TO_PURCHASE = ["#/paths/~1orders/post", "201", read_purchase_link("get", "/order/id")]
+
+
+@pytest.mark.parametrize(
+    ("keyword", "listing"),
+    [
+        ("items", lambda item: {"type": "array", "items": item}),
+        ("additionalProperties", lambda item: {"type": "object", "additionalProperties": item}),
+        ("items/allOf/0", lambda item: {"type": "array", "items": {"allOf": [item]}}),
+        ("prefixItems/0", lambda item: {"type": "array", "prefixItems": [item]}),
+    ],
+    ids=["items", "map-values", "all-of-branch", "prefix-items"],
+)
+def test_references_to_items_of_different_collections_name_different_resources(ctx, keyword, listing):
+    paths = warehouses_and_orders(
+        lambda collection: listing(collection_item(collection)),
+        lambda collection: listed_in_operation(collection, keyword),
+    )
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0")
+    assert inferred_links(graph) == [CREATE_TO_PURCHASE]
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["#/components/schemas/Purchase", "#/paths/~1catalog/get/responses/200/content/application~1json/schema"],
+    ids=["component", "operation"],
+)
+@pytest.mark.parametrize(
+    ("keyword", "shape"),
+    [("oneOf", {}), ("anyOf", {}), ("allOf", {}), ("prefixItems", {"type": "array"})],
+    ids=["one-of", "any-of", "all-of", "prefix-items"],
+)
+def test_references_to_sibling_subschemas_name_different_resources(ctx, location, keyword, shape):
+    positions = {"orders": 0, "warehouses": 1}
+
+    def sibling(collection):
+        return ref(f"{location}/{keyword}/{positions[collection]}")
+
+    paths = warehouses_and_orders(lambda collection: {"type": "array", "items": sibling(collection)}, sibling)
+    purchase = {**shape, keyword: [collection_item("orders"), collection_item("warehouses")]}
+    paths["/catalog"] = {"get": response("200", purchase)}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Purchase": purchase}}, version="3.1.0")
+    assert inferred_links(graph) == [LIST_TO_PURCHASE, CREATE_TO_PURCHASE]
+
+
+def test_references_to_items_of_different_component_lists_name_different_resources(ctx):
+    paths = warehouses_and_orders(
+        lambda collection: component_ref(collection.capitalize()),
+        lambda collection: ref(f"#/components/schemas/{collection.capitalize()}/items"),
+    )
+    lists = {name.capitalize(): {"type": "array", "items": collection_item(name)} for name in ("warehouses", "orders")}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": lists})
+    assert inferred_links(graph) == [CREATE_TO_PURCHASE]
+
+
+def test_components_named_after_keywords_keep_their_names(ctx):
+    names = {"warehouses": "schema", "orders": "items"}
+    paths = warehouses_and_orders(
+        lambda collection: {"type": "array", "items": component_ref(names[collection])},
+        lambda collection: component_ref(names[collection]),
+    )
+    items = {name: collection_item(collection) for collection, name in names.items()}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": items})
+    assert [(resource.name, resource.fields) for resource in graph.resources.values()] == [
+        ("schema", ["city", "id"]),
+        ("items", ["id", "total"]),
+    ]
+    assert inferred_links(graph) == [LIST_TO_PURCHASE, CREATE_TO_PURCHASE]
+
+
+def item_schema_ref(path):
+    return ref(f"#/paths/{path.replace('/', '~1')}/get/responses/200/content/application~1json/schema")
+
+
+@pytest.mark.parametrize("created", ["/orders/{purchase_id}", "/orders/%7Bpurchase_id%7D"], ids=["braces", "encoded"])
+def test_references_to_operation_schemas_of_different_collections_name_different_resources(ctx, created):
+    parameters = [path_param("purchase_id", "integer")]
+    paths = {
+        "/warehouses": {"post": response("201", item_schema_ref("/warehouses/{code}"))},
+        "/warehouses/{code}": {
+            "get": {
+                **response(
+                    "200", {"type": "object", "properties": {"id": {"type": "integer"}, "city": {"type": "string"}}}
+                ),
+                "parameters": [path_param("code", "integer")],
+            }
+        },
+        "/orders": {"post": response("201", item_schema_ref(created))},
+        "/orders/{purchase_id}": {
+            "get": {
+                **response(
+                    "200", {"type": "object", "properties": {"id": {"type": "integer"}, "total": {"type": "integer"}}}
+                ),
+                "parameters": parameters,
+            },
+            "put": {**response("200", item_schema_ref("/orders/{purchase_id}")), "parameters": parameters},
+        },
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        ["#/paths/~1orders/post", "201", read_purchase_link("get", "/id")],
+        ["#/paths/~1orders/post", "201", read_purchase_link("put", "/id")],
+        ["#/paths/~1orders~1{purchase_id}/put", "200", read_purchase_link("get", "/id")],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("keyword", "container"),
+    [("items", "array"), ("additionalProperties", "object")],
+    ids=["items", "map-values"],
+)
+def test_references_to_a_collection_and_its_members_name_different_resources(ctx, keyword, container):
+    collection = item_schema_ref("/orders")["$ref"]
+    member = ref(f"{collection}/{keyword}")
+    paths = {
+        "/orders": {
+            "get": response("200", {"type": container, keyword: collection_item("orders")}),
+            "post": response("201", member),
+            "put": {"requestBody": {"content": {"application/json": {"schema": ref(collection)}}}, **response("200")},
+        },
+        "/orders/{purchase_id}": {
+            "get": {**response("200", member), "parameters": [path_param("purchase_id", "integer")]},
+        },
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [["#/paths/~1orders/post", "201", read_purchase_link("get", "/id")]]
+
+
 @pytest.mark.parametrize(
     "response_schema",
     [
