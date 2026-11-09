@@ -781,6 +781,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         except (TypeError, ValueError, LookupError, json.JSONDecodeError, NotImplementedError):
             return
         if has_descriptors:
+            documented = operation.responses.find_by_status_code(response.status_code)
             self.repository.record_response(
                 operation=operation.label,
                 status_code=response.status_code,
@@ -789,6 +790,12 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 identity=case.auth_identity,
                 query=case.query or {},
                 referenced=referenced_by(case),
+                # A response documented with a body names the returned resource; `default` usually documents errors.
+                documented_status=documented.status_code
+                if documented is not None
+                and documented.status_code != "default"
+                and declared_response_schema(operation, response.status_code, content_type) is not None
+                else None,
             )
         if semantic_active:
             # Without a usable schema, fall back to a schemaless walk.

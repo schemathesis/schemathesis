@@ -166,6 +166,7 @@ class OpenAPIAnalysis:
                         status_code=status_code,
                         payload=example_value,
                         from_example=True,
+                        documented_status=response.status_code,
                     )
 
     @property
