@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
-from schemathesis.core.jsonschema.bundler import BundleError
+from schemathesis.core.jsonschema import resolve_bundled_ref
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.transforms import decode_pointer, encode_pointer
@@ -792,43 +793,47 @@ def declared_field_values(response: OpenApiResponse, pointer: str, field: str, r
 def allowed_values(schema: Mapping[str, Any], resolver: Resolver | None) -> list[Any] | None:
     """Values `enum` or `const` limit `schema` to that its `type` allows; `None` when it lists none.
 
-    Without a resolver, references are skipped.
+    Without a resolver, references are followed into the schema's bundle.
     """
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
     values: list[Any] | None = None
     types: set[str] | None = None
-    nullable = False
-    pending: list[tuple[Resolver | None, Mapping[str, Any]]] = [(resolver, schema)]
+    # Each node carries whether it sits under a nullable schema.
+    pending: list[tuple[Resolver | None, Mapping[str, Any], bool]] = [(resolver, schema, False)]
     # `allOf` chains may be recursive.
-    seen: set[int] = set()
+    seen: set[tuple[int, bool]] = set()
     while pending:
-        current_resolver, node = pending.pop()
+        current_resolver, node, nullable = pending.pop()
+        # A nullable schema accepts `null` along with everything under it; OpenAPI 3.0 keeps `nullable` next to `$ref`.
+        nullable = nullable or _is_nullable(node)
         if "$ref" in node:
             if current_resolver is None:
-                continue
-            try:
-                current_resolver, node = maybe_resolve_with_resolver(node, current_resolver)
-            except (RefResolutionError, InvalidSchema):
-                continue
-        if id(node) in seen:
+                # Without a resolver every node is a bundled body schema or one of its `allOf` branches.
+                node = resolve_bundled_ref(cast("dict[str, Any]", node), bundled)
+            else:
+                try:
+                    current_resolver, node = maybe_resolve_with_resolver(node, current_resolver)
+                except (RefResolutionError, InvalidSchema):
+                    continue
+            nullable = nullable or _is_nullable(node)
+        if (id(node), nullable) in seen:
             continue
-        seen.add(id(node))
+        seen.add((id(node), nullable))
         listed = [node["const"]] if "const" in node else node.get("enum")
         if isinstance(listed, list):
             values = listed if values is None else [value for value in values if contains_value(listed, value)]
         declared = node.get("type")
         if isinstance(declared, (str, list)):
             node_types = {declared} if isinstance(declared, str) else set(declared)
+            # `nullable` adds `null` to the type; `enum` still decides whether `null` is allowed.
+            if nullable:
+                node_types.add("null")
             types = node_types if types is None else _intersect_types(types, node_types)
-        if node.get("nullable") is True or node.get("x-nullable") is True:
-            nullable = True
         branches = node.get("allOf")
         if isinstance(branches, list):
-            pending.extend((current_resolver, branch) for branch in branches if isinstance(branch, dict))
+            pending.extend((current_resolver, branch, nullable) for branch in branches if isinstance(branch, dict))
     if values is None:
         return None
-    # `nullable` adds `null` to the type; `enum` still decides whether `null` is allowed.
-    if nullable and types is not None:
-        types = types | {"null"}
     # A listed value the declared `type` rules out never appears in a valid instance.
     if types is not None:
         values = [
@@ -845,6 +850,10 @@ def _intersect_types(left: set[str], right: set[str]) -> set[str]:
     if ("integer" in left and "number" in right) or ("number" in left and "integer" in right):
         common.add("integer")
     return common
+
+
+def _is_nullable(schema: Mapping[str, Any]) -> bool:
+    return schema.get("nullable") is True or schema.get("x-nullable") is True
 
 
 _JSON_TYPES = {

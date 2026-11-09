@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import maybe_resolve_bundled, resolve_bundled_ref
+from schemathesis.core.jsonschema import maybe_resolve_bundled, resolve_bundled_ref, schema_with_bundle
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
@@ -413,7 +413,8 @@ def _resolve_body_dependencies(
         # Generation never sends `readOnly` fields, so a link must not either.
         if is_read_only(subschema, bundled):
             continue
-        deferred.writable_body_fields[property_name] = subschema
+        # The bundle resolves the field's references, e.g. an `enum` behind `$ref`.
+        deferred.writable_body_fields[property_name] = schema_with_bundle(subschema, schema)
         if property_name in required and _is_scalar(subschema):
             deferred.body_fields.append((property_name, subschema))
         resource_name = naming.from_parameter(property_name, path, body_field=True)
