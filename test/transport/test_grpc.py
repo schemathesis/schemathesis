@@ -542,6 +542,40 @@ def test_rejected_fields_are_observed(ctx, tmp_path, body, expected):
     assert parse_observations(case.operation, case, case.call()) == expected
 
 
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        (
+            {},
+            json.dumps(
+                {
+                    "code": 3,
+                    "message": "invalid account",
+                    "details": [
+                        {
+                            "@type": f"{ANY_URL}google.rpc.BadRequest",
+                            "fieldViolations": [
+                                {"field": "display_name", "description": "must not be empty"},
+                                {"field": "profile.contact_email", "description": "must not be empty"},
+                            ],
+                        },
+                        {"@type": f"{ANY_URL}example.Unknown", "value": "CAE="},
+                    ],
+                },
+                indent=2,
+            ),
+        ),
+        ({"x-details": "malformed"}, BINARY_PAYLOAD),
+        ({"x-details": "invalid-retry-info"}, BINARY_PAYLOAD),
+        ({"x-details": "invalid-duration"}, BINARY_PAYLOAD),
+    ],
+    ids=["decoded", "malformed", "invalid-retry-info", "invalid-duration"],
+)
+def test_status_details_are_shown_in_place_of_the_body(ctx, tmp_path, headers, expected):
+    response = create_account(ctx, tmp_path).Case(body={}, headers=headers).call()
+    assert format_response_payload(response, config=OutputConfig()) == expected
+
+
 def test_observed_fields_are_filled(ctx, tmp_path):
     operation = create_account(ctx, tmp_path)
     store = ErrorFeedbackStore()
