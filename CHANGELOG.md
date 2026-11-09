@@ -23,6 +23,7 @@
 - Links filling path parameters from `writeOnly` response fields behind `$ref` or marked `x-writeOnly`.
 - Missing links for responses naming the resource id `pk`, as in Django REST Framework.
 - Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.
+- Links copying a fetched value into an update body field whose `$ref` enum rejects it.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
 - Coverage and examples phases sending requests without credentials learned by auth inference.

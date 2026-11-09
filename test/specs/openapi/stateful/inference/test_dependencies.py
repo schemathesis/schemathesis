@@ -7978,6 +7978,40 @@ CREATE_TO_READ = [
         ),
         (
             {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading(
+                    {"type": "string", "enum": ["queued", None], "allOf": [{"type": "string", "nullable": True}]}
+                ),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading(
+                    {"type": "string", "nullable": True, "enum": ["queued", None], "allOf": [{"type": "string"}]}
+                ),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading(
+                    {"type": "string", "nullable": True, **component_ref("ReadStateWithNull")}
+                ),
+            },
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "version": {"type": "string", "enum": ["queued"]},
+                "read": versioned_item_reading({"type": "string", **component_ref("ReadStateWithNull")}),
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
                 "version": {"type": "number", "enum": [1.0, 2.0]},
                 "read": versioned_item_reading({"type": "number", "enum": [1, 2]}),
             },
@@ -8140,6 +8174,10 @@ CREATE_TO_READ = [
         "read-const-rejected-by-update",
         "nullable-read-enum-rejected-by-update",
         "read-null-accepted-by-nullable-update",
+        "read-null-outside-type-under-nullable-branch-ignored",
+        "read-null-through-nullable-parent-rejected-by-update",
+        "read-null-through-nullable-next-to-reference-rejected-by-update",
+        "read-null-outside-referenced-type-ignored",
         "integer-read-enum-accepted-by-float-update-enum",
         "read-enum-value-outside-type-ignored",
         "read-boolean-outside-integer-type-ignored",
@@ -8171,11 +8209,103 @@ def test_update_echoes_values_only_item_read_returns(ctx, kwargs, expected):
             "schemas": {
                 "Tag": {"type": "object", "properties": {"id": {"type": "integer"}, "label": {"type": "string"}}},
                 "RunState": {"type": "string", "enum": ["queued", "running", "success", "failed"]},
+                "ReadStateWithNull": {"type": "string", "enum": ["queued", None]},
                 "NestedState": {
                     "type": "string",
                     "enum": ["queued", "running"],
                     "allOf": [component_ref("NestedState")],
                 },
+            }
+        },
+    )
+    assert inferred_links(graph) == expected
+
+
+@pytest.mark.parametrize(
+    ("version", "update_version"),
+    [
+        ("3.0.2", {"type": "string", "allOf": [component_ref("UpdateState")]}),
+        ("3.1.0", {"type": "string", **component_ref("UpdateState")}),
+    ],
+    ids=["all-of", "sibling"],
+)
+@pytest.mark.parametrize(
+    ("read_version", "expected"),
+    [
+        ({"type": "string", "enum": ["queued", "running"]}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        (
+            {"type": "string", "enum": ["queued", "success", "failed"]},
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+    ],
+    ids=["read-enum-rejected-by-update", "equal-enums-echoed"],
+)
+def test_update_echo_checks_update_enum_behind_reference(ctx, version, update_version, read_version, expected):
+    _, graph = analyze_dependencies(
+        ctx,
+        versioned_item_paths(version=update_version, read=versioned_item_reading(read_version)),
+        version=version,
+        components={"schemas": {"UpdateState": {"type": "string", "enum": ["queued", "success", "failed"]}}},
+    )
+    assert inferred_links(graph) == expected
+
+
+@pytest.mark.parametrize(
+    ("update_version", "expected"),
+    [
+        (
+            {"type": "string", "enum": ["queued", "success", None], "allOf": [{"type": "string", "nullable": True}]},
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {"type": "string", "enum": ["queued", "success", None], "allOf": [component_ref("NullableString")]},
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {"type": "string", "enum": ["queued", "success", None], "allOf": [component_ref("NullableValue")]},
+            [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {
+                "type": "string",
+                "nullable": True,
+                "enum": ["queued", "success", None],
+                "allOf": [component_ref("NullableString")],
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {"type": "string", "nullable": True, "enum": ["queued", "success", None], "allOf": [{"type": "string"}]},
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        ({"type": "string", **component_ref("StateWithNull")}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        (
+            {"type": "string", "nullable": True, **component_ref("StateWithNull")},
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+    ],
+    ids=[
+        "nullable-branch-under-non-null-update",
+        "referenced-nullable-branch-under-non-null-update",
+        "referenced-untyped-nullable-branch-under-non-null-update",
+        "nullable-update-with-nullable-branch-echoed",
+        "nullable-update-with-non-null-branch-echoed",
+        "update-reference-enum-null-outside-type",
+        "nullable-next-to-update-reference-echoed",
+    ],
+)
+def test_update_echo_accepts_null_only_where_every_all_of_branch_does(ctx, update_version, expected):
+    _, graph = analyze_dependencies(
+        ctx,
+        versioned_item_paths(
+            version=update_version,
+            read=versioned_item_reading({"type": "string", "enum": ["queued", None], "nullable": True}),
+        ),
+        components={
+            "schemas": {
+                "NullableString": {"type": "string", "nullable": True},
+                "NullableValue": {"nullable": True},
+                "StateWithNull": {"type": "string", "enum": ["queued", "success", None]},
             }
         },
     )
