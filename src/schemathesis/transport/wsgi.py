@@ -205,6 +205,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             content=content,
             request=requests.Request(**requests_kwargs).prepare(),
             elapsed=elapsed,
+            message=response.status.partition(" ")[2],
+            encoding=response.mimetype_params.get("charset"),
             verify=False,
             stream_cut_short=stream_cut_short,
             _override=Override.from_send_kwargs(kwargs),
