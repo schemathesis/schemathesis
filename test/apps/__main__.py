@@ -19,17 +19,36 @@ import importlib
 import inspect
 import pkgutil
 import sys
+from collections.abc import Callable
 from functools import partial
+from types import ModuleType
 
 from test.apps.catalog import openapi as openapi_catalog
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import envelopes
 from test.apps.catalog.openapi.envelopes import Envelope
-from test.apps.runtime import OpenAPIApp
+from test.apps.runtime import GraphQLApp, OpenAPIApp
+
+
+def _factories(module: ModuleType) -> dict[str, Callable[[], OpenAPIApp | GraphQLApp]]:
+    # Factories that need no arguments; the rest get explicit entries.
+    return {
+        name: value
+        for name, value in vars(module).items()
+        if inspect.isfunction(value)
+        and value.__module__ == module.__name__
+        and not name.startswith("_")
+        and all(
+            parameter.default is not parameter.empty
+            or parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
+            for parameter in inspect.signature(value).parameters.values()
+        )
+    }
+
 
 # Every catalog module; envelopes take an argument, so they get their own entries below.
-_OPENAPI_MODULES = {
-    module.name: importlib.import_module(f"{openapi_catalog.__name__}.{module.name}")
+_OPENAPI_FACTORIES = {
+    module.name: _factories(importlib.import_module(f"{openapi_catalog.__name__}.{module.name}"))
     for module in pkgutil.iter_modules(openapi_catalog.__path__)
     if not module.ispkg and module.name != "envelopes"
 }
@@ -43,16 +62,8 @@ _ENVELOPE_FACTORIES = {
     **{f"rails_{variant}": partial(envelopes.planted_bug, value) for variant, value in envelopes.RAILS.items()},
 }
 
-# Factories that need no arguments; the rest get explicit entries.
 _GRAPHQL_FACTORIES = {
-    **{
-        name: value
-        for name, value in vars(graphql_bookstore).items()
-        if inspect.isfunction(value)
-        and value.__module__ == graphql_bookstore.__name__
-        and not name.startswith("_")
-        and all(parameter.default is not parameter.empty for parameter in inspect.signature(value).parameters.values())
-    },
+    **_factories(graphql_bookstore),
     # Answers every query with no data, the shape of a server that never serves the query.
     "canned_response": partial(graphql_bookstore.canned_response, {"data": None}),
 }
@@ -73,26 +84,21 @@ def _resolve(name: str):
         module_name, factory_name = name.split(".", 1)
     else:
         module_name, factory_name = "basic", name
-    module = _OPENAPI_MODULES.get(module_name)
-    if module is None:
-        raise SystemExit(f"Unknown module: {module_name!r}. Choices: {sorted(_OPENAPI_MODULES)}")
-    factory = getattr(module, factory_name, None)
-    if factory is None or not callable(factory):
+    factories = _OPENAPI_FACTORIES.get(module_name)
+    if factories is None:
+        raise SystemExit(f"Unknown module: {module_name!r}. Choices: {sorted(_OPENAPI_FACTORIES)}")
+    factory = factories.get(factory_name)
+    if factory is None:
         raise SystemExit(f"Unknown factory {factory_name!r} in {module_name}")
     return factory
 
 
 def _list_factories() -> None:
     print("Available factories (default module is `basic`; use `<module>.<name>` for others):")
-    for module_name, module in _OPENAPI_MODULES.items():
-        names = sorted(
-            name
-            for name, value in vars(module).items()
-            if not name.startswith("_") and callable(value) and getattr(value, "__module__", None) == module.__name__
-        )
-        if names:
+    for module_name, factories in _OPENAPI_FACTORIES.items():
+        if factories:
             print(f"\n  {module_name}.*:")
-            for name in names:
+            for name in sorted(factories):
                 print(f"    {name}")
     print("\n  envelopes.*:")
     for name in sorted(_ENVELOPE_FACTORIES):

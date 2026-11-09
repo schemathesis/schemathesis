@@ -291,7 +291,7 @@ def test_warning_on_no_2xx_options_only(ctx, cli, snapshot_cli):
             },
         ),
     ],
-    ids=["default", "selected", "disabled-all", "disabled-operation", "enabled-operation", "fail-on-operation"],
+    ids=["default", "disabled-all", "selected", "disabled-operation", "enabled-operation", "fail-on-operation"],
 )
 def test_warning_on_all_not_found(ctx, cli, snapshot_cli, args, kwargs):
     api = ctx.openapi.apps.success_and_failure()

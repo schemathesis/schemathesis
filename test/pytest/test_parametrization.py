@@ -764,11 +764,12 @@ def test_hypothesis_settings_database_from_profile(testdir):
     # And @schema.parametrize() is used
     testdir.make_test(
         """
+import os
 import tempfile
 from hypothesis import settings as hyp_settings, database
 
-# Create a custom database in a temporary directory
-custom_db_path = tempfile.mkdtemp()
+# Create a custom database in a temporary directory inside the test's own directory
+custom_db_path = tempfile.mkdtemp(dir=os.getcwd())
 custom_db = database.DirectoryBasedExampleDatabase(custom_db_path)
 
 # Register and load the profile (derandomize=False is required when using a database)
@@ -798,12 +799,13 @@ def test_hypothesis_settings_decorator_database(testdir):
     # And @schema.parametrize() is used
     testdir.make_test(
         """
+import os
 import tempfile
 from hypothesis import settings as hyp_settings, database
 import pytest
 
-# Create a custom database in a temporary directory
-custom_db_path = tempfile.mkdtemp()
+# Create a custom database in a temporary directory inside the test's own directory
+custom_db_path = tempfile.mkdtemp(dir=os.getcwd())
 custom_db = database.DirectoryBasedExampleDatabase(custom_db_path)
 
 @schema.parametrize()
