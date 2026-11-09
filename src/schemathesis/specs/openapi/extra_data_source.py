@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
@@ -26,7 +27,11 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     build_nested_body,
     merge_request_body,
 )
-from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching, referenced_values
+from schemathesis.specs.openapi.stateful.dependencies.naming import (
+    normalize_for_matching,
+    referenced_values,
+    trailing_path_parameter,
+)
 from schemathesis.specs.openapi.utils import read_from_wire
 
 if TYPE_CHECKING:
@@ -843,14 +848,18 @@ class OpenApiExtraDataSource(ExtraDataSource):
         variant_key = jsonschema_rs.canonical.json.to_string(plain_str_values(resource_params))
         self.usage_tracker.record_successful_delete(variant_key)
 
-        # Tombstone + evict the deleted resource: subsequent pool draws skip it, and the
-        # underlying entries no longer linger in the repository.
-        for param_name, param_value in case.path_parameters.items():
-            requirement = self.requirements.get((operation.label, ParameterLocation.PATH, param_name))
-            if requirement is None:
-                continue
-            try:
-                self._tombstoned.add((requirement.resource_name, param_value))
-            except TypeError:  # unhashable value (e.g. list); fall through, eviction still runs
-                pass
-            self.repository.remove_by_value(requirement.resource_name, param_value)
+        # Tombstone + evict the resource named by the trailing path parameter, also before a format suffix like `.json`:
+        # later pool draws skip it and the repository drops it, while its parents outlive the deletion.
+        name = trailing_path_parameter(re.sub(r"\.\w+$", "", operation.path.rstrip("/")))
+        if name is None or name not in case.path_parameters:
+            return
+        requirement = self.requirements.get((operation.label, ParameterLocation.PATH, name))
+        if requirement is None:
+            return
+        value = case.path_parameters[name]
+        try:
+            self._tombstoned.add((requirement.resource_name, value))
+        except TypeError:
+            # An unhashable value (e.g. a list) is not tombstoned; eviction still runs.
+            pass
+        self.repository.remove_by_value(requirement.resource_name, requirement.resource_field, value)
