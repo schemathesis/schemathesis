@@ -23,6 +23,7 @@ from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies.naming import (
     KeyKind,
+    collection_path,
     from_path,
     key_kind,
     normalize_for_matching,
@@ -58,6 +59,8 @@ class DependencyGraph:
                     del input["is_parent_key"]
                 del input["is_named_after_collection"]
                 del input["body_path"]
+                del input["item_fields"]
+                del input["is_inline_item"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
@@ -215,10 +218,7 @@ class DependencyGraph:
                                 )
                             ):
                                 continue
-                            pointer = output_slot.pointer
-                            if output_slot.cardinality == Cardinality.MANY:
-                                pointer = pointer.rstrip("/") + "/*"
-                            value_expr = f"$response.body#{pointer}"
+                            value_expr = f"$response.body#{item_pointer(output_slot.pointer, output_slot.cardinality)}"
                         elif input_slot.resource_field is not None:
                             # A name filter's prefix says whose name it takes (`owner_name`); other names are wrong.
                             if (
@@ -260,8 +260,32 @@ class DependencyGraph:
                                 )
                                 value_expr = f"$response.body#{body_pointer}"
                         else:
+                            if input_slot.item_fields is not None:
+                                source_fields = (
+                                    output_slot.resource.fields
+                                    if output_slot.response_fields is None
+                                    else output_slot.response_fields
+                                )
+                                # An item taking no object, or sharing no field with the resource, is something else.
+                                if not input_slot.item_fields or (
+                                    source_fields and input_slot.item_fields.isdisjoint(source_fields)
+                                ):
+                                    continue
+                            if input_slot.is_inline_item:
+                                # An inline item is named after its path, so a namesake from another collection differs;
+                                # an item of the collection and the collection nested under a parent are the same.
+                                producer_collection = stripped_paths[producer_id].rstrip("/") or "/"
+                                if trailing_path_parameter(producer_collection) is not None:
+                                    producer_collection = collection_path(producer_collection) or "/"
+                                consumer_collection = stripped_paths[consumer_id].rstrip("/") or "/"
+                                if output_slot.resource.name == path_resource_names[producer_id] and not (
+                                    f"{producer_collection}/".startswith(f"{consumer_collection}/")
+                                    or producer_collection.endswith(consumer_collection)
+                                    or consumer_collection.endswith(producer_collection)
+                                ):
+                                    continue
                             # No resource field means use the whole resource
-                            value_expr = f"$response.body#{output_slot.pointer}"
+                            value_expr = f"$response.body#{item_pointer(output_slot.pointer, output_slot.cardinality)}"
                         if value_expr.startswith("$response.body") and output_slot.status_code in ("204", "205"):
                             # These statuses forbid a body, whatever the schema declares.
                             continue
@@ -836,6 +860,13 @@ def _merge_nested_body(target: dict[str, Any], source: dict[str, Any]) -> None:
             target[key] = value
 
 
+def item_pointer(base: str, cardinality: Cardinality) -> str:
+    """Pointer to one item at `base`, any element when `base` holds a collection."""
+    if cardinality == Cardinality.MANY:
+        return base.rstrip("/") + "/*"
+    return base
+
+
 def extend_pointer(base: str, field: str, parent_cardinality: Cardinality) -> str:
     if not base.endswith("/"):
         base += "/"
@@ -996,6 +1027,10 @@ class InputSlot:
     body_path: BodyPath = ()
     # Whether only the field's name ties it to the collection (`part`), not an identifier suffix (`part_id`)
     is_named_after_collection: bool = False
+    # Fields a top-level array item declares, empty for an item taking no object; `None` for any object
+    item_fields: frozenset[str] | None = None
+    # Whether this input is a top-level array item declared inline rather than as a named schema
+    is_inline_item: bool = False
 
 
 @dataclass(slots=True)

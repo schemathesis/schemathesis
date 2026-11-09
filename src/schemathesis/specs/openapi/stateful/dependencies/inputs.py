@@ -367,6 +367,37 @@ def _is_scalar(schema: JsonSchema) -> bool:
     return isinstance(schema, dict) and bool(_SCALAR_TYPES & set(get_type(schema)))
 
 
+def _takes_object(schema: object, bundled: dict[str, JsonSchema], seen: frozenset[str] = frozenset()) -> bool:
+    if not isinstance(schema, dict):
+        return schema is not False
+    if "object" not in get_type(schema) or ("const" in schema and not isinstance(schema["const"], dict)):
+        return False
+    values = schema.get("enum")
+    if isinstance(values, list) and not any(isinstance(value, dict) for value in values):
+        return False
+    negated = schema.get("not")
+    if isinstance(negated, dict) and set(negated) <= {"type"} and "object" in get_type(negated):
+        return False
+    reference = schema.get("$ref")
+    if isinstance(reference, str) and reference not in seen:
+        target = bundled.get(reference.rsplit("/", 1)[-1])
+        if target is not None and not _takes_object(target, bundled, seen | {reference}):
+            return False
+    for key in ("anyOf", "oneOf"):
+        branches = schema.get(key)
+        if isinstance(branches, list) and not any(_takes_object(branch, bundled, seen) for branch in branches):
+            return False
+    branches = schema.get("allOf")
+    return not isinstance(branches, list) or all(_takes_object(branch, bundled, seen) for branch in branches)
+
+
+def _item_fields(items: dict[str, Any], bundled: dict[str, JsonSchema]) -> frozenset[str] | None:
+    if not _takes_object(items, bundled):
+        return frozenset()
+    properties, _ = _flatten_composition(items, bundled)
+    return frozenset(properties) or None
+
+
 def _resolve_body_dependencies(
     *,
     body: OpenApiBody,
@@ -407,6 +438,8 @@ def _resolve_body_dependencies(
                 resource_field=field,
                 parameter_name=0,
                 parameter_location=ParameterLocation.BODY,
+                item_fields=_item_fields(items, bundled),
+                is_inline_item=not isinstance(items.get("$ref"), str),
             )
 
     # Inspect each property that could be a part of some other resource.
