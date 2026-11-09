@@ -2386,12 +2386,26 @@ def iter_parameters_v3(
             )
 
 
+# Keywords ending a pointer to a schema without a name of its own: `.../orders/items`.
+_SUBSCHEMA_KEYWORDS = frozenset({"items", "additionalProperties", "schema"})
+# Each member of these lists describes its own value: `oneOf/0` and `oneOf/1` are different schemas.
+_SUBSCHEMA_LISTS = frozenset({"allOf", "anyOf", "oneOf", "prefixItems"})
+# Maps keyed by author-chosen names: `properties/items` is a property called `items`.
+_NAMED_MEMBERS = frozenset({"properties", "definitions", "schemas", "$defs"})
+
+
 def resource_name_from_ref(reference: str) -> str:
-    """Extract and normalize resource name from a $ref."""
+    """Resource name for a $ref: the normalized schema name, or the pointer itself for an unnamed subschema."""
     from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_schema_name
 
-    raw_name = reference.rsplit("/", maxsplit=1)[-1]
-    return normalize_schema_name(raw_name)
+    parent, _, last = reference.rpartition("/")
+    container = parent.rpartition("/")[2]
+    if (last in _SUBSCHEMA_KEYWORDS and container not in _NAMED_MEMBERS) or (
+        last.isdigit() and container in _SUBSCHEMA_LISTS
+    ):
+        # Keywords and list positions name nothing; the pointer to them tells unrelated schemas apart.
+        return unquote(reference)
+    return normalize_schema_name(last)
 
 
 def build_path_parameter_v2(kwargs: Mapping[str, Any]) -> OpenApiParameter:

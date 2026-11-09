@@ -7,6 +7,7 @@
 - Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
+- Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
