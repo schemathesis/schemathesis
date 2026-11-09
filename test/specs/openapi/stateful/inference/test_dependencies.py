@@ -4979,6 +4979,423 @@ def test_top_level_array_body_links_every_fk_field_of_its_items(ctx):
     ]
 
 
+@pytest.mark.parametrize(
+    ["list_schema", "items_pointer"],
+    [
+        ({"type": "array", "items": component_ref("Warehouse")}, "/*"),
+        (
+            {"type": "object", "properties": {"data": {"type": "array", "items": component_ref("Warehouse")}}},
+            "/data/*",
+        ),
+    ],
+    ids=["bare", "enveloped"],
+)
+def test_top_level_array_body_takes_one_item_of_a_list_response(ctx, list_schema, items_pointer):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("get", "/warehouses", "200", list_schema),
+            **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id", "integer")]),
+            **operation_with_body(
+                "post", "/warehouses/batch", "200", {"type": "array", "items": component_ref("Warehouse")}
+            ),
+        },
+        components={
+            "schemas": {
+                "Warehouse": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+            }
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1warehouses/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1warehouses~1{id}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.id": f"$response.body#{items_pointer}/id"},
+            },
+        ],
+        [
+            "#/paths/~1warehouses/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1warehouses~1batch/post",
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                "requestBody": [f"$response.body#{items_pointer}"],
+            },
+        ],
+        [
+            "#/paths/~1warehouses~1{id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1warehouses~1batch/post",
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                "requestBody": ["$response.body#/"],
+            },
+        ],
+    ]
+
+
+def inline_object(*names):
+    return {"type": "object", "properties": {name: {"type": "string"} for name in names}}
+
+
+WAREHOUSE_SCHEMAS = {
+    "Warehouse": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+}
+
+
+@pytest.mark.parametrize(
+    ["list_items", "items", "schemas", "takes_item"],
+    [
+        (component_ref("Warehouse"), component_ref("Warehouse"), WAREHOUSE_SCHEMAS, True),
+        (
+            component_ref("WarehouseOutput"),
+            component_ref("WarehouseInput"),
+            {"WarehouseOutput": inline_object("id", "name"), "WarehouseInput": inline_object("name", "region")},
+            True,
+        ),
+        (
+            component_ref("WarehouseOutput"),
+            component_ref("WarehouseInput"),
+            {"WarehouseOutput": inline_object("id", "slug"), "WarehouseInput": inline_object("title", "color")},
+            False,
+        ),
+        (
+            component_ref("WarehouseOutput"),
+            {"allOf": [component_ref("WarehouseInput")]},
+            {"WarehouseOutput": inline_object("id", "slug"), "WarehouseInput": inline_object("title", "color")},
+            False,
+        ),
+        (component_ref("Warehouse"), {"allOf": [component_ref("Warehouse")]}, WAREHOUSE_SCHEMAS, True),
+        (inline_object("id", "name"), component_ref("Warehouse"), WAREHOUSE_SCHEMAS, True),
+        (
+            inline_object("id", "name"),
+            component_ref("Warehouse"),
+            {"Warehouse": inline_object("label", "color")},
+            False,
+        ),
+        (inline_object("id", "name"), component_ref("Warehouse"), {"Warehouse": True}, True),
+        (
+            component_ref("Warehouse"),
+            {"type": "object", "properties": {"name": {"type": "string"}, "region": {"type": "string"}}},
+            WAREHOUSE_SCHEMAS,
+            True,
+        ),
+        (component_ref("Warehouse"), {"type": "object"}, WAREHOUSE_SCHEMAS, True),
+        (component_ref("Warehouse"), {"not": {"type": "string"}}, WAREHOUSE_SCHEMAS, True),
+        (
+            component_ref("Warehouse"),
+            {"anyOf": [inline_object("name"), {"type": "string"}]},
+            WAREHOUSE_SCHEMAS,
+            True,
+        ),
+        ({"type": "object"}, {"type": "object", "properties": {"name": {"type": "string"}}}, WAREHOUSE_SCHEMAS, True),
+        ({"type": "integer"}, {"type": "integer"}, WAREHOUSE_SCHEMAS, True),
+        (component_ref("Warehouse"), {"type": "integer"}, WAREHOUSE_SCHEMAS, False),
+        (inline_object("id", "name"), component_ref("Warehouse"), {"Warehouse": {"type": "string"}}, False),
+        (
+            inline_object("id", "name"),
+            {"allOf": [component_ref("Warehouse")]},
+            {"Warehouse": {"type": "string"}},
+            False,
+        ),
+        (
+            component_ref("Warehouse"),
+            {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+            WAREHOUSE_SCHEMAS,
+            False,
+        ),
+        (component_ref("Warehouse"), {"enum": ["north", "south"]}, WAREHOUSE_SCHEMAS, False),
+        (component_ref("Warehouse"), {"not": {"type": "object"}}, WAREHOUSE_SCHEMAS, False),
+        (
+            component_ref("Warehouse"),
+            {"type": "object", "properties": {"op": {"type": "string"}, "path": {"type": "string"}}},
+            WAREHOUSE_SCHEMAS,
+            False,
+        ),
+    ],
+    ids=[
+        "ref",
+        "ref-output-into-ref-input-shared-field",
+        "ref-output-into-ref-input-no-shared-field",
+        "ref-output-into-all-of-ref-input-no-shared-field",
+        "all-of-ref",
+        "inline-list-into-ref",
+        "inline-list-into-ref-no-shared-field",
+        "inline-list-into-ref-to-any-value",
+        "inline-shared-field",
+        "any-object",
+        "anything-but-a-scalar",
+        "any-of-object-or-scalar",
+        "fieldless-list",
+        "scalar-list-into-scalar",
+        "object-into-scalar",
+        "object-into-ref-scalar",
+        "object-into-all-of-ref-scalar",
+        "object-into-any-of-scalars",
+        "object-into-enum-of-scalars",
+        "object-into-anything-but-an-object",
+        "inline-no-shared-field",
+    ],
+)
+def test_top_level_array_body_takes_a_list_item_only_when_its_items_accept_it(
+    ctx, list_items, items, schemas, takes_item
+):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/warehouses": {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": list_items})["/warehouses"],
+                **operation_with_body("post", "/warehouses", "200", {"type": "array", "items": items})["/warehouses"],
+            }
+        },
+        components={"schemas": schemas},
+    )
+    link = [
+        "#/paths/~1warehouses/get",
+        "200",
+        {
+            "operationRef": "#/paths/~1warehouses/post",
+            "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            "requestBody": ["$response.body#/*"],
+        },
+    ]
+    assert inferred_links(graph) == ([link] if takes_item else [])
+
+
+@pytest.mark.parametrize(
+    ["paths", "expected"],
+    [
+        (
+            {
+                **operation(
+                    "get",
+                    "/warehouses/{id}",
+                    "200",
+                    {"type": "object", "properties": {"data": inline_object("id", "name")}},
+                    [path_param("id")],
+                ),
+                **operation_with_body("post", "/warehouses", "200", {"type": "array", "items": inline_object("name")}),
+            },
+            [
+                [
+                    "#/paths/~1warehouses~1{id}/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1warehouses/post",
+                        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                        "requestBody": ["$response.body#/data"],
+                    },
+                ]
+            ],
+        ),
+        (
+            {
+                **operation(
+                    "get",
+                    "/depots/{depot_id}/warehouses",
+                    "200",
+                    {"type": "array", "items": inline_object("id", "name")},
+                    [path_param("depot_id")],
+                ),
+                **operation_with_body("post", "/warehouses", "200", {"type": "array", "items": inline_object("name")}),
+            },
+            [
+                [
+                    "#/paths/~1depots~1{depot_id}~1warehouses/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1warehouses/post",
+                        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                        "requestBody": ["$response.body#/*"],
+                    },
+                ]
+            ],
+        ),
+        (
+            {
+                **operation(
+                    "get",
+                    "/depots/{depot_id}/warehouses/{id}",
+                    "200",
+                    {"type": "object", "properties": {"data": inline_object("id", "name")}},
+                    [path_param("depot_id"), path_param("id")],
+                ),
+                **operation_with_body("post", "/warehouses", "200", {"type": "array", "items": inline_object("name")}),
+            },
+            [
+                [
+                    "#/paths/~1depots~1{depot_id}~1warehouses~1{id}/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1warehouses/post",
+                        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                        "requestBody": ["$response.body#/data"],
+                    },
+                ]
+            ],
+        ),
+        (
+            {
+                **operation(
+                    "get",
+                    "/warehouses/{id}",
+                    "200",
+                    {"type": "object", "properties": {"data": inline_object("id", "name")}},
+                    [path_param("id")],
+                ),
+                **operation_with_body(
+                    "post",
+                    "/depots/{depot_id}/warehouses",
+                    "200",
+                    {"type": "array", "items": inline_object("name")},
+                    parameters=[path_param("depot_id")],
+                ),
+            },
+            [
+                [
+                    "#/paths/~1warehouses~1{id}/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1depots~1{depot_id}~1warehouses/post",
+                        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                        "requestBody": ["$response.body#/data"],
+                    },
+                ]
+            ],
+        ),
+        (
+            {
+                **operation("post", "/devices/import", "200", {"type": "array", "items": inline_object("mac", "name")}),
+                **operation_with_body(
+                    "post", "/assets/import", "200", {"type": "array", "items": inline_object("mac", "name")}
+                ),
+            },
+            [],
+        ),
+        (
+            {
+                **operation("post", "/devices/import", "200", {"type": "array", "items": inline_object("mac", "name")}),
+                **operation_with_body("post", "/assets/import", "200", {"type": "array", "items": {"type": "object"}}),
+            },
+            [],
+        ),
+        (
+            {
+                **operation(
+                    "get",
+                    "/depots/{depot_id}/warehouses",
+                    "200",
+                    {"type": "array", "items": inline_object("id", "name")},
+                    [path_param("depot_id")],
+                ),
+                **operation_with_body("post", "/warehouses", "200", {"type": "array", "items": {"type": "object"}}),
+            },
+            [
+                [
+                    "#/paths/~1depots~1{depot_id}~1warehouses/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1warehouses/post",
+                        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                        "requestBody": ["$response.body#/*"],
+                    },
+                ]
+            ],
+        ),
+        (
+            {
+                **operation("get", "/jobs", "200", {"type": "array", "items": inline_object("id", "name")}),
+                **operation_with_body(
+                    "put",
+                    "/jobs/{id}",
+                    "200",
+                    {"type": "array", "items": inline_object("id", "name", "size")},
+                    parameters=[path_param("id")],
+                ),
+            },
+            [
+                [
+                    "#/paths/~1jobs/get",
+                    "200",
+                    {
+                        "operationRef": "#/paths/~1jobs~1{id}/put",
+                        "x-schemathesis": {"is_inferred": True},
+                        "parameters": {"path.id": "$response.body#/*/id"},
+                    },
+                ]
+            ],
+        ),
+    ],
+    ids=[
+        "item-of-the-collection",
+        "collection-under-a-parent",
+        "item-of-the-collection-under-a-parent",
+        "item-into-the-collection-under-a-parent",
+        "same-action-on-another-collection",
+        "any-object-into-the-same-action-on-another-collection",
+        "any-object-from-the-collection-under-a-parent",
+        "parent-collection",
+    ],
+)
+def test_inline_array_items_take_a_whole_resource_only_from_their_own_collection(ctx, paths, expected):
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == expected
+
+
+@pytest.mark.parametrize(
+    ("producer", "producer_parameters", "consumer", "consumer_parameters", "is_linked"),
+    [
+        ("/warehouses/{id}/", ["id"], "/warehouses/", [], True),
+        ("/depots/{depot_id}/warehouses/{id}/", ["depot_id", "id"], "/warehouses/", [], True),
+        ("/warehouses/{id}/", ["id"], "/depots/{depot_id}/warehouses/", ["depot_id"], True),
+        ("/devices/{id}/", ["id"], "/warehouses/", [], False),
+    ],
+    ids=[
+        "item-of-the-collection",
+        "item-of-the-collection-under-a-parent",
+        "item-into-the-collection-under-a-parent",
+        "item-of-another-collection",
+    ],
+)
+def test_inline_array_items_take_a_whole_resource_from_their_own_collection_behind_trailing_slashes(
+    ctx, producer, producer_parameters, consumer, consumer_parameters, is_linked
+):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation(
+                "get",
+                producer,
+                "200",
+                {"type": "object", "properties": {"data": inline_object("id", "name")}},
+                [path_param(name) for name in producer_parameters],
+            ),
+            **operation_with_body(
+                "post",
+                consumer,
+                "200",
+                {"type": "array", "items": inline_object("name")},
+                parameters=[path_param(name) for name in consumer_parameters],
+            ),
+        },
+    )
+    expected = [
+        [
+            f"#/paths/{producer.replace('/', '~1')}/get",
+            "200",
+            {
+                "operationRef": f"#/paths/{consumer.replace('/', '~1')}/post",
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+                "requestBody": ["$response.body#/data"],
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (expected if is_linked else [])
+
+
 def nested_object(name, schema):
     return {"type": "object", "properties": {name: schema}}
 

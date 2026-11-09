@@ -23,6 +23,7 @@
 - Missing links for body fields and query filters named after a resource, e.g. `part`, `?company=`.
 - Links filling path parameters from `writeOnly` response fields behind `$ref` or marked `x-writeOnly`.
 - Missing links for responses naming the resource id `pk`, as in Django REST Framework.
+- Links sending a whole list or an unrelated object as an array request body item.
 - Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.
 - Links copying a fetched value into an update body field whose `$ref` enum rejects it.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
