@@ -77,7 +77,14 @@ from schemathesis.core.jsonschema.patterns import (
     pin_pattern_length,
 )
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference_with_uri
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type, to_json_type_name
+from schemathesis.core.jsonschema.types import (
+    ANY_TYPE,
+    JsonSchema,
+    JsonSchemaObject,
+    JsonValue,
+    get_type,
+    to_json_type_name,
+)
 from schemathesis.core.parameters import EXTRA_PROPERTY_LOCATIONS, HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone, jsonify_python_specific_types
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -2904,19 +2911,11 @@ def is_valid_for_others(
             continue
         if validator.is_valid(value):
             return True
-        # In serialized contexts (multipart, form-urlencoded, path/query/header), non-string
-        # values are converted via str() before transmission. Only skip if the other branch
-        # explicitly requires string type — schemas without a type constraint accept strings
-        # vacuously (e.g. `minimum` doesn't apply to strings), which would be a false match.
+        # Form values travel as str(); a branch without a declared type accepts any string vacuously, so it can't count.
         if will_be_serialized_to_string and not isinstance(value, str) and schemas is not None:
-            other = schemas[vidx]
-            if isinstance(other, dict):
-                explicit_type = other.get("type")
-                has_string = explicit_type == "string" or (
-                    isinstance(explicit_type, list) and "string" in explicit_type
-                )
-                if has_string and validator.is_valid(str(value)):
-                    return True
+            admitted = parameter_types(schemas[vidx])
+            if "string" in admitted and admitted != ANY_TYPE and validator.is_valid(str(value)):
+                return True
     return False
 
 
