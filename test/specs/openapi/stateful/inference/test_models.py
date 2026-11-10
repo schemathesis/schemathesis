@@ -214,14 +214,20 @@ _LIST_CONFIGS = {
 
 # `/brokers/-/configs` shares its response with `/brokers/{broker_id}/configs` but has no `{broker_id}` to forward.
 @pytest.mark.parametrize(
-    ("owner_response", "shared_response", "components"),
+    ("owner_response", "shared_response", "components", "owner_broker_id"),
     [
         (
             {"$ref": "#/components/responses/ListConfigs"},
             {"$ref": "#/components/responses/ListConfigs"},
             {"responses": {"ListConfigs": _LIST_CONFIGS}},
+            "$request.path.broker_id",
         ),
-        (_LIST_CONFIGS, {"$ref": "#/paths/~1brokers~1{broker_id}~1configs/get/responses/200"}, {}),
+        (
+            _LIST_CONFIGS,
+            {"$ref": "#/paths/~1brokers~1{broker_id}~1configs/get/responses/200"},
+            {},
+            "$request.path.broker_id",
+        ),
         (
             {"$ref": "#/components/responses/ListConfigs"},
             {"$ref": "#/components/responses/ListConfigs"},
@@ -234,12 +240,22 @@ _LIST_CONFIGS = {
                 },
                 "mediaTypes": {"Configs": _LIST_CONFIGS["content"]["application/json"]},
             },
+            "$request.path.broker_id",
+        ),
+        (
+            {"$ref": "responses.json#/ListConfigs"},
+            {"$ref": "responses.json#/ListConfigs"},
+            {},
+            "$response.body#/data/*/broker_id",
         ),
     ],
-    ids=["component", "inline", "component-with-media-type-reference"],
+    ids=["component", "inline", "component-with-media-type-reference", "other-file"],
 )
-def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_response, shared_response, components):
-    schema = ctx.openapi.load_schema(
+def test_inject_links_keeps_links_off_operations_sharing_a_response(
+    ctx, owner_response, shared_response, components, owner_broker_id
+):
+    ctx.makefile({"ListConfigs": _LIST_CONFIGS}, filename="responses")
+    path = ctx.openapi.write_schema(
         {
             "/brokers/{broker_id}/configs": {
                 "get": {"parameters": _path_param("broker_id"), "responses": {"200": owner_response}}
@@ -258,20 +274,20 @@ def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_r
         components=components,
         version="3.2.0",
     )
+    schema = schemathesis.openapi.from_path(str(path))
     inject_links(schema)
 
-    paths = schema.raw_schema["paths"]
     get_config = "#/paths/~1brokers~1{broker_id}~1configs~1{name}/get"
     list_all = {"operationRef": "#/paths/~1brokers~1-~1configs/get"}
-    assert paths["/brokers/{broker_id}/configs"]["get"]["responses"]["200"]["links"] == {
+    assert dict(schema["/brokers/{broker_id}/configs"]["GET"].responses.get("200").iter_links()) == {
         "ListAllConfigs": list_all,
         "GetConfig": {
             "operationRef": get_config,
             "x-schemathesis": {"is_inferred": True},
-            "parameters": {"path.name": "$response.body#/data/*/name", "path.broker_id": "$request.path.broker_id"},
+            "parameters": {"path.name": "$response.body#/data/*/name", "path.broker_id": owner_broker_id},
         },
     }
-    assert paths["/brokers/-/configs"]["get"]["responses"]["200"]["links"] == {
+    assert dict(schema["/brokers/-/configs"]["GET"].responses.get("200").iter_links()) == {
         "ListAllConfigs": list_all,
         "GetConfig": {
             "operationRef": get_config,
@@ -280,6 +296,38 @@ def test_inject_links_keeps_links_off_operations_sharing_a_response(ctx, owner_r
                 "path.name": "$response.body#/data/*/name",
                 "path.broker_id": "$response.body#/data/*/broker_id",
             },
+        },
+    }
+
+
+def test_inject_links_copies_path_parameters_every_operation_sharing_a_response_has(ctx):
+    ctx.makefile({"ListConfigs": _LIST_CONFIGS}, filename="responses")
+    list_configs = {
+        "get": {"parameters": _path_param("broker_id"), "responses": {"200": {"$ref": "responses.json#/ListConfigs"}}}
+    }
+    path = ctx.openapi.write_schema(
+        {
+            "/brokers/{broker_id}/configs": list_configs,
+            "/brokers/{broker_id}/archived-configs": list_configs,
+            "/brokers/-/configs": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/brokers/{broker_id}/configs/{name}": {
+                "get": {
+                    "parameters": _path_param("broker_id") + _path_param("name"),
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_path(str(path))
+    inject_links(schema)
+
+    assert dict(schema["/brokers/{broker_id}/archived-configs"]["GET"].responses.get("200").iter_links()) == {
+        "ListAllConfigs": {"operationRef": "#/paths/~1brokers~1-~1configs/get"},
+        "GetConfig": {
+            "operationRef": "#/paths/~1brokers~1{broker_id}~1configs~1{name}/get",
+            "x-schemathesis": {"is_inferred": True},
+            "parameters": {"path.name": "$response.body#/data/*/name", "path.broker_id": "$request.path.broker_id"},
         },
     }
 
