@@ -24,6 +24,7 @@ from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.failure_codes import get_failure_class
+from schemathesis.pytest._keys import _WORKER_AFTER_RUN_FAILURES_KEY
 from schemathesis.pytest.reporting import PYTEST_FORMATS, PytestReportOutcome, open_writers
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
@@ -46,6 +47,8 @@ if TYPE_CHECKING:
 _XDIST_WRITERS_KEY: pytest.StashKey[dict[str, dict]] = pytest.StashKey()
 # Key used in xdist workeroutput to pass serialized recorders from workers to the controller
 SCHEMATHESIS_RECORDERS_KEY = "schemathesis_recorders"
+# Key used in xdist workeroutput to pass formatted `after_run` failures from workers to the controller
+SCHEMATHESIS_AFTER_RUN_FAILURES_KEY = "schemathesis_after_run_failures"
 # Key used in xdist workerinput to pass the run seed from the controller to workers
 SCHEMATHESIS_SEED_KEY = "schemathesis_seed"
 
@@ -388,6 +391,9 @@ class XdistReportingPlugin:
             if schema_id not in stash:
                 stash[schema_id] = {"writer_config": payload["writer_config"], "records": []}
             stash[schema_id]["records"].extend(payload["records"])
+        node.config.stash.setdefault(_WORKER_AFTER_RUN_FAILURES_KEY, []).extend(
+            workeroutput.get(SCHEMATHESIS_AFTER_RUN_FAILURES_KEY, [])
+        )
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
         try:

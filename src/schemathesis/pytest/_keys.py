@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 
 # Keyed by `id(schema)` for O(1) dedup.
 _PYTEST_SCHEMAS_KEY: pytest.StashKey[dict] = pytest.StashKey()
+# Formatted `after_run` failures that pytest-xdist workers sent to the controller.
+_WORKER_AFTER_RUN_FAILURES_KEY: pytest.StashKey[list[str]] = pytest.StashKey()
 
 
 def track_schema(config: pytest.Config, schema: BaseSchema) -> None:
