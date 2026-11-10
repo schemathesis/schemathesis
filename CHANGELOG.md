@@ -42,6 +42,7 @@
 - Links reading values from map properties named after the path, e.g. `tags` in `PATCH /orders/{id}/tags`.
 - `st replay` dropping recorded fields in top-level array request bodies next to linked ones.
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
+- Links learned from `Location` headers or body URLs reaching other operations sharing a `$ref` response.
 - Coverage and examples phases sending requests without credentials learned by auth inference.
 - Stateful testing failing when operations share a response defined in another file.
 - gRPC error details in `grpc-status-details-bin` shown as `<EMPTY>` in failure output.

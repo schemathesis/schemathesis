@@ -411,6 +411,12 @@ def _is_word_run(text: str, words: list[str]) -> bool:
     )
 
 
+def unshare_responses(schema: OpenApiSchema) -> None:
+    _unshare_responses(schema)
+    # Operations built earlier still point at the response definitions that were just replaced
+    schema._operations.clear_cache()
+
+
 def inject_links(schema: OpenApiSchema) -> int:
     injected = 0
     # Shared by producers and targets; the same operations recur across thousands of links.

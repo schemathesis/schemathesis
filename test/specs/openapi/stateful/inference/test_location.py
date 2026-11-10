@@ -4,7 +4,7 @@ import pytest
 from flask import jsonify, request
 
 from schemathesis.core.transport import Response
-from schemathesis.engine.observations import LocationHeaderEntry, Observations
+from schemathesis.engine.observations import BodyUrlEntry, LocationHeaderEntry, Observations
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
@@ -926,6 +926,44 @@ def test_inferred_link_for_undocumented_response_reaches_state_machine(ctx, resp
         for link in transition.outgoing
     ] == [("201", "GET /users/{userId}")]
     assert (inference.inferred, inference.total, inference.selected) == (1, 1, 1)
+
+
+@pytest.mark.parametrize(
+    "created",
+    [lambda: {"$ref": "#/components/responses/Created"}, lambda: {"description": "Created"}],
+    ids=["shared", "inline"],
+)
+def test_learned_link_stays_with_operation_sharing_response(ctx, created):
+    item = {
+        "get": {
+            "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"responses": {"201": created()}}},
+            "/users/{id}": item,
+            "/admins": {"post": {"responses": {"201": created()}}},
+            "/admins/{id}": item,
+        },
+        components={"responses": {"Created": {"description": "Created"}}},
+    )
+    observations = Observations()
+    observations.location_headers[schema["/users"]["POST"]] = [LocationHeaderEntry(value="/users/1", status_code=201)]
+    observations.body_urls[schema["/admins"]["POST"]] = [
+        BodyUrlEntry(status_code=201, pointer="/href", value="/admins/1")
+    ]
+
+    inference = schema.apply_stateful_inference(observations)
+
+    state_machine = schema.as_state_machine()
+    assert sorted(
+        (link.source.label, link.status_code, link.target.label)
+        for transition in state_machine._transitions.operations.values()
+        for link in transition.outgoing
+    ) == [("POST /admins", "201", "GET /admins/{id}"), ("POST /users", "201", "GET /users/{id}")]
+    assert (inference.inferred, inference.total, inference.selected) == (2, 2, 2)
 
 
 @pytest.mark.parametrize(

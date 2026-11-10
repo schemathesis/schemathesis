@@ -58,6 +58,7 @@ class OpenAPIAnalysis:
     __slots__ = (
         "schema",
         "_links_injected",
+        "_responses_unshared",
         "_dependency_graph",
         "_dependency_layers",
         "_resource_descriptors",
@@ -71,6 +72,7 @@ class OpenAPIAnalysis:
     def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
         self._links_injected = False
+        self._responses_unshared = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
         self._dependency_layers: list[list[str]] | None | NotSet = NOT_SET
         self._resource_descriptors: Sequence[ResourceDescriptor] | None = None
@@ -211,6 +213,12 @@ class OpenAPIAnalysis:
         injected = dependencies.inject_links(self.schema)
         self._links_injected = True
         return injected
+
+    def unshare_responses(self) -> None:
+        """Give each operation its own copy of every response definition it shares with other operations."""
+        if not self._responses_unshared:
+            dependencies.unshare_responses(self.schema)
+            self._responses_unshared = True
 
     def iter_warnings(self) -> Iterator[SchemaWarning]:
         """Iterate over all cached schema warnings."""
