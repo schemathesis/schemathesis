@@ -29,6 +29,7 @@
 - Links treating array fields named like `customer_id` as a single identifier.
 - Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
 - No inferred links for responses whose schema lives in another file and references its siblings.
+- Links filling `*_name` header parameters with an unrelated `name` field.
 - Missing links and an internal error for response schemas with their own `$id` and `$defs`.
 - Missing links for body fields and query filters named after a resource, e.g. `part`, `?company=`.
 - Links filling path parameters from `writeOnly` response fields behind `$ref` or marked `x-writeOnly`.
