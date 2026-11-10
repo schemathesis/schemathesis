@@ -11489,38 +11489,111 @@ def test_identifier_parameters_take_primary_key_field(ctx):
     ]
 
 
-@pytest.mark.parametrize(
-    ("name", "schema", "expected"),
-    [
-        ("id", {"type": "integer"}, True),
-        ("groupId", {"type": "integer"}, True),
-        ("uuid", {"type": "string", "format": "uuid"}, False),
-        ("uid", {"type": "string", "format": "uuid"}, False),
-        ("groupUuid", {"type": "string", "format": "uuid"}, False),
-        ("groupGuid", {"type": "string", "format": "uuid"}, False),
-    ],
-    ids=["id", "prefixed-id", "uuid", "uid", "prefixed-uuid", "prefixed-guid"],
-)
-def test_only_id_parameters_take_integer_primary_key(ctx, name, schema, expected):
-    paths = {
-        **operation("post", "/groups", "201", component_ref("Group")),
-        **operation(
-            "get",
-            f"/groups/{{{name}}}",
-            "200",
-            parameters=[{"name": name, "in": "path", "required": True, "schema": schema}],
-        ),
-    }
+UUID = {"type": "string", "format": "uuid"}
 
-    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Group": PRIMARY_KEYED_PART}})
+
+@pytest.mark.parametrize(
+    ("component", "consumer_first"),
+    [("Group", False), ("Group", True), ("UserGroup", False)],
+    ids=["producer-first", "consumer-first", "suffix-named-producer"],
+)
+@pytest.mark.parametrize(
+    ("location", "name", "path", "schema", "properties", "field"),
+    [
+        ("path", "id", "/groups/{id}", INTEGER, {"pk": INTEGER}, "pk"),
+        ("path", "id", "/groups/{id}", UUID, {"pk": INTEGER}, None),
+        ("path", "id", "/groups/{id}", UUID, {"id": INTEGER}, None),
+        ("path", "id", "/groups/{id}", UUID, {"id": UUID}, "id"),
+        ("path", "id", "/groups/{id}", UUID, {"id": INTEGER, "uuid": UUID}, "uuid"),
+        ("path", "id", "/groups/{id}", UUID, {"pk": INTEGER, "uuid": UUID}, "uuid"),
+        ("path", "groupId", "/members/{groupId}", INTEGER, {"pk": INTEGER}, "pk"),
+        ("path", "groupId", "/members/{groupId}", UUID, {"pk": INTEGER}, None),
+        ("path", "group_id", "/members/{group_id}", INTEGER, {"pk": INTEGER}, "pk"),
+        ("path", "group_id", "/members/{group_id}", UUID, {"pk": INTEGER}, None),
+        ("query", "groupId", "/members", INTEGER, {"pk": INTEGER}, "pk"),
+        ("query", "groupId", "/members", UUID, {"pk": INTEGER}, None),
+        ("header", "group_id", "/members", INTEGER, {"pk": INTEGER}, "pk"),
+        ("header", "group_id", "/members", UUID, {"pk": INTEGER}, None),
+        ("path", "uuid", "/groups/{uuid}", UUID, {"id": UUID}, "id"),
+        ("path", "uuid", "/groups/{uuid}", UUID, {"id": INTEGER}, None),
+        ("path", "uuid", "/groups/{uuid}", UUID, {"pk": INTEGER}, None),
+        ("path", "uuid", "/groups/{uuid}", {**UUID, "pattern": "^[0-9a-f-]+$"}, {"id": INTEGER}, None),
+        ("path", "uid", "/groups/{uid}", UUID, {"pk": INTEGER}, None),
+        ("path", "groupUuid", "/groups/{groupUuid}", UUID, {"pk": INTEGER}, None),
+        ("path", "groupGuid", "/groups/{groupGuid}", UUID, {"pk": INTEGER}, None),
+    ],
+    ids=[
+        "id-integer-pk",
+        "id-uuid-integer-pk",
+        "id-uuid-integer-id",
+        "id-uuid-uuid-id",
+        "id-uuid-integer-id-beside-uuid",
+        "id-uuid-integer-pk-beside-uuid",
+        "prefixed-id-integer-pk",
+        "prefixed-id-uuid-integer-pk",
+        "snake-id-integer-pk",
+        "snake-id-uuid-integer-pk",
+        "query-integer-pk",
+        "query-uuid-integer-pk",
+        "header-integer-pk",
+        "header-uuid-integer-pk",
+        "uuid-uuid-id",
+        "uuid-integer-id",
+        "uuid-integer-pk",
+        "uuid-with-pattern-integer-id",
+        "uid-integer-pk",
+        "prefixed-uuid-integer-pk",
+        "prefixed-guid-integer-pk",
+    ],
+)
+def test_identifier_parameters_take_fields_their_format_accepts(
+    ctx, location, name, path, schema, properties, field, component, consumer_first
+):
+    producer = operation("post", "/groups", "201", component_ref(component))
+    consumer = operation(
+        "get", path, "200", parameters=[{"name": name, "in": location, "required": True, "schema": schema}]
+    )
+    paths = {**consumer, **producer} if consumer_first else {**producer, **consumer}
+
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {component: {"type": "object", "properties": properties}}}
+    )
 
     links = [
         [
             "#/paths/~1groups/post",
             "201",
             {
-                "operationRef": f"#/paths/~1groups~1{{{name}}}/get",
-                "parameters": {f"path.{name}": "$response.body#/pk"},
+                "operationRef": f"#/paths/{path.replace('/', '~1')}/get",
+                "parameters": {f"{location}.{name}": f"$response.body#/{field}"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (links if field is not None else [])
+
+
+@pytest.mark.parametrize("consumer_first", [False, True], ids=["producer-first", "consumer-first"])
+@pytest.mark.parametrize(("code", "expected"), [(UUID, True), (INTEGER, False)], ids=["uuid-code", "integer-code"])
+def test_uuid_parameter_named_after_a_field_takes_only_that_field(ctx, code, expected, consumer_first):
+    # A `code` holds a different value than the group's uuid `id`, so an integer `code` leaves `{code}` unbound.
+    producer = operation("post", "/groups", "201", component_ref("Group"))
+    consumer = operation(
+        "get", "/groups/{code}", "200", parameters=[{"name": "code", "in": "path", "required": True, "schema": UUID}]
+    )
+    paths = {**consumer, **producer} if consumer_first else {**producer, **consumer}
+
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"Group": {"type": "object", "properties": {"id": UUID, "code": code}}}}
+    )
+
+    links = [
+        [
+            "#/paths/~1groups/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1groups~1{code}/get",
+                "parameters": {"path.code": "$response.body#/code"},
                 "x-schemathesis": {"is_inferred": True},
             },
         ]

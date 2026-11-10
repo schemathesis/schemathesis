@@ -33,7 +33,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     rebind_body_fields_to_unique_producers,
     rebind_inherited_suffix_matches,
     rebind_orphan_synthetics,
-    unbind_single_values_from_array_fields,
+    unbind_mistyped_values,
     update_input_field_bindings,
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
@@ -269,8 +269,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
     bind_echoed_body_fields(schema, operations, deferred)
 
-    # A body field taking an array of identifiers never takes one value (`customer_id: [1, 2]` <- `Customer.id`).
-    unbind_single_values_from_array_fields(operations, deferred)
+    # A body field taking an array of identifiers never takes one value (`customer_id: [1, 2]` <- `Customer.id`),
+    # and a UUID parameter never takes a non-string field (`{id}` <- an integer `Group.pk`).
+    unbind_mistyped_values(schema, operations, deferred)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)
