@@ -128,6 +128,20 @@ def test_malformed_ok_body_is_reported_as_binary(ctx):
 
 
 @pytest.mark.parametrize(
+    ("headers", "expected"),
+    [({}, '{\n  "duration": "1.500s"\n}'), ({"x-details": "invalid-duration"}, BINARY_PAYLOAD)],
+    ids=["valid-duration", "invalid-duration"],
+)
+def test_ok_response_payload(ctx, headers, expected):
+    response = (
+        load(ctx.grpc.apps.envelope())["types.Types"]["WellKnown"]
+        .Case(body={"duration": "1.500s"}, headers=headers)
+        .call()
+    )
+    assert format_response_payload(response, config=OutputConfig()) == expected
+
+
+@pytest.mark.parametrize(
     ("user_id", "expected"),
     [(503, (14, "UNAVAILABLE")), (504, (4, "DEADLINE_EXCEEDED: upstream timed out"))],
     ids=["unavailable", "deadline-exceeded"],
