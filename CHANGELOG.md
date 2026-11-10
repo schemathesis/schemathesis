@@ -30,6 +30,7 @@
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Links treating array fields named like `customer_id` as a single identifier.
 - Coverage phase sending request bodies of tens of megabytes for arrays with a large `maxItems`.
+- Links filling a parent's `{id}` with a nested item's id, e.g. in `/options/{id}/entry/{entrypk}`.
 - No inferred links for responses whose schema lives in another file and references its siblings.
 - Links filling `*_name` header parameters with an unrelated `name` field.
 - Missing links and an internal error for response schemas with their own `$id` and `$defs`.

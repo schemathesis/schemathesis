@@ -205,14 +205,11 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
     # For body fields the prefix-match against the path-derived resource is the
     # safety check, so the `{parameter}` template requirement is dropped.
     if body_field or f"{{{parameter}}}" in path:
-        for suffix in ("uuid", "guid", "slug", "name", "id"):
-            if lower.endswith(suffix) and len(lower) > len(suffix):
-                prefix_lower = lower[: -len(suffix)]
-                if len(prefix_lower) >= 2:
-                    path_resource = from_path(strip_version_prefix(path), parameter_name=parameter)
-                    if path_resource is not None and path_resource.lower() == prefix_lower:
-                        return path_resource
-                break
+        prefix_lower = _concatenated_prefix(parameter, path, body_field=body_field)
+        if prefix_lower is not None:
+            path_resource = from_path(strip_version_prefix(path), parameter_name=parameter)
+            if path_resource is not None and path_resource.lower() == prefix_lower:
+                return path_resource
 
     # Path parameter named after its parent collection (`/sessions/{session}` -> Session).
     # Common route-model-binding convention; bind only when the name equals the singularized
@@ -223,6 +220,23 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False, query
             return path_resource
 
     return None
+
+
+def _concatenated_prefix(parameter: str, path: str, *, body_field: bool) -> str | None:
+    lower = parameter.lower()
+    # `/entry/{entrypk}` keys an entry. A body field like `serverpk` often holds a public key, and a parent
+    # `{orderpk}` in `/orders/{orderpk}/items` would take the resource of the items under it.
+    primary_key = ("pk",) if trailing_path_parameter(path) == parameter and not body_field else ()
+    for suffix in ("uuid", "guid", "slug", "name", "id", *primary_key):
+        if lower.endswith(suffix) and len(lower) > len(suffix):
+            prefix_lower = lower[: -len(suffix)]
+            return prefix_lower if len(prefix_lower) >= 2 else None
+    return None
+
+
+def is_concatenated_primary_key(parameter: str) -> bool:
+    """Whether `parameter` joins a resource name and `pk` without a separator (`entrypk`)."""
+    return _split_parameter_name(parameter)[1] == "pk"
 
 
 @lru_cache(maxsize=512)
@@ -258,6 +272,36 @@ def from_path(path: str, parameter_name: str | None = None) -> str | None:
 def owning_resource(parameter: str, path: str) -> str | None:
     """Resource named by the static segment right before `{parameter}` (`/api/projects/{code}` -> `Project`)."""
     return _owning_segment_resource(_resource_segments(strip_version_prefix(path)), parameter)
+
+
+def item_collections(paths: Collection[str]) -> frozenset[str]:
+    """Collections a path keys items of, with blanked parameters (`/options/{id}/entry/{pk}` -> `options/{}/entry`)."""
+    collections = set()
+    for path in paths:
+        segments = _blank_parameters(path)
+        for index, segment in enumerate(segments):
+            if segment == "{}":
+                collections.add("/".join(segments[:index]))
+    return frozenset(collections)
+
+
+@lru_cache(maxsize=512)
+def nested_resource_names(parameter: str, path: str, collections: frozenset[str]) -> tuple[str, ...]:
+    """Item collections under `{parameter}`, normalized (`/options/{id}/entry/{entrypk}` -> `entry` for `id`)."""
+    segments = _resource_segments(path)
+    placeholder = f"{{{parameter}}}"
+    if placeholder not in segments:
+        return ()
+    blanked = _blank_parameters(path)
+    return tuple(
+        normalize_for_matching(to_singular(segments[index]))
+        for index in range(segments.index(placeholder) + 1, len(segments))
+        if "/".join(blanked[: index + 1]) in collections
+    )
+
+
+def _blank_parameters(path: str) -> list[str]:
+    return ["{}" if "{" in segment else segment for segment in _resource_segments(path)]
 
 
 def _owning_segment_resource(segments: list[str], parameter: str) -> str | None:
@@ -861,6 +905,9 @@ def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
 
     if parameter_name.endswith("_slug") and len(parameter_name) > 5:
         return parameter_name[:-5], "_slug"
+
+    if parameter_name.endswith("pk") and len(parameter_name) > 2:
+        return parameter_name[:-2], "pk"
 
     return "", parameter_name
 

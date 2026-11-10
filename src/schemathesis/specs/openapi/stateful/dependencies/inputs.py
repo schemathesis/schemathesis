@@ -174,7 +174,8 @@ def _resolve_parameter_dependency(
         matched_resource, matched_field = _find_matching_resource_by_suffix(
             resource_name=resource_name,
             parameter_name=parameter_name,
-            resources=resources,
+            operation=operation,
+            state=state,
         )
         if matched_resource is not None and matched_field is not None:
             resource = matched_resource
@@ -237,11 +238,27 @@ def _find_resource_in_responses(
     return None
 
 
+def _suffix_match_candidates(parameter_name: str, operation: APIOperation, state: InferenceState) -> ResourceMap:
+    # `{entrypk}` keys the one resource its own operation returns: `LogEntry` elsewhere in the API, or entries listed
+    # inside that response, are other resources.
+    if not naming.is_concatenated_primary_key(parameter_name):
+        return state.resources
+    returned: ResourceMap = {}
+    statuses = set()
+    for response, extracted in cached_resources_from_responses(operation=operation, state=state):
+        # Each response yields the resource it describes before the resources nested in it.
+        if response.status_code not in statuses and extracted.cardinality == Cardinality.ONE:
+            returned[extracted.resource.name] = extracted.resource
+        statuses.add(response.status_code)
+    return returned
+
+
 def _find_matching_resource_by_suffix(
     *,
     resource_name: str,
     parameter_name: str,
-    resources: ResourceMap,
+    operation: APIOperation,
+    state: InferenceState,
 ) -> tuple[ResourceDefinition, str] | tuple[None, None]:
     """Find a resource with matching suffix or prefix when exact match not found.
 
@@ -256,8 +273,17 @@ def _find_matching_resource_by_suffix(
     Only considers high-quality resources (schema-defined with properties) and
     requires the parameter to match a field via find_matching_field.
     """
+    nested_items = _nested_items(parameter_name, resource_name, operation.path, state.item_collections)
     return next(
-        _iter_suffix_matches(resource_name=resource_name, parameter_name=parameter_name, resources=resources),
+        (
+            (candidate, field)
+            for candidate, field in _iter_suffix_matches(
+                resource_name=resource_name,
+                parameter_name=parameter_name,
+                resources=_suffix_match_candidates(parameter_name, operation, state),
+            )
+            if not naming.normalize_for_matching(candidate.name).endswith(nested_items)
+        ),
         (None, None),
     )
 
@@ -295,6 +321,9 @@ def _iter_suffix_matches(
         ):
             yield candidate_resource, matched_field
 
+
+# Keys of whatever object declares them, never of one of its parents.
+_BARE_KEYS = frozenset((*naming.ID_FIELD_NAMES, "pk"))
 
 GENERIC_FIELD_NAMES = frozenset(
     {
@@ -892,7 +921,7 @@ def update_input_field_bindings(resource_names: set[str], operations: OperationM
                 input_slot.resource_field = new_field
 
 
-def merge_related_resources(operations: OperationMap, resources: ResourceMap) -> None:
+def merge_related_resources(operations: OperationMap, resources: ResourceMap, item_collections: frozenset[str]) -> None:
     """Merge parameter-inferred resources with schema-defined resources from related operations."""
     candidates = find_producer_consumer_candidates(operations)
     returned_by: dict[tuple[str, str], set[str]] = {}
@@ -916,6 +945,9 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap) ->
 
             if result is not None:
                 new_resource_name, new_field_name = result
+                # The producer creates the item listed under a bare `{id}`, not what that `{id}` names.
+                if _names_nested_item(input_slot, new_resource_name, consumer.path, item_collections):
+                    continue
                 # Update input slot to use the better resource definition
                 input_slot.resource = resources[new_resource_name]
                 input_slot.resource_field = new_field_name
@@ -1266,13 +1298,10 @@ def bind_item_parameters_to_collections(
     # Collection paths each resource is listed under; `/apis/{api}/comments` and `/domains/{domain}/comments` differ
     listed_at: dict[str, set[str]] = {}
     producers: dict[str, list[tuple[OperationNode, OutputSlot]]] = {}
-    # `(resource, field)` pairs that `*_id` fields of produced resources point to
-    fed: set[tuple[str, str]] = set()
+    fed = _fed_identifiers(operations)
     for operation in operations.values():
         for output in operation.outputs:
             producers.setdefault(output.resource.name, []).append((operation, output))
-            fed.update((fk.target_resource, fk.target_field) for fk in output.resource.fk_fields)
-            fed.update((fk.target_resource, fk.target_field) for fk in output.resource.nested_fk_fields)
             if operation.method == "get" and output.cardinality == Cardinality.MANY:
                 collection = operation.path.rstrip("/")
                 listed.setdefault(collection, {})[output.resource.name] = output.resource
@@ -1363,6 +1392,16 @@ def bind_item_parameters_to_collections(
 
     for operation, slot in listed_identifiers:
         operation.inputs.append(slot)
+
+
+def _fed_identifiers(operations: OperationMap) -> set[tuple[str, str]]:
+    # `(resource, field)` pairs that `*_id` fields of produced resources point to
+    fed: set[tuple[str, str]] = set()
+    for operation in operations.values():
+        for output in operation.outputs:
+            fed.update((fk.target_resource, fk.target_field) for fk in output.resource.fk_fields)
+            fed.update((fk.target_resource, fk.target_field) for fk in output.resource.nested_fk_fields)
+    return fed
 
 
 def _listed_field(
@@ -1506,6 +1545,72 @@ def bind_id_fields_to_returned_resources(operations: OperationMap) -> None:
             input_slot.is_suffix_matched = False
 
 
+def bind_parent_keys(schema: OpenApiSchema, operations: OperationMap) -> None:
+    """Bind the path keys of the parents an item lives under."""
+    bind_parent_ids_to_parent_items(operations)
+    bind_parent_keys_to_item_fields(schema, operations)
+
+
+def bind_parent_ids_to_parent_items(operations: OperationMap) -> None:
+    """Give a bare `{id}` nothing names in `/options/{id}/entry` what `/options/{id}` takes."""
+    parents = _unambiguous_parents(_item_slots(operations))
+    produced = _produced_resource_names(operations)
+    fed = _fed_identifiers(operations)
+    for operation in operations.values():
+        for input_slot in operation.inputs:
+            parent = _parent_item(input_slot, operation.path, parents, produced, fed)
+            if parent:
+                input_slot.resource = parent.resource
+                input_slot.resource_field = parent.resource_field
+
+
+def _item_slots(operations: OperationMap) -> dict[str, list[InputSlot]]:
+    # The trailing path parameter of every item operation, by the path it keys (`/options/{id}`).
+    item_slots: dict[str, list[InputSlot]] = {}
+    for operation in operations.values():
+        item_parameter = naming.trailing_path_parameter(operation.path)
+        item_slot = find_input(operation.inputs, ParameterLocation.PATH, item_parameter) if item_parameter else None
+        if item_slot is not None:
+            item_slots.setdefault(operation.path.rstrip("/"), []).append(item_slot)
+    return item_slots
+
+
+def _unambiguous_parents(item_slots: dict[str, list[InputSlot]]) -> dict[str, InputSlot]:
+    # One shape keying the items of several collections, e.g. a shared publish result, names none of them.
+    keyed_paths: dict[str, set[str]] = {}
+    for path, slots in item_slots.items():
+        for slot in slots:
+            keyed_paths.setdefault(slot.resource.name, set()).add(path)
+    return {
+        path: slots[0]
+        for path, slots in item_slots.items()
+        if len({(slot.resource.name, slot.resource_field) for slot in slots}) == 1
+        and len(keyed_paths[slots[0].resource.name]) == 1
+    }
+
+
+def _parent_item(
+    input_slot: InputSlot,
+    path: str,
+    parents: dict[str, InputSlot],
+    produced: set[str],
+    fed: set[tuple[str, str]],
+) -> InputSlot | None:
+    # Only a bare `{id}` no link reaches yet: nothing produces its placeholder and no field refers to it.
+    parameter_name = input_slot.parameter_name
+    if (
+        input_slot.parameter_location != ParameterLocation.PATH
+        or input_slot.resource.source != DefinitionSource.PARAMETER_INFERENCE
+        or input_slot.resource.name in produced
+        or (input_slot.resource.name, input_slot.resource_field) in fed
+        or not isinstance(parameter_name, str)
+        or parameter_name.lower() not in _BARE_KEYS
+    ):
+        return None
+    placeholder = f"{{{parameter_name}}}"
+    return parents.get(path.split(placeholder, 1)[0] + placeholder)
+
+
 def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: OperationMap) -> None:
     """Fill `{warehouseId}` of `/warehouses/{warehouseId}/shipments/{id}` from `Shipment.warehouseId` if unproduced."""
     produced = _produced_resource_names(operations)
@@ -1537,6 +1642,8 @@ def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: Operation
                 and parameter_name != item_parameter
                 and isinstance(parameter_name, str)
                 and parameter_name in item.fields
+                # The item's own `id` keys the item, not its parent.
+                and parameter_name.lower() not in _BARE_KEYS
                 and input_slot.resource.source == DefinitionSource.PARAMETER_INFERENCE
                 and input_slot.resource.name not in produced
                 and parameter_name in path_parameters
@@ -1547,6 +1654,26 @@ def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: Operation
                 input_slot.resource = item
                 input_slot.resource_field = parameter_name
                 input_slot.is_parent_key = True
+
+
+def _nested_items(
+    parameter_name: str, resource_name: str, path: str, item_collections: frozenset[str]
+) -> tuple[str, ...]:
+    # `{id}` in `/options/{id}/entry/{entrypk}` names an option, never the `OptionEntry` listed under it.
+    if parameter_name.lower() not in _BARE_KEYS:
+        return ()
+    own = naming.normalize_for_matching(resource_name)
+    return tuple(name for name in naming.nested_resource_names(parameter_name, path, item_collections) if name != own)
+
+
+def _names_nested_item(input_slot: InputSlot, resource_name: str, path: str, item_collections: frozenset[str]) -> bool:
+    return (
+        input_slot.parameter_location == ParameterLocation.PATH
+        and isinstance(input_slot.parameter_name, str)
+        and naming.normalize_for_matching(resource_name).endswith(
+            _nested_items(input_slot.parameter_name, input_slot.resource.name, path, item_collections)
+        )
+    )
 
 
 def _fits_path_parameter(field_types: set[str], parameter: OpenApiParameter) -> bool:

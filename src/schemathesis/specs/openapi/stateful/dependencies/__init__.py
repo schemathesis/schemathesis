@@ -23,7 +23,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     bind_created_item_keys,
     bind_id_fields_to_returned_resources,
     bind_item_parameters_to_collections,
-    bind_parent_keys_to_item_fields,
+    bind_parent_keys,
     declared_parameter_types,
     disambiguate_module_variants,
     disambiguate_path_suffix_matches,
@@ -239,7 +239,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     update_input_field_bindings(state.updated_resources, operations)
 
     # Merge parameter-inferred resources with schema-defined ones
-    merge_related_resources(operations, resources)
+    merge_related_resources(operations, resources, state.item_collections)
 
     # Bind required body fields to a producer only when the response field identifies it uniquely.
     rebind_body_fields_to_unique_producers(operations, deferred)
@@ -265,8 +265,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # `fromAirportId` names what responses return under `fromAirport` (`AirportResponse.id`).
     bind_id_fields_to_returned_resources(operations)
 
-    # An item carries the key of the parent it lives under (`Shipment.warehouseId`) when nothing produces the parent.
-    bind_parent_keys_to_item_fields(schema, operations)
+    # A bare `{id}` in `/options/{id}/entry` keys what `/options/{id}` takes, and an item carries the key of the parent
+    # it lives under (`Shipment.warehouseId`) when nothing produces the parent.
+    bind_parent_keys(schema, operations)
 
     # Bind update body fields to values only the item `GET` returns (`version`, `checksum`), and unbind copied fields
     # whose `enum` rejects a value the resource returns (`type` <- `Domain.type`).
