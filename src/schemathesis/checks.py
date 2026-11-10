@@ -152,7 +152,7 @@ class CheckContext:
         transport_kwargs: dict[str, Any] | None,
         recorder: ScenarioRecorder | None = None,
         *,
-        response_checks: ResponseChecks | None,
+        response_checks: ResponseChecks | None = None,
         phase: PhaseName | None = None,
         auth_enforced_operations: set[str] | None = None,
     ) -> None:

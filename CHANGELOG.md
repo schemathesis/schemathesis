@@ -16,6 +16,7 @@
 - Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
 - `after_run` of class-based checks dropping failures under `pytest-xdist` and firing for deselected tests.
 - False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.
+- `TypeError` when building `schemathesis.CheckContext` without the `response_checks` keyword.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Missing links for fields inside request body arrays behind components that only reference another.
 - Silently unauthenticated gRPC calls with `auth.set_from_requests`; report it as unsupported.
