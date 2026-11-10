@@ -710,6 +710,60 @@ def unbind_single_values_from_array_fields(operations: OperationMap, deferred: d
         ]
 
 
+def unbind_mistyped_values(
+    schema: OpenApiSchema, operations: OperationMap, deferred: dict[str, DeferredBindings]
+) -> None:
+    """Unbind values a request slot rejects: one identifier for an array field, a non-string for a UUID parameter."""
+    unbind_single_values_from_array_fields(operations, deferred)
+    for label, node in operations.items():
+        slots = _non_string_parameter_slots(node)
+        if slots:
+            declared = schema.find_operation_by_label(label)
+            assert declared is not None
+            _bind_to_string_identifiers(node, slots, _uuid_parameters(declared))
+
+
+def _non_string_parameter_slots(node: OperationNode) -> list[InputSlot]:
+    return [
+        slot
+        for slot in node.inputs
+        if slot.parameter_location != ParameterLocation.BODY
+        and slot.resource_field is not None
+        and "string" not in slot.resource.types.get(slot.resource_field, {"string"})
+    ]
+
+
+def _uuid_parameters(operation: APIOperation) -> set[tuple[ParameterLocation, str]]:
+    return {(parameter.location, parameter.name) for parameter in operation.iter_parameters() if _takes_uuid(parameter)}
+
+
+def _takes_uuid(parameter: OpenApiParameter) -> bool:
+    schema = _parameter_schema(parameter)
+    return isinstance(schema, dict) and schema.get("format") == "uuid"
+
+
+def _bind_to_string_identifiers(
+    node: OperationNode, slots: list[InputSlot], parameters: set[tuple[ParameterLocation, str]]
+) -> None:
+    # A UUID parameter takes the resource's string identifier (`uuid` beside an integer `pk`), or nothing.
+    for slot in slots:
+        if (slot.parameter_location, slot.parameter_name) not in parameters:
+            continue
+        identifier = _string_identifier_for(slot)
+        if identifier is None:
+            node.inputs = [other for other in node.inputs if other is not slot]
+        else:
+            slot.resource_field = identifier
+
+
+def _string_identifier_for(slot: InputSlot) -> str | None:
+    # Only an identifier field gives way to the resource's string identifier; a `code` holds another value.
+    assert slot.resource_field is not None
+    if naming.normalize_for_matching(slot.resource_field) not in (*naming.ID_FIELD_NAMES, "pk"):
+        return None
+    return _string_identifier(slot.resource)
+
+
 def rebind_inherited_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:
     """Re-resolve suffix matches that hold only through a field inherited via `allOf`.
 
@@ -781,11 +835,16 @@ def _prefer_string_identifier(
         or "string" in resource.types.get(field, {"string"})
     ):
         return field
+    identifier = _string_identifier(resource)
+    return field if identifier is None else identifier
+
+
+def _string_identifier(resource: ResourceDefinition) -> str | None:
     for identifier in naming.ID_FIELD_NAMES:
         for candidate in resource.fields:
             if naming.normalize_for_matching(candidate) == identifier and "string" in resource.types.get(candidate, ()):
                 return candidate
-    return field
+    return None
 
 
 def update_input_field_bindings(resource_names: set[str], operations: OperationMap) -> None:
