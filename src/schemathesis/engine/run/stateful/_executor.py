@@ -13,7 +13,7 @@ from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, HypothesisWarning, Unsatisfiable, UnsatisfiedAssumption
 from hypothesis.stateful import Rule
 
-from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.checks import CheckContext, CheckFunction, validate
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.error_feedback.collector import parse_observations
@@ -712,7 +712,7 @@ def validate_response(
     def on_success(name: str, case: Case) -> None:
         recorder.record_check_success(name=name, case_id=case.id)
 
-    failures = run_checks(
+    failures = validate(
         case=case,
         response=response,
         ctx=check_ctx,

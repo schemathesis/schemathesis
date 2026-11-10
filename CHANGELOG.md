@@ -12,6 +12,7 @@
 - False positive `positive_data_acceptance` in pytest for required bodies with unresolvable references.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
 - Links treating `PUT` updaters as creators when the collection's `POST` is a path item `$ref`.
+- `after_validate` hook never called by `st run` and `st fuzz`.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
 - `after_run` of class-based checks dropping failures under `pytest-xdist` and firing for deselected tests.
