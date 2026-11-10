@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from functools import reduce
 
 import click
+from click.core import ParameterSource
 
 from schemathesis.cli.ext.options import CsvEnumChoice
 from schemathesis.config import ReportFormat, SchemathesisConfig, SchemathesisWarning, get_workers_count
@@ -222,7 +223,12 @@ def convert_maximize(
     return METRICS.get_by_names(names)
 
 
-def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GenerationMode]:
+def convert_generation_mode(
+    ctx: click.core.Context, param: click.core.Parameter, value: str
+) -> list[GenerationMode] | None:
+    # Unless the flag is given, `[generation] mode` from the configuration file decides; both default to "all".
+    if ctx.get_parameter_source(param.name) is ParameterSource.DEFAULT:
+        return None
     return GenerationMode.from_choice(value)
 
 

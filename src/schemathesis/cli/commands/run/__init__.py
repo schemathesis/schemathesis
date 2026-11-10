@@ -215,7 +215,7 @@ def run(
     request_proxy: str | None = None,
     output_sanitize: bool | None = None,
     output_truncate: bool | None = None,
-    generation_modes: list[GenerationMode],
+    generation_modes: list[GenerationMode] | None,
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
     generation_maximize: list[MetricFunction] | None,
