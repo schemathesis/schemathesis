@@ -6,7 +6,7 @@ Infers which operations must run before others by tracking resource creation and
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, TypeGuard
 
 from schemathesis.core import NOT_SET
@@ -42,6 +42,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     DefinitionSource,
     DependencyGraph,
     InputSlot,
+    LinkDefinition,
     NormalizedLink,
     OperationMap,
     OperationNode,
@@ -418,13 +419,14 @@ def inject_links(schema: OpenApiSchema) -> int:
     # target - only same-target links can be subsets. Values keep the mapping alive so `id` is unique.
     # Next to them, the next suffix to try per colliding link name, as names taken once stay taken.
     normalized_cache: dict[int, tuple[dict[str, Any], dict[tuple[str, str], list[NormalizedLink]], dict[str, int]]] = {}
-    _unshare_responses(schema)
+    shared = _unshare_responses(schema)
     # Operations built earlier still point at the response definitions that were just replaced
     schema._operations.clear_cache()
     for response_links in schema.analysis.dependency_graph.iter_links():
         operation = _find_operation_by_reference(schema, response_links.producer_operation_ref, operation_cache)
         response = operation.responses.get(response_links.status_code)
         links = response.source.setdefault(schema.adapter.links_keyword, {})
+        _, reader_paths = shared.get(id(response.source), (None, ()))
 
         entry = normalized_cache.get(id(links))
         if entry is None:
@@ -443,7 +445,7 @@ def inject_links(schema: OpenApiSchema) -> int:
 
         # Compared against what was known before this response, not against each other.
         pending: list[NormalizedLink] = []
-        for link_name, definition in response_links.links.items():
+        for link_name, definition in _followable_links(response_links.links, reader_paths):
             inferred_link = definition.to_openapi()
 
             # Check if duplicate / subsets exists
@@ -465,19 +467,23 @@ def inject_links(schema: OpenApiSchema) -> int:
     return injected
 
 
-def _unshare_responses(schema: OpenApiSchema) -> None:
+def _unshare_responses(schema: OpenApiSchema) -> dict[int, tuple[Mapping[str, Any], list[str]]]:
     """Give each operation its own copy of a response it shares, so links inferred for one never reach another.
 
     A link may forward the producer's own path parameters, which another operation sharing the response lacks.
+    A response in another document than its operations stays in place; those are returned keyed by `id`, with the
+    paths of the operations reading each.
     """
     slots: list[tuple[dict[str, Any], str, Mapping[str, Any]]] = []
     uses: dict[int, int] = {}
+    # Values keep each response alive so its `id` stays unique
+    kept: dict[int, tuple[Mapping[str, Any], list[str]]] = {}
     # Raw definitions, as building every operation costs far more than resolving its responses
     try:
         entries = schema._operation_lookup.entries()
     except RefResolutionError:
         # An unresolvable path item is reported as a schema error for its operations
-        return
+        return {}
     for entry in entries:
         raw_responses = entry.definition.get("responses", {})
         try:
@@ -494,10 +500,26 @@ def _unshare_responses(schema: OpenApiSchema) -> None:
             # Copied elsewhere, its own references would resolve against the wrong document
             if response.resolver.base_uri == entry.resolver.base_uri:
                 slots.append((raw_responses, keys[status_code], response.source))
+            else:
+                kept.setdefault(id(response.source), (response.source, []))[1].append(entry.path)
     links_keyword = schema.adapter.links_keyword
     for raw_responses, key, definition in slots:
         if uses[id(definition)] > 1:
             raw_responses[key] = {**definition, links_keyword: dict(definition.get(links_keyword, {}))}
+    return kept
+
+
+def _followable_links(
+    links: dict[str, LinkDefinition], reader_paths: Sequence[str]
+) -> Iterator[tuple[str, LinkDefinition]]:
+    """Links that every operation reading the response can follow, as each has the path parameters they copy."""
+    for name, link in links.items():
+        if all(
+            all(f"{{{value.removeprefix('$request.path.')}}}" in path for path in reader_paths)
+            for value in link.parameters.values()
+            if value.startswith("$request.path.")
+        ):
+            yield name, link
 
 
 def _find_operation_by_reference(schema: OpenApiSchema, reference: str, cache: dict[str, APIOperation]) -> APIOperation:
