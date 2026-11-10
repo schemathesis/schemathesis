@@ -324,12 +324,17 @@ def build_constants_overlay_strategy(
 
     # Resolve once: property path -> tuple of (schema-valid pool value, its origin) for that property.
     candidates: dict[tuple[str, ...], list[tuple[ConstantValue, Origin | None]]] = {}
-    root_schema = container_schema or {"type": "object", "properties": schema_properties}
-    leaves = (
-        _iter_constant_leaves(root_schema, root_schema=root_schema, validator_cls=validator_cls)
-        if location == "body"
-        else (((name,), schema) for name, schema in schema_properties.items() if isinstance(schema, dict))
-    )
+    if location == "body":
+        root_schema = container_schema or {"type": "object", "properties": schema_properties}
+        excluded = root_schema.get("properties", {}).keys() - schema_properties.keys()
+        # Properties the caller leaves out get their values elsewhere and must not receive constants.
+        leaves = (
+            (path, schema)
+            for path, schema in _iter_constant_leaves(root_schema, root_schema=root_schema, validator_cls=validator_cls)
+            if path[0] not in excluded
+        )
+    else:
+        leaves = (((name,), schema) for name, schema in schema_properties.items() if isinstance(schema, dict))
     for path, schema in leaves:
         keys = _constant_types_for(schema, validator_cls)
         if location != "body":

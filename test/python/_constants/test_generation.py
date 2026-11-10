@@ -10,6 +10,7 @@ from hypothesis.errors import NoSuchExample
 
 import schemathesis
 from schemathesis.config import GenerationConfig, SchemathesisConfig
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation.body_overrides import build_body_override_overlay_strategy
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -1054,6 +1055,17 @@ _FORM_SCHEMA = {
 }
 
 
+def _form_schema_with_all_of():
+    schema = deepclone(_FORM_SCHEMA)
+    schema["components"] = {
+        "schemas": {"HasBlob": {"type": "object", "properties": {"blob": {"type": "string", "format": "binary"}}}}
+    }
+    schema["paths"]["/upload"]["post"]["requestBody"]["content"]["multipart/form-data"]["schema"]["allOf"] = [
+        {"$ref": "#/components/schemas/HasBlob"}
+    ]
+    return schema
+
+
 def test_form_body_records_constant_provenance(ctx):
     schema = ctx.openapi.from_full_schema(_FORM_SCHEMA)
     operation = schema["/upload"]["POST"]
@@ -1071,6 +1083,40 @@ def test_form_body_records_constant_provenance(ctx):
     draw = next(draw for draw in generated.constants_draws if draw.parameter_name == "label")
     assert draw.value == "MAGIC_LABEL"
     assert draw.location == "body"
+
+
+@pytest.mark.parametrize("raw_schema", [_FORM_SCHEMA, _form_schema_with_all_of()], ids=["inline", "allOf-ref"])
+def test_form_body_does_not_record_constant_for_encoded_field(ctx, raw_schema):
+    schemathesis.openapi.media_type("application/octet-stream", st.just(b"MEDIA_TYPE_VALUE"))
+    schema = ctx.openapi.from_full_schema(raw_schema)
+    operation = schema["/upload"]["POST"]
+    config = schema.config.generation_for(operation=operation, phase="fuzzing")
+    label_strategy = _build_form_strategy_with_encoding(
+        operation.body[0], operation, config, GenerationMode.POSITIVE, _source("string", "MAGIC_LABEL")
+    )
+    generated = find(
+        label_strategy,
+        lambda result: (
+            isinstance(result, GeneratedValue)
+            and any(draw.parameter_name == "label" and draw.value == "MAGIC_LABEL" for draw in result.constants_draws)
+        ),
+        settings=_FIND_FIRST,
+    )
+    assert [draw for draw in generated.constants_draws if draw.parameter_name == "label"] == [
+        _constant_draw("label", "MAGIC_LABEL", body_path="/label")
+    ]
+
+    strategy = _build_form_strategy_with_encoding(
+        operation.body[0], operation, config, GenerationMode.POSITIVE, _source("bytes", b"STALE_CONSTANT")
+    )
+
+    assert [
+        draw
+        for value in generate_many(strategy, 20)
+        if isinstance(value, GeneratedValue)
+        for draw in value.constants_draws
+        if draw.parameter_name == "blob"
+    ] == []
 
 
 @given(data=st.data())
