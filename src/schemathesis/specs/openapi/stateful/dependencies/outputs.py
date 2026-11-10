@@ -48,6 +48,7 @@ def extract_outputs(
             extract_object_keys=extracted.extract_object_keys,
             response_fields=extracted.response_fields,
             identifier_pointer=extracted.identifier_pointer,
+            named_after_path=extracted.named_after_path,
         )
 
     yield from _path_keyed_outputs(
@@ -105,6 +106,7 @@ def _path_keyed_outputs(
         cardinality=Cardinality.ONE,
         status_code=success_status,
         path_parameter=trailing,
+        named_after_path=True,
     )
 
 

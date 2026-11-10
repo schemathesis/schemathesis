@@ -58,6 +58,8 @@ class ExtractedResource:
     response_fields: frozenset[str] | None = None
     # Envelope field identifying the wrapped resource (`/bookingid` next to `/booking`)
     identifier_pointer: str | None = None
+    # Whether only the operation path names the resource, as no `$ref` declares it
+    named_after_path: bool = False
 
 
 def extract_resources_from_responses(
@@ -262,7 +264,7 @@ def iter_resources_from_response(
     )
 
     if result is not None:
-        resource, cardinality, response_fields = result
+        resource, cardinality, response_fields, named_after_path = result
         if canonicalized is not resolved and unwrapped.pointer == ROOT_POINTER and cardinality == Cardinality.ONE:
             # Flattening keeps one `allOf` reference only; the fields of every inherited schema belong to the response
             response_fields = _declared_fields(resolved, current_resolver)
@@ -280,6 +282,7 @@ def iter_resources_from_response(
             pointer=pointer,
             response_fields=response_fields,
             identifier_pointer=identifier_pointer,
+            named_after_path=named_after_path,
         )
         parent_cardinality = cardinality
         # Look for sub-resources. When the unwrapped schema is an array (MANY producer),
@@ -310,7 +313,7 @@ def iter_resources_from_response(
                             parent_ref=reference,
                         )
                         if sub_result is not None:
-                            subresource, sub_cardinality, sub_fields = sub_result
+                            subresource, sub_cardinality, sub_fields, _ = sub_result
                             subresource_pointer = extend_pointer(pointer, field, parent_cardinality=parent_cardinality)
                             yield ExtractedResource(
                                 resource=subresource,
@@ -336,7 +339,7 @@ def iter_resources_from_response(
                                         parent_ref=sub_unwrapped.ref or reference,
                                     )
                                     if inner_result is not None:
-                                        inner_resource, inner_cardinality, inner_fields = inner_result
+                                        inner_resource, inner_cardinality, inner_fields, _ = inner_result
                                         yield ExtractedResource(
                                             resource=inner_resource,
                                             cardinality=inner_cardinality,
@@ -400,6 +403,18 @@ def _is_object_without_properties(schema: Mapping[str, Any], resolver: Resolver)
     )
 
 
+def _named_after_path(schema: Mapping[str, Any], parent_ref: str | None) -> bool:
+    """Whether only the path names what a schema, or the items of an array schema, declare: no `$ref`, even in allOf."""
+    if parent_ref is not None:
+        return False
+    items = schema.get("items")
+    declared = items if isinstance(items, dict) else schema
+    branches = declared.get("allOf")
+    return "$ref" not in declared and not (
+        isinstance(branches, list) and any(isinstance(branch, dict) and "$ref" in branch for branch in branches)
+    )
+
+
 def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: Resolver) -> str | None:
     """Recover original $ref from allOf branches after canonicalization.
 
@@ -459,6 +474,7 @@ def _resource_from_primitive_response(
         cardinality=Cardinality.ONE,
         pointer=pointer,
         is_primitive_identifier=True,
+        named_after_path=True,
     )
 
 
@@ -509,6 +525,7 @@ def _resource_from_primitive_array(*, path: str, resources: ResourceMap) -> Extr
         cardinality=Cardinality.MANY,
         pointer=ROOT_POINTER,
         is_primitive_identifier=True,
+        named_after_path=True,
     )
 
 
@@ -520,8 +537,9 @@ def _extract_resource_and_cardinality(
     updated_resources: set[str],
     resolver: Resolver,
     parent_ref: str | None = None,
-) -> tuple[ResourceDefinition, Cardinality, frozenset[str] | None] | None:
-    """Extract resource from schema and determine cardinality, with the fields the schema declares."""
+) -> tuple[ResourceDefinition, Cardinality, frozenset[str] | None, bool] | None:
+    """Extract resource from schema and determine cardinality, the fields it declares and if only the path names it."""
+    named_after_path = _named_after_path(schema, parent_ref)
     # Check if it's an array
     if schema.get("type") == "array" or "items" in schema:
         items = schema.get("items")
@@ -545,7 +563,7 @@ def _extract_resource_and_cardinality(
         if resource is None:
             return None
 
-        return resource, Cardinality.MANY, _declared_fields(resolved_items, items_resolver)
+        return resource, Cardinality.MANY, _declared_fields(resolved_items, items_resolver), named_after_path
 
     # Single object
     resource = _extract_resource_from_schema(
@@ -560,7 +578,7 @@ def _extract_resource_and_cardinality(
     if resource is None:
         return None
 
-    return resource, Cardinality.ONE, _declared_fields(schema, resolver)
+    return resource, Cardinality.ONE, _declared_fields(schema, resolver), named_after_path
 
 
 def _extract_resource_from_schema(

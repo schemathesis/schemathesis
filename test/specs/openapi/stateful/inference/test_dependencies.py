@@ -3916,6 +3916,219 @@ def test_references_to_a_collection_and_its_members_name_different_resources(ctx
     assert inferred_links(graph) == [["#/paths/~1orders/post", "201", read_purchase_link("get", "/id")]]
 
 
+def inline_devices(*fields):
+    properties = {field: {"type": "string"} for field in fields}
+    return {"get": response("200", {"type": "array", "items": {"type": "object", "properties": properties}})}
+
+
+def device_item_operation(parameter):
+    return {"get": {**response("200"), "parameters": [path_param(parameter)]}}
+
+
+def list_to_device_link(collection, target, parameter, field):
+    return [
+        f"#/paths/{collection.replace('/', '~1')}/get",
+        "200",
+        {
+            "operationRef": f"#/paths/{target.replace('/', '~1')}/get",
+            "x-schemathesis": {"is_inferred": True},
+            "parameters": {f"path.{parameter}": f"$response.body#/*/{field}"},
+        },
+    ]
+
+
+DEVICES_TO_DEVICE = list_to_device_link("/devices", "/devices/{serial}", "serial", "serial")
+MANAGED_TO_REFRESH = list_to_device_link("/x/managed/devices", "/x/managed/device/{deviceId}/refresh", "deviceId", "id")
+
+
+@pytest.mark.parametrize(
+    ("parameter", "field"),
+    [("deviceId", "id"), ("id", "id"), ("imei", "imei")],
+    ids=["named-id", "bare-id", "own-field"],
+)
+def test_inline_items_of_a_qualified_collection_keyed_differently_are_another_resource(ctx, parameter, field):
+    item = f"/x/managed/devices/{{{parameter}}}/apps"
+    paths = {
+        "/x/managed/devices": inline_devices("id", "imei", "serial"),
+        item: device_item_operation(parameter),
+        "/x/managed/device/{deviceId}/refresh": device_item_operation("deviceId"),
+        "/devices": inline_devices("serial", "name"),
+        "/devices/{serial}": device_item_operation("serial"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        list_to_device_link("/x/managed/devices", item, parameter, field),
+        MANAGED_TO_REFRESH,
+        DEVICES_TO_DEVICE,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("method", "status", "schema", "pointer"),
+    [("get", "200", {"type": "array", "items": {"type": "string"}}, "/*"), ("post", "201", {"type": "string"}, "/")],
+    ids=["listed", "created"],
+)
+def test_identifiers_of_a_qualified_collection_keyed_differently_are_another_resource(
+    ctx, method, status, schema, pointer
+):
+    paths = {
+        "/x/managed/devices": {method: response(status, schema)},
+        "/x/managed/devices/{deviceId}/apps": device_item_operation("deviceId"),
+        "/devices": inline_devices("serial", "name"),
+        "/devices/{serial}": device_item_operation("serial"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            f"#/paths/~1x~1managed~1devices/{method}",
+            status,
+            {
+                "operationRef": "#/paths/~1x~1managed~1devices~1{deviceId}~1apps/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.deviceId": f"$response.body#{pointer}"},
+            },
+        ],
+        DEVICES_TO_DEVICE,
+    ]
+
+
+@pytest.mark.parametrize(
+    "items",
+    [component_ref("Device"), {"allOf": [component_ref("Device")]}],
+    ids=["ref", "all-of-ref"],
+)
+def test_items_of_a_qualified_collection_declared_as_the_plain_collection_items_are_the_same_resource(ctx, items):
+    def listed():
+        return {"get": response("200", {"type": "array", "items": items})}
+
+    paths = {
+        "/x/managed/devices": listed(),
+        "/x/managed/devices/{deviceId}/apps": device_item_operation("deviceId"),
+        "/devices": listed(),
+        "/devices/{serial}": device_item_operation("serial"),
+    }
+    device = {"type": "object", "properties": {"id": {"type": "string"}, "serial": {"type": "string"}}}
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Device": device}})
+    assert inferred_links(graph) == [
+        list_to_device_link("/x/managed/devices", "/x/managed/devices/{deviceId}/apps", "deviceId", "id"),
+        list_to_device_link("/x/managed/devices", "/devices/{serial}", "serial", "serial"),
+        list_to_device_link("/devices", "/x/managed/devices/{deviceId}/apps", "deviceId", "id"),
+        DEVICES_TO_DEVICE,
+    ]
+
+
+STOCK_TO_DEVICE = list_to_device_link("/x/stock/devices", "/devices/{serial}", "serial", "serial")
+
+
+@pytest.mark.parametrize(
+    ("stock", "expected"),
+    [
+        (
+            {
+                "/x/stock/devices": inline_devices("id", "serial"),
+                "/x/stock/devices/{serial}": device_item_operation("serial"),
+            },
+            [
+                list_to_device_link("/x/stock/devices", "/x/stock/devices/{serial}", "serial", "serial"),
+                STOCK_TO_DEVICE,
+                list_to_device_link("/devices", "/x/stock/devices/{serial}", "serial", "serial"),
+                DEVICES_TO_DEVICE,
+            ],
+        ),
+        (
+            {
+                "/x/stock/devices": inline_devices("id", "serial"),
+                "/x/stock/devices/{owner}/{serial}": {
+                    "get": {**response("200"), "parameters": [path_param("owner"), path_param("serial")]}
+                },
+            },
+            [STOCK_TO_DEVICE, DEVICES_TO_DEVICE],
+        ),
+        (
+            {"/x/stock/devices/{kind}": {**inline_devices("id", "serial"), "parameters": [path_param("kind")]}},
+            [
+                list_to_device_link("/x/stock/devices/{kind}", "/devices/{serial}", "serial", "serial"),
+                DEVICES_TO_DEVICE,
+            ],
+        ),
+    ],
+    ids=["same-key", "composite-key", "list-selector"],
+)
+def test_inline_items_of_a_qualified_collection_without_own_key_are_the_same_resource(ctx, stock, expected):
+    paths = {
+        **stock,
+        "/devices": inline_devices("serial", "name"),
+        "/devices/{serial}": device_item_operation("serial"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == expected
+
+
+def test_inline_items_of_a_qualified_collection_feed_the_same_collection_under_another_parent(ctx):
+    site_devices = inline_devices("id", "serial")
+    site_devices["get"]["parameters"] = [path_param("siteId")]
+    paths = {
+        "/managed/devices": inline_devices("id", "serial"),
+        "/managed/devices/{deviceId}": device_item_operation("deviceId"),
+        "/sites/{siteId}/managed/devices": site_devices,
+        "/sites/{siteId}/managed/devices/{deviceId}": {
+            "get": {**response("200"), "parameters": [path_param("siteId"), path_param("deviceId")]}
+        },
+        "/devices": inline_devices("serial", "name"),
+        "/devices/{serial}": device_item_operation("serial"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    site_to_site = list_to_device_link(
+        "/sites/{siteId}/managed/devices", "/sites/{siteId}/managed/devices/{deviceId}", "deviceId", "id"
+    )
+    site_to_site[2]["parameters"]["path.siteId"] = "$request.path.siteId"
+    assert inferred_links(graph) == [
+        list_to_device_link("/managed/devices", "/managed/devices/{deviceId}", "deviceId", "id"),
+        list_to_device_link("/managed/devices", "/sites/{siteId}/managed/devices/{deviceId}", "deviceId", "id"),
+        list_to_device_link("/sites/{siteId}/managed/devices", "/managed/devices/{deviceId}", "deviceId", "id"),
+        site_to_site,
+        DEVICES_TO_DEVICE,
+    ]
+
+
+def test_key_sent_in_path_to_a_qualified_collection_is_another_resource(ctx):
+    paths = {
+        "/x/managed/devices": inline_devices("id", "serial"),
+        "/x/managed/devices/{deviceId}": {"post": {**response("201"), "parameters": [path_param("deviceId")]}},
+        "/devices": inline_devices("serial", "name"),
+        "/devices/{serial}": device_item_operation("serial"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    create = list_to_device_link("/x/managed/devices", "/x/managed/devices/{deviceId}", "deviceId", "id")
+    create[2]["operationRef"] = "#/paths/~1x~1managed~1devices~1{deviceId}/post"
+    assert inferred_links(graph) == [create, DEVICES_TO_DEVICE]
+
+
+def test_key_sent_in_body_to_a_qualified_collection_feeds_the_plain_one(ctx):
+    paths = {
+        **operation_with_body(
+            "post",
+            "/x/mirrors/videos",
+            "201",
+            {"type": "object", "properties": {"videoId": {"type": "string"}}, "required": ["videoId"]},
+        ),
+        **operation("get", "/x/mirrors/videos/{mirrorId}", "200", parameters=[path_param("mirrorId")]),
+        **operation("get", "/videos/{id}", "200", parameters=[path_param("id")]),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1x~1mirrors~1videos/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1videos~1{id}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.id": "$request.body#/videoId"},
+            },
+        ]
+    ]
+
+
 @pytest.mark.parametrize(
     "response_schema",
     [
