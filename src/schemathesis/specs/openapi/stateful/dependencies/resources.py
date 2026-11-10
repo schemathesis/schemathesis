@@ -774,6 +774,10 @@ def declared_field_values(response: OpenApiResponse, pointer: str, field: str) -
     # References up to the field were resolved when the output was extracted; the field's own are resolved below.
     for name in [*(decode_pointer(part) for part in pointer.split("/") if part), field]:
         current_resolver, current = maybe_resolve_with_resolver(current, current_resolver)
+        items = current.get("items")
+        # A list's fields are those of its items.
+        if isinstance(items, dict):
+            current_resolver, current = maybe_resolve_with_resolver(items, current_resolver)
         entry = _collect_properties(current, current_resolver).get(name)
         # A field declared without a schema (`true`) may hold anything.
         if entry is None or not isinstance(entry[1], dict):

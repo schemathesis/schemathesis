@@ -12053,6 +12053,77 @@ def test_name_is_copied_only_into_an_update_of_its_resource(ctx):
     ]
 
 
+DOMAIN_TYPES = ["master", "slave"]
+
+
+@pytest.mark.parametrize(
+    ("record_types", "copied"),
+    [
+        (["A", "AAAA", "CNAME"], False),
+        (["master", "CNAME"], False),
+        (DOMAIN_TYPES, True),
+        (["master", "slave", "CNAME"], True),
+    ],
+    ids=["disjoint", "partial-overlap", "equal", "accepts-every-value"],
+)
+@pytest.mark.parametrize(
+    "declare",
+    [
+        lambda schema, name: schema,
+        lambda schema, name: component_ref(name),
+        lambda schema, name: {"allOf": [schema]},
+        lambda schema, name: {"allOf": [component_ref(name)]},
+    ],
+    ids=["inline", "reference", "all-of", "all-of-reference"],
+)
+@pytest.mark.parametrize(
+    ("producer", "producer_ref", "item"),
+    [
+        (
+            lambda domain: operation(
+                "get", "/domains/{domain_name}", "200", domain, parameters=[path_param("domain_name")]
+            ),
+            "#/paths/~1domains~1{domain_name}/get",
+            "",
+        ),
+        (
+            lambda domain: operation("get", "/domains", "200", {"type": "array", "items": domain}),
+            "#/paths/~1domains/get",
+            "/*",
+        ),
+    ],
+    ids=["item", "list"],
+)
+def test_field_copied_from_addressed_resource_only_with_values_the_body_accepts(
+    ctx, record_types, copied, declare, producer, producer_ref, item
+):
+    # `POST /domains/{domain_name}/records {type}` must not send a domain `type` the record type enum rejects.
+    domain_type = {"type": "string", "enum": DOMAIN_TYPES}
+    record_type = {"type": "string", "enum": record_types}
+    domain = {"type": "object", "properties": {"name": {"type": "string"}, "type": declare(domain_type, "DomainType")}}
+    record = {"type": "object", "properties": {"type": declare(record_type, "RecordType")}, "required": ["type"]}
+    paths = {
+        **producer(domain),
+        **operation_with_body(
+            "post", "/domains/{domain_name}/records", "201", record, parameters=[path_param("domain_name")]
+        ),
+    }
+
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"DomainType": domain_type, "RecordType": record_type}}
+    )
+
+    link = {
+        "operationRef": "#/paths/~1domains~1{domain_name}~1records/post",
+        "parameters": {"path.domain_name": f"$response.body#{item}/name"},
+        "x-schemathesis": {"is_inferred": True},
+    }
+    if copied:
+        link["requestBody"] = {"type": f"$response.body#{item}/type"}
+        link["x-schemathesis"]["merge_body"] = True
+    assert inferred_links(graph) == [[producer_ref, "200", link]]
+
+
 def injected_links(schema):
     schema.as_state_machine()
     links = {}

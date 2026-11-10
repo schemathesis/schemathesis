@@ -1006,6 +1006,8 @@ class DeferredBindings:
     named_query_parameters: list[tuple[str, JsonSchema]]
     # Required scalar body fields.
     body_fields: list[tuple[str, JsonSchema]]
+    # Required body fields copied from a resource the parameters address (`type` <- `Domain.type`).
+    copied_resource_fields: list[tuple[InputSlot, JsonSchema]]
     # `(resource, parameter)` for path parameters named after a field of their owning resource (`/projects/{code}`).
     field_named_path_parameters: list[tuple[str, str]]
     # Body fields a client may send.
@@ -1018,6 +1020,7 @@ class DeferredBindings:
         self.named_scalars = []
         self.named_query_parameters = []
         self.body_fields = []
+        self.copied_resource_fields = []
         self.field_named_path_parameters = []
         self.writable_body_fields = {}
         self.identifier_array_fields = set()
