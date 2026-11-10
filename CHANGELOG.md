@@ -34,6 +34,7 @@
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - Links reading values from map properties named after the path, e.g. `tags` in `PATCH /orders/{id}/tags`.
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
+- Links learned from `Location` headers or body URLs reaching other operations sharing a `$ref` response.
 - Coverage and examples phases sending requests without credentials learned by auth inference.
 - gRPC error details in `grpc-status-details-bin` shown as `<EMPTY>` in failure output.
 - Resource pool forgetting live ids after a DELETE, e.g. the org after `DELETE /orgs/1/users/7`.

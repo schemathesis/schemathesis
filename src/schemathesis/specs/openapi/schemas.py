@@ -426,10 +426,13 @@ class OpenApiSchema(BaseSchema):
         _ = self._validation_error
         injected = 0
         if observations is not None:
+            # Links learned from one operation must not reach other operations sharing its response definition
+            self.analysis.unshare_responses()
+            # Operations recorded before unsharing still point at the shared definitions
             for operation, entries in observations.location_headers.items():
-                injected += self.analysis.inferencer.inject_links(operation, entries)
+                injected += self.analysis.inferencer.inject_links(self[operation.path][operation.method], entries)
             for operation, body_entries in observations.body_urls.items():
-                injected += self.analysis.inferencer.inject_links(operation, body_entries)
+                injected += self.analysis.inferencer.inject_links(self[operation.path][operation.method], body_entries)
         if self.analysis.should_inject_links():
             injected += self.analysis.inject_links()
         # Injected links land in the schema, where operations may share a response definition, so one
