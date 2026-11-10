@@ -8716,19 +8716,13 @@ def test_unbuildable_optional_property_does_not_erase_positive_cases(ctx):
             "required": ["name"],
             "properties": {
                 "name": {"type": "string"},
-                "token": {
-                    "type": "string",
-                    "pattern": ".*",
-                    "minLength": 0,
-                    "maxLength": 2147483647,
-                },
+                "token": {"type": "string", "pattern": "\\p{Tibetan}+"},
             },
         },
     )
     assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
         {"name": ""},
         {"name": OVERSIZED},
-        {"name": "", "token": ""},
     ]
 
 
