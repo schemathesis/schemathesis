@@ -28,6 +28,7 @@ from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candi
 from test.apps.catalog.openapi import basic
 from test.apps.fragments import handlers
 from test.apps.fragments.schemas import linked_users
+from test.utils import run_given
 
 
 def _make_flaky_repro_schema(ctx):
@@ -821,6 +822,82 @@ def test_iter_link_candidates_edge_links(ctx, case_factory, response_factory, li
         excluded_labels=set(),
     )
     assert candidates == []
+
+
+@pytest.mark.parametrize(
+    ("extension", "expected"),
+    [
+        (None, {"productId": "abc", "quantity": 1}),
+        ({"merge_body": False}, {"productId": "abc"}),
+    ],
+    ids=["merge", "replace"],
+)
+def test_link_candidate_body_merging(ctx, case_factory, response_factory, extension, expected):
+    link = {"operationId": "createOrder", "requestBody": {"productId": "$response.body#/productId"}}
+    if extension is not None:
+        link["x-schemathesis"] = extension
+    schema = ctx.openapi.load_schema(
+        {
+            "/products": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"productId": {"type": "string"}}}
+                                }
+                            },
+                            "links": {"CreateOrder": link},
+                        }
+                    }
+                }
+            },
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["productId", "quantity"],
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "productId": {"type": "string"},
+                                        "quantity": {"type": "integer", "enum": [1]},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+        }
+    )
+    source = schema["/products"]["POST"]
+    target = schema["/orders"]["POST"]
+    response = Response.from_requests(
+        response_factory.requests(status_code=201, content=json.dumps({"productId": "abc"}).encode()),
+        verify=True,
+    )
+    [(operation, overrides)] = schema.iter_link_candidates(
+        operation=source,
+        case=case_factory(operation=source),
+        response=response,
+        operations_by_label={source.label: source, target.label: target},
+        excluded_labels=set(),
+    )
+    bodies = []
+
+    @run_given(operation.as_strategy(**overrides), max_examples=5)
+    def collect(case):
+        bodies.append(case.body)
+
+    assert bodies
+    assert [body for body in bodies if body != expected] == []
 
 
 def test_fuzz_follows_wildcard_link_with_one_listed_identifier(ctx, app_runner):

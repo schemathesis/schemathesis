@@ -778,6 +778,7 @@ def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
     # POST /products returns a fixed high-entropy (productId, secret) pair; only when /audit
     # body carries that exact pair does the planted schema violation surface. Random fuzz
     # has no way to guess the pair, so without body-link forwarding the bug is invisible.
+    # The link sets no `quantity`, so the bug also needs the generated one kept in the body.
     valid_product_id = "alpha-product-7af3-bbfd-4b2d-9b5d"
     valid_secret = "bravo-secret-9c11-c209-1cac-a29f"
     paths = {
@@ -818,10 +819,11 @@ def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["productId", "secret"],
+                                "required": ["productId", "secret", "quantity"],
                                 "properties": {
                                     "productId": {"type": "string"},
                                     "secret": {"type": "string"},
+                                    "quantity": {"type": "integer"},
                                 },
                             }
                         }
@@ -846,6 +848,8 @@ def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
         if not isinstance(data, dict):
             return "", 400
         if (data.get("productId"), data.get("secret")) != (valid_product_id, valid_secret):
+            return "", 400
+        if not isinstance(data.get("quantity"), int):
             return "", 400
         # Planted bug: required `name` is null for valid pairs.
         return jsonify({"name": None}), 200

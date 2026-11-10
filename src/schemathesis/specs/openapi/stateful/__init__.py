@@ -454,21 +454,28 @@ def into_step_input(
                             applied_parameters.append((ParameterLocation.BODY, field_name))
 
                     if selected_fields:
-                        if isinstance(case.body, dict):
-                            case.body = merge_link_body(case.body, selected_fields)
-                        else:
-                            # Can't merge into non-dict, replace entirely
-                            case.body = selected_fields
+                        LinkedBody(selected_fields).apply(case)
                 elif biased_coin(use_p):
-                    case.body = merge_link_body(case.body, request_body)
+                    LinkedBody(request_body).apply(case)
                     applied_parameters.append((ParameterLocation.BODY, None))
-                if case._meta is not None:
-                    case._meta.constants_draws = prune_overwritten_body_constants(case._meta.constants_draws, case.body)
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)
 
     return builder
+
+
+@dataclass(frozen=True, slots=True)
+class LinkedBody:
+    """Request body values a link sets on top of a generated body."""
+
+    value: JsonValue
+
+    def apply(self, case: Case) -> Case:
+        case.body = merge_link_body(case.body, self.value)
+        if case._meta is not None:
+            case._meta.constants_draws = prune_overwritten_body_constants(case._meta.constants_draws, case.body)
+        return case
 
 
 def merge_link_body(generated: object, linked: JsonValue) -> JsonValue:
