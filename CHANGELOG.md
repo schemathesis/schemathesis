@@ -46,6 +46,7 @@
 - Coverage and examples phases sending requests without credentials learned by auth inference.
 - Stateful testing failing when operations share a response defined in another file.
 - gRPC error details in `grpc-status-details-bin` shown as `<EMPTY>` in failure output.
+- Missing links for nested body fields and response fields named like `part_pk` or `customer-id`.
 - Resource pool forgetting live ids after a DELETE, e.g. the org after `DELETE /orgs/1/users/7`.
 - Links filling `format: uuid` parameters with the resource's integer `id`.
 - False positive `negative_data_rejection` for string bodies with text media types other than `text/plain`.
