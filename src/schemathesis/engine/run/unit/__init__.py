@@ -78,10 +78,7 @@ def _create_scheduler(
 ) -> tuple[Scheduler, int]:
     """Create the appropriate scheduler and count the entries it will hand out."""
     operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
-    if phase.name != PhaseName.COVERAGE:
-        # An operation whose required body has no usable schema cannot be sent valid data, so every phase
-        # but coverage - which tests it by omitting the body - would judge it on data it never described.
-        operations = [item for item in operations if not (isinstance(item, Ok) and item.ok().has_skipped_required_body)]
+    operations = [item for item in operations if not isinstance(item, Ok) or item.ok().is_testable_in(phase.name)]
     if only is not None:
         operations = [item for item in operations if isinstance(item, Ok) and item.ok().label in only]
     # Entries the schema could not produce never claim a share, so counting them shrinks every other one.

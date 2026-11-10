@@ -1124,6 +1124,12 @@ class APIOperation(Generic[P, R, S, SchemaT]):
             for parameter in self.skipped_parameters
         )
 
+    def is_testable_in(self, phase: str) -> bool:
+        """Whether the given test phase can send this operation the data its schema describes."""
+        # An operation whose required body has no usable schema cannot be sent valid data, so every phase
+        # but coverage - which tests it by omitting the body - would judge it on data it never described.
+        return phase == TestPhase.COVERAGE or not self.has_skipped_required_body
+
     def iter_parameters(self) -> Iterator[P]:
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 

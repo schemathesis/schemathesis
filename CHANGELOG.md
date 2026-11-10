@@ -9,6 +9,7 @@
 - Missing links for fields inherited through `allOf` chains reusing a schema name across files.
 - `[generation] mode` from the config file ignored by `st run` and `st fuzz`.
 - False positive `negative_data_rejection` for form body values another `anyOf` branch accepts as text.
+- False positive `positive_data_acceptance` in pytest for required bodies with unresolvable references.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.
 - Links treating `PUT` updaters as creators when the collection's `POST` is a path item `$ref`.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
