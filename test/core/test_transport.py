@@ -56,6 +56,12 @@ def test_empty_wsgi_response_encoding(headers, expected):
     assert (response.status_code, response.content, response.encoding) == (204, b"", expected)
 
 
+def test_wsgi_response_encoding(response_factory):
+    raw = response_factory.wsgi(content="café".encode("latin-1"), content_type="text/plain; charset=latin-1")
+    response = Response.from_wsgi(raw)
+    assert (response.encoding, response.text) == ("latin-1", "café")
+
+
 @pytest.mark.parametrize(
     ("content", "charset", "expected"),
     [
