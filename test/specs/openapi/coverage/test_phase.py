@@ -7427,9 +7427,23 @@ def test_negative_data_rejection_no_false_positive_for_nullable_binary_multipart
     [
         ({"type": "string", "pattern": "^[0-9]+$"}, [{"f": [""]}]),
         ({"type": "string", "pattern": "^[0-9]+$", "nullable": True}, [{"f": [""]}]),
+        ({"allOf": [{"type": "string", "pattern": "^[0-9]+$"}]}, [{"f": [""]}]),
+        ({"allOf": [{"$ref": "#/components/schemas/Text"}]}, [{"f": [""]}]),
+        ({"allOf": [{"$ref": "#/components/schemas/Loop"}]}, [{"f": [""]}]),
+        ({"allOf": [{"type": "string", "pattern": "^[0-9]+$"}, {"minimum": 10}]}, [{"f": [""]}]),
+        ({"allOf": [{"minimum": 10}, {"maximum": 20}]}, [{"f": [4]}]),
         ({"enum": ["4"]}, []),
     ],
-    ids=["string", "nullable-string", "untyped-enum"],
+    ids=[
+        "string",
+        "nullable-string",
+        "all-of",
+        "all-of-ref",
+        "all-of-ref-cycle",
+        "all-of-untyped-sibling",
+        "untyped-all-of",
+        "untyped-enum",
+    ],
 )
 def test_negative_multipart_array_items_skip_values_another_branch_accepts_as_text(ctx, text_branch, expected):
     # Each array item travels as its own text part, so `4` arrives as "4" and matches the text branch.
@@ -7438,6 +7452,12 @@ def test_negative_multipart_array_items_skip_values_another_branch_accepts_as_te
         ctx,
         {"type": "object", "properties": {"f": {"type": "array", "items": items}}},
         media_type="multipart/form-data",
+        components={
+            "schemas": {
+                "Text": {"type": "string", "pattern": "^[0-9]+$"},
+                "Loop": {"allOf": [{"type": "string", "pattern": "^[0-9]+$"}, {"$ref": "#/components/schemas/Loop"}]},
+            }
+        },
     )
 
     assert [
