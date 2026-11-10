@@ -19,6 +19,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     Cardinality,
     DefinitionSource,
     NestedFKCache,
+    OpenFields,
     OperationMap,
     ResourceDefinition,
     ResourceMap,
@@ -877,22 +878,71 @@ def contains_value(values: list[Any], value: Any) -> bool:
 
 
 def _declared_fields(schema: Mapping[str, Any], resolver: Resolver) -> frozenset[str] | None:
-    """Fields declared by an object schema, its `allOf` parents, and any of its `oneOf` / `anyOf` alternatives."""
+    """Fields declared by an object schema, its `allOf` parents, and any of their `oneOf` / `anyOf` alternatives."""
     schema_resolver, resolved = maybe_resolve_with_resolver(schema, resolver)
-    if "object" not in get_type(cast(dict, resolved)) and "properties" not in resolved:
+    if not _may_be_object(resolved):
         # Binary or scalar bodies carry no fields at all
         return frozenset()
-    fields = set(_collect_properties(resolved, schema_resolver))
-    for keyword in ("oneOf", "anyOf"):
-        alternatives = resolved.get(keyword)
-        if not isinstance(alternatives, list):
+    alternative_fields, is_open = _alternative_fields(resolved, schema_resolver, frozenset())
+    fields = frozenset(_collect_properties(resolved, schema_resolver)) | alternative_fields
+    if not fields:
+        return None
+    return OpenFields(fields) if is_open else fields
+
+
+def _may_be_object(schema: Mapping[str, Any]) -> bool:
+    return "object" in get_type(cast(dict, schema)) or "properties" in schema
+
+
+def _alternative_fields(
+    schema: Mapping[str, Any], resolver: Resolver, seen: frozenset[str]
+) -> tuple[frozenset[str], bool]:
+    """Fields the `oneOf` / `anyOf` alternatives within `schema` declare, and whether one may hold any field."""
+    fields: frozenset[str] = frozenset()
+    is_open = False
+    for is_alternative, branch_resolver, branch, branch_seen in _iter_composition_branches(schema, resolver, seen):
+        branch_fields, branch_open = _alternative_fields(branch, branch_resolver, branch_seen)
+        if is_alternative and _may_be_object(branch):
+            branch_fields |= frozenset(_collect_properties(branch, branch_resolver))
+            # An object alternative listing no fields may hold any, as a bare object response may
+            branch_open |= not branch_fields
+        fields |= branch_fields
+        is_open |= branch_open
+    return fields, is_open
+
+
+def _iter_composition_branches(
+    schema: Mapping[str, Any], resolver: Resolver, seen: frozenset[str]
+) -> Iterator[tuple[bool, Resolver, Mapping[str, Any], frozenset[str]]]:
+    """Each `allOf` / `oneOf` / `anyOf` branch of `schema`, resolved and flagged when it is a `oneOf` / `anyOf` one."""
+    for keyword in ("allOf", "oneOf", "anyOf"):
+        branches = schema.get(keyword)
+        if not isinstance(branches, list):
             continue
-        for alternative in alternatives:
-            if not isinstance(alternative, dict):
+        is_alternative = keyword != "allOf"
+        for branch in branches:
+            if branch is True:
+                branch = {}
+            if not isinstance(branch, dict):
                 continue
-            try:
-                alternative_resolver, alternative = maybe_resolve_with_resolver(alternative, schema_resolver)
-            except (RefResolutionError, InvalidSchema):
-                continue
-            fields.update(_collect_properties(alternative, alternative_resolver))
-    return frozenset(fields) or None
+            resolved = _resolve_branch(branch, resolver, seen)
+            if resolved is not None:
+                yield is_alternative, *resolved
+
+
+def _resolve_branch(
+    branch: Mapping[str, Any], resolver: Resolver, seen: frozenset[str]
+) -> tuple[Resolver, Mapping[str, Any], frozenset[str]] | None:
+    """`branch` resolved, with the references followed to reach it; `None` when it closes a reference cycle."""
+    reference = branch.get("$ref")
+    if isinstance(reference, str):
+        uri = resolve_reference_uri(resolver.base_uri, reference)
+        if uri in seen:
+            return None
+        seen = seen | {uri}
+    try:
+        branch_resolver, resolved = maybe_resolve_with_resolver(branch, resolver)
+    except (RefResolutionError, InvalidSchema):
+        # Nothing rules out a field of a branch that cannot be read
+        return resolver, {}, seen
+    return branch_resolver, resolved, seen

@@ -13751,6 +13751,77 @@ def test_path_param_named_after_resource_and_an_undeclared_field_is_not_linked(c
     assert inferred_links(graph) == []
 
 
+ONE_OF_CHECK = {"oneOf": [component_ref("HttpCheck"), component_ref("TcpCheck")]}
+OPEN_ONE_OF_CHECK = {"oneOf": [component_ref("HttpCheck"), {"type": "object"}]}
+
+
+# Only a response listing fields of its own, or with no branch that may hold any field, rules a field out.
+@pytest.mark.parametrize(
+    ("items", "unverifiable"),
+    [
+        (ONE_OF_CHECK, False),
+        (component_ref("Check"), False),
+        ({"allOf": [component_ref("Check")]}, False),
+        ({"allOf": [component_ref("CheckBase"), component_ref("Check")]}, False),
+        ({"oneOf": [component_ref("Check"), component_ref("TcpCheck")]}, False),
+        ({"oneOf": [{"allOf": [component_ref("Check")]}, component_ref("TcpCheck")]}, False),
+        ({**OPEN_ONE_OF_CHECK, "type": "object", "properties": {"name": {"type": "string"}}}, False),
+        ({"oneOf": [component_ref("HttpCheck"), False]}, False),
+        (OPEN_ONE_OF_CHECK, True),
+        (
+            {"oneOf": [{**OPEN_ONE_OF_CHECK, "properties": {"name": {"type": "string"}}}, component_ref("TcpCheck")]},
+            True,
+        ),
+        ({"oneOf": [component_ref("HttpCheck"), True]}, True),
+        ({"oneOf": [component_ref("HttpCheck"), component_ref("Missing")]}, True),
+    ],
+    ids=[
+        "oneOf",
+        "ref-oneOf",
+        "allOf-oneOf",
+        "allOf-base-oneOf",
+        "nested-oneOf",
+        "branch-allOf-oneOf",
+        "properties-open-branch",
+        "false-branch",
+        "open-branch",
+        "nested-open-branch",
+        "true-branch",
+        "dangling-branch",
+    ],
+)
+@pytest.mark.parametrize("key", ["id", "checkID"], ids=["undeclared", "declared"])
+def test_path_param_named_after_one_of_resource_links_only_a_declared_field(ctx, items, unverifiable, key):
+    components = {
+        "schemas": {
+            "Check": ONE_OF_CHECK,
+            "CheckBase": {"type": "object", "properties": {"name": {"type": "string"}}},
+            "HttpCheck": {"type": "object", "properties": {key: {"type": "string"}, "url": {"type": "string"}}},
+            "TcpCheck": {"type": "object", "properties": {"id": {"type": "string"}, "port": {"type": "integer"}}},
+        }
+    }
+    listing = {"type": "object", "properties": {"checks": {"type": "array", "items": items}}}
+    paths = {
+        **operation("get", "/checks", "200", listing),
+        **operation("delete", "/checks/{checkID}", "204", parameters=[path_param("checkID")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, version="3.1.0", components=components)
+
+    expected = [
+        [
+            "#/paths/~1checks/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1checks~1{checkID}/delete",
+                "parameters": {"path.checkID": "$response.body#/checks/*/checkID"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (expected if key == "checkID" or unverifiable else [])
+
+
 PROJECT_MEMBER = {"type": "object", "properties": {"key": {"type": "string"}, "role": {"type": "string"}}}
 
 
