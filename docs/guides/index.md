@@ -1,0 +1,93 @@
+# Available Guides
+
+## Getting Started
+
+### [Triaging Failures](triage.md)
+Work through a large number of failures systematically — from easy batch fixes to individual investigation.
+
+### [Baseline](baseline.md)
+Record the failures you are not fixing yet so CI fails only on ones that are new.
+
+### [Replaying Failures](crash-reproduction.md)
+Re-run the exact cases that failed a previous run with `st replay` to confirm fixes, without launching a whole new campaign.
+
+### [Authentication](auth.md)
+Set up authentication for APIs that require credentials. Covers static tokens, config-based token fetch, Web Fuzzing Commons auth files, dynamic refresh, and endpoint-specific auth strategies.
+
+### [Testing Object-Level Authorization](object-level-authorization.md)
+Check that one user cannot read objects another user owns, using two sets of credentials.
+
+### [Testing Write-Level Authorization](write-side-authorization.md)
+Build checks for the write side: cross-identity writes, mass assignment and non-atomic transitions.
+
+### [Adding Schema Validation to Existing Tests](schema-conformance.md)
+Validate API responses against your schema in existing test suites without using Schemathesis for data generation.
+
+## Integration
+
+### [HTML Report](html-report.md)
+Write a run to one offline page with the verdict, warnings and a command to reproduce every failure.
+
+### [Allure Integration](allure.md)
+Export test results as Allure report files with per-operation status, failure steps, and severity labels.
+
+### [CI/CD Integration](cicd.md)
+Integrate Schemathesis into automated testing pipelines. Includes GitHub Actions and GitLab CI configurations, JUnit and JSON reports for gating, and splitting a run across jobs.
+
+### [Using Schemathesis with Docker](docker.md)
+Run Schemathesis without installing Python — covers file schemas, hooks, and reports.
+
+### [Schema Coverage](coverage.md)
+Measure schema-level API coverage down to individual keywords using TraceCov.
+
+### [Testing Python Web Applications](python-apps.md)
+Test Flask, FastAPI, and other Python web apps directly without network overhead.
+
+## Customization
+
+### [Custom Media Types](custom-media-types.md)
+Generate valid binary content like PDFs or images when your API accepts specialized file formats.
+
+### [Custom Serializers](custom-serializers.md)
+Transform test data into non-JSON formats like CSV, MessagePack, or XML for APIs that expect alternative serialization.
+
+### [Custom Response Deserializers](custom-response-deserializers.md)
+Decode non-JSON or vendor-specific responses back into Python objects so schema checks work with your API.
+
+### [Server-Sent Events](server-sent-events.md)
+Test `text/event-stream` endpoints - validate each event against `itemSchema`, handle polymorphic event types, and work with embedded JSON payloads.
+
+### [Testing gRPC Services](grpc.md)
+Fuzz unary gRPC methods through server reflection or a descriptor set, over plaintext or TLS.
+
+### [GraphQL Custom Scalars](graphql-custom-scalars.md)
+Configure domain-specific scalar types so Schemathesis generates appropriate test data for emails, phone numbers, or custom IDs.
+
+### [Extending Schemathesis](extending.md)
+Customize data generation and validation through hooks, custom checks, and format strategies.
+
+### [Extending CLI](extending-cli.md)
+Add custom command-line options and event handlers for integration with external tools.
+
+## Advanced Testing
+
+### [Optimizing for Maximum Bug Detection](config-optimization.md)
+Configure Schemathesis for thorough testing when preparing for production releases or conducting security assessments.
+
+### [Benchmarking Schemathesis](benchmarking.md)
+Configure a run for measuring the tool itself - comparing it with other tools, or checking whether a change helped.
+
+### [Continuous Fuzzing](continuous-fuzzing.md)
+Run `st run --max-time` for overnight sessions and fuzzing pipelines that keep generating test cases until a time limit is reached.
+
+### [Customizing Stateful Testing](stateful-testing.md)
+Schemathesis chains operations into workflows on its own — configure authentication, data initialization, and scenario setup for the cases where the defaults don't fit.
+
+### [Using Hypothesis Strategies](hypothesis-strategies.md)
+Combine Schemathesis with custom Hypothesis strategies or use Schemathesis strategies in other testing frameworks.
+
+### [Targeted Testing](targeted.md)
+Use property-based testing strategies to find performance issues and edge cases by directing test generation toward specific goals.
+
+### [Fuzz Dictionaries](fuzz-dictionary.md)
+Feed curated value pools (SQL injection payloads, real IDs, classic security strings) into generation, broadly by type or pinpointed at a parameter.
