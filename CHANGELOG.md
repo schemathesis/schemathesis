@@ -31,6 +31,7 @@
 - Missing links for responses naming the resource id `pk`, as in Django REST Framework.
 - Links passing path parameters like `{id}` between unrelated resources, e.g. a customer id into `/orders/{id}`.
 - Links copying a fetched value into an update body field whose `$ref` enum rejects it.
+- Open API 3.2 media types referenced from another file leaving responses unvalidated and without links.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - Links reading values from map properties named after the path, e.g. `tags` in `PATCH /orders/{id}/tags`.
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.

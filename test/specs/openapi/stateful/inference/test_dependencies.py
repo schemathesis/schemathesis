@@ -3671,6 +3671,39 @@ def test_same_reference_text_in_another_file_names_a_different_schema(ctx):
     ]
 
 
+@pytest.mark.parametrize(
+    "media_type",
+    [{"schema": ORDER_IN_OTHER_FILE}, ref("common.json#/components/mediaTypes/Order")],
+    ids=["schema-in-other-file", "media-type-in-other-file"],
+)
+def test_media_type_in_other_file_referring_to_sibling_definition(ctx, media_type):
+    ctx.makefile(
+        {
+            "components": {
+                "mediaTypes": {"Order": {"schema": component_ref("Order")}},
+                "schemas": {"Order": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}},
+            }
+        },
+        filename="common",
+    )
+    content = {"application/json": media_type}
+    root = ctx.openapi.write_schema(
+        {
+            "/orders": {"post": {"responses": {"201": {"description": "Created", "content": content}}}},
+            "/orders/{orderId}": {
+                "get": {
+                    "parameters": [path_param("orderId")],
+                    "responses": {"200": {"description": "OK", "content": content}},
+                }
+            },
+        },
+        version="3.2.0",
+    )
+    assert inferred_links(analyze(schemathesis.openapi.from_path(str(root)))) == [
+        ["#/paths/~1orders/post", "201", read_order_link("/id")]
+    ]
+
+
 def listed_in_operation(collection, keyword):
     return ref(
         f"#/paths/~1{collection}/get/responses/200/content/application~1json/schema/properties/{collection}/{keyword}"

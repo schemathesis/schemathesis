@@ -409,6 +409,27 @@ def test_openapi_3_2_media_type_reference_in_response(ctx, response_factory, con
         )
 
 
+def test_openapi_3_2_media_type_reference_into_other_file_in_response(ctx, response_factory):
+    ctx.makefile(
+        {
+            "components": {
+                "mediaTypes": {"Item": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                "schemas": {"Item": ITEM},
+            }
+        },
+        filename="media",
+    )
+    content = {"application/json": {"$ref": "media.json#/components/mediaTypes/Item"}}
+    path = ctx.openapi.write_schema(
+        {"/items": {"get": {"responses": {"200": {"description": "OK", "content": content}}}}}, version="3.2.0"
+    )
+    operation = schemathesis.openapi.from_path(str(path))["/items"]["GET"]
+    headers = {"content-type": ["application/json"]}
+    operation.validate_response(response_factory.core(content=b'{"id": 1}', headers=headers))
+    with pytest.raises(JsonSchemaError):
+        operation.validate_response(response_factory.core(content=b'{"id": "bad"}', headers=headers))
+
+
 @pytest.mark.parametrize(
     "parameters",
     [

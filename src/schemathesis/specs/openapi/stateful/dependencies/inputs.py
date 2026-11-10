@@ -951,7 +951,7 @@ def _accepts_read_values(
     response = reader.responses.get(output.status_code)
     # The output was extracted from this response.
     assert response is not None
-    read = declared_field_values(response, output.pointer, field, schema.root_resolver)
+    read = declared_field_values(response, output.pointer, field)
     return read is None or all(contains_value(accepted, value) for value in read)
 
 
@@ -1382,7 +1382,7 @@ def bind_parent_keys_to_item_fields(schema: OpenApiSchema, operations: Operation
         unreadable = {
             field
             for response in declared.responses.iter_successful_responses()
-            for field in write_only_fields(response, schema.root_resolver)
+            for field in write_only_fields(response)
         }
         for input_slot in operation.inputs:
             parameter_name = input_slot.parameter_name

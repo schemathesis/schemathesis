@@ -149,6 +149,8 @@ class OpenApiResponse:
     # The response object in the loaded document. Inferred links go there, so operations rebuilt later keep them
     source: Mapping[str, Any]
     resolver: Resolver
+    # Media types given by `$ref` resolve their own references in the document the `$ref` points to
+    media_type_resolvers: dict[str, Resolver]
     scope: str
     adapter: ResponseAdapter
     cache: ResponseSchemaCache
@@ -158,6 +160,7 @@ class OpenApiResponse:
         "definition",
         "source",
         "resolver",
+        "media_type_resolvers",
         "scope",
         "adapter",
         "cache",
@@ -179,6 +182,11 @@ class OpenApiResponse:
         """Convert media type to cache key, using sentinel for None."""
         return media_type if media_type is not None else _NO_MEDIA_TYPE
 
+    def _resolver_for(self, media_type: str | None) -> Resolver:
+        if media_type is None:
+            return self.resolver
+        return self.media_type_resolvers.get(media_type, self.resolver)
+
     def get_schema(self, media_type: str | None = None) -> ResolvedSchema:
         """Return the schema for the given media type (or the default one).
 
@@ -192,7 +200,7 @@ class OpenApiResponse:
                 bundled = self.adapter.extract_schema_for_media_type(
                     self.definition,
                     resolved_media_type,
-                    self.resolver,
+                    self._resolver_for(resolved_media_type),
                     self.scope,
                     self.adapter.nullable_keyword,
                     self.cache,
@@ -232,7 +240,12 @@ class OpenApiResponse:
         if resolved is None:
             try:
                 bundled = self.adapter.extract_stream_schema(
-                    self.definition, media_type, self.resolver, self.scope, self.adapter.nullable_keyword, self.cache
+                    self.definition,
+                    media_type,
+                    self._resolver_for(media_type),
+                    self.scope,
+                    self.adapter.nullable_keyword,
+                    self.cache,
                 )
             except RefResolutionError as exc:
                 resolved = ResolvedSchema(
@@ -300,35 +313,37 @@ class OpenApiResponse:
         media_type_object = _media_type_object(self.definition, media_type)
         return media_type_object is not None and "itemSchema" in media_type_object
 
-    def iter_documented_schemas(self) -> Iterator[JsonSchema]:
-        """Every schema this response documents, as written and one per media type."""
+    def iter_documented_schemas(self) -> Iterator[tuple[Resolver, JsonSchema]]:
+        """Every schema this response documents, as written and one per media type, with the resolver for it."""
         content = self.definition.get("content")
         if not isinstance(content, dict) or not content:
-            raw = self.get_raw_schema()
+            resolver, raw = self.get_raw_schema()
             if raw is not None:
-                yield raw
+                yield resolver, raw
             return
         for media_type, media_type_object in content.items():
             if not isinstance(media_type_object, dict):
                 continue
+            resolver = self._resolver_for(media_type)
             # A media type left unresolved documents nothing but its own reference
             if "$ref" in media_type_object:
-                yield media_type_object
+                yield resolver, media_type_object
                 continue
             schemas = [media_type_object.get("schema")]
             if media_types.is_sse(media_type) or media_types.is_json_sequence(media_type):
                 schemas.append(media_type_object.get("itemSchema"))
-            yield from (schema for schema in schemas if schema is not None)
+            yield from ((resolver, schema) for schema in schemas if schema is not None)
 
-    def get_raw_schema(self) -> JsonSchema | None:
-        """Raw and unresolved response schema.
+    def get_raw_schema(self) -> tuple[Resolver, JsonSchema | None]:
+        """Raw and unresolved response schema, with the resolver for its references.
 
         For OpenAPI 3.x with multiple content types, returns the schema for the first/default media type.
         Used primarily for stateful testing where we analyze schema structure rather than validate responses.
 
         TODO: Extend stateful testing to support multiple content types properly.
         """
-        return self.adapter.extract_raw_response_schema(self.definition)
+        media_type, schema = self.adapter.extract_raw_response_schema(self.definition)
+        return self._resolver_for(media_type), schema
 
     @property
     def headers(self) -> OpenApiResponseHeaders:
@@ -403,6 +418,7 @@ class OpenApiResponses:
             definition=definition,
             source=definition,
             resolver=self.resolver,
+            media_type_resolvers={},
             scope=self.scope,
             adapter=self.adapter,
             cache=self.cache,
@@ -472,17 +488,17 @@ def _iter_resolved_responses(
         status_code = str(key)
         response_resolver, source = maybe_resolve_with_resolver(response, resolver)
         resolved = source
+        media_type_resolvers: dict[str, Resolver] = {}
         content = source.get("content", {})
         if not isinstance(content, dict):
             # Written without an object value, `content` documents no media types
             resolved = {**source, "content": {}}
         elif any(not isinstance(entry, dict) or _has_reference(entry) for entry in content.values()):
-            resolved = {
-                **source,
-                "content": {
-                    media_type: _resolve_media_type(entry, response_resolver) for media_type, entry in content.items()
-                },
-            }
+            resolved_content = {}
+            for media_type, entry in content.items():
+                media_type_resolver, resolved_content[media_type] = _resolve_media_type(entry, response_resolver)
+                media_type_resolvers[media_type] = media_type_resolver
+            resolved = {**source, "content": resolved_content}
         new_scope = response_resolver.base_uri
         yield (
             status_code,
@@ -491,6 +507,7 @@ def _iter_resolved_responses(
                 definition=resolved,
                 source=source,
                 resolver=response_resolver,
+                media_type_resolvers=media_type_resolvers,
                 scope=new_scope,
                 adapter=adapter,
                 cache=cache,
@@ -503,22 +520,22 @@ def _has_reference(entry: object) -> bool:
     return isinstance(entry, dict) and ("$ref" in entry or has_example_references(entry))
 
 
-def _resolve_media_type(entry: object, resolver: Resolver) -> object:
+def _resolve_media_type(entry: object, resolver: Resolver) -> tuple[Resolver, object]:
     if not isinstance(entry, dict):
         # Still documented as a media type, with no schema or examples
-        return {}
+        return resolver, {}
     try:
-        return resolve_media_type_object(entry, resolver)[1]
+        return resolve_media_type_object(entry, resolver)
     except RefResolutionError:
         # Kept as written: the response goes unvalidated and its reference is reported as unresolvable
-        return entry
+        return resolver, entry
 
 
 def extract_response_schema_v2(
     response: Mapping[str, Any], resolver: Resolver, scope: str, nullable_keyword: str, cache: ResponseSchemaCache
 ) -> Bundle | None:
     """Extract and prepare response schema for Swagger 2.0."""
-    schema = extract_raw_response_schema_v2(response)
+    _, schema = extract_raw_response_schema_v2(response)
     if schema is not None:
         return cache.prepared(
             schema,
@@ -531,22 +548,24 @@ def extract_response_schema_v2(
     return None
 
 
-def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | None:
+def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> tuple[str | None, JsonSchema | None]:
     """Extract raw schema from Swagger 2.0 response (schema is at top level)."""
-    return response.get("schema")
+    return None, response.get("schema")
 
 
 def extract_raw_response_schema_v3(
     response: Mapping[str, Any], *, schema_covers_stream: bool = False
-) -> JsonSchema | None:
+) -> tuple[str | None, JsonSchema | None]:
     content = response.get("content", {})
-    first_schema = None
+    first_media_type, first_schema = None, None
     for media_type, media_type_object in content.items():
         if media_types.is_sse(media_type):
-            return _media_type_schema(media_type, media_type_object, schema_covers_stream=schema_covers_stream)
+            return media_type, _media_type_schema(
+                media_type, media_type_object, schema_covers_stream=schema_covers_stream
+            )
         if first_schema is None:
-            first_schema = media_type_object.get("schema")
-    return first_schema
+            first_media_type, first_schema = media_type, media_type_object.get("schema")
+    return first_media_type, first_schema
 
 
 def _build_prepared_schema(
