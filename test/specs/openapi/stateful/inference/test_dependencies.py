@@ -5599,17 +5599,27 @@ def test_name_parameter_does_not_take_identifier(ctx, consumer, parameter, expec
 
 
 @pytest.mark.parametrize(
-    ("item_fields", "parameters"),
+    ("location", "parameter", "item_fields", "returns_item", "source"),
     [
-        (["id", "name"], {"path.fileId": "$response.body#/id"}),
-        (
-            ["id", "track_name"],
-            {"path.fileId": "$response.body#/id", "query.track_name": "$response.body#/track_name"},
-        ),
+        ("query", "track_name", ["id", "name"], False, None),
+        ("query", "track_name", ["id", "track_name"], False, "track_name"),
+        ("query", "track_name", ["id", "name"], True, None),
+        ("header", "track_name", ["id", "name"], False, None),
+        ("header", "track_name", ["id", "track_name"], False, "track_name"),
+        ("header", "X-File-Name", ["id", "name"], False, "name"),
+        ("header", "X-Registry-Name", ["id", "name"], True, "name"),
     ],
-    ids=["other-name-field", "own-name-field"],
+    ids=[
+        "query-other-name-field",
+        "query-own-name-field",
+        "query-other-name-field-of-returned-item",
+        "header-other-name-field",
+        "header-own-name-field",
+        "header-prefixed-resource-name",
+        "header-name-of-returned-item",
+    ],
 )
-def test_name_query_parameter_takes_only_field_of_same_name(ctx, item_fields, parameters):
+def test_name_parameter_takes_only_field_of_same_name(ctx, location, parameter, item_fields, returns_item, source):
     item = {"type": "object", "properties": {field: {"type": "string"} for field in item_fields}}
     _, graph = analyze_dependencies(
         ctx,
@@ -5619,14 +5629,18 @@ def test_name_query_parameter_takes_only_field_of_same_name(ctx, item_fields, pa
                 "patch",
                 "/files/{fileId}",
                 "200",
+                item if returns_item else None,
                 parameters=[
                     path_param("fileId"),
-                    {"name": "track_name", "in": "query", "required": False, "schema": {"type": "string"}},
+                    {"name": parameter, "in": location, "required": False, "schema": {"type": "string"}},
                 ],
             ),
         },
     )
 
+    parameters = {"path.fileId": "$response.body#/id"}
+    if source is not None:
+        parameters[f"{location}.{parameter}"] = f"$response.body#/{source}"
     assert inferred_links(graph) == [
         [
             "#/paths/~1files/post",

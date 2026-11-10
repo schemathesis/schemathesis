@@ -222,15 +222,16 @@ class DependencyGraph:
                         elif input_slot.resource_field is not None:
                             # A name filter's prefix says whose name it takes (`owner_name`); other names are wrong.
                             if (
-                                input_slot.parameter_location == ParameterLocation.QUERY
+                                input_slot.parameter_location in (ParameterLocation.QUERY, ParameterLocation.HEADER)
                                 and isinstance(input_slot.parameter_name, str)
                                 and key_kind(input_slot.parameter_name) == KeyKind.NAME
                                 and (
-                                    not parameter_names_source(
+                                    not _name_takes_source(
                                         parameter=input_slot.parameter_name,
+                                        location=input_slot.parameter_location,
                                         field=input_slot.resource_field,
-                                        resource=output_slot.resource.name,
-                                        pointer=output_slot.pointer,
+                                        output_slot=output_slot,
+                                        consumer=consumer,
                                     )
                                     # `Rule.TemplateName` beside `Rule.Name` names a template, not the rule.
                                     or (
@@ -785,6 +786,21 @@ def _takes_confirmed_value(input_slot: InputSlot, confirmed: InputSlot) -> bool:
 def _names_identifier(field: str, resource_name: str) -> bool:
     # `id` or `<resource>Id`: the field that identifies the resource itself, not one it refers to
     return normalize_for_matching(field) in ("id", normalize_for_matching(resource_name) + "id")
+
+
+def _name_takes_source(
+    *, parameter: str, location: ParameterLocation, field: str, output_slot: OutputSlot, consumer: OperationNode
+) -> bool:
+    """Whether a `*_name` query or header parameter names the resource or response field holding `field`."""
+    if location == ParameterLocation.HEADER:
+        # A call returning the item sets its own name, even under a vendor prefix: `X-Registry-Name`.
+        if any(output.resource is output_slot.resource for output in consumer.outputs):
+            return True
+        if parameter[:2].lower() == "x-":
+            parameter = parameter[2:]
+    return parameter_names_source(
+        parameter=parameter, field=field, resource=output_slot.resource.name, pointer=output_slot.pointer
+    )
 
 
 def _key_kind(parameter_name: str | int) -> KeyKind | None:
