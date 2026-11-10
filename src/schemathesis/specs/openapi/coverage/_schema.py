@@ -78,6 +78,7 @@ from schemathesis.core.jsonschema.patterns import (
 )
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference_with_uri
 from schemathesis.core.jsonschema.types import (
+    ALL_TYPES,
     ANY_TYPE,
     JsonSchema,
     JsonSchemaObject,
@@ -2652,7 +2653,7 @@ def _negative_any_of(
             for generated in cover_schema_iter(nctx, sub_schema, seen):
                 # Negative value for this schema could be a positive value for another one
                 if not contains_binary(generated.value) and any(
-                    is_valid_for_others(generated.value, idx, judge, resolved_schemas, stringify_body_fields)
+                    is_valid_for_others(ctx, generated.value, idx, judge, resolved_schemas, stringify_body_fields)
                     for judge in validators
                 ):
                     continue
@@ -2898,7 +2899,27 @@ def cover_schema_iter(
                         )
 
 
+def _admitted_types(ctx: CoverageContext, schema: JsonSchema) -> list[str]:
+    """Types every part of `schema` allows, reading `allOf` parts and references through."""
+    admitted = ALL_TYPES
+    pending = [schema]
+    references: list[str] = []
+    while pending:
+        node = pending.pop()
+        if isinstance(node, dict) and "$ref" in node:
+            if node["$ref"] not in references:
+                references.append(node["$ref"])
+                pending.append(ctx.resolve_ref(node["$ref"]))
+            continue
+        node_types = parameter_types(node)
+        admitted = [name for name in admitted if name in node_types]
+        if isinstance(node, dict):
+            pending.extend(node.get("allOf", []))
+    return admitted
+
+
 def is_valid_for_others(
+    ctx: CoverageContext,
     value: Any,
     idx: int,
     validators: list[jsonschema_rs.Validator],
@@ -2913,7 +2934,7 @@ def is_valid_for_others(
             return True
         # Form values travel as str(); a branch without a declared type accepts any string vacuously, so it can't count.
         if will_be_serialized_to_string and not isinstance(value, str) and schemas is not None:
-            admitted = parameter_types(schemas[vidx])
+            admitted = _admitted_types(ctx, schemas[vidx])
             if "string" in admitted and admitted != ANY_TYPE and validator.is_valid(str(value)):
                 return True
     return False
