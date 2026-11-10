@@ -3763,6 +3763,53 @@ def test_references_to_items_of_different_component_lists_name_different_resourc
     assert inferred_links(graph) == [CREATE_TO_PURCHASE]
 
 
+@pytest.mark.parametrize(
+    ("listing", "reference", "name"),
+    [
+        ("/orders", listed_in_operation("orders", "items"), "Order"),
+        ("/orders", ref("#/components/schemas/Orders/items"), "Order"),
+        ("/orders", ref("common.json#/Orders/items"), "Order"),
+        ("/", ref("#/components/schemas/Orders/items"), "Resource"),
+        ("/orders", component_ref("Purchase"), "Purchase"),
+    ],
+    ids=[
+        "operation-list-item",
+        "component-list-item",
+        "other-file-list-item",
+        "root-path-list-item",
+        "named-component",
+    ],
+)
+def test_link_names_for_unnamed_subschemas_come_from_the_consumer_path(ctx, listing, reference, name):
+    item = collection_item("orders")
+    orders = {"type": "array", "items": item}
+    ctx.makefile({"Orders": orders}, filename="common")
+    read = {**response("200", reference), "parameters": [path_param("purchase_id", "integer")]}
+    purchase = f"{listing.rstrip('/')}/{{purchase_id}}"
+    root = ctx.openapi.write_schema(
+        {
+            listing: {
+                "get": response("200", {"type": "object", "properties": {"orders": orders}}),
+                "post": response("201", reference),
+            },
+            purchase: {"get": read, "delete": read},
+        },
+        components={"schemas": {"Orders": orders, "Purchase": item}},
+    )
+    get, delete = (
+        {
+            "operationRef": f"#/paths/{purchase.replace('/', '~1')}/{method}",
+            "parameters": {"path.purchase_id": "$response.body#/id"},
+        }
+        for method in ("get", "delete")
+    )
+    assert injected_links(schemathesis.openapi.from_path(str(root))) == {
+        f"POST {listing} 201": {f"Get{name}": get, f"Delete{name}": delete},
+        f"GET {purchase} 200": {f"Delete{name}": delete},
+        f"DELETE {purchase} 200": {f"Get{name}": get},
+    }
+
+
 def test_components_named_after_keywords_keep_their_names(ctx):
     names = {"warehouses": "schema", "orders": "items"}
     paths = warehouses_and_orders(

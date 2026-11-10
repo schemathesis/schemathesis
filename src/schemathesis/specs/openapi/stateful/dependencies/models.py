@@ -265,21 +265,8 @@ class DependencyGraph:
                         if value_expr.startswith("$response.body") and output_slot.status_code in ("204", "205"):
                             # These statuses forbid a body, whatever the schema declares.
                             continue
-                        link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
-                        # A separate link, so other links keep generating these fields.
-                        if input_slot.echoes_response:
-                            link_name += "Echo"
-                        parameters = {}
-                        request_body: dict[str, Any] | list = {}
-                        # Data is extracted from response body
-                        if input_slot.parameter_location == ParameterLocation.BODY:
-                            request_body = build_nested_body(
-                                input_slot.body_path or (input_slot.parameter_name,), value_expr
-                            )
-                        else:
-                            parameters = {
-                                f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": value_expr,
-                            }
+                        link_name = _link_name(consumer.method, input_slot, path_resource_names[consumer_id])
+                        parameters, request_body = _link_values(input_slot, value_expr)
                         if not input_slot.is_named_after_collection:
                             forwarding.add(link_name)
                         existing = links.get(link_name)
@@ -780,6 +767,23 @@ def _takes_confirmed_value(input_slot: InputSlot, confirmed: InputSlot) -> bool:
         KeyKind.NAME,
         KeyKind.IDENTIFIER,
     }
+
+
+def _link_name(method: str, input_slot: InputSlot, consumer_resource_name: str | None) -> str:
+    resource_name = input_slot.resource.name
+    # Unnamed subschemas are keyed by their pointer, which is not a name to show users.
+    if "#/" in resource_name:
+        resource_name = consumer_resource_name or "Resource"
+    # A separate link, so other links keep generating these fields.
+    suffix = "Echo" if input_slot.echoes_response else ""
+    return f"{method.capitalize()}{resource_name}{suffix}"
+
+
+def _link_values(input_slot: InputSlot, value_expr: str) -> tuple[dict[str, str], dict[str, Any] | list[Any]]:
+    """Link parameters and request body that send `value_expr` to the input."""
+    if input_slot.parameter_location == ParameterLocation.BODY:
+        return {}, build_nested_body(input_slot.body_path or (input_slot.parameter_name,), value_expr)
+    return {f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": value_expr}, {}
 
 
 def _names_identifier(field: str, resource_name: str) -> bool:
