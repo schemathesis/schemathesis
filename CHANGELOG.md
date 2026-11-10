@@ -33,6 +33,7 @@
 - No inferred links for responses whose schema lives in another file and references its siblings.
 - Links filling `*_name` header parameters with an unrelated `name` field.
 - Missing links and an internal error for response schemas with their own `$id` and `$defs`.
+- Links passing values from collections like `/managed/devices` into unrelated operations like `/devices/{serial}`.
 - Missing links for body fields and query filters named after a resource, e.g. `part`, `?company=`.
 - Links filling path parameters from `writeOnly` response fields behind `$ref` or marked `x-writeOnly`.
 - Missing links for responses naming the resource id `pk`, as in Django REST Framework.

@@ -4,6 +4,7 @@ import enum
 import re
 from collections.abc import Collection, Mapping
 from functools import lru_cache
+from typing import TypeAlias
 
 from schemathesis.core.text import to_pascal_case
 
@@ -267,6 +268,90 @@ def _owning_segment_resource(segments: list[str], parameter: str) -> str | None:
     if index == 0 or "{" in segments[index - 1]:
         return None
     return to_pascal_case(to_singular(segments[index - 1]))
+
+
+# Static segments of a path, with `{}` for every parameter: `("sites", "{}", "managed", "devices")`.
+CollectionShape: TypeAlias = tuple[str, ...]
+
+
+@lru_cache(maxsize=32)
+def qualified_collections(paths: frozenset[str]) -> frozenset[CollectionShape]:
+    """Collections behind a static segment that key their items unlike the plain collection of the same name.
+
+    `/sites/{id}/managed/devices/{deviceId}` lists other things than `/devices/{serial}` does, while
+    `/stock/devices/{serial}` lists the same devices.
+    """
+    placeholders = _collection_placeholders(paths)
+    # `/urls/{list_type}` without `/urls` selects a list rather than naming an item
+    listed = {_collection_shape(path) for path in paths}
+    return _keyed_unlike_plain(placeholders, listed)
+
+
+def item_collection(path: str) -> CollectionShape:
+    """The collection whose items `path` addresses: `/managed/devices/{deviceId}` -> `("managed", "devices")`."""
+    shape = _collection_shape(path)
+    end = len(shape)
+    while end and shape[end - 1] == "{}":
+        end -= 1
+    return shape[:end]
+
+
+def _collection_placeholders(paths: Collection[str]) -> dict[CollectionShape, set[str]]:
+    placeholders: dict[CollectionShape, set[str]] = {}
+    for path in paths:
+        shape = _collection_shape(path)
+        end = 0
+        for index, segment in enumerate(_collection_segments(path)):
+            if shape[index] != "{}":
+                end = index + 1
+            elif end:
+                # Every key of `/apps/{owner}/{app}` counts
+                placeholders.setdefault(shape[:end], set()).add(segment)
+    return placeholders
+
+
+def _keyed_unlike_plain(
+    placeholders: dict[CollectionShape, set[str]], listed: set[CollectionShape]
+) -> frozenset[CollectionShape]:
+    plain: dict[str, set[str]] = {}
+    for shape, keys in placeholders.items():
+        if len(shape) == 1 or shape[-2] == "{}":
+            plain.setdefault(shape[-1], set()).update(keys)
+    return frozenset(shape for shape, keys in placeholders.items() if _keyed_unlike(shape, keys, plain, listed))
+
+
+def _keyed_unlike(
+    shape: CollectionShape, keys: set[str], plain: dict[str, set[str]], listed: set[CollectionShape]
+) -> bool:
+    return (
+        len(shape) > 1
+        and shape[-2] != "{}"
+        and shape in listed
+        and shape[-1] in plain
+        and _item_keys(plain[shape[-1]], shape[-1]).isdisjoint(_item_keys(keys, shape[-1]))
+    )
+
+
+def _item_keys(placeholders: set[str], collection: str) -> set[str]:
+    # `{deviceId}`, `{device_id}`, `{device}` and `{id}` under `/devices` are one key
+    prefix = normalize_for_matching(to_singular(collection))
+    return {
+        normalize_for_matching(placeholder.strip("{}")).removeprefix(prefix) or "id" for placeholder in placeholders
+    }
+
+
+@lru_cache(maxsize=2048)
+def _collection_segments(path: str) -> tuple[str, ...]:
+    return tuple(_resource_segments(strip_version_prefix(path)))
+
+
+@lru_cache(maxsize=2048)
+def _collection_shape(path: str) -> CollectionShape:
+    return _shape(_collection_segments(path))
+
+
+def _shape(segments: tuple[str, ...]) -> CollectionShape:
+    return tuple("{}" if "{" in segment else segment for segment in segments)
 
 
 IRREGULAR_TO_PLURAL = {

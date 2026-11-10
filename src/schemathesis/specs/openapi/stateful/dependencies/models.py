@@ -25,10 +25,12 @@ from schemathesis.specs.openapi.stateful.dependencies.naming import (
     KeyKind,
     collection_path,
     from_path,
+    item_collection,
     key_kind,
     normalize_for_matching,
     owning_resource,
     parameter_names_source,
+    qualified_collections,
     strip_version_prefix,
     trailing_path_parameter,
 )
@@ -64,6 +66,7 @@ class DependencyGraph:
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
+                del output["named_after_path"]
                 if output.get("identifier_pointer") is None:
                     output.pop("identifier_pointer", None)
                 if output.get("path_parameter") is None:
@@ -97,23 +100,8 @@ class DependencyGraph:
 
         # Precomputed data for the cross-namespace scope guard (bare {id} collision check).
         # All string work happens once here rather than inside the hot inner loop.
-        path_resource_names: dict[int, str | None] = {}
-        # Stripped producer path per operation
-        stripped_paths: dict[int, str] = {}
-        # (consumer_collection, consumer_collection + "/") for ops with a bare {id} segment
-        id_collection_paths: dict[int, tuple[str, str] | None] = {}
-        for op in self.operations.values():
-            op_id = id(op)
-            path_resource_names[op_id] = from_path(op.path)
-            stripped_paths[op_id] = strip_version_prefix(op.path)
-            segments = op.path.split("/")
-            for i, seg in enumerate(segments):
-                if seg == "{id}":
-                    collection = strip_version_prefix("/".join(segments[:i]) or "/")
-                    id_collection_paths[op_id] = (collection, collection + "/")
-                    break
-            else:
-                id_collection_paths[op_id] = None
+        path_resource_names, stripped_paths, id_collection_paths = _scope_guard_paths(self.operations.values())
+        qualifiers = _collection_qualifiers(list(self.operations.values()))
 
         # Index consumers by resource
         consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]] = defaultdict(dict)
@@ -137,10 +125,13 @@ class DependencyGraph:
         for producer in self.operations.values():
             producer_path = encoded_paths[id(producer)]
             producer_id = id(producer)
+            qualifier = qualifiers.get(producer_id)
 
             for output_slot in producer.outputs:
                 # Only iterate over consumers that match this resource
                 relevant_consumers = consumers_by_resource.get(id(output_slot.resource), {})
+                if qualifier is not None:
+                    relevant_consumers = _consumers_under(relevant_consumers, qualifier, output_slot)
                 confirmed = _confirmed_input(producer, output_slot)
 
                 for consumer_id, (consumer, input_slots) in relevant_consumers.items():
@@ -1116,6 +1107,8 @@ class OutputSlot:
     # Envelope field identifying the resource when the resource itself declares no identifier
     # (`/bookingid` in `{bookingid: 1, booking: {...}}`).
     identifier_pointer: str | None = None
+    # Whether only the operation path names the resource, as no `$ref` declares it
+    named_after_path: bool = False
 
     @property
     def declared_fields(self) -> Collection[str]:
@@ -1259,6 +1252,52 @@ def _returned_by_path(operations: Iterable[OperationNode]) -> dict[str, set[int]
             if output_slot.pointer == "/":
                 returned.setdefault(operation.path, set()).add(id(output_slot.resource))
     return returned
+
+
+def _scope_guard_paths(
+    operations: Iterable[OperationNode],
+) -> tuple[dict[int, str | None], dict[int, str], dict[int, tuple[str, str] | None]]:
+    path_resource_names: dict[int, str | None] = {}
+    # Stripped producer path per operation
+    stripped_paths: dict[int, str] = {}
+    # (consumer_collection, consumer_collection + "/") for ops with a bare {id} segment
+    id_collection_paths: dict[int, tuple[str, str] | None] = {}
+    for op in operations:
+        op_id = id(op)
+        path_resource_names[op_id] = from_path(op.path)
+        stripped_paths[op_id] = strip_version_prefix(op.path)
+        segments = op.path.split("/")
+        for i, seg in enumerate(segments):
+            if seg == "{id}":
+                collection = strip_version_prefix("/".join(segments[:i]) or "/")
+                id_collection_paths[op_id] = (collection, collection + "/")
+                break
+        else:
+            id_collection_paths[op_id] = None
+    return path_resource_names, stripped_paths, id_collection_paths
+
+
+def _collection_qualifiers(operations: list[OperationNode]) -> dict[int, str]:
+    # The segment before a collection whose items differ from the plain collection's: `managed` in `/managed/devices`
+    qualified = qualified_collections(frozenset(operation.path for operation in operations))
+    if not qualified:
+        return {}
+    return {
+        id(operation): collection[-2]
+        for operation in operations
+        if (collection := item_collection(operation.path)) in qualified
+    }
+
+
+def _consumers_under(
+    consumers: dict[int, tuple[OperationNode, list[InputSlot]]], qualifier: str, output_slot: OutputSlot
+) -> dict[int, tuple[OperationNode, list[InputSlot]]]:
+    # Items `/managed/devices` declares inline share only a name with `/devices` items, so they stay under `managed`
+    if not output_slot.named_after_path:
+        return consumers
+    return {
+        consumer_id: entry for consumer_id, entry in consumers.items() if qualifier in item_collection(entry[0].path)
+    }
 
 
 def _keys_different_items(producer: OperationNode, consumer: OperationNode, parameter: str) -> bool:
