@@ -309,6 +309,10 @@ CANONICAL_CASES = [
     # Python's `re` matches `$` before a trailing newline; the validator does not.
     ({"type": "string", "pattern": "x$"}, ()),
     ({"type": "string", "pattern": "[0-9]{2}", "maxLength": 4}, ()),
+    (
+        {"type": "string", "pattern": r"^(\+\d{1,3})?\d*", "minLength": 1, "maxLength": 10},
+        (str.isdigit, lambda value: value.startswith("+")),
+    ),
     # Python reads the shorthand classes over the whole of Unicode, the validator over ASCII only.
     ({"type": "string", "pattern": "^\\d+"}, (lambda value: len(value) > 1,)),
     ({"type": "string", "pattern": "^[\\w]+"}, ()),
