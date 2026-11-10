@@ -474,11 +474,8 @@ class Response:
 
         reason = http.client.responses.get(response.status_code, "Unknown")
         data = response.get_data()
-        if not response.response:
-            # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
-            encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
-        else:
-            encoding = None
+        # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
+        encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
         request = requests.Request(
             method=response.request.method,
             url=str(response.request.url),
