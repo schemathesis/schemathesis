@@ -465,12 +465,8 @@ def _resolve_body_dependencies(
             and resource_name not in candidate_resource_names
         )
         if resource_name is not None and not gated:
-            fk_info = infer_fk_target(property_name)
-            if (
-                fk_info is not None
-                and not fk_info[2]
-                and holds_only_arrays(iter_all_of_chain(subschema, bundled, _resolve_bundled))
-            ):
+            plural = _names_identifier_array(property_name, subschema, bundled)
+            if plural is False:
                 deferred.identifier_array_fields.add(property_name)
             resource = resources.get(resource_name)
             if resource is None:
@@ -495,6 +491,7 @@ def _resolve_body_dependencies(
                 resource_field=field,
                 parameter_name=property_name,
                 parameter_location=ParameterLocation.BODY,
+                takes_array=plural is True,
             )
             continue
 
@@ -550,7 +547,7 @@ class NestedFKScan:
     # Bodies bundle the same references separately, yet find the same FK fields behind them.
     by_reference: NestedFKCache
     # Bodies reuse the same schemas at many places; each is scanned once per remaining depth.
-    by_schema: dict[tuple[int, int], list[tuple[BodyPath, str, str]]]
+    by_schema: dict[tuple[int, int], list[tuple[BodyPath, str, str, bool]]]
     # Flattened writable properties, once whatever the remaining depth.
     flattened: dict[int, dict[str, Any]]
 
@@ -559,7 +556,7 @@ def _extract_nested_body_fk_fields(
     schema: dict[str, Any],
     resources: ResourceMap,
     scan: NestedFKScan,
-    deferred: list[tuple[str, str, BodyPath]],
+    deferred: list[tuple[str, str, BodyPath, bool]],
 ) -> Iterator[InputSlot]:
     """Recursively extract FK fields from nested request body schemas.
 
@@ -581,7 +578,7 @@ def _extract_nested_body_fk_fields(
     for property_name, subschema in children:
         if not isinstance(subschema, dict) or is_read_only(subschema, scan.bundled):
             continue
-        for suffix, target_resource_name, target_field in _container_fk_fields(subschema, scan, 5):
+        for suffix, target_resource_name, target_field, takes_array in _container_fk_fields(subschema, scan, 5):
             nested_path = (property_name, *suffix)
             resource = resources.get(target_resource_name)
             if resource is not None:
@@ -590,19 +587,22 @@ def _extract_nested_body_fk_fields(
                     resource_field=target_field,
                     parameter_name=format_body_key(nested_path),
                     parameter_location=ParameterLocation.BODY,
+                    takes_array=takes_array,
                     body_path=nested_path,
                 )
             else:
-                deferred.append((target_resource_name, target_field, nested_path))
+                deferred.append((target_resource_name, target_field, nested_path, takes_array))
 
 
-def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: int) -> list[tuple[BodyPath, str, str]]:
-    """FK fields under `schema` as `(path suffix, target resource, target field)`."""
+def _container_fk_fields(
+    schema: dict[str, Any], scan: NestedFKScan, max_depth: int
+) -> list[tuple[BodyPath, str, str, bool]]:
+    """FK fields under `schema` as `(path suffix, target resource, target field, whether it takes an array)`."""
     key = (id(schema), max_depth)
     cached = scan.by_schema.get(key)
     if cached is not None:
         return cached
-    fields: list[tuple[BodyPath, str, str]] = []
+    fields: list[tuple[BodyPath, str, str, bool]] = []
     scan.by_schema[key] = fields
     reference = schema.get("$ref")
     if isinstance(reference, str):
@@ -625,8 +625,8 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
         items = schema.get("items")
         if isinstance(items, dict):
             fields.extend(
-                ((0, *suffix), resource, field)
-                for suffix, resource, field in _container_fk_fields(items, scan, max_depth)
+                ((0, *suffix), resource, field, takes_array)
+                for suffix, resource, field, takes_array in _container_fk_fields(items, scan, max_depth)
             )
         return fields
 
@@ -643,17 +643,18 @@ def _container_fk_fields(schema: dict[str, Any], scan: NestedFKScan, max_depth: 
         if fk_info is None:
             continue
         target_resource_name, target_field, is_array = fk_info
+        takes_array = holds_only_arrays(iter_all_of_chain(field_schema, scan.bundled, _resolve_bundled))
         # A singular name on an array holds no single identifier to send.
-        if not is_array and holds_only_arrays(iter_all_of_chain(field_schema, scan.bundled, _resolve_bundled)):
+        if not is_array and takes_array:
             continue
-        fields.append(((name,), target_resource_name, target_field))
+        fields.append(((name,), target_resource_name, target_field, takes_array))
 
     if max_depth > 1:
         for name, subschema in properties.items():
             if isinstance(subschema, dict):
                 fields.extend(
-                    ((name, *suffix), resource, field)
-                    for suffix, resource, field in _container_fk_fields(subschema, scan, max_depth - 1)
+                    ((name, *suffix), resource, field, takes_array)
+                    for suffix, resource, field, takes_array in _container_fk_fields(subschema, scan, max_depth - 1)
                 )
     return fields
 
@@ -687,6 +688,17 @@ def _takes_array(schema: JsonSchema) -> bool:
         elif all("array" in types for types in declared):
             return True
     return False
+
+
+def _names_identifier_array(name: str, schema: JsonSchema, bundled: dict[str, Any]) -> bool | None:
+    """For a field named after identifiers and holding only arrays, whether the name is plural (`customer_ids`).
+
+    A plural name takes identifiers as array items, a singular one (`customer_id`) takes none; other fields give `None`.
+    """
+    fk_info = infer_fk_target(name)
+    if fk_info is None or not holds_only_arrays(iter_all_of_chain(schema, bundled, _resolve_bundled)):
+        return None
+    return fk_info[2]
 
 
 def _resolve_bundled(schema: dict[str, Any], bundled: dict[str, Any]) -> tuple[dict[str, Any], object] | None:

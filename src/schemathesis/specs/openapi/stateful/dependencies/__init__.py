@@ -109,7 +109,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # producer paths can sort after their consumers (e.g. /departments alphabetises before
     # /locations) and the per-operation pass would otherwise drop those slots.
     for label, bindings in deferred.items():
-        for target_resource_name, target_field, body_path in bindings.nested_fks:
+        for target_resource_name, target_field, body_path, takes_array in bindings.nested_fks:
             target_resource = resources.get(target_resource_name)
             if target_resource is None:
                 continue
@@ -119,6 +119,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     resource_field=target_field,
                     parameter_name=format_body_key(body_path),
                     parameter_location=ParameterLocation.BODY,
+                    takes_array=takes_array,
                     body_path=body_path,
                 )
             )
