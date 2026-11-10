@@ -4,7 +4,8 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from schemathesis.core.errors import InvalidSchema, RefResolutionError
+from schemathesis.core import media_types
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType, RefResolutionError
 from schemathesis.core.jsonschema import resolve_bundled_ref
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_uri
@@ -162,7 +163,7 @@ def iter_resources_from_response(
     # Example: POST /api/recipes returns just a slug string - treat this as Recipe.slug
     # Example: POST /api/users returns just an integer ID - treat this as User.id
     schema_type = schema.get("type")
-    if schema_type in ("string", "integer") and method in ("post", "put"):
+    if _is_created_identifier(method=method, schema_type=schema_type, response=response):
         primitive_resource = _resource_from_primitive_response(path=path, resources=resources)
         if primitive_resource is not None:
             yield primitive_resource
@@ -455,6 +456,32 @@ def _resource_from_boolean_schema(*, path: str, resources: ResourceMap) -> Extra
         resources[name] = resource
     # Do not update existing resource as if it is inferred, it will have at least one field
     return ExtractedResource(resource=resource, cardinality=Cardinality.ONE, pointer=ROOT_POINTER)
+
+
+def _is_created_identifier(*, method: str, schema_type: object, response: OpenApiResponse) -> bool:
+    """Whether a POST/PUT response body is just the identifier of what it created."""
+    return (
+        schema_type in ("string", "integer")
+        and method in ("post", "put")
+        and _can_carry_identifier(response.get_raw_schema_media_type())
+    )
+
+
+_IDENTIFIER_MEDIA_TYPES = (("application", "json"), ("text", "plain"))
+
+
+def _can_carry_identifier(media_type: str | None) -> bool:
+    """Whether a whole body of this media type can be a bare identifier, not a document such as SDP or HTML."""
+    # Open API 2.0 responses name no media type of their own
+    if media_type is None:
+        return True
+    try:
+        parsed = media_types.parse(media_type)
+    except MalformedMediaType:
+        return False
+    return media_types.is_json_parts(parsed) or any(
+        media_types.matches_parts(parsed, candidate) for candidate in _IDENTIFIER_MEDIA_TYPES
+    )
 
 
 def _resource_from_primitive_response(
