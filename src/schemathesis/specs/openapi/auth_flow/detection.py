@@ -97,10 +97,10 @@ def _find_token(properties: JsonSchemaObject, resolver: Resolver, seen: set[int]
 
 def _token_pointer(login: APIOperation) -> str | None:
     for response in login.responses.iter_successful_responses():
-        raw_schema = response.get_raw_schema()
+        resolver, raw_schema = response.get_raw_schema()
         if not isinstance(raw_schema, dict):
             continue
-        resolver, body_schema = _resolve(raw_schema, response.resolver)
+        resolver, body_schema = _resolve(raw_schema, resolver)
         properties = body_schema.get("properties")
         if isinstance(properties, dict):
             found = _find_token(properties, resolver, {id(properties)})

@@ -417,6 +417,38 @@ def test_detect_unresolvable_references(ctx, operation, expected):
     ]
 
 
+# A media type from another document resolves its schema there, not in the document referring to it.
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        ("#/components/schemas/User", []),
+        ("#/components/schemas/RootOnly", [("response `200`", "#/components/schemas/RootOnly")]),
+    ],
+    ids=["defined-next-to-media-type", "defined-in-referring-document"],
+)
+def test_detect_unresolvable_references_in_media_type_from_other_file(ctx, reference, expected):
+    ctx.makefile(
+        {
+            "components": {
+                "mediaTypes": {"User": {"schema": {"$ref": reference}}},
+                "schemas": {"User": {"type": "object"}},
+            }
+        },
+        filename="media",
+    )
+    content = {"application/json": {"$ref": "media.json#/components/mediaTypes/User"}}
+    path = ctx.openapi.write_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "Success", "content": content}}}}},
+        version="3.2.0",
+        components={"schemas": {"RootOnly": {"type": "object"}}},
+    )
+
+    assert detect_unresolvable_references(schemathesis.openapi.from_path(str(path))["/users"]["GET"]) == [
+        UnresolvableReferenceWarning(operation_label="GET /users", subject=subject, reference=reference)
+        for subject, reference in expected
+    ]
+
+
 @pytest.mark.parametrize("first", ["A", "B"])
 def test_unresolvable_reference_behind_a_cycle_is_reported_for_every_response(ctx, first):
     second = "B" if first == "A" else "A"

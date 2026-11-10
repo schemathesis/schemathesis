@@ -1,5 +1,6 @@
 import pytest
 
+import schemathesis
 from schemathesis.specs.openapi.auth_flow.detection import detect_auth_flow
 from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 
@@ -156,6 +157,24 @@ TOKEN_IN_OWN_DOCUMENT = {
 )
 def test_token_behind_references_into_its_own_document(ctx, token_schema, pointer):
     assert _detect(ctx, _flow(token_schema=token_schema), version="3.1.0").token_pointer == pointer
+
+
+def test_token_in_media_type_from_other_file(ctx):
+    ctx.makefile(
+        {
+            "components": {
+                "mediaTypes": {"Token": {"schema": {"$ref": "#/components/schemas/Token"}}},
+                "schemas": {"Token": TOKEN_RESPONSE},
+            }
+        },
+        filename="media",
+    )
+    paths = _flow()
+    paths["/login"]["post"]["responses"]["200"]["content"] = {
+        "application/json": {"$ref": "media.json#/components/mediaTypes/Token"}
+    }
+    path = ctx.openapi.write_schema(paths, version="3.2.0", components={"securitySchemes": BEARER})
+    assert detect_auth_flow(schemathesis.openapi.from_path(str(path))) == EXPECTED
 
 
 @pytest.mark.parametrize(

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.security import SecurityParameter
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
-ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
+ExtractRawResponseSchema = Callable[[Mapping[str, Any]], tuple[str | None, Union["JsonSchema", None]]]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "Resolver", str, str], "Bundle"]
 ResolveResponseMediaType = Callable[[Mapping[str, Any], str | None], str | None]
 ExtractSchemaForMediaType = Callable[

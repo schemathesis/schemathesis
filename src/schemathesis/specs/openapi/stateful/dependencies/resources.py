@@ -92,7 +92,6 @@ ResponseResourceCache: TypeAlias = dict[str, list[tuple["OpenApiResponse", Extra
 class InferenceState:
     """What the per-operation scan shares across every operation of one schema."""
 
-    resolver: Resolver
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
     candidate_resource_names: frozenset[str]
     resources: ResourceMap
@@ -107,7 +106,6 @@ class InferenceState:
     @classmethod
     def for_schema(cls, schema: OpenApiSchema) -> InferenceState:
         return cls(
-            resolver=schema.root_resolver,
             candidate_resource_names=naming.collect_candidate_resource_names(schema.raw_schema),
             resources={},
             updated_resources=set(),
@@ -143,7 +141,7 @@ def iter_resources_from_response(
     resources = state.resources
     updated_resources = state.updated_resources
     canonicalization_cache = state.canonicalization_cache
-    schema = response.get_raw_schema()
+    current_resolver, schema = response.get_raw_schema()
 
     if isinstance(schema, bool):
         boolean_resource = _resource_from_boolean_schema(path=path, resources=resources)
@@ -173,8 +171,6 @@ def iter_resources_from_response(
             if primitive_array is not None:
                 yield primitive_array
                 return None
-
-    current_resolver = response.resolver if response.resolver is not None else state.resolver
 
     # Handle map-by-id GET responses: `{type: object, additionalProperties: <object>}` with no
     # explicit properties. Keys are the identifiers (Kubernetes pod-statuses, TBA team-statuses).
@@ -719,12 +715,11 @@ def _collect_inherited_properties(
     return properties, frozenset(consulted)
 
 
-def write_only_fields(response: OpenApiResponse, resolver: Resolver) -> set[str]:
+def write_only_fields(response: OpenApiResponse) -> set[str]:
     """Top-level fields the response declares `writeOnly`, which therefore never appear in it."""
-    schema = response.get_raw_schema()
+    current_resolver, schema = response.get_raw_schema()
     if not isinstance(schema, dict):
         return set()
-    current_resolver = response.resolver if response.resolver is not None else resolver
     try:
         schema_resolver, resolved = maybe_resolve_with_resolver(schema, current_resolver)
         properties = _collect_properties(resolved, schema_resolver)
@@ -747,11 +742,9 @@ def _follow_reference(resolver: Resolver, node: Mapping[str, Any]) -> tuple[Reso
 
 def referenced_schema_names(response: OpenApiResponse, pointer: str) -> dict[str, str]:
     """Schema each field of the object at `pointer` (of each item, for a list) refers to: `role` -> `NestedRole`."""
-    schema = response.get_raw_schema()
+    schema_resolver, schema = response.get_raw_schema()
     # The output at `pointer` was extracted from this schema, so its references resolve.
-    current_resolver, current = maybe_resolve_with_resolver(
-        schema if isinstance(schema, dict) else {}, response.resolver
-    )
+    current_resolver, current = maybe_resolve_with_resolver(schema if isinstance(schema, dict) else {}, schema_resolver)
     for name in (decode_pointer(part) for part in pointer.split("/") if part):
         entry_resolver, subschema = _collect_properties(current, current_resolver).get(name, (current_resolver, {}))
         current_resolver, current = maybe_resolve_with_resolver(
@@ -772,12 +765,11 @@ def referenced_schema_names(response: OpenApiResponse, pointer: str) -> dict[str
     return names
 
 
-def declared_field_values(response: OpenApiResponse, pointer: str, field: str, resolver: Resolver) -> list[Any] | None:
+def declared_field_values(response: OpenApiResponse, pointer: str, field: str) -> list[Any] | None:
     """Values the response allows for `field` of the object at `pointer`; `None` when it does not list them."""
-    schema = response.get_raw_schema()
+    current_resolver, schema = response.get_raw_schema()
     # Outputs come from the response body, so the schema is an object.
     assert isinstance(schema, dict)
-    current_resolver = response.resolver if response.resolver is not None else resolver
     current: Any = schema
     # References up to the field were resolved when the output was extracted; the field's own are resolved below.
     for name in [*(decode_pointer(part) for part in pointer.split("/") if part), field]:

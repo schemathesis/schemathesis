@@ -347,8 +347,8 @@ def _iter_unvalidatable_responses(operation: APIOperation, memo: dict[str, str |
     """Yield the responses that cannot be validated, with the reference to blame."""
     for status_code, response in operation.responses.items():
         seen: set[str] = set()
-        for schema in response.iter_documented_schemas():
-            reference = find_unresolvable_reference(schema, response.resolver, memo)
+        for resolver, schema in response.iter_documented_schemas():
+            reference = find_unresolvable_reference(schema, resolver, memo)
             if reference is not None and reference not in seen:
                 seen.add(reference)
                 yield f"response `{status_code}`", reference
