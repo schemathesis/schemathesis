@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from schemathesis import errors, graphql, grpc, openapi, pytest, python
+from schemathesis import errors, graphql, grpc, openapi, pytest, python, stateful
 from schemathesis.auths import AuthContext, AuthProvider, auth
 from schemathesis.checks import CheckContext, CheckFunction, CheckResult, check
 from schemathesis.config import SchemathesisConfig as Config
 from schemathesis.core.deserialization import DeserializationContext, deserializer
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.generation import GenerationMode, stateful
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.metrics import MetricContext, MetricFunction, metric
 from schemathesis.hooks import HookContext, hook
