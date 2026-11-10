@@ -636,6 +636,7 @@ def _container_fk_fields(
     fields: list[tuple[BodyPath, str, str, bool]] = []
     scan.by_schema[key] = fields
     reference = schema.get("$ref")
+    target = schema
     if isinstance(reference, str):
         # Follows alias chains; returns the schema itself when its reference does not resolve.
         target = resolve_bundled_ref(schema, scan.bundled)
@@ -646,20 +647,14 @@ def _container_fk_fields(
             if shared is not fields:
                 scan.by_schema[key] = shared
                 return shared
-        if target is not schema and target.get("type") == "array":
-            # Each followed reference spends depth, so an array whose items point back at it terminates.
-            if max_depth <= 1:
-                return fields
-            schema = target
-            max_depth -= 1
-    if schema.get("type") == "array":
-        items = schema.get("items")
-        if isinstance(items, dict):
-            fields.extend(
-                ((0, *suffix), resource, field, takes_array)
-                for suffix, resource, field, takes_array in _container_fk_fields(items, scan, max_depth)
-            )
+    array_fields = _array_fk_fields(schema, target, scan, max_depth)
+    if array_fields is not None:
+        fields.extend(array_fields)
         return fields
+
+    # An array alternative, as in a nullable `anyOf: [array, null]`, keeps its items in its own branch.
+    if not _COMPOSING_KEYWORDS.isdisjoint(schema):
+        fields.extend(_array_branch_fk_fields(schema, scan, max_depth))
 
     # Composition branches may carry the actual object shape, so flatten before treating as object.
     properties = scan.flattened.get(id(schema))
@@ -674,7 +669,7 @@ def _container_fk_fields(
         if fk_info is None:
             continue
         target_resource_name, target_field, is_array = fk_info
-        takes_array = holds_only_arrays(iter_all_of_chain(field_schema, scan.bundled, _resolve_bundled))
+        takes_array = _holds_only_arrays(field_schema, scan.bundled)
         # A singular name on an array holds no single identifier to send.
         if not is_array and takes_array:
             continue
@@ -688,6 +683,43 @@ def _container_fk_fields(
                     for suffix, resource, field, takes_array in _container_fk_fields(subschema, scan, max_depth - 1)
                 )
     return fields
+
+
+def _array_fk_fields(
+    schema: dict[str, Any], target: dict[str, Any], scan: NestedFKScan, max_depth: int
+) -> list[tuple[BodyPath, str, str, bool]] | None:
+    """FK fields under the items of the array `target` (what `schema` refers to) or `schema`; `None` for no array."""
+    # Each followed reference spends depth, so an array whose items point back at it terminates.
+    candidates = [(target, max_depth - 1), (schema, max_depth)] if target is not schema else [(schema, max_depth)]
+    for node, depth in candidates:
+        declared = node.get("type")
+        if declared == "array" or (isinstance(declared, list) and holds_only_arrays((node,))):
+            items = node.get("items")
+            if depth < 1 or not isinstance(items, dict):
+                return []
+            return [
+                ((0, *suffix), resource, field, takes_array)
+                for suffix, resource, field, takes_array in _container_fk_fields(items, scan, depth)
+            ]
+    return None
+
+
+_COMPOSING_KEYWORDS = frozenset(("$ref", "allOf", "anyOf", "oneOf"))
+
+
+def _array_branch_fk_fields(
+    schema: dict[str, Any], scan: NestedFKScan, max_depth: int
+) -> list[tuple[BodyPath, str, str, bool]]:
+    """FK fields under the `anyOf`/`oneOf` branches on the `$ref`/`allOf` chain of `schema` that hold only arrays."""
+    return [
+        entry
+        for node in iter_all_of_chain(schema, scan.bundled, _resolve_bundled)
+        for keyword in ("anyOf", "oneOf")
+        if isinstance(node.get(keyword), list)
+        for branch in node[keyword]
+        if holds_only_arrays(iter_all_of_chain(branch, scan.bundled, _resolve_bundled))
+        for entry in _container_fk_fields(branch, scan, max_depth)
+    ]
 
 
 def _takes_array(schema: JsonSchema) -> bool:
@@ -727,9 +759,31 @@ def _names_identifier_array(name: str, schema: JsonSchema, bundled: dict[str, An
     A plural name takes identifiers as array items, a singular one (`customer_id`) takes none; other fields give `None`.
     """
     fk_info = infer_fk_target(name)
-    if fk_info is None or not holds_only_arrays(iter_all_of_chain(schema, bundled, _resolve_bundled)):
+    if fk_info is None or not _holds_only_arrays(schema, bundled):
         return None
     return fk_info[2]
+
+
+def _holds_only_arrays(schema: JsonSchema, bundled: dict[str, Any]) -> bool:
+    """Whether `schema` holds arrays and maybe `null`, nothing else: `type: [array, null]`, `anyOf: [array, null]`."""
+    chain = list(iter_all_of_chain(schema, bundled, _resolve_bundled))
+    return holds_only_arrays(chain) or any(
+        _alternatives_hold_only_arrays(node[keyword], bundled)
+        for node in chain
+        for keyword in ("anyOf", "oneOf")
+        if isinstance(node.get(keyword), list)
+    )
+
+
+_NULL_ONLY = frozenset({"null"})
+
+
+def _alternatives_hold_only_arrays(branches: list[JsonSchema], bundled: dict[str, Any]) -> bool:
+    """Whether one of `branches` holds only arrays and every other one holds only arrays or only `null`."""
+    chains = [list(iter_all_of_chain(branch, bundled, _resolve_bundled)) for branch in branches]
+    return any(map(holds_only_arrays, chains)) and all(
+        holds_only_arrays(chain) or _NULL_ONLY in map(declared_types, chain) for chain in chains
+    )
 
 
 def _resolve_bundled(schema: dict[str, Any], bundled: dict[str, Any]) -> tuple[dict[str, Any], object] | None:
