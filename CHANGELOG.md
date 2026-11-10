@@ -6,6 +6,7 @@
 
 - Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
 - `[[operations]]` auth and headers leaking to other operations.
+- Links sending a scalar identifier into array fields like `customer_ids`.
 - Missing links for fields inherited through `allOf` chains reusing a schema name across files.
 - `[generation] mode` from the config file ignored by `st run` and `st fuzz`.
 - False positive `negative_data_rejection` for form body values another `anyOf` branch accepts as text.

@@ -291,7 +291,7 @@ class DependencyGraph:
                             # These statuses forbid a body, whatever the schema declares.
                             continue
                         link_name = _link_name(consumer.method, input_slot, path_resource_names[consumer_id])
-                        parameters, request_body = _link_values(input_slot, value_expr)
+                        parameters, request_body = _link_values(input_slot, output_slot, confirmed, value_expr)
                         if not input_slot.is_named_after_collection:
                             forwarding.add(link_name)
                         existing = links.get(link_name)
@@ -808,11 +808,33 @@ def _link_name(method: str, input_slot: InputSlot, consumer_resource_name: str |
     return f"{method.capitalize()}{resource_name}{suffix}"
 
 
-def _link_values(input_slot: InputSlot, value_expr: str) -> tuple[dict[str, str], dict[str, Any] | list[Any]]:
+def _link_values(
+    input_slot: InputSlot, output_slot: OutputSlot, confirmed: InputSlot | None, value_expr: str
+) -> tuple[dict[str, str], dict[str, Any] | list[Any]]:
     """Link parameters and request body that send `value_expr` to the input."""
     if input_slot.parameter_location == ParameterLocation.BODY:
-        return {}, build_nested_body(input_slot.body_path or (input_slot.parameter_name,), value_expr)
+        return {}, _link_body(input_slot, output_slot, confirmed, value_expr)
     return {f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": value_expr}, {}
+
+
+def _link_body(
+    input_slot: InputSlot, output_slot: OutputSlot, confirmed: InputSlot | None, value: str
+) -> dict[str, Any] | list[Any]:
+    """A body holding `value` where `input_slot` lands; one identifier fills an array of them as its item."""
+    path = input_slot.body_path or (input_slot.parameter_name,)
+    if input_slot.takes_array and _sends_one_value(input_slot, output_slot, confirmed):
+        path = (*path, 0)
+    return build_nested_body(path, value)
+
+
+def _sends_one_value(input_slot: InputSlot, output_slot: OutputSlot, confirmed: InputSlot | None) -> bool:
+    if output_slot.path_parameter is not None or output_slot.is_primitive_identifier:
+        return True
+    if output_slot.body_field is not None:
+        # The request field the producer was called with may itself hold an array of identifiers.
+        return confirmed is not None and not confirmed.takes_array
+    # A field named like the input holds the same array, e.g. `customer_ids` sent back as it was read.
+    return input_slot.resource_field != input_slot.parameter_name
 
 
 def _names_identifier(field: str, resource_name: str) -> bool:
@@ -879,7 +901,7 @@ def _merge_nested_body(target: dict[str, Any], source: dict[str, Any]) -> None:
             _merge_nested_body(target[key], value)
         elif key in target and isinstance(target[key], list) and isinstance(value, list):
             # Merge list items (for array body fields)
-            _merge_nested_body(target[key][0], value[0])
+            target[key] = merge_request_body(target[key], value)
         else:
             target[key] = value
 
@@ -991,7 +1013,7 @@ def find_input(inputs: Iterable[InputSlot], location: ParameterLocation, name: s
 # A body field location, integers marking array items.
 BodyPath: TypeAlias = tuple[str | int, ...]
 # FK fields behind a bundled reference, by the reference's original URI and the remaining depth.
-NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[BodyPath, str, str]]]
+NestedFKCache: TypeAlias = dict[tuple[str, int], list[tuple[BodyPath, str, str, bool]]]
 
 
 @dataclass(slots=True)
@@ -999,7 +1021,7 @@ class DeferredBindings:
     """Inputs of one operation that bind only once every operation has been scanned."""
 
     # Nested-body FK lookups whose target resource was not registered yet.
-    nested_fks: list[tuple[str, str, BodyPath]]
+    nested_fks: list[tuple[str, str, BodyPath, bool]]
     # Scalar body fields that may name the collection listing their values (`country` <- `GET /countries`).
     named_scalars: list[tuple[str, str, JsonSchema]]
     # Query parameters that may name the collection listing their values (`?part=` <- `GET /parts`).
@@ -1039,7 +1061,7 @@ class InputSlot:
     # Integer means index in an array (only single items are supported)
     parameter_name: str | int
     parameter_location: ParameterLocation
-    # Whether a parameter takes an array of values, e.g. `?ids=1&ids=2`
+    # Whether a parameter takes an array of values, e.g. `?ids=1&ids=2`, or a body field `customer_ids: [1, 2]`
     takes_array: bool = False
     # Whether this input was matched via suffix matching (e.g., "file_name" -> "BackupFile")
     # Suffix-matched inputs can be upgraded by merge_related_resources if a producer exists
