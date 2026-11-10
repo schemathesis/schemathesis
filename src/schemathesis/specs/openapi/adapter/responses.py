@@ -345,6 +345,11 @@ class OpenApiResponse:
         media_type, schema = self.adapter.extract_raw_response_schema(self.definition)
         return self._resolver_for(media_type), schema
 
+    def get_raw_schema_media_type(self) -> str | None:
+        """Media type of the raw response schema; `None` when the response names none, as in Open API 2.0."""
+        media_type, _ = self.adapter.extract_raw_response_schema(self.definition)
+        return media_type
+
     @property
     def headers(self) -> OpenApiResponseHeaders:
         """A collection of header definitions for this response."""

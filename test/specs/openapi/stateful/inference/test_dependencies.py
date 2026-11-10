@@ -13791,6 +13791,61 @@ def test_item_path_parameter_keeps_placeholder_fed_by_id_fields(ctx):
         assert input_bindings(graph, label)["id"] == "StreamTarget", label
 
 
+CALL_ID_FROM_CREATED_CALL = [
+    [
+        "#/paths/~1calls/post",
+        "201",
+        {
+            "operationRef": "#/paths/~1calls~1{call_id}~1accept/post",
+            "x-schemathesis": {"is_inferred": True},
+            "parameters": {"path.call_id": "$response.body#/"},
+        },
+    ]
+]
+
+
+# A string body in a media type such as SDP or HTML is a document, not the created id.
+@pytest.mark.parametrize(
+    ("media_type", "expected"),
+    [
+        ("application/json", CALL_ID_FROM_CREATED_CALL),
+        ("application/vnd.api+json; charset=utf-8", CALL_ID_FROM_CREATED_CALL),
+        ("text/plain", CALL_ID_FROM_CREATED_CALL),
+        ("*/*", CALL_ID_FROM_CREATED_CALL),
+        ("application/sdp", []),
+        ("text/html", []),
+        ("json", []),
+    ],
+    ids=["json", "json-suffix", "plain-text", "any", "sdp", "html", "malformed"],
+)
+def test_created_id_from_primitive_body_needs_identifier_media_type(ctx, media_type, expected):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/calls": {"post": response("201", {"type": "string"}, media_type)},
+            "/calls/{call_id}/accept": {"post": {"parameters": [path_param("call_id")], **response("200")}},
+        },
+    )
+    assert inferred_links(graph) == expected
+
+
+def test_created_id_from_primitive_body_in_swagger_2(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/calls": {"post": {"responses": {"201": {"description": "Created", "schema": {"type": "string"}}}}},
+            "/calls/{call_id}/accept": {
+                "post": {
+                    "parameters": [{"name": "call_id", "in": "path", "required": True, "type": "string"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="2.0",
+    )
+    assert inferred_links(graph) == CALL_ID_FROM_CREATED_CALL
+
+
 # Spring-style envelopes wrap a created id next to status fields: `{time, httpStatus, isSuccess, response: "<id>"}`.
 def test_created_id_inside_status_envelope_links_to_item_operations(ctx):
     envelope = {
