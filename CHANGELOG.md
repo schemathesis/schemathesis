@@ -15,6 +15,7 @@
 - Links treating `PUT` updaters as creators when the collection's `POST` is a path item `$ref`.
 - `after_validate` hook never called by `st run` and `st fuzz`.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
+- Class-based checks' `after_run` never called for `as_state_machine().TestCase` under pytest.
 - Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
 - `after_run` of class-based checks dropping failures under `pytest-xdist` and firing for deselected tests.
 - False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.

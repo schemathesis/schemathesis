@@ -68,6 +68,47 @@ def test_after_run_skipped_on_collect_only(testdir):
     assert result.ret == 0, result.stdout.str()
 
 
+_SEEN_OPERATIONS_CHECK = """
+@schemathesis.check
+class SeenOperations:
+    def __init__(self):
+        self.seen = set()
+
+    def after_response(self, ctx, response, case):
+        self.seen.add(case.operation.label)
+
+    def after_run(self, ctx):
+        if {raise_when_seen} and self.seen:
+            raise AssertionError("seen: " + ", ".join(sorted(self.seen)))
+"""
+
+
+@pytest.mark.parametrize(
+    ("raise_when_seen", "exit_code", "expected_lines"),
+    [
+        (True, 1, ["*- ST901 Custom check failed: `SeenOperations`*", "*    seen: *POST /users/*"]),
+        (False, 0, ["*= 1 passed in *"]),
+    ],
+    ids=["failing", "passing"],
+)
+def test_after_run_for_state_machine(ctx, testdir, raise_when_seen, exit_code, expected_lines):
+    api = ctx.openapi.apps.users_crud()
+    testdir.make_test(
+        _SEEN_OPERATIONS_CHECK.format(raise_when_seen=raise_when_seen)
+        + f"""
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
+schema.config.checks.update(included_check_names=["SeenOperations"])
+TestCase = schema.as_state_machine().TestCase
+TestCase.settings = settings(max_examples=2, stateful_step_count=2, deadline=None, derandomize=True)
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    assert result.ret == exit_code
+    result.stdout.fnmatch_lines(expected_lines)
+
+
 def test_after_run_failure_reported_without_terminal(testdir):
     testdir.make_test(_ALWAYS_FAIL_CHECK + _SCHEMA_PARAMETRIZE_BODY)
     result = testdir.runpytest("-p", "no:terminal")
