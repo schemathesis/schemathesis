@@ -14,6 +14,7 @@
 - Links treating `PUT` updaters as creators when the collection's `POST` is a path item `$ref`.
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
+- `after_run` of class-based checks dropping failures under `pytest-xdist` and firing for deselected tests.
 - False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Missing links for fields inside request body arrays behind components that only reference another.
