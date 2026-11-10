@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from schemathesis import graphql, grpc, openapi
+from schemathesis import auths, graphql, grpc, openapi
 from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.validation import validate_tls_verify
@@ -36,6 +36,10 @@ GRPC_HTTP_REPORTS_MESSAGE = (
 )
 GRPC_WFC_AUTH_MESSAGE = (
     "Web Fuzzing Commons authentication (`--auth-wfc`, `[auth.wfc]`) is not available for gRPC targets"
+)
+GRPC_REQUESTS_AUTH_MESSAGE = (
+    "`requests` auth objects are not supported for gRPC targets; "
+    "pass credentials as headers, basic auth or an `@schemathesis.auth()` class"
 )
 WFC_REPORT_MESSAGE = "WFC reports describe REST endpoints and are only available for Open API schemas"
 GRPC_DESCRIPTOR_SET_EXTENSIONS = (".binpb", ".pb", ".protoset")
@@ -60,6 +64,11 @@ def into_event_stream(
             raise click.UsageError(GRPC_HTTP_REPORTS_MESSAGE)
         if config.auth.wfc is not None:
             raise click.UsageError(GRPC_WFC_AUTH_MESSAGE)
+        if any(
+            isinstance(provider, auths.SelectiveAuthProvider) and isinstance(provider.provider, auths.RequestsAuth)
+            for provider in auths.GLOBAL_AUTH_STORAGE.providers
+        ):
+            raise click.UsageError(GRPC_REQUESTS_AUTH_MESSAGE)
         try:
             require_extra()
         except ImportError as exc:

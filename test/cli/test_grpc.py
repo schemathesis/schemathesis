@@ -192,14 +192,59 @@ def test_remote_descriptor_set_extension_is_not_grpc(cli, snapshot_cli):
 
 
 @pytest.mark.parametrize(
-    ("location", "option"),
-    [(None, "--tls-verify=false"), (None, "--proxy=http://127.0.0.1:1"), ("api.binpb", "--url=http://127.0.0.1:1")],
-    ids=["tls-verify", "proxy", "descriptor-set-http-url"],
+    ("location", "options", "hooks"),
+    [
+        (None, ("--tls-verify=false",), None),
+        (None, ("--proxy=http://127.0.0.1:1",), None),
+        ("api.binpb", ("--url=http://127.0.0.1:1",), None),
+        (
+            None,
+            (),
+            """
+from requests.auth import HTTPBasicAuth
+
+schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass"))
+""",
+        ),
+    ],
+    ids=["tls-verify", "proxy", "descriptor-set-http-url", "requests-auth"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unusable_options_refused(ctx, cli, snapshot_cli, location, option):
+def test_unusable_options_refused(ctx, cli, snapshot_cli, location, options, hooks):
     server = ctx.grpc.apps.users(tls=True)
-    assert cli.run(location or server.target, option) == snapshot_cli
+    # Writing a hooks module moves the working directory away from the descriptor set file.
+    module = ctx.write_pymodule(hooks) if hooks is not None else None
+    assert cli.run(location or server.target, *options, hooks=module) == snapshot_cli
+    assert (server.calls, server.reflection_calls) == ([], [])
+
+
+def test_auth_class_sends_credentials(ctx, cli):
+    server = ctx.grpc.apps.users()
+    module = pinned_user(
+        ctx,
+        1,
+        extra="""
+@schemathesis.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return "Bearer secret"
+
+    def set(self, case, data, context):
+        case.headers["Authorization"] = data
+""",
+    )
+    result = cli.run(
+        server.target,
+        "--include-name=pkg.Users/GetUser",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--checks=not_a_server_error",
+        hooks=module,
+    )
+    assert (result.exit_code, [dict(call.metadata).get("authorization") for call in server.calls]) == (
+        0,
+        ["Bearer secret"],
+    )
 
 
 @pytest.mark.parametrize("source", ["flag", "config"])

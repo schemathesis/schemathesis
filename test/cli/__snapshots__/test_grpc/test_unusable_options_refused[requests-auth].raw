@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: `requests` auth objects are not supported for gRPC targets; pass credentials as headers, basic auth or an `@schemathesis.auth()` class
