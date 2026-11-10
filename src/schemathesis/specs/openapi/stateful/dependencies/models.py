@@ -247,10 +247,7 @@ class DependencyGraph:
                             ):
                                 continue
                             # A pointer to an undeclared response field always resolves to nothing.
-                            if (
-                                output_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES
-                                and input_slot.resource_field not in output_slot.declared_fields
-                            ):
+                            if not output_slot.may_declare(input_slot.resource_field):
                                 identifier_pointer = output_slot.identifier_pointer_for(input_slot.resource_field)
                                 if identifier_pointer is None:
                                     continue
@@ -1082,6 +1079,12 @@ class InputSlot:
     is_inline_item: bool = False
 
 
+class OpenFields(frozenset[str]):
+    """Fields a response declares when one of its `oneOf` / `anyOf` alternatives may also hold any other field."""
+
+    __slots__ = ()
+
+
 @dataclass(slots=True)
 class OutputSlot:
     """Describes how to extract a resource from an operation's response."""
@@ -1117,6 +1120,14 @@ class OutputSlot:
     @property
     def declared_fields(self) -> Collection[str]:
         return self.resource.fields if self.response_fields is None else self.response_fields
+
+    def may_declare(self, field: str) -> bool:
+        """Whether `field` can exist at `pointer`; only a response or resource listing all its fields rules one out."""
+        if self.resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES and (
+            self.response_fields is None or isinstance(self.response_fields, OpenFields)
+        ):
+            return True
+        return field in self.declared_fields
 
     def identifier_pointer_for(self, field: str) -> str | None:
         """Envelope pointer holding `field`, when `field` is the resource's own identifier and the resource lacks it."""
