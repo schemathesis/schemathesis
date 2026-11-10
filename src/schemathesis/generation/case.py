@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Mapping
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, assert_never
 from urllib.parse import urlsplit
@@ -12,10 +12,9 @@ from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import (
     CheckContext,
     CheckFunction,
-    CheckResult,
     load_all_checks,
-    run_checks,
     run_checks_for,
+    validate,
 )
 from schemathesis.core import NOT_SET, Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage
@@ -24,7 +23,6 @@ from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation, plain_str_values
 from schemathesis.core.transport import HttpMethod, Response, prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
-from schemathesis.engine import Status
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
@@ -34,9 +32,7 @@ from schemathesis.hooks import (
     HookContext,
     dispatch_after_call,
     dispatch_after_network_error,
-    dispatch_after_validate,
     dispatch_before_call,
-    schema_hook_dispatchers,
 )
 from schemathesis.transport.prepare import base_url_from_request_url, prepare_path
 from schemathesis.transport.serialization import contains_binary
@@ -571,46 +567,17 @@ class Case(Generic[OperationT]):
         checks = [
             check for check in list(checks) + list(additional_checks or []) if check not in set(excluded_checks or [])
         ]
-        after_validate_dispatchers = schema_hook_dispatchers(self.operation.schema)
-        has_after_validate = any(dispatcher.defines("after_validate") for dispatcher in after_validate_dispatchers)
-        check_results: list[CheckResult] = []
-        _on_success: Callable[[str, Case], None] | None
 
-        if has_after_validate:
+        def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+            collected.add(failure)
 
-            def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
-                collected.add(failure)
-                check_results.append(CheckResult(name=name, status=Status.FAILURE, failure=failure))
-
-            def on_success(name: str, _: Case) -> None:
-                check_results.append(CheckResult(name=name, status=Status.SUCCESS, failure=None))
-
-            _on_success = on_success
-
-        else:
-
-            def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
-                collected.add(failure)
-
-            _on_success = None
-
-        failures = run_checks(
+        failures = validate(
             case=self,
             response=response,
             ctx=ctx,
             checks=checks,
             on_failure=on_failure,
-            on_success=_on_success,
         )
-        if has_after_validate:
-            hook_context = HookContext(operation=self.operation)
-            dispatch_after_validate(
-                *after_validate_dispatchers,
-                context=hook_context,
-                case=self,
-                response=response,
-                results=check_results,
-            )
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"

@@ -1,3 +1,6 @@
+import re
+from collections import Counter
+
 import pytest
 from _pytest.main import ExitCode
 from flask import jsonify
@@ -170,21 +173,33 @@ def test_hooks_file_path_runs_once_per_call(ctx, cli, tmp_path):
     hooks_file = tmp_path / "counting_hooks.py"
     hooks_file.write_text(f"""
 import schemathesis
+
+def record(line):
+    with open({str(calls)!r}, "a") as fd:
+        fd.write(line + "\\n")
+
 @schemathesis.hook
 def before_call(context, case, **kwargs):
-    with open({str(calls)!r}, "a") as fd:
-        fd.write(".")
+    record("before_call")
+
+@schemathesis.hook
+def after_validate(context, case, response, results):
+    record(f"after_validate {{[(result.name, result.status.name) for result in results]}}")
 """)
     result = cli.main(
         "run",
         api.schema_url,
-        "--phases=fuzzing",
+        "--phases=coverage,fuzzing",
         "--max-examples=3",
+        "--checks=not_a_server_error",
         env={"SCHEMATHESIS_HOOKS": str(hooks_file)},
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     api_calls = [request for request in api.requests if request.path.startswith("/api/")]
-    assert len(calls.read_text()) == len(api_calls)
+    assert Counter(calls.read_text().splitlines()) == {
+        "before_call": len(api_calls),
+        "after_validate [('not_a_server_error', 'SUCCESS')]": len(api_calls),
+    }
 
 
 def test_env_hooks_extend_cli_when_config_sets_hooks(ctx, cli):
@@ -281,19 +296,35 @@ def filter_failure(context, failure, case, response):
     )
 
 
-def test_filter_failure_is_summarized_in_fuzz(ctx, cli):
+def test_filter_failure_is_summarized_in_fuzz(ctx, cli, tmp_path):
     api = ctx.openapi.apps.failure()
+    calls = tmp_path / "calls.txt"
     module = ctx.write_pymodule(
-        """
+        f"""
+def record(line):
+    with open({str(calls)!r}, "a") as fd:
+        fd.write(line + "\\n")
+
 @schemathesis.hook
 def filter_failure(context, failure, case, response):
+    record("filter_failure")
     return response.status_code != 500
+
+@schemathesis.hook
+def after_validate(context, case, response, results):
+    record(f"after_validate {{[(result.name, result.status.name) for result in results]}}")
 """
     )
 
     result = cli.main("fuzz", api.schema_url, "-c", "not_a_server_error", "--max-time=1", hooks=module)
 
-    assert "Filtered: " in result.stdout, result.stdout
+    filtered = re.search(r"Filtered: (\d+)", result.stdout)
+    assert filtered is not None, result.stdout
+    # Every failure is dropped, so the check passes on each response.
+    assert Counter(calls.read_text().splitlines()) == {
+        "filter_failure": int(filtered.group(1)),
+        "after_validate [('not_a_server_error', 'SUCCESS')]": int(filtered.group(1)),
+    }
 
 
 def test_filter_failure_keeps_what_it_does_not_reject(ctx, cli):

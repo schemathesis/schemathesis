@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import threading
 from collections.abc import Callable, Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol, TypeVar, cast
 
 from typing_extensions import TypeIs
@@ -22,7 +22,7 @@ from schemathesis.core.transport import CallOutcome, Response
 from schemathesis.engine import Status
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, CoverageScenario, coverage_scenario
 from schemathesis.generation.overrides import Override
-from schemathesis.hooks import should_keep_failure
+from schemathesis.hooks import HookContext, dispatch_after_validate, schema_hook_dispatchers, should_keep_failure
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
@@ -534,6 +534,53 @@ def run_checks(
             if not skip_check and on_success:
                 on_success(name, case)
 
+    return collected
+
+
+@dataclass(slots=True)
+class _CheckOutcomes:
+    """Outcomes kept for `after_validate` hooks, each one also passed on to the caller's callbacks."""
+
+    on_failure: Callable[[str, set[Failure], Failure], None]
+    on_success: Callable[[str, Case], None] | None
+    results: list[CheckResult] = field(default_factory=list)
+
+    def failed(self, name: str, collected: set[Failure], failure: Failure) -> None:
+        self.results.append(CheckResult(name=name, status=Status.FAILURE, failure=failure))
+        self.on_failure(name, collected, failure)
+
+    def succeeded(self, name: str, case: Case) -> None:
+        self.results.append(CheckResult(name=name, status=Status.SUCCESS, failure=None))
+        if self.on_success is not None:
+            self.on_success(name, case)
+
+
+def validate(
+    *,
+    case: Case,
+    response: Response,
+    ctx: CheckContext,
+    checks: Iterable[CheckFunction],
+    on_failure: Callable[[str, set[Failure], Failure], None],
+    on_success: Callable[[str, Case], None] | None = None,
+) -> set[Failure]:
+    """Run a set of checks against a response, then pass their outcomes to `after_validate` hooks."""
+    dispatchers = schema_hook_dispatchers(case.operation.schema)
+    if not any(dispatcher.defines("after_validate") for dispatcher in dispatchers):
+        return run_checks(
+            case=case, response=response, ctx=ctx, checks=checks, on_failure=on_failure, on_success=on_success
+        )
+    outcomes = _CheckOutcomes(on_failure=on_failure, on_success=on_success)
+    collected = run_checks(
+        case=case, response=response, ctx=ctx, checks=checks, on_failure=outcomes.failed, on_success=outcomes.succeeded
+    )
+    dispatch_after_validate(
+        *dispatchers,
+        context=HookContext(operation=case.operation),
+        case=case,
+        response=response,
+        results=outcomes.results,
+    )
     return collected
 
 

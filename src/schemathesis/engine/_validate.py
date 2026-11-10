@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from schemathesis.checks import run_checks
+from schemathesis.checks import validate
 from schemathesis.core.failures import FailureGroup
 from schemathesis.engine._baseline import is_known
 
@@ -41,7 +41,7 @@ def validate_response(
     def on_success(name: str, _case: Case) -> None:
         recorder.record_check_success(name=name, case_id=_case.id)
 
-    failures = run_checks(
+    failures = validate(
         case=case,
         response=response,
         ctx=ctx,
