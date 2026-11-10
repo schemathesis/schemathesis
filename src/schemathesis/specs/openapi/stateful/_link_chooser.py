@@ -7,6 +7,7 @@ from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import status_code_matches
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi.expressions import MultiMatch
+from schemathesis.specs.openapi.stateful import LinkedBody
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
@@ -59,9 +60,22 @@ def collect_link_candidates(
                 if resolved_body is _FAILED:
                     continue
                 overrides["body"] = resolved_body
-            # A wildcard link that matched several values gives one candidate per value.
-            for index in range(_count_matches(overrides)):
-                candidates.append((operations_by_label[target_label], _select_match(overrides, index)))
+            candidates.extend(
+                _candidates_per_match(operations_by_label[target_label], overrides, merge_body=link.merge_body)
+            )
+    return candidates
+
+
+def _candidates_per_match(
+    target: APIOperation, overrides: dict[str, Any], *, merge_body: bool
+) -> list[tuple[APIOperation, dict[str, Any]]]:
+    """One candidate per value a wildcard link matched; a merged link body keeps the other generated fields."""
+    candidates: list[tuple[APIOperation, dict[str, Any]]] = []
+    for index in range(_count_matches(overrides)):
+        selected = _select_match(overrides, index)
+        if merge_body and "body" in selected:
+            selected["body"] = LinkedBody(selected["body"])
+        candidates.append((target, selected))
     return candidates
 
 

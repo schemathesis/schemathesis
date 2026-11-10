@@ -70,7 +70,7 @@ from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader, RawSchemaVersion, resolve_path_item
 from .serialization import _build_urlencoded_serializer
-from .stateful import collect_transitions, create_state_machine
+from .stateful import LinkedBody, collect_transitions, create_state_machine
 from .utils import PathTemplate, compile_path_template, parse_spec_version, read_from_wire
 from .validation import validate_documented_response
 
@@ -724,7 +724,8 @@ class OpenApiSchema(BaseSchema):
         media_type: str | None = None,
         phase: TestPhase = TestPhase.FUZZING,
     ) -> SearchStrategy[Case]:
-        return openapi_cases(
+        linked = body if isinstance(body, LinkedBody) else None
+        strategy = openapi_cases(
             operation=operation,
             hooks=hooks,
             auth_storage=auth_storage,
@@ -734,10 +735,13 @@ class OpenApiSchema(BaseSchema):
             headers=headers,
             cookies=cookies,
             query=query,
-            body=body,
+            body=NOT_SET if linked is not None else body,
             media_type=media_type,
             phase=phase,
         )
+        if linked is None:
+            return strategy
+        return strategy.map(linked.apply)
 
     @override
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
