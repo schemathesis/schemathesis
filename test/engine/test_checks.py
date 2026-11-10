@@ -337,6 +337,21 @@ def test_not_a_server_error(ctx, value, swagger_20, response_factory):
     assert exc_info.type.__name__ == "ServerError"
 
 
+@pytest.mark.parametrize("status_code", [200, 500], ids=["success", "server-error"])
+def test_public_check_context_without_class_checks(ctx, swagger_20, response_factory, status_code):
+    context = schemathesis.CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None
+    )
+    response = response_factory.core(status_code=status_code)
+    case = make_case(ctx, swagger_20, {})
+    if status_code == 200:
+        assert not_a_server_error(context, response, case) is None
+    else:
+        with pytest.raises(ServerError) as exc_info:
+            not_a_server_error(context, response, case)
+        assert (exc_info.value.operation, exc_info.value.status_code) == ("GET /path", 500)
+
+
 @pytest.mark.parametrize("value", [400, 405])
 def test_status_code_conformance_valid(ctx, value, swagger_20, response_factory):
     response = response_factory.requests()

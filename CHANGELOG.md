@@ -12,6 +12,7 @@
 - `SCHEMATHESIS_HOOKS` ignored or loaded too late for its CLI options when the config file sets `hooks`.
 - Links passing ids between unrelated resources whose `$ref` ends in `items` or `schema`.
 - False `Content deserialization error` for WSGI app responses declaring a non-UTF-8 `charset`.
+- `TypeError` when building `schemathesis.CheckContext` without the `response_checks` keyword.
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - Missing links for fields inside request body arrays behind components that only reference another.
 - Silently unauthenticated gRPC calls with `auth.set_from_requests`; report it as unsupported.
