@@ -251,8 +251,8 @@ def run_resetting_server() -> int:
     return listener.getsockname()[1]
 
 
-def run_port_proxy(port: int) -> int:
-    """Relay connections to `port`; once nothing listens there, accept and reset them, as a port proxy does."""
+def run_port_proxy(port: int, *, resets: int = 0) -> int:
+    """Relay connections to `port` after resetting the first `resets`; reset them while nothing listens there."""
     listener = socket.create_server(("127.0.0.1", 0))
 
     def relay(source: socket.socket, target: socket.socket) -> None:
@@ -269,14 +269,22 @@ def run_port_proxy(port: int) -> int:
                 pass
             connection.close()
 
+    def reset(connection: socket.socket) -> None:
+        # Resetting only once the client spoke makes it see a reset rather than a closed connection.
+        connection.recv(65536)
+        connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        connection.close()
+
     def handle(connection: socket.socket) -> None:
+        nonlocal resets
+        if resets:
+            resets -= 1
+            reset(connection)
+            return
         try:
             upstream = socket.create_connection(("127.0.0.1", port))
         except OSError:
-            # Resetting only once the client spoke makes it see a reset rather than a closed connection.
-            connection.recv(65536)
-            connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
-            connection.close()
+            reset(connection)
             return
         for source, target in ((connection, upstream), (upstream, connection)):
             threading.Thread(target=relay, args=(source, target), daemon=True).start()
@@ -313,7 +321,7 @@ class AppRunner:
     run_https_flask_app: Callable[[Flask], int]
     run_client_cert_flask_app: Callable[[Flask, Path], ClientCertServer]
     run_resetting_server: Callable[[], int]
-    run_port_proxy: Callable[[int], int]
+    run_port_proxy: Callable[..., int]
     run_asgi_app: Callable[..., int]
     openapi_url: Callable[..., str]
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from inspect import iscoroutinefunction
@@ -33,6 +34,25 @@ def get(app: object) -> BaseTransport:
     from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
     return WSGI_TRANSPORT
+
+
+T = TypeVar("T")
+
+
+def retry_on_transport_errors(call: Callable[[], T], retries: int) -> T:
+    """Return what `call` returns, retrying connection errors and timeouts up to `retries` times."""
+    import requests
+
+    attempt = 0
+    while True:
+        try:
+            return call()
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt >= retries:
+                raise
+            # Exponential backoff capped at 10s.
+            time.sleep(min(2**attempt, 10))
+            attempt += 1
 
 
 S = TypeVar("S", contravariant=True)

@@ -5,6 +5,7 @@ import json
 import socket
 import ssl
 import threading
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
@@ -24,7 +25,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.specs.grpc.converter import message_to_json
 from schemathesis.specs.grpc.schemas import MEDIA_TYPE, parse_target, prepare_call_kwargs, request_metadata
-from schemathesis.transport import BaseTransport, SerializationContext
+from schemathesis.transport import BaseTransport, SerializationContext, retry_on_transport_errors
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -124,45 +125,22 @@ class GrpcTransport(BaseTransport["requests.Session"]):
         channel = self._channel(address, tls, verify, cert)
         # No serializers: the call sends and receives bytes, or no message at all.
         call: grpc.UnaryUnaryMultiCallable[bytes, bytes | None] = channel.unary_unary(case.path)
-        # Whether the server refused a new connection, once a call fails before being sent.
-        unreachable = False
-        try:
-            try:
-                with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
-                    started_at = Instant()
-                    content, outcome = call.with_call(**call_kwargs, timeout=timeout)
-            except grpc.RpcError as error:
-                if not (cast(grpc.Call, error).details() or "").startswith(NOT_CONNECTED):
-                    raise
-                unreachable = not _is_reachable(address, tls, verify, cert)
-                if unreachable:
-                    raise
-                # The server is up, but a channel that failed to connect waits before trying again and fails calls in
-                # the meantime without sending them.
-                started_at = Instant()
-                content, outcome = call.with_call(**call_kwargs, timeout=timeout, wait_for_ready=True)
-        except grpc.RpcError as error:
-            # Taken before the reachability check, which is not part of the response time.
-            elapsed = started_at.elapsed
-            # Every error a unary call raises is also the call itself.
-            outcome = cast(grpc.Call, error)
-            code = outcome.code()
-            # Errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
-            # Servers send DEADLINE_EXCEEDED with any text too; only one arriving at the timeout is a read timeout.
-            if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout - DEADLINE_CLOCK_SLACK:
-                raise read_timeout_error(base_url, timeout, request) from error
-            if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):
-                cause = _unavailable_error(
-                    outcome.details() or "",
-                    address=address,
-                    tls=tls,
-                    base_url=base_url,
-                    answered=channel in self._answered,
-                )
-                raise requests.exceptions.ConnectionError(cause, request=request) from cause
-            content = b""
-        else:
-            elapsed = started_at.elapsed
+        retries = config.request_retries_for(operation=case.operation) or 0
+        attempt = partial(
+            self._call,
+            call,
+            call_kwargs,
+            request,
+            channel=channel,
+            address=address,
+            tls=tls,
+            verify=verify,
+            cert=cert,
+            base_url=base_url,
+            timeout=timeout,
+        )
+        with ratelimit(config.rate_limit_for(operation=case.operation), config.base_url):
+            content, outcome, elapsed = retry_on_transport_errors(attempt, retries)
         self._answered.add(channel)
         code = outcome.code()
         details = outcome.details() or ""
@@ -223,6 +201,59 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 channel = create_channel(address, tls, verify, cert)
                 self._channels[key] = channel
             return channel
+
+    def _call(
+        self,
+        call: grpc.UnaryUnaryMultiCallable[bytes, bytes | None],
+        call_kwargs: dict[str, Any],
+        request: requests.PreparedRequest,
+        *,
+        channel: grpc.Channel,
+        address: str,
+        tls: bool,
+        verify: bool | str,
+        cert: str | tuple[str, str] | None,
+        base_url: str,
+        timeout: float,
+    ) -> tuple[bytes | None, grpc.Call, float]:
+        """Content, outcome and response time of one call; network-level failures raise `requests` errors."""
+        # Whether the server refused a new connection, once a call fails before being sent.
+        unreachable = False
+        try:
+            try:
+                started_at = Instant()
+                content, outcome = call.with_call(**call_kwargs, timeout=timeout)
+            except grpc.RpcError as error:
+                if not (cast(grpc.Call, error).details() or "").startswith(NOT_CONNECTED):
+                    raise
+                unreachable = not _is_reachable(address, tls, verify, cert)
+                if unreachable:
+                    raise
+                # The server is up, but a channel that failed to connect waits before trying again and fails calls in
+                # the meantime without sending them.
+                started_at = Instant()
+                content, outcome = call.with_call(**call_kwargs, timeout=timeout, wait_for_ready=True)
+        except grpc.RpcError as error:
+            # Taken before the reachability check, which is not part of the response time.
+            elapsed = started_at.elapsed
+            # Every error a unary call raises is also the call itself.
+            outcome = cast(grpc.Call, error)
+            code = outcome.code()
+            # Errors are wrapped the way `requests` wraps its own, so error reports read the inner one.
+            # Servers send DEADLINE_EXCEEDED with any text too; only one arriving at the timeout is a read timeout.
+            if code == grpc.StatusCode.DEADLINE_EXCEEDED and started_at.elapsed >= timeout - DEADLINE_CLOCK_SLACK:
+                raise read_timeout_error(base_url, timeout, request) from error
+            if code == grpc.StatusCode.UNAVAILABLE and (unreachable or not _is_reachable(address, tls, verify, cert)):
+                cause = _unavailable_error(
+                    outcome.details() or "",
+                    address=address,
+                    tls=tls,
+                    base_url=base_url,
+                    answered=channel in self._answered,
+                )
+                raise requests.exceptions.ConnectionError(cause, request=request) from cause
+            return b"", outcome, elapsed
+        return content, outcome, started_at.elapsed
 
 
 def serialize_message(context: SerializationContext, body: Body) -> dict[str, bytes]:
