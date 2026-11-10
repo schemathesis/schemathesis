@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-def enabled_modes(phases: PhasesConfig) -> list[HypothesisTestMode]:
+def enabled_modes(phases: PhasesConfig, operation: APIOperation) -> list[HypothesisTestMode]:
     modes = []
     if phases.examples.enabled:
         modes.append(HypothesisTestMode.EXAMPLES)
@@ -24,7 +24,7 @@ def enabled_modes(phases: PhasesConfig) -> list[HypothesisTestMode]:
         modes.append(HypothesisTestMode.FUZZING)
     if phases.coverage.enabled:
         modes.append(HypothesisTestMode.COVERAGE)
-    return modes
+    return [mode for mode in modes if operation.is_testable_in(mode)]
 
 
 def build_operation_test(
@@ -36,7 +36,7 @@ def build_operation_test(
     feedback: FeedbackSources,
     explicit_settings: hypothesis.settings | None = None,
 ) -> Callable:
-    modes = enabled_modes(config.phases_for(operation=operation))
+    modes = enabled_modes(config.phases_for(operation=operation), operation)
     # Only fuzzing uses max_examples.
     phase = "fuzzing" if HypothesisTestMode.FUZZING in modes else None
     return create_test(

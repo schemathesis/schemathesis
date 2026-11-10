@@ -1128,6 +1128,52 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        ({"$ref": "#/components/schemas/Missing"}, ["coverage"]),
+        ({"type": "object"}, ["coverage", "fuzzing"]),
+    ],
+    ids=["unresolvable", "usable"],
+)
+def test_required_body_phases(testdir, ctx, app_runner, tmp_path, body_schema, expected):
+    # Without a usable body schema, every request is body-less; only the coverage case omitting the body is fair.
+    app, raw_schema = ctx.openapi.make_flask_app(
+        {
+            "/things": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/things", methods=["POST"])
+    def things():
+        if not isinstance(request.get_json(silent=True), dict):
+            return jsonify({"error": "object body required"}), 400
+        return jsonify({})
+
+    log_path = tmp_path / "phases.log"
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{app_runner.openapi_url(app, path="")}")
+
+@schema.parametrize()
+@settings(max_examples=5)
+def test(case):
+    with open({str(log_path)!r}, "a") as f:
+        f.write(f"{{case.meta.phase.name.value}}\\n")
+    case.call_and_validate()
+""",
+        schema=raw_schema,
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    assert sorted(set(log_path.read_text().splitlines())) == expected
+
+
 def test_non_serializable_example(testdir, ctx):
     api = ctx.openapi.apps.success()
     testdir.make_test(
