@@ -289,6 +289,7 @@ from schemathesis.core.jsonschema.patterns import (
         ("^[a-z][0-9]+", 3, 6, "^[a-z][0-9]{2,5}$"),
         ("^foo[a-z]+", 4, 8, "^foo[a-z]{1,5}$"),
         ("^[a-z][0-9]+", 5, None, "^[a-z][0-9]{4,}"),
+        ("^[A-Z]{2}[0-9]*$", 20, 30, "^[A-Z]{2}[0-9]{18,28}$"),
         # A slot shorter than its maximum leaves the rest of the budget to its siblings.
         (r"^[a-z]{1,3}[0-9]+$", None, 10, r"^[a-z]{1,3}[0-9]{1,9}$"),
         # A group is a part like any other, and its own repeat is where its share of the budget goes.
@@ -410,23 +411,26 @@ def test_update_quantifier_unanchored_multi_enforces_min(pattern, min_length, ma
 
 
 @pytest.mark.parametrize(
-    ("pattern", "min_length", "max_length", "value"),
+    ("pattern", "min_length", "max_length", "value", "expected"),
     [
         # Multi-slot rewrite must accept any distribution that satisfies the original
         # pattern within the length budget; per-slot caps from a balanced split would
         # reject valid lengths the original pattern allowed.
-        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 100),
-        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 127),
-        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" * 128),
-        (r"^[a-z]{1,3}[0-9]+$", None, 10, "a" + "0" * 9),
-        (r"^[a-z]{1,3}[0-9]+$", 1, 10, "a" + "0" * 9),
+        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 100, True),
+        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" + "0" * 127, True),
+        (r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", 1, 128, "A" * 128, True),
+        (r"^[a-z]{1,3}[0-9]+$", None, 10, "a" + "0" * 9, True),
+        (r"^[a-z]{1,3}[0-9]+$", 1, 10, "a" + "0" * 9, True),
         # Matches every string, so it gets a narrower rewrite that must still let the digits fill the budget.
-        (r"^(\+\d{1,3})?\d*", None, 10, "1234567890"),
+        (r"^(\+\d{1,3})?\d*", None, 10, "1234567890", True),
+        (r"^(\+\d{1,3})?\d*", 1, 10, "7", True),
+        (r"^(\+\d{1,3})?\d*", 1, 10, "1234567890", True),
+        (r"^(\+\d{1,3})?\d*", 1, 10, "12345678901", False),
     ],
 )
-def test_update_quantifier_admits_uneven_slot_distributions(pattern, min_length, max_length, value):
+def test_update_quantifier_admits_uneven_slot_distributions(pattern, min_length, max_length, value, expected):
     rewritten = update_quantifier(pattern, min_length, max_length)
-    assert re.match(rewritten, value), (rewritten, value)
+    assert bool(re.fullmatch(rewritten, value)) is expected, (rewritten, value)
 
 
 # Ten optional characters plus a dash, then a fixed 36-character tail: 36 or 47 characters, never anything between.

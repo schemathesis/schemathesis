@@ -1295,7 +1295,12 @@ def _distribute_multi(
             return None
         distribution = full_distribution
 
-    if complete and not exact_length:
+    # A narrow rewrite must still let an optional part be skipped; requiring it loses every value without it.
+    forced_optional = any(
+        orig_min == 0 < new_min and orig_max != MAXREPEAT
+        for (orig_min, orig_max), (new_min, _) in zip(quantifier_bounds, distribution, strict=True)
+    )
+    if (complete or forced_optional) and not exact_length:
         distribution = _cover_needed_counts(
             distribution, quantifier_bounds, repetition_lengths, repetition_max_lengths, fixed_length, min_l, max_l
         )
