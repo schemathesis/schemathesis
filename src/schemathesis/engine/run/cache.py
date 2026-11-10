@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 
 import requests
 
+from schemathesis.auths import apply_basic_auth
 from schemathesis.core import NOT_SET
 from schemathesis.core.cache import (
     FORMAT_VERSION,
@@ -340,12 +341,20 @@ def _replay(ctx: EngineContext, entry: Entry, operation: APIOperation) -> tuple[
     case = _build_case(operation, entry.request)
     if case is None:
         return None
+    _set_configured_auth(ctx, case)
     kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
         response = case.call(**kwargs)
     except requests.RequestException:
         return None
     return case, response
+
+
+def _set_configured_auth(ctx: EngineContext, case: Case) -> None:
+    """Add the operation's configured basic auth, which cached requests are stored without."""
+    auth = ctx.config.auth_for(operation=case.operation)
+    if auth is not None:
+        apply_basic_auth(case, *auth)
 
 
 def _send_without_auth(ctx: EngineContext, case: Case, operation: APIOperation) -> Response | None:

@@ -271,11 +271,15 @@ class EngineContext:
             return outcome.with_traceback(traceback)
         return cached
 
-    def get_session(self, *, operation: APIOperation | None = None) -> requests.Session:
+    def get_session(self) -> requests.Session:
         session = getattr(self._thread_local, "session", None)
         if session is not None:
             return session
-        session = make_session(self.config, operation=operation)
+        from schemathesis.transport.requests import ManagedCookiesSession
+
+        # One session serves every operation on this thread, so auth, headers and TLS settings travel with each request.
+        session = ManagedCookiesSession()
+        session.headers = {}
         self._thread_local.session = session
         return session
 
@@ -349,7 +353,7 @@ class EngineContext:
                 base_timeout = kwargs.get("timeout")
                 if base_timeout is None or override < base_timeout:
                     kwargs["timeout"] = override
-        kwargs["session"] = self.get_session(operation=operation)
+        kwargs["session"] = self.get_session()
         return kwargs
 
     # Extra data source for augmenting test generation with real data.

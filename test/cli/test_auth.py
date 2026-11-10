@@ -173,6 +173,45 @@ def after_call(context, case, response):
     )
 
 
+# Configured credentials also win over a netrc entry for the same host.
+def test_operation_auth_and_headers_stay_with_their_operation(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success_and_text()
+    netrc = tmp_path / "netrc"
+    netrc.write_text("machine 127.0.0.1 login netrc password secret\n")
+    cli.main(
+        "run",
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=1",
+        "--checks=not_a_server_error",
+        env={"NETRC": str(netrc)},
+        config={
+            "auth": {"basic": {"username": "project", "password": "secret"}},
+            "operations": [
+                {
+                    "include-name": "GET /api/success",
+                    "auth": {"basic": {"username": "success", "password": "secret"}},
+                    "headers": {"X-Success": "1"},
+                },
+                {"include-name": "GET /api/text", "headers": {"X-Text": "1"}},
+            ],
+        },
+    )
+    assert {
+        (
+            request.path,
+            request.headers.get("Authorization"),
+            request.headers.get("X-Success"),
+            request.headers.get("X-Text"),
+        )
+        for request in api.requests
+        if request.path.startswith("/api/")
+    } == {
+        ("/api/success", "Basic c3VjY2VzczpzZWNyZXQ=", "1", None),
+        ("/api/text", "Basic cHJvamVjdDpzZWNyZXQ=", None, "1"),
+    }
+
+
 @pytest.fixture
 def verify_auth(ctx):
     return ctx.write_pymodule("""
