@@ -781,30 +781,7 @@ def report_subtest(
 def pytest_runtest_setup(item: pytest.Item) -> None:
     item_cls = getattr(item, "cls", None)
     if item_cls is not None and (schema := StatefulSchemaMark.get(item_cls)) is not None:
-        # Attach a callback to the TestCase class so the state machine can hand off
-        # its recorder to the report writers once the scenario finishes.
-        _schema = schema
-        if _is_xdist_worker(item.config):
-            reports = _schema.config.reports
-            if _has_reports(reports):
-
-                def _xdist_stateful_callback(recorder: Any, elapsed_sec: float) -> None:
-                    # pytest-xdist sets `workeroutput` on worker configs.
-                    workeroutput = item.config.workeroutput  # type: ignore[attr-defined]
-                    _push_to_xdist_workeroutput(workeroutput, _schema, recorder, elapsed_sec)
-
-                item.stash[_STATEFUL_WRITERS_KEY] = []
-                StatefulCallbackMark.set(item_cls, _xdist_stateful_callback)
-        else:
-            writers = _open_writers(_schema, item.config)
-            item.stash[_STATEFUL_WRITERS_KEY] = writers
-            if writers:
-
-                def _stateful_callback(recorder: Any, elapsed_sec: float) -> None:
-                    # Tags are not available for stateful tests — operations are discovered dynamically
-                    _write_to_writers(writers, recorder, elapsed_sec)
-
-                StatefulCallbackMark.set(item_cls, _stateful_callback)
+        _setup_stateful_test(item, item_cls, schema)
         return
 
     if not isinstance(item, SchemathesisFunction):
@@ -854,6 +831,33 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     forwarder = _register_allure_forwarder(item.operation_label, writers)
     if forwarder is not None:
         item.stash[_ALLURE_FORWARDER_KEY] = forwarder
+
+
+def _setup_stateful_test(item: pytest.Item, item_cls: type, schema: BaseSchema) -> None:
+    track_schema(item.config, schema)
+    # Attach a callback to the TestCase class so the state machine can hand off
+    # its recorder to the report writers once the scenario finishes.
+    if _is_xdist_worker(item.config):
+        reports = schema.config.reports
+        if _has_reports(reports):
+
+            def _xdist_stateful_callback(recorder: Any, elapsed_sec: float) -> None:
+                # pytest-xdist sets `workeroutput` on worker configs.
+                workeroutput = item.config.workeroutput  # type: ignore[attr-defined]
+                _push_to_xdist_workeroutput(workeroutput, schema, recorder, elapsed_sec)
+
+            item.stash[_STATEFUL_WRITERS_KEY] = []
+            StatefulCallbackMark.set(item_cls, _xdist_stateful_callback)
+    else:
+        writers = _open_writers(schema, item.config)
+        item.stash[_STATEFUL_WRITERS_KEY] = writers
+        if writers:
+
+            def _stateful_callback(recorder: Any, elapsed_sec: float) -> None:
+                # Tags are not available for stateful tests — operations are discovered dynamically
+                _write_to_writers(writers, recorder, elapsed_sec)
+
+            StatefulCallbackMark.set(item_cls, _stateful_callback)
 
 
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
