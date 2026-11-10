@@ -196,14 +196,17 @@ def test(case, data):
     assert "Solution: Create separate test functions" in stdout
 
 
-def test_given_with_dangling_example_reference(testdir):
+@pytest.mark.parametrize(
+    "test_source",
+    [
+        "@schema.parametrize()\ndef test(case):\n    pass",
+        "@schema.parametrize()\n@schema.given(data=st.data())\ndef test(case, data):\n    pass",
+    ],
+    ids=["plain", "given"],
+)
+def test_dangling_example_reference_fails_only_its_operation(testdir, test_source):
     testdir.make_test(
-        """
-@schema.parametrize()
-@schema.given(data=st.data())
-def test(case, data):
-    pass
-        """,
+        test_source,
         paths={
             "/users": {
                 "get": {
@@ -217,12 +220,20 @@ def test(case, data):
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
-            }
+            },
+            "/health": {"get": {"responses": {"200": {"description": "OK"}}}},
         },
+        schema_name="simple_openapi.yaml",
     )
     result = testdir.runpytest("-v")
-    result.assert_outcomes(errors=1)
-    assert "RefResolutionError: Pointer '/components/examples/Nope' does not exist" in result.stdout.str()
+    result.assert_outcomes(passed=1, failed=1)
+    result.stdout.re_match_lines(
+        [
+            r".+test\[GET /users\] FAILED",
+            r".+test\[GET /health\] PASSED",
+            r"schemathesis.core.errors.RefResolutionError: Pointer '/components/examples/Nope' does not exist",
+        ]
+    )
 
 
 def test_given_with_explicit_hypothesis_example(testdir):
@@ -1000,9 +1011,12 @@ def test(case):
     result = testdir.runpytest()
     # We should skip checking for a server error
     result.assert_outcomes(failed=1)
-    assert (
-        "hypothesis.errors.Unsatisfiable: Failed to generate test cases from examples for this API operation"
-        in result.stdout.str()
+    result.stdout.re_match_lines(
+        [
+            r"E +hypothesis.errors.Unsatisfiable: Failed to generate test cases from examples for this API operation",
+            r" +Cannot generate test data for query parameter 'key'",
+            r" +Nothing satisfies `minimum: 5` and `maximum: 4`",
+        ]
     )
 
 

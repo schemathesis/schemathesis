@@ -17,13 +17,10 @@ from pluggy import Result as PluggyResult
 from schemathesis.checks import collect_after_run_failures, run_checks_for
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
-    SERIALIZERS_SUGGESTION_MESSAGE,
     IncorrectUsage,
     InvalidHeadersExample,
-    InvalidRegexPattern,
     InvalidSchema,
     SchemathesisError,
-    SerializationNotPossible,
     format_exception,
 )
 from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_reported_failure, format_failures, get_origin
@@ -443,11 +440,8 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
     """
     from schemathesis.generation.hypothesis.builder import (
         ApiOperationMark,
-        InvalidHeadersExampleMark,
-        InvalidRegexMark,
+        ExamplesControllerMark,
         MissingPathParameters,
-        NonSerializableMark,
-        UnsatisfiableExampleMark,
         UnserializablePayloadMark,
     )
 
@@ -465,22 +459,9 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
                 raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE) from None
             raise InvalidSchema(exc.args[0]) from None
         except (SkipTest, unittest.SkipTest) as exc:
-            if UnsatisfiableExampleMark.is_set(pyfuncitem.obj):
-                raise Unsatisfiable("Failed to generate test cases from examples for this API operation") from None
-            non_serializable = NonSerializableMark.get(pyfuncitem.obj)
-            if non_serializable is not None:
-                media_types = ", ".join(non_serializable.media_types)
-                raise SerializationNotPossible(
-                    "Failed to generate test cases from examples for this API operation because of"
-                    f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
-                    media_types=non_serializable.media_types,
-                ) from None
-            invalid_regex = InvalidRegexMark.get(pyfuncitem.obj)
-            if invalid_regex is not None:
-                raise InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex) from None
-            invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
-            if invalid_headers is not None:
-                raise InvalidHeadersExample.from_headers(invalid_headers) from None
+            examples = ExamplesControllerMark.get(pyfuncitem.obj)
+            if examples is not None and examples.deferred_errors:
+                raise examples.deferred_errors[0] from None
             pytest.skip(exc.args[0])
         except FailedHealthCheck as exc:
             operation = ApiOperationMark.get(pyfuncitem.obj)
@@ -498,9 +479,11 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         if unserializable_payload is not None:
             emit_unserializable_payload_warning(unserializable_payload)
 
-        invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
-        if invalid_headers is not None:
-            raise InvalidHeadersExample.from_headers(invalid_headers) from None
+        examples = ExamplesControllerMark.get(pyfuncitem.obj)
+        if examples is not None:
+            for error in examples.deferred_errors:
+                if isinstance(error, InvalidHeadersExample):
+                    raise error from None
 
         missing_path_parameters = MissingPathParameters.get(pyfuncitem.obj)
         if missing_path_parameters:

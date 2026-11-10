@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable, Generator, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import wraps
@@ -12,36 +12,21 @@ import hypothesis
 from hypothesis import Phase, Verbosity
 from hypothesis import strategies as st
 from hypothesis._settings import CI, all_settings
-from hypothesis.errors import Unsatisfiable
-from jsonschema_rs import ValidationError
 
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.errors import (
-    IncorrectUsage,
-    InvalidSchema,
-    SerializationNotPossible,
-    UnresolvableReference,
-    is_regex_validation_error,
-)
+from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.marks import Mark
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.case import Case, adjust_urlencoded_payload, find_invalid_headers
-from schemathesis.generation.drivers import missing_path_parameters_error
-from schemathesis.generation.feedback import NO_FEEDBACK, FeedbackSources
-from schemathesis.generation.hypothesis import examples, setup
-from schemathesis.generation.hypothesis.examples import add_single_example
+from schemathesis.generation.case import Case
+from schemathesis.generation.drivers import Controller, ExamplesGenerator, missing_path_parameters_error
+from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
-from schemathesis.generation.meta import TestPhase, content_type_probes_first
+from schemathesis.generation.meta import content_type_probes_first
 from schemathesis.generation.overrides import Override
-from schemathesis.hooks import (
-    GLOBAL_HOOK_DISPATCHER,
-    HookContext,
-    HookDispatcher,
-    HookDispatcherMark,
-    dispatch_before_add_examples,
-)
+from schemathesis.hooks import HookDispatcher, HookDispatcherMark
 from schemathesis.schemas import APIOperation
 
 setup()
@@ -211,9 +196,10 @@ def create_test(
             hypothesis_test,
             operation,
             fill_missing=phases_config.examples.fill_missing,
-            hook_dispatcher=hook_dispatcher,
+            override=config.override,
             feedback=config.feedback,
-            **strategy_kwargs,
+            auth_storage=auth_storage,
+            hooks=hook_dispatcher,
         )
 
     if (
@@ -295,76 +281,24 @@ def make_async_test(test: Callable) -> Callable:
 def add_examples(
     test: Callable,
     operation: APIOperation,
-    fill_missing: bool,
-    hook_dispatcher: HookDispatcher | None = None,
-    feedback: FeedbackSources = NO_FEEDBACK,
-    **kwargs: Any,
-) -> Callable:
-    for example in generate_example_cases(
-        test=test,
-        operation=operation,
-        fill_missing=fill_missing,
-        hook_dispatcher=hook_dispatcher,
-        feedback=feedback,
-        **kwargs,
-    ):
-        test = hypothesis.example(case=example)(test)
-
-    return test
-
-
-def generate_example_cases(
     *,
-    test: Callable,
-    operation: APIOperation,
     fill_missing: bool,
-    hook_dispatcher: HookDispatcher | None = None,
-    feedback: FeedbackSources = NO_FEEDBACK,
-    **kwargs: Any,
-) -> Generator[Case]:
-    """Add examples to the Hypothesis test, if they are specified in the schema."""
-    try:
-        result: list[Case] = [
-            examples.generate_one(strategy)
-            for strategy in operation.get_strategies_from_examples(
-                feedback=feedback.for_examples(),
-                fill_missing=fill_missing,
-                **kwargs,
-            )
-        ]
-    except (
-        InvalidSchema,
-        Unsatisfiable,
-        UnresolvableReference,
-        SerializationNotPossible,
-        ValidationError,
-    ) as exc:
-        result = []
-        if isinstance(exc, Unsatisfiable):
-            UnsatisfiableExampleMark.set(test, exc)
-        if isinstance(exc, SerializationNotPossible):
-            NonSerializableMark.set(test, exc)
-        if is_regex_validation_error(exc):
-            InvalidRegexMark.set(test, exc)
-
-    if fill_missing and not result:
-        strategy = operation.as_strategy(phase=TestPhase.EXAMPLES, feedback=feedback.for_examples(), **kwargs)
-        add_single_example(strategy, result)
-
-    context = HookContext(operation=operation)  # context should be passed here instead
-    dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, operation.schema.hooks)
-    if hook_dispatcher:
-        dispatchers = (*dispatchers, hook_dispatcher)
-    dispatch_before_add_examples(*dispatchers, context=context, examples=result)
-    original_test = test
-    for example in result:
-        if example.headers is not None:
-            invalid_headers = dict(find_invalid_headers(example.headers))
-            if invalid_headers:
-                InvalidHeadersExampleMark.set(original_test, invalid_headers)
-                continue
-        adjust_urlencoded_payload(example)
-        yield example
+    override: Override,
+    feedback: FeedbackSources,
+    auth_storage: AuthStorage | None,
+    hooks: HookDispatcher | None,
+) -> Callable:
+    generator = ExamplesGenerator(
+        operation=operation,
+        override=override,
+        feedback=feedback,
+        fill_missing=fill_missing,
+        hooks=hooks,
+        auth_storage=auth_storage,
+    )
+    ExamplesControllerMark.set(test, generator.controller)
+    _defer_explicit_examples(test, lambda: _as_explicit_examples(generator))
+    return test
 
 
 def add_coverage(
@@ -390,23 +324,38 @@ def add_coverage(
     )
 
     def generate() -> list:
-        # Only carries the attached examples; Hypothesis never calls it.
-        def collector() -> None:
-            raise NotImplementedError
-
-        # Hypothesis runs explicit examples in reverse order of attachment.
-        for case in content_type_probes_first(generator):
-            hypothesis.example(case=case)(collector)
+        examples = _as_explicit_examples(content_type_probes_first(generator))
         unserializable = generator.controller.unserializable_media_types
         if unserializable:
             UnserializablePayloadMark.set(test, sorted(unserializable))
-        return getattr(collector, "hypothesis_explicit_examples", [])
+        return examples
 
-    # Collecting a test must stay cheap: pytest builds every test up front, including skipped ones.
-    test.hypothesis_explicit_examples = _DeferredExamples(  # type: ignore[attr-defined]
-        getattr(test, "hypothesis_explicit_examples", ()), generate
-    )
+    _defer_explicit_examples(test, generate)
     return test
+
+
+def _as_explicit_examples(cases: Iterable[Case]) -> list:
+    # Only carries the attached examples; Hypothesis never calls it.
+    def collector() -> None:
+        raise NotImplementedError
+
+    # Hypothesis runs explicit examples in reverse order of attachment.
+    for case in cases:
+        hypothesis.example(case=case)(collector)
+    return getattr(collector, "hypothesis_explicit_examples", [])
+
+
+def _defer_explicit_examples(test: Callable, generate: Callable[[], list]) -> None:
+    """Append explicit examples that are generated on first read.
+
+    Collecting a test must stay cheap: pytest builds every test up front, including skipped ones. Generating
+    during the run also makes a generation error fail only this test.
+    """
+    examples = getattr(test, "hypothesis_explicit_examples", ())
+    if not isinstance(examples, _DeferredExamples):
+        examples = _DeferredExamples(examples)
+        test.hypothesis_explicit_examples = examples  # type: ignore[attr-defined]
+    examples.pending.append(generate)
 
 
 class _DeferredExamples:
@@ -415,16 +364,17 @@ class _DeferredExamples:
     Hypothesis only reverses this sequence and checks whether it is empty.
     """
 
-    __slots__ = ("_examples", "_generate")
+    __slots__ = ("_examples", "pending")
 
-    def __init__(self, examples: Iterable, generate: Callable[[], list]) -> None:
+    def __init__(self, examples: Iterable) -> None:
         self._examples = list(examples)
-        self._generate: Callable[[], list] | None = generate
+        self.pending: list[Callable[[], list]] = []
 
     def _materialized(self) -> list:
-        if self._generate is not None:
-            generate, self._generate = self._generate, None
-            self._examples.extend(generate())
+        while self.pending:
+            self._examples.extend(self.pending[0]())
+            # Dropped only once generated, so running a failed test again raises the same error.
+            del self.pending[0]
         return self._examples
 
     def __reversed__(self) -> Iterator:
@@ -434,10 +384,7 @@ class _DeferredExamples:
         return len(self._materialized())
 
 
-UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")
-NonSerializableMark = Mark[SerializationNotPossible](attr_name="non_serializable")
+ExamplesControllerMark = Mark[Controller](attr_name="examples_controller")
 UnserializablePayloadMark = Mark[list[str]](attr_name="unserializable_payload")
-InvalidRegexMark = Mark[ValidationError](attr_name="invalid_regex")
-InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
 MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
 ApiOperationMark = Mark[APIOperation](attr_name="api_operation")
