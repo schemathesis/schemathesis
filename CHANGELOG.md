@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Schema-level `examples` reached through `$ref` chains ignored in the examples phase.
+- `[[operations]]` auth and headers leaking to other operations.
 - Missing links for fields inherited through `allOf` chains reusing a schema name across files.
 - False positive `negative_data_rejection` for form body values another `anyOf` branch accepts as text.
 - Send `content` parameters with `+json` or `charset` JSON media types as JSON text.

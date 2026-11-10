@@ -788,6 +788,32 @@ def test_call_uses_configured_tls_verify(app_runner, echo_app):
     assert schema["/users"]["GET"].Case().call().verify is False
 
 
+# A netrc entry for the host replaces generated credentials, but not configured ones.
+@pytest.mark.parametrize(
+    ("basic_auth", "expected"),
+    [(("user", "pass"), "Basic dXNlcjpwYXNz"), (None, "Basic bmV0cmM6c2VjcmV0")],
+    ids=["configured", "generated"],
+)
+def test_call_prefers_configured_auth_over_netrc(ctx, app_runner, monkeypatch, tmp_path, basic_auth, expected):
+    netrc = tmp_path / "netrc"
+    netrc.write_text("machine 127.0.0.1 login netrc password secret\n")
+    monkeypatch.setenv("NETRC", str(netrc))
+    app, _ = ctx.openapi.make_flask_app(
+        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"basic": {"type": "http", "scheme": "basic"}}},
+        security=[{"basic": []}],
+    )
+
+    @app.route("/users")
+    def users():
+        return flask.jsonify(flask.request.headers.get("Authorization"))
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.update(basic_auth=basic_auth)
+    case = generate_many(schema["/users"]["GET"].as_strategy(), 1)[0]
+    assert case.call().json() == expected
+
+
 @pytest.mark.parametrize(
     ("setting", "value", "base_url", "error", "match"),
     [

@@ -155,9 +155,10 @@ def test_error_feedback_contradicted_drops_entry(ctx, tmp_path, app_runner):
     assert entries == []
 
 
-def test_method_not_allowed_confirmed_hydrates_skip(ctx, tmp_path):
+def test_method_not_allowed_confirmed_with_configured_auth_hydrates_skip(ctx, tmp_path):
     api = ctx.openapi.apps.unimplemented_method()
     schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.update(basic_auth=("user", "pass"))
     _point_cache_at(schema, tmp_path)
     _seed(
         tmp_path,
@@ -179,6 +180,9 @@ def test_method_not_allowed_confirmed_hydrates_skip(ctx, tmp_path):
     report = engine.cache.run()
 
     assert report.replayed == 1
+    assert [(request.method, request.path, request.headers.get("Authorization")) for request in api.requests] == [
+        ("POST", "/missing", "Basic dXNlcjpwYXNz")
+    ]
     verdict = engine.supervisor.verdict("POST /missing")
     assert verdict.directive is SchedulingDirective.SKIP
     assert "restored from cache" in (verdict.reason or "")

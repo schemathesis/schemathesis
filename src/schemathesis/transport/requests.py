@@ -191,7 +191,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         return data
 
-    def _build_request_data(self, case: Case, kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _build_request_data(
+        self, case: Case, kwargs: dict[str, Any], session: requests.Session | None
+    ) -> dict[str, Any]:
         """Merge the serialized case with transport settings from config and explicit keyword arguments."""
         settings = case.operation.schema.config.request_settings_for(operation=case.operation)
         data = self.serialize_case(case, **kwargs)
@@ -210,6 +212,14 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         proxies = settings.proxies
         if proxies is not None:
             data.setdefault("proxies", proxies)
+        # A request without auth gets netrc credentials for its host, which would replace the configured ones.
+        if (
+            case._has_explicit_auth
+            and data.get("auth") is None
+            and (session is None or not session.auth)
+            and "Authorization" in data["headers"]
+        ):
+            data["auth"] = lambda request: request
         return data
 
     @override
@@ -228,7 +238,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 headers.setdefault(name, value)
             kwargs["headers"] = headers
 
-        data = self._build_request_data(case, kwargs)
+        data = self._build_request_data(case, kwargs, session)
         # Unless redirects are configured, a documented redirect is the response under test, not its target.
         if max_redirects == 0 or (
             max_redirects is None and any(code.startswith("3") for code in case.operation.responses.status_codes)
