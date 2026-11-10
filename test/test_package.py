@@ -27,6 +27,15 @@ def test_builtin_check_importable_from_checks_module():
     subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ, "PYTHONPATH": SRC})
 
 
+def test_state_machine_importable_from_stateful_module():
+    code = (
+        "from schemathesis.stateful import APIStateMachine\n"
+        "from schemathesis.generation.stateful import state_machine\n"
+        "assert APIStateMachine is state_machine.APIStateMachine\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, env={**os.environ, "PYTHONPATH": SRC})
+
+
 def test_openapi_checks_registered_without_cli():
     # Library users load schemas without importing the CLI or the pytest plugin
     code = (
