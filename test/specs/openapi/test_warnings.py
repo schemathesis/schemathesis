@@ -457,7 +457,7 @@ def test_unresolvable_reference_behind_a_cycle_is_reported_for_every_response(ct
 @pytest.mark.parametrize(
     ("pattern", "expected"),
     [
-        ("^.{1,2097152}", ["Dropped `^.{1,2097152}` - generated values may not match it"]),
+        ("^.{1,2097152}[0-9]", ["Dropped `^.{1,2097152}[0-9]` - generated values may not match it"]),
         (
             "^(\\/|(\\/(?!\\.)+[^$#<>;`|&?{}^*/\\n]+){1,4})$",
             ["Dropped `^(\\/|(\\/(?!\\.)+[^$#<>;`|&?{}^*/\\n]+){1,4})$` - generated values may not match it"],

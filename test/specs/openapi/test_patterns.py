@@ -360,11 +360,11 @@ def test_pcre_class_syntax_is_translated_or_dropped(ctx, pattern, expected):
 def test_quantifier_rewrite_the_validator_cannot_compile_is_not_taken():
     # Folding a bound this large into the pattern makes a quantifier the regex engine refuses; the
     # pattern and the bound both stay as they were.
-    schema = {"type": "string", "pattern": "^.{1,}$", "maxLength": 2147483647}
+    schema = {"type": "string", "pattern": "^.{1,}[0-9]$", "maxLength": 2147483647}
 
     update_pattern_in_schema(schema)
 
-    assert schema == {"type": "string", "pattern": "^.{1,}$", "maxLength": 2147483647}
+    assert schema == {"type": "string", "pattern": "^.{1,}[0-9]$", "maxLength": 2147483647}
 
 
 @pytest.mark.parametrize("length_keyword", ["minLength", "maxLength"], ids=["min", "max"])
