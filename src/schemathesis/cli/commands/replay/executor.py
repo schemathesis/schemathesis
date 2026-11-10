@@ -452,7 +452,6 @@ def _apply_link_parameters(
                 )
                 for name, value in body.items()
             )
-            case.body = merge_link_body(recorded_body, body)
         else:
             linked.append(
                 LinkedValue(
@@ -463,8 +462,9 @@ def _apply_link_parameters(
                     pointers=body_pointers(link.request_body),
                 )
             )
-            if body is not UNRESOLVABLE:
-                case.body = body
+        if body is not UNRESOLVABLE:
+            # Object and array literals set fields inside the recorded body; a single expression replaces it.
+            case.body = merge_link_body(case.body, body) if isinstance(link.request_body, (dict, list)) else body
     return linked
 
 

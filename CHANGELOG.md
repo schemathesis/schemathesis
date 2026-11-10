@@ -33,6 +33,7 @@
 - Links copying a fetched value into an update body field whose `$ref` enum rejects it.
 - False positive `negative_data_rejection` for `deepObject` members sent as valid strings. [#5902](https://github.com/schemathesis/schemathesis/issues/5902)
 - Links reading values from map properties named after the path, e.g. `tags` in `PATCH /orders/{id}/tags`.
+- `st replay` dropping recorded fields in top-level array request bodies next to linked ones.
 - `st replay` dropping recorded nested request body fields next to the ones a link sets.
 - Coverage and examples phases sending requests without credentials learned by auth inference.
 - gRPC error details in `grpc-status-details-bin` shown as `<EMPTY>` in failure output.
