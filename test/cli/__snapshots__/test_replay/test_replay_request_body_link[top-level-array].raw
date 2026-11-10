@@ -1,0 +1,29 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
+
+  x FAILED POST /target
+
+=================================== FAILURES ===================================
+_________________________________ POST /target _________________________________
+
+     1  GET   /source  200
+     2  POST  /target  500  body = [{"id": "new"}] (was [{"id": "old ..., from step 1)
+
+1. Test Case ID: <PLACEHOLDER>
+
+- ST101 Server error
+
+[500] Internal Server Error:
+
+    `{"error":"boom"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================
