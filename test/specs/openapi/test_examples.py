@@ -15,11 +15,12 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.engine import events
 from schemathesis.engine.run import PhaseName
+from schemathesis.generation.drivers import ExamplesGenerator
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
-from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.generation.overrides import Override
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceRepository
 from schemathesis.specs.openapi.adapter.parameters import _apply_overlay, parameters_to_json_schema
@@ -2225,7 +2226,7 @@ def test_yaml_example_with_binary_tag(tmp_path):
     spec.write_text(SPEC_WITH_BINARY_EXAMPLE)
     schema = schemathesis.openapi.from_path(str(spec))
     operation = schema["/items"]["POST"]
-    cases = generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
+    cases = ExamplesGenerator(operation=operation, override=Override(), feedback=FeedbackSources(), fill_missing=False)
     assert [case.body for case in cases] == [{"blob": "YWJj"}]
 
 
@@ -3558,7 +3559,9 @@ def _example_cases(ctx, operation_definition, *, fill_missing, version="3.0.2"):
     )
     return [
         (case.query, case.body)
-        for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=fill_missing)
+        for case in ExamplesGenerator(
+            operation=operation, override=Override(), feedback=FeedbackSources(), fill_missing=fill_missing
+        )
     ]
 
 
@@ -5216,7 +5219,9 @@ def test_x_example_in_openapi_3_parameter_schema(ctx):
 
     assert [
         (case.path_parameters, case.query)
-        for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
+        for case in ExamplesGenerator(
+            operation=operation, override=Override(), feedback=FeedbackSources(), fill_missing=False
+        )
     ] == [({"id": "abc"}, {"q": "qq", "name": "nn"})]
 
 
@@ -5245,7 +5250,9 @@ def test_x_examples_in_openapi_3_parameters(ctx):
 
     assert [
         (case.path_parameters, case.query)
-        for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
+        for case in ExamplesGenerator(
+            operation=operation, override=Override(), feedback=FeedbackSources(), fill_missing=False
+        )
     ] == [({"id": "abc"}, {"q": "qq"})]
 
 

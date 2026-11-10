@@ -25,9 +25,10 @@ from schemathesis.core.transforms import deepclone, encode_pointer
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.drivers import without_unserializable_payload
-from schemathesis.generation.hypothesis.builder import generate_example_cases
+from schemathesis.generation.drivers import ExamplesGenerator, without_unserializable_payload
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.examples import generate_many
+from schemathesis.generation.overrides import Override
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.transport.prepare import normalize_base_url, prepare_request
@@ -369,9 +370,9 @@ def _coverage_cases(
 
 
 def _example_cases(operation: APIOperation) -> Generator[Case]:
-    def _noop(case: Case) -> None: ...
-
-    yield from generate_example_cases(test=_noop, operation=operation, fill_missing=False)
+    yield from ExamplesGenerator(
+        operation=operation, override=Override(), feedback=FeedbackSources(), fill_missing=False
+    )
 
 
 def _fuzzing_cases(

@@ -29,7 +29,6 @@ from schemathesis.generation.hypothesis.examples import add_single_example, gene
 from schemathesis.generation.hypothesis.reporting import GENERIC_UNSATISFIABLE_MESSAGE
 from schemathesis.generation.meta import CoveragePhaseData, TestPhase
 from schemathesis.hooks import (
-    GLOBAL_HOOK_DISPATCHER,
     HookContext,
     HookDispatcher,
     dispatch_before_add_examples,
@@ -211,9 +210,12 @@ class ExamplesGenerator:
         override: Override,
         feedback: FeedbackSources,
         fill_missing: bool,
+        hooks: HookDispatcher | None = None,
+        auth_storage: AuthStorage | None = None,
     ) -> None:
         self._operation = operation
-        self._as_strategy_kwargs = override.as_strategy_kwargs()
+        self._as_strategy_kwargs = {"hooks": hooks, "auth_storage": auth_storage, **override.as_strategy_kwargs()}
+        self._hooks = hooks
         self._feedback = feedback
         self._fill_missing = fill_missing
         self._controller = Controller()
@@ -278,7 +280,7 @@ class ExamplesGenerator:
 
         context = HookContext(operation=operation)
         # Per-test hooks are a pytest-plugin feature; the engine has none.
-        dispatch_before_add_examples(GLOBAL_HOOK_DISPATCHER, operation.schema.hooks, context=context, examples=cases)
+        dispatch_before_add_examples(*case_hook_dispatchers(operation, self._hooks), context=context, examples=cases)
 
         for case in cases:
             if case.headers is not None:
