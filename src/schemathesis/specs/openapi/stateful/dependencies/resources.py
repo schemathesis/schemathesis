@@ -105,6 +105,8 @@ class InferenceState:
     # Per-operation response resources, materialized once and replayed by input + output extraction.
     response_resource_cache: ResponseResourceCache
     nested_fk_cache: NestedFKCache
+    # Collections whose items a path keys, so `{id}` in `/options/{id}/entry` knows `entry` lists items.
+    item_collections: frozenset[str]
 
     @classmethod
     def for_schema(cls, schema: OpenApiSchema) -> InferenceState:
@@ -115,6 +117,7 @@ class InferenceState:
             canonicalization_cache={},
             response_resource_cache={},
             nested_fk_cache={},
+            item_collections=naming.item_collections(schema.raw_schema.get("paths") or {}),
         )
 
 

@@ -12273,6 +12273,508 @@ def test_named_primary_key_parameter_takes_a_string_key(ctx):
     assert [link[2]["parameters"] for link in inferred_links(graph)] == [{"path.part_pk": "$response.body#/pk"}]
 
 
+def option_list(key):
+    return {
+        "type": "object",
+        "properties": {
+            key: {"type": "integer"},
+            "name": {"type": "string"},
+            "choices": {"type": "array", "items": component_ref("OptionEntry")},
+        },
+        "required": [key, "name"],
+    }
+
+
+OPTIONS = "#/paths/~1options/post"
+OPTION = "#/paths/~1options~1{id}/get"
+OPTION_ENTRIES = "#/paths/~1options~1{id}~1entry/post"
+OPTION_ENTRY = "#/paths/~1options~1{id}~1entry~1{entrypk}/get"
+PARENT_PK = {"path.id": "$response.body#/pk"}
+PARENT_ID = {"path.id": "$response.body#/id"}
+LISTED_ENTRY = {"path.entrypk": "$response.body#/choices/*/id", "path.id": "$request.path.id"}
+CREATED_ENTRY = {"path.entrypk": "$response.body#/id", "path.id": "$request.path.id"}
+
+
+def option_links(parent):
+    return [
+        [OPTIONS, "201", parent_key_link(OPTION, parent)],
+        [OPTIONS, "201", parent_key_link(OPTION_ENTRIES, parent)],
+        [OPTIONS, "201", parent_key_link(OPTION_ENTRY, parent)],
+        [OPTIONS, "201", parent_key_link(OPTION_ENTRY, {"path.entrypk": "$response.body#/choices/*/id"})],
+        [OPTION, "200", parent_key_link(OPTION_ENTRIES, parent)],
+        [OPTION, "200", parent_key_link(OPTION_ENTRY, parent)],
+        [OPTION, "200", parent_key_link(OPTION_ENTRY, LISTED_ENTRY)],
+        [OPTION_ENTRIES, "201", parent_key_link(OPTION_ENTRY, CREATED_ENTRY)],
+    ]
+
+
+@pytest.mark.parametrize(
+    ["option", "key", "expected"],
+    [
+        (option_list("pk"), "pk", option_links(PARENT_PK)),
+        (component_ref("OptionList"), "pk", option_links(PARENT_PK)),
+        (
+            {"allOf": [component_ref("OptionList")]},
+            "pk",
+            [
+                [OPTIONS, "201", parent_key_link(OPTION, PARENT_PK)],
+                [OPTIONS, "201", parent_key_link(OPTION_ENTRIES, PARENT_PK)],
+                [OPTIONS, "201", parent_key_link(OPTION_ENTRY, PARENT_PK)],
+                [OPTION, "200", parent_key_link(OPTION_ENTRIES, PARENT_PK)],
+                [OPTION, "200", parent_key_link(OPTION_ENTRY, PARENT_PK)],
+                [OPTION_ENTRIES, "201", parent_key_link(OPTION_ENTRY, CREATED_ENTRY)],
+            ],
+        ),
+        (component_ref("OptionList"), "id", option_links(PARENT_ID)),
+    ],
+    ids=["inline", "reference", "all-of", "reference-keyed-by-id"],
+)
+def test_parent_key_and_nested_item_key_take_their_own_resources(ctx, option, key, expected):
+    # `OptionEntry` starts with `Option` too, but it is the item under `{id}`, not what `{id}` names.
+    paths = {
+        **operation("post", "/options", "201", option),
+        **operation("get", "/options/{id}", "200", option, [path_param("id", "integer")]),
+        **operation("post", "/options/{id}/entry", "201", component_ref("OptionEntry"), [path_param("id", "integer")]),
+        **operation(
+            "get",
+            "/options/{id}/entry/{entrypk}",
+            "200",
+            component_ref("OptionEntry"),
+            [path_param("id", "integer"), path_param("entrypk", "integer")],
+        ),
+    }
+    entry = {"type": "object", "properties": {"id": {"type": "integer"}, "value": {"type": "string"}}}
+
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"OptionList": option_list(key), "OptionEntry": entry}}
+    )
+
+    assert inferred_links(graph) == expected
+
+
+def order_item_paths(parent, parameters, order, item):
+    order_parameters = [*parameters, path_param("orderpk", "integer")]
+    items = f"{parent}/orders/{{orderpk}}/items"
+    return {
+        **operation("post", f"{parent}/orders", "201", component_ref(order), parameters),
+        **operation("get", f"{parent}/orders/{{orderpk}}", "200", component_ref(order), order_parameters),
+        **operation("post", items, "201", component_ref(item), order_parameters),
+        **operation(
+            "get",
+            f"{items}/{{itempk}}",
+            "200",
+            component_ref(item),
+            [*order_parameters, path_param("itempk", "integer")],
+        ),
+    }
+
+
+def store_order_paths(item):
+    return {
+        **operation("post", "/stores", "201", component_ref("Store")),
+        **operation("get", "/stores/{id}", "200", component_ref("Store"), [path_param("id", "integer")]),
+        **order_item_paths("/stores/{id}", [path_param("id", "integer")], "StoreOrder", item),
+    }
+
+
+STORES = "#/paths/~1stores/post"
+STORE = "#/paths/~1stores~1{id}/get"
+STORE_ORDERS = "#/paths/~1stores~1{id}~1orders/post"
+STORE_ORDER = "#/paths/~1stores~1{id}~1orders~1{orderpk}/get"
+STORE_ORDER_ITEMS = "#/paths/~1stores~1{id}~1orders~1{orderpk}~1items/post"
+STORE_ORDER_ITEM = "#/paths/~1stores~1{id}~1orders~1{orderpk}~1items~1{itempk}/get"
+STORE_ORDER_LINKS = [
+    [STORES, "201", parent_key_link(STORE, PARENT_ID)],
+    [STORES, "201", parent_key_link(STORE_ORDERS, PARENT_ID)],
+    [STORES, "201", parent_key_link(STORE_ORDER, PARENT_ID)],
+    [STORES, "201", parent_key_link(STORE_ORDER_ITEMS, PARENT_ID)],
+    [STORES, "201", parent_key_link(STORE_ORDER_ITEM, PARENT_ID)],
+    [STORE, "200", parent_key_link(STORE_ORDERS, PARENT_ID)],
+    [STORE, "200", parent_key_link(STORE_ORDER, PARENT_ID)],
+    [STORE, "200", parent_key_link(STORE_ORDER_ITEMS, PARENT_ID)],
+    [STORE, "200", parent_key_link(STORE_ORDER_ITEM, PARENT_ID)],
+    [
+        STORE_ORDERS,
+        "201",
+        parent_key_link(STORE_ORDER, {"path.orderpk": "$response.body#/id", "path.id": "$request.path.id"}),
+    ],
+    [
+        STORE_ORDER_ITEMS,
+        "201",
+        parent_key_link(
+            STORE_ORDER_ITEM,
+            {
+                "path.itempk": "$response.body#/id",
+                "path.orderpk": "$request.path.orderpk",
+                "path.id": "$request.path.id",
+            },
+        ),
+    ],
+]
+PK_ORDERS = "#/paths/~1orders/post"
+PK_ORDER = "#/paths/~1orders~1{orderpk}/get"
+PK_ORDER_ITEMS = "#/paths/~1orders~1{orderpk}~1items/post"
+PK_ORDER_ITEM = "#/paths/~1orders~1{orderpk}~1items~1{itempk}/get"
+PK_ORDER_KEY = {"path.orderpk": "$response.body#/id"}
+PK_ORDER_ITEM_KEY = {"path.itempk": "$response.body#/id", "path.orderpk": "$request.path.orderpk"}
+
+
+@pytest.mark.parametrize(
+    ["paths", "schemas", "expected"],
+    [
+        (store_order_paths("StoreOrderItem"), ["Store", "StoreOrder", "StoreOrderItem"], STORE_ORDER_LINKS),
+        (store_order_paths("StoreOrderItemDetail"), ["Store", "StoreOrder", "StoreOrderItemDetail"], STORE_ORDER_LINKS),
+        (
+            {
+                path: item
+                for path, item in order_item_paths("", [], "Order", "OrderItemDetail").items()
+                if "/items" in path
+            },
+            ["OrderItemDetail"],
+            [[PK_ORDER_ITEMS, "201", parent_key_link(PK_ORDER_ITEM, PK_ORDER_ITEM_KEY)]],
+        ),
+        (
+            order_item_paths("", [], "Order", "OrderItem"),
+            ["Order", "OrderItem"],
+            [
+                [PK_ORDERS, "201", parent_key_link(PK_ORDER, PK_ORDER_KEY)],
+                [PK_ORDERS, "201", parent_key_link(PK_ORDER_ITEMS, PK_ORDER_KEY)],
+                [PK_ORDERS, "201", parent_key_link(PK_ORDER_ITEM, PK_ORDER_KEY)],
+                [PK_ORDER, "200", parent_key_link(PK_ORDER_ITEMS, PK_ORDER_KEY)],
+                [PK_ORDER, "200", parent_key_link(PK_ORDER_ITEM, PK_ORDER_KEY)],
+                [PK_ORDER_ITEMS, "201", parent_key_link(PK_ORDER_ITEM, PK_ORDER_ITEM_KEY)],
+            ],
+        ),
+    ],
+    ids=["under-a-parent", "item-schema-with-suffix", "without-parent-producer", "parent-named-after-its-segment"],
+)
+def test_concatenated_parent_key_does_not_take_nested_item_identifier(ctx, paths, schemas, expected):
+    item = {"type": "object", "properties": {"id": {"type": "integer"}}}
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": dict.fromkeys(schemas, item)})
+
+    assert inferred_links(graph) == expected
+
+
+LOGS = operation("post", "/logs", "201", component_ref("LogEntry"))
+ITEM_KEYED_BY_ID = {"type": "object", "properties": {"id": {"type": "integer"}}}
+JOURNAL_ENTRIES = "#/paths/~1entries/get"
+JOURNAL_ENTRY = "#/paths/~1entries~1{entrypk}/get"
+ORDER_KEY = [path_param("orderpk", "integer")]
+ORDER_ITEMS = operation("post", "/orders/{orderpk}/items", "201", component_ref("OrderItem"), ORDER_KEY)
+
+
+@pytest.mark.parametrize(
+    ["paths", "schemas", "expected"],
+    [
+        (
+            {
+                **LOGS,
+                **operation("post", "/options", "201", component_ref("OptionList")),
+                **operation("get", "/options/{id}", "200", component_ref("OptionList"), [path_param("id", "integer")]),
+                **operation(
+                    "get",
+                    "/options/{id}/entry/{entrypk}",
+                    "200",
+                    component_ref("OptionEntry"),
+                    [path_param("id", "integer"), path_param("entrypk", "integer")],
+                ),
+            },
+            {"LogEntry": ITEM_KEYED_BY_ID, "OptionList": option_list("pk"), "OptionEntry": ITEM_KEYED_BY_ID},
+            [
+                [OPTIONS, "201", parent_key_link(OPTION, PARENT_PK)],
+                [OPTIONS, "201", parent_key_link(OPTION_ENTRY, PARENT_PK)],
+                [OPTIONS, "201", parent_key_link(OPTION_ENTRY, {"path.entrypk": "$response.body#/choices/*/id"})],
+                [OPTION, "200", parent_key_link(OPTION_ENTRY, PARENT_PK)],
+                [OPTION, "200", parent_key_link(OPTION_ENTRY, LISTED_ENTRY)],
+            ],
+        ),
+        (
+            {
+                **LOGS,
+                **operation("get", "/entries", "200", {"type": "array", "items": component_ref("JournalEntry")}),
+                **operation(
+                    "get",
+                    "/entries/{entrypk}",
+                    "200",
+                    component_ref("JournalEntry"),
+                    [path_param("entrypk", "integer")],
+                ),
+            },
+            {"LogEntry": ITEM_KEYED_BY_ID, "JournalEntry": ITEM_KEYED_BY_ID},
+            [[JOURNAL_ENTRIES, "200", parent_key_link(JOURNAL_ENTRY, {"path.entrypk": "$response.body#/*/id"})]],
+        ),
+        (
+            {**ORDER_ITEMS, **operation("get", "/orders/{orderpk}", "200", component_ref("OrderDetail"), ORDER_KEY)},
+            {"OrderItem": ITEM_KEYED_BY_ID, "OrderDetail": ITEM_KEYED_BY_ID},
+            [],
+        ),
+        (
+            {**ORDER_ITEMS, **operation("delete", "/orders/{orderpk}", "204", parameters=ORDER_KEY)},
+            {"OrderItem": ITEM_KEYED_BY_ID},
+            [],
+        ),
+        (
+            {
+                **ORDER_ITEMS,
+                **operation(
+                    "get",
+                    "/orders/{orderpk}",
+                    "200",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "items": {"type": "array", "items": component_ref("OrderItem")},
+                        },
+                    },
+                    ORDER_KEY,
+                ),
+            },
+            {"OrderItem": ITEM_KEYED_BY_ID},
+            [],
+        ),
+        (
+            {**ORDER_ITEMS, **operation("get", "/orders/{orderpk}", "200", component_ref("OrderView"), ORDER_KEY)},
+            {
+                "OrderItem": ITEM_KEYED_BY_ID,
+                "OrderView": {
+                    "type": "object",
+                    "properties": {"latest": component_ref("OrderItem"), "total": {"type": "integer"}},
+                },
+            },
+            [],
+        ),
+        (
+            {**ORDER_ITEMS, **operation("get", "/orders/{orderpk}", "200", component_ref("Order"), ORDER_KEY)},
+            {"OrderItem": ITEM_KEYED_BY_ID, "Order": ITEM_KEYED_BY_ID},
+            [[PK_ORDER, "200", parent_key_link(PK_ORDER_ITEMS, PK_ORDER_KEY)]],
+        ),
+    ],
+    ids=[
+        "nested-entry",
+        "listed-entry",
+        "order-detail-after-items",
+        "order-delete-after-items",
+        "order-embedding-items",
+        "order-embedding-an-item",
+        "order-after-items",
+    ],
+)
+def test_concatenated_item_key_takes_what_its_operation_returns(ctx, paths, schemas, expected):
+    # `LogEntry` and `OrderItem` match `{entrypk}` and `{orderpk}` by name, yet these operations return other resources.
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+
+    assert inferred_links(graph) == expected
+
+
+def test_parent_key_without_parent_item_does_not_take_nested_item_identifier(ctx):
+    paths = {
+        **operation("post", "/options", "201", component_ref("OptionList")),
+        **operation("post", "/options/{id}/entry", "201", component_ref("OptionEntry"), [path_param("id", "integer")]),
+        **operation(
+            "get",
+            "/options/{id}/entry/{entrypk}",
+            "200",
+            component_ref("OptionEntry"),
+            [path_param("id", "integer"), path_param("entrypk", "integer")],
+        ),
+    }
+    entry = {"type": "object", "properties": {"id": {"type": "integer"}, "value": {"type": "string"}}}
+
+    _, graph = analyze_dependencies(
+        ctx, paths, components={"schemas": {"OptionList": option_list("pk"), "OptionEntry": entry}}
+    )
+
+    assert inferred_links(graph) == [
+        [OPTIONS, "201", parent_key_link(OPTION_ENTRY, {"path.entrypk": "$response.body#/choices/*/id"})],
+        [OPTION_ENTRIES, "201", parent_key_link(OPTION_ENTRY, CREATED_ENTRY)],
+    ]
+
+
+@pytest.mark.parametrize(
+    ["collection", "segment", "schema_name"],
+    [("users", "profile", "UserProfile"), ("orders", "detail", "OrderDetail"), ("jobs", "run", "JobRun")],
+    ids=["profile", "detail", "run"],
+)
+def test_parent_key_takes_the_created_schema_named_after_a_segment_without_items(ctx, collection, segment, schema_name):
+    created = f"#/paths/~1{collection}/post"
+    read = f"#/paths/~1{collection}~1{{id}}~1{segment}/get"
+    delete = f"#/paths/~1{collection}~1{{id}}~1{segment}/delete"
+    paths = {
+        **operation("post", f"/{collection}", "201", component_ref(schema_name)),
+        f"/{collection}/{{id}}/{segment}": {
+            "get": {**response("200", component_ref(schema_name)), "parameters": [path_param("id", "integer")]},
+            "delete": {**response("204"), "parameters": [path_param("id", "integer")]},
+        },
+    }
+    created_schema = {"type": "object", "properties": {"id": {"type": "integer"}, "email": {"type": "string"}}}
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {schema_name: created_schema}})
+
+    assert inferred_links(graph) == [
+        [created, "201", parent_key_link(read, PARENT_ID)],
+        [created, "201", parent_key_link(delete, PARENT_ID)],
+        [read, "200", parent_key_link(delete, PARENT_ID)],
+    ]
+
+
+PLANNER = {"type": "object", "properties": {"pk": {"type": "integer"}, "name": {"type": "string"}}, "required": ["pk"]}
+PLANNERS = "#/paths/~1planners/post"
+PLANNER_ITEM = "#/paths/~1planners~1{id}/get"
+POPULATE = "#/paths/~1planners~1{id}~1populate/put"
+TEAM_ITEM = "#/paths/~1teams~1{id}/get"
+
+
+@pytest.mark.parametrize(
+    ["extra_paths", "schemas", "expected"],
+    [
+        (
+            {},
+            {"PlannerDetail": PLANNER},
+            [
+                [PLANNERS, "201", parent_key_link(PLANNER_ITEM, PARENT_PK)],
+                [PLANNERS, "201", parent_key_link(POPULATE, PARENT_PK)],
+                [PLANNER_ITEM, "200", parent_key_link(POPULATE, PARENT_PK)],
+            ],
+        ),
+        (
+            operation("get", "/goals/{id}", "200", component_ref("Goal"), [path_param("id", "integer")]),
+            {
+                "PlannerDetail": PLANNER,
+                "Goal": {"type": "object", "properties": {"id": {"type": "integer"}, "plannerId": {"type": "integer"}}},
+            },
+            [
+                [PLANNERS, "201", parent_key_link(PLANNER_ITEM, PARENT_PK)],
+                [
+                    "#/paths/~1goals~1{id}/get",
+                    "200",
+                    parent_key_link(POPULATE, {"path.id": "$response.body#/plannerId"}),
+                ],
+            ],
+        ),
+        (
+            {
+                **operation("post", "/teams", "201", component_ref("PlannerDetail")),
+                **operation("get", "/teams/{id}", "200", component_ref("PlannerDetail"), [path_param("id", "integer")]),
+            },
+            {"PlannerDetail": PLANNER},
+            [
+                [PLANNERS, "201", parent_key_link(PLANNER_ITEM, PARENT_PK)],
+                [PLANNERS, "201", parent_key_link(TEAM_ITEM, PARENT_PK)],
+                [PLANNER_ITEM, "200", parent_key_link(TEAM_ITEM, PARENT_PK)],
+                ["#/paths/~1teams/post", "201", parent_key_link(PLANNER_ITEM, PARENT_PK)],
+                ["#/paths/~1teams/post", "201", parent_key_link(TEAM_ITEM, PARENT_PK)],
+                [TEAM_ITEM, "200", parent_key_link(PLANNER_ITEM, PARENT_PK)],
+            ],
+        ),
+    ],
+    ids=["parent-item", "parent-key-field", "shape-of-several-collections"],
+)
+def test_parent_key_takes_what_its_parent_item_takes(ctx, extra_paths, schemas, expected):
+    paths = {
+        **operation("post", "/planners", "201", component_ref("PlannerDetail")),
+        **operation("get", "/planners/{id}", "200", component_ref("PlannerDetail"), [path_param("id", "integer")]),
+        **operation("put", "/planners/{id}/populate", "204", parameters=[path_param("id", "integer")]),
+        **extra_paths,
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": schemas})
+
+    assert inferred_links(graph) == expected
+
+
+def test_parent_key_keeps_the_key_its_own_creator_takes(ctx):
+    created = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    paths = {
+        **operation("post", "/workflows", "201", component_ref("CreateWorkflowResponse")),
+        **operation("post", "/workflows/{id}", "204", parameters=[path_param("id")]),
+        **operation("post", "/workflows/{id}/start", "204", parameters=[path_param("id")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"CreateWorkflowResponse": created}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1workflows/post",
+            "201",
+            parent_key_link("#/paths/~1workflows~1{id}/post", {"path.id": "$response.body#/id"}),
+        ],
+        [
+            "#/paths/~1workflows~1{id}/post",
+            "204",
+            parent_key_link("#/paths/~1workflows~1{id}~1start/post", {"path.id": "$request.path.id"}),
+        ],
+    ]
+
+
+def test_parent_key_of_a_self_nested_collection_takes_its_items(ctx):
+    paths = {
+        **operation("post", "/folders", "201", component_ref("SubFolder")),
+        **operation(
+            "get",
+            "/folders/{id}/folders",
+            "200",
+            {"type": "array", "items": component_ref("SubFolder")},
+            [path_param("id", "integer")],
+        ),
+    }
+    folder = {"type": "object", "properties": {"id": {"type": "integer"}}}
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"SubFolder": folder}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1folders/post",
+            "201",
+            parent_key_link("#/paths/~1folders~1{id}~1folders/get", {"path.id": "$response.body#/id"}),
+        ]
+    ]
+
+
+def test_body_field_ending_in_pk_is_not_a_primary_key(ctx):
+    # `serverpk` holds a public key, not the key of a server.
+    server = {"type": "object", "properties": {"serverid": {"type": "string"}, "serverpk": {"type": "string"}}}
+    paths = {
+        **operation_with_body(
+            "post",
+            "/servers",
+            "201",
+            {"type": "object", "properties": {"serverpk": {"type": "string"}}, "required": ["serverpk"]},
+            component_ref("Server"),
+        ),
+        **operation("get", "/servers/{serverid}", "200", component_ref("Server"), [path_param("serverid")]),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Server": server}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1servers/post",
+            "201",
+            parent_key_link("#/paths/~1servers~1{serverid}/get", {"path.serverid": "$response.body#/serverid"}),
+        ]
+    ]
+
+
+def test_identifier_inside_a_path_segment_takes_a_prefixed_schema(ctx):
+    paths = {
+        **operation("post", "/reports", "201", component_ref("ReportDetail")),
+        **operation("get", "/reports/{id}.csv", "200", parameters=[path_param("id", "integer")]),
+    }
+    report = {"type": "object", "properties": {"id": {"type": "integer"}}}
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"ReportDetail": report}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1reports/post",
+            "201",
+            parent_key_link("#/paths/~1reports~1{id}.csv/get", {"path.id": "$response.body#/id"}),
+        ]
+    ]
+
+
 PRODUCT_NAME_BODY = {"type": "object", "properties": {"productName": {"type": "string"}}, "required": ["productName"]}
 
 
