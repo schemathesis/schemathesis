@@ -5493,6 +5493,90 @@ def test_infer_fk_target_snake_case_unchanged(field, expected):
     assert infer_fk_target(field) == expected
 
 
+@pytest.mark.parametrize("holds_array", [False, True], ids=["scalar", "array"])
+@pytest.mark.parametrize("nested", [False, True], ids=["top-level", "nested"])
+@pytest.mark.parametrize(
+    ("collection", "resource", "key", "foreign_key"),
+    [
+        ("parts", "Part", "id", "part_id"),
+        ("parts", "Part", "pk", "part_pk"),
+        ("customers", "Customer", "id", "customer-id"),
+    ],
+    ids=["snake-id", "snake-pk", "kebab-id"],
+)
+def test_foreign_key_spellings_link_both_ways_unless_holding_an_array(
+    ctx, collection, resource, key, foreign_key, nested, holds_array
+):
+    fields = {foreign_key: {"type": "array", "items": {"type": "integer"}} if holds_array else {"type": "integer"}}
+    if nested:
+        fields = {"shipping": {"type": "object", "properties": fields}}
+    components = {
+        "schemas": {
+            resource: {"type": "object", "properties": {key: {"type": "integer"}, "name": {"type": "string"}}},
+            "Order": {"type": "object", "properties": {"id": {"type": "integer"}, **fields}},
+        }
+    }
+    item = f"/{collection}/{{{key}}}"
+    paths = {
+        **operation("post", f"/{collection}", "201", component_ref(resource)),
+        **operation("get", item, "200", component_ref(resource), parameters=[path_param(key, "integer")]),
+        **operation_with_body(
+            "post", "/orders", "201", {"type": "object", "properties": fields}, component_ref("Order")
+        ),
+        **operation(
+            "get", "/orders/{order_id}", "200", component_ref("Order"), parameters=[path_param("order_id", "integer")]
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+
+    body = {foreign_key: f"$response.body#/{key}"}
+    pointer = f"/{foreign_key}"
+    if nested:
+        body = {"shipping": body}
+        pointer = f"/shipping{pointer}"
+    item_ref = f"#/paths/{item.replace('/', '~1')}/get"
+    into_orders = {
+        "operationRef": "#/paths/~1orders/post",
+        "requestBody": body,
+        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+    }
+    into_item = {
+        "operationRef": item_ref,
+        "parameters": {f"path.{key}": f"$response.body#{pointer}"},
+        "x-schemathesis": {"is_inferred": True},
+    }
+    created_to_item = [
+        f"#/paths/~1{collection}/post",
+        "201",
+        {
+            "operationRef": item_ref,
+            "parameters": {f"path.{key}": f"$response.body#/{key}"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+    created_order_to_read = [
+        "#/paths/~1orders/post",
+        "201",
+        {
+            "operationRef": "#/paths/~1orders~1{order_id}/get",
+            "parameters": {"path.order_id": "$response.body#/id"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    ]
+    if holds_array:
+        assert inferred_links(graph) == [created_to_item, created_order_to_read]
+    else:
+        assert inferred_links(graph) == [
+            created_to_item,
+            [f"#/paths/~1{collection}/post", "201", into_orders],
+            [item_ref, "200", into_orders],
+            created_order_to_read,
+            ["#/paths/~1orders/post", "201", into_item],
+            ["#/paths/~1orders~1{order_id}/get", "200", into_item],
+        ]
+
+
 def test_camelcase_nested_fk_produces_input_slot(ctx):
     _, graph = analyze_dependencies(
         ctx,

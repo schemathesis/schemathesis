@@ -547,6 +547,10 @@ FK_SUFFIX_MAP: dict[str, tuple[str, bool]] = {
     "_id": ("id", False),
     "_uuid": ("uuid", False),
     "_guid": ("guid", False),
+    "-id": ("id", False),
+    "-uuid": ("uuid", False),
+    "-guid": ("guid", False),
+    "_pk": ("pk", False),
 }
 
 # camelCase boundaries; longest plural suffix first so `Ids` matches before `Id`.
@@ -580,7 +584,7 @@ def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
     """
     field_lower = field.lower()
 
-    # snake_case path. Check suffixes (longer ones first to match _ids before _id).
+    # snake_case and kebab-case path. Check suffixes (longer ones first to match _ids before _id).
     for suffix, (target_field, is_array) in FK_SUFFIX_MAP.items():
         # Skip bare identifier fields (not FKs, they're primary identifiers)
         if field_lower == suffix.lstrip("_"):
