@@ -1,5 +1,6 @@
 import os
 import platform
+import re
 import textwrap
 
 import pytest
@@ -269,6 +270,30 @@ def test_continue_on_failure_from_config(cli, ctx):
     )
 
     assert "  20 generated," in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize(
+    ("args", "sent_integers"),
+    [((), {True}), (("--mode=all",), {True, False})],
+    ids=["mode-from-config", "mode-flag-overrides-config"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_generation_mode_from_config(cli, ctx, snapshot_cli, args, sent_integers):
+    api = ctx.openapi.apps.identical_query_parameters()
+
+    result = cli.run(
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=10",
+        "--seed=1",
+        *args,
+        config={"generation": {"mode": "positive"}},
+    )
+
+    assert {re.fullmatch("-?[0-9]+", request.query.get("q", "")) is not None for request in api.requests} == (
+        sent_integers
+    )
+    assert result == snapshot_cli
 
 
 def test_request_timeout_from_config(cli, ctx):

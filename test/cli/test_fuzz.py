@@ -1027,7 +1027,7 @@ def after_call(context, case, response):
 PING_PATHS = {"/ping": {"get": {"responses": {"200": {"description": "OK"}}}}}
 
 
-def test_fuzz_negative_skips_operations_without_negatable_parts(cli, app_runner, ctx):
+def test_fuzz_negative_mode_from_config_skips_operations_without_negatable_parts(cli, app_runner, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
             **PING_PATHS,
@@ -1044,7 +1044,9 @@ def test_fuzz_negative_skips_operations_without_negatable_parts(cli, app_runner,
     def items():
         return jsonify({}), 400
 
-    result = cli.main("fuzz", app_runner.openapi_url(app), "--mode=negative", "--max-time=0", "--workers=1")
+    result = cli.main(
+        "fuzz", app_runner.openapi_url(app), "--max-time=0", "--workers=1", config={"generation": {"mode": "negative"}}
+    )
 
     assert _parse_operations_summary(result.stdout) == (
         {"selected": 2, "tested": 1, "skipped": 1},
