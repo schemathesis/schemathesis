@@ -21,7 +21,6 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     align_created_identifiers,
     bind_created_item_keys,
-    bind_echoed_body_fields,
     bind_id_fields_to_returned_resources,
     bind_item_parameters_to_collections,
     bind_parent_keys_to_item_fields,
@@ -29,6 +28,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     disambiguate_module_variants,
     disambiguate_path_suffix_matches,
     extract_inputs,
+    fit_body_fields_to_read_values,
     merge_related_resources,
     rebind_body_fields_to_unique_producers,
     rebind_inherited_suffix_matches,
@@ -267,8 +267,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # An item carries the key of the parent it lives under (`Shipment.warehouseId`) when nothing produces the parent.
     bind_parent_keys_to_item_fields(schema, operations)
 
-    # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
-    bind_echoed_body_fields(schema, operations, deferred)
+    # Bind update body fields to values only the item `GET` returns (`version`, `checksum`), and unbind copied fields
+    # whose `enum` rejects a value the resource returns (`type` <- `Domain.type`).
+    fit_body_fields_to_read_values(schema, operations, deferred)
 
     # A body field taking an array of identifiers never takes one value (`customer_id: [1, 2]` <- `Customer.id`),
     # and a UUID parameter never takes a non-string field (`{id}` <- an integer `Group.pk`).

@@ -527,12 +527,14 @@ def _resolve_body_dependencies(
         if naming.key_kind(property_name) == naming.KeyKind.NAME and resource.name != updated_resource:
             continue
 
-        yield InputSlot(
+        slot = InputSlot(
             resource=resource,
             resource_field=property_name,
             parameter_name=property_name,
             parameter_location=ParameterLocation.BODY,
         )
+        deferred.copied_resource_fields.append((slot, deferred.writable_body_fields[property_name]))
+        yield slot
 
     # Recursively find nested FK fields in request body
     scan = NestedFKScan(
@@ -983,6 +985,14 @@ def rebind_body_fields_to_unique_producers(
                 )
 
 
+def fit_body_fields_to_read_values(
+    schema: OpenApiSchema, operations: OperationMap, deferred: dict[str, DeferredBindings]
+) -> None:
+    """Bind and unbind body fields by the values the responses they copy from return."""
+    bind_echoed_body_fields(schema, operations, deferred)
+    unbind_copied_fields_rejecting_read_values(schema, operations, deferred)
+
+
 def bind_echoed_body_fields(
     schema: OpenApiSchema, operations: OperationMap, deferred: dict[str, DeferredBindings]
 ) -> None:
@@ -1045,6 +1055,38 @@ def _accepts_read_values(
     assert response is not None
     read = declared_field_values(response, output.pointer, field)
     return read is None or all(contains_value(accepted, value) for value in read)
+
+
+def unbind_copied_fields_rejecting_read_values(
+    schema: OpenApiSchema, operations: OperationMap, deferred: dict[str, DeferredBindings]
+) -> None:
+    """Unbind body fields copied from a resource whose responses list a value the field rejects (`slave` for `A`)."""
+    for label, bindings in deferred.items():
+        rejected = [
+            slot
+            for slot, field_schema in bindings.copied_resource_fields
+            if not _accepts_resource_values(schema, operations, slot, field_schema)
+        ]
+        if rejected:
+            node = operations[label]
+            node.inputs = [slot for slot in node.inputs if all(slot is not other for other in rejected)]
+
+
+def _accepts_resource_values(
+    schema: OpenApiSchema, operations: OperationMap, slot: InputSlot, field_schema: JsonSchema
+) -> bool:
+    field = slot.resource_field
+    # Copied fields keep naming a field of their resource.
+    assert field is not None
+    # Every response of the resource describes the same field, so one listing a rejected value is enough.
+    return not isinstance(field_schema, dict) or all(
+        output.response_fields is None
+        or field not in output.response_fields
+        or _accepts_read_values(schema, label, output, field, field_schema)
+        for label, node in operations.items()
+        for output in node.outputs
+        if output.resource is slot.resource
+    )
 
 
 def _has_resource_prefix(field: str, resource_name: str) -> bool:
