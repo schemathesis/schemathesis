@@ -5773,6 +5773,100 @@ def test_nested_body_fk_links_from_producer(ctx, body, components, expected):
     ]
 
 
+WAREHOUSE_LINE = nested_object("warehouse_id", {"type": "string"})
+LINES_OR_NULL = {"anyOf": [{"type": "array", "items": WAREHOUSE_LINE}, {"type": "null"}]}
+LINES_OR_NULL_COMPONENTS = {
+    "schemas": {
+        "Lines": {"type": ["array", "null"], "items": WAREHOUSE_LINE},
+        "NullableLines": LINES_OR_NULL,
+        "Described": {"description": "Order lines"},
+    }
+}
+LINKED_LINES = [{"warehouse_id": "$response.body#/id"}]
+
+
+@pytest.mark.parametrize(
+    ["version", "lines", "components", "expected"],
+    [
+        ("3.0.2", {"type": "array", "nullable": True, "items": WAREHOUSE_LINE}, {}, LINKED_LINES),
+        ("3.1.0", {"type": ["array", "null"], "items": WAREHOUSE_LINE}, {}, LINKED_LINES),
+        ("3.1.0", component_ref("Lines"), LINES_OR_NULL_COMPONENTS, LINKED_LINES),
+        (
+            "3.1.0",
+            {**component_ref("Described"), "type": "array", "items": WAREHOUSE_LINE},
+            LINES_OR_NULL_COMPONENTS,
+            LINKED_LINES,
+        ),
+        (
+            "3.1.0",
+            {**component_ref("Described"), "type": ["array", "null"], "items": WAREHOUSE_LINE},
+            LINES_OR_NULL_COMPONENTS,
+            LINKED_LINES,
+        ),
+        ("3.1.0", LINES_OR_NULL, {}, LINKED_LINES),
+        ("3.1.0", component_ref("NullableLines"), LINES_OR_NULL_COMPONENTS, LINKED_LINES),
+        ("3.1.0", {"allOf": [LINES_OR_NULL]}, {}, LINKED_LINES),
+        ("3.1.0", {"allOf": [component_ref("NullableLines")]}, LINES_OR_NULL_COMPONENTS, LINKED_LINES),
+        ("3.1.0", {"oneOf": [component_ref("Lines"), {"type": "null"}]}, LINES_COMPONENTS, LINKED_LINES),
+        (
+            "3.1.0",
+            {"type": ["array", "null"], "items": nested_object("warehouse_ids", {"type": "array"})},
+            {},
+            [{"warehouse_ids": ["$response.body#/id"]}],
+        ),
+        (
+            "3.1.0",
+            {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": nested_object("warehouse_ids", {"anyOf": [{"type": "array"}, {"type": "null"}]}),
+                    },
+                    {"type": "null"},
+                ]
+            },
+            {},
+            [{"warehouse_ids": ["$response.body#/id"]}],
+        ),
+        ("3.1.0", {"anyOf": [WAREHOUSE_LINE, {"type": "null"}]}, {}, {"warehouse_id": "$response.body#/id"}),
+        ("3.1.0", {"properties": {"warehouse_id": {"type": "string"}}}, {}, {"warehouse_id": "$response.body#/id"}),
+    ],
+    ids=[
+        "nullable",
+        "array-or-null",
+        "array-or-null-ref",
+        "array-next-to-ref",
+        "array-or-null-next-to-ref",
+        "any-of-array-or-null",
+        "any-of-array-or-null-ref",
+        "any-of-array-or-null-all-of",
+        "any-of-array-or-null-all-of-ref",
+        "one-of-ref-or-null",
+        "plural-ids-in-array-or-null",
+        "plural-ids-any-of-array-or-null",
+        "any-of-object-or-null",
+        "untyped-object",
+    ],
+)
+def test_nested_body_fk_links_through_nullable_array(ctx, version, lines, components, expected):
+    paths = {
+        **operation("post", "/warehouses", "201", SCHEMA_WITH_ID, operation_id="createWarehouse"),
+        **operation_with_body("post", "/orders", "201", nested_object("lines", lines), operation_id="createOrder"),
+    }
+    _, graph = analyze_dependencies(ctx, paths, version=version, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1warehouses/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1orders/post",
+                "requestBody": {"lines": expected},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
 def test_nested_body_fk_links_from_producer_next_to_boolean_schema_reference(ctx):
     body = nested_object(
         "shipping", {"allOf": [component_ref("Any"), nested_object("warehouse_id", {"type": "string"})]}
@@ -5796,6 +5890,7 @@ def test_nested_body_fk_links_from_producer_next_to_boolean_schema_reference(ctx
 
 
 CUSTOMER_IDS = {"type": "array", "items": {"type": "integer"}}
+CUSTOMER_IDS_OR_NULL = {"anyOf": [CUSTOMER_IDS, {"type": "null"}]}
 CUSTOMER_COMPONENTS = {
     "schemas": {
         "Customer": {"type": "object", "properties": {"id": {"type": "integer"}}},
@@ -6043,6 +6138,14 @@ def customer_to_order(body):
         (nested_object("customer_id", component_ref("CustomerIds")), []),
         (nested_object("customer_id", {"allOf": [CUSTOMER_IDS]}), []),
         (nested_object("customer_id", {"allOf": [component_ref("CustomerIds")]}), []),
+        (nested_object("customer_id", CUSTOMER_IDS_OR_NULL), []),
+        (nested_object("customer_id", component_ref("CustomerIdsOrNull")), []),
+        (nested_object("customer_id", {"allOf": [CUSTOMER_IDS_OR_NULL]}), []),
+        (nested_object("customer_id", {"allOf": [component_ref("CustomerIdsOrNull")]}), []),
+        (
+            nested_object("customer_id", {"anyOf": [CUSTOMER_IDS, {"type": "integer"}]}),
+            [customer_to_order({"customer_id": "$response.body#/id"})],
+        ),
         (
             nested_object("customer_id", {"type": "integer"}),
             [customer_to_order({"customer_id": "$response.body#/id"})],
@@ -6055,6 +6158,24 @@ def customer_to_order(body):
         (nested_object("shipping", nested_object("customer_id", component_ref("CustomerIds"))), []),
         (nested_object("shipping", nested_object("customer_id", {"allOf": [CUSTOMER_IDS]})), []),
         (nested_object("shipping", nested_object("customer_id", {"allOf": [component_ref("CustomerIds")]})), []),
+        (nested_object("shipping", nested_object("customer_id", CUSTOMER_IDS_OR_NULL)), []),
+        (nested_object("shipping", nested_object("customer_id", component_ref("CustomerIdsOrNull"))), []),
+        (
+            nested_object(
+                "lines",
+                {
+                    "anyOf": [
+                        {"type": "array", "items": nested_object("customer_id", CUSTOMER_IDS_OR_NULL)},
+                        {"type": "null"},
+                    ]
+                },
+            ),
+            [],
+        ),
+        (
+            nested_object("shipping", nested_object("customer_id", {"anyOf": [CUSTOMER_IDS, {"type": "integer"}]})),
+            [customer_to_order({"shipping": {"customer_id": "$response.body#/id"}})],
+        ),
         (
             nested_object("shipping", nested_object("customer_id", {"type": "integer"})),
             [customer_to_order({"shipping": {"customer_id": "$response.body#/id"}})],
@@ -6065,12 +6186,21 @@ def customer_to_order(body):
         "array-ref",
         "array-all-of",
         "array-all-of-ref",
+        "any-of-array-or-null",
+        "any-of-array-or-null-ref",
+        "any-of-array-or-null-all-of",
+        "any-of-array-or-null-all-of-ref",
+        "any-of-array-or-integer",
         "integer",
         "recursive-ref",
         "nested-array",
         "nested-array-ref",
         "nested-array-all-of",
         "nested-array-all-of-ref",
+        "nested-any-of-array-or-null",
+        "nested-any-of-array-or-null-ref",
+        "any-of-array-or-null-in-nullable-array",
+        "nested-any-of-array-or-integer",
         "nested-integer",
     ],
 )
@@ -6094,6 +6224,12 @@ def test_singular_fk_body_field_holding_an_array_gets_no_link(ctx, body, expecte
             nested_object("customer_ids", {"type": ["array", "null"], "items": {"type": "integer"}}),
             {"customer_ids": ["$response.body#/id"]},
         ),
+        (nested_object("customer_ids", CUSTOMER_IDS_OR_NULL), {"customer_ids": ["$response.body#/id"]}),
+        (nested_object("customer_ids", component_ref("CustomerIdsOrNull")), {"customer_ids": ["$response.body#/id"]}),
+        (
+            nested_object("customer_ids", {"oneOf": [CUSTOMER_IDS, {"type": "null"}]}),
+            {"customer_ids": ["$response.body#/id"]},
+        ),
         (nested_object("customerIds", CUSTOMER_IDS), {"customerIds": ["$response.body#/id"]}),
         (
             nested_object("shipping", nested_object("customer_ids", CUSTOMER_IDS)),
@@ -6109,6 +6245,14 @@ def test_singular_fk_body_field_holding_an_array_gets_no_link(ctx, body, expecte
         ),
         (
             nested_object("shipping", nested_object("customer_ids", {"allOf": [component_ref("CustomerIds")]})),
+            {"shipping": {"customer_ids": ["$response.body#/id"]}},
+        ),
+        (
+            nested_object("shipping", nested_object("customer_ids", CUSTOMER_IDS_OR_NULL)),
+            {"shipping": {"customer_ids": ["$response.body#/id"]}},
+        ),
+        (
+            nested_object("shipping", nested_object("customer_ids", {"allOf": [component_ref("CustomerIdsOrNull")]})),
             {"shipping": {"customer_ids": ["$response.body#/id"]}},
         ),
         (
@@ -6131,11 +6275,16 @@ def test_singular_fk_body_field_holding_an_array_gets_no_link(ctx, body, expecte
         "array-all-of",
         "array-all-of-ref",
         "nullable-array",
+        "any-of-array-or-null",
+        "any-of-array-or-null-ref",
+        "one-of-array-or-null",
         "camel-case-array",
         "nested-array",
         "nested-array-ref",
         "nested-array-all-of",
         "nested-array-all-of-ref",
+        "nested-any-of-array-or-null",
+        "nested-any-of-array-or-null-all-of-ref",
         "array-item-array",
         "integer",
         "array-or-integer",
@@ -6264,8 +6413,15 @@ def test_plural_fk_body_field_holding_an_array_takes_a_forwarded_identifier_as_i
 @pytest.mark.parametrize("name", ["customer_id", "customer_ids"])
 @pytest.mark.parametrize(
     "customer_id",
-    [CUSTOMER_IDS, component_ref("CustomerIds"), {"allOf": [CUSTOMER_IDS]}, {"allOf": [component_ref("CustomerIds")]}],
-    ids=["array", "array-ref", "array-all-of", "array-all-of-ref"],
+    [
+        CUSTOMER_IDS,
+        component_ref("CustomerIds"),
+        {"allOf": [CUSTOMER_IDS]},
+        {"allOf": [component_ref("CustomerIds")]},
+        CUSTOMER_IDS_OR_NULL,
+        component_ref("CustomerIdsOrNull"),
+    ],
+    ids=["array", "array-ref", "array-all-of", "array-all-of-ref", "any-of-array-or-null", "any-of-array-or-null-ref"],
 )
 def test_fk_body_field_holding_an_array_takes_the_same_array_field(ctx, customer_id, name):
     order = {"type": "object", "properties": {"id": {"type": "integer"}, name: customer_id}}
