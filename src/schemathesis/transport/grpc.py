@@ -185,8 +185,8 @@ class GrpcTransport(BaseTransport["requests.Session"]):
                 try:
                     rendered = message_to_json(output_class.FromString(content), method.output_type.file.pool)
                     return json.dumps(rendered, indent=2, ensure_ascii=False)
-                except message.DecodeError:
-                    # Shown as binary; response conformance reports the message or packed value that does not decode.
+                except (message.DecodeError, json_format.Error, ValueError):
+                    # Shown as binary when it does not decode or holds a value JSON cannot express.
                     return None
 
         elif "grpc-status-details-bin" in response_headers:

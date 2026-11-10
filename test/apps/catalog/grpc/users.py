@@ -554,22 +554,36 @@ def library(*, fixed: bool = False) -> GrpcApp:
 def envelope() -> GrpcApp:
     """`types.Types/Envelope` reads `first.extra` without a presence check, as a careless handler would.
 
-    It answers with an empty `types.Envelope`. Reflection describes `types.Types`.
+    It answers with an empty `types.Envelope`. `types.Types/WellKnown` echoes the request, or, with
+    `x-details: invalid-duration` metadata, answers with a duration JSON cannot express.
+    Reflection describes `types.Types`.
     """
     pool = load_pool(all_types_descriptor_set())
     envelope_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("types.Envelope"))
+    well_known_class = message_factory.GetMessageClass(pool.FindMessageTypeByName("types.WellKnown"))
 
-    def handle(payload: bytes, context: grpc.ServicerContext) -> bytes:
+    def handle_envelope(payload: bytes, context: grpc.ServicerContext) -> bytes:
         request = envelope_class.FromString(payload)
         if request.HasField("first") and not request.first.HasField("extra"):
             context.abort(grpc.StatusCode.INTERNAL, "nil extra")
         return envelope_class().SerializeToString()
 
+    def handle_well_known(payload: bytes, context: grpc.ServicerContext) -> bytes:
+        if dict(context.invocation_metadata()).get("x-details") == "invalid-duration":
+            response = well_known_class()
+            response.duration.nanos = 1_500_000_000
+            return response.SerializeToString()
+        return payload
+
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     server.add_generic_rpc_handlers(
         (
             grpc.method_handlers_generic_handler(
-                "types.Types", {"Envelope": grpc.unary_unary_rpc_method_handler(handle)}
+                "types.Types",
+                {
+                    "Envelope": grpc.unary_unary_rpc_method_handler(handle_envelope),
+                    "WellKnown": grpc.unary_unary_rpc_method_handler(handle_well_known),
+                },
             ),
         )
     )

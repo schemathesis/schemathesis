@@ -42,6 +42,7 @@
 - False `JSON deserialization error` for `application/jwt` responses; send `+jwt` request bodies as text.
 - Fuzzing not reusing ids returned next to the resource, e.g. `{bookingid, booking}`.
 - `--auth-wfc` ignored and `--report wfc` writing an empty report for GraphQL schemas.
+- Internal error in failure output for gRPC OK responses with invalid well-known values.
 - Optional multipart fields with a custom `encoding` never generated.
 - Sporadic `BlockingIOError` runtime errors with multiple workers on free-threaded Python.
 

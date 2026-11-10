@@ -131,7 +131,7 @@ def method_not_allowed_schema(ctx):
 
 
 def unimplemented_schema(ctx):
-    # The server implements `Envelope` only, so `Scalars` answers UNIMPLEMENTED.
+    # The server leaves `Scalars` unimplemented, so it answers UNIMPLEMENTED.
     return load(ctx.grpc.apps.envelope()).include(name=["types.Types/Scalars", "types.Types/Envelope"])
 
 
