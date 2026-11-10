@@ -4,8 +4,8 @@ import binascii
 import inspect
 import json
 import os
-import time
 from collections.abc import Iterator, Mapping, MutableMapping
+from functools import partial
 from http.client import RemoteDisconnected
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
@@ -30,7 +30,7 @@ from schemathesis.core.transport import (
     read_event_stream,
 )
 from schemathesis.generation.overrides import Override
-from schemathesis.transport import BaseTransport, SerializationContext
+from schemathesis.transport import BaseTransport, SerializationContext, retry_on_transport_errors
 from schemathesis.transport.prepare import (
     get_exclude_headers,
     prepare_cookies,
@@ -272,7 +272,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             retries = config.request_retries_for(operation=case.operation) or 0
             max_stream_events = config.max_stream_events_for(operation=case.operation)
             with ratelimit(rate_limit, config.base_url):
-                response = _request_with_retries(session, data, retries, max_stream_events)
+                response = retry_on_transport_errors(
+                    partial(_request_resending_on_dropped_connection, session, data, max_stream_events), retries
+                )
             return Response.from_requests(
                 response,
                 verify=verify,
@@ -286,21 +288,6 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 session.close()
             elif isinstance(session, ManagedCookiesSession):
                 session.cookies.clear()
-
-
-def _request_with_retries(
-    session: requests.Session, data: dict[str, Any], retries: int, max_stream_events: int
-) -> requests.Response:
-    # Retry transient network failures with exponential backoff capped at 10s.
-    attempt = 0
-    while True:
-        try:
-            return _request_resending_on_dropped_connection(session, data, max_stream_events)
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-            if attempt >= retries:
-                raise
-            time.sleep(min(2**attempt, 10))
-            attempt += 1
 
 
 def _request_resending_on_dropped_connection(

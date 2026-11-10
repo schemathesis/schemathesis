@@ -22,6 +22,7 @@
 - Coverage phase generating invalid or missing positive cases behind components that only reference another.
 - `ModuleNotFoundError` for the documented `from schemathesis.stateful import APIStateMachine`.
 - Missing links for fields inside request body arrays behind components that only reference another.
+- gRPC calls ignoring `request-retries` on connection errors and timeouts.
 - Silently unauthenticated gRPC calls with `auth.set_from_requests`; report it as unsupported.
 - Internal error during generation for string schemas with a pattern and a huge `maxLength`.
 - Links treating array fields named like `customer_id` as a single identifier.

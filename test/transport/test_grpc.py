@@ -266,6 +266,20 @@ def test_stopped_server_raises_connection_error_until_it_restarts(ctx):
     assert operation.Case(body={"userId": 7}).call().status_line == "OK"
 
 
+# A call fails on the network only once a new connection to the target fails as well, so each proxy resets two.
+def test_request_retries_resend_calls_that_failed_on_the_network(ctx, app_runner):
+    server = ctx.grpc.apps.users()
+    port = int(server.target.rsplit(":", 1)[1])
+
+    def behind_flapping_proxy(retries):
+        return {"base-url": f"grpc://127.0.0.1:{app_runner.run_port_proxy(port, resets=2)}", "request-retries": retries}
+
+    with pytest.raises(requests.exceptions.ConnectionError):
+        get_user(server, 7, config=behind_flapping_proxy(0))
+    _, response = get_user(server, 7, config=behind_flapping_proxy(1))
+    assert (response.status_line, [call.method for call in server.calls]) == ("OK", ["GetUser"])
+
+
 @pytest.mark.parametrize(
     "base_url", ["grpc://nonexistent-host.invalid:50051", "grpc://127.0.0.1:port"], ids=["host", "port"]
 )
