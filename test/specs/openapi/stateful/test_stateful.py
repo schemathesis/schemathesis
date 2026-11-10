@@ -824,6 +824,151 @@ def test_unsatisfiable_fk_consumer_not_classified_as_root(ctx):
     ]
 
 
+_GROUP_FILTER = {"in": "query", "name": "groupId", "schema": {"type": "integer"}}
+_TEAM_ID = {"teamId": {"type": "integer"}}
+
+
+def _json_body(schema):
+    return {"requestBody": {"content": {"application/json": {"schema": schema}}}}
+
+
+@pytest.mark.parametrize(
+    ("list_parameters", "create", "is_root"),
+    [
+        (
+            [],
+            {"parameters": [{"in": "query", "name": "firstName", "required": False, "schema": {"type": "string"}}]},
+            True,
+        ),
+        (
+            [],
+            {"parameters": [{"in": "query", "name": "groupId", "required": False, "schema": {"type": "integer"}}]},
+            True,
+        ),
+        (
+            [],
+            {"parameters": [{"in": "query", "name": "groupId", "required": True, "schema": {"type": "integer"}}]},
+            False,
+        ),
+        ([_GROUP_FILTER], _json_body({"type": "object", "properties": _TEAM_ID}), True),
+        ([_GROUP_FILTER], _json_body({"type": "object", "properties": _TEAM_ID, "required": ["teamId"]}), False),
+        ([_GROUP_FILTER], _json_body({"allOf": [{"$ref": "#/components/schemas/Membership"}]}), False),
+        (
+            [_GROUP_FILTER],
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {**_TEAM_ID, "membership": {"$ref": "#/components/schemas/Membership"}},
+                }
+            ),
+            True,
+        ),
+        (
+            [_GROUP_FILTER],
+            _json_body(
+                {
+                    "type": "object",
+                    "properties": {**_TEAM_ID, "membership": {"$ref": "#/components/schemas/Membership"}},
+                    "required": ["membership"],
+                }
+            ),
+            False,
+        ),
+        ([_GROUP_FILTER], {"parameters": [{"in": "header", "name": "X-Team-Id", "schema": {"type": "integer"}}]}, True),
+        (
+            [_GROUP_FILTER],
+            {"parameters": [{"in": "cookie", "name": "teamId", "required": True, "schema": {"type": "integer"}}]},
+            False,
+        ),
+    ],
+    ids=[
+        "optional-filter",
+        "optional-foreign-key",
+        "required-foreign-key",
+        "optional-body-field",
+        "required-body-field",
+        "required-body-field-behind-reference",
+        "optional-body-object",
+        "required-body-object",
+        "optional-header",
+        "required-cookie",
+    ],
+)
+def test_omittable_input_keeps_operation_as_root(ctx, list_parameters, create, is_root):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": list_parameters,
+                    "responses": {
+                        "200": {"content": {"application/json": {"schema": {"type": "array", "items": _ID_OBJECT}}}}
+                    },
+                },
+                "post": {
+                    **create,
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                },
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+        },
+        components={
+            "schemas": {"Membership": {"type": "object", "properties": _TEAM_ID, "required": ["teamId"]}},
+        },
+    )
+
+    state_machine = schema.as_state_machine()
+    assert sorted(
+        name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
+    ) == [
+        "GET_users___200_GetUser__GET_users_userId_",
+        "POST_users___201_GetUser__GET_users_userId_",
+        "RANDOM__GET_users",
+        *(["RANDOM__POST_users"] if is_root else []),
+    ]
+
+
+def test_path_foreign_key_without_required_flag_demotes_root(ctx):
+    # Path parameters are always sent, whatever `required` says.
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [_GROUP_FILTER],
+                    "responses": {
+                        "200": {"content": {"application/json": {"schema": {"type": "array", "items": _ID_OBJECT}}}}
+                    },
+                }
+            },
+            "/teams/{teamId}/users": {
+                "post": {
+                    "parameters": [{"in": "path", "name": "teamId", "schema": {"type": "integer"}}],
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+        }
+    )
+
+    state_machine = schema.as_state_machine()
+    assert sorted(
+        name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
+    ) == [
+        "GET_users___200_GetUser__GET_users_userId_",
+        "POST_teams_teamId_users___201_GetUser__GET_users_userId_",
+        "RANDOM__GET_users",
+    ]
+
+
 def test_self_referential_fk_creator_remains_root(ctx):
     person_req = {
         "type": "object",

@@ -356,6 +356,17 @@ def assigns_identifier(operation: APIOperation, resource_name: str) -> bool:
     return False
 
 
+def is_optional_body_field(operation: APIOperation, name: str) -> bool:
+    """Whether a request body of `operation` can leave out its top-level field `name`."""
+    for body in operation.body:
+        # Boolean schemas require no fields.
+        schema = body.raw_schema if isinstance(body.raw_schema, dict) else {}
+        _, required = _flatten_composition(maybe_resolve_bundled(schema), schema.get(BUNDLE_STORAGE_KEY, {}))
+        if name not in required:
+            return True
+    return False
+
+
 _SCALAR_TYPES = frozenset({"string", "integer", "number"})
 
 

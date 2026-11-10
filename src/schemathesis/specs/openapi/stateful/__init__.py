@@ -34,6 +34,7 @@ from schemathesis.generation.stateful.state_machine import (
 from schemathesis.generation.value import prune_overwritten_body_constants
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.expressions import MultiMatch
+from schemathesis.specs.openapi.stateful.dependencies.inputs import is_optional_body_field
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.specs.openapi.schemas import OpenApiSchema
-    from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, OperationNode
+    from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot, OperationNode
 
 FilterFunction = Callable[["StepOutput"], bool]
 
@@ -333,7 +334,10 @@ def is_likely_root_transition(operation: APIOperation, node: OperationNode | Non
     # FK consumers whose target resource has no producer anywhere are guaranteed to fail
     # with random data; chains depending on a producer can still be reached via Links.
     if node is not None and any(
-        slot.resource_field is not None and slot.resource.name not in produced_anywhere for slot in node.inputs
+        slot.resource_field is not None
+        and slot.resource.name not in produced_anywhere
+        and not _is_omittable(operation, slot)
+        for slot in node.inputs
     ):
         return False
 
@@ -343,6 +347,19 @@ def is_likely_root_transition(operation: APIOperation, node: OperationNode | Non
 
     # GET operations without path parameters are likely to return lists
     return operation.method == "get" and not operation.path_parameters
+
+
+def _is_omittable(operation: APIOperation, slot: InputSlot) -> bool:
+    """Whether requests can leave out the input the slot fills, such as a list filter or an optional body field."""
+    if slot.parameter_location == ParameterLocation.BODY:
+        # A nested field goes away with the top-level field holding it.
+        field = slot.body_path[0] if slot.body_path else slot.parameter_name
+        return isinstance(field, str) and is_optional_body_field(operation, field)
+    # Path parameters are always sent, whatever `required` says.
+    return slot.parameter_location != ParameterLocation.PATH and any(
+        parameter.name == slot.parameter_name and not parameter.is_required
+        for parameter in operation.get_parameter_set(slot.parameter_location)
+    )
 
 
 def into_step_input(
