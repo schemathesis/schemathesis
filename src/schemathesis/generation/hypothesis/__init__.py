@@ -33,11 +33,6 @@ def setup() -> None:
     if getattr(setup, "_is_patched", False):
         return
 
-    # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
-    # if e.g. Schemathesis CLI is used with multiple workers
-    with deterministic_PRNG():
-        pass
-
     threadlocal = getattr(root_core, "threadlocal", None)
     if threadlocal is not None:
         register_random = entropy.register_random
@@ -51,6 +46,11 @@ def setup() -> None:
                 register_random(r)
 
         entropy.register_random = _register_random
+
+    # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
+    # if e.g. Schemathesis CLI is used with multiple workers
+    with deterministic_PRNG():
+        pass
 
     def _is_first_param_referenced_in_function(f: Callable) -> bool:
         code = getattr(f, "__code__", None)

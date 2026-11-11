@@ -542,11 +542,17 @@ from schemathesis import *
     assert "cannot collect test class" not in result.stdout.str()
 
 
-# Every pytest run with Schemathesis installed loads the plugin, so it should not pay for an HTTP client.
-_PLUGIN_PROBE = "import sys, schemathesis.pytest.plugin; print(sorted(m for m in sys.modules if m.split('.')[0] in {'requests', 'urllib3'} or m == 'schemathesis.python.asgi'))"
+# Every pytest run with Schemathesis installed loads the plugin, so it should not pay for HTTP clients or test builders.
+_PLUGIN_PROBE = (
+    "import sys, schemathesis.pytest.plugin; "
+    "print(sorted(m for m in sys.modules if m.split('.')[0] in {'requests', 'urllib3'} or m in {"
+    "'schemathesis.python.asgi', "
+    "'schemathesis.generation.hypothesis.builder', "
+    "'schemathesis.generation.stateful.state_machine'}))"
+)
 
 
-def test_plugin_load_does_not_import_asgi_client():
+def test_plugin_load_does_not_import_heavy_modules():
     output = subprocess.run([sys.executable, "-c", _PLUGIN_PROBE], capture_output=True, text=True, check=True).stdout
     assert output.strip() == "[]"
 

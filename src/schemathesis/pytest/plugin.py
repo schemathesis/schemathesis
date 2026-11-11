@@ -28,23 +28,22 @@ from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status
 from schemathesis.generation.feedback import FeedbackSources
-from schemathesis.generation.hypothesis.builder import (
+from schemathesis.generation.hypothesis.given import GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE, resolve_given
+from schemathesis.generation.hypothesis.marks import (
     ApiOperationMark,
     ExamplesControllerMark,
     MissingPathParameters,
     UnserializablePayloadMark,
 )
-from schemathesis.generation.hypothesis.given import GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE, resolve_given
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
     build_unsatisfiable_error,
     ignore_hypothesis_output,
 )
-from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
+from schemathesis.generation.stateful import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest import _subtests
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, _WORKER_AFTER_RUN_FAILURES_KEY, track_schema
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
-from schemathesis.pytest._test_builder import schema_error_suffix
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.reporting import PytestReportOutcome, open_writers, write_report_locations, write_to_writers
 from schemathesis.pytest.warnings import (
@@ -166,7 +165,7 @@ class SchemathesisCase(PyCollector):
         to produce tests out of hypothesis ones.
         """
         from schemathesis.checks import load_all_checks
-        from schemathesis.pytest._test_builder import build_operation_test
+        from schemathesis.pytest._test_builder import build_operation_test, schema_error_suffix
 
         load_all_checks()
 

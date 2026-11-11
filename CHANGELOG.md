@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.33.2...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Faster pytest plugin loading and Hypothesis setup on large schemas.
+
 ### :bug: Fixed
 
 - Stateful links combining values from different list items, e.g. one item's `owner` with another's `id`.
@@ -20,6 +24,7 @@
 - Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
 - Configured `Authorization` headers replaced by netrc credentials for the same host.
 - `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
+- Blank argument values in Hypothesis failures of pytest sessions without Schemathesis tests.
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
 - False positive and internal error in `negative_data_rejection` for `deepObject` members under `$ref`. [#6025](https://github.com/schemathesis/schemathesis/issues/6025) [#6028](https://github.com/schemathesis/schemathesis/issues/6028)

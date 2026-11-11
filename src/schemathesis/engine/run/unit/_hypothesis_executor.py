@@ -17,7 +17,7 @@ from schemathesis.engine.run.unit._case import ServerWentAway
 from schemathesis.engine.run.unit._errors import classify_test_exception
 from schemathesis.engine.run.unit._scenario import Scenario, finish_scenario, iter_closing_events, start_scenario
 from schemathesis.generation.hypothesis import add_database_key
-from schemathesis.generation.hypothesis.builder import MissingPathParameters
+from schemathesis.generation.hypothesis.marks import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
