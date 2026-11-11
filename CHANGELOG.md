@@ -2,6 +2,21 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.33.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Stateful links combining values from different list items, e.g. one item's `owner` with another's `id`.
+- Links from `2XX` or `default` responses followed on status codes another response declares.
+- Link calibration lowering correct links' reuse on 4xx responses unrelated to the linked values.
+- Internal error when a link targets an operation with an unresolvable `$ref`.
+- Links using Swagger 2.0 HTML or other non-identifier response bodies as the created resource id.
+- Links treating `anyOf`/`oneOf` array-or-null fields named like `customer_id` as a single identifier.
+- Missing links for request bodies declared as `anyOf`/`oneOf` of an array and `null`.
+- Cache replay sending requests without auth providers or `[auth.openapi]` credentials.
+- Custom `encoding` ignored for form fields declared in `allOf` branches.
+- Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
+- `FileNotFoundError` in pytest VCR, HAR and JUnit reports when their directory does not exist.
+- Slow `pytest-xdist` runs with growing memory when any report is enabled.
+
 ## [4.33.2](https://github.com/schemathesis/schemathesis/compare/v4.33.1...v4.33.2) - 2026-11-11
 
 ### :bug: Fixed
