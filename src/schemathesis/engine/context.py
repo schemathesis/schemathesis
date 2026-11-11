@@ -253,7 +253,7 @@ class EngineContext:
     def stop(self) -> None:
         self.control.stop()
 
-    def detect_server_outage(self, exc: requests.ConnectionError) -> bool:
+    def detect_server_outage(self, exc: Exception) -> bool:
         """Stop the run when a refused or reset connection means the server went away."""
         if not self.server.is_down(exc):
             return False

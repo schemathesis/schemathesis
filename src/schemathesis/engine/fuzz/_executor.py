@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from warnings import catch_warnings
 
-import requests
 from hypothesis.errors import Flaky, FlakyStrategyDefinition, Unsatisfiable, UnsatisfiedAssumption
 from hypothesis.strategies import one_of, sampled_from
 from urllib3.exceptions import InsecureRequestWarning
@@ -400,7 +399,7 @@ def _send_step(
         recorder.forget_case(case_id=case.id)
         return None
     except TRANSPORT_ERRORS as exc:
-        outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
+        outage = ctx.detect_server_outage(exc)
         if outage and ctx.server.is_after_outage(exc):
             # The outage stops the run, but the steps the server answered before it went away still get checked.
             recorder.forget_case(case_id=case.id)
