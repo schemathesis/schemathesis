@@ -33,7 +33,7 @@ from schemathesis.generation.stateful.state_machine import (
 )
 from schemathesis.generation.value import prune_overwritten_body_constants
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.expressions import MultiMatch
+from schemathesis.specs.openapi.stateful.link_values import count_matches, select_match
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
@@ -374,6 +374,10 @@ def into_step_input(
             else:
                 use_p = DEFAULT_USE_PROBABILITY
                 calibrated = False
+            # Pick via the `use_true_random` instance so the per-step pick stays out of Hypothesis's data tree; the
+            # producer's response shape can vary across runs of the same byte stream when the API has mutable state,
+            # and a tracked draw would be flagged as inconsistent.
+            index = _choose_match_index(transition, random)
             for container, data in transition.parameters.items():
                 overrides[container] = {}
                 location = CONTAINER_TO_LOCATION[container]
@@ -383,14 +387,7 @@ def into_step_input(
                     if not isinstance(extracted.value, Ok) or extracted.value.ok() in (None, UNRESOLVABLE):
                         continue
 
-                    value = extracted.value.ok()
-                    # Wildcard expressions yield multiple candidates. Pick via the
-                    # `use_true_random` instance so the per-step pick stays out of
-                    # Hypothesis's data tree — the producer's response shape can vary
-                    # across runs of the same byte stream when the API has mutable
-                    # state, and a tracked draw would be flagged as inconsistent.
-                    if isinstance(value, MultiMatch):
-                        value = random.choice(value.values)
+                    value = select_match(extracted.value.ok(), index)
 
                     if calibrated:
                         p = use_p
@@ -411,15 +408,7 @@ def into_step_input(
                         overrides[container][name] = value
                         applied_parameters.append((location, name))
 
-            # Get the extracted body value
-            if (
-                transition.request_body is not None
-                and isinstance(transition.request_body.value, Ok)
-                and transition.request_body.value.ok() is not UNRESOLVABLE
-            ):
-                request_body = _choose_wildcard_matches(transition.request_body.value.ok(), random)
-            else:
-                request_body = NOT_SET
+            request_body = _linked_request_body(transition, index)
 
             # Link suppose to replace the entire extracted body
             if request_body is not NOT_SET and not link.merge_body and biased_coin(use_p):
@@ -492,15 +481,21 @@ def merge_link_body(generated: object, linked: JsonValue) -> JsonValue:
     return linked
 
 
-def _choose_wildcard_matches(value: Any, random: Random) -> Any:
-    # Each wildcard expression in a body yields several candidates; one is picked per field.
-    if isinstance(value, MultiMatch):
-        return random.choice(value.values)
-    if isinstance(value, dict):
-        return {key: _choose_wildcard_matches(item, random) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_choose_wildcard_matches(item, random) for item in value]
-    return value
+def _choose_match_index(transition: Transition, random: Random) -> int:
+    """Position of the list item that every wildcard value of this transition is taken from."""
+    extracted = [param for container in transition.parameters.values() for param in container.values()]
+    if transition.request_body is not None:
+        extracted.append(transition.request_body)
+    matches = count_matches([param.value.ok() for param in extracted if isinstance(param.value, Ok)])
+    return random.randrange(matches) if matches > 1 else 0
+
+
+def _linked_request_body(transition: Transition, index: int) -> Any:
+    """Request body extracted by the link with wildcard values taken from the list item at `index`."""
+    body = transition.request_body
+    if body is None or not isinstance(body.value, Ok) or body.value.ok() is UNRESOLVABLE:
+        return NOT_SET
+    return select_match(body.value.ok(), index)
 
 
 def is_transition_allowed(source: str, target: str) -> Callable[[OpenAPIStateMachine], bool]:
