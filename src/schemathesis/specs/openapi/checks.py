@@ -18,7 +18,14 @@ from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, AuthScenario, Failure, IgnoredAuth
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator, resolve_bundled_ref
+from schemathesis.core.jsonschema import (
+    BUNDLE_STORAGE_KEY,
+    get_type,
+    make_validator,
+    maybe_resolve_bundled,
+    resolve_bundled_ref,
+    schema_with_bundle,
+)
 from schemathesis.core.jsonschema.types import JsonSchema, as_object_schema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import (
@@ -423,8 +430,8 @@ def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str)
                 (reading for reading in readings if not _has_errors_at(validator, {**sent, name: reading}, name)),
                 readings[0],
             )
-        properties = alternative.optimized_schema.get("properties", {})
-        return validator.is_valid(_fold_bracketed_names(sent, properties, validator_cls))
+        properties = maybe_resolve_bundled(alternative.optimized_schema).get("properties", {})
+        return validator.is_valid(_fold_bracketed_names(sent, properties, validator_cls, alternative.optimized_schema))
     except Exception:
         # Schemas the validator cannot read - can't tell whether the sent body is valid
         return False
@@ -753,13 +760,14 @@ def _query_as_sent(
     response: Response,
     case: Case,
     query: Mapping[str, object],
-    properties: dict[str, JsonSchema],
-    required: list[str],
+    container_schema: dict[str, Any],
 ) -> dict[str, object] | None:
     """Replace generated query values with the text actually sent wherever the server reads that text as is."""
     sent_values = _sent_query_values(response, case)
     if sent_values is None:
         return None
+    properties: dict[str, JsonSchema] = container_schema.get("properties", {})
+    required: list[str] = container_schema.get("required", [])
     sent: dict[str, object] = {}
     # Iterating the generated query skips keys added outside of generation, e.g. query-based auth.
     for name, value in query.items():
@@ -790,13 +798,17 @@ def _query_as_sent(
     if querystring is not None:
         # The whole query is the one `querystring` parameter, read as a form.
         form = properties.get(querystring)
-        inner = form.get("properties", {}) if isinstance(form, dict) else {}
-        return {querystring: _fold_bracketed_names(sent, inner, validator_cls)}
-    return _fold_bracketed_names(sent, properties, validator_cls)
+        bundle = container_schema.get(BUNDLE_STORAGE_KEY)
+        inner = resolve_bundled_ref(form, bundle).get("properties", {}) if isinstance(form, dict) else {}
+        return {querystring: _fold_bracketed_names(sent, inner, validator_cls, container_schema)}
+    return _fold_bracketed_names(sent, properties, validator_cls, container_schema)
 
 
 def _fold_bracketed_names(
-    values: dict[str, object], properties: Mapping[str, JsonSchema], validator_cls: type[jsonschema_rs.Validator]
+    values: dict[str, object],
+    properties: Mapping[str, JsonSchema],
+    validator_cls: type[jsonschema_rs.Validator],
+    root_schema: JsonSchema,
 ) -> dict[str, object]:
     """Read `name[key]` back into the object property `name`, as `deepObject` sends each member under such a name."""
     folded: dict[str, object] = {}
@@ -808,7 +820,7 @@ def _fold_bracketed_names(
                 key = rest[:-1]
                 if isinstance(value, list):
                     # Servers read one of the repeated values.
-                    validator = make_validator(properties[name], validator_cls)
+                    validator = make_validator(schema_with_bundle(properties[name], root_schema), validator_cls)
                     value = next((item for item in value if not _has_errors_at(validator, {key: item}, key)), value)
                 members[key] = value
                 continue
@@ -848,9 +860,7 @@ def _non_body_negative_values_match_schema(response: Response, case: Case) -> bo
         if not container:
             continue
         if location == ParameterLocation.QUERY:
-            sent = _query_as_sent(
-                response, case, value, container.schema.get("properties", {}), container.schema.get("required", [])
-            )
+            sent = _query_as_sent(response, case, value, container.schema)
             if sent is not None:
                 value = sent
         v = dict(value) if location == ParameterLocation.HEADER else value
