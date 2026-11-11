@@ -268,6 +268,30 @@ def test_api(case):
     }
 
 
+def test_xdist_worker_records_each_case_once(testdir, ctx):
+    api = ctx.openapi.apps.success()
+    junit_path = str(testdir.tmpdir.join("report.xml"))
+    ok = {"get": {"responses": {"200": {"description": "OK"}}}}
+    _make_xdist_test(
+        ctx,
+        testdir,
+        f"""
+schema.config.reports.update(junit_path=r"{junit_path}")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    assert len(schema.hooks.get_all_by_name("after_call")) == 1
+    case.call()
+""",
+        base_url=f"{api.base_url}/api",
+        paths={f"/success{index}": ok for index in range(6)},
+    )
+    testdir.runpytest("-n", "2").assert_outcomes(passed=6)
+
+    assert _junit_outcomes(junit_path) == {f"GET /success{index}": ("passed", "") for index in range(6)}
+
+
 def test_lazy_vcr_report_via_xdist_skips_tests_without_calls(testdir, ctx):
     api = ctx.openapi.apps.success_and_failure()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
