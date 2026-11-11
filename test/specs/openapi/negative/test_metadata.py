@@ -2,9 +2,15 @@ import pytest
 from hypothesis import given, settings
 from hypothesis.database import InMemoryExampleDatabase
 
+import schemathesis
 from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from test.utils import find_first
+
+OWNER = {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "pattern": "^[a-z]+$"}}}
+TAG = {"type": "string", "minLength": 2}
+BOUND = {"type": "integer", "minimum": 1}
 
 
 def _mutation(
@@ -197,3 +203,126 @@ def test_mutations_cover_every_negated_location(ctx):
         assert "X-Token" in description, description
 
     test()
+
+
+def _load_pets(ctx, version, variant):
+    prefix = "#/definitions/" if version == "2.0" else "#/components/schemas/"
+    pet = {
+        "type": "object",
+        "required": ["owner", "tags", "meta"],
+        "properties": {
+            "owner": {"$ref": "owner.json" if variant == "external-file" else f"{prefix}Owner"},
+            "tags": {"type": "array", "minItems": 1, "items": {"$ref": f"{prefix}Tag"}},
+            "meta": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": f"{prefix}Tag"}},
+        },
+    }
+    responses = {"200": {"description": "OK"}}
+    if version == "2.0":
+        definition = {
+            "parameters": [{"in": "body", "name": "body", "required": True, "schema": {"$ref": f"{prefix}Pet"}}],
+            "responses": responses,
+        }
+        components = {"definitions": {"Pet": pet, "Owner": OWNER, "Tag": TAG}}
+    else:
+        body = {"schema": {"$ref": f"{prefix}Pet"}}
+        if variant == "encoded-multipart":
+            content = {
+                "multipart/form-data": {**body, "encoding": {"tags": {"contentType": "text/plain, application/json"}}}
+            }
+        else:
+            content = {"application/json": body}
+        definition = {
+            "parameters": [
+                {"in": location, "name": name, "required": True, "schema": {"$ref": f"{prefix}Limit"}}
+                for location, name in (("query", "limit"), ("header", "X-Limit"), ("path", "id"))
+            ],
+            "requestBody": {"required": True, "content": content},
+            "responses": responses,
+        }
+        limit = {"allOf": [{"$ref": f"{prefix}Bound"}]}
+        components = {
+            "components": {"schemas": {"Pet": pet, "Owner": OWNER, "Tag": TAG, "Limit": limit, "Bound": BOUND}}
+        }
+    paths = {"/pets/{id}": {"post": definition}} if version != "2.0" else {"/pets": {"post": definition}}
+    if variant != "external-file":
+        return ctx.openapi.load_schema(paths, version=version, **components)
+    ctx.makefile(OWNER, filename="owner")
+    return schemathesis.openapi.from_path(str(ctx.openapi.write_schema(paths, version=version, **components)))
+
+
+@pytest.mark.parametrize(
+    ("version", "variant", "channel", "location", "path", "keyword", "expected"),
+    [
+        ("3.0.2", None, "value", "body", ("owner", "name"), "pattern", "/components/schemas/Owner/properties/name"),
+        ("3.0.2", None, "value", "body", ("owner",), "required", "/components/schemas/Owner"),
+        ("3.0.2", None, "value", "body", ("tags",), "minLength", "/components/schemas/Tag"),
+        ("3.0.2", None, "value", "body", ("meta",), "minLength", "/components/schemas/Tag"),
+        ("2.0", None, "value", "body", ("owner", "name"), "pattern", "/definitions/Owner/properties/name"),
+        ("3.1.0", None, "value", "body", ("owner", "name"), "pattern", "/components/schemas/Owner/properties/name"),
+        ("3.0.2", "external-file", "value", "body", ("owner", "name"), "pattern", "/owner.json/properties/name"),
+        ("3.0.2", None, "schema", "body", ("owner", "name"), "pattern", "/components/schemas/Owner/properties/name"),
+        ("2.0", None, "schema", "body", ("owner", "name"), "pattern", "/definitions/Owner/properties/name"),
+        ("3.1.0", None, "schema", "body", ("owner", "name"), "pattern", "/components/schemas/Owner/properties/name"),
+        ("3.0.2", "external-file", "schema", "body", ("owner", "name"), "pattern", "/owner.json/properties/name"),
+        (
+            "3.0.2",
+            "encoded-multipart",
+            "value",
+            "body",
+            ("owner", "name"),
+            "pattern",
+            "/components/schemas/Owner/properties/name",
+        ),
+        (
+            "3.0.2",
+            "encoded-multipart",
+            "schema",
+            "body",
+            ("owner", "name"),
+            "pattern",
+            "/components/schemas/Owner/properties/name",
+        ),
+        ("3.0.2", None, "schema", "query", ("limit",), "minimum", "/components/schemas/Bound"),
+        ("3.0.2", None, "schema", "header", ("X-Limit",), "minimum", "/components/schemas/Bound"),
+        ("3.0.2", None, "schema", "path", ("id",), "minimum", "/components/schemas/Bound"),
+    ],
+    ids=[
+        "value-nested-leaf",
+        "value-required",
+        "value-items",
+        "value-additional-properties",
+        "value-swagger-2.0",
+        "value-openapi-3.1",
+        "value-external-file",
+        "schema-nested-leaf",
+        "schema-swagger-2.0",
+        "schema-openapi-3.1",
+        "schema-external-file",
+        "value-encoded-multipart",
+        "schema-encoded-multipart",
+        "schema-query",
+        "schema-header",
+        "schema-path",
+    ],
+)
+def test_mutation_location_names_definition_behind_reference(
+    ctx, version, variant, channel, location, path, keyword, expected
+):
+    schema = _load_pets(ctx, version, variant)
+    operation = next(schema.get_all_operations()).ok()
+
+    def is_target(mutation):
+        return (
+            mutation.channel == channel
+            and mutation.parameter_location == location
+            and mutation.path[: len(path)] == path
+            and keyword in mutation.keywords
+        )
+
+    case = find_first(
+        operation.as_strategy(generation_mode=GenerationMode.NEGATIVE),
+        lambda case: any(is_target(mutation) for mutation in case.meta.phase.data.mutations),
+        # Each draw breaks one of several values, so the rarest target needs a wide search.
+        max_examples=3000,
+    )
+    assert [mutation.schema_pointer for mutation in case.meta.phase.data.mutations if is_target(mutation)] == [expected]

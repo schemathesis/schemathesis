@@ -4294,6 +4294,25 @@ def test_response_schema_conformance_resolves_references_inside_embedded_resourc
     )
 
 
+@pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
+def test_response_schema_conformance_names_negated_reference(ctx, response_factory, version):
+    prefix = "#/definitions/" if version == "2.0" else "#/components/schemas/"
+    schema = {"type": "object", "properties": {"tag": {"not": {"$ref": f"{prefix}Tag"}}}}
+    if version == "2.0":
+        response = {"description": "OK", "schema": schema}
+        components = {"definitions": {"Tag": {"type": "string"}}}
+    else:
+        response = {"description": "OK", "content": {"application/json": {"schema": schema}}}
+        components = {"components": {"schemas": {"Tag": {"type": "string"}}}}
+    operation = ctx.openapi.load_operation(
+        "GET /items", {"responses": {"200": response}}, version=version, **components
+    )
+
+    with pytest.raises(JsonSchemaError) as exc:
+        operation.validate_response(response_factory.core(content=b'{"tag": "x"}'))
+    assert exc.value.validation_message == '{"$ref":"#/components/schemas/Tag"} is not allowed for "x"'
+
+
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
     schema = ctx.openapi.load_schema(_DATE_TIME_PATHS, config=config)

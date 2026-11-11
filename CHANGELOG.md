@@ -26,6 +26,7 @@
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
 - `FileNotFoundError` in pytest VCR, HAR and JUnit reports when their directory does not exist.
+- Internal names like `schema000001` in `negative_data_rejection` and response conformance failure messages.
 - Slow `pytest-xdist` runs with growing memory when any report is enabled.
 
 ## [4.33.2](https://github.com/schemathesis/schemathesis/compare/v4.33.1...v4.33.2) - 2026-11-11
