@@ -30,6 +30,7 @@ class StatefulConfig:
     wrong_link_parser_attributed: bool = False
     wrong_link_type_mismatch: bool = False
     wrong_link_to_missing_id: bool = False
+    plain_text_rejection: bool = False
 
 
 def _initial_users() -> dict[int, dict]:
@@ -418,6 +419,9 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
         if config.independent_500:
             return jsonify({"error": "Something went wrong - DELETE"}), 500
         if user:
+            if config.plain_text_rejection and len(user["name"]) % 2 == 1:
+                # Both branches are common, so the link collects successes and rejections regardless of the seed
+                return "Name is too long", 400, {"Content-Type": "text/plain"}
             # Only delete users with short names when use_after_free is on
             if config.use_after_free:
                 if len(user["name"]) < 10:

@@ -412,6 +412,15 @@ class ParserBlamesUnrelated:
 
 
 @dataclass(slots=True)
+class CorrectLinkPlainTextRejection:
+    # Correct link; DELETE rejects odd-length names with a plain-text 400 that no parser attributes to the link.
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        store.config.plain_text_rejection = True
+
+
+@dataclass(slots=True)
 class WrongLinkToMissingId:
     # Link extracts `manager_id` (never resolves to a user); DELETE returns plain 404.
     priority: int = 0

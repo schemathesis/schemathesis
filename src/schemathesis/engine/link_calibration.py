@@ -13,10 +13,18 @@ MIN_PROBABILITY = 0.05
 class TransitionScore:
     successes: int = 0
     failures: int = 0
+    # Rejections no parser explains; they count against the link only until it has succeeded once.
+    unattributed: int = 0
+
+    @property
+    def counted_failures(self) -> int:
+        if self.successes == 0:
+            return self.failures + self.unattributed
+        return self.failures
 
     @property
     def use_probability(self) -> float:
-        total = self.successes + self.failures
+        total = self.successes + self.counted_failures
         if total < MIN_SAMPLES:
             return DEFAULT_USE_PROBABILITY
         return max(MIN_PROBABILITY, self.successes / total)
@@ -24,6 +32,7 @@ class TransitionScore:
     def merge(self, other: TransitionScore) -> None:
         self.successes += other.successes
         self.failures += other.failures
+        self.unattributed += other.unattributed
 
 
 @dataclass(slots=True)
@@ -51,9 +60,12 @@ class LinkCalibrationState:
         else:
             entry.failures += 1
 
+    def record_unattributed(self, transition_id: str) -> None:
+        self.write.setdefault(transition_id, TransitionScore()).unattributed += 1
+
     def use_probability(self, transition_id: str) -> float:
         return self.read.get(transition_id, TransitionScore()).use_probability
 
     def is_calibrated(self, transition_id: str) -> bool:
         score = self.read.get(transition_id)
-        return score is not None and score.successes + score.failures >= MIN_SAMPLES
+        return score is not None and score.successes + score.counted_failures >= MIN_SAMPLES

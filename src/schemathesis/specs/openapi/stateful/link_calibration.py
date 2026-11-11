@@ -43,7 +43,10 @@ def record_link_outcome(
     step_input: StepInput,
     recorder: ScenarioRecorder,
 ) -> None:
-    """Update a link's score from parser-attributed blame, dropping 404/409 as resource-state evidence."""
+    """Update a link's score from parser-attributed blame, dropping 404/409 as resource-state evidence.
+
+    A 4xx that no parser explains is recorded as unattributed: it lowers the score only of a link that never succeeded.
+    """
     if (
         step_input.transition is None
         or not step_input.is_applied
@@ -63,7 +66,10 @@ def record_link_outcome(
         return
     if status in (404, 409):
         return
-    if observations and not _is_link_attributed(observations, step_input.applied_parameters):
+    if not observations:
+        calibration.record_unattributed(step_input.transition.id)
+        return
+    if not _is_link_attributed(observations, step_input.applied_parameters):
         return
 
     calibration.record(step_input.transition.id, success=False)
