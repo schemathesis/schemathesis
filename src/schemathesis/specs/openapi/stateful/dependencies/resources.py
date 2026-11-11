@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from schemathesis.core import media_types
@@ -25,6 +25,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     OperationMap,
     ResourceDefinition,
     ResourceMap,
+    declared_field_types,
     extend_pointer,
     extract_fk_fields,
     extract_nested_fk_fields,
@@ -58,6 +59,8 @@ class ExtractedResource:
     extract_object_keys: bool = False
     # Fields this response declares for the resource; `None` when it declares none
     response_fields: frozenset[str] | None = None
+    # Types of the fields this response declares, apart from those only its alternatives declare
+    field_types: dict[str, frozenset[str]] = field(default_factory=dict)
     # Envelope field identifying the wrapped resource (`/bookingid` next to `/booking`)
     identifier_pointer: str | None = None
     # Whether only the operation path names the resource, as no `$ref` declares it
@@ -95,6 +98,8 @@ def extract_resources_from_responses(
 
 
 ResponseResourceCache: TypeAlias = dict[str, list[tuple["OpenApiResponse", ExtractedResource]]]
+# Field types by the identity of the schema declaring them, kept next to it so the identity stays its own.
+FieldTypesCache: TypeAlias = dict[int, tuple[object, dict[str, frozenset[str]]]]
 
 
 @dataclass(slots=True)
@@ -113,6 +118,8 @@ class InferenceState:
     nested_fk_cache: NestedFKCache
     # Collections whose items a path keys, so `{id}` in `/options/{id}/entry` knows `entry` lists items.
     item_collections: frozenset[str]
+    # Responses share schemas, whose field types are read once.
+    field_types_cache: FieldTypesCache
 
     @classmethod
     def for_schema(cls, schema: OpenApiSchema) -> InferenceState:
@@ -124,6 +131,7 @@ class InferenceState:
             response_resource_cache={},
             nested_fk_cache={},
             item_collections=naming.item_collections(schema.raw_schema.get("paths") or {}),
+            field_types_cache={},
         )
 
 
@@ -198,6 +206,7 @@ def iter_resources_from_response(
             if map_resource is not None:
                 # The values are what the response declares, not the resource the keys identify.
                 map_resource.response_fields = _declared_fields(additional, current_resolver)
+                map_resource.field_types = _declared_field_types(additional, current_resolver, state.field_types_cache)
                 yield map_resource
                 return None
 
@@ -276,14 +285,16 @@ def iter_resources_from_response(
         resources=resources,
         updated_resources=updated_resources,
         resolver=unwrapped.resolver,
+        field_types_cache=state.field_types_cache,
         parent_ref=recovered_ref or unwrapped.ref or parent_ref,
     )
 
     if result is not None:
-        resource, cardinality, response_fields, named_after_path = result
+        resource, cardinality, response_fields, field_types, named_after_path = result
         if canonicalized is not resolved and unwrapped.pointer == ROOT_POINTER and cardinality == Cardinality.ONE:
             # Flattening keeps one `allOf` reference only; the fields of every inherited schema belong to the response
             response_fields = _declared_fields(resolved, current_resolver)
+            field_types = _declared_field_types(resolved, current_resolver, state.field_types_cache)
         identifier_pointer = None
         if pointer is None and unwrapped.pointer != ROOT_POINTER and cardinality == Cardinality.ONE:
             identifier_pointer = _envelope_identifier_pointer(canonicalized, resource.name)
@@ -297,6 +308,7 @@ def iter_resources_from_response(
             cardinality=cardinality,
             pointer=pointer,
             response_fields=response_fields,
+            field_types=field_types,
             identifier_pointer=identifier_pointer,
             named_after_path=named_after_path,
         )
@@ -326,16 +338,18 @@ def iter_resources_from_response(
                             resources=resources,
                             updated_resources=updated_resources,
                             resolver=sub_search_resolver,
+                            field_types_cache=state.field_types_cache,
                             parent_ref=reference,
                         )
                         if sub_result is not None:
-                            subresource, sub_cardinality, sub_fields, _ = sub_result
+                            subresource, sub_cardinality, sub_fields, sub_field_types, _ = sub_result
                             subresource_pointer = extend_pointer(pointer, field, parent_cardinality=parent_cardinality)
                             yield ExtractedResource(
                                 resource=subresource,
                                 cardinality=sub_cardinality,
                                 pointer=subresource_pointer,
                                 response_fields=sub_fields,
+                                field_types=sub_field_types,
                             )
                             # When the sub-schema is itself a pagination/list wrapper (e.g. Spring
                             # `CustomResponse{response: {content: [...]}}`), descend one more level
@@ -352,15 +366,19 @@ def iter_resources_from_response(
                                         resources=resources,
                                         updated_resources=updated_resources,
                                         resolver=sub_unwrapped.resolver,
+                                        field_types_cache=state.field_types_cache,
                                         parent_ref=sub_unwrapped.ref or reference,
                                     )
                                     if inner_result is not None:
-                                        inner_resource, inner_cardinality, inner_fields, _ = inner_result
+                                        inner_resource, inner_cardinality, inner_fields, inner_field_types, _ = (
+                                            inner_result
+                                        )
                                         yield ExtractedResource(
                                             resource=inner_resource,
                                             cardinality=inner_cardinality,
                                             pointer=subresource_pointer + sub_unwrapped.pointer,
                                             response_fields=inner_fields,
+                                            field_types=inner_field_types,
                                         )
 
 
@@ -594,9 +612,10 @@ def _extract_resource_and_cardinality(
     resources: ResourceMap,
     updated_resources: set[str],
     resolver: Resolver,
+    field_types_cache: FieldTypesCache,
     parent_ref: str | None = None,
-) -> tuple[ResourceDefinition, Cardinality, frozenset[str] | None, bool] | None:
-    """Extract resource from schema and determine cardinality, the fields it declares and if only the path names it."""
+) -> tuple[ResourceDefinition, Cardinality, frozenset[str] | None, dict[str, frozenset[str]], bool] | None:
+    """Extract a resource, its cardinality, the fields it declares with their types and if only the path names it."""
     named_after_path = _named_after_path(schema, parent_ref)
     # Check if it's an array
     if schema.get("type") == "array" or "items" in schema:
@@ -621,7 +640,13 @@ def _extract_resource_and_cardinality(
         if resource is None:
             return None
 
-        return resource, Cardinality.MANY, _declared_fields(resolved_items, items_resolver), named_after_path
+        return (
+            resource,
+            Cardinality.MANY,
+            _declared_fields(resolved_items, items_resolver),
+            _declared_field_types(resolved_items, items_resolver, field_types_cache),
+            named_after_path,
+        )
 
     # Single object
     resource = _extract_resource_from_schema(
@@ -636,7 +661,13 @@ def _extract_resource_and_cardinality(
     if resource is None:
         return None
 
-    return resource, Cardinality.ONE, _declared_fields(schema, resolver), named_after_path
+    return (
+        resource,
+        Cardinality.ONE,
+        _declared_fields(schema, resolver),
+        _declared_field_types(schema, resolver, field_types_cache),
+        named_after_path,
+    )
 
 
 def _extract_resource_from_schema(
@@ -964,6 +995,19 @@ def _declared_fields(schema: Mapping[str, Any], resolver: Resolver) -> frozenset
     if not fields:
         return None
     return OpenFields(fields) if is_open else fields
+
+
+def _declared_field_types(
+    schema: Mapping[str, Any], resolver: Resolver, cache: FieldTypesCache
+) -> dict[str, frozenset[str]]:
+    """Types of the fields an object schema and its `allOf` parents declare."""
+    schema_resolver, resolved = maybe_resolve_with_resolver(schema, resolver)
+    cached = cache.get(id(resolved))
+    if cached is not None and cached[0] is resolved:
+        return cached[1]
+    types = declared_field_types(_collect_properties(resolved, schema_resolver)) if _may_be_object(resolved) else {}
+    cache[id(resolved)] = (resolved, types)
+    return types
 
 
 def _may_be_object(schema: Mapping[str, Any]) -> bool:
