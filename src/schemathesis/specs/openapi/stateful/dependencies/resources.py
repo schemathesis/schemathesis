@@ -11,6 +11,7 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.transforms import decode_pointer, encode_pointer
+from schemathesis.specs.openapi.adapter.content_types import produces_v2
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.converter import WRITE_ONLY_KEYWORDS, has_annotation
@@ -72,6 +73,7 @@ def extract_resources_from_responses(
     handling `allOf` / `oneOf` / `anyOf` composition, and determining cardinality.
     Updates the global resource registry as resources are discovered.
     """
+    produces = _declared_media_types(produces_v2(operation))
     for response in operation.responses.iter_successful_responses():
         try:
             extracted = list(
@@ -79,6 +81,7 @@ def extract_resources_from_responses(
                     method=operation.method,
                     path=operation.path,
                     response=response,
+                    produces=produces,
                     state=state,
                 )
             )
@@ -143,6 +146,7 @@ def iter_resources_from_response(
     method: str,
     path: str,
     response: OpenApiResponse,
+    produces: list[str],
     state: InferenceState,
 ) -> Iterator[ExtractedResource]:
     resources = state.resources
@@ -163,7 +167,7 @@ def iter_resources_from_response(
     # Example: POST /api/recipes returns just a slug string - treat this as Recipe.slug
     # Example: POST /api/users returns just an integer ID - treat this as User.id
     schema_type = schema.get("type")
-    if _is_created_identifier(method=method, schema_type=schema_type, response=response):
+    if _is_created_identifier(method=method, schema_type=schema_type, response=response, produces=produces):
         primitive_resource = _resource_from_primitive_response(path=path, resources=resources)
         if primitive_resource is not None:
             yield primitive_resource
@@ -458,23 +462,35 @@ def _resource_from_boolean_schema(*, path: str, resources: ResourceMap) -> Extra
     return ExtractedResource(resource=resource, cardinality=Cardinality.ONE, pointer=ROOT_POINTER)
 
 
-def _is_created_identifier(*, method: str, schema_type: object, response: OpenApiResponse) -> bool:
+def _is_created_identifier(*, method: str, schema_type: object, response: OpenApiResponse, produces: list[str]) -> bool:
     """Whether a POST/PUT response body is just the identifier of what it created."""
     return (
         schema_type in ("string", "integer")
         and method in ("post", "put")
-        and _can_carry_identifier(response.get_raw_schema_media_type())
+        and _response_can_carry_identifier(response, produces)
     )
+
+
+def _response_can_carry_identifier(response: OpenApiResponse, produces: list[str]) -> bool:
+    media_type = response.get_raw_schema_media_type()
+    if media_type is not None:
+        return _can_carry_identifier(media_type)
+    # Open API 2.0 responses name no media type of their own, so the operation's `produces` lists the candidates
+    return not produces or any(_can_carry_identifier(candidate) for candidate in produces)
+
+
+def _declared_media_types(produces: object) -> list[str]:
+    """Media types a `produces` value lists; a malformed non-list value or non-string entry lists none."""
+    if not isinstance(produces, list):
+        return []
+    return [media_type for media_type in produces if isinstance(media_type, str)]
 
 
 _IDENTIFIER_MEDIA_TYPES = (("application", "json"), ("text", "plain"))
 
 
-def _can_carry_identifier(media_type: str | None) -> bool:
+def _can_carry_identifier(media_type: str) -> bool:
     """Whether a whole body of this media type can be a bare identifier, not a document such as SDP or HTML."""
-    # Open API 2.0 responses name no media type of their own
-    if media_type is None:
-        return True
     try:
         parsed = media_types.parse(media_type)
     except MalformedMediaType:

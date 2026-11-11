@@ -8,11 +8,16 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-def response_content_types_v2(operation: APIOperation, response: Response) -> list[str]:
+def produces_v2(operation: APIOperation) -> list[str]:
+    """Media types the operation's responses may have: its own `produces`, else the global one."""
     produces = operation.definition.raw.get("produces")
     if produces:
         return produces
     return operation.schema.raw_schema.get("produces", [])
+
+
+def response_content_types_v2(operation: APIOperation, response: Response) -> list[str]:
+    return produces_v2(operation)
 
 
 def request_content_types_v2(operation: APIOperation) -> list[str]:
