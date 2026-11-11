@@ -30,6 +30,7 @@
 - False positive and internal error in `negative_data_rejection` for `deepObject` members under `$ref`. [#6025](https://github.com/schemathesis/schemathesis/issues/6025) [#6028](https://github.com/schemathesis/schemathesis/issues/6028)
 - False positive `positive_data_acceptance` when a `body.*` override sets a field sharing its `$ref` with others. [#6026](https://github.com/schemathesis/schemathesis/issues/6026)
 - Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
+- False negatives and positives in `negative_data_rejection` for non-body parameters behind `$ref` or `allOf`.
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
 - Dictionary bindings on body paths ignoring constraints outside the bound field, e.g. `contains` or `enum`.
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.

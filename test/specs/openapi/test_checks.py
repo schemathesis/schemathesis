@@ -16,6 +16,7 @@ from schemathesis.core.parameters import EncodedPath, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -57,7 +58,7 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 from schemathesis.specs.openapi.validation import _check_discriminator
-from test.utils import check_context
+from test.utils import EventStream, check_context
 
 
 @pytest.mark.parametrize(
@@ -561,6 +562,83 @@ def test_negative_data_rejection_reports_invalid_boolean_next_to_extras(ctx, res
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
+_INTEGER_REFERENCE = {"$ref": "#/components/schemas/Integer"}
+_LIMIT_PARAMETER = {"name": "limit", "required": True, "schema": {"$ref": "#/components/schemas/Limit"}}
+_TAGS_PARAMETER = {"name": "tags", "schema": {"type": "array", "items": {"type": "string"}}}
+
+
+@pytest.mark.parametrize("location", ["query", "header", "cookie"])
+@pytest.mark.parametrize(
+    ("parameters", "phase"),
+    [
+        ([_LIMIT_PARAMETER], PhaseName.FUZZING),
+        ([_LIMIT_PARAMETER], PhaseName.COVERAGE),
+        (
+            [
+                {
+                    "name": "limit",
+                    "required": True,
+                    "schema": {"allOf": [_INTEGER_REFERENCE, {"description": "Page size"}]},
+                }
+            ],
+            PhaseName.COVERAGE,
+        ),
+        ([{"name": "limit", "required": True, "schema": {"oneOf": [_INTEGER_REFERENCE]}}], PhaseName.COVERAGE),
+        ([{"name": "limit", "required": True, "schema": {"allOf": [{"type": "integer"}]}}], PhaseName.COVERAGE),
+        ([{"name": "limit", "schema": {"$ref": "#/components/schemas/Name"}}], PhaseName.COVERAGE),
+        ([{"name": "limit", "schema": {"allOf": [{"$ref": "#/components/schemas/Name"}]}}], PhaseName.COVERAGE),
+        ([{"name": "limit", "schema": {"allOf": [{"type": "string", "minLength": 1}]}}], PhaseName.COVERAGE),
+        ([_LIMIT_PARAMETER, _TAGS_PARAMETER], PhaseName.FUZZING),
+        ([_LIMIT_PARAMETER, _TAGS_PARAMETER], PhaseName.COVERAGE),
+    ],
+    ids=[
+        "alias-fuzzing",
+        "alias-coverage",
+        "all-of-reference-with-description-coverage",
+        "one-of-reference-coverage",
+        "all-of-coverage",
+        "optional-string-alias-coverage",
+        "all-of-reference-optional-string-coverage",
+        "all-of-optional-string-coverage",
+        "alias-beside-array-fuzzing",
+        "alias-beside-array-coverage",
+    ],
+)
+def test_negative_data_rejection_reports_scalar_parameter_behind_reference(ctx, location, parameters, phase):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"in": location, **parameter} for parameter in parameters],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Limit": _INTEGER_REFERENCE,
+                "Integer": {"type": "integer"},
+                "Name": {"$ref": "#/components/schemas/String"},
+                "String": {"type": "string", "minLength": 1},
+            }
+        },
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({})
+
+    stream = EventStream(
+        schemathesis.openapi.from_wsgi("/openapi.json", app),
+        checks=[negative_data_rejection],
+        phases=[phase],
+        modes=[GenerationMode.NEGATIVE],
+        max_examples=10,
+    ).execute()
+    assert stream.failures_count == 1
+
+
 def test_negative_data_rejection_ignores_extras_next_to_allow_empty_value_string(ctx, response_factory):
     # `allowEmptyValue` admits types other than string, but "0" is still a valid string, not `false`.
     operation = ctx.openapi.load_operation(
@@ -1022,7 +1100,7 @@ def _wire_identical_case(schema, other_header):
     )
 
 
-def _wire_identical_schema(ctx, header_schema):
+def _wire_identical_schema(ctx, header_schema, **kwargs):
     return ctx.openapi.load_schema(
         {
             "/test": {
@@ -1033,7 +1111,8 @@ def _wire_identical_schema(ctx, header_schema):
                     ]
                 }
             }
-        }
+        },
+        **kwargs,
     )
 
 
@@ -1043,6 +1122,29 @@ def test_negative_data_rejection_keeps_checking_when_another_location_sends_an_a
     case = _wire_identical_case(schema, {"X-Other": ["a"]})
     with pytest.raises(AcceptedNegativeData):
         negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+def test_negative_data_rejection_keeps_checking_when_another_location_has_a_self_referencing_schema(
+    ctx, response_factory
+):
+    schema = _wire_identical_schema(
+        ctx,
+        {"$ref": "#/components/schemas/Name"},
+        components={"schemas": {"Name": {"anyOf": [{"type": "string"}, {"$ref": "#/components/schemas/Name"}]}}},
+    )
+    case = _wire_identical_case(schema, {"X-Other": "abc"})
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+def test_negative_data_rejection_ignores_header_behind_reference_beside_wire_identical_query(ctx, response_factory):
+    schema = _wire_identical_schema(
+        ctx,
+        {"$ref": "#/components/schemas/Name"},
+        components={"schemas": {"Name": {"$ref": "#/components/schemas/String"}, "String": {"type": "string"}}},
+    )
+    case = _wire_identical_case(schema, {"X-Other": "abc", "X-Extra": "junk"})
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
 def test_negative_data_rejection_keeps_checking_when_another_location_has_an_unreadable_schema(ctx, response_factory):
@@ -1325,6 +1427,9 @@ def test_negative_data_rejection_validates_numeric_wire_value_against_query_sche
         ({"schema": {"type": "boolean"}}, "yes"),
         ({"schema": {"type": "boolean"}}, "OFF"),
         ({"schema": {"type": "boolean"}}, 0),
+        ({"schema": {"allOf": [{"type": "integer"}, {"description": "Page size"}]}}, "5"),
+        ({"schema": {"allOf": [{"minimum": 1}, {"type": "integer"}]}}, "5"),
+        ({"schema": {"allOf": [{"type": "integer"}, {"type": "number", "minimum": 1}]}}, "5"),
     ],
     ids=[
         "number-becomes-string",
@@ -1334,6 +1439,9 @@ def test_negative_data_rejection_validates_numeric_wire_value_against_query_sche
         "yes-boolean",
         "uppercase-off-boolean",
         "integer-boolean",
+        "all-of-typed-and-untyped",
+        "all-of-untyped-and-typed",
+        "all-of-integer-and-number",
     ],
 )
 def test_negative_data_rejection_validates_serialized_query(ctx, response_factory, parameter, value):
