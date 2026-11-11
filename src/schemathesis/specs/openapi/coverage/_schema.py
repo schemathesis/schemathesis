@@ -4048,6 +4048,15 @@ def _negative_enum(
         yield from _negative_type(ctx, schema, inferred, seen)
 
 
+def _sent_like_valid_form_field(validator: jsonschema_rs.Validator, value: Any) -> bool:
+    # Form bodies (urlencoded and multipart) stringify scalar property values on the wire;
+    # any non-string whose `str(value)` satisfies the property schema is a no-op mutation.
+    if not isinstance(value, str) and validator.is_valid(str(value)):
+        return True
+    # A form field sends a scalar exactly like the one-item array holding it, e.g. `0` and `[0]`.
+    return not isinstance(value, (list, dict)) and (validator.is_valid([value]) or validator.is_valid([str(value)]))
+
+
 def _negative_properties(
     ctx: CoverageContext, template: dict, properties: dict
 ) -> Generator[GeneratedValue, None, None]:
@@ -4083,10 +4092,7 @@ def _negative_properties(
             for value in cover_schema_iter(nctx, sub_schema):
                 if validator is not None:
                     v = value.value
-                    # Form bodies (urlencoded and multipart) stringify scalar property values
-                    # on the wire; any non-string whose `str(v)` satisfies the property schema
-                    # is a no-op mutation.
-                    if is_form and not isinstance(v, str) and validator.is_valid(str(v)):
+                    if is_form and _sent_like_valid_form_field(validator, v):
                         continue
                     # XML text content stringifies primitives; objects/arrays keep structure.
                     if is_xml and isinstance(v, (bool, int, float)) and validator.is_valid(str(v)):
