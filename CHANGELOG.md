@@ -26,6 +26,7 @@
 - False positive `positive_data_acceptance` when a `body.*` override sets a field sharing its `$ref` with others. [#6026](https://github.com/schemathesis/schemathesis/issues/6026)
 - Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
+- Dictionary bindings on body paths ignoring constraints outside the bound field, e.g. `contains` or `enum`.
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
 - `FileNotFoundError` in pytest VCR, HAR and JUnit reports when their directory does not exist.
 - Slow `pytest-xdist` runs with growing memory when any report is enabled.
