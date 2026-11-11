@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, NoReturn
 
-import requests
-
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
@@ -57,6 +55,17 @@ def raise_if_stopped(stop_reason: StopReason) -> None:
         raise ServerWentAway
     if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
         raise KeyboardInterrupt
+
+
+def detect_outage(exc: Exception, case: Case, ctx: EngineContext, recorder: ScenarioRecorder) -> bool:
+    """Whether the server went away; an error that only hit the already dead server stops the scenario at once."""
+    outage = ctx.detect_server_outage(exc)
+    if outage and ctx.server.is_after_outage(exc):
+        # A check's own request may be the refused one; the case itself was answered then.
+        if recorder.find_response(case_id=case.id) is None:
+            recorder.forget_case(case_id=case.id)
+        raise ServerWentAway from None
+    return outage
 
 
 def run_one_case(
@@ -136,12 +145,7 @@ def _raise_case_error(
             exc, case.media_type, path=case.operation.path, method=case.operation.method
         )
     network_error = _as_unrecoverable_network_error(exc, case, scenario.transport_kwargs)
-    outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
-    if outage and ctx.server.is_after_outage(exc):
-        # A check's own request may be the refused one; the case itself was answered then.
-        if scenario.recorder.find_response(case_id=case.id) is None:
-            scenario.recorder.forget_case(case_id=case.id)
-        raise ServerWentAway from None
+    outage = detect_outage(exc, case, ctx, scenario.recorder)
     if network_error is not None:
         # Server likely has crashed and does not accept any connections at all
         # Don't report these error - only the original crash should be reported

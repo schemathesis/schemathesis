@@ -165,10 +165,12 @@ class ServerMonitor:
             sent.error = error
             sent.finished = self._clock
 
-    def is_down(self, exc: requests.ConnectionError) -> bool:
+    def is_down(self, exc: Exception) -> bool:
         """Whether a refused or reset connection means the server is gone for the rest of the run."""
         import requests
 
+        if not isinstance(exc, requests.ConnectionError):
+            return False
         refused = is_connection_refused(exc)
         if not self._recent or exc.request is None or not (refused or _is_reset(exc)):
             return False
