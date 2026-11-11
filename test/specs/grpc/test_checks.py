@@ -158,7 +158,7 @@ def test_bad_status_details(operation, response_factory):
         operation.validate_response(response, case=operation.Case(body={}))
 
 
-# Without a run to remember the verdict, every successful call is resent without credentials.
+# Outside a run, the schema remembers that the method rejected missing credentials, so it is probed once.
 @pytest.mark.parametrize(
     "headers",
     [
@@ -179,7 +179,6 @@ def test_ignored_auth_outside_a_run(ctx, headers):
         ("Bearer x", "1"),
         (None, "1"),
         ("Bearer x", "1"),
-        (None, "1"),
     ]
 
 

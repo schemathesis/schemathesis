@@ -292,6 +292,8 @@ class RunChecks:
     instances: dict[str, CheckInstance]
     # Per-instance locks so distinct checks don't serialize globally.
     locks: dict[str, threading.Lock]
+    # Operations whose missing and invalid credentials were already rejected in this run.
+    auth_enforced_operations: set[str] = field(default_factory=set)
 
     @classmethod
     def from_registry(cls, config: ChecksConfig) -> RunChecks:

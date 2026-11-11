@@ -44,7 +44,7 @@ class CheckContextData:
             recorder=recorder,
             response_checks=ctx.checks.for_responses(),
             phase=phase,
-            auth_enforced_operations=ctx.auth_enforced_operations,
+            auth_enforced_operations=ctx.checks.auth_enforced_operations,
         )
 
 
