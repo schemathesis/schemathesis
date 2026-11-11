@@ -65,6 +65,10 @@ def open_writers(
     started_at: float,
 ) -> list[_ReportWriter]:
     """Open a writer for every enabled report, closing the opened ones if a later one fails."""
+    # Report files may go into a directory that does not exist yet, e.g. the default one in a fresh checkout.
+    for format in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT):
+        if reports.get(format).enabled:
+            path_of(format).parent.mkdir(parents=True, exist_ok=True)
     writers: list[_ReportWriter] = []
     try:
         if reports.vcr.enabled:

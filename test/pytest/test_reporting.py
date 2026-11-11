@@ -97,9 +97,10 @@ def test_reports_use_pytest_outcome(testdir, tmp_path, ctx, outcome, junit, allu
 
 def test_reports_written_via_config(testdir, ctx):
     api = ctx.openapi.apps.success()
-    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
-    har_path = str(testdir.tmpdir.join("cassette.har"))
-    report_path = str(testdir.tmpdir.join("report.xml"))
+    # Each report goes into its own directory that does not exist yet.
+    cassette_path = str(testdir.tmpdir.join("vcr", "cassette.yaml"))
+    har_path = str(testdir.tmpdir.join("har", "cassette.har"))
+    report_path = str(testdir.tmpdir.join("junit", "report.xml"))
     testdir.make_test(
         f"""
 schema.config.update(base_url="{api.base_url}/api")
@@ -201,7 +202,8 @@ def test_api(case):
 
 def test_reports_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
-    report_dir = testdir.tmpdir.mkdir("reports")
+    # Does not exist before the run.
+    report_dir = testdir.tmpdir.join("reports")
     har_path = str(testdir.tmpdir.join("cassette.har"))
     junit_path = str(testdir.tmpdir.join("report.xml"))
     ok = {"responses": {"200": {"description": "OK"}}}
