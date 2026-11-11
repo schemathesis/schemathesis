@@ -1423,10 +1423,23 @@ def test_negative_data_rejection_validates_query_and_headers_as_sent(ctx, respon
 
 
 DEEP_OBJECT_FIELDS = {"type": "object", "additionalProperties": {"type": "string", "maxLength": 5}}
+DEEP_OBJECT_FORM = {"type": "object", "properties": {"fields": DEEP_OBJECT_FIELDS}, "additionalProperties": False}
+# Components that reference other components stay `$ref`s after loading.
+DEEP_OBJECT_COMPONENTS = {
+    "schemas": {
+        "Form": {
+            "type": "object",
+            "properties": {"fields": {"$ref": "#/components/schemas/Fields"}},
+            "additionalProperties": False,
+        },
+        "Fields": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Member"}},
+        "Member": {"type": "string", "maxLength": 5},
+    }
+}
 DEEP_OBJECT_MEMBERS = pytest.mark.parametrize(
     ("member", "reported"),
-    [(None, False), (True, False), (12, False), (2.7270633252329124e16, True)],
-    ids=["null", "boolean", "number", "too-long"],
+    [(None, False), (True, False), (12, False), ([], False), (2.7270633252329124e16, True)],
+    ids=["null", "boolean", "number", "empty-list", "too-long"],
 )
 
 
@@ -1454,13 +1467,49 @@ def _additional_properties_mutation(location, path, pointer, parameter=None):
         ),
         (
             {
+                "in": "query",
+                "name": "fields",
+                "style": "deepObject",
+                "explode": True,
+                "schema": {"$ref": "#/components/schemas/Fields"},
+            },
+            ("fields",),
+            "/properties/fields",
+        ),
+        (
+            {
+                "in": "query",
+                "name": "fields",
+                "style": "deepObject",
+                "explode": True,
+                "schema": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Member"}},
+            },
+            ("fields",),
+            "/properties/fields",
+        ),
+        (
+            {
+                "in": "querystring",
+                "name": "query",
+                "content": {
+                    "application/x-www-form-urlencoded": {
+                        "schema": DEEP_OBJECT_FORM,
+                        "encoding": {"fields": {"style": "deepObject"}},
+                    }
+                },
+            },
+            ("query", "fields"),
+            "/properties/query/properties/fields",
+        ),
+        (
+            {
                 "in": "querystring",
                 "name": "query",
                 "content": {
                     "application/x-www-form-urlencoded": {
                         "schema": {
                             "type": "object",
-                            "properties": {"fields": DEEP_OBJECT_FIELDS},
+                            "properties": {"fields": {"$ref": "#/components/schemas/Fields"}},
                             "additionalProperties": False,
                         },
                         "encoding": {"fields": {"style": "deepObject"}},
@@ -1470,8 +1519,29 @@ def _additional_properties_mutation(location, path, pointer, parameter=None):
             ("query", "fields"),
             "/properties/query/properties/fields",
         ),
+        (
+            {
+                "in": "querystring",
+                "name": "query",
+                "content": {
+                    "application/x-www-form-urlencoded": {
+                        "schema": {"$ref": "#/components/schemas/Form"},
+                        "encoding": {"fields": {"style": "deepObject"}},
+                    }
+                },
+            },
+            ("query", "fields"),
+            "/properties/query/properties/fields",
+        ),
     ],
-    ids=["query", "querystring"],
+    ids=[
+        "query",
+        "query-nested-ref",
+        "query-member-ref",
+        "querystring",
+        "querystring-property-ref",
+        "querystring-nested-ref",
+    ],
 )
 @pytest.mark.parametrize(
     ("member", "reported"),
@@ -1479,19 +1549,23 @@ def _additional_properties_mutation(location, path, pointer, parameter=None):
         (None, False),
         (True, False),
         (12, False),
+        ([], False),
         (2.7270633252329124e16, True),
         (["far too long", "ok"], False),
         (["far too long", "also too long"], True),
     ],
-    ids=["null", "boolean", "number", "too-long", "repeated", "repeated-too-long"],
+    ids=["null", "boolean", "number", "empty-list", "too-long", "repeated", "repeated-too-long"],
 )
 def test_negative_data_rejection_reads_deep_object_query_members_as_sent(
     ctx, response_factory, parameter, path, pointer, member, reported
 ):
     operation = ctx.openapi.load_operation(
-        "GET /items", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version="3.2.0"
+        "GET /items",
+        {"parameters": [parameter], "responses": {"200": {"description": "OK"}}},
+        version="3.2.0",
+        components=DEEP_OBJECT_COMPONENTS,
     )
-    query = {"V": member}
+    query = {"V": member, "W": "ok"}
     for name in reversed(path):
         query = {name: query}
     case = operation.Case(
@@ -2742,8 +2816,11 @@ def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
         negative_data_rejection(check_context(), case.call(), case)
 
 
+@pytest.mark.parametrize(
+    "schema", [DEEP_OBJECT_FORM, {"$ref": "#/components/schemas/Form"}], ids=["inline", "nested-ref"]
+)
 @DEEP_OBJECT_MEMBERS
-def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app_runner, member, reported):
+def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app_runner, schema, member, reported):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -2752,11 +2829,7 @@ def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app
                         "required": True,
                         "content": {
                             URLENCODED: {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"fields": DEEP_OBJECT_FIELDS},
-                                    "additionalProperties": False,
-                                },
+                                "schema": schema,
                                 "encoding": {"fields": {"style": "deepObject", "explode": True}},
                             }
                         },
@@ -2766,6 +2839,7 @@ def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app
             }
         },
         version="3.1.0",
+        components=DEEP_OBJECT_COMPONENTS,
     )
 
     @app.route("/items", methods=["POST"])
@@ -2779,7 +2853,7 @@ def test_negative_data_rejection_reads_deep_object_form_members_as_sent(ctx, app
             generation_modes=[GenerationMode.NEGATIVE],
             mutations=(_additional_properties_mutation(ParameterLocation.BODY, (), ""),),
         ),
-        body={"fields": {"V": member}},
+        body={"fields": {"V": member, "W": "ok"}},
         media_type=URLENCODED,
     )
 
