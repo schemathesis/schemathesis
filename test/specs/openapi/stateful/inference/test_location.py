@@ -3,6 +3,7 @@ from urllib.parse import urlsplit
 import pytest
 from flask import jsonify, request
 
+import schemathesis
 from schemathesis.core.transport import Response
 from schemathesis.engine.observations import BodyUrlEntry, LocationHeaderEntry, Observations
 from schemathesis.generation.stateful.state_machine import StepOutput
@@ -915,25 +916,27 @@ def test_inferred_link_for_undocumented_response_reaches_state_machine(ctx, resp
 
 @pytest.mark.parametrize(
     "created",
-    [lambda: {"$ref": "#/components/responses/Created"}, lambda: {"description": "Created"}],
-    ids=["shared", "inline"],
+    [{"$ref": "#/components/responses/Created"}, {"description": "Created"}, {"$ref": "responses.json#/Created"}],
+    ids=["shared", "inline", "other-file"],
 )
 def test_learned_link_stays_with_operation_sharing_response(ctx, created):
+    ctx.makefile({"Created": {"description": "Created"}}, filename="responses")
     item = {
         "get": {
             "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
             "responses": {"200": {"description": "OK"}},
         }
     }
-    schema = ctx.openapi.load_schema(
+    path = ctx.openapi.write_schema(
         {
-            "/users": {"post": {"responses": {"201": created()}}},
+            "/users": {"post": {"responses": {"201": created}}},
             "/users/{id}": item,
-            "/admins": {"post": {"responses": {"201": created()}}},
+            "/admins": {"post": {"responses": {"201": created}}},
             "/admins/{id}": item,
         },
         components={"responses": {"Created": {"description": "Created"}}},
     )
+    schema = schemathesis.openapi.from_path(str(path))
     observations = Observations()
     observations.location_headers[schema["/users"]["POST"]] = [LocationHeaderEntry(value="/users/1", status_code=201)]
     observations.body_urls[schema["/admins"]["POST"]] = [

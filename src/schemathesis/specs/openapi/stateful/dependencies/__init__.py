@@ -6,17 +6,19 @@ Infers which operations must run before others by tracking resource creation and
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
+from schemathesis.core.jsonschema.resolver import collect_ids, resolve_reference_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import format_body_key
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
-from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
+from schemathesis.specs.openapi.adapter.responses import OpenApiResponse, OpenApiResponses
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     align_created_identifiers,
@@ -481,19 +483,52 @@ def _unshare_responses(schema: OpenApiSchema) -> dict[int, tuple[Mapping[str, An
     """Give each operation its own copy of a response it shares, so links inferred for one never reach another.
 
     A link may forward the producer's own path parameters, which another operation sharing the response lacks.
-    A response in another document than its operations stays in place; those are returned keyed by `id`, with the
-    paths of the operations reading each.
+    A copy of a response from another document points its references into that document. One whose references
+    resolve against a name a schema gives itself stays in place; those are returned keyed by `id`, with the paths
+    of the operations reading each.
     """
-    slots: list[tuple[dict[str, Any], str, Mapping[str, Any]]] = []
-    uses: dict[int, int] = {}
+    slots = list(_response_slots(schema))
+    uses = Counter(id(response.source) for *_, response in slots)
+    links_keyword = schema.adapter.links_keyword
     # Values keep each response alive so its `id` stays unique
     kept: dict[int, tuple[Mapping[str, Any], list[str]]] = {}
+    # One copy of a response from another document serves every operation reading it
+    copies: dict[int, Mapping[str, Any] | None] = {}
+    for raw_responses, key, path, base_uri, response in slots:
+        if uses[id(response.source)] == 1:
+            continue
+        definition = _readable_from(base_uri, response, copies)
+        if definition is None:
+            kept.setdefault(id(response.source), (response.source, []))[1].append(path)
+        else:
+            raw_responses[key] = {**definition, links_keyword: dict(definition.get(links_keyword, {}))}
+    return kept
+
+
+def _readable_from(
+    base_uri: str, response: OpenApiResponse, copies: dict[int, Mapping[str, Any] | None]
+) -> Mapping[str, Any] | None:
+    """The response's definition as read from the document at `base_uri`, or `None` when it cannot move there."""
+    own_base_uri = response.resolver.base_uri
+    if own_base_uri == base_uri:
+        return response.source
+    key = id(response.source)
+    if key not in copies:
+        # Under a schema that names itself, references resolve against that name and fall back to its document
+        movable = not collect_ids(response.source, own_base_uri)
+        copied = _with_absolute_references(response.source, own_base_uri) if movable else None
+        copies[key] = cast("Mapping[str, Any] | None", copied)
+    return copies[key]
+
+
+def _response_slots(schema: OpenApiSchema) -> Iterator[tuple[dict[str, Any], str, str, str, OpenApiResponse]]:
+    """Each response with the raw responses holding it, its key there, and its operation's path and document."""
     # Raw definitions, as building every operation costs far more than resolving its responses
     try:
         entries = schema._operation_lookup.entries()
     except RefResolutionError:
         # An unresolvable path item is reported as a schema error for its operations
-        return {}
+        return
     for entry in entries:
         raw_responses = entry.definition.get("responses", {})
         try:
@@ -506,17 +541,20 @@ def _unshare_responses(schema: OpenApiSchema) -> dict[int, tuple[Mapping[str, An
         assert isinstance(raw_responses, dict)
         keys = {str(key): key for key in raw_responses}
         for status_code, response in responses.items():
-            uses[id(response.source)] = uses.get(id(response.source), 0) + 1
-            # Copied elsewhere, its own references would resolve against the wrong document
-            if response.resolver.base_uri == entry.resolver.base_uri:
-                slots.append((raw_responses, keys[status_code], response.source))
-            else:
-                kept.setdefault(id(response.source), (response.source, []))[1].append(entry.path)
-    links_keyword = schema.adapter.links_keyword
-    for raw_responses, key, definition in slots:
-        if uses[id(definition)] > 1:
-            raw_responses[key] = {**definition, links_keyword: dict(definition.get(links_keyword, {}))}
-    return kept
+            yield raw_responses, keys[status_code], entry.path, entry.resolver.base_uri, response
+
+
+def _with_absolute_references(node: object, base_uri: str) -> object:
+    if isinstance(node, dict):
+        return {
+            key: resolve_reference_uri(base_uri, value)
+            if key == "$ref" and isinstance(value, str)
+            else _with_absolute_references(value, base_uri)
+            for key, value in node.items()
+        }
+    if isinstance(node, list):
+        return [_with_absolute_references(item, base_uri) for item in node]
+    return node
 
 
 def _followable_links(
