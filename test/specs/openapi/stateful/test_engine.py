@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 import schemathesis
 import schemathesis.openapi
 from schemathesis.checks import not_a_server_error
+from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events
@@ -468,10 +469,157 @@ def test_flaky_suite_retries_only_after_new_failure(ctx, stop_event):
 def test_unsatisfiable(engine_factory):
     engine = engine_factory(Unsatisfiable(), max_examples=1)
     result = collect_result(engine)
-    assert result.errors
-    assert isinstance(result.errors[0].value, hypothesis.errors.Unsatisfiable)
-    assert "Cannot generate test data for request body (application/json)" in str(result.errors[0].value)
+    assert [
+        (error.label, error.related_to_operation, type(error.value), str(error.value).splitlines()[0])
+        for error in result.errors
+    ] == [
+        (
+            "POST /users",
+            True,
+            hypothesis.errors.Unsatisfiable,
+            "Cannot generate test data for request body (application/json)",
+        )
+    ]
     assert result.events[-1].status == Status.ERROR
+
+
+INVALID_ITEMS = {"type": "array", "items": {"type": "string", "required": True}}
+NO_INTEGER = {"type": "integer", "minimum": 5, "maximum": 1}
+NAMED = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+
+
+def _body(schema, media_type="application/json"):
+    return {"requestBody": {"required": True, "content": {media_type: {"schema": schema}}}}
+
+
+def _by_id(name):
+    return [{"name": name, "in": "path", "required": True, "schema": {"type": "integer"}}]
+
+
+def _created(links):
+    return {
+        "201": {
+            "description": "Created",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}},
+            "links": links,
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    ("create_item", "update_user", "expected"),
+    [
+        (
+            _body(INVALID_ITEMS),
+            _body(NAMED),
+            ("POST /items", InvalidSchema, "Invalid `requestBody` definition"),
+        ),
+        (
+            _body(NO_INTEGER),
+            _body(NAMED),
+            (
+                "POST /items",
+                hypothesis.errors.Unsatisfiable,
+                "Cannot generate test data for request body (application/json)",
+            ),
+        ),
+        (
+            {**_body(NAMED), "parameters": [{"name": "limit", "in": "query", "required": True, "schema": NO_INTEGER}]},
+            _body(NAMED),
+            ("POST /items", hypothesis.errors.Unsatisfiable, "Cannot generate test data for query parameter 'limit'"),
+        ),
+        (
+            _body(NAMED, media_type="application/x-unknown"),
+            _body(NAMED),
+            (
+                "POST /items",
+                SerializationNotPossible,
+                "No supported serializers for media types: application/x-unknown",
+            ),
+        ),
+        (
+            _body(NAMED),
+            _body(INVALID_ITEMS),
+            ("PUT /users/{userId}", InvalidSchema, "Invalid `requestBody` definition"),
+        ),
+        (
+            _body(NAMED),
+            _body(NO_INTEGER),
+            (
+                "PUT /users/{userId}",
+                hypothesis.errors.Unsatisfiable,
+                "Cannot generate test data for request body (application/json)",
+            ),
+        ),
+    ],
+    ids=[
+        "invalid-schema",
+        "unsatisfiable",
+        "unsatisfiable-query",
+        "unsupported-media-type",
+        "invalid-schema-link-target",
+        "unsatisfiable-link-target",
+    ],
+)
+def test_operation_without_generatable_data_is_reported_by_name(
+    ctx, app_runner, stop_event, create_item, update_user, expected
+):
+    # Items have no explicit links, so only inferred links reach them.
+    user_links = {
+        "GetUser": {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}},
+        "UpdateUser": {"operationId": "updateUser", "parameters": {"userId": "$response.body#/id"}},
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {"post": {**_body(NAMED), "responses": _created(user_links)}},
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": _by_id("userId"),
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "put": {
+                    "operationId": "updateUser",
+                    "parameters": _by_id("userId"),
+                    **update_user,
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+            "/items": {"post": {**create_item, "responses": _created({})}},
+            "/items/{itemId}": {"get": {"parameters": _by_id("itemId"), "responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>", methods=["GET", "PUT"])
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def read_or_update(**_):
+        return jsonify({"id": 1})
+
+    result = _run_items_app(app, app_runner, stop_event, max_examples=10)
+    sent = {
+        event.recorder.cases[case_id].value.operation.label
+        for event in result.events
+        if isinstance(event, events.ScenarioFinished)
+        for case_id in event.recorder.interactions
+    }
+    errors = [
+        (error.label, error.related_to_operation, type(error.value), str(error.value).splitlines()[0])
+        for error in result.errors
+    ]
+    # The suite that met the operation ends; a fresh one never schedules it, so no scenario replays a draw of it.
+    suites = [event.status for event in result.events if isinstance(event, events.SuiteFinished)]
+    label, error_type, message = expected
+    assert (errors, suites, result.events[-1].status, "GET /users/{userId}" in sent) == (
+        [(label, True, error_type, message)],
+        [Status.ERROR, Status.SUCCESS],
+        Status.ERROR,
+        True,
+    )
 
 
 def test_custom_headers(engine_factory):
