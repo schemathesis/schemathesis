@@ -9,10 +9,7 @@ import schemathesis
 from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.examples import generate_many
-from schemathesis.transport.asgi import ASGI_TRANSPORT
-from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import Binary
-from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import run_given
 
 
@@ -21,11 +18,6 @@ def custom_part_serializer():
     @schemathesis.serializer("application/x-part-custom")
     def serialize_custom(ctx, value):
         return b"CUSTOM:" + json.dumps(value).encode()
-
-    yield
-
-    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
-        transport.unregister_serializer("application/x-part-custom")
 
 
 SUPPRESSED_HEALTH_CHECKS = list(HealthCheck)

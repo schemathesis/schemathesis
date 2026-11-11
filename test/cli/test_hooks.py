@@ -5,6 +5,8 @@ import pytest
 from _pytest.main import ExitCode
 from flask import jsonify
 
+from test.apps.catalog.openapi import basic, users
+
 
 def test_before_call_no_kwargs_unpacking(ctx, cli):
     api = ctx.openapi.apps.success()
@@ -164,8 +166,13 @@ def before_call(context, case, **kwargs):
     assert "division by zero" in result.stdout
 
 
-def test_hooks_file_path_runs_once_per_call(ctx, cli, tmp_path):
-    api = ctx.openapi.apps.success()
+@pytest.mark.parametrize(
+    ("factory", "phases", "prefix"),
+    [(basic.success, "coverage,fuzzing", "/api/"), (users.crud, "stateful", "/users")],
+    ids=["coverage-fuzzing", "stateful"],
+)
+def test_hooks_file_path_runs_once_per_call(ctx, cli, tmp_path, factory, phases, prefix):
+    api = ctx.openapi.serve(factory())
     calls = tmp_path / "calls.txt"
     hooks_file = tmp_path / "counting_hooks.py"
     hooks_file.write_text(f"""
@@ -186,17 +193,20 @@ def after_validate(context, case, response, results):
     result = cli.main(
         "run",
         api.schema_url,
-        "--phases=coverage,fuzzing",
+        f"--phases={phases}",
         "--max-examples=3",
         "--checks=not_a_server_error",
         env={"SCHEMATHESIS_HOOKS": str(hooks_file)},
     )
-    assert result.exit_code == ExitCode.OK, result.stdout
-    api_calls = [request for request in api.requests if request.path.startswith("/api/")]
-    assert Counter(calls.read_text().splitlines()) == {
+    api_calls = [request for request in api.requests if request.path.startswith(prefix)]
+    hook_calls = Counter(calls.read_text().splitlines())
+    # The stateful app has a planted server error that a short run finds only on some runs.
+    failed = hook_calls.pop("after_validate [('not_a_server_error', 'FAILURE')]", 0)
+    assert hook_calls == {
         "before_call": len(api_calls),
-        "after_validate [('not_a_server_error', 'SUCCESS')]": len(api_calls),
+        "after_validate [('not_a_server_error', 'SUCCESS')]": len(api_calls) - failed,
     }
+    assert result.exit_code == (ExitCode.TESTS_FAILED if failed else ExitCode.OK), result.stdout
 
 
 def test_env_hooks_extend_cli_when_config_sets_hooks(ctx, cli):

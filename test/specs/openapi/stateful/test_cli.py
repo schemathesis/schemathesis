@@ -35,7 +35,6 @@ def test_default(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.flaky(reruns=2)
 def test_sanitization(ctx, cli, tmp_path):
     api = ctx.openapi.apps.users_crud()
     cassette_path = tmp_path / "output.yaml"
@@ -43,6 +42,8 @@ def test_sanitization(ctx, cli, tmp_path):
     result = cli.run_and_assert(
         api.schema_url,
         "--phases=stateful",
+        # The bug needs a create, update, read sequence, which takes several scenarios to reach.
+        "--max-examples=50",
         "-c not_a_server_error",
         f"--header=Authorization: Bearer {token}",
         f"--report-vcr-path={cassette_path}",
@@ -53,7 +54,6 @@ def test_sanitization(ctx, cli, tmp_path):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.flaky(reruns=4)
 def test_max_failures(ctx, cli, snapshot_cli):
     api = ctx.openapi.serve(users.crud_with_failure())
     assert (

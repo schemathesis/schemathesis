@@ -9077,7 +9077,6 @@ def _customer_order_app(ctx, create_customer_body, create_order):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.flaky(reruns=4)
 def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
     def create_order(customer_id, customers):
         if not isinstance(customer_id, (str, int)):
@@ -9100,7 +9099,6 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.flaky(reruns=4)
 def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
     def create_order(customer_id, customers):
         if customer_id not in customers:

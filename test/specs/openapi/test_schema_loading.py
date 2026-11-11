@@ -1004,10 +1004,10 @@ def test_parsing_errors_uri(schema_url, content_type, payload, expected, app_run
     def schema():
         return Response(payload, content_type=content_type)
 
-    port = app_runner.run_flask_app(app)
+    url = app_runner.openapi_url(app, path=f"/{schema_url}")
 
     with pytest.raises(LoaderError) as exc:
-        schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/{schema_url}")
+        schemathesis.openapi.from_url(url)
     assert exc.value.extras == expected
 
 
@@ -1021,9 +1021,7 @@ def test_unknown_content_type_retry_yaml(app_runner):
     def schema():
         return Response(payload, content_type="application/vnd.oai.openapi; charset=utf-8")
 
-    port = app_runner.run_flask_app(app)
-
-    schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/schema")
+    schemathesis.openapi.from_url(app_runner.openapi_url(app, path="/schema"))
 
 
 def test_malformed_content_type_falls_back_to_parsing(ctx, app_runner):

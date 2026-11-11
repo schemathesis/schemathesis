@@ -4349,7 +4349,7 @@ def test_crash_found_before_the_outage_is_still_reported_per_operation(subproces
     ("mode", "crasher_position", "errors", "cases"),
     [
         ("refuse", 0, "  🚫 Server Unavailable: 1", "N generated, N passed"),
-        # The request the dying server reset leads the list and is also its operation's error.
+        # The request the dying server resets is its operation's error, listed before the crasher unless they match.
         ("reset", 1, "  🚫 Network Error: 1\n  🚫 Server Unavailable: 1", "N generated, N passed, 1 errored"),
     ],
     ids=["refused", "reset-then-refused"],
@@ -4369,8 +4369,8 @@ def test_fuzz_stops_when_server_stops_accepting_connections(
     assert result.stdout.partition("Errors:\n")[2].partition("\n\n")[0] == errors, result.stdout
     summary = result.stdout.partition("Test cases:\n  ")[2].partition("\n")[0]
     assert re.sub(r"\d+ (generated|passed)", r"N \1", summary) == cases, result.stdout
-    listed = result.stdout.split("before it went away:\n\n")[1].split("\n\n")
-    assert int(re.findall(r"""'\{"size": (\d+)\}'""", listed[crasher_position])[0]) > 50000
+    leading = result.stdout.split("before it went away:\n\n")[1].split("\n\n")[: crasher_position + 1]
+    assert any(int(size) > 50000 for size in re.findall(r"""'\{"size": (\d+)\}'""", "\n".join(leading))), result.stdout
 
 
 ERROR_THEN_GONE_SERVER = (

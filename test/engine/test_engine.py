@@ -1845,11 +1845,12 @@ def test_max_time_runs_coverage_cases_generated_before_the_slice_ran_out(ctx):
         if case.meta.phase.name == TestPhase.COVERAGE:
             generated.append(case.id)
             if len(generated) == 5:
-                time.sleep(1.2)
+                # Fuzzing holds back half the run, so this outlasts the share and leaves the rest for the requests.
+                time.sleep(3.2)
         return case
 
     schema.hook("map_case")(map_case)
-    stream = execute(schema, max_time=2, max_examples=100_000, phases=[PhaseName.COVERAGE, PhaseName.FUZZING])
+    stream = execute(schema, max_time=6, max_examples=100_000, phases=[PhaseName.COVERAGE, PhaseName.FUZZING])
     finished = stream.find(events.ScenarioFinished, phase=PhaseName.COVERAGE)
 
     # On a slow machine the share runs out before the slow case, so compare against what was generated.

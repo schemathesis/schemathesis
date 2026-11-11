@@ -206,8 +206,7 @@ def test_examples_and_coverage_phases_apply_parameter_and_header_overrides(ctx, 
     def items(key):
         return "", 200
 
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
 
     EventStream(
         schema,
@@ -258,8 +257,7 @@ def test_coverage_phase_applies_override_when_container_is_absent(ctx, app_runne
     def items():
         return "", 200
 
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
 
     EventStream(schema, phases=[PhaseName.COVERAGE], parameters={"tag": "fixed"}).execute()
 
@@ -349,11 +347,11 @@ def test_unique_inputs_dedupes_repeated_explicit_examples(ctx, app_runner):
         captured.append(request.query_string.decode())
         return ("", 200)
 
-    port = app_runner.run_flask_app(app)
+    url = app_runner.openapi_url(app)
 
     def run(unique: bool) -> list[str]:
         captured.clear()
-        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+        schema = schemathesis.openapi.from_url(url)
         # TODO: `phases.update(...)` resets per-phase generation defaults and clobbers user-set
         # `generation.unique_inputs`. Drop this manual disabling once that bug is fixed.
         schema.config.phases.coverage.enabled = False

@@ -213,8 +213,7 @@ def test_fuzz_finds_failure_without_continue_on_failure(ctx):
 
 def test_fuzz_preflight_excludes_non_generatable_operation_before_hypothesis(ctx, app_runner):
     app = _make_flaky_repro_schema(ctx)
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     schema.config.seed = 1
 
     collected = _fuzz_events(schema, FuzzConfig())
@@ -565,8 +564,7 @@ def test_fuzz_preflight_excludes_hook_broken_operation_but_keeps_survivors(ctx):
 
 def test_fuzz_preflight_reports_exclusion_once_across_workers(ctx, app_runner):
     app = _make_flaky_repro_schema(ctx)
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     schema.config.seed = 1
     schema.config.update(workers=2)
 
