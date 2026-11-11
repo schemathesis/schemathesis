@@ -2185,6 +2185,51 @@ def test_links_inferred_from_urls_in_response_bodies(ctx, app_runner, body, stat
     )
 
 
+def test_links_inferred_from_urls_in_response_bodies_after_empty_pages(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/teams": {
+                "get": {
+                    "parameters": [{"name": "page", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/teams/{pk}": {
+                "get": {
+                    "parameters": [{"name": "pk", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    calls = []
+    fetched = []
+
+    @app.route("/teams")
+    def list_teams():
+        calls.append(flask.request.args.get("page"))
+        if len(calls) <= 20:
+            return flask.jsonify({"results": []})
+        return flask.jsonify({"results": [{"url": f"/teams/{TEAM_ID}"}]})
+
+    @app.route("/teams/<int:pk>")
+    def get_team(pk):
+        fetched.append(pk)
+        return flask.jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    # More than 10 examples because the operation must answer more than 20 times.
+    stream = execute(
+        schema,
+        max_examples=25,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+    started = stream.find(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+
+    assert (started.payload.inferred_transitions > 0, TEAM_ID in fetched) == (True, True)
+
+
 @pytest.mark.parametrize(
     ("headers", "body"),
     [
