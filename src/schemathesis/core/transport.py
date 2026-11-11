@@ -96,7 +96,7 @@ def read_event_stream(
 class RequestSettings:
     """Timeout, TLS and proxy settings for requests to the API under test."""
 
-    # `None` leaves the choice to the caller: in-process apps run without a timeout.
+    # `None` leaves the choice to the caller: WSGI apps run without a timeout, other transports use the default.
     timeout: float | int | None
     verify: bool | str | None
     cert: str | tuple[str, str] | None

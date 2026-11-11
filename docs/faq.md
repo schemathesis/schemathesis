@@ -45,7 +45,7 @@ See more details in the [Checks reference](reference/checks.md).
 ## How should I run Schemathesis?
 
 - **CLI**: Complete feature set with all test phases, and reporting. Recommended for most users.
-- **Python library**: Integrates with pytest test suites. `@schema.parametrize()` does not run the stateful phase (use [`schema.as_state_machine()`](guides/stateful-testing.md)), does not run API capability probes, and does not apply `--generation-maximize` metrics (see [Targeted Testing](guides/targeted.md#target-a-metric-in-pytest)).
+- **Python library**: Integrates with pytest test suites. Several features, including the stateful phase, run only in the CLI; see [Runs only under `schemathesis run`](explanations/pytest.md#runs-only-under-schemathesis-run).
 
 ## What if my application doesn't have an API schema?
 

@@ -283,7 +283,7 @@ def create_channel(
 
 
 def _credentials(verify: bool | str, cert: str | tuple[str, str] | None) -> grpc.ChannelCredentials:
-    # `True` trusts the system roots.
+    # `True` trusts the CA roots bundled with the gRPC library, not the system trust store.
     root_certificates = Path(verify).read_bytes() if isinstance(verify, str) else None
     if cert is None:
         private_key = certificate_chain = None
