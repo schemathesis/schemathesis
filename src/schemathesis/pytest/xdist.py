@@ -3,11 +3,14 @@ from __future__ import annotations
 import base64
 import dataclasses
 import hashlib
+import json
+import tempfile
 import time
+from contextlib import ExitStack
 from functools import cache, partial
 from pathlib import Path
 from random import Random
-from typing import TYPE_CHECKING
+from typing import IO, TYPE_CHECKING
 
 import jsonschema_rs
 import pytest
@@ -30,7 +33,7 @@ from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.html.build import enabled_checks
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
 
     from xdist.workermanage import WorkerController
 
@@ -43,10 +46,10 @@ if TYPE_CHECKING:
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
 
-# schema_id -> {"writer_config": ..., "records": [...]}
-_XDIST_WRITERS_KEY: pytest.StashKey[dict[str, dict]] = pytest.StashKey()
-# Key used in xdist workeroutput to pass serialized recorders from workers to the controller
-SCHEMATHESIS_RECORDERS_KEY = "schemathesis_recorders"
+# Test report attribute carrying a worker's serialized records to the controller
+_RECORDS_ATTRIBUTE = "_schemathesis_records"
+# Records a worker has not sent to the controller yet
+WORKER_OUTBOX_KEY: pytest.StashKey[WorkerOutbox] = pytest.StashKey()
 # Key used in xdist workeroutput to pass formatted `after_run` failures from workers to the controller
 SCHEMATHESIS_AFTER_RUN_FAILURES_KEY = "schemathesis_after_run_failures"
 # Key used in xdist workerinput to pass the run seed from the controller to workers
@@ -88,7 +91,7 @@ def serialize_recorder(
     message: str | None = None,
     has_recorder: bool = True,
 ) -> dict:
-    """Serialize a ScenarioRecorder for cross-process transport via workeroutput."""
+    """Serialize a ScenarioRecorder for cross-process transport."""
     interactions: dict[str, dict] = {}
     for case_id, interaction in recorder.interactions.items():
         request = interaction.request
@@ -363,6 +366,25 @@ def _open_writers_from_config(
     )
 
 
+class WorkerOutbox:
+    """Serialized records of a worker, sent to the controller with its next test report."""
+
+    __slots__ = ("pending", "schema_ids")
+
+    def __init__(self) -> None:
+        # (schema id, writer configuration or None if this worker already sent it, record as JSON)
+        self.pending: list[tuple[str, dict | None, str]] = []
+        self.schema_ids: set[str] = set()
+
+    def add(self, schema: SchemaMetadata, record: dict) -> None:
+        schema_id = _schema_id(schema)
+        writer_config = None
+        if schema_id not in self.schema_ids:
+            self.schema_ids.add(schema_id)
+            writer_config = _serialize_writer_config(schema)
+        self.pending.append((schema_id, writer_config, json.dumps(record)))
+
+
 class XdistReportingPlugin:
     """Pytest plugin sharing one seed across xdist workers and building reports on the controller."""
 
@@ -370,59 +392,81 @@ class XdistReportingPlugin:
         # Registered at configuration time, so this is when the whole run started.
         self.started_at = time.time()
         self.seed = Random().getrandbits(128)
+        self.outbox: WorkerOutbox | None = None
+        # Controller side: schema id -> (writer configuration, records received so far, one JSON per line)
+        self.spools: dict[str, tuple[dict, IO[str]]] = {}
+        self.spool_files = ExitStack()
 
     def pytest_configure(self, config: pytest.Config) -> None:
         workerinput = getattr(config, "workerinput", None)
         if workerinput is not None:
             SchemathesisConfig.shared_seed = workerinput.get(SCHEMATHESIS_SEED_KEY)
+            self.outbox = config.stash[WORKER_OUTBOX_KEY] = WorkerOutbox()
 
     def pytest_configure_node(self, node: WorkerController) -> None:
         node.workerinput[SCHEMATHESIS_SEED_KEY] = self.seed
 
+    @pytest.hookimpl(wrapper=True)
+    def pytest_runtest_logreport(self, report: pytest.TestReport) -> Generator[None, None, None]:
+        outbox = self.outbox
+        if outbox is None:
+            # Records go to disk before other plugins see the report, as some keep every report until the end.
+            for schema_id, writer_config, record in report.__dict__.pop(_RECORDS_ATTRIBUTE, ()):
+                self._spool(schema_id, writer_config).write(record + "\n")
+            return (yield)
+        if not outbox.pending:
+            return (yield)
+        report.__dict__[_RECORDS_ATTRIBUTE] = outbox.pending
+        outbox.pending = []
+        try:
+            return (yield)
+        finally:
+            # Workers keep their reports until the end too; the records are already on their way to the controller.
+            del report.__dict__[_RECORDS_ATTRIBUTE]
+
+    def _spool(self, schema_id: str, writer_config: dict | None) -> IO[str]:
+        entry = self.spools.get(schema_id)
+        if entry is None:
+            # Each worker sends the writer configuration with its first record of a schema.
+            assert writer_config is not None
+            spool = self.spool_files.enter_context(tempfile.TemporaryFile("w+", encoding="utf-8"))  # noqa: SIM115
+            entry = self.spools[schema_id] = (writer_config, spool)
+        return entry[1]
+
     def pytest_testnodedown(self, node: WorkerController, error: object) -> None:
-        # Accumulate per schema_id; writing is deferred to pytest_sessionfinish
-        # so we know the full set of schemas before opening any files.
-        # Workers that exit abnormally don't deliver results; skip them instead of crashing the whole controller.
+        # Workers that exit abnormally don't deliver their output; skip them instead of crashing the whole controller.
         workeroutput = getattr(node, "workeroutput", None)
         if workeroutput is None:
             return
-        stash = node.config.stash.setdefault(_XDIST_WRITERS_KEY, {})
-        for schema_id, payload in workeroutput.get(SCHEMATHESIS_RECORDERS_KEY, {}).items():
-            if schema_id not in stash:
-                stash[schema_id] = {"writer_config": payload["writer_config"], "records": []}
-            stash[schema_id]["records"].extend(payload["records"])
         node.config.stash.setdefault(_WORKER_AFTER_RUN_FAILURES_KEY, []).extend(
             workeroutput.get(SCHEMATHESIS_AFTER_RUN_FAILURES_KEY, [])
         )
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
-        if hasattr(session.config, "workerinput"):
-            return
-        data = session.config.stash.get(_XDIST_WRITERS_KEY, {})
-        if not data:
-            return
-
-        multi = len(data) > 1
-        for schema_id, payload in data.items():
-            suffix = schema_id[:8] if multi else None
-            writers = _open_writers_from_config(
-                payload["writer_config"], session.config, started_at=self.started_at, suffix=suffix
-            )
-            try:
-                for record in payload["records"]:
-                    recorder, elapsed_sec = deserialize_recorder(record)
-                    write_to_writers(
-                        writers,
-                        recorder,
-                        elapsed_sec,
-                        tags=record.get("tags"),
-                        outcome=_outcome_from_record(record),
-                        has_recorder=record.get("has_recorder", True),
-                    )
-                    _replay_allure_calls(writers, record.get("allure_calls", []))
-            finally:
-                for writer in writers:
-                    writer.close()
+        multi = len(self.spools) > 1
+        with self.spool_files:
+            for schema_id, (writer_config, spool) in self.spools.items():
+                suffix = schema_id[:8] if multi else None
+                writers = _open_writers_from_config(
+                    writer_config, session.config, started_at=self.started_at, suffix=suffix
+                )
+                try:
+                    spool.seek(0)
+                    for line in spool:
+                        record = json.loads(line)
+                        recorder, elapsed_sec = deserialize_recorder(record)
+                        write_to_writers(
+                            writers,
+                            recorder,
+                            elapsed_sec,
+                            tags=record.get("tags"),
+                            outcome=_outcome_from_record(record),
+                            has_recorder=record.get("has_recorder", True),
+                        )
+                        _replay_allure_calls(writers, record.get("allure_calls", []))
+                finally:
+                    for writer in writers:
+                        writer.close()
 
 
 def _outcome_from_record(record: dict) -> PytestReportOutcome | None:

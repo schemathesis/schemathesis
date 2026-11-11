@@ -369,24 +369,31 @@ def test_api(case):
     result.assert_outcomes(passed=1)
 
 
-def test_xdist_worker_crash_does_not_break_controller(testdir, ctx):
-    # Crashed workers don't report results; the hook must skip them, not raise.
+def test_xdist_worker_crash_keeps_finished_results(testdir, ctx):
     api = ctx.openapi.apps.success()
+    junit_path = str(testdir.tmpdir.join("report.xml"))
+    ok = {"get": {"responses": {"200": {"description": "OK"}}}}
     _make_xdist_test(
         ctx,
         testdir,
-        """
+        f"""
 import os
+
+schema.config.reports.update(junit_path=r"{junit_path}")
 
 @schema.parametrize()
 @settings(max_examples=1)
 def test_api(case):
-    os._exit(1)
+    if case.path == "/crash":
+        os._exit(1)
+    case.call()
 """,
         base_url=f"{api.base_url}/api",
+        paths={"/success": ok, "/crash": ok},
     )
     result = testdir.runpytest("-n", "1")
     assert "INTERNALERROR" not in "\n".join(result.outlines + result.errlines)
+    assert _junit_outcomes(junit_path) == {"GET /success": ("passed", "")}
 
 
 @pytest.mark.parametrize("explicit_seed", [None, 42])

@@ -593,8 +593,8 @@ def _unregister_allure_forwarder(forwarder: AllureHookForwarder) -> None:
     allure_commons.plugin_manager.unregister(forwarder)
 
 
-def _push_to_xdist_workeroutput(
-    workeroutput: dict,
+def _send_to_xdist_controller(
+    config: pytest.Config,
     schema: SchemaMetadata,
     recorder: ScenarioRecorder,
     elapsed_sec: float,
@@ -603,18 +603,10 @@ def _push_to_xdist_workeroutput(
     outcome: PytestReportOutcome | None = None,
     has_recorder: bool = True,
 ) -> None:
-    from schemathesis.pytest.xdist import (
-        SCHEMATHESIS_RECORDERS_KEY,
-        _schema_id,
-        _serialize_writer_config,
-        serialize_recorder,
-    )
+    from schemathesis.pytest.xdist import WORKER_OUTBOX_KEY, serialize_recorder
 
-    sid = _schema_id(schema)
-    recorders = workeroutput.setdefault(SCHEMATHESIS_RECORDERS_KEY, {})
-    if sid not in recorders:
-        recorders[sid] = {"writer_config": _serialize_writer_config(schema), "records": []}
-    recorders[sid]["records"].append(
+    config.stash[WORKER_OUTBOX_KEY].add(
+        schema,
         serialize_recorder(
             recorder,
             elapsed_sec,
@@ -623,7 +615,7 @@ def _push_to_xdist_workeroutput(
             status=outcome.status if outcome is not None else None,
             message=outcome.message if outcome is not None else None,
             has_recorder=has_recorder,
-        )
+        ),
     )
 
 
@@ -682,9 +674,8 @@ def _write_pytest_result(
         if recorder.failing_case_ids():
             outcome = PytestReportOutcome(Status.FAILURE)
     if _is_xdist_worker(item.config):
-        _push_to_xdist_workeroutput(
-            # pytest-xdist sets `workeroutput` on worker configs.
-            item.config.workeroutput,  # type: ignore[attr-defined]
+        _send_to_xdist_controller(
+            item.config,
             schema,
             recorder,
             elapsed_sec,
@@ -791,9 +782,7 @@ def _setup_stateful_test(item: pytest.Item, item_cls: type, schema: BaseSchema) 
         if _has_reports(reports):
 
             def _xdist_stateful_callback(recorder: ScenarioRecorder, elapsed_sec: float) -> None:
-                # pytest-xdist sets `workeroutput` on worker configs.
-                workeroutput = item.config.workeroutput  # type: ignore[attr-defined]
-                _push_to_xdist_workeroutput(workeroutput, schema, recorder, elapsed_sec)
+                _send_to_xdist_controller(item.config, schema, recorder, elapsed_sec)
 
             item.stash[_STATEFUL_WRITERS_KEY] = []
             StatefulCallbackMark.set(item_cls, _xdist_stateful_callback)
