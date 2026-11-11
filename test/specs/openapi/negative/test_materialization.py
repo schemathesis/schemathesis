@@ -25,10 +25,10 @@ def test_materialize_bundled_ref_yields_target_dict_as_schema(materialize_target
     targets = materialize_targets(schema, descriptors)
     by_walk = {d.walk: target for d, target in zip(descriptors, targets, strict=True)}
     inner_target = by_walk[(WalkStep("$ref", "inner"),)]
-    assert inner_target.schema is schema[BUNDLE_STORAGE_KEY]["inner"]
+    assert inner_target.schema is schema[BUNDLE_STORAGE_KEY]["inner-1"]
 
 
-def test_materialize_dag_yields_distinct_targets_pointing_to_same_dict(materialize_targets):
+def test_materialize_dag_yields_targets_in_separate_copies(materialize_targets):
     schema = {
         "type": "object",
         "properties": {
@@ -45,8 +45,16 @@ def test_materialize_dag_yields_distinct_targets_pointing_to_same_dict(materiali
         s for d, s in zip(descriptors, targets, strict=True) if d.walk and d.walk[-1] == WalkStep("properties", "leaf")
     ]
     assert len(leaf_targets) == 2
-    assert leaf_targets[0].schema is leaf_targets[1].schema
-    assert leaf_targets[0].path != leaf_targets[1].path
+    assert leaf_targets[0].schema is not leaf_targets[1].schema
+    shared = {"type": "object", "properties": {"leaf": {"type": "string"}}}
+    assert schema == {
+        "type": "object",
+        "properties": {
+            "inner": {"$ref": "#/x-bundled/shared-1"},
+            "alt_inner": {"$ref": "#/x-bundled/shared-2"},
+        },
+        BUNDLE_STORAGE_KEY: {"shared": shared, "shared-1": shared, "shared-2": shared},
+    }
 
 
 def test_materialize_skips_descriptors_when_replay_schema_diverges(materialize_targets):

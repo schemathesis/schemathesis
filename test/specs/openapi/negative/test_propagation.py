@@ -41,10 +41,10 @@ def test_propagation_writes_required_through_bundled_refs(materialize_targets):
     }
     descriptors = compute_mutation_targets(schema)
     targets = materialize_targets(schema, descriptors)
-    leaf_target = next(s for s in targets if s.schema is schema[BUNDLE_STORAGE_KEY]["inner"]["properties"]["leaf"])
+    leaf_target = next(s for s in targets if s.schema is schema[BUNDLE_STORAGE_KEY]["inner-3"]["properties"]["leaf"])
     _propagate_required_path(leaf_target.path)
-    assert schema[BUNDLE_STORAGE_KEY]["outer"]["required"] == ["inner"]
-    assert schema[BUNDLE_STORAGE_KEY]["inner"]["required"] == ["leaf"]
+    assert schema[BUNDLE_STORAGE_KEY]["outer-2"]["required"] == ["inner"]
+    assert schema[BUNDLE_STORAGE_KEY]["inner-3"]["required"] == ["leaf"]
 
 
 def test_propagation_is_idempotent(materialize_targets):
