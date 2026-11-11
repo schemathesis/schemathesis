@@ -500,6 +500,42 @@ def test_login_redirect_counts_as_enforced_auth(ctx):
         assert case.call_and_validate(checks=[ignored_auth]).json() == {"user": "alice"}
 
 
+@pytest.mark.hypothesis_nested
+def test_enforced_auth_is_probed_once_per_operation(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/secured": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "security": [{"bearerAuth": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}},
+    )
+    probes = []
+
+    @app.route("/secured")
+    def secured():
+        token = request.headers.get("Authorization")
+        if token != "Bearer good":
+            probes.append(token)
+            return jsonify({"detail": "Unauthorized"}), 401
+        return jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    queries = set()
+
+    @run_given(case=schema["/secured"]["GET"].as_strategy(), max_examples=10)
+    def test(case):
+        queries.add(case.query["q"])
+        case.call_and_validate(headers={"Authorization": "Bearer good"}, checks=[ignored_auth])
+
+    assert len(queries) > 1
+    assert probes == [None, "Bearer SCHEMATHESIS-INVALID-VALUE"]
+
+
 def test_server_error_without_auth_is_reported():
     app = _api_with_basic_auth(missing=500, invalid=500)
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
