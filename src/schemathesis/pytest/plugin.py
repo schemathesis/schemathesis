@@ -6,7 +6,7 @@ import unittest
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from functools import partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 import pytest
 from _pytest.config import hookimpl
@@ -28,7 +28,14 @@ from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status
 from schemathesis.generation.feedback import FeedbackSources
+from schemathesis.generation.hypothesis.builder import (
+    ApiOperationMark,
+    ExamplesControllerMark,
+    MissingPathParameters,
+    UnserializablePayloadMark,
+)
 from schemathesis.generation.hypothesis.given import (
+    GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE,
     GivenArgsMark,
     GivenKwargsMark,
     is_given_applied,
@@ -433,18 +440,11 @@ def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pyt
 
 
 @hookimpl(wrapper=True)
-def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
+def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> Generator[None, object, None]:
     """It is possible to have a Hypothesis exception in runtime.
 
     For example - kwargs validation is failed for some strategy.
     """
-    from schemathesis.generation.hypothesis.builder import (
-        ApiOperationMark,
-        ExamplesControllerMark,
-        MissingPathParameters,
-        UnserializablePayloadMark,
-    )
-
     __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
         try:
@@ -453,16 +453,9 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         except FailureGroup as exc:
             raise as_reported_failure(exc) from None
         except InvalidArgument as exc:
-            if "Inconsistent args" in str(exc) and "@example()" in str(exc):
-                from schemathesis.generation.hypothesis.given import GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE
-
-                raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE) from None
-            raise InvalidSchema(exc.args[0]) from None
+            raise _translate_invalid_argument(exc) from None
         except (SkipTest, unittest.SkipTest) as exc:
-            examples = ExamplesControllerMark.get(pyfuncitem.obj)
-            if examples is not None and examples.deferred_errors:
-                raise examples.deferred_errors[0] from None
-            pytest.skip(exc.args[0])
+            _translate_skip(pyfuncitem, exc)
         except FailedHealthCheck as exc:
             operation = ApiOperationMark.get(pyfuncitem.obj)
             assert operation is not None
@@ -473,23 +466,41 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
             raise build_unsatisfiable_error(
                 operation, with_tip=True, filter_tracker=operation.filter_case_tracker
             ) from None
-
-        # The operation ran, but part of it was left untested - a warning keeps the surviving cases passing.
-        unserializable_payload = UnserializablePayloadMark.get(pyfuncitem.obj)
-        if unserializable_payload is not None:
-            emit_unserializable_payload_warning(unserializable_payload)
-
-        examples = ExamplesControllerMark.get(pyfuncitem.obj)
-        if examples is not None:
-            for error in examples.deferred_errors:
-                if isinstance(error, InvalidHeadersExample):
-                    raise error from None
-
-        missing_path_parameters = MissingPathParameters.get(pyfuncitem.obj)
-        if missing_path_parameters:
-            raise missing_path_parameters from None
+        _raise_post_run_errors(pyfuncitem)
     else:
         yield
+
+
+def _translate_invalid_argument(exc: InvalidArgument) -> SchemathesisError:
+    if "Inconsistent args" in str(exc) and "@example()" in str(exc):
+        return IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE)
+    return InvalidSchema(exc.args[0])
+
+
+def _translate_skip(pyfuncitem: pytest.Function, exc: SkipTest | unittest.SkipTest) -> NoReturn:
+    __tracebackhide__ = True
+    examples = ExamplesControllerMark.get(pyfuncitem.obj)
+    if examples is not None and examples.deferred_errors:
+        raise examples.deferred_errors[0] from None
+    pytest.skip(exc.args[0])
+
+
+def _raise_post_run_errors(pyfuncitem: pytest.Function) -> None:
+    __tracebackhide__ = True
+    # The operation ran, but part of it was left untested - a warning keeps the surviving cases passing.
+    unserializable_payload = UnserializablePayloadMark.get(pyfuncitem.obj)
+    if unserializable_payload is not None:
+        emit_unserializable_payload_warning(unserializable_payload)
+
+    examples = ExamplesControllerMark.get(pyfuncitem.obj)
+    if examples is not None:
+        for error in examples.deferred_errors:
+            if isinstance(error, InvalidHeadersExample):
+                raise error from None
+
+    missing_path_parameters = MissingPathParameters.get(pyfuncitem.obj)
+    if missing_path_parameters:
+        raise missing_path_parameters from None
 
 
 def _is_xdist_worker(config: pytest.Config) -> bool:
