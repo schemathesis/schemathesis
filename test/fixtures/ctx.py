@@ -157,6 +157,9 @@ class OpenAPIApps:
     def success_and_basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_basic())
 
+    def schema_unavailable(self, *, failures: int = 1) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.schema_unavailable(failures))
+
     def rails_planted_bug(self, *, envelope: openapi_envelopes.RailsEnvelope) -> OpenAPIServer:
         return _start(self.parent, openapi_envelopes.planted_bug(openapi_envelopes.RAILS[envelope]))
 
@@ -228,10 +231,8 @@ class GraphQLApps:
     def federated_subgraph(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.federated_subgraph())
 
-    def from_schema(
-        self, schema, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask"
-    ) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.from_schema(schema, endpoint=endpoint, framework=framework))
+    def from_schema(self, schema, *, framework: Literal["flask", "fastapi"] = "flask") -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.from_schema(schema, framework=framework))
 
     def canned_response(self, payload: object, *, status_code: int = 200) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.canned_response(payload, status_code=status_code))

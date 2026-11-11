@@ -1,6 +1,6 @@
 import pytest
 from flask import jsonify, request
-from hypothesis import Phase, find
+from hypothesis import Phase
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
@@ -23,7 +23,7 @@ from schemathesis.generation.meta import (
 from schemathesis.resources import PoolDraw
 from schemathesis.specs.openapi.checks import ignored_auth
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
-from test.utils import run_given
+from test.utils import find_first, run_given
 
 
 def make_negative_meta(location, parameter=None, description="Test mutation"):
@@ -489,7 +489,7 @@ def test_pipe_delimited_query_parameters_revalidate_after_edit(ctx):
     operation = ctx.openapi.load_operation(
         "GET /items", {"parameters": parameters, "responses": {"200": {"description": "OK"}}}
     )
-    case = find(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case = find_first(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True, max_examples=1)
 
     assert case.meta.components[ParameterLocation.QUERY].mode == GenerationMode.POSITIVE
     case.query["unknown"] = "x"
@@ -505,7 +505,7 @@ def test_replacing_query_container_revalidates_as_negative(ctx, query):
             "responses": {"200": {"description": "OK"}},
         },
     )
-    case = find(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case = find_first(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True, max_examples=1)
     case.query = query
     assert case.meta.components[ParameterLocation.QUERY].mode == GenerationMode.NEGATIVE
 
@@ -562,7 +562,9 @@ def header_operation(ctx):
 
 @pytest.mark.parametrize("name", ["Authorization", "X-Other"], ids=["declared-in-other-case", "undeclared"])
 def test_header_added_by_hook_keeps_case_positive(header_operation, name):
-    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case = find_first(
+        header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True, max_examples=1
+    )
     case.headers = case.headers or {}
     case.headers[name] = "Bearer token"
     assert case.meta.generation.mode == GenerationMode.POSITIVE
@@ -575,13 +577,17 @@ def test_header_added_by_hook_keeps_case_positive(header_operation, name):
     ids=["invalid-value", "missing-required"],
 )
 def test_header_replaced_by_hook_with_invalid_value_is_negative(header_operation, headers):
-    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case = find_first(
+        header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True, max_examples=1
+    )
     case.headers = headers
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
 
 def test_derived_case_revalidation_leaves_original_metadata_intact(header_operation):
-    case = find(header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case = find_first(
+        header_operation.as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True, max_examples=1
+    )
     meta = case.meta
     derived = case.derive(headers=CaseInsensitiveDict({"X-Count": "abc"}))
     assert derived.meta.generation.mode == GenerationMode.NEGATIVE

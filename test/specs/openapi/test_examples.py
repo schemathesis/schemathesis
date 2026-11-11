@@ -7,7 +7,7 @@ from unittest.mock import ANY
 import jsonschema_rs
 import pytest
 from flask import Flask, Response
-from hypothesis import HealthCheck, Phase, find, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -41,7 +41,7 @@ from test.utils import EventStream, assert_requests_call
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.schemas import OpenApiSchema
-from test.utils import run_given
+from test.utils import find_first, run_given
 
 
 @pytest.fixture(scope="module")
@@ -247,22 +247,18 @@ def test_examples_phase_drops_float32_collapsing(ctx, location):
     # A spec example valid as float64 but collapsing to 0 in float32 must not become a positive example case.
     inner = {"type": "number", "format": "float", "exclusiveMinimum": 0, "example": 5e-324, "examples": [5e-324]}
     if location == "query":
-        endpoint = {
-            "get": {
-                "parameters": [{"name": "f", "in": "query", "required": True, "schema": inner}],
-                "responses": {"200": {"description": "OK"}},
-            }
+        definition = {
+            "parameters": [{"name": "f", "in": "query", "required": True, "schema": inner}],
+            "responses": {"200": {"description": "OK"}},
         }
         method = "GET"
     else:
-        endpoint = {
-            "post": {
-                "requestBody": {"required": True, "content": {"application/json": {"schema": inner}}},
-                "responses": {"200": {"description": "OK"}},
-            }
+        definition = {
+            "requestBody": {"required": True, "content": {"application/json": {"schema": inner}}},
+            "responses": {"200": {"description": "OK"}},
         }
         method = "POST"
-    operation = ctx.openapi.load_schema({"/r": endpoint}, version="3.1.0")["/r"][method]
+    operation = ctx.openapi.load_operation(f"{method} /r", definition, version="3.1.0")
     assert [example.value for example in (*extract_top_level(operation), *extract_from_schemas(operation))] == []
 
 
@@ -621,7 +617,7 @@ def test_multipart_examples(ctx):
     # Then examples should be correctly generated
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
-    assert find(strategies[0], lambda case: case.body == {"key": "test"})
+    assert find_first(strategies[0], lambda case: case.body == {"key": "test"}, max_examples=2000)
 
 
 def test_invalid_x_examples(ctx):
@@ -665,7 +661,7 @@ def test_shared_examples_openapi_2(ctx):
     )
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
-    assert find(strategies[0], lambda case: case.body == "value")
+    assert find_first(strategies[0], lambda case: case.body == "value", max_examples=2000)
 
 
 @pytest.mark.parametrize("examples", [{"example1": {"value": "value"}}, ["value"]])
@@ -691,7 +687,7 @@ def test_examples_ref_openapi_2(ctx, examples):
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert find(strategies[0], lambda case: case.body == "value")
+    assert find_first(strategies[0], lambda case: case.body == "value", max_examples=2000)
 
 
 @pytest.mark.parametrize("body", ["BodyDirect", "BodyRef"])
@@ -718,7 +714,7 @@ def test_examples_ref_openapi_3(ctx, body):
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert find(strategies[0], lambda case: case.body == "value")
+    assert find_first(strategies[0], lambda case: case.body == "value", max_examples=2000)
 
 
 def test_boolean_subschema(ctx):
@@ -951,14 +947,13 @@ def test_examples_container_in_body_subschema(ctx, version, container, expected)
         ]
     }
     if version == "2.0":
-        operation = {"parameters": [{"name": "body", "in": "body", "schema": body_schema}]}
+        definition = {"parameters": [{"name": "body", "in": "body", "schema": body_schema}]}
     else:
-        operation = {"requestBody": {"content": {"application/json": {"schema": body_schema}}}}
-    schema = ctx.openapi.load_schema(
-        {"/test": {"post": {**operation, "responses": {"default": {"description": "OK"}}}}},
-        version=version,
+        definition = {"requestBody": {"content": {"application/json": {"schema": body_schema}}}}
+    operation = ctx.openapi.load_operation(
+        "POST /test", {**definition, "responses": {"default": {"description": "OK"}}}, version=version
     )
-    assert [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])] == [
+    assert [example_to_dict(example) for example in extract_top_level(operation)] == [
         {"media_type": "application/json", "value": expected}
     ]
 
@@ -1361,6 +1356,37 @@ def test_example_body_keeps_json_types(ctx):
     assert examples.generate_one(operation.get_strategies_from_examples()[0]).body == {"flag": True, "limit": None}
 
 
+@pytest.mark.hypothesis_nested
+def test_examples_validity(ctx):
+    api = ctx.openapi.apps.success()
+    schema = ctx.openapi.load_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {"name": "anyKey", "in": "header", "schema": {"type": "string"}},
+                        {"name": "id", "in": "query", "schema": {"type": "string", "example": "1"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        servers=[{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
+    )
+
+    operation = next(schema.get_all_operations()).ok()
+    strategy = get_strategies_from_examples(operation)[0]
+
+    @given(case=strategy)
+    @settings(deadline=None)
+    def test(case):
+        # Generated examples should have valid parameters
+        # E.g. headers should be latin-1 encodable
+        case.call(base_url=f"{api.base_url}/api")
+
+    test()
+
+
 def test_external_value(ctx, app_runner):
     # When the API schema contains examples via `externalValue` keyword
     answer_app = Flask(__name__)
@@ -1369,7 +1395,6 @@ def test_external_value(ctx, app_runner):
     def answer():
         return Response(b"42", content_type="application/json")
 
-    port = app_runner.run_flask_app(answer_app)
     operation = ctx.openapi.load_operation(
         "POST /test/",
         {
@@ -1377,7 +1402,9 @@ def test_external_value(ctx, app_runner):
                 "content": {
                     "application/json": {
                         "schema": {"type": "integer"},
-                        "examples": {"answer": {"externalValue": f"http://127.0.0.1:{port}/answer.json"}},
+                        "examples": {
+                            "answer": {"externalValue": app_runner.openapi_url(answer_app, path="/answer.json")}
+                        },
                     }
                 }
             },

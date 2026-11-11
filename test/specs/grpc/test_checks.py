@@ -8,8 +8,7 @@ from requests.structures import CaseInsensitiveDict
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.config import ConfigError
-from schemathesis.config._checks import ChecksConfig
+from schemathesis.config import ChecksConfig, ConfigError
 from schemathesis.core.error_feedback import Observation, ObservationKind
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import ServerError, Severity

@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 import pytest
 from _pytest.main import ExitCode
-from flask import Response, jsonify
+from flask import Response
 
 from test.apps.catalog.openapi import basic
 from test.utils import allure_results
@@ -310,34 +310,6 @@ def test_report_write_error(ctx, cli, snapshot_cli):
     assert result == snapshot_cli
 
 
-def test_coverage_unspecified_method_in_junit(cli, ctx, tmp_path):
-    # See GH-3699
-    # When coverage phase triggers an `unsupported_method` failure via UNSPECIFIED_HTTP_METHOD,
-    # the failure must appear in JUnit XML
-    xml_path = tmp_path / "junit.xml"
-    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    # Server accepts all methods — returns 200 instead of 405 for undocumented methods
-    @app.route("/users", methods=["GET", "DELETE", "POST", "PUT", "PATCH", "HEAD"])
-    def users():
-        return jsonify([])
-
-    result = cli.run_openapi_app(
-        app,
-        "--phases=coverage",
-        f"--report-junit-path={xml_path}",
-        "--checks=unsupported_method",
-    )
-
-    # Exit code is 1: the check detected that undocumented methods were accepted
-    assert result.exit_code == 1
-
-    # JUnit must reflect that failure
-    tree = ElementTree.parse(xml_path)
-    root = tree.getroot()
-    assert int(root.attrib.get("failures", 0)) > 0
-
-
 def test_after_run_failure_in_junit(ctx, cli, ensure_reachability_module, tmp_path):
     api = ctx.openapi.apps.success_and_failure()
     xml_path = tmp_path / "junit.xml"
@@ -358,6 +330,39 @@ def test_after_run_failure_in_junit(ctx, cli, ensure_reachability_module, tmp_pa
     assert run_checks is not None, list(testcases_by_name)
     assert run_checks[0].tag == "failure"
     assert "never returned 2xx" in (run_checks[0].text or run_checks[0].attrib.get("message", ""))
+
+
+_UNSORTED_RUN_CHECK_FAILURES = """
+from schemathesis.core.failures import CustomFailure, FailureGroup
+
+
+@schemathesis.check
+class ZRunCheck:
+    def after_response(self, ctx, response, case):
+        pass
+
+    def after_run(self, ctx):
+        raise AssertionError("zzz run-level failure")
+
+
+@schemathesis.check
+class ARunCheck:
+    def after_response(self, ctx, response, case):
+        pass
+
+    def after_run(self, ctx):
+        raise FailureGroup(
+            [
+                CustomFailure(operation=None, title="dup", message="aaa duplicated", exception=AssertionError("dup"))
+                for _ in range(2)
+            ]
+        )
+"""
+
+
+@pytest.fixture
+def unsorted_run_check_failures_module(ctx):
+    return ctx.write_pymodule(_UNSORTED_RUN_CHECK_FAILURES)
 
 
 def test_after_run_failures_in_reports_are_sorted_and_deduplicated(

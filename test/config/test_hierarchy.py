@@ -2,6 +2,7 @@ import hypothesis
 import pytest
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
+import schemathesis
 from schemathesis.config import ProjectConfig, SchemathesisConfig
 
 LABEL = "PUT /users/{user_id}"
@@ -176,6 +177,23 @@ def test_transport_setting_for_operation(operation, matcher, key, project_value,
     project = SchemathesisConfig.from_dict(raw).projects.get_default()
     expected = operation_value if matcher == LABEL else project_value
     assert (getter(project), getter(project, operation=operation)) == (project_value, expected)
+
+
+def test_project_operations_take_precedence_over_global_operations(ctx):
+    raw_schema = ctx.openapi.build_schema({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    config = SchemathesisConfig.from_dict(
+        {
+            "operations": [{"include-path": "/items", "request-timeout": 1}],
+            "project": [
+                {
+                    "title": raw_schema["info"]["title"],
+                    "operations": [{"include-path": "/items", "request-timeout": 99}],
+                }
+            ],
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema, config=config)
+    assert schema.config.request_timeout_for(operation=schema["/items"]["GET"]) == 99
 
 
 @pytest.mark.parametrize(

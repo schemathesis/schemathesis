@@ -615,6 +615,35 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET /users\]"])
 
 
+def test_app_with_parametrize(testdir):
+    # Regression - missed argument inside "wrapper" in `BaseSchema.parametrize`
+    testdir.makepyfile(
+        """
+    import schemathesis
+    from hypothesis import settings
+    from test.apps.catalog.openapi.basic import success_and_failure
+
+    api = success_and_failure()
+    app = api.server
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+    called = False
+
+    @schema.parametrize()
+    @settings(max_examples=1)
+    def test(case):
+        global called
+        called = True
+        assert case.operation.schema.app is app
+
+    def test_two():
+        assert called
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=3)
+
+
 def test_empty_content(ctx):
     # When the "content" value is empty in "requestBody"
     operation = ctx.openapi.load_operation(
@@ -758,7 +787,6 @@ def test_(case):
     assert "timed out" in result.stdout.str()
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_settings_database_from_profile(testdir):
     # When a hypothesis profile with a custom database is loaded
     # And @schema.parametrize() is used
@@ -793,7 +821,6 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_settings_decorator_database(testdir):
     # When @settings decorator with a custom database is applied to a test
     # And @schema.parametrize() is used
@@ -859,7 +886,6 @@ LARGE_MINIMUM_BODY_PATHS = {
 }
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 @pytest.mark.parametrize(
     "setup",
     [
@@ -896,7 +922,6 @@ def test_suppress_health_check_under_ci_profile(ctx, testdir, setup):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_configured_database_under_ci_profile(testdir):
     testdir.make_test(
         """
@@ -920,7 +945,6 @@ def verify_settings_after_collection(request):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 @pytest.mark.parametrize(
     ("config", "setting", "expected"),
     [

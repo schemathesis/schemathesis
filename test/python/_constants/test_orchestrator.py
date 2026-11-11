@@ -6,11 +6,12 @@ import pytest
 from flask import Flask, jsonify
 
 from schemathesis.core.warnings import SchemathesisWarning
+from schemathesis.python import constants
 from schemathesis.python._constants import orchestrator
 from schemathesis.python._constants.adapters.flask import FlaskAdapter
 from schemathesis.python._constants.orchestrator import extract_all
 from schemathesis.python._constants.pool import ConstantsPool
-from schemathesis.python._constants.registry import SourceRegistry, constants
+from schemathesis.python._constants.registry import SourceRegistry
 from schemathesis.python._constants.warnings import iter_constants_warnings
 from test.python._constants.fixtures.dep_pkg import flask_app, shared
 from test.python._constants.helpers import pool_values

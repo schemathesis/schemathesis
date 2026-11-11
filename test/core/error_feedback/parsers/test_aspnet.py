@@ -6,14 +6,13 @@ from schemathesis.core.error_feedback import (
     BoundDirection,
     FormatPayload,
     NumericBoundPayload,
-    Observation,
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
 )
 from schemathesis.core.error_feedback.parsers.aspnet import AspNetParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
+from test.core.error_feedback.parsers.helpers import observation_signatures, parse_observations
 
 _ASPNET_TYPE_URI = "https://tools.ietf.org/html/rfc9110#section-15.5.1"
 
@@ -174,10 +173,6 @@ def test_aspnet_parser_accepts_any_single_problem_details_marker(marker):
 )
 def test_aspnet_parser_can_parse_rejects_non_aspnet_bodies(body):
     assert AspNetParser().can_parse(body=body) is False
-
-
-def _aspnet_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
-    return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
 
 
 @pytest.mark.parametrize(
@@ -427,7 +422,7 @@ def test_aspnet_parser_parse(make_operation, method, path, body, expected, case_
 
 def test_aspnet_parser_parse_multi_field(make_operation, case_factory):
     observations = parse_observations(AspNetParser(), _ASPNET_MULTI_FIELD, make_operation, case_factory)
-    assert _aspnet_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.MUST_NOT_BE_BLANK, None),
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),

@@ -7,13 +7,12 @@ from schemathesis.core.error_feedback import (
     EnumPayload,
     FormatPayload,
     NumericBoundPayload,
-    Observation,
     ObservationKind,
     SizeBoundPayload,
 )
 from schemathesis.core.error_feedback.parsers.go_validator import GoValidatorParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
+from test.core.error_feedback.parsers.helpers import observation_signatures, parse_observations
 
 
 def _go_default_envelope(message: str) -> dict:
@@ -442,10 +441,6 @@ def test_go_validator_parser_can_parse_rejects_non_go_bodies(body):
     assert GoValidatorParser().can_parse(body=body) is False
 
 
-def _go_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
-    return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
-
-
 @pytest.mark.parametrize(
     ("body", "expected"),
     [
@@ -668,7 +663,7 @@ def test_go_validator_parser_default_multi_field(make_operation, case_factory):
     observations = GoValidatorParser().parse(
         operation=make_operation(), body=_GO_DEFAULT_MULTI_FIELD, case=case_factory()
     )
-    assert _go_signatures(observations) == [
+    assert observation_signatures(observations) == [
         (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
     ]
 
@@ -677,7 +672,7 @@ def test_go_validator_parser_structured_multi_field(make_operation, case_factory
     observations = GoValidatorParser().parse(
         operation=make_operation(), body=_GO_STRUCTURED_MULTI_FIELD, case=case_factory()
     )
-    assert _go_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),

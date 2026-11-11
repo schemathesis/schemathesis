@@ -19,14 +19,8 @@ from schemathesis.resources import SemanticDraw
 from test.utils import run_given
 
 
-def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, *, version: str = "3.0.2", **kwargs):
-    schema = ctx.openapi.load_schema(paths, version=version, **kwargs)
-    parent_config = SchemathesisConfig.from_dict(config)
-    schema.config._parent = parent_config
-    schema.config.generation = parent_config.projects.default.generation
-    schema.config.parameters = parent_config.projects.default.parameters
-    schema.config.operations = parent_config.projects.default.operations
-    return schema
+def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, **kwargs):
+    return ctx.openapi.load_schema(paths, config=SchemathesisConfig.from_dict(config), **kwargs)
 
 
 _PATHS_ONE_STRING = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from hypothesis import settings
 
 from schemathesis import auths, hooks
 from schemathesis.checks import CHECKS
@@ -58,7 +59,12 @@ def reset_global_state():
     builtin_serializers = [(transport, dict(transport._serializers)) for transport in TRANSPORTS]
     # Under pytest-xdist every worker shares one seed; each test (and each rerun) needs its own.
     SchemathesisConfig.shared_seed = None
+    # A test may register or load Hypothesis profiles; the suite's active one is restored after it.
+    active_profile = settings.get_current_profile_name()
+    default_profile = settings.get_profile("default")
     yield
+    settings.register_profile("default", default_profile)
+    settings.load_profile(active_profile)
     for registry, entries in builtin_entries:
         builtin_names = {entry.__name__ for entry in entries}
         for name in registry.get_all_names():

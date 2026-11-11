@@ -289,3 +289,17 @@ class BrokenAuth:
     )
     # Then the error should be caught and displayed clearly
     assert cli.main("run", api.schema_url, "--max-examples=1", hooks=module) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    "extra_kwargs",
+    [
+        {},
+        {"config": {"auth": {"openapi": {"BearerAuth": {"bearer": "real-token"}}}}},
+    ],
+    ids=["no-creds", "with-creds"],
+)
+def test_auth_inference_toggles_protected_access(ctx, cli, snapshot_cli, extra_kwargs):
+    api = ctx.openapi.apps.under_declared_security()
+    assert cli.run(api.schema_url, "--max-examples=10", **extra_kwargs) == snapshot_cli

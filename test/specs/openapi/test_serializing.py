@@ -959,10 +959,6 @@ def test_path_style_delimiters_stay_literal(ctx, style, explode, schema, expecte
 _WIRE_FORM_ARRAY = [None, True, False, 1, 1.5, "x"]
 
 
-def delimited_query_paths(parameter):
-    return {"/teapot": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}}
-
-
 def openapi3_delimited_parameter(style):
     return {
         "name": "color",
@@ -1037,7 +1033,9 @@ def coverage_rendered(operation, render):
     ids=["pipeDelimited", "spaceDelimited", "form", "pipes", "ssv", "tsv", "csv"],
 )
 def test_delimited_query_items_use_json_wire_form(ctx, parameter, version, expected):
-    operation = ctx.openapi.load_schema(delimited_query_paths(parameter), version=version)["/teapot"]["GET"]
+    operation = ctx.openapi.load_operation(
+        "GET /teapot", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version=version
+    )
 
     assert fuzzing_rendered(operation, prepared_query_string) == {expected}
     assert examples_rendered(operation, prepared_query_string) == {expected}
@@ -1151,10 +1149,9 @@ def wire_value(case, location):
 def test_type_list_parameters_use_declared_style(ctx, location, schema, extra, expected):
     path = "/teapot/{p}" if location == "path" else "/teapot"
     parameter = {"name": "p", "in": location, "required": True, "schema": schema, **extra}
-    operation = ctx.openapi.load_schema(
-        {path: {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}},
-        version="3.1.0",
-    )[path]["GET"]
+    operation = ctx.openapi.load_operation(
+        f"GET {path}", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}, version="3.1.0"
+    )
 
     assert fuzzing_rendered(operation, partial(wire_value, location=location)) == {expected}
 

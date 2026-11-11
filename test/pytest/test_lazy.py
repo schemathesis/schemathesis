@@ -1058,7 +1058,6 @@ def test_api(case):
     result.assert_outcomes(failed=1)
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_settings_database_from_profile_lazy(testdir):
     # When a hypothesis profile with a custom database is loaded
     # And lazy schema parametrize is used
@@ -1095,7 +1094,6 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_settings_decorator_database_lazy(testdir):
     # When @settings decorator with a custom database is applied to a test
     # And lazy schema parametrize is used

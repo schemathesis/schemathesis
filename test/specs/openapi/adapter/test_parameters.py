@@ -1,19 +1,285 @@
-"""Tests for behavior not specific to forms."""
+from dataclasses import fields
 
 import pytest
 
+import schemathesis
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.generation.hypothesis.examples import generate_many
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import PayloadAlternatives
 from schemathesis.specs.openapi.adapter import v2, v3_0
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
-from test.specs.openapi.parameters.conftest import (
-    OPEN_API_2_USER_IN_BODY,
-    OPEN_API_3_USER,
-    USER_JSONSCHEMA,
-    assert_parameters,
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, form_data_to_json_schema
+from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
+
+
+def make_user_schema(is_loose=False, **properties):
+    properties = {"first_name": {"type": "string"}, "last_name": {"type": "string"}, **properties}
+    schema = {
+        "additionalProperties": False,
+        "properties": properties,
+        "required": list(properties),
+    }
+    if not is_loose:
+        schema["type"] = "object"
+    return schema
+
+
+# JSON Schema for a User, which is common for all spec versions.
+USER_JSONSCHEMA = make_user_schema(middle_name={"anyOf": [{"type": "string"}, {"type": "null"}]})
+USER_JSONSCHEMA_WITH_FILE = make_user_schema(
+    middle_name={"anyOf": [{"type": "string"}, {"type": "null"}]}, scan={"type": "string", "format": "binary"}
 )
+OPEN_API_2_USER_FORM_PARAMETERS = [
+    {"in": "formData", "name": "first_name", "required": True, "type": "string"},
+    {"in": "formData", "name": "last_name", "required": True, "type": "string"},
+    {"in": "formData", "name": "middle_name", "required": True, "type": "string", "x-nullable": True},
+]
+OPEN_API_2_USER_FORM_WITH_FILE_PARAMETERS = [
+    *OPEN_API_2_USER_FORM_PARAMETERS,
+    {"in": "formData", "name": "scan", "required": True, "type": "file"},
+]
+OPEN_API_2_USER_IN_BODY = {
+    "in": "body",
+    "name": "user",
+    "schema": make_user_schema(middle_name={"type": "string", "x-nullable": True}),
+}
+OPEN_API_3_USER = make_user_schema(middle_name={"type": "string", "nullable": True})
+OPEN_API_3_USER_WITH_FILE = make_user_schema(
+    middle_name={"type": "string", "nullable": True}, scan={"type": "string", "format": "binary"}
+)
+
+
+@pytest.fixture
+def make_openapi_2_schema(ctx):
+    def maker(consumes, parameters):
+        schema = ctx.openapi.build_schema(
+            {
+                "/users": {
+                    "post": {
+                        "summary": "Test operation",
+                        "description": "Test",
+                        "parameters": parameters,
+                        "consumes": consumes,
+                        "produces": ["application/json"],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            version="2.0",
+        )
+        SWAGGER_20_VALIDATOR.validate(schema)
+        return schema
+
+    return maker
+
+
+@pytest.fixture
+def make_openapi_3_schema(ctx):
+    def maker(body=None, parameters=None):
+        definition = {
+            "summary": "Test operation",
+            "description": "Test",
+            "responses": {"200": {"description": "OK"}},
+        }
+        if body is not None:
+            definition["requestBody"] = body
+        if parameters is not None:
+            definition["parameters"] = parameters
+        schema = ctx.openapi.build_schema({"/users": {"post": definition}})
+        OPENAPI_30_VALIDATOR.validate(schema)
+        return schema
+
+    return maker
+
+
+def _compare(left, right):
+    assert type(left) is type(right)
+    for field in fields(left):
+        left_attr = getattr(left, field.name)
+        right_attr = getattr(right, field.name)
+        if isinstance(left_attr, list):
+            assert len(left_attr) == len(right_attr)
+            for sub_left, sub_right in zip(left_attr, right_attr, strict=True):
+                _compare(sub_left, sub_right)
+        else:
+            assert left_attr == right_attr
+
+
+def assert_parameters(schema, expected, json_schemas, location="body"):
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/users"]["POST"]
+    container = getattr(operation, location)
+    _compare(container, expected)
+    assert [item.optimized_schema for item in container] == json_schemas
+
+
+@pytest.mark.parametrize(
+    "consumes",
+    [
+        ["application/x-www-form-urlencoded"],
+        ["application/x-www-form-urlencoded", "multipart/form-data"],
+    ],
+)
+def test_forms_open_api_2(consumes, make_openapi_2_schema):
+    # In Open API 2.0, forms are separate "formData" parameters
+    schema = make_openapi_2_schema(consumes, OPEN_API_2_USER_FORM_PARAMETERS)
+    assert_parameters(
+        schema,
+        PayloadAlternatives(
+            [
+                # They are represented as a single "composite" body for each media type
+                OpenApiBody.from_form_parameters(
+                    definition=form_data_to_json_schema(OPEN_API_2_USER_FORM_PARAMETERS),
+                    media_type=value,
+                    name_to_uri={},
+                    adapter=v2,
+                )
+                for value in consumes
+            ]
+        ),
+        # Each converted schema should correspond to the default User schema.
+        [USER_JSONSCHEMA] * len(consumes),
+    )
+
+
+@pytest.mark.parametrize(
+    "consumes",
+    [
+        ["multipart/form-data"],
+        # When "consumes" is not defined, then multipart is the default media type for "formData" parameters
+        [],
+    ],
+)
+def test_multipart_form_open_api_2(
+    consumes,
+    make_openapi_2_schema,
+):
+    # Multipart forms are represented as a list of "formData" parameters
+    schema = make_openapi_2_schema(consumes, OPEN_API_2_USER_FORM_WITH_FILE_PARAMETERS)
+    assert_parameters(
+        schema,
+        PayloadAlternatives(
+            [
+                # Is represented with a "composite" body
+                OpenApiBody.from_form_parameters(
+                    definition=form_data_to_json_schema(OPEN_API_2_USER_FORM_WITH_FILE_PARAMETERS),
+                    media_type="multipart/form-data",
+                    name_to_uri={},
+                    adapter=v2,
+                )
+            ]
+        ),
+        [USER_JSONSCHEMA_WITH_FILE],
+    )
+
+
+def test_urlencoded_form_open_api_3(make_openapi_3_schema):
+    # A regular urlencoded form in Open API 3
+    schema = make_openapi_3_schema(
+        {
+            "required": True,
+            "content": {"application/x-www-form-urlencoded": {"schema": OPEN_API_3_USER}},
+        }
+    )
+    assert_parameters(
+        schema,
+        PayloadAlternatives(
+            [
+                OpenApiBody.from_definition(
+                    definition={"schema": OPEN_API_3_USER},
+                    media_type="application/x-www-form-urlencoded",
+                    is_required=True,
+                    resource_name=None,
+                    name_to_uri={},
+                    adapter=v3_0,
+                )
+            ]
+        ),
+        # It should correspond to the default User schema
+        [USER_JSONSCHEMA],
+    )
+
+
+def test_loose_urlencoded_form_open_api_3(make_openapi_3_schema):
+    # The schema doesn't define "type": "object"
+    loose_schema = {"schema": make_user_schema(is_loose=True, middle_name={"type": "string", "nullable": True})}
+    schema = make_openapi_3_schema(
+        {
+            "required": True,
+            "content": {"application/x-www-form-urlencoded": loose_schema},
+        }
+    )
+    assert_parameters(
+        schema,
+        PayloadAlternatives(
+            [
+                OpenApiBody.from_definition(
+                    definition=loose_schema,
+                    media_type="application/x-www-form-urlencoded",
+                    is_required=True,
+                    resource_name=None,
+                    name_to_uri={},
+                    adapter=v3_0,
+                )
+            ]
+        ),
+        # But when it is converted to JSON Schema, Schemathesis sets `type` to `object`
+        # Therefore it corresponds to the default JSON Schema defined for a User
+        [USER_JSONSCHEMA],
+    )
+
+
+def test_multipart_form_open_api_3(make_openapi_3_schema):
+    # A regular multipart for with a file upload in Open API 3
+    schema = make_openapi_3_schema(
+        {
+            "required": True,
+            "content": {"multipart/form-data": {"schema": OPEN_API_3_USER_WITH_FILE}},
+        }
+    )
+    assert_parameters(
+        schema,
+        PayloadAlternatives(
+            [
+                OpenApiBody.from_definition(
+                    definition={"schema": OPEN_API_3_USER_WITH_FILE},
+                    media_type="multipart/form-data",
+                    is_required=True,
+                    resource_name=None,
+                    name_to_uri={},
+                    adapter=v3_0,
+                )
+            ]
+        ),
+        # When converted, the schema corresponds the default schema defined for a User object with a file
+        [USER_JSONSCHEMA_WITH_FILE],
+    )
+
+
+def test_swagger_form_body_requires_only_required_parameters(ctx):
+    operation = ctx.openapi.load_operation(
+        "POST /users",
+        {
+            "consumes": ["application/x-www-form-urlencoded"],
+            "parameters": [
+                {"name": "name", "in": "formData", "type": "string", "required": True},
+                {"name": "nickname", "in": "formData", "type": "string"},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+        version="2.0",
+    )
+    assert [(body.is_required, body.optimized_schema) for body in operation.body] == [
+        (
+            True,
+            {
+                "properties": {"name": {"type": "string"}, "nickname": {"type": "string"}},
+                "additionalProperties": False,
+                "type": "object",
+                "required": ["name"],
+            },
+        )
+    ]
 
 
 @pytest.mark.parametrize(
@@ -414,3 +680,67 @@ def test_negative_bodies_never_reuse_schema_examples(ctx):
     )
     bodies = [case.body for case in generate_many(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), 50)]
     assert {"name": "picked"} not in bodies
+
+
+def _form_media_types(operation):
+    return [parameter.media_type for parameter in operation.body if parameter.location == "body"]
+
+
+@pytest.mark.parametrize(
+    ("consumes", "parameters", "expected"),
+    [
+        (
+            ["application/json"],
+            [{"name": "name", "in": "formData", "type": "string", "required": True}],
+            ["application/x-www-form-urlencoded"],
+        ),
+        (
+            ["application/xml"],
+            [{"name": "name", "in": "formData", "type": "string"}],
+            ["application/x-www-form-urlencoded"],
+        ),
+        (
+            ["application/json"],
+            [
+                {"name": "name", "in": "formData", "type": "string"},
+                {"name": "attachment", "in": "formData", "type": "file"},
+            ],
+            ["multipart/form-data"],
+        ),
+        (
+            ["application/x-www-form-urlencoded"],
+            [{"name": "name", "in": "formData", "type": "string"}],
+            ["application/x-www-form-urlencoded"],
+        ),
+        (
+            ["multipart/form-data"],
+            [{"name": "f", "in": "formData", "type": "file"}],
+            ["multipart/form-data"],
+        ),
+        (
+            ["application/json", "application/x-www-form-urlencoded"],
+            [{"name": "name", "in": "formData", "type": "string"}],
+            ["application/x-www-form-urlencoded"],
+        ),
+        (
+            None,
+            [{"name": "name", "in": "formData", "type": "string"}],
+            ["multipart/form-data"],
+        ),
+    ],
+    ids=[
+        "json-consumes-overridden-to-urlencoded",
+        "xml-consumes-overridden-to-urlencoded",
+        "json-consumes-with-file-overridden-to-multipart",
+        "urlencoded-consumes-unchanged",
+        "multipart-consumes-unchanged",
+        "mixed-consumes-drops-non-form",
+        "no-consumes-defaults-to-multipart",
+    ],
+)
+def test_form_data_media_type_override(ctx, consumes, parameters, expected):
+    operation = {"parameters": parameters, "responses": {"200": {"description": "OK"}}}
+    if consumes is not None:
+        operation["consumes"] = consumes
+    schema = ctx.openapi.load_schema({"/op": {"post": operation}}, version="2.0")
+    assert _form_media_types(schema["/op"]["POST"]) == expected

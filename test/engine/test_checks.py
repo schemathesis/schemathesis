@@ -8,7 +8,7 @@ import pytest
 import schemathesis.checks
 from schemathesis import Case
 from schemathesis.checks import max_response_time, not_a_server_error, run_checks
-from schemathesis.config._checks import ChecksConfig
+from schemathesis.config import ChecksConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import CustomFailure, Failure, FailureGroup, ResponseTimeExceeded, ServerError
 from schemathesis.core.transport import Response

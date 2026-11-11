@@ -262,6 +262,10 @@ def test_drf_parser_classifier_prefixes(message, kind, payload):
         ("Ensure this field has no more than 64 characters.", None, 64),
         ("Ensure this field has at most 20 characters.", None, 20),
         ("Ensure this value has at most 20 characters (it has 25).", None, 20),
+        ("Ensure this field has at least 1 elements.", 1, None),
+        ("Ensure this field has at least 2 elements.", 2, None),
+        ("Ensure this field has no more than 5 elements.", None, 5),
+        ("Ensure this field has no more than 1 element.", None, 1),
     ],
     ids=[
         "drf-min",
@@ -270,26 +274,13 @@ def test_drf_parser_classifier_prefixes(message, kind, payload):
         "drf-max-no-more-than",
         "drf-max-at-most",
         "django-bridge-max-with-suffix",
+        "array-min-int",
+        "array-min-int-2",
+        "array-max-int",
+        "array-max-int-singular-element",
     ],
 )
-def test_drf_parser_classifier_string_size(message, expected_min, expected_max):
-    assert _classify(message) == (
-        ObservationKind.SIZE_BOUND,
-        SizeBoundPayload(min=expected_min, max=expected_max),
-    )
-
-
-@pytest.mark.parametrize(
-    "message, expected_min, expected_max",
-    [
-        ("Ensure this field has at least 1 elements.", 1, None),
-        ("Ensure this field has at least 2 elements.", 2, None),
-        ("Ensure this field has no more than 5 elements.", None, 5),
-        ("Ensure this field has no more than 1 element.", None, 1),
-    ],
-    ids=["min-int", "min-int-2", "max-int", "max-int-singular-element"],
-)
-def test_drf_parser_classifier_array_size(message, expected_min, expected_max):
+def test_drf_parser_classifier_size(message, expected_min, expected_max):
     assert _classify(message) == (
         ObservationKind.SIZE_BOUND,
         SizeBoundPayload(min=expected_min, max=expected_max),

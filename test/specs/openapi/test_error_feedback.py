@@ -1622,37 +1622,6 @@ def _build_type_mismatch_observations(
                 "properties": {"addresses": {"type": "array"}},
             },
         ),
-    ],
-    ids=[
-        "localdate-to-date",
-        "localdatetime-to-date-time",
-        "instant-to-date-time",
-        "uuid-to-uuid",
-        "url-to-uri",
-        "existing-format-preserved",
-        "unmapped-type-passthrough",
-        "non-string-property-skipped",
-        "type-union-with-null-applies",
-        "absent-property-not-synthesised",
-        "bool-schema-passthrough",
-        "non-object-root-passthrough",
-        "nested-path-applies-format",
-        "array-element-applies-format-via-items",
-        "array-without-items-passes-through",
-    ],
-)
-def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expected, case_factory):
-    assert (
-        _apply_body_adjustment(
-            TypeMismatchAdjustment(), input_schema, _build_type_mismatch_observations(*items), case_factory
-        )
-        == expected
-    )
-
-
-@pytest.mark.parametrize(
-    "input_schema, items, expected",
-    [
         (
             {"type": "object", "properties": {"age": {"type": "string"}}},
             [(("age",), "integer")],
@@ -1707,14 +1676,6 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
             {"type": "object", "properties": {"x": {"type": "boolean"}}},
         ),
         (
-            {"type": "object", "properties": {"hire_date": {"type": "string"}}},
-            [(("hire_date",), "java.time.LocalDate")],
-            {
-                "type": "object",
-                "properties": {"hire_date": {"type": "string", "format": "date"}},
-            },
-        ),
-        (
             # Schema declares a sub-object; rewriting `type` to a scalar would
             # leave `properties` orphaned. Conservative: skip.
             {
@@ -1742,6 +1703,21 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
         ),
     ],
     ids=[
+        "localdate-to-date",
+        "localdatetime-to-date-time",
+        "instant-to-date-time",
+        "uuid-to-uuid",
+        "url-to-uri",
+        "existing-format-preserved",
+        "unmapped-type-passthrough",
+        "non-string-property-skipped",
+        "type-union-with-null-applies",
+        "absent-property-not-synthesised",
+        "bool-schema-passthrough",
+        "non-object-root-passthrough",
+        "nested-path-applies-format",
+        "array-element-applies-format-via-items",
+        "array-without-items-passes-through",
         "drf-token-rewrites-scalar-type",
         "drf-token-noop-when-matching",
         "composed-anyOf-skip",
@@ -1749,12 +1725,11 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
         "composed-allOf-skip",
         "type-list-skip",
         "drf-token-boolean",
-        "java-fqn-regression",
         "drf-token-skipped-when-existing-type-is-object",
         "drf-token-skipped-when-existing-type-is-array",
     ],
 )
-def test_type_mismatch_adjustment_handles_drf_and_java_payloads(input_schema, items, expected, case_factory):
+def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expected, case_factory):
     assert (
         _apply_body_adjustment(
             TypeMismatchAdjustment(), input_schema, _build_type_mismatch_observations(*items), case_factory

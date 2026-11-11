@@ -47,7 +47,6 @@ def before_call(context, case, kwargs):
     assert cli.main("run", api.schema_url, "--phases=stateful", "--max-examples=1", hooks=module) == snapshot_cli
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_hypothesis_deadline_from_hooks_is_reported(ctx, cli):
     api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
@@ -67,7 +66,6 @@ def before_call(context, case, kwargs):
     assert "exceeds the deadline of 50.00ms" in result.stdout
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 @pytest.mark.parametrize("max_examples", [3, 100])
 def test_max_examples_option_wins_over_profile_from_hooks(ctx, cli, app_runner, max_examples):
     app, _ = ctx.openapi.make_flask_app(
@@ -104,7 +102,6 @@ hypothesis.settings.load_profile("large")
     assert f"{max_examples} generated" in result.stdout
 
 
-@pytest.mark.usefixtures("restore_hypothesis_profile")
 def test_stateful_run_with_default_profile_settings(ctx, cli):
     api = ctx.openapi.apps.stateful_users()
     module = ctx.write_pymodule(

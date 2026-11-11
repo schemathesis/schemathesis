@@ -19,8 +19,7 @@ from schemathesis.auths import (
     set_on_case,
 )
 from schemathesis.checks import not_a_server_error
-from schemathesis.config import ApiKeyAuthConfig, ConfigError, SchemathesisConfig
-from schemathesis.config._auth import DynamicTokenAuthConfig
+from schemathesis.config import ApiKeyAuthConfig, ConfigError, DynamicTokenAuthConfig, SchemathesisConfig
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.adapter.security import build_auth_provider

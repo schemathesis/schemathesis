@@ -1,6 +1,6 @@
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, find, given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 
@@ -19,6 +19,7 @@ from schemathesis.specs.openapi.negative.value_channel import (
     collect_value_targets,
     violate_max_length,
 )
+from test.utils import find_first
 
 _SUPPRESSED = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
 
@@ -259,7 +260,7 @@ def test_value_channel_base_body_is_valid():
         )
 
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             negative_schema(
                 schema,
                 operation_name="POST /widgets/",
@@ -271,7 +272,7 @@ def test_value_channel_base_body_is_valid():
             ),
             is_invalid_before_mutation,
             # The excluded value is rare, so a small budget would pass without looking.
-            settings=settings(max_examples=1000, database=None, deadline=None, suppress_health_check=_SUPPRESSED),
+            max_examples=1000,
         )
 
 

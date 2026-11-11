@@ -8,7 +8,6 @@ from schemathesis.core.error_feedback import (
     EnumPayload,
     FormatPayload,
     NumericBoundPayload,
-    Observation,
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
@@ -16,7 +15,7 @@ from schemathesis.core.error_feedback import (
 )
 from schemathesis.core.error_feedback.parsers.ajv import AjvParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
+from test.core.error_feedback.parsers.helpers import observation_signatures, parse_observations
 
 
 def _ajv_array_envelope(*errors: dict) -> dict:
@@ -437,10 +436,6 @@ def test_ajv_parser_can_parse_rejects_non_ajv_bodies(body):
     assert AjvParser().can_parse(body=body) is False
 
 
-def _ajv_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
-    return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
-
-
 @pytest.mark.parametrize(
     ("body", "expected"),
     [
@@ -706,7 +701,7 @@ def test_ajv_parser_root_type_error_only_applies_to_request_body(make_operation,
 
 def test_ajv_parser_parse_multi_field(make_operation, case_factory):
     observations = parse_observations(AjvParser(), _AJV_MULTI_FIELD, make_operation, case_factory)
-    assert _ajv_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),
@@ -721,7 +716,7 @@ def test_ajv_parser_parse_multi_field(make_operation, case_factory):
 
 def test_ajv_parser_fastify_parse_multi_field_clauses(make_operation, case_factory):
     observations = parse_observations(AjvParser(), _FASTIFY_MULTI_FIELD, make_operation, case_factory)
-    assert _ajv_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("name",), ObservationKind.MUST_NOT_BE_BLANK, None),
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),

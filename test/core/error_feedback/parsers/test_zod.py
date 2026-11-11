@@ -7,14 +7,13 @@ from schemathesis.core.error_feedback import (
     EnumPayload,
     FormatPayload,
     NumericBoundPayload,
-    Observation,
     ObservationKind,
     SizeBoundPayload,
     TypeMismatchPayload,
 )
 from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
+from test.core.error_feedback.parsers.helpers import observation_signatures, parse_observations
 
 
 def _zod_envelope(*issues: dict) -> dict:
@@ -359,10 +358,6 @@ def test_zod_parser_can_parse_recognises_envelope(body):
 )
 def test_zod_parser_can_parse_rejects_non_zod_bodies(body):
     assert ZodParser().can_parse(body=body) is False
-
-
-def _zod_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
-    return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
 
 
 @pytest.mark.parametrize(
@@ -748,7 +743,7 @@ def test_zod_parser_parse(make_operation, method, path, body, expected, case_fac
 
 def test_zod_parser_parse_multi_field(make_operation, case_factory):
     observations = parse_observations(ZodParser(), _ZOD_MULTI_FIELD, make_operation, case_factory)
-    assert _zod_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (
@@ -769,7 +764,7 @@ def test_zod_parser_skips_issue_with_non_list_path(make_operation, case_factory)
 
     observations = parse_observations(ZodParser(), body, make_operation, case_factory)
 
-    assert _zod_signatures(observations) == [(("email",), ObservationKind.FORMAT, FormatPayload(name="email"))]
+    assert observation_signatures(observations) == [(("email",), ObservationKind.FORMAT, FormatPayload(name="email"))]
 
 
 @pytest.mark.parametrize(

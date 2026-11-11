@@ -1,5 +1,7 @@
 import json
 import re
+import shlex
+from dataclasses import dataclass, field
 
 import pytest
 import requests
@@ -7,7 +9,6 @@ from _pytest.main import ExitCode
 from fastapi import FastAPI
 from flask import jsonify, redirect
 from hypothesis import HealthCheck, settings
-from pydantic import BaseModel, ConfigDict, Field
 from werkzeug.exceptions import InternalServerError
 
 import schemathesis
@@ -25,6 +26,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.generation.modes import GenerationMode
 from test.apps.builders import make_permissive_flask_app
+from test.apps.catalog.openapi import users
 from test.utils import run_given
 
 
@@ -38,25 +40,29 @@ def _make_get_users_app() -> FastAPI:
     return app
 
 
-class _User(BaseModel):
-    first_name: str = Field(min_length=3)
-    last_name: str = Field(min_length=3)
-    model_config = ConfigDict(extra="forbid")
-
-
-def _make_create_user_app() -> FastAPI:
-    app = FastAPI()
-
-    @app.post("/users/", status_code=201)
-    def create_user(user: _User) -> dict:
-        return {"id": "0"}
-
-    return app
-
-
 app = _make_get_users_app()
 schema = schemathesis.openapi.from_dict(app.openapi())
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+
+@dataclass
+class CurlWrapper:
+    testdir: field()
+
+    def run(self, command: str):
+        if "⚠️" in command:
+            command = command.split("⚠️")[0].strip()
+        return self.testdir.run(*shlex.split(command))
+
+    def assert_valid(self, command: str):
+        result = self.run(command)
+        if result.ret != 0:
+            assert "Failed to connect" in result.stderr.lines[-1]
+
+
+@pytest.fixture
+def curl(testdir):
+    return CurlWrapper(testdir)
 
 
 @pytest.fixture
@@ -101,8 +107,7 @@ def test_non_utf_8_body(curl):
 
 
 def test_json_payload(curl):
-    new_app = _make_create_user_app()
-    schema = schemathesis.openapi.from_dict(new_app.openapi())
+    schema = schemathesis.openapi.from_dict(users.crud_asgi().spec)
     case = schema["/users/"]["POST"].Case(body={"foo": 42}, media_type="application/json")
     command = case.as_curl_command()
     assert command == "curl -X POST -H 'Content-Type: application/json' -d '{\"foo\": 42}' http://localhost/users/"

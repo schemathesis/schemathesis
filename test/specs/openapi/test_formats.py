@@ -2,7 +2,7 @@ from base64 import b64decode
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, find, given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from schemathesis.config import GenerationConfig
@@ -12,7 +12,7 @@ from schemathesis.specs.openapi._hypothesis import _build_custom_formats, _canon
 from schemathesis.specs.openapi.coverage._schema import is_valid_header_value
 from schemathesis.specs.openapi.formats import FORMAT_LENGTHS, register_string_format
 from schemathesis.transport.serialization import Binary
-from test.utils import run_given
+from test.utils import find_first, run_given
 
 FORMATS = _build_custom_formats(GenerationConfig(), GenerationMode.POSITIVE)
 # Formats named by JSON Schema; the `_`-prefixed rest are internal and carry their own invariants.
@@ -92,7 +92,7 @@ FILE_SIGNATURES = pytest.mark.parametrize("signature", SIGNATURES, ids=["png", "
 @FILE_SIGNATURES
 def test_binary_format_draws_real_files(signature):
     # Upload handlers that parse the file reject random bytes before reaching their own logic.
-    find(FORMATS["binary"], lambda value: value.data.startswith(signature), settings=SETTINGS)
+    find_first(FORMATS["binary"], lambda value: value.data.startswith(signature), max_examples=50)
 
 
 @FILE_SIGNATURES
@@ -102,11 +102,11 @@ def test_length_bounded_binary_format_draws_real_files(signature):
         GenerationConfig(),
         jsonschema_rs.Draft202012Validator,
     )
-    find(built, lambda value: value.data.startswith(signature), settings=SETTINGS)
+    find_first(built, lambda value: value.data.startswith(signature), max_examples=50)
 
 
 def test_binary_format_still_draws_arbitrary_bytes():
-    find(FORMATS["binary"], lambda value: value.data and not value.data.startswith(SIGNATURES), settings=SETTINGS)
+    find_first(FORMATS["binary"], lambda value: value.data and not value.data.startswith(SIGNATURES), max_examples=50)
 
 
 @pytest.mark.parametrize("name", ["_header_value", "_basic_auth", "_bearer_auth", "_if_match_header"])

@@ -6,7 +6,7 @@ from fractions import Fraction
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, assume, find, given, settings
+from hypothesis import HealthCheck, Phase, assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, NoSuchExample, Unsatisfiable
 from hypothesis.internal.observability import with_observability_callback
@@ -30,7 +30,7 @@ from schemathesis.specs.openapi._hypothesis import (
     make_positive_strategy,
 )
 from schemathesis.transport.serialization import Binary
-from test.utils import run_given
+from test.utils import find_first, run_given
 
 
 def test_end_anchor_after_pattern_normalization():
@@ -1308,7 +1308,7 @@ def test_canonical_generation_reaches(schema, reaches):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     # High budget: each predicate looks for one specific value, not a property of every draw.
     for predicate in reaches:
-        find(built, predicate, settings=settings(max_examples=1000, database=None))
+        find_first(built, predicate, max_examples=1000)
 
 
 def test_optional_properties_are_size_biased():
@@ -1527,7 +1527,7 @@ def test_canonical_recursion_is_drawn_at_any_depth(node):
         return 0
 
     # Inlining a pointer bounds how deep a value can go; naming it does not.
-    find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
+    find_first(built, lambda value: depth(value) >= 3, max_examples=2000)
 
 
 def test_canonical_negated_recursive_additional_properties():
@@ -1582,8 +1582,7 @@ def test_canonical_dynamic_recursion_is_drawn_at_any_depth(validator_cls, schema
     def depth(value):
         return 1 + depth(value["child"]) if isinstance(value, dict) and "child" in value else 0
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
+    find_first(built, lambda value: depth(value) >= 3, max_examples=2000)
 
 
 def test_canonical_all_of_with_a_pointer_back_into_the_value():
@@ -1612,7 +1611,7 @@ def test_canonical_all_of_with_a_pointer_back_into_the_value():
     def test(value):
         assert is_valid(value), value
 
-    find(built, lambda value: "parent" in value, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: "parent" in value, max_examples=1000)
 
 
 def test_canonical_one_of_admits_only_what_a_single_branch_takes():
@@ -1632,8 +1631,8 @@ def test_canonical_one_of_admits_only_what_a_single_branch_takes():
         assert is_valid(value), value
 
     # Both ends stay reachable; only the overlap between them is gone.
-    find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
-    find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: value < 0, max_examples=1000)
+    find_first(built, lambda value: value > 10, max_examples=1000)
 
 
 def test_canonical_one_of_branches_naming_draft_4_definitions():
@@ -1650,9 +1649,8 @@ def test_canonical_one_of_branches_naming_draft_4_definitions():
     def test(value):
         assert is_valid(value), value
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
-    find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: value < 0, max_examples=1000)
+    find_first(built, lambda value: value > 10, max_examples=1000)
 
 
 def test_canonical_one_of_beside_a_conjunction_drives_the_draw():
@@ -1674,7 +1672,7 @@ def test_canonical_one_of_beside_a_conjunction_drives_the_draw():
     def test(value):
         assert is_valid(value), value
 
-    find(built, lambda value: value["mode"] == "onDemand", settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: value["mode"] == "onDemand", max_examples=1000)
 
 
 def test_canonical_array_shorter_than_the_positions_it_names():
@@ -1683,10 +1681,9 @@ def test_canonical_array_shorter_than_the_positions_it_names():
 
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: value == [], settings=settings(max_examples=1000, database=None))
-    find(built, lambda value: len(value) == 1, settings=settings(max_examples=1000, database=None))
-    find(built, lambda value: len(value) == 2, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: value == [], max_examples=1000)
+    find_first(built, lambda value: len(value) == 1, max_examples=1000)
+    find_first(built, lambda value: len(value) == 2, max_examples=1000)
 
 
 def test_canonical_array_keeps_the_positions_a_floor_demands():
@@ -1746,8 +1743,7 @@ def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):
     def test(value):
         assert matches(value), value
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: len(value) > 1, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: len(value) > 1, max_examples=1000)
 
 
 # The validator counts a few non-ASCII spaces, like U+00A0, as `\s`.
@@ -1759,7 +1755,7 @@ def test_canonical_pattern_non_whitespace_class_draws_no_validator_whitespace(pa
 
     with pytest.raises(NoSuchExample):
         # The excluded value is rare, so a small budget would pass without looking.
-        find(built, lambda value: not is_valid(value), settings=settings(max_examples=1000, database=None))
+        find_first(built, lambda value: not is_valid(value), max_examples=1000)
 
 
 def test_canonical_object_floor_over_values_that_cannot_be_drawn():
@@ -1773,7 +1769,7 @@ def test_canonical_object_floor_over_values_that_cannot_be_drawn():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
     with pytest.raises(Unsatisfiable):
-        find(built, lambda value: True, settings=settings(max_examples=50, database=None))
+        find_first(built, lambda value: True, max_examples=50)
 
 
 def test_canonical_reference_with_no_finite_value_admits_nothing():
@@ -1854,8 +1850,7 @@ def test_canonical_content_string_generation(schema, reaches):
         assert is_valid(value), value
 
     for predicate in reaches:
-        # Ceiling for a search that stops at the first match.
-        find(built, predicate, settings=settings(max_examples=1000, database=None))
+        find_first(built, predicate, max_examples=1000)
 
 
 def test_canonical_number_generation_without_representable_values():
@@ -1866,7 +1861,7 @@ def test_canonical_number_generation_without_representable_values():
     )
 
     with pytest.raises(Unsatisfiable):
-        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+        find_first(built, lambda _: True, max_examples=10)
 
 
 def test_canonical_number_excluding_integers_under_draft4():
@@ -1880,8 +1875,7 @@ def test_canonical_number_excluding_integers_under_draft4():
     def test(value):
         assert is_valid(value), value
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: value > 4, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: value > 4, max_examples=1000)
 
 
 @pytest.mark.parametrize("pattern", ["[\\d\\D]", "[\\s\\S]", "[\\w\\W]"], ids=["digit", "space", "word"])
@@ -1892,7 +1886,7 @@ def test_barred_pattern_naming_every_character(pattern):
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
     with pytest.raises(Unsatisfiable):
-        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+        find_first(built, lambda _: True, max_examples=10)
 
 
 def test_canonical_integer_grid_without_a_multiple_in_range():
@@ -1901,7 +1895,7 @@ def test_canonical_integer_grid_without_a_multiple_in_range():
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
     with pytest.raises(Unsatisfiable):
-        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+        find_first(built, lambda _: True, max_examples=10)
 
 
 @pytest.mark.parametrize(
@@ -1999,8 +1993,7 @@ def test_canonical_closed_object_reaches_every_admitted_name():
     }
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: set(value) == {"a", "b"}, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: set(value) == {"a", "b"}, max_examples=1000)
 
 
 def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
@@ -2038,10 +2031,10 @@ def test_canonical_object_demand_without_a_spellable_complement(schema, validato
         assert is_valid(value), value
 
     # Objects are the only shape the demand governs; the other branches are off-type values.
-    find(
+    find_first(
         built,
         lambda value: isinstance(value, dict) and bool(value),
-        settings=settings(max_examples=1000, database=None),
+        max_examples=1000,
     )
 
 
@@ -2101,8 +2094,7 @@ def test_canonical_typed_group_keeps_the_type():
     def test(value):
         assert is_valid(value), value
 
-    # Ceiling for a search that stops at the first match.
-    find(built, lambda value: value == 2, settings=settings(max_examples=1000, database=None))
+    find_first(built, lambda value: value == 2, max_examples=1000)
 
 
 UNSATISFIABLE_ARRAY_SCHEMAS = [
@@ -2303,11 +2295,10 @@ def test_canonical_array_unique_items_separates_booleans_from_numbers():
         jsonschema_rs.Draft202012Validator,
     )
 
-    find(
+    find_first(
         built,
         lambda value: any(item is True for item in value) and 1 in value,
-        # Ceiling for a search that stops at the first match.
-        settings=settings(max_examples=2000, database=None),
+        max_examples=2000,
     )
 
 
@@ -2362,7 +2353,7 @@ def test_canonical_format_drops_values_the_pattern_rejects():
     )
 
     with pytest.raises(Unsatisfiable):
-        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+        find_first(built, lambda _: True, max_examples=10)
 
 
 def test_canonical_object_keeps_declared_names_outside_the_alphabet():

@@ -1154,20 +1154,17 @@ def test_positive_oversized_strings_only_for_unbounded_body_strings(ctx):
 
 def test_positive_oversized_strings_skip_parameters(ctx):
     # Servers reject long URLs and headers before the application sees them, whatever the schema says.
-    operation = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /foo/{id}",
         {
-            "/foo/{id}": {
-                "get": {
-                    "parameters": [
-                        {"name": location, "in": location, "required": True, "schema": {"type": "string"}}
-                        for location in ("query", "header", "cookie")
-                    ]
-                    + [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )["/foo/{id}"]["GET"]
+            "parameters": [
+                {"name": location, "in": location, "required": True, "schema": {"type": "string"}}
+                for location in ("query", "header", "cookie")
+            ]
+            + [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
 
     assert not scenario_cases(collect_cases(operation, GenerationMode.POSITIVE), CoverageScenario.OVERSIZED_STRING)
 

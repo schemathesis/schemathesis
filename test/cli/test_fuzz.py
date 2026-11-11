@@ -73,17 +73,6 @@ def _make_multi_operation_failure_app(ctx, app_runner):
     return app_runner.openapi_url(app)
 
 
-def _make_slow_fuzz_app(ctx, app_runner):
-    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
-
-    @app.route("/users")
-    def users():
-        time.sleep(0.1)
-        return jsonify([])
-
-    return app_runner.openapi_url(app)
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_when_no_checks_ran(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
@@ -201,9 +190,9 @@ def test_fuzz_final_line_with_failure(cli, app_runner, ctx, tmp_path, snapshot_c
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
-    url = _make_slow_fuzz_app(ctx, app_runner)
-    assert cli.main("fuzz", url, "--max-time=30", "--request-timeout=0.001") == snapshot_cli
+def test_fuzz_final_line_with_error(cli, ctx, snapshot_cli):
+    api = ctx.openapi.apps.slow()
+    assert cli.main("fuzz", api.schema_url, "--max-time=30", "--request-timeout=0.001") == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -257,7 +246,7 @@ def after_call(context, case, response):
             r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios?\n\n    ❌ (?:1 unique failure|(?!1 )\d+ unique failures)\n    Last new failure: \d+\.\d{2}s ago\n",
         ),
         (
-            _make_slow_fuzz_app,
+            lambda ctx, app_runner: ctx.openapi.apps.slow().schema_url,
             ["--request-timeout=0.001"],
             r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios?\n\n    🚫 1 error\n    Last new failure: none yet\n",
         ),

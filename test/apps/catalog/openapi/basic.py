@@ -276,6 +276,24 @@ def success_and_basic() -> OpenAPIApp:
     )
 
 
+def schema_unavailable(failures: int = 1) -> OpenAPIApp:
+    """The first `failures` schema fetches answer 503, like a service that is still starting."""
+    spec = build_schema(schemas.success())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    remaining = failures
+
+    @app.before_request
+    def not_ready() -> object:
+        nonlocal remaining
+        if request.path == "/openapi.json" and remaining > 0:
+            remaining -= 1
+            return jsonify({"detail": "not ready"}), 503
+        return None
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def sessions_and_log_event() -> OpenAPIApp:
     return flask_app(schemas.sessions_and_log_event(), handlers.register_sessions_and_log_event)
 

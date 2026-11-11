@@ -17,6 +17,7 @@ import urllib3
 import yaml
 from hypothesis import HealthCheck, given, settings
 from hypothesis.database import InMemoryExampleDatabase
+from hypothesis.strategies import SearchStrategy
 
 from schemathesis import Case
 from schemathesis.checks import CheckContext
@@ -67,6 +68,18 @@ def run_given(
         wrapped()
 
     return run
+
+
+T = TypeVar("T")
+
+
+def find_first(strategy: SearchStrategy[T], condition: Callable[[T], object], *, max_examples: int) -> T:
+    """Return the first drawn value satisfying `condition`; unlike `hypothesis.find`, skip shrinking it."""
+    return hypothesis.find(
+        strategy,
+        condition,
+        settings=settings(max_examples=max_examples, phases=[hypothesis.Phase.generate], database=None, deadline=None),
+    )
 
 
 def objects_at(value: Any, path: Sequence[str]) -> list[Any]:

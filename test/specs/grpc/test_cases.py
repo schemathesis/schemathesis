@@ -5,7 +5,7 @@ import re
 import sys
 
 import pytest
-from hypothesis import HealthCheck, find, given, settings
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.config import SchemathesisWarning
@@ -26,7 +26,7 @@ from test.apps.catalog.grpc.descriptors import (
     validated_descriptor_set,
     write_descriptor_set,
 )
-from test.utils import run_given
+from test.utils import find_first, run_given
 
 # The address and host checks the validation rules define.
 EMAIL = re.compile(
@@ -292,7 +292,11 @@ def test_positive_values_satisfy_validation_rules_with_reported_fields(validated
 
 # `find` raises when no generated body sets another member of the oneof.
 def test_legacy_rules_of_oneof_member_apply_only_when_set(validated_schema):
-    find(validated_schema["validated.Spans"]["Choose"].as_strategy(), lambda case: "exact" in case.body)
+    find_first(
+        validated_schema["validated.Spans"]["Choose"].as_strategy(),
+        lambda case: "exact" in case.body,
+        max_examples=2000,
+    )
 
 
 # Newer Pythons drop standard-alphabet characters from URL-safe base64 and warn about it first.
@@ -690,4 +694,4 @@ def leaves_unset(body, path):
 def test_fields_outside_reported_paths_stay_optional(schema, method, kind, reported, unset):
     operation = schema["types.Types"][method]
     strategy = operation.as_strategy(feedback=feedback_for(operation, reported, kind=kind))
-    find(strategy, lambda case: leaves_unset(case.body, unset))
+    find_first(strategy, lambda case: leaves_unset(case.body, unset), max_examples=2000)

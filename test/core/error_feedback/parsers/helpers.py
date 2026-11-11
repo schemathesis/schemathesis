@@ -24,6 +24,10 @@ def parse_observations(
     return parser.parse(operation=operation, body=body, case=case_factory(**(case_kwargs or {})))
 
 
+def observation_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
+    return sorted((observation.parameter_path, observation.kind, observation.payload) for observation in observations)
+
+
 SPRING_MESSAGES = (
     b'{"error":"Bad Request","status":400,'
     b'"messages":["zipcode - must not be blank","city - must not be blank"],'

@@ -4,7 +4,7 @@ import random
 import graphql
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, find, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 
@@ -37,11 +37,10 @@ from test.python._constants.fixtures import (
     graphql_app,
     graphql_string_pool,
 )
+from test.utils import find_first
 
-# Constant substitution is probabilistic; `find` drives generation until it fires (or proves it can't).
-_FIND = settings(max_examples=200, database=None)
-# Stops at the first match; shrinking it adds seconds and nothing these tests read.
-_FIND_FIRST = settings(_FIND, phases=[Phase.generate])
+# Constant substitution is probabilistic; the search draws until it fires (or proves it can't).
+_MAX_EXAMPLES = 200
 
 
 def _app_constants(source, *, name="provider"):
@@ -64,13 +63,13 @@ def test_constant_from_wsgi_app_unlocks_bug():
     # The high-entropy unlock code exists only in the app source; reaching it requires harvesting it.
     assert buggy_app.UNLOCK_CODE in _harvested(buggy_app.app, "string")
     operation = schemathesis.openapi.from_dict(buggy_app.SCHEMA)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE,
             feedback=FeedbackSources(constants_value_source=_source("string", buggy_app.UNLOCK_CODE)),
         ),
         lambda case: isinstance(case.body, dict) and case.body.get("code") == buggy_app.UNLOCK_CODE,
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert case.body["code"] == buggy_app.UNLOCK_CODE
 
@@ -78,13 +77,13 @@ def test_constant_from_wsgi_app_unlocks_bug():
 def test_constant_from_fastapi_app_unlocks_bug():
     assert buggy_asgi_app.UNLOCK_CODE in _harvested(buggy_asgi_app.app, "string")
     operation = schemathesis.openapi.from_asgi("/openapi.json", app=buggy_asgi_app.app)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE,
             feedback=FeedbackSources(constants_value_source=_source("string", buggy_asgi_app.UNLOCK_CODE)),
         ),
         lambda case: isinstance(case.body, dict) and case.body.get("code") == buggy_asgi_app.UNLOCK_CODE,
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert case.body["code"] == buggy_asgi_app.UNLOCK_CODE
 
@@ -95,14 +94,13 @@ def test_registered_constants_apply_to_direct_operation_strategy():
         return graphql_string_pool
 
     operation = schemathesis.openapi.from_dict(buggy_app.SCHEMA)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(),
         lambda case: (
             case._meta is not None
             and any(draw.value == graphql_string_pool.TOKEN for draw in case._meta.constants_draws)
         ),
-        # Ceiling for a search that stops at the first match.
-        settings=settings(max_examples=200, database=None),
+        max_examples=_MAX_EXAMPLES,
     )
 
     assert case.body["code"] == graphql_string_pool.TOKEN
@@ -146,12 +144,12 @@ def test_registered_constants_apply_to_direct_state_machine():
 def test_constant_applied_to_body_in_fuzz_mode():
     pool = _app_constants(buggy_app.app)
     operation = schemathesis.openapi.from_dict(buggy_app.SCHEMA)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=pool)
         ),
         lambda case: case._meta is not None and any(d.parameter_name == "code" for d in case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert any(d.parameter_name == "code" for d in case._meta.constants_draws)
 
@@ -159,12 +157,12 @@ def test_constant_applied_to_body_in_fuzz_mode():
 def test_constant_applied_to_query_parameter():
     pool = _app_constants(buggy_query_app.app)
     operation = schemathesis.openapi.from_dict(buggy_query_app.SCHEMA)["/unlock"]["GET"]
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=pool)
         ),
         lambda case: case._meta is not None and any(d.parameter_name == "code" for d in case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     draw = next(d for d in case._meta.constants_draws if d.parameter_name == "code")
     assert case.query["code"] == draw.value
@@ -180,7 +178,7 @@ def test_constant_rejected_by_generation_settings_does_not_hide_the_rest():
         generation_config=GenerationConfig(allow_x00=False),
         probability=1.0,
     )
-    assert find(strategy, lambda value: True, settings=_FIND).value == {"code": "fine"}
+    assert find_first(strategy, lambda value: True, max_examples=_MAX_EXAMPLES).value == {"code": "fine"}
 
 
 def _nul_constant_strategy(ctx, allow_x00):
@@ -195,18 +193,18 @@ def _nul_constant_strategy(ctx, allow_x00):
 def test_constants_respect_allow_x00(ctx):
     # A NUL harvested from the app's source must not reach data when the user disabled `\x00`.
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             _nul_constant_strategy(ctx, allow_x00=False),
             lambda case: isinstance(case.body, dict) and "\x00" in str(case.body.get("code", "")),
-            settings=_FIND,
+            max_examples=_MAX_EXAMPLES,
         )
 
 
 def test_constant_with_nul_is_substituted_when_allowed(ctx):
-    find(
+    find_first(
         _nul_constant_strategy(ctx, allow_x00=True),
         lambda case: case.body == {"code": "pre\x00post"},
-        settings=_FIND_FIRST,
+        max_examples=_MAX_EXAMPLES,
     )
 
 
@@ -236,13 +234,13 @@ def test_constants_respect_codec(ctx):
     schema.config.generation.update(codec="ascii")
     operation = schema["/unlock"]["POST"]
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             operation.as_strategy(
                 generation_mode=GenerationMode.POSITIVE,
                 feedback=FeedbackSources(constants_value_source=_source("string", "café")),
             ),
             lambda case: isinstance(case.body, dict) and case.body.get("code") == "café",
-            settings=_FIND,
+            max_examples=_MAX_EXAMPLES,
         )
 
 
@@ -259,10 +257,10 @@ def test_constants_substituted_only_when_codec_admits_them(ctx, codec, substitut
         return isinstance(case.body, dict) and case.body.get("code") == "café"
 
     if substituted:
-        assert has_constant(find(strategy, has_constant, settings=_FIND))
+        assert has_constant(find_first(strategy, has_constant, max_examples=_MAX_EXAMPLES))
     else:
         with pytest.raises(NoSuchExample):
-            find(strategy, has_constant, settings=_FIND)
+            find_first(strategy, has_constant, max_examples=_MAX_EXAMPLES)
 
 
 def test_constants_overlay_keeps_non_object_body(ctx):
@@ -270,10 +268,10 @@ def test_constants_overlay_keeps_non_object_body(ctx):
         ctx, {"type": ["object", "string"], "properties": {"code": {"type": "string"}}}, version="3.1.0"
     )
     operation = schema["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN"))),
         lambda case: isinstance(case.body, str),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert case.body == ""
 
@@ -286,7 +284,7 @@ def test_constants_not_substituted_into_security_parameters(ctx):
         components={"securitySchemes": {"ApiKeyQuery": {"type": "apiKey", "in": "query", "name": "api_key"}}},
     )
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             operation.as_strategy(
                 generation_mode=GenerationMode.POSITIVE,
                 feedback=FeedbackSources(constants_value_source=_source("string", "42")),
@@ -294,19 +292,19 @@ def test_constants_not_substituted_into_security_parameters(ctx):
             lambda case: (
                 case._meta is not None and any(draw.parameter_name == "api_key" for draw in case._meta.constants_draws)
             ),
-            settings=_FIND,
+            max_examples=_MAX_EXAMPLES,
         )
 
 
 def test_constant_applied_to_integer_path_parameter():
     pool = _app_constants(buggy_path_app.app)
     operation = schemathesis.openapi.from_dict(buggy_path_app.SCHEMA)["/item/{item_id}"]["GET"]
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=pool)
         ),
         lambda case: case._meta is not None and any(d.parameter_name == "item_id" for d in case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     draw = next(d for d in case._meta.constants_draws if d.parameter_name == "item_id")
     assert draw.value == buggy_path_app.MAGIC_ID
@@ -323,13 +321,13 @@ def test_constant_keeps_its_provenance_after_path_serialization(ctx, style, sent
             "responses": {"200": {"description": "OK"}},
         },
     )
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE,
             feedback=FeedbackSources(constants_value_source=_source("string", "a b")),
         ),
         lambda case: case.path_parameters["name"] == sent,
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert [(draw.location, draw.parameter_name, draw.value) for draw in case._meta.constants_draws] == [
         ("path", "name", "a b")
@@ -346,13 +344,13 @@ def test_constants_reach_a_parameter_whose_strategy_was_built_without_them(ctx):
         },
     )
     generate_many(operation.as_strategy(generation_mode=GenerationMode.POSITIVE), 1)
-    find(
+    find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE,
             feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ")),
         ),
         lambda case: case.query["code"] == "TOKEN_XYZ",
-        settings=_FIND_FIRST,
+        max_examples=_MAX_EXAMPLES,
     )
 
 
@@ -369,13 +367,13 @@ def test_constant_substituted_into_referenced_query_parameter(ctx):
             "schemas": {"Code": {"allOf": [{"$ref": "#/components/schemas/Text"}]}, "Text": {"type": "string"}}
         },
     )
-    find(
+    find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE,
             feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ")),
         ),
         lambda case: case.query["code"] == "TOKEN_XYZ",
-        settings=_FIND_FIRST,
+        max_examples=_MAX_EXAMPLES,
     )
 
 
@@ -383,24 +381,24 @@ def test_bug_stays_unfindable_without_the_feature():
     # No source: the overlay is off, so no constant provenance is ever recorded.
     operation = schemathesis.openapi.from_dict(buggy_app.SCHEMA)["/unlock"]["POST"]
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             operation.as_strategy(
                 generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=None)
             ),
             lambda case: case._meta is not None and bool(case._meta.constants_draws),
-            settings=_FIND,
+            max_examples=_MAX_EXAMPLES,
         )
 
 
 def test_constant_usage_recorded_in_case_metadata():
     pool = _app_constants(buggy_app.app)
     operation = schemathesis.openapi.from_dict(buggy_app.SCHEMA)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=pool)
         ),
         lambda case: case._meta is not None and any(d.parameter_name == "code" for d in case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     draws = [draw for draw in case._meta.constants_draws if draw.parameter_name == "code"]
     assert draws, "constant substitutions into `code` should be recorded on the case metadata"
@@ -414,10 +412,10 @@ def test_constant_usage_recorded_in_case_metadata():
 def test_constants_auto_extracted_from_wsgi_app():
     # No registered source and no explicit pool: loading a WSGI app introspects its modules by default.
     operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
         lambda case: case._meta is not None and bool(case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
 
@@ -480,10 +478,10 @@ def test_app_constants_cache_is_invalidated_when_registry_changes():
 
 def test_constants_auto_extracted_from_asgi_app():
     operation = schemathesis.openapi.from_asgi("/openapi.json", app=buggy_asgi_app.app)["/unlock"]["POST"]
-    case = find(
+    case = find_first(
         operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
         lambda case: case._meta is not None and bool(case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
 
@@ -492,10 +490,10 @@ def test_auto_extraction_disabled_by_config():
     config = SchemathesisConfig.from_str("[analysis.constants]\nenabled = false\n")
     operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app, config=config)["/unlock"]["POST"]
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
             lambda case: case._meta is not None and bool(case._meta.constants_draws),
-            settings=_FIND,
+            max_examples=_MAX_EXAMPLES,
         )
 
 
@@ -505,12 +503,12 @@ def _graphql_operations():
 
 
 def _graphql_case(operation, pool, predicate):
-    return find(
+    return find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE, feedback=FeedbackSources(constants_value_source=pool)
         ),
         predicate,
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
 
 
@@ -535,10 +533,10 @@ def test_constants_auto_extracted_from_graphql_wsgi_app():
     # The strawberry request handler is a library view, but Flask records the app's own module,
     # so its resolver literals are reached without manual registration.
     operation = _graphql_operations()["Query.lookup"]
-    case = find(
+    case = find_first(
         operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
         lambda case: case._meta is not None and bool(case._meta.constants_draws),
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
 
@@ -597,10 +595,10 @@ def test_graphql_constants_replace_only_some_list_elements():
         )
         return case._meta is not None and 0 < len(case._meta.constants_draws) < len(tags)
 
-    case = find(
+    case = find_first(
         _graphql_operations()["Query.byTags"].as_strategy(generation_mode=GenerationMode.POSITIVE),
         partly_substituted,
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert all(draw.body_path == "/byTags/tags" for draw in case._meta.constants_draws)
 
@@ -765,7 +763,7 @@ def test_flatmap_hook_prunes_only_modified_constant_draw():
         lambda value: st.just({"payload": {**value["payload"], "code": "changed"}})
     )(generated)
 
-    produced = find(strategy, lambda value: True)
+    produced = find_first(strategy, lambda value: True, max_examples=1)
 
     assert produced.constants_draws == (unchanged,)
 
@@ -775,9 +773,10 @@ def test_noop_map_and_flatmap_hooks_keep_constant_draws():
     generated = GeneratedValue(value={"code": "CONSTANT"}, meta=None, constants_draws=(draw,))
 
     mapped = wrap_map_hook_for_generated_value(lambda value: value)(generated)
-    flatmapped = find(
+    flatmapped = find_first(
         wrap_flatmap_hook_for_generated_value(lambda value: st.just(value))(generated),
         lambda value: True,
+        max_examples=1,
     )
 
     assert mapped.constants_draws == (draw,)
@@ -951,7 +950,7 @@ def test_nested_non_body_parameter_is_not_substituted():
         probability=1.0,
     )
 
-    produced = find(strategy, lambda value: True)
+    produced = find_first(strategy, lambda value: True, max_examples=1)
 
     assert produced == {"filter": {"code": "ORIGINAL"}}
 
@@ -971,7 +970,7 @@ def test_binary_constant_not_substituted_into_non_body_parameter():
         probability=1.0,
     )
 
-    produced = find(strategy, lambda value: True)
+    produced = find_first(strategy, lambda value: True, max_examples=1)
 
     assert produced == {"blob": "ORIGINAL"}
 
@@ -996,7 +995,7 @@ def test_header_string_constant_filtered_by_header_validity(value, expected):
         probability=1.0,
     )
 
-    produced = find(strategy, lambda v: True)
+    produced = find_first(strategy, lambda v: True, max_examples=1)
 
     result = produced.value if isinstance(produced, GeneratedValue) else produced
     assert result["X-Token"] == expected
@@ -1021,7 +1020,7 @@ def test_header_string_constant_filtered_by_excluded_characters(value, expected)
         probability=1.0,
     )
 
-    produced = find(strategy, lambda v: True)
+    produced = find_first(strategy, lambda v: True, max_examples=1)
 
     result = produced.value if isinstance(produced, GeneratedValue) else produced
     assert result["X-Token"] == expected
@@ -1073,12 +1072,13 @@ def test_form_body_records_constant_provenance(ctx):
     strategy = _build_form_strategy_with_encoding(
         operation.body[0], operation, config, GenerationMode.POSITIVE, _source("string", "MAGIC_LABEL")
     )
-    generated = find(
+    generated = find_first(
         strategy,
         lambda result: (
             isinstance(result, GeneratedValue)
             and any(draw.parameter_name == "label" for draw in result.constants_draws)
         ),
+        max_examples=2000,
     )
     draw = next(draw for draw in generated.constants_draws if draw.parameter_name == "label")
     assert draw.value == "MAGIC_LABEL"
@@ -1094,13 +1094,13 @@ def test_form_body_does_not_record_constant_for_encoded_field(ctx, raw_schema):
     label_strategy = _build_form_strategy_with_encoding(
         operation.body[0], operation, config, GenerationMode.POSITIVE, _source("string", "MAGIC_LABEL")
     )
-    generated = find(
+    generated = find_first(
         label_strategy,
         lambda result: (
             isinstance(result, GeneratedValue)
             and any(draw.parameter_name == "label" and draw.value == "MAGIC_LABEL" for draw in result.constants_draws)
         ),
-        settings=_FIND_FIRST,
+        max_examples=_MAX_EXAMPLES,
     )
     assert [draw for draw in generated.constants_draws if draw.parameter_name == "label"] == [
         _constant_draw("label", "MAGIC_LABEL", body_path="/label")
@@ -1259,7 +1259,7 @@ def test_constant_substituted_into_composed_or_nested_body(ctx, body_schema, bod
     operation = ctx.openapi.from_full_schema(raw_schema)["/items"]["POST"]
     value = "a3f9c1e7b5d24680"
 
-    case = find(
+    case = find_first(
         operation.as_strategy(
             generation_mode=GenerationMode.POSITIVE,
             feedback=FeedbackSources(constants_value_source=_source("string", value)),
@@ -1268,6 +1268,7 @@ def test_constant_substituted_into_composed_or_nested_body(ctx, body_schema, bod
             case._meta is not None
             and any(draw.body_path == body_path and draw.value == value for draw in case._meta.constants_draws)
         ),
+        max_examples=2000,
     )
 
     actual = case.body
@@ -1304,11 +1305,11 @@ def test_constant_substitution_depth_limit(ctx, depth, substituted):
     operation = _nested_body_operation(ctx, body_schema)
     strategy = operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ")))
     if substituted:
-        case = find(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", settings=_FIND)
+        case = find_first(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", max_examples=_MAX_EXAMPLES)
         assert _leaf_at(case.body, depth) == "TOKEN_XYZ"
     else:
         with pytest.raises(NoSuchExample):
-            find(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", settings=_FIND)
+            find_first(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", max_examples=_MAX_EXAMPLES)
 
 
 @pytest.mark.parametrize(
@@ -1345,10 +1346,10 @@ def test_constant_substituted_into_referencing_body(ctx, node):
         version="3.1.0",
         components={"schemas": {"Node": node, "Name": {"type": "string"}}},
     )
-    find(
+    find_first(
         operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ"))),
         lambda case: isinstance(case.body, dict) and case.body.get("name") == "TOKEN_XYZ",
-        settings=_FIND_FIRST,
+        max_examples=_MAX_EXAMPLES,
     )
 
 
@@ -1380,10 +1381,10 @@ def test_constant_substituted_into_nested_body_property(ctx, outer):
             "schemas": {"Inner": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}
         },
     )
-    find(
+    find_first(
         operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("string", "TOKEN_XYZ"))),
         lambda case: isinstance(case.body, dict) and _leaf(case.body) == "TOKEN_XYZ",
-        settings=_FIND_FIRST,
+        max_examples=_MAX_EXAMPLES,
     )
 
 
@@ -1400,10 +1401,10 @@ def test_constant_substituted_through_boolean_all_of_branch(ctx):
             "allOf": [True, {"properties": {"n": {"type": ["number", "integer"]}}, "required": ["n"]}],
         },
     )
-    case = find(
+    case = find_first(
         operation.as_strategy(feedback=FeedbackSources(constants_value_source=_source("integer", 987654321))),
         lambda case: isinstance(case.body, dict) and case.body.get("n") == 987654321,
-        settings=_FIND,
+        max_examples=_MAX_EXAMPLES,
     )
     assert case.body == {"n": 987654321}
 
@@ -1436,7 +1437,7 @@ def test_body_override_removes_overridden_constant_provenance():
         validator=None,
     )
 
-    produced = find(strategy, lambda value: True)
+    produced = find_first(strategy, lambda value: True, max_examples=1)
 
     assert produced.value == {"payload": {"code": "OVERRIDE", "name": "KEPT"}}
     assert produced.constants_draws == (sibling,)

@@ -74,40 +74,32 @@ def _meta(location, *, mode=GenerationMode.POSITIVE):
 
 
 BODY_OPERATION = {
-    "/data": {
-        "post": {
-            "requestBody": {
-                "required": True,
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "object",
-                            "properties": {"kind": {"type": "string"}, "size": {"type": "integer"}},
-                            "required": ["kind"],
-                            "if": {"properties": {"kind": {"const": "big"}}, "required": ["kind"]},
-                            "then": {"required": ["size"]},
-                        }
-                    }
-                },
-            },
-            "responses": {"200": {"description": "OK"}},
-        }
-    }
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {"kind": {"type": "string"}, "size": {"type": "integer"}},
+                    "required": ["kind"],
+                    "if": {"properties": {"kind": {"const": "big"}}, "required": ["kind"]},
+                    "then": {"required": ["size"]},
+                }
+            }
+        },
+    },
+    "responses": {"200": {"description": "OK"}},
 }
 QUERY_OPERATION = {
-    "/data": {
-        "get": {
-            "parameters": [{"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}}],
-            "responses": {"200": {"description": "OK"}},
-        }
-    }
+    "parameters": [{"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}}],
+    "responses": {"200": {"description": "OK"}},
 }
 
 
 # A conditional body counts as invalid only where the API's own validator enforces it.
 @pytest.mark.parametrize(("version", "is_violation"), [("3.0.2", False), ("3.1.0", True)])
 def test_body_judged_by_the_schema_production_validates_with(ctx, case_factory, version, is_violation):
-    operation = ctx.openapi.load_schema(BODY_OPERATION, version=version)["/data"]["POST"]
+    operation = ctx.openapi.load_operation("POST /data", BODY_OPERATION, version=version)
     case = case_factory(operation=operation, method="POST", body={"kind": "big"}, _meta=_meta(ParameterLocation.BODY))
 
     violation = check_conformance(case)
@@ -118,7 +110,7 @@ def test_body_judged_by_the_schema_production_validates_with(ctx, case_factory, 
 
 
 def test_non_body_container_is_checked(ctx, case_factory):
-    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", QUERY_OPERATION)
     meta = _meta(ParameterLocation.QUERY)
     meta.raw_containers[ParameterLocation.QUERY] = {"limit": "not-a-number"}
     case = case_factory(operation=operation, query={"limit": "not-a-number"}, _meta=meta)
@@ -131,14 +123,14 @@ def test_non_body_container_is_checked(ctx, case_factory):
 
 # On the wire an integer is a string and an object is spread over sibling keys.
 def test_container_without_a_typed_snapshot_is_not_judged(ctx, case_factory):
-    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", QUERY_OPERATION)
     case = case_factory(operation=operation, query={"limit": "5"}, _meta=_meta(ParameterLocation.QUERY))
 
     assert check_conformance(case) is None
 
 
 def test_ungenerated_container_is_not_judged(ctx, case_factory):
-    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", QUERY_OPERATION)
     meta = _meta(ParameterLocation.PATH)
     meta.raw_containers[ParameterLocation.QUERY] = {"limit": "not-a-number"}
     case = case_factory(operation=operation, query={"limit": "not-a-number"}, _meta=meta)
@@ -148,7 +140,7 @@ def test_ungenerated_container_is_not_judged(ctx, case_factory):
 
 # Negative generation drops required parameters it cannot negate, leaving untouched containers incomplete.
 def test_untouched_container_of_a_negative_case_is_not_judged(ctx, case_factory):
-    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", QUERY_OPERATION)
     meta = CaseMetadata(
         generation=GenerationInfo(time=0.0, mode=GenerationMode.NEGATIVE),
         components={ParameterLocation.QUERY: ComponentInfo(mode=GenerationMode.POSITIVE)},
@@ -161,13 +153,9 @@ def test_untouched_container_of_a_negative_case_is_not_judged(ctx, case_factory)
 
 
 HEADER_OPERATION = {
-    "/data": {
-        "post": {
-            "parameters": [{"name": "Content-Type", "in": "header", "required": True, "schema": {"type": "string"}}],
-            "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
-            "responses": {"200": {"description": "OK"}},
-        }
-    }
+    "parameters": [{"name": "Content-Type", "in": "header", "required": True, "schema": {"type": "string"}}],
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
+    "responses": {"200": {"description": "OK"}},
 }
 
 
@@ -181,7 +169,7 @@ HEADER_OPERATION = {
     ids=["unsupported", "malformed"],
 )
 def test_content_type_probe_header_is_not_judged(ctx, case_factory, scenario, content_type):
-    operation = ctx.openapi.load_schema(HEADER_OPERATION)["/data"]["POST"]
+    operation = ctx.openapi.load_operation("POST /data", HEADER_OPERATION)
     meta = CaseMetadata(
         generation=GenerationInfo(time=0.0, mode=GenerationMode.NEGATIVE),
         components={ParameterLocation.HEADER: ComponentInfo(mode=GenerationMode.NEGATIVE)},
@@ -196,7 +184,7 @@ def test_content_type_probe_header_is_not_judged(ctx, case_factory, scenario, co
 # Query values reach the server as text, so the string `"5"` reads as the integer a valid case would send.
 @pytest.mark.parametrize(("value", "is_violation"), [("5", True), ("abc", False)])
 def test_negative_container_is_judged_after_serialization(ctx, case_factory, value, is_violation):
-    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", QUERY_OPERATION)
     meta = _meta(ParameterLocation.QUERY, mode=GenerationMode.NEGATIVE)
     meta.raw_containers[ParameterLocation.QUERY] = {"limit": value}
     case = case_factory(operation=operation, query={"limit": value}, _meta=meta)
@@ -210,7 +198,7 @@ def test_negative_container_is_judged_after_serialization(ctx, case_factory, val
 
 
 def test_positive_container_survives_serialization(ctx, case_factory):
-    operation = ctx.openapi.load_schema(QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", QUERY_OPERATION)
     meta = _meta(ParameterLocation.QUERY)
     meta.raw_containers[ParameterLocation.QUERY] = {"limit": 5}
     case = case_factory(operation=operation, query={"limit": 5}, _meta=meta)
@@ -219,26 +207,22 @@ def test_positive_container_survives_serialization(ctx, case_factory):
 
 
 ARRAY_QUERY_OPERATION = {
-    "/data": {
-        "get": {
-            "parameters": [
-                {
-                    "name": "ids",
-                    "in": "query",
-                    "required": True,
-                    "explode": False,
-                    "schema": {"type": "array", "items": {"type": "integer"}},
-                }
-            ],
-            "responses": {"200": {"description": "OK"}},
+    "parameters": [
+        {
+            "name": "ids",
+            "in": "query",
+            "required": True,
+            "explode": False,
+            "schema": {"type": "array", "items": {"type": "integer"}},
         }
-    }
+    ],
+    "responses": {"200": {"description": "OK"}},
 }
 
 
 # A non-exploded array is sent comma-joined, a spelling the scalar reader does not undo.
 def test_serialized_array_is_not_read_as_text(ctx, case_factory):
-    operation = ctx.openapi.load_schema(ARRAY_QUERY_OPERATION)["/data"]["GET"]
+    operation = ctx.openapi.load_operation("GET /data", ARRAY_QUERY_OPERATION)
     meta = _meta(ParameterLocation.QUERY)
     meta.raw_containers[ParameterLocation.QUERY] = {"ids": [1, 2]}
     case = case_factory(operation=operation, query={"ids": "1,2"}, _meta=meta)
@@ -248,8 +232,9 @@ def test_serialized_array_is_not_read_as_text(ctx, case_factory):
 
 def _operation(ctx, parameter):
     path = "/data/{x}" if parameter["in"] == "path" else "/data"
-    paths = {path: {"get": {"parameters": [{"name": "x", **parameter}], "responses": {"200": {"description": "OK"}}}}}
-    return ctx.openapi.load_schema(paths)[path]["GET"]
+    return ctx.openapi.load_operation(
+        f"GET {path}", {"parameters": [{"name": "x", **parameter}], "responses": {"200": {"description": "OK"}}}
+    )
 
 
 @pytest.mark.parametrize(

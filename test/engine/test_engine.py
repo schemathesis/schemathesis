@@ -1948,11 +1948,11 @@ def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runne
 
     @schemathesis.check
     def slow_check(ctx, response, case):
-        time.sleep(6.6 if response.status_code == 500 else 6.2)
+        time.sleep(2.6 if response.status_code == 500 else 2.2)
         assert response.status_code < 500
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    stream = execute(schema, checks=(slow_check,), max_time=6, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
+    stream = execute(schema, checks=(slow_check,), max_time=2, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
 
     assert {(event.label, event.status) for event in stream.find_all(events.ScenarioFinished)} == {
         ("GET /first", Status.SUCCESS),
@@ -2013,7 +2013,7 @@ def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
     # Ctrl-C and a spent budget both stop the run; only the budget is a planned finish.
     @schemathesis.check
     def interrupt_after_the_deadline(ctx, response, case):
-        time.sleep(3.2)
+        time.sleep(1.2)
         raise KeyboardInterrupt
 
     api = ctx.openapi.apps.success()
@@ -2021,7 +2021,7 @@ def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
     stream = execute(
         schema,
         checks=[interrupt_after_the_deadline],
-        max_time=3,
+        max_time=1,
         max_examples=5,
         phases=[PhaseName.FUZZING],
     )
@@ -2069,7 +2069,7 @@ def test_max_time_reserves_for_stateful_when_links_are_only_inferred(ctx, app_ru
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     stream = execute(
         schema,
-        max_time=6,
+        max_time=3,
         max_examples=100_000,
         modes=[GenerationMode.POSITIVE],
         phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
@@ -2352,9 +2352,10 @@ def test_planted_bug_behind_a_value_only_the_listing_carries(ctx, factory):
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(
         schema,
-        max_time=10,
-        # More examples than fit in the time limit, so the clock ends the run.
+        max_time=6,
+        # More examples than fit in the time limit, so only the planted failure or the clock ends the run.
         max_examples=100_000,
+        max_failures=1,
         checks=(not_a_server_error,),
         phases=[PhaseName.FUZZING],
     )

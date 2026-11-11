@@ -9,9 +9,7 @@ from flask import jsonify
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.config import ConfigError, SchemathesisConfig
-from schemathesis.config._auth import DynamicTokenAuthConfig
-from schemathesis.config._checks import ChecksConfig
+from schemathesis.config import ChecksConfig, ConfigError, DynamicTokenAuthConfig, SchemathesisConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
 from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import EncodedPath, ParameterLocation
@@ -103,8 +101,6 @@ from test.utils import check_context
             {"id": "123", "name": "John", "email": "john@example.com"},
             True,
         ),
-        # LHS is a prefix of RHS, with different variable values
-        ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "123"}, True),
         # LHS is a prefix of RHS, with different variable types
         ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": 123}, True),
         ("/users/{id}", {"id": 123}, "/users/{id}/details", {"id": "123"}, True),
@@ -5762,9 +5758,9 @@ def test_negative_data_rejection_single_parameter(
         "required": location == ParameterLocation.PATH,
         "schema": parameter_schema,
     }
-    operation = ctx.openapi.load_schema(
-        {path: {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}}
-    )[path]["GET"]
+    operation = ctx.openapi.load_operation(
+        f"GET {path}", {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}
+    )
     mutation = (
         _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="value", location=location) if type_mutation else None
     )

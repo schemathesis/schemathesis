@@ -7,7 +7,6 @@ from schemathesis.core.error_feedback import (
     EnumPayload,
     FormatPayload,
     NumericBoundPayload,
-    Observation,
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
@@ -15,7 +14,7 @@ from schemathesis.core.error_feedback import (
 )
 from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
 from schemathesis.core.parameters import ParameterLocation
-from test.core.error_feedback.parsers.helpers import parse_observations
+from test.core.error_feedback.parsers.helpers import observation_signatures, parse_observations
 
 _SYMFONY_NOT_BLANK_CODE = "c1051bb4-d103-4f74-8988-acbcafc7fdc3"
 
@@ -291,10 +290,6 @@ def test_symfony_parser_can_parse_rejects_non_symfony_bodies(body):
     assert SymfonyParser().can_parse(body=body) is False
 
 
-def _symfony_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
-    return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
-
-
 @pytest.mark.parametrize(
     ("body", "expected"),
     [
@@ -487,7 +482,7 @@ def test_symfony_parser_default_multi_field(make_operation, case_factory):
     observations = SymfonyParser().parse(
         operation=make_operation(), body=_SYMFONY_DEFAULT_MULTI_FIELD, case=case_factory()
     )
-    assert _symfony_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),
@@ -503,7 +498,7 @@ def test_symfony_parser_default_multi_field(make_operation, case_factory):
 
 def test_symfony_parser_api_platform_multi_field(make_operation, case_factory):
     observations = parse_observations(SymfonyParser(), _SYMFONY_API_MULTI_FIELD, make_operation, case_factory)
-    assert _symfony_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=3, max=None)),
