@@ -591,12 +591,7 @@ def snapshot_cli(request, snapshot):
                 return f"{base_name}.{suffix}"
             return base_name
 
-    class SnapshotAssertion(snapshot.__class__):
-        def rebuild(self):
-            return self.use_extension(extension_class=CliSnapshotExtension)
-
-    snapshot.__class__ = SnapshotAssertion
-    return snapshot.rebuild()
+    return snapshot.use_extension(extension_class=CliSnapshotExtension)
 
 
 @pytest.fixture

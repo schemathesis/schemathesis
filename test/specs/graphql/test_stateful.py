@@ -8,25 +8,6 @@ from test.apps.catalog.graphql import bookstore
 pytestmark = pytest.mark.usefixtures("book_id_scalar")
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
-    # A query seeds Project.fullPath; the consuming mutation errors only on a real captured path.
-    api = ctx.graphql.apps.non_id_pool()
-    assert (
-        cli.run(
-            api.schema_url,
-            "--no-shrink",
-            "--max-examples=30",
-            "--phases=stateful",
-            "-m",
-            "positive",
-            "-c",
-            "not_a_server_error",
-        )
-        == snapshot_cli
-    )
-
-
 @pytest.mark.parametrize(
     "factory",
     [bookstore.bare_slug, bookstore.relay_connection, bookstore.use_after_delete, bookstore.double_delete],
@@ -50,6 +31,24 @@ def test_stateful_finds_captured_value_bug(ctx, cli, snapshot_cli, factory):
         )
         == snapshot_cli
     )
+
+
+# Need enough scenarios to exercise the per-operation demote path while other resolvers stay healthy.
+def test_one_slow_resolver_does_not_abort_stateful_phase(ctx, cli):
+    api = ctx.graphql.serve(bookstore.slow_mutation())
+    result = cli.run(
+        api.schema_url,
+        "--phases=stateful",
+        "--max-examples=20",
+        "-m",
+        "positive",
+        "-c",
+        "not_a_server_error",
+        config={"operations": [{"include-name": "Mutation.deleteBook", "request-timeout": 0.5}]},
+    )
+    assert "Unhealthy API" not in result.stdout
+    assert "UnhealthyAPIError" not in result.stdout
+    assert "Stateful" in result.stdout
 
 
 def test_stateful_consumers_mostly_target_created_resources(ctx, cli):

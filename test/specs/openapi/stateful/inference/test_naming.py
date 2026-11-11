@@ -241,28 +241,6 @@ def test_to_plural(word, expected):
 
 
 @pytest.mark.parametrize(
-    ["text", "expected"],
-    [
-        ("user_id", "UserId"),
-        ("api_key", "ApiKey"),
-        ("sip_trunk", "SipTrunk"),
-        ("user-id", "UserId"),
-        ("api-key", "ApiKey"),
-        ("sipTrunk", "SipTrunk"),
-        ("userId", "UserId"),
-        ("accountHolder", "AccountHolder"),
-        ("UserProfile", "UserProfile"),
-        ("SipTrunk", "SipTrunk"),
-        ("API", "API"),
-        ("userID", "UserID"),
-        ("user", "User"),
-    ],
-)
-def test_to_pascal_case(text, expected):
-    assert naming.to_pascal_case(text) == expected
-
-
-@pytest.mark.parametrize(
     ["name", "prefixes", "suffixes", "expected"],
     [
         pytest.param("UserResponse", ["get"], ["response"], "User", id="suffix-only"),

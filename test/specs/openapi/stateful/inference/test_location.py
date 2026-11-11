@@ -242,6 +242,52 @@ def _link_by(key: str, value: str, **parameters):
             "/path~with~tildes/123",
             [link_by_ref("#/paths/~1path~0with~0tildes~1{id}/get", id="/path\\~with\\~tildes/([^/?#]+)")],
         ),
+        # Same path with multiple methods - ALL should be included
+        (
+            {
+                "/users/{userId}": {
+                    "get": {"operationId": "getUserById"},
+                    "put": {"operationId": "updateUser"},
+                    "delete": {"operationId": "deleteUser"},
+                    "patch": {"operationId": "patchUser"},
+                }
+            },
+            "/users/123",
+            [
+                link_by_id("getUserById", userId="/users/([^/?#]+)"),
+                link_by_id("updateUser", userId="/users/([^/?#]+)"),
+                link_by_id("deleteUser", userId="/users/([^/?#]+)"),
+                link_by_id("patchUser", userId="/users/([^/?#]+)"),
+            ],
+        ),
+        # Prefix matching should find ALL methods on matching paths
+        (
+            {
+                "/users/{userId}": {
+                    "get": {"operationId": "getUser"},
+                    "put": {"operationId": "updateUser"},
+                },
+                "/users/{userId}/posts": {
+                    "get": {"operationId": "getUserPosts"},
+                    "post": {"operationId": "createUserPost"},
+                },
+                "/users/{userId}/posts/{postId}": {
+                    "get": {"operationId": "getUserPost"},
+                    "put": {"operationId": "updateUserPost"},
+                    "delete": {"operationId": "deleteUserPost"},
+                },
+            },
+            "/users/123",
+            [
+                link_by_id("getUser", userId="/users/([^/?#]+)"),
+                link_by_id("updateUser", userId="/users/([^/?#]+)"),
+                link_by_id("getUserPosts", userId="/users/([^/?#]+)"),
+                link_by_id("createUserPost", userId="/users/([^/?#]+)"),
+                link_by_id("getUserPost", userId="/users/([^/?#]+)"),
+                link_by_id("updateUserPost", userId="/users/([^/?#]+)"),
+                link_by_id("deleteUserPost", userId="/users/([^/?#]+)"),
+            ],
+        ),
     ],
 )
 def test_build_location_link(ctx, paths, location, expected, response_factory):
@@ -464,67 +510,6 @@ def test_inferred_link_extracts_path_parameters(ctx, response_factory, base_url,
     response = Response.from_requests(response_factory.requests(headers={"Location": location}), True)
     output = StepOutput(response=response, case=None)
     assert {name: expressions.evaluate(expr, output) for name, expr in link["parameters"].items()} == expected
-
-
-@pytest.mark.parametrize(
-    ["paths", "location", "expected"],
-    [
-        # Same path with multiple methods - ALL should be included
-        (
-            {
-                "/users/{userId}": {
-                    "get": {"operationId": "getUserById"},
-                    "put": {"operationId": "updateUser"},
-                    "delete": {"operationId": "deleteUser"},
-                    "patch": {"operationId": "patchUser"},
-                }
-            },
-            "/users/123",
-            [
-                link_by_id("getUserById", userId="/users/([^/?#]+)"),
-                link_by_id("updateUser", userId="/users/([^/?#]+)"),
-                link_by_id("deleteUser", userId="/users/([^/?#]+)"),
-                link_by_id("patchUser", userId="/users/([^/?#]+)"),
-            ],
-        ),
-        # Prefix matching should find ALL methods on matching paths
-        (
-            {
-                "/users/{userId}": {
-                    "get": {"operationId": "getUser"},
-                    "put": {"operationId": "updateUser"},
-                },
-                "/users/{userId}/posts": {
-                    "get": {"operationId": "getUserPosts"},
-                    "post": {"operationId": "createUserPost"},
-                },
-                "/users/{userId}/posts/{postId}": {
-                    "get": {"operationId": "getUserPost"},
-                    "put": {"operationId": "updateUserPost"},
-                    "delete": {"operationId": "deleteUserPost"},
-                },
-            },
-            "/users/123",
-            [
-                link_by_id("getUser", userId="/users/([^/?#]+)"),
-                link_by_id("updateUser", userId="/users/([^/?#]+)"),
-                link_by_id("getUserPosts", userId="/users/([^/?#]+)"),
-                link_by_id("createUserPost", userId="/users/([^/?#]+)"),
-                link_by_id("getUserPost", userId="/users/([^/?#]+)"),
-                link_by_id("updateUserPost", userId="/users/([^/?#]+)"),
-                link_by_id("deleteUserPost", userId="/users/([^/?#]+)"),
-            ],
-        ),
-    ],
-)
-def test_build_links_all_methods(ctx, paths, location, expected, response_factory):
-    schema = ctx.openapi.load_schema(paths, version="3.1.0")
-    inferencer = LinkInferencer.from_schema(schema)
-    results = build_links(inferencer, location)
-    assert results == expected
-
-    if results:
-        assert_links_work(response_factory, location, results, schema)
 
 
 def test_build_links_no_paths_in_schema(ctx):

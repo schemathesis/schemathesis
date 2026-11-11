@@ -1004,43 +1004,42 @@ def test_serialize_possessive(pattern, expected):
     assert _serialize(list(sre_parse.parse(pattern))) == expected
 
 
-@pytest.mark.parametrize("char", list(string.printable))
-def test_serialize_printable_char(char):
-    parsed = sre_parse.parse(re.escape(char))
-    serialized = _serialize(list(parsed))
-    assert re.compile(serialized).fullmatch(char)
-
-
 @pytest.mark.parametrize(
-    ("char", "name"),
+    "char",
     [
-        ("\x00", "null"),
-        ("\x01", "SOH"),
-        ("\x07", "BEL"),
-        ("\x08", "BS"),
-        ("\x1b", "ESC"),
-        ("\x7f", "DEL"),
-        ("\x80", "0x80"),
-        ("\xff", "0xff"),
+        *string.printable,
+        "\x00",
+        "\x01",
+        "\x07",
+        "\x08",
+        "\x1b",
+        "\x7f",
+        "\x80",
+        "\xff",
+        "\u00e9",
+        "\u00f1",
+        "\u0100",
+        "\u4e2d",
+        "\U0001f600",
+    ],
+    ids=[
+        *string.printable,
+        "null",
+        "SOH",
+        "BEL",
+        "BS",
+        "ESC",
+        "DEL",
+        "0x80",
+        "0xff",
+        "e-acute",
+        "n-tilde",
+        "A-macron",
+        "CJK",
+        "emoji",
     ],
 )
-def test_serialize_control_char(char, name):
-    parsed = sre_parse.parse(re.escape(char))
-    serialized = _serialize(list(parsed))
-    assert re.compile(serialized).fullmatch(char)
-
-
-@pytest.mark.parametrize(
-    ("char", "name"),
-    [
-        ("\u00e9", "e-acute"),
-        ("\u00f1", "n-tilde"),
-        ("\u0100", "A-macron"),
-        ("\u4e2d", "CJK"),
-        ("\U0001f600", "emoji"),
-    ],
-)
-def test_serialize_unicode_char(char, name):
+def test_serialize_char(char):
     parsed = sre_parse.parse(re.escape(char))
     serialized = _serialize(list(parsed))
     assert re.compile(serialized).fullmatch(char)

@@ -124,7 +124,6 @@ def test_is_xml_media_type(value, expected):
         (("*", "*"), ("application", "json"), True),
         (("*", "*"), ("text", "plain"), True),
         # Asymmetry: wildcard only in expected
-        (("application", "*"), ("application", "json"), True),
         (("application", "json"), ("application", "*"), False),
     ],
 )

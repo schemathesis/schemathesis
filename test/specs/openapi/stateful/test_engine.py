@@ -25,6 +25,7 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     use_after_free,
 )
+from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from test.apps.catalog.openapi.modifiers.stateful import (
     BearerAuth,
     CircularLinks,
@@ -825,6 +826,26 @@ def test_explicit_hypothesis_default_max_steps(ctx):
     )
 
     assert [len(event.recorder.cases) for event in engine if isinstance(event, events.ScenarioFinished)][-1] == 50
+
+
+def test_stateful_harvest_flows_into_pool(ctx):
+    api = ctx.openapi.apps.stateful_users()
+    config = schemathesis.Config()
+    config.projects.override.phases.stateful.inference.algorithms = []
+    config.projects.override.generation.update(
+        modes=[GenerationMode.POSITIVE],
+        unique_inputs=False,
+        max_examples=10,
+        database="none",
+    )
+    schema = schemathesis.openapi.from_url(api.schema_url, config=config)
+    engine_context = EngineContext(schema=schema, stop_event=threading.Event())
+    list(stateful.execute(engine=engine_context, phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)))
+    extra_data_source = engine_context.extra_data_source
+    assert isinstance(extra_data_source, OpenApiExtraDataSource)
+    assert list(extra_data_source.repository.iter_instances("User")), (
+        "stateful 2xx bodies were not ingested into the pool at the suite boundary"
+    )
 
 
 def test_ignored_auth_valid(engine_factory):

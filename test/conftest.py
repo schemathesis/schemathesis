@@ -79,17 +79,7 @@ def hypothesis_max_examples():
 
 
 @pytest.fixture
-def restore_hypothesis_profile():
-    # Tests that register or load profiles must leave the suite's one active.
-    active = settings.get_current_profile_name()
-    original = settings.get_profile("default")
-    yield
-    settings.register_profile("default", original)
-    settings.load_profile(active)
-
-
-@pytest.fixture
-def hypothesis_ci_profile(restore_hypothesis_profile):
+def hypothesis_ci_profile():
     # The same profile Hypothesis loads on import when the `CI` environment variable is set.
     settings.load_profile("ci")
 

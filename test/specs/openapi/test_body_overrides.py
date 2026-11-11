@@ -9,14 +9,8 @@ from schemathesis.generation.hypothesis.examples import generate_many
 from test.utils import run_given
 
 
-def _load_schema(ctx, config: dict, paths: dict, *, version: str = "3.0.2"):
-    schema = ctx.openapi.load_schema(paths, version=version)
-    parent_config = SchemathesisConfig.from_dict(config)
-    schema.config._parent = parent_config
-    schema.config.generation = parent_config.projects.default.generation
-    schema.config.parameters = parent_config.projects.default.parameters
-    schema.config.operations = parent_config.projects.default.operations
-    return schema
+def _load_schema(ctx, config: dict, paths: dict):
+    return ctx.openapi.load_schema(paths, config=SchemathesisConfig.from_dict(config))
 
 
 def _path_with_body(body_schema: dict, *, required: bool = True) -> dict:

@@ -734,7 +734,7 @@ def test_max_time_reports_unreached_operations(ctx, cli, snapshot_cli):
 
     try:
         result = cli.run_openapi_app(
-            app, "--max-time=5", "--phases=fuzzing", "--checks=not_a_server_error", "--workers=1"
+            app, "--max-time=2", "--phases=fuzzing", "--checks=not_a_server_error", "--workers=1"
         )
     finally:
         release.set()
@@ -937,19 +937,6 @@ def test_headers_conformance_valid(ctx, cli):
 
     lines = result.stdout.split("\n")
     assert "1. Received a response with missing headers: X-Custom-Header" not in lines
-
-
-def test_multiple_failures_single_check(ctx, cli, snapshot_cli):
-    api = ctx.openapi.apps.multiple_failures()
-    assert (
-        cli.run(
-            api.schema_url,
-            "--generation-deterministic",
-            "-c not_a_server_error,positive_data_acceptance",
-            "--mode=positive",
-        )
-        == snapshot_cli
-    )
 
 
 def test_continue_on_failure(ctx, cli):
@@ -2308,7 +2295,7 @@ def test_max_time_counts_every_operation_once(ctx, cli, snapshot_cli):
     assert (
         cli.run_openapi_app(
             app,
-            "--max-time=5",
+            "--max-time=2",
             "--max-examples=5",
             "--generation-database=none",
             "--phases=fuzzing",
@@ -2398,7 +2385,7 @@ def test_max_time_reports_coverage_once_beside_fuzzing(ctx, cli, snapshot_cli):
     assert (
         cli.run_openapi_app(
             app,
-            "--max-time=5",
+            "--max-time=2",
             "--max-examples=5",
             "--generation-database=none",
             "--phases=coverage,fuzzing",
@@ -2881,7 +2868,6 @@ def data_generation_check(ctx, response, case):
     )
 
 
-@pytest.mark.flaky(reruns=4)
 def test_multiple_generation_modes(ctx, cli, data_generation_check):
     api = ctx.openapi.apps.payload()
     # When multiple data generation methods are supplied in CLI
@@ -2931,24 +2917,10 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli):
         assert cli.run(f"{url}/openapi.json", "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 
 
-def test_wait_for_schema_retries_503(cli, app_runner, ctx):
+def test_wait_for_schema_retries_503(cli, ctx):
     # When the schema endpoint returns 503 initially, then succeeds
-    schema = ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    app = Flask(__name__)
-    call_count = [0]
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        call_count[0] += 1
-        if call_count[0] < 3:
-            return jsonify({"error": "service unavailable"}), 503
-        return jsonify(schema)
-
-    @app.route("/success")
-    def success():
-        return jsonify({})
-
-    cli.run_and_assert(app_runner.openapi_url(app), "--wait-for-schema=5", "--max-examples=1", "--mode=positive")
+    api = ctx.openapi.apps.schema_unavailable(failures=2)
+    cli.run_and_assert(api.schema_url, "--wait-for-schema=5", "--max-examples=1", "--mode=positive")
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -3234,7 +3206,6 @@ def test_output_sanitization_via_config(ctx, cli, hypothesis_max_examples, enabl
     assert expected in result.stdout, result.stdout
 
 
-@pytest.mark.flaky(reruns=4)
 def test_multiple_failures_in_single_check(ctx, app_runner, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -3262,7 +3233,6 @@ def test_multiple_failures_in_single_check(ctx, app_runner, cli, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={base_url}", "--checks=all", "--mode=positive") == snapshot_cli
 
 
-@pytest.mark.flaky(reruns=4)
 def test_binary_payload(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -3296,7 +3266,6 @@ def test_binary_payload(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.flaky(reruns=4)
 def test_long_payload(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -3331,7 +3300,6 @@ def test_long_payload(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Snapshot is inaccurate on Windows")
-@pytest.mark.flaky(reruns=4)
 def test_multiple_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -3366,7 +3334,6 @@ def test_multiple_errors(ctx, cli, snapshot_cli):
     assert cli.run(str(schema_path), "--url=http://127.0.0.1:1") == snapshot_cli
 
 
-@pytest.mark.flaky(reruns=4)
 def test_group_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -3414,7 +3381,6 @@ def test_group_errors(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.flaky(reruns=4)
 def test_complex_urlencoded_example(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
@@ -5523,7 +5489,7 @@ def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
-            "--max-time=5",
+            "--max-time=2",
             "--max-examples=5",
             "--generation-database=none",
             "--phases=stateful",

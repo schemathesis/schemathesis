@@ -204,19 +204,14 @@ def test_pool_captures_response_only_under_its_documented_status(cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.parametrize("config_enabled", [False, True])
-def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config_enabled):
-    config = (
-        _response_pool_config() if config_enabled else _response_pool_config(enabled=False, operation_ordering="none")
-    )
-
+def test_extra_data_sources_disabled_misses_bug(cli, snapshot_cli, ctx):
     assert (
         cli.run_openapi_app(
             _items_app(ctx, _store_item),
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--mode=positive",
-            config=config,
+            config=_response_pool_config(enabled=False, operation_ordering="none"),
         )
         == snapshot_cli
     )

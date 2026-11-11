@@ -1,13 +1,21 @@
 import subprocess
 import sys
 import threading
+from contextlib import asynccontextmanager
+from typing import Annotated
 
 import anyio
 import pytest
 import requests
+from fastapi import Cookie, FastAPI, Header, Request
+from fastapi.responses import PlainTextResponse
+from hypothesis import Phase
+from pydantic import BaseModel
 
+import schemathesis
 from schemathesis.core.errors import get_request_error_message
 from schemathesis.python.asgi import ASGIClient, shutdown_lifespans
+from test.utils import run_given
 
 
 async def echo_scope_app(scope, receive, send):
@@ -431,3 +439,220 @@ def test_slow_application_times_out():
     with pytest.raises(requests.exceptions.ReadTimeout) as info:
         ASGIClient(app).get("/slow", timeout=0.25)
     assert get_request_error_message(info.value) == "Read timed out after 0.25 seconds"
+
+
+@pytest.mark.hypothesis_nested
+def test_cookies(ctx):
+    app = FastAPI()
+
+    @app.get("/cookies")
+    def cookies(token: str = Cookie(None)):
+        return {"token": token}
+
+    operation = ctx.openapi.load_operation(
+        "GET /cookies",
+        {
+            "parameters": [
+                {
+                    "name": "token",
+                    "in": "cookie",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["test"]},
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    strategy = operation.as_strategy()
+
+    @run_given(case=strategy, max_examples=3)
+    def test(case):
+        response = case.call(app=app)
+        assert response.status_code == 200
+        assert response.json() == {"token": "test"}
+
+
+@pytest.mark.hypothesis_nested
+def test_null_byte():
+    app = FastAPI()
+
+    class Payload(BaseModel):
+        name: str
+
+    @app.post("/data")
+    def post_create(payload: Payload):
+        payload = payload.model_dump()
+        assert "\x00" not in payload["name"]
+        return {"success": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
+    schema.config.generation.update(allow_x00=False)
+
+    strategy = schema["/data"]["POST"].as_strategy()
+
+    @run_given(case=strategy, max_examples=50, phases=[Phase.generate])
+    def test(case):
+        response = case.call()
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
+
+
+@pytest.mark.hypothesis_nested
+def test_null_byte_in_headers():
+    app = FastAPI()
+
+    @app.post("/data")
+    def operation(x_header: Annotated[str, Header()], x_cookie: Annotated[str, Cookie()]):
+        assert "\x00" not in x_header
+        assert "\x00" not in x_cookie
+        return {"success": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
+    schema.config.generation.update(allow_x00=False)
+
+    strategy = schema["/data"]["POST"].as_strategy()
+
+    @run_given(case=strategy, max_examples=50, phases=[Phase.generate])
+    def test(case):
+        response = case.call()
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
+
+
+def test_base_url(ctx):
+    # See GH-1366
+    # When base URL has non-empty base path
+    operation = ctx.openapi.load_operation(
+        "GET /foo",
+        {"responses": {"200": {"description": "OK"}}},
+        version="3.0.3",
+        servers=[{"url": "https://example.org/v1"}],
+    )
+
+    # And is used for an ASGI app
+    app = FastAPI()
+
+    @app.get("/v1/foo")
+    def read_root():
+        return {"Hello": "World"}
+
+    strategy = operation.as_strategy()
+
+    @run_given(case=strategy, max_examples=1)
+    def test(case):
+        response = case.call(app=app)
+        # Then the base path should be respected and calls should not lead to 404
+        assert response.status_code == 200
+
+
+def test_schema_and_generated_requests_share_one_host():
+    # A `Host`-validating app must not have to allow one host for loading and another for the run.
+    app = FastAPI()
+    seen = []
+
+    @app.middleware("http")
+    async def record_host(request, call_next):
+        seen.append(request.headers["host"])
+        return await call_next(request)
+
+    @app.get("/ping")
+    async def ping():
+        return {"ok": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+    @run_given(case=schema["/ping"]["GET"].as_strategy(), max_examples=1, phases=[Phase.generate])
+    def test(case):
+        assert case.call().status_code == 200
+
+    assert seen == ["testserver", "testserver"]
+
+
+def test_head_operation():
+    app = FastAPI()
+
+    @app.head("/ping")
+    async def ping():
+        return PlainTextResponse("pong")
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+    @run_given(case=schema["/ping"]["HEAD"].as_strategy(), max_examples=1)
+    def test(case):
+        response = case.call()
+        assert response.status_code == 200
+        assert response.content == b""
+
+
+def test_application_rejecting_weak_references():
+    # Hand-written ASGI apps may use `__slots__`, which makes them unusable as weak-reference targets.
+    class Application:
+        __slots__ = ()
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] == "lifespan":
+                while True:
+                    message = await receive()
+                    if message["type"] == "lifespan.startup":
+                        await send({"type": "lifespan.startup.complete"})
+                    elif message["type"] == "lifespan.shutdown":
+                        await send({"type": "lifespan.shutdown.complete"})
+                        return
+            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"text/plain")]})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+    with ASGIClient(Application()) as client:
+        assert client.get("http://testserver/health").text == "ok"
+
+
+@pytest.mark.hypothesis_nested
+def test_lifespan_state():
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        yield {"db": "connected"}
+
+    app = FastAPI(lifespan=lifespan)
+
+    @app.get("/state/{name}")
+    async def read_state(request: Request, name: str):
+        return {"db": request.state.db}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+    @run_given(case=schema["/state/{name}"]["GET"].as_strategy(), max_examples=2, phases=[Phase.generate])
+    def test(case):
+        assert case.call().json() == {"db": "connected"}
+
+
+@pytest.mark.hypothesis_nested
+def test_caller_supplied_session_is_used():
+    app = FastAPI()
+
+    @app.get("/echo")
+    async def echo(x_custom: Annotated[str, Header()] = "MISSING"):
+        return {"header": x_custom}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    client = ASGIClient(app)
+    client.headers["x-custom"] = "from-session"
+
+    @run_given(case=schema["/echo"]["GET"].as_strategy(), max_examples=1, phases=[Phase.generate])
+    def test(case):
+        assert case.call(session=client).json() == {"header": "from-session"}
+
+
+def test_curl_command_names_the_host_the_request_used():
+    # A reproduction naming a host the run never used cannot reproduce a `Host`-validating rejection.
+    app = FastAPI()
+
+    @app.get("/ping")
+    async def ping():
+        return {"ok": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+    @run_given(case=schema["/ping"]["GET"].as_strategy(), max_examples=1, phases=[Phase.generate])
+    def test(case):
+        response = case.call()
+        assert case.as_curl_command() == f"curl -X GET {response.request.url}"

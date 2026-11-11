@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from unittest.mock import ANY
+
 import pytest
-from flask import Flask, Response, abort, got_request_exception, jsonify
+import requests
+from flask import Flask, Response, abort, got_request_exception, jsonify, request
 from werkzeug.exceptions import HTTPException
 
+import schemathesis
+from schemathesis.core.transforms import to_wire_string
 from test.utils import run_given
 
 
@@ -72,3 +77,106 @@ def test_wsgi_returns_response_for_handled_http_exception(ctx):
     response = operation.Case().call(app=app)
 
     assert (response.status_code, response.json()) == (404, {"message": "No such user"})
+
+
+@pytest.mark.hypothesis_nested
+def test_cookies(ctx):
+    app = Flask(__name__)
+
+    @app.route("/cookies", methods=["GET"])
+    def cookies():
+        return jsonify(request.cookies)
+
+    operation = ctx.openapi.load_operation(
+        "GET /cookies",
+        {
+            "parameters": [
+                {
+                    "name": "token",
+                    "in": "cookie",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["test"]},
+                }
+            ],
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+
+    strategy = operation.as_strategy()
+
+    @run_given(case=strategy, max_examples=3)
+    def test(case):
+        response = case.call(app=app)
+        assert response.status_code == 200
+        assert response.json() == {"token": "test"}
+
+
+def sign_request(request):
+    request.headers["X-Signature"] = f"{request.method} {request.url}"
+    return request
+
+
+@pytest.mark.parametrize("base_url", [None, "http://api.example.com/v1"], ids=["default-host", "base-url"])
+def test_session_auth_reaches_the_app(ctx, base_url):
+    app = Flask(__name__)
+
+    @app.route("/v1/items", methods=["POST"])
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify(
+            {
+                "signature": request.headers.get("X-Signature"),
+                "body": request.get_json(),
+            }
+        )
+
+    operation = ctx.openapi.load_operation(
+        "POST /items",
+        {
+            "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    session = requests.Session()
+    session.auth = sign_request
+    response = operation.Case(body={"id": 1}).call(app=app, session=session, base_url=base_url)
+    url = f"{base_url or 'http://localhost'}/items"
+    assert response.json() == {"signature": f"POST {url}", "body": {"id": 1}}
+
+
+@pytest.mark.hypothesis_nested
+def test_form_data(ctx):
+    api = ctx.openapi.apps.multipart()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    strategy = schema["/api/multipart"]["POST"].as_strategy()
+
+    @run_given(case=strategy, max_examples=3)
+    def test(case):
+        response = case.call()
+        assert response.status_code == 200
+        # converted to string in the app
+        assert response.json() == {key: to_wire_string(value) for key, value in case.body.items()}
+
+
+@pytest.mark.hypothesis_nested
+def test_binary_body(ctx):
+    # When an API operation accepts a binary input
+    api = ctx.openapi.apps.upload_file()
+    operation = ctx.openapi.load_operation(
+        "POST /api/upload_file",
+        {
+            "requestBody": {
+                "content": {"application/octet-stream": {"schema": {"format": "binary", "type": "string"}}}
+            },
+            "responses": {"200": {"description": "OK"}},
+        },
+    )
+    strategy = operation.as_strategy()
+
+    @run_given(case=strategy, max_examples=3)
+    def test(case):
+        response = case.call(app=api.wsgi_app)
+        assert response.status_code == 200
+        assert response.json() == {"size": ANY}
+
+    # Then it should be sent correctly

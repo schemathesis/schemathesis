@@ -310,6 +310,13 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_opera
         ("must be less than 0", 0.0, BoundDirection.MAX, True),
         ("must be less than or equal to 0", 0.0, BoundDirection.MAX, False),
         ("MUST BE GREATER THAN 5", 5.0, BoundDirection.MIN, True),
+        ("Value shall be a positive number", 0.0, BoundDirection.MIN, True),
+        ("Value shall be a non-negative number", 0.0, BoundDirection.MIN, False),
+        ("Value shall be a non negative number", 0.0, BoundDirection.MIN, False),
+        ("Value shall be a negative number", 0.0, BoundDirection.MAX, True),
+        ("Value shall be a non-positive number", 0.0, BoundDirection.MAX, False),
+        ("must be a positive value", 0.0, BoundDirection.MIN, True),
+        ("VALUE SHALL BE A POSITIVE NUMBER", 0.0, BoundDirection.MIN, True),
     ],
     ids=[
         "min-inclusive",
@@ -321,44 +328,16 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_opera
         "negative",
         "negative-or-zero",
         "case-insensitive",
+        "keyword-positive",
+        "keyword-non-negative-hyphen",
+        "keyword-non-negative-space",
+        "keyword-negative",
+        "keyword-non-positive",
+        "keyword-must-be-positive-value",
+        "keyword-case-insensitive",
     ],
 )
 def test_spring_parser_recognizes_numeric_bound_message_variants(
-    message, expected_bound, expected_direction, expected_exclusive, make_operation, case_factory
-):
-    body = {"subErrors": [{"field": "score", "message": message}]}
-    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
-    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
-        (
-            ("score",),
-            ObservationKind.NUMERIC_BOUND,
-            NumericBoundPayload(bound=expected_bound, direction=expected_direction, exclusive=expected_exclusive),
-        ),
-    ]
-
-
-@pytest.mark.parametrize(
-    "message, expected_bound, expected_direction, expected_exclusive",
-    [
-        ("Value shall be a positive number", 0.0, BoundDirection.MIN, True),
-        ("Value shall be a non-negative number", 0.0, BoundDirection.MIN, False),
-        ("Value shall be a non negative number", 0.0, BoundDirection.MIN, False),
-        ("Value shall be a negative number", 0.0, BoundDirection.MAX, True),
-        ("Value shall be a non-positive number", 0.0, BoundDirection.MAX, False),
-        ("must be a positive value", 0.0, BoundDirection.MIN, True),
-        ("VALUE SHALL BE A POSITIVE NUMBER", 0.0, BoundDirection.MIN, True),
-    ],
-    ids=[
-        "positive",
-        "non-negative-hyphen",
-        "non-negative-space",
-        "negative",
-        "non-positive",
-        "must-be-positive-value",
-        "case-insensitive",
-    ],
-)
-def test_spring_parser_recognizes_positive_negative_keyword_variants(
     message, expected_bound, expected_direction, expected_exclusive, make_operation, case_factory
 ):
     body = {"subErrors": [{"field": "score", "message": message}]}

@@ -420,20 +420,10 @@ _PYDANTIC_V1_FIXTURES: tuple[tuple[dict, Observation], ...] = (
 
 @pytest.mark.parametrize(
     "entry, expected",
-    _PYDANTIC_FIXTURES,
-    ids=[entry["type"] for entry, _ in _PYDANTIC_FIXTURES],
+    _PYDANTIC_FIXTURES + _PYDANTIC_V1_FIXTURES,
+    ids=[entry["type"] for entry, _ in _PYDANTIC_FIXTURES + _PYDANTIC_V1_FIXTURES],
 )
-def test_pydantic_parser_extracts_v2_observation(entry, expected, make_operation, case_factory):
-    obs = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
-    assert obs == (expected,)
-
-
-@pytest.mark.parametrize(
-    "entry, expected",
-    _PYDANTIC_V1_FIXTURES,
-    ids=[entry["type"] for entry, _ in _PYDANTIC_V1_FIXTURES],
-)
-def test_pydantic_parser_extracts_v1_observation(entry, expected, make_operation, case_factory):
+def test_pydantic_parser_extracts_observation(entry, expected, make_operation, case_factory):
     obs = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
     assert obs == (expected,)
 

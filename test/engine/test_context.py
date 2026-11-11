@@ -7,7 +7,7 @@ from flask import make_response, request
 
 import schemathesis
 from schemathesis.auths import REAUTH_BREAKER_THRESHOLD, ReauthState
-from schemathesis.config._auth import DynamicTokenAuthConfig
+from schemathesis.config import DynamicTokenAuthConfig
 from schemathesis.core.result import Ok
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.health import TIGHTENED_TIMEOUT_SECONDS

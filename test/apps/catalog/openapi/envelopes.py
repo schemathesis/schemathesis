@@ -18,13 +18,9 @@ _BOUNDED_FIELDS: tuple[tuple[str, int, int], ...] = (
 
 _STATUS_DESCRIPTIONS = {400: "Bad Request", 422: "Unprocessable Entity"}
 
-_SYMFONY_LENGTH_MIN_CODE = "9ff3fdc4-b214-49db-8718-39c315e33d45"
-_SYMFONY_LENGTH_MAX_CODE = "d94b19cc-114f-4f44-9cc4-4138e80a87b9"
-
 
 class Violation(NamedTuple):
     field: str
-    value: str
     minimum: int
     maximum: int
     too_short: bool
@@ -84,7 +80,7 @@ def planted_bug(envelope: Envelope) -> OpenAPIApp:
                 value = ""
             too_short = len(value) < minimum
             if too_short or len(value) > maximum:
-                violations.append(Violation(field, value, minimum, maximum, too_short))
+                violations.append(Violation(field, minimum, maximum, too_short))
         if violations:
             return jsonify(envelope.render(violations)), envelope.status
         return "", 500
@@ -108,54 +104,6 @@ def _render_ajv(violations: list[Violation]) -> object:
     }
 
 
-def _problem_details(errors: dict[str, list[str]]) -> dict[str, object]:
-    return {
-        "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-        "title": "One or more validation errors occurred.",
-        "status": 400,
-        "errors": errors,
-    }
-
-
-def _render_aspnet(violations: list[Violation]) -> object:
-    # ProblemDetails with the DataAnnotations `minimum length of 'N'` phrasing, keyed by C# property names.
-    errors: dict[str, list[str]] = {}
-    for violation in violations:
-        name = violation.field.capitalize()
-        bound = "minimum" if violation.too_short else "maximum"
-        errors.setdefault(name, []).append(
-            f"The field {name} must be a string or array type with a {bound} length of '{violation.limit}'."
-        )
-    return _problem_details(errors)
-
-
-def _render_flask_rest(violations: list[Violation]) -> object:
-    issues = {
-        violation.field: f"'{violation.value}' is {'shorter' if violation.too_short else 'longer'} "
-        f"than {violation.limit} characters"
-        for violation in violations
-    }
-    return {"errors": issues, "message": "Input payload validation failed"}
-
-
-def _render_go_validator(violations: list[Violation]) -> object:
-    # Structured `tag` + `param` + `kind` carry the size bounds directly, keyed by Go struct field names.
-    return {
-        "errors": [
-            {
-                "field": violation.field.capitalize(),
-                "kind": "string",
-                "namespace": f"Body.{violation.field.capitalize()}",
-                "param": str(violation.limit),
-                "tag": "min" if violation.too_short else "max",
-                "type": "string",
-                "value": violation.value,
-            }
-            for violation in violations
-        ]
-    }
-
-
 def _render_laravel(violations: list[Violation]) -> object:
     errors: dict[str, list[str]] = {}
     for violation in violations:
@@ -165,25 +113,6 @@ def _render_laravel(violations: list[Violation]) -> object:
             message = f"The {violation.field} field must not be greater than {violation.limit} characters."
         errors.setdefault(violation.field, []).append(message)
     return {"message": "The given data was invalid.", "errors": errors}
-
-
-def _render_litestar(violations: list[Violation]) -> object:
-    issues = [
-        {
-            "message": f"Expected `str` of length {'>=' if violation.too_short else '<='} {violation.limit}",
-            "key": violation.field,
-            "source": "body",
-        }
-        for violation in violations
-    ]
-    return {"status_code": 400, "detail": "Validation failed for POST /users", "extra": issues}
-
-
-def _render_marshmallow(violations: list[Violation]) -> object:
-    return {
-        violation.field: [f"Length must be between {violation.minimum} and {violation.maximum}."]
-        for violation in violations
-    }
 
 
 def _rails_messages(violations: list[Violation]) -> list[tuple[str, str]]:
@@ -212,64 +141,8 @@ def _rails_legacy(messages: list[tuple[str, str]]) -> dict[str, list[str]]:
 _RAILS_NOT_AN_OBJECT = [("base", "must be a valid JSON object")]
 
 
-def _render_symfony(violations: list[Violation]) -> object:
-    # `Length` UUID codes plus `{{ limit }}` parameters carry the size bounds directly.
-    return [
-        {
-            "propertyPath": violation.field,
-            "message": f"This value is too short. It should have {violation.limit} characters or more."
-            if violation.too_short
-            else f"This value is too long. It should have {violation.limit} characters or less.",
-            "code": _SYMFONY_LENGTH_MIN_CODE if violation.too_short else _SYMFONY_LENGTH_MAX_CODE,
-            "parameters": {
-                "{{ limit }}": str(violation.limit),
-                "{{ min }}": str(violation.minimum),
-                "{{ max }}": str(violation.maximum),
-            },
-        }
-        for violation in violations
-    ]
-
-
-def _render_zod(violations: list[Violation]) -> object:
-    issues = []
-    for violation in violations:
-        if violation.too_short:
-            issue: dict[str, object] = {"code": "too_small", "minimum": violation.limit}
-            message = f"String must contain at least {violation.limit} character(s)"
-        else:
-            issue = {"code": "too_big", "maximum": violation.limit}
-            message = f"String must contain at most {violation.limit} character(s)"
-        issues.append(
-            {
-                **issue,
-                "type": "string",
-                "inclusive": True,
-                "exact": False,
-                "message": message,
-                "path": [violation.field],
-            }
-        )
-    return {"errors": issues}
-
-
 AJV = Envelope(400, {"errors": []}, _render_ajv)
-ASPNET = Envelope(400, _problem_details({}), _render_aspnet)
-FLASK_REST = Envelope(
-    400, {"errors": {"_schema": "Invalid input"}, "message": "Input payload validation failed"}, _render_flask_rest
-)
-GO_VALIDATOR = Envelope(400, {"errors": []}, _render_go_validator)
 LARAVEL = Envelope(422, {"message": "The given data was invalid.", "errors": {}}, _render_laravel)
-LITESTAR = Envelope(
-    400,
-    {
-        "status_code": 400,
-        "detail": "Validation failed for POST /users",
-        "extra": [{"message": "Expected `object`, got `null`", "key": "data", "source": "body"}],
-    },
-    _render_litestar,
-)
-MARSHMALLOW = Envelope(422, {"_schema": ["Invalid input type."]}, _render_marshmallow)
 RAILS: dict[RailsEnvelope, Envelope] = {
     "modern": Envelope(
         422,
@@ -287,5 +160,3 @@ RAILS: dict[RailsEnvelope, Envelope] = {
         lambda violations: {"errors": _rails_grouped(_rails_messages(violations))},
     ),
 }
-SYMFONY = Envelope(422, [], _render_symfony)
-ZOD = Envelope(400, {"errors": []}, _render_zod)

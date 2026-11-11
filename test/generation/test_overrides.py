@@ -3,20 +3,15 @@ from schemathesis.generation.overrides import Override, for_operation
 
 
 def test_qualified_key_wins_over_bare(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = ctx.openapi.load_operation(
+        "GET /items",
         {
-            "/items": {
-                "get": {
-                    "parameters": [{"name": "user_id", "in": "query", "schema": {"type": "integer"}}],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "parameters": [{"name": "user_id", "in": "query", "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        config=SchemathesisConfig.from_dict({"parameters": {"user_id": 1, "query.user_id": 2}}),
     )
-    parent = SchemathesisConfig.from_dict({"parameters": {"user_id": 1, "query.user_id": 2}})
-    schema.config._parent = parent
-    schema.config.parameters = parent.projects.default.parameters
-    assert for_operation(schema.config, operation=schema["/items"]["GET"]).query == {"user_id": 2}
+    assert for_operation(operation.schema.config, operation=operation).query == {"user_id": 2}
 
 
 def test_applied_headers_stay_case_insensitive(ctx):

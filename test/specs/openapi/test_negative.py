@@ -7,7 +7,7 @@ import pytest
 import requests
 from _pytest.main import ExitCode
 from flask import jsonify
-from hypothesis import HealthCheck, Phase, find, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 from jsonschema_rs import canonical
@@ -37,7 +37,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     remove_required_property,
 )
 from schemathesis.specs.openapi.negative.utils import can_negate
-from test.utils import assert_requests_call, run_given
+from test.utils import assert_requests_call, find_first, run_given
 
 MAX_EXAMPLES = 15
 SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
@@ -665,11 +665,11 @@ def test_allow_empty_value_is_not_generated_as_negative(ctx, parameter_schema):
     )
 
     with pytest.raises(NoSuchExample):
-        find(
+        find_first(
             schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE),
             lambda case: case.query == {"filter": ""},
             # The excluded value is rare, so a small budget would pass without looking.
-            settings=settings(max_examples=100, deadline=None),
+            max_examples=100,
         )
 
 
@@ -1886,11 +1886,10 @@ def test_omitting_required_header_next_to_explicit_one_is_negative(ctx):
     operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE, headers={"X-Tenant": "t"})
 
-    find(
+    find_first(
         strategy,
         lambda case: "X-Token" not in case.headers and isinstance(case.body, dict) and "kind" in case.body,
-        # Ceiling for a search that stops at the first match.
-        settings=settings(max_examples=100, database=None, suppress_health_check=list(HealthCheck)),
+        max_examples=100,
     )
 
 

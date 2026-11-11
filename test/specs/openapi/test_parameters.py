@@ -5,7 +5,7 @@ import re
 import jsonschema_rs
 import pytest
 from flask import Flask, jsonify, request
-from hypothesis import HealthCheck, assume, find, given, settings
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 
 import schemathesis
@@ -18,7 +18,7 @@ from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
 from test.apps.catalog.openapi import basic
-from test.utils import assert_requests_call, run_given
+from test.utils import assert_requests_call, find_first, run_given
 
 
 def _parameter(version, name, location, type_):
@@ -302,7 +302,7 @@ def test_bearer_auth_valid_header():
     # And no invalid headers should be generated
     strategy = get_default_format_strategies()["_bearer_auth"]
     with pytest.raises(NoSuchExample):
-        find(strategy, lambda x: not is_valid_header({"x": x}))
+        find_first(strategy, lambda x: not is_valid_header({"x": x}), max_examples=2000)
 
 
 def test_positive_bearer_tokens_are_ascii(ctx):
@@ -314,7 +314,7 @@ def test_positive_bearer_tokens_are_ascii(ctx):
     )
     strategy = operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
     with pytest.raises(NoSuchExample):
-        find(strategy, lambda case: not case.headers["Authorization"].isascii())
+        find_first(strategy, lambda case: not case.headers["Authorization"].isascii(), max_examples=2000)
 
 
 def test_unknown_data(ctx):
@@ -1185,8 +1185,12 @@ paths:
         received.append(sorted(request.args))
         return jsonify({})
 
-    port = app_runner.run_flask_app(app)
-    cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}", "--max-examples=1", "--checks=not_a_server_error")
+    cli.run(
+        str(schema_path),
+        f"--url={app_runner.openapi_url(app, path='')}",
+        "--max-examples=1",
+        "--checks=not_a_server_error",
+    )
 
     assert {key for keys in received for key in keys} == {"on"}
 
@@ -1218,14 +1222,14 @@ def test_non_string_property_name(ctx, location, mode):
         "additionalProperties": False,
     }
     if location == "query":
-        operation = {"parameters": [{"in": "query", "name": "key", "required": True, "schema": object_schema}]}
+        definition = {"parameters": [{"in": "query", "name": "key", "required": True, "schema": object_schema}]}
     else:
-        operation = {
+        definition = {
             "requestBody": {"required": True, "content": {"application/json": {"schema": object_schema}}},
         }
-    schema = ctx.openapi.load_schema({"/foo": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}})
+    operation = ctx.openapi.load_operation("POST /foo", {**definition, "responses": {"200": {"description": "OK"}}})
 
-    @run_given(case=schema["/foo"]["POST"].as_strategy(generation_mode=mode), max_examples=1)
+    @run_given(case=operation.as_strategy(generation_mode=mode), max_examples=1)
     def test(case):
         if mode == GenerationMode.POSITIVE:
             assert (case.query if location == "query" else case.body) == {"true": "ALPHA", "200": "BETA"}
@@ -1561,7 +1565,7 @@ def test_empty_query_values_are_generated_only_where_the_wire_keeps_them(ctx, pa
     )
     strategy = operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
     if empty:
-        find(strategy, lambda case: case.query.get("q") in ([], ""), settings=settings(max_examples=50, database=None))
+        find_first(strategy, lambda case: case.query.get("q") in ([], ""), max_examples=50)
     else:
         assert [case.query for case in generate_many(strategy, 20) if case.query.get("q") in ([], "")] == []
 

@@ -6,13 +6,13 @@ from schemathesis.core.error_feedback import (
     BoundDirection,
     FormatPayload,
     NumericBoundPayload,
-    Observation,
     ObservationKind,
     SizeBoundPayload,
     TypeMismatchPayload,
 )
 from schemathesis.core.error_feedback.parsers.laravel import LaravelParser
 from schemathesis.core.parameters import ParameterLocation
+from test.core.error_feedback.parsers.helpers import observation_signatures
 
 
 def _laravel_envelope(errors: dict) -> dict:
@@ -177,10 +177,6 @@ def test_laravel_parser_can_parse_rejects_non_laravel_bodies(body):
 )
 def test_laravel_parser_rejects_problem_details_markers_and_errors_lists(extra):
     assert LaravelParser().can_parse(body={**_LARAVEL_REQUIRED, **extra}) is False
-
-
-def _laravel_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
-    return sorted((o.parameter_path, o.kind, o.payload) for o in observations)
 
 
 @pytest.mark.parametrize(
@@ -464,7 +460,7 @@ def test_laravel_parser_parse_multi_field_drops_unactionable(make_operation, cas
         body=_LARAVEL_MULTI_FIELD,
         case=case_factory(),
     )
-    assert _laravel_signatures(observations) == sorted(
+    assert observation_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
             (("age",), ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name="integer")),

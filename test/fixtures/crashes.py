@@ -84,10 +84,7 @@ def _build_transition(*, link: Link, parent_id: str) -> Transition:
 
 
 @pytest.fixture
-def crash_factory(ctx, response_factory):
-
-    def operation_for(method: str, path: str):
-        return ctx.openapi.load_operation(f"{method.upper()} {path}", {"responses": {"200": {"description": "OK"}}})
+def crash_factory(make_operation, response_factory):
 
     def record_step(
         recorder: ScenarioRecorder,
@@ -96,7 +93,7 @@ def crash_factory(ctx, response_factory):
         parent_id: str | None,
         case_ids: list[str],
     ) -> str:
-        operation = operation_for(step.method, step.path)
+        operation = make_operation(method=step.method, path=step.path)
         case = operation.Case(
             method=step.method.upper(),
             path_parameters=step.path_parameters,

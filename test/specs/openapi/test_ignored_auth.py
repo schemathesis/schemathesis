@@ -472,6 +472,34 @@ def test_forbidden_response_counts_as_enforced_auth():
     schema["/"]["GET"].Case().call_and_validate(session=ASGIClient(app), auth=("test", "test"), checks=[ignored_auth])
 
 
+@pytest.mark.hypothesis_nested
+def test_login_redirect_counts_as_enforced_auth(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/me": {"get": {"security": [{"session": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"session": {"type": "apiKey", "in": "cookie", "name": "session"}}},
+    )
+
+    @app.route("/me", methods=["GET"])
+    def me():
+        if request.cookies.get("session") != "valid":
+            return redirect("/login")
+        return jsonify({"user": "alice"})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+    @schema.auth()
+    class Session:
+        def get(self, case, context):
+            return "valid"
+
+        def set(self, case, data, context):
+            case.cookies = {"session": data}
+
+    @run_given(case=schema["/me"]["GET"].as_strategy(), max_examples=1)
+    def test(case):
+        assert case.call_and_validate(checks=[ignored_auth]).json() == {"user": "alice"}
+
+
 def test_server_error_without_auth_is_reported():
     app = _api_with_basic_auth(missing=500, invalid=500)
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)

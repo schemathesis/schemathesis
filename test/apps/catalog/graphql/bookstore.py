@@ -528,16 +528,16 @@ def _make_coverage_inputs() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation)
 
 
-def coverage_inputs(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_coverage_inputs(), endpoint, "flask")
+def coverage_inputs() -> GraphQLApp:
+    return _wrap(_make_coverage_inputs(), "/graphql", "flask")
 
 
-def lenient(*, endpoint: str = "/graphql") -> GraphQLApp:
+def lenient() -> GraphQLApp:
     # Answers every operation with data and no errors, as a server that skips document validation would.
     schema = _make_coverage_inputs()
     app = Flask("test_app")
 
-    @app.route(endpoint, methods=["POST"])
+    @app.route("/graphql", methods=["POST"])
     def graphql_endpoint() -> object:
         query = request.json["query"]
         document = graphql.parse(query)
@@ -548,75 +548,70 @@ def lenient(*, endpoint: str = "/graphql") -> GraphQLApp:
             return jsonify(data=schema.execute_sync(query).data)
         return jsonify(data={field.name.value: None})
 
-    return GraphQLApp(server=app, kind="flask", endpoint=endpoint)
+    return GraphQLApp(server=app, kind="flask", endpoint="/graphql")
 
 
 def books(*, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask") -> GraphQLApp:
     return _wrap(_make_default(), endpoint, framework)
 
 
-def federated_subgraph(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_federated_subgraph(), endpoint, "flask")
+def federated_subgraph() -> GraphQLApp:
+    return _wrap(_make_federated_subgraph(), "/graphql", "flask")
 
 
-def from_schema(
-    schema: strawberry.Schema,
-    *,
-    endpoint: str = "/graphql",
-    framework: Literal["flask", "fastapi"] = "flask",
-) -> GraphQLApp:
-    return _wrap(schema, endpoint, framework)
+def from_schema(schema: strawberry.Schema, *, framework: Literal["flask", "fastapi"] = "flask") -> GraphQLApp:
+    return _wrap(schema, "/graphql", framework)
 
 
-def canned_response(payload: object, *, status_code: int = 200, endpoint: str = "/graphql") -> GraphQLApp:
+def canned_response(payload: object, *, status_code: int = 200) -> GraphQLApp:
     # Answers every query with `payload`, which lets a test send data no conforming server would.
     app = Flask("test_app")
 
-    @app.route(endpoint, methods=["POST"])
+    @app.route("/graphql", methods=["POST"])
     def graphql() -> tuple[str, int, dict[str, str]]:
         return json.dumps(payload), status_code, {"Content-Type": "application/json"}
 
-    return GraphQLApp(server=app, kind="flask", endpoint=endpoint)
+    return GraphQLApp(server=app, kind="flask", endpoint="/graphql")
 
 
-def use_after_create(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_use_after_create(), endpoint, "flask")
+def use_after_create() -> GraphQLApp:
+    return _wrap(_make_use_after_create(), "/graphql", "flask")
 
 
-def unknown_id_failure(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_unknown_id_failure(), endpoint, "flask")
+def unknown_id_failure() -> GraphQLApp:
+    return _wrap(_make_unknown_id_failure(), "/graphql", "flask")
 
 
-def tombstone_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_tombstone(), endpoint, "flask")
+def tombstone_pool() -> GraphQLApp:
+    return _wrap(_make_tombstone(), "/graphql", "flask")
 
 
-def use_after_delete(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_use_after_delete(), endpoint, "flask")
+def use_after_delete() -> GraphQLApp:
+    return _wrap(_make_use_after_delete(), "/graphql", "flask")
 
 
-def slow_mutation(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_slow_mutation(), endpoint, "flask")
+def slow_mutation() -> GraphQLApp:
+    return _wrap(_make_slow_mutation(), "/graphql", "flask")
 
 
-def double_delete(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_double_delete(), endpoint, "flask")
+def double_delete() -> GraphQLApp:
+    return _wrap(_make_double_delete(), "/graphql", "flask")
 
 
-def generic_id_pool(*, fixed: bool = False, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_generic_id(fixed=fixed), endpoint, "flask")
+def generic_id_pool(*, fixed: bool = False) -> GraphQLApp:
+    return _wrap(_make_generic_id(fixed=fixed), "/graphql", "flask")
 
 
-def input_object_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_input_object(), endpoint, "flask")
+def input_object_pool() -> GraphQLApp:
+    return _wrap(_make_input_object(), "/graphql", "flask")
 
 
-def list_argument_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_list_argument(), endpoint, "flask")
+def list_argument_pool() -> GraphQLApp:
+    return _wrap(_make_list_argument(), "/graphql", "flask")
 
 
-def non_id_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_non_id_pool(), endpoint, "flask")
+def non_id_pool() -> GraphQLApp:
+    return _wrap(_make_non_id_pool(), "/graphql", "flask")
 
 
 def _make_bare_slug() -> strawberry.Schema:
@@ -642,8 +637,8 @@ def _make_bare_slug() -> strawberry.Schema:
     return strawberry.Schema(Query)
 
 
-def bare_slug(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_bare_slug(), endpoint, "flask")
+def bare_slug() -> GraphQLApp:
+    return _wrap(_make_bare_slug(), "/graphql", "flask")
 
 
 def _make_relay_connection() -> strawberry.Schema:
@@ -679,5 +674,5 @@ def _make_relay_connection() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation)
 
 
-def relay_connection(*, endpoint: str = "/graphql") -> GraphQLApp:
-    return _wrap(_make_relay_connection(), endpoint, "flask")
+def relay_connection() -> GraphQLApp:
+    return _wrap(_make_relay_connection(), "/graphql", "flask")

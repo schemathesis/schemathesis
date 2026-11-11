@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from xml.etree import ElementTree
 
 import pytest
 from _pytest.main import ExitCode
@@ -52,8 +53,10 @@ def test_allure_failure_has_reproduce_attachment(ctx, cli, tmp_path):
     assert any("curl" in m.lower() for m in step_messages)
 
 
-def test_coverage_unspecified_method_in_allure(ctx, cli, tmp_path):
+def test_coverage_unspecified_method_in_reports(ctx, cli, tmp_path):
+    # See GH-3699
     allure_dir = tmp_path / "allure-results"
+    xml_path = tmp_path / "junit.xml"
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/users", methods=["GET", "DELETE", "POST", "PUT", "PATCH", "HEAD"])
@@ -65,14 +68,19 @@ def test_coverage_unspecified_method_in_allure(ctx, cli, tmp_path):
             app,
             "--phases=coverage",
             f"--report-allure-path={allure_dir}",
+            f"--report-junit-path={xml_path}",
             "--checks=unsupported_method",
         ).exit_code
         == ExitCode.TESTS_FAILED
     )
 
-    results = allure_results(allure_dir)
-    messages = [step["statusDetails"]["message"] for result in results for step in result.get("steps", [])]
-    assert any("Wrong response to undeclared method" in message for message in messages)
+    titles = [
+        step["statusDetails"]["message"].splitlines()[0]
+        for result in allure_results(allure_dir)
+        for step in result.get("steps", [])
+    ]
+    assert titles == ["- ST204 Wrong response to undeclared method"]
+    assert ElementTree.parse(xml_path).getroot().attrib["failures"] == "1"
 
 
 def test_allure_no_report_without_flag(ctx, cli, tmp_path):

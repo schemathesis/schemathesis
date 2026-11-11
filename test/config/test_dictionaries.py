@@ -117,25 +117,12 @@ def test_unreadable_dictionary_file_reports_error(tmp_path):
         ('"a\\x"', r"truncated \\x escape"),
         ('"\\xZZ"', r"invalid hex escape `\\xZZ`"),
         ('"\\q"', r"unknown escape `\\q`"),
-    ],
-    ids=["trailing-backslash", "truncated-hex", "invalid-hex", "unknown-escape"],
-)
-def test_libfuzzer_escape_errors(tmp_path, content, match):
-    (tmp_path / "bad.dict").write_text(content + "\n", encoding="utf-8")
-    (tmp_path / "schemathesis.toml").write_text('[dictionaries.x]\nfrom-file = "bad.dict"\n', encoding="utf-8")
-    with pytest.raises(ConfigError, match=match):
-        SchemathesisConfig.from_path(tmp_path / "schemathesis.toml")
-
-
-@pytest.mark.parametrize(
-    "content,match",
-    [
         ('="value"', "invalid entry name ``"),
         ('foo+bar="x"', "invalid entry name `foo\\+bar`"),
     ],
-    ids=["empty-prefix", "non-alphanumeric"],
+    ids=["trailing-backslash", "truncated-hex", "invalid-hex", "unknown-escape", "empty-prefix", "non-alphanumeric"],
 )
-def test_libfuzzer_invalid_entry_name(tmp_path, content, match):
+def test_libfuzzer_parse_errors(tmp_path, content, match):
     (tmp_path / "bad.dict").write_text(content + "\n", encoding="utf-8")
     (tmp_path / "schemathesis.toml").write_text('[dictionaries.x]\nfrom-file = "bad.dict"\n', encoding="utf-8")
     with pytest.raises(ConfigError, match=match):
