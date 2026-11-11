@@ -23,6 +23,7 @@
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
 - Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
+- False negatives and positives in `negative_data_rejection` for non-body parameters behind `$ref` or `allOf`.
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
 - `FileNotFoundError` in pytest VCR, HAR and JUnit reports when their directory does not exist.

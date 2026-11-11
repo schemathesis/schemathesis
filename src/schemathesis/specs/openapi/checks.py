@@ -335,11 +335,11 @@ def _declared_parameters_are_valid(case: Case, location: ParameterLocation) -> b
     assert isinstance(value, Mapping)
     container = case.operation.get_parameter_set(location)
     schema = container.schema
-    if _has_serialization_sensitive_types(schema, container):
+    properties = _parameter_schemas(schema)
+    if _has_serialization_sensitive_types(properties, container):
         # Arrays and objects are rewritten on the wire, so post-serialization validity is unknowable.
         return False
     validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
-    properties = schema.get("properties", {})
     try:
         declared = {
             name: _boolean_from_wire_spelling(item, properties.get(name, {}), validator_cls)
@@ -731,7 +731,7 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
 
 
 def _declares_type(schema: JsonSchema, name: str) -> bool:
-    declared = schema.get("type") if isinstance(schema, dict) else None
+    declared = maybe_resolve_bundled(schema).get("type") if isinstance(schema, dict) else None
     return declared == name or isinstance(declared, list) and name in declared
 
 
@@ -780,8 +780,8 @@ def _query_as_sent(
             sent[name] = texts[0] if len(texts) == 1 else texts
             continue
         # Other types keep their generated value, as the server parses the text back into it.
-        schema = properties[name]
-        is_string = _declares_type(schema, "string")
+        schema = schema_with_bundle(properties[name], container_schema)
+        is_string = _declares_type(schema, "string") or parameter_types(schema) == ["string"]
         # Frameworks read a blank non-string value as an absent one, which an optional parameter allows.
         if texts == [""] and not is_string and name not in required:
             continue
@@ -1300,24 +1300,25 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         if isinstance(value, Mapping) and meta_for_location is not None and meta_for_location.mode.is_negative:
             container = case.operation.get_parameter_set(location)
             schema = container.schema
+            properties = _parameter_schemas(schema)
 
-            if _has_serialization_sensitive_types(schema, container):
+            if _has_serialization_sensitive_types(properties, container):
                 # Wire-serialized arrays and objects can't be re-validated, so only mutation metadata can tell.
                 if isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)) and any(
-                    _negates_declared_parameter(mutation, location, schema) for mutation in phase_data.mutations
+                    _negates_declared_parameter(mutation, location, properties) for mutation in phase_data.mutations
                 ):
                     return False
                 # Coverage negates one parameter at a time; a scalar one reaches the wire as generated.
                 if (
                     isinstance(phase_data, CoveragePhaseData)
                     and phase_data.parameter_location == location
+                    and phase_data.parameter is not None
                     and phase_data.parameter in container
-                    and not _allows_container_type(schema.get("properties", {}).get(phase_data.parameter, {}))
+                    and not _allows_container_type(properties.get(phase_data.parameter, {}))
                 ):
                     return False
                 continue
 
-            properties = schema.get("properties", {})
             try:
                 value_without_additional_properties = {
                     k: _boolean_from_wire_spelling(v, properties.get(k, {}), validator_cls)
@@ -1350,11 +1351,13 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     return True
 
 
-def _negates_declared_parameter(mutation: Mutation, location: ParameterLocation, schema: dict) -> bool:
+def _negates_declared_parameter(
+    mutation: Mutation, location: ParameterLocation, properties: Mapping[str, JsonSchema]
+) -> bool:
     """Whether `mutation` invalidates a declared parameter in a way that survives wire serialization."""
     if mutation.parameter_location != location or mutation.parameter is None:
         return False
-    if not _allows_container_type(schema.get("properties", {}).get(mutation.parameter, {})):
+    if not _allows_container_type(properties.get(mutation.parameter, {})):
         return True
     # Other types arrive as a string that reads as a one-element array, and an empty value is sent as no value.
     return mutation.operator != OperatorKind.CHANGE_TYPE and "required" not in mutation.keywords
@@ -1374,7 +1377,7 @@ def _boolean_from_wire_spelling(
     return value
 
 
-def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameterSet) -> bool:
+def _has_serialization_sensitive_types(properties: Mapping[str, JsonSchema], container: OpenApiParameterSet) -> bool:
     """Check if schema contains array or object types in defined parameters.
 
     In query/header/cookie parameters, arrays and objects are serialized to strings.
@@ -1386,7 +1389,6 @@ def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameter
     Validation of string against array schema fails incorrectly.
     A better approach would be to apply serialization later on in the process.
     """
-    properties = schema.get("properties", {})
     return any(
         _allows_container_type(prop_schema) for prop_name, prop_schema in properties.items() if prop_name in container
     )
@@ -1396,6 +1398,14 @@ def _allows_container_type(schema: JsonSchema) -> bool:
     """Whether a parameter schema admits arrays or objects."""
     types = parameter_types(schema)
     return "array" in types or "object" in types
+
+
+def _parameter_schemas(container_schema: dict[str, Any]) -> dict[str, JsonSchema]:
+    """Parameter schemas by name, each keeping the bundle its references point into."""
+    properties = container_schema.get("properties", {})
+    if BUNDLE_STORAGE_KEY not in container_schema:
+        return properties
+    return {name: schema_with_bundle(subschema, container_schema) for name, subschema in properties.items()}
 
 
 # Methods that cannot re-create a resource — reading, modifying-in-place, or removing.

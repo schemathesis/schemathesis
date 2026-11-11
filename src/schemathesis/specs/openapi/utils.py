@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any
 from packaging import version
 
 from schemathesis.core import string_to_boolean
-from schemathesis.core.jsonschema.types import JsonSchema, get_type, to_json_type_name
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, resolve_bundled_ref
+from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type, to_json_type_name
 
 if TYPE_CHECKING:
     from schemathesis.core.parameters import ParameterLocation
@@ -30,15 +31,35 @@ def parse_spec_version(value: str) -> version.Version:
 
 
 def parameter_types(schema: JsonSchema) -> list[str]:
-    """Types a parameter schema admits, reading `nullable` and `allowEmptyValue` wrappers through."""
+    """Types a parameter schema admits, reading wrappers like `nullable` and references into its bundle through."""
+    if isinstance(schema, dict) and "type" not in schema:
+        return _admitted_types(schema, schema.get(BUNDLE_STORAGE_KEY), frozenset())
+    return get_type(schema)
+
+
+def _admitted_types(schema: JsonSchema, bundled: object, references: frozenset[str]) -> list[str]:
     if isinstance(schema, dict) and "type" not in schema:
         if "enum" in schema:
             return [to_json_type_name(value) for value in schema["enum"]]
         if "const" in schema:
             return [to_json_type_name(schema["const"])]
+        reference = schema.get("$ref")
+        # A reference seen before is a cycle, which admits whatever the schema says beside it.
+        if isinstance(reference, str) and reference not in references:
+            target = resolve_bundled_ref(schema, bundled)
+            if target is not schema:
+                return _admitted_types(target, bundled, references | {reference})
         branches = [*schema.get("anyOf", []), *schema.get("oneOf", [])]
         if branches:
-            return [name for branch in branches for name in parameter_types(branch)]
+            return [name for branch in branches for name in _admitted_types(branch, bundled, references)]
+        all_of = schema.get("allOf", [])
+        if all_of:
+            # A value matches every branch, so only the types all of them admit remain; numbers include integers.
+            remaining = ALL_TYPES
+            for branch in all_of:
+                types = _admitted_types(branch, bundled, references)
+                remaining = [name for name in remaining if name in types or (name == "integer" and "number" in types)]
+            return remaining
     return get_type(schema)
 
 

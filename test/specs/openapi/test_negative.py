@@ -730,6 +730,48 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("location", ["query", "header", "cookie"])
+@pytest.mark.parametrize(
+    "parameter_schema",
+    [
+        {"$ref": "#/components/schemas/Limit"},
+        {"allOf": [{"$ref": "#/components/schemas/Integer"}, {"description": "Page size"}]},
+    ],
+    ids=["alias", "all-of-reference-with-description"],
+)
+def test_negative_parameter_behind_reference_is_invalid_as_sent(ctx, location, parameter_schema):
+    operation = ctx.openapi.load_operation(
+        "GET /items",
+        {
+            "parameters": [{"name": "value", "in": location, "required": True, "schema": parameter_schema}],
+            "responses": {"200": {"description": "OK"}},
+        },
+        # `pattern` applies once a mutation turns the integer into a string, so most such strings spell an integer.
+        components={
+            "schemas": {
+                "Limit": {"$ref": "#/components/schemas/Integer"},
+                "Integer": {"type": "integer", "pattern": "^[0-9]+$"},
+            }
+        },
+    )
+    parameter_location = ParameterLocation(location)
+    validator = make_validator(
+        operation.get_parameter_set(parameter_location).items[0].validation_schema,
+        operation.schema.adapter.jsonschema_validator_cls,
+    )
+    valid_as_sent = []
+
+    # Type changes into a string are a small slice of the negative space.
+    @run_given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE), max_examples=150)
+    def test(case):
+        value = (case.get_container(parameter_location) or {}).get("value")
+        if isinstance(value, str) and value.isascii() and value.isdigit() and validator.is_valid(int(value)):
+            valid_as_sent.append(value)
+
+    assert valid_as_sent == []
+
+
+@pytest.mark.hypothesis_nested
 def test_negative_query_does_not_negate_annotation_keywords(ctx):
     annotation_keywords = {"default", "title", "description", "deprecated", "$comment", "readOnly", "writeOnly"}
     operation = ctx.openapi.load_operation(
