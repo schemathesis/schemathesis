@@ -327,3 +327,5 @@ class AppAuth:
 **Schema loading fails with 404.** The first argument to `from_asgi`/`from_wsgi` must be the path your application serves the schema on; see the table in [Which Frameworks Work](#which-frameworks-work).
 
 **Every request returns 400 under Django.** Add `localhost` (WSGI) or `testserver` (ASGI) to `ALLOWED_HOSTS`.
+
+**Slow handlers never time out and redirects come back as `3xx` under WSGI.** A WSGI app runs in-process, so `request-timeout` does not interrupt a handler and `max-redirects` is ignored. Test a running server over the network, or an ASGI app, when timeouts or redirects matter.
