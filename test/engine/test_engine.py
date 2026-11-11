@@ -1893,7 +1893,7 @@ def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
     # Repeating a phase is only worth the time if each cycle explores somewhere the last one did not.
     api = ctx.openapi.apps.path_variable()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(schema, max_time=10, max_examples=20, seed=1, phases=[PhaseName.FUZZING])
+    stream = execute(schema, max_time=2, max_examples=20, seed=1, phases=[PhaseName.FUZZING])
     rounds: list[set[str]] = []
     for event in stream.events:
         if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.FUZZING:

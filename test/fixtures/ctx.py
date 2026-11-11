@@ -166,14 +166,6 @@ class OpenAPIApps:
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
 
-    def replay_inferred_list_link(
-        self, *, item_ids: list[int], failing: bool, consumer: Literal["path", "body"] = "path"
-    ) -> OpenAPIServer:
-        return _start(
-            self.parent,
-            openapi_stateful.replay_inferred_list_link(item_ids=item_ids, failing=failing, consumer=consumer),
-        )
-
     def flaky_branch_blocks(self) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.flaky_branch_blocks())
 
@@ -242,9 +234,6 @@ class GraphQLApps:
 
     def generic_id_pool(self, *, fixed: bool = False) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.generic_id_pool(fixed=fixed))
-
-    def non_id_pool(self) -> GraphQLServer:
-        return _start(self.parent, graphql_bookstore.non_id_pool())
 
 
 @dataclass

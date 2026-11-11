@@ -120,7 +120,7 @@ def test_list_argument_planted_bug_findability(ctx, cli, snapshot_cli, config):
 def test_non_id_pool_planted_bug_findability(ctx, cli, snapshot_cli):
     # Fuzzing captures Project.fullPath from the projects query and reuses it in moveIssue(projectPath:),
     # reaching a resolver that only errors on a real path.
-    api = ctx.graphql.apps.non_id_pool()
+    api = ctx.graphql.serve(bookstore.non_id_pool())
     assert (
         cli.run(
             api.schema_url,

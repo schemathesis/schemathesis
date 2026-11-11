@@ -275,7 +275,7 @@ def test_fetch_http_goes_through_configured_proxy(ctx, app_runner):
         return jsonify({"access_token": "test-token"})
 
     schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema.config.proxy = f"http://127.0.0.1:{app_runner.run_flask_app(proxy)}"
+    schema.config.proxy = app_runner.openapi_url(proxy, path="")
     operation = schema["/data"]["GET"]
     with refusing_url() as url:
         schema.config.update(base_url=url)

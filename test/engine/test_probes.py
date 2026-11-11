@@ -26,8 +26,7 @@ def _make_strict_server(app_runner, reject: Callable[[], object]) -> str:
     def _ok(_path: str):
         return "ok"
 
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/"
+    return app_runner.openapi_url(app, path="/")
 
 
 @pytest.fixture
