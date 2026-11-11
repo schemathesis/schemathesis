@@ -274,6 +274,21 @@ def owning_resource(parameter: str, path: str) -> str | None:
     return _owning_segment_resource(_resource_segments(strip_version_prefix(path)), parameter)
 
 
+@lru_cache(maxsize=1024)
+def named_collection(path: str, resource: str) -> str | None:
+    """`path` up to its last segment naming `resource` items, parameters blanked: `/kits/{}/options` for `Option`."""
+    segments = ["{}" if "{" in segment else segment for segment in path.split("/") if segment]
+    for index in range(len(segments) - 1, -1, -1):
+        if segments[index] != "{}" and names_items_of(segments[index], resource):
+            return "/" + "/".join(segments[: index + 1])
+    return None
+
+
+def names_items_of(word: str, resource: str) -> bool:
+    """Whether `word` names `resource` items, alone or as a collection: `option` or `options` for `Option`."""
+    return normalize_for_matching(to_singular(word)) == normalize_for_matching(resource)
+
+
 def item_collections(paths: Collection[str]) -> frozenset[str]:
     """Collections a path keys items of, with blanked parameters (`/options/{id}/entry/{pk}` -> `options/{}/entry`)."""
     collections = set()

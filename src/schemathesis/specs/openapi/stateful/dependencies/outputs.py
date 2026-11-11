@@ -47,6 +47,7 @@ def extract_outputs(
             is_primitive_identifier=extracted.is_primitive_identifier,
             extract_object_keys=extracted.extract_object_keys,
             response_fields=extracted.response_fields,
+            field_types=extracted.field_types,
             identifier_pointer=extracted.identifier_pointer,
             named_after_path=extracted.named_after_path,
             value_types=extracted.value_types,
