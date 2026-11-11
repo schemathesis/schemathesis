@@ -21,6 +21,7 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.stateful.state_machine import StepInput, Transition
 from schemathesis.specs.openapi.stateful.link_calibration import record_link_outcome
 from test.apps.catalog.openapi.modifiers.stateful import (
+    CorrectLinkPlainTextRejection,
     EnsureResourceAvailability,
     ParserBlamesUnrelated,
     SingleLink,
@@ -86,23 +87,31 @@ def recorder():
 
 
 @pytest.mark.parametrize(
-    "successes,failures,expected",
+    "score,expected",
     [
-        pytest.param(MIN_SAMPLES - 1, 0, DEFAULT_USE_PROBABILITY, id="below-min-samples-keeps-default"),
-        pytest.param(MIN_SAMPLES, 0, 1.0, id="all-success"),
-        pytest.param(0, MIN_SAMPLES, MIN_PROBABILITY, id="all-failure-hits-floor"),
-        pytest.param(0, 1000, MIN_PROBABILITY, id="floor-holds-at-large-counts"),
-        pytest.param(8, 2, 0.8, id="mixed-empirical-ratio"),
+        pytest.param(
+            TransitionScore(successes=MIN_SAMPLES - 1), DEFAULT_USE_PROBABILITY, id="below-min-samples-keeps-default"
+        ),
+        pytest.param(TransitionScore(successes=MIN_SAMPLES), 1.0, id="all-success"),
+        pytest.param(TransitionScore(failures=MIN_SAMPLES), MIN_PROBABILITY, id="all-failure-hits-floor"),
+        pytest.param(TransitionScore(failures=1000), MIN_PROBABILITY, id="floor-holds-at-large-counts"),
+        pytest.param(TransitionScore(successes=8, failures=2), 0.8, id="mixed-empirical-ratio"),
+        pytest.param(
+            TransitionScore(unattributed=MIN_SAMPLES), MIN_PROBABILITY, id="unattributed-without-success-hits-floor"
+        ),
+        pytest.param(
+            TransitionScore(successes=MIN_SAMPLES, unattributed=50), 1.0, id="unattributed-after-success-ignored"
+        ),
     ],
 )
-def test_transition_score_use_probability(successes, failures, expected):
-    assert TransitionScore(successes=successes, failures=failures).use_probability == pytest.approx(expected)
+def test_transition_score_use_probability(score, expected):
+    assert score.use_probability == pytest.approx(expected)
 
 
 def test_transition_score_merge():
-    score = TransitionScore(successes=3, failures=1)
-    score.merge(TransitionScore(successes=2, failures=4))
-    assert score == TransitionScore(successes=5, failures=5)
+    score = TransitionScore(successes=3, failures=1, unattributed=2)
+    score.merge(TransitionScore(successes=2, failures=4, unattributed=1))
+    assert score == TransitionScore(successes=5, failures=5, unattributed=3)
 
 
 def test_calibration_state_begin_iteration_merges_write_to_read():
@@ -206,7 +215,7 @@ def test_record_link_outcome_negative_generation(negative_case, response_factory
     "status_code,expected",
     [
         (200, TransitionScore(successes=1, failures=0)),
-        (400, TransitionScore(successes=0, failures=1)),
+        (400, TransitionScore(unattributed=1)),
     ],
 )
 def test_record_link_outcome_records_success_or_failure(
@@ -289,6 +298,7 @@ def test_record_link_outcome_ignores_unattributed_observations(
         pytest.param(WrongLinkTypeMismatch(), True, id="wrong-link-status-fallback-drops"),
         pytest.param(WrongLinkParserAttributed(), True, id="wrong-link-parser-attributed-drops"),
         pytest.param(ParserBlamesUnrelated(), False, id="parser-mismatch-stays-default"),
+        pytest.param(CorrectLinkPlainTextRejection(), False, id="correct-link-unexplained-400-stays-default"),
     ],
 )
 def test_calibration_attribution_e2e(
@@ -299,12 +309,12 @@ def test_calibration_attribution_e2e(
     name = type(scenario_modifier).__name__
     if expected_score_drops:
         assert observer.read, f"{name}: link expected to be penalized but no failures recorded"
-        score = next(iter(observer.read.values()))
-        assert score.successes + score.failures >= MIN_SAMPLES, f"{name}: insufficient samples ({score!r})"
+        transition_id, score = next(iter(observer.read.items()))
+        assert observer.is_calibrated(transition_id), f"{name}: insufficient samples ({score!r})"
         assert score.use_probability < DEFAULT_USE_PROBABILITY, f"{name}: probability not dropped ({score!r})"
     else:
         assert observer.target_request_count >= MIN_SAMPLES, (
             f"{name}: link target hit only {observer.target_request_count} times — engine did not exercise the link"
         )
         for transition_id, score in observer.read.items():
-            assert score.failures == 0, f"{transition_id!r} ({name}): {score.failures} unattributed failures"
+            assert score.use_probability >= DEFAULT_USE_PROBABILITY, f"{transition_id!r} ({name}): demoted ({score!r})"
