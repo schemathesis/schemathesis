@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from hypothesis import strategies as st
 from hypothesis.stateful import RULE_MARKER, Bundle, Rule
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition, RefResolutionError
-from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCalibrationState
@@ -20,7 +19,6 @@ from schemathesis.generation.hypothesis import add_database_key
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.control import TransitionController
 from schemathesis.generation.stateful.state_machine import (
-    BASE_EXPLORATION_RATE,
     APIStateMachine,
     RecordingStateMachine,
     StepInput,
@@ -31,12 +29,10 @@ from schemathesis.generation.stateful.state_machine import (
 )
 from schemathesis.generation.value import prune_overwritten_body_constants
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.stateful.link_values import count_matches, select_match
+from schemathesis.specs.openapi.stateful.link_values import plan_link_values
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
-    from random import Random
-
     from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -358,94 +354,33 @@ def into_step_input(
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
             random = draw(st.randoms(use_true_random=True))
 
-            def biased_coin(p: float) -> bool:
-                return random.random() < p
-
             # Extract transition data from previous operation's output
             transition = link.extract(output)
 
-            overrides: dict[str, Any] = {}
-            applied_parameters: list[tuple[ParameterLocation, str | None]] = []
             if link_calibration is not None:
                 use_p = link_calibration.use_probability(transition.id)
                 calibrated = link_calibration.is_calibrated(transition.id)
             else:
                 use_p = DEFAULT_USE_PROBABILITY
                 calibrated = False
-            # Pick via the `use_true_random` instance so the per-step pick stays out of Hypothesis's data tree; the
-            # producer's response shape can vary across runs of the same byte stream when the API has mutable state,
-            # and a tracked draw would be flagged as inconsistent.
-            index = _choose_match_index(transition, random)
-            for container, data in transition.parameters.items():
-                overrides[container] = {}
-                location = CONTAINER_TO_LOCATION[container]
-
-                for name, extracted in data.items():
-                    # Skip if extraction failed or returned unusable value
-                    if not isinstance(extracted.value, Ok) or extracted.value.ok() in (None, UNRESOLVABLE):
-                        continue
-
-                    value = select_match(extracted.value.ok(), index)
-
-                    if calibrated:
-                        p = use_p
-                    else:
-                        # No data yet: use per-parameter heuristics.
-                        # Path parameters are critical for routing; required parameters
-                        # should follow links more; optional params get more exploration.
-                        exploration_rate = BASE_EXPLORATION_RATE
-                        if container == "path_parameters":
-                            exploration_rate *= 0.5
-                        if extracted.is_required:
-                            exploration_rate *= 0.5
-                        else:
-                            exploration_rate *= 3.0
-                        p = 1.0 - exploration_rate
-
-                    if biased_coin(p):
-                        overrides[container][name] = value
-                        applied_parameters.append((location, name))
-
-            request_body = _linked_request_body(transition, index)
-
-            # Link suppose to replace the entire extracted body
-            if request_body is not NOT_SET and not link.merge_body and biased_coin(use_p):
-                overrides["body"] = request_body
-                if isinstance(overrides["body"], dict):
-                    applied_parameters.extend((ParameterLocation.BODY, field) for field in overrides["body"])
-                else:
-                    applied_parameters.append((ParameterLocation.BODY, None))
-
+            plan = plan_link_values(
+                transition, merge_body=link.merge_body, use_probability=use_p, calibrated=calibrated, random=random
+            )
             case = draw(
                 _step_case_strategy(
                     target,
                     modes,
                     feedback=feedback,
-                    path_parameters=overrides.get("path_parameters"),
-                    query=overrides.get("query"),
-                    headers=overrides.get("headers"),
-                    cookies=overrides.get("cookies"),
-                    body=overrides.get("body", NOT_SET),
+                    path_parameters=plan.overrides.get("path_parameters"),
+                    query=plan.overrides.get("query"),
+                    headers=plan.overrides.get("headers"),
+                    cookies=plan.overrides.get("cookies"),
+                    body=plan.body,
                 )
             )
-            if request_body is not NOT_SET and link.merge_body:
-                if isinstance(request_body, dict):
-                    selected_fields = {}
-
-                    for field_name, field_value in request_body.items():
-                        if field_value is UNRESOLVABLE:
-                            continue
-
-                        if biased_coin(use_p):
-                            selected_fields[field_name] = field_value
-                            applied_parameters.append((ParameterLocation.BODY, field_name))
-
-                    if selected_fields:
-                        LinkedBody(selected_fields).apply(case)
-                elif biased_coin(use_p):
-                    LinkedBody(request_body).apply(case)
-                    applied_parameters.append((ParameterLocation.BODY, None))
-            return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
+            if plan.merged_body is not NOT_SET:
+                LinkedBody(plan.merged_body).apply(case)
+            return StepInput(case=case, transition=transition, applied_parameters=plan.applied_parameters)
 
         return inner(output=_output)
 
@@ -477,23 +412,6 @@ def merge_link_body(generated: object, linked: JsonValue) -> JsonValue:
         merged_items = [merge_link_body(item, value) for item, value in zip(generated, linked, strict=False)]
         return merged_items + generated[len(linked) :] + linked[len(generated) :]
     return linked
-
-
-def _choose_match_index(transition: Transition, random: Random) -> int:
-    """Position of the list item that every wildcard value of this transition is taken from."""
-    extracted = [param for container in transition.parameters.values() for param in container.values()]
-    if transition.request_body is not None:
-        extracted.append(transition.request_body)
-    matches = count_matches([param.value.ok() for param in extracted if isinstance(param.value, Ok)])
-    return random.randrange(matches) if matches > 1 else 0
-
-
-def _linked_request_body(transition: Transition, index: int) -> Any:
-    """Request body extracted by the link with wildcard values taken from the list item at `index`."""
-    body = transition.request_body
-    if body is None or not isinstance(body.value, Ok) or body.value.ok() is UNRESOLVABLE:
-        return NOT_SET
-    return select_match(body.value.ok(), index)
 
 
 def is_transition_allowed(source: str, target: str) -> Callable[[OpenAPIStateMachine], bool]:
