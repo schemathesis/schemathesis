@@ -23,6 +23,26 @@ enabled = false
 expected-statuses = ["400", "422"]
 ```
 
+**Python:**
+```python
+import schemathesis
+from schemathesis.checks import not_a_server_error, response_schema_conformance, status_code_conformance
+
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+
+
+@schema.parametrize()
+def test_only_specific_checks(case):
+    case.call_and_validate(checks=[status_code_conformance, response_schema_conformance])
+
+
+@schema.parametrize()
+def test_skip_specific_checks(case):
+    case.call_and_validate(excluded_checks=[not_a_server_error])
+```
+
+Every check on this page imports from `schemathesis.checks` under its name.
+
 See [CLI reference](../reference/cli.md#-c-checks-checks) and [configuration reference](../reference/configuration.md#checks) for details.
 
 !!! note "Exception: max_response_time"

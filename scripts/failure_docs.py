@@ -14,6 +14,26 @@ HEADER = """\
 
 Every failure Schemathesis reports starts with a code, such as `ST101`. `st explain <code>` prints the same
 information in the terminal.
+
+In Python, `case.call_and_validate()` raises a `FailureGroup`, and each failure in its `exceptions` carries the
+code as `failure.code`. Match on the code, which stays the same across releases, rather than on failure classes.
+To ignore `ST103` and fail on everything else:
+
+```python
+import schemathesis
+from schemathesis.errors import FailureGroup
+
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+
+
+@schema.parametrize()
+def test_api(case):
+    try:
+        case.call_and_validate()
+    except FailureGroup as group:
+        if any(failure.code != "ST103" for failure in group.exceptions):
+            raise
+```
 """
 
 

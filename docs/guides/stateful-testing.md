@@ -190,6 +190,8 @@ state_machine.run(settings=settings(state_machine.TestCase.settings, max_example
 - `max_examples` - number of scenarios (default: 100)
 - `stateful_step_count` - maximum API calls per scenario (default: 6)
 
+`generation.max-examples` in `schemathesis.toml` does not change `TestCase`; set `max_examples` through `TestCase.settings` as shown above.
+
 ## Defining OpenAPI links
 
 Add a link to your schema if Schemathesis does not discover a connection you need. A link connects a **producer** operation (`POST /users`) with a **consumer** operation (`GET /users/{userId}`):

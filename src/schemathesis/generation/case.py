@@ -447,7 +447,8 @@ class Case(Generic[OperationT]):
 
         Args:
             base_url: Override the schema's base URL.
-            session: Reuse an existing requests session.
+            session: Reuse an existing requests session. TLS verification follows the `tls-verify` option,
+                not `session.verify`; use `schema.config.update(tls_verify=False)` to disable it.
             headers: Additional headers.
             params: Additional query parameters.
             cookies: Additional cookies.
@@ -608,7 +609,8 @@ class Case(Generic[OperationT]):
 
         Args:
             base_url: Override the schema's base URL.
-            session: Reuse an existing requests session.
+            session: Reuse an existing requests session. TLS verification follows the `tls-verify` option,
+                not `session.verify`; use `schema.config.update(tls_verify=False)` to disable it.
             headers: Additional headers to send.
             checks: Explicit set of checks to run.
             additional_checks: Additional custom checks to run.

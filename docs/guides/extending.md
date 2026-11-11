@@ -160,7 +160,7 @@ When a per-response invariant is not enough, use a class. A class-based check ma
 - `after_response(self, ctx, response, case)` - called once per response, same signature as a function check.
 - `after_run(self, ctx)` - called once after all test phases complete; use it to assert invariants that only make sense across the whole run.
 
-The class is instantiated **once per run**, so state accumulated in `after_response` is available in `after_run`.
+State accumulated in `after_response` is available in `after_run`. The CLI creates **one instance per run**; pytest creates **one instance per `@schema.parametrize()` test function**, so its `after_run` sees only that function's responses.
 
 !!! warning
     `after_response` may be re-invoked during Hypothesis shrinking and replay. Keep accumulation idempotent - prefer sets and `min`/`max` over counters.
