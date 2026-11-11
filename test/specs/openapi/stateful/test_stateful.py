@@ -15,6 +15,7 @@ import schemathesis
 from schemathesis.config import OperationConfig
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.generation.hypothesis.examples import generate_many
@@ -1097,6 +1098,101 @@ def test_linked_steps_keep_negative_share_of_scenario_starts(ctx, response_facto
         modes[input.case.meta.generation.mode] += 1
 
     assert 0 < modes[GenerationMode.NEGATIVE] / modes.total() < 0.45, modes
+
+
+@pytest.mark.parametrize(
+    ("target", "link_values", "id_location"),
+    [
+        (
+            {
+                "/owners/{owner}/items/{id}": {
+                    "get": {
+                        "operationId": "useItem",
+                        "parameters": [
+                            {"name": "owner", "in": "path", "required": True, "schema": {"type": "string"}},
+                            {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            {"parameters": {"owner": "$response.body#/items/*/owner", "id": "$response.body#/items/*/id"}},
+            ParameterLocation.PATH,
+        ),
+        (
+            {
+                "/owners/{owner}/items": {
+                    "put": {
+                        "operationId": "useItem",
+                        "parameters": [
+                            {"name": "owner", "in": "path", "required": True, "schema": {"type": "string"}},
+                        ],
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            {
+                "parameters": {"owner": "$response.body#/items/*/owner"},
+                "requestBody": {"id": "$response.body#/items/*/id"},
+            },
+            ParameterLocation.BODY,
+        ),
+    ],
+    ids=["parameters", "parameter-and-body"],
+)
+def test_wildcard_link_values_come_from_one_list_item(ctx, response_factory, target, link_values, id_location):
+    schema = ctx.openapi.load_schema(
+        {
+            "/owners": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "UseItem": {
+                                    "operationId": "useItem",
+                                    **link_values,
+                                    "x-schemathesis": {"is_inferred": True},
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            **target,
+        }
+    )
+    source = schema["/owners"]["POST"]
+    [target_path] = target
+    [method] = target[target_path]
+    [link] = collect_transitions([source, schema[target_path][method]]).operations[source.label].outgoing
+    content = b'{"items": [{"owner": "a", "id": 1}, {"owner": "b", "id": 2}, {"owner": "c", "id": 3}]}'
+    response = Response.from_requests(response_factory.requests(content=content, status_code=201), True)
+    strategy = into_step_input(target=link.target, link=link, modes=[GenerationMode.POSITIVE])(
+        StepOutput(response=response, case=source.Case())
+    )
+    pairs = []
+
+    @run_given(input=strategy, max_examples=10)
+    def test(input):
+        if {(ParameterLocation.PATH, "owner"), (id_location, "id")} <= set(input.applied_parameters):
+            ids = input.case.path_parameters if id_location is ParameterLocation.PATH else input.case.body
+            pairs.append((input.case.path_parameters["owner"], ids["id"]))
+
+    assert pairs
+    assert [pair for pair in pairs if pair not in {("a", 1), ("b", 2), ("c", 3)}] == []
 
 
 def test_test_case_runs_in_process(ctx):

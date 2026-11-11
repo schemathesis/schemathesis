@@ -6,8 +6,8 @@ from schemathesis.core.result import Ok
 from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import status_code_matches
 from schemathesis.generation.stateful.state_machine import StepOutput
-from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful import LinkedBody
+from schemathesis.specs.openapi.stateful.link_values import count_matches, select_match
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
@@ -71,33 +71,12 @@ def _candidates_per_match(
 ) -> list[tuple[APIOperation, dict[str, Any]]]:
     """One candidate per value a wildcard link matched; a merged link body keeps the other generated fields."""
     candidates: list[tuple[APIOperation, dict[str, Any]]] = []
-    for index in range(_count_matches(overrides)):
-        selected = _select_match(overrides, index)
+    for index in range(count_matches(overrides)):
+        selected = select_match(overrides, index)
         if merge_body and "body" in selected:
             selected["body"] = LinkedBody(selected["body"])
         candidates.append((target, selected))
     return candidates
-
-
-def _count_matches(value: Any) -> int:
-    if isinstance(value, MultiMatch):
-        return len(value.values)
-    if isinstance(value, dict):
-        return max(map(_count_matches, value.values()), default=1)
-    if isinstance(value, list):
-        return max(map(_count_matches, value), default=1)
-    return 1
-
-
-def _select_match(value: Any, index: int) -> Any:
-    # Values matched from the same array stay paired by their position in it.
-    if isinstance(value, MultiMatch):
-        return value.values[index % len(value.values)]
-    if isinstance(value, dict):
-        return {key: _select_match(item, index) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_select_match(item, index) for item in value]
-    return value
 
 
 _FAILED: Any = object()
