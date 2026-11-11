@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Container, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -22,7 +22,8 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, resolve_bundled_root
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, resolve_bundled_ref, resolve_bundled_root
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.numeric import (
     bounds_are_unsatisfiable,
     is_numeric_bound,
@@ -63,6 +64,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiBody,
     OpenApiParameterSet,
     build_constants_overlay_strategy,
+    collect_object_properties,
 )
 from schemathesis.specs.openapi.coverage._schema import ANNOTATION_KEYWORDS
 from schemathesis.specs.openapi.diagnostics import build_unsatisfiable_schema_error
@@ -553,6 +555,33 @@ def _maybe_set_optional_body(
     return strategy
 
 
+def _accept_any_value_for(
+    schema: dict[str, Any], names: Container[str], bundled: object, ancestors: tuple[dict[str, Any], ...] = ()
+) -> dict[str, Any]:
+    """`schema` with `names` accepting any value wherever it or its `allOf` branches declare them."""
+    resolved = resolve_bundled_ref(schema, bundled)
+    # A branch referencing one of its ancestors closes a cycle and stays as declared.
+    if any(resolved is ancestor for ancestor in ancestors):
+        return schema
+    result = _accept_any_value_in_properties(resolved, names)
+    branches = resolved.get("allOf")
+    if isinstance(branches, list):
+        result["allOf"] = [
+            _accept_any_value_for(branch, names, bundled, (*ancestors, resolved))
+            if isinstance(branch, dict)
+            else branch
+            for branch in branches
+        ]
+    return result
+
+
+def _accept_any_value_in_properties(schema: dict[str, Any], names: Container[str]) -> dict[str, Any]:
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return dict(schema)
+    return {**schema, "properties": {name: {} if name in names else value for name, value in properties.items()}}
+
+
 def _build_form_strategy_with_encoding(
     parameter: OpenApiBody,
     operation: OpenApiOperation,
@@ -567,10 +596,11 @@ def _build_form_strategy_with_encoding(
     Returns `None` if no custom encoding with registered strategies or comma-separated content types is found.
     """
     schema = resolve_bundled_root(as_object_schema(parameter.optimized_schema))
-    if schema.get("type") != "object":
+    # A schema composing its properties through `allOf` may leave `type` to its branches.
+    if schema.get("type", "object") != "object":
         return None
 
-    properties = schema.get("properties", {})
+    properties, _ = collect_object_properties(schema)
     if not properties:
         return None
 
@@ -609,13 +639,9 @@ def _build_form_strategy_with_encoding(
         base_schema = schema
     else:
         # A violation drawn inside an encoded property would be overwritten by the media type data.
-        base_schema = {
-            **schema,
-            "properties": {
-                name: {} if name in property_with_content_type_strategies else subschema
-                for name, subschema in properties.items()
-            },
-        }
+        base_schema = _accept_any_value_for(
+            schema, property_with_content_type_strategies, schema.get(BUNDLE_STORAGE_KEY)
+        )
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
     body_strategy = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode](
         base_schema,
