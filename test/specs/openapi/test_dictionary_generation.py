@@ -760,6 +760,108 @@ def test_body_binding_top_level_array(ctx):
     assert elements_seen > 0 and elements_with_alpha == elements_seen
 
 
+_UNIQUE_STRINGS = {"type": "array", "minItems": 3, "uniqueItems": True, "items": {"type": "string"}}
+
+
+def _ids_body(ids: dict) -> dict:
+    return {"type": "object", "properties": {"ids": ids}, "required": ["ids"]}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("key", "body_schema", "version"),
+    [
+        ("body.ids[*]", _ids_body(_UNIQUE_STRINGS), "3.0.2"),
+        ("body.[*]", _UNIQUE_STRINGS, "3.0.2"),
+        ("body.ids[*]", _ids_body({"$ref": "#/components/schemas/UniqueStrings"}), "3.0.2"),
+        (
+            "body.ids[*]",
+            _ids_body({"$ref": "#/components/schemas/Strings", "uniqueItems": True, "minItems": 3}),
+            "3.1.0",
+        ),
+        (
+            "body.ids[*]",
+            _ids_body({"allOf": [{"$ref": "#/components/schemas/Strings"}, {"uniqueItems": True, "minItems": 3}]}),
+            "3.0.2",
+        ),
+        ("body.ids[*]", _ids_body({**_UNIQUE_STRINGS, "nullable": True}), "3.0.2"),
+        (
+            "body.ids[*]",
+            _ids_body(
+                {"type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": True, "items": {"enum": list("abc")}}
+            ),
+            "3.0.2",
+        ),
+        (
+            "body.items[*].id",
+            {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "uniqueItems": True,
+                        "items": {
+                            "type": "object",
+                            "properties": {"id": {"enum": list("abc")}},
+                            "required": ["id"],
+                            "additionalProperties": False,
+                        },
+                    }
+                },
+                "required": ["items"],
+            },
+            "3.0.2",
+        ),
+        (
+            "body.groups[*].ids[*]",
+            {
+                "type": "object",
+                "properties": {
+                    "groups": {"type": "array", "minItems": 1, "items": _ids_body(_UNIQUE_STRINGS)},
+                },
+                "required": ["groups"],
+            },
+            "3.0.2",
+        ),
+    ],
+    ids=[
+        "array-items",
+        "top-level-array",
+        "array-behind-ref",
+        "ref-sibling",
+        "all-of-sibling",
+        "nullable",
+        "enum-items",
+        "object-items",
+        "nested-array",
+    ],
+)
+def test_body_binding_keeps_unique_items_distinct(ctx, key, body_schema, version):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {"dictionaries": {"ids": {"values": ["a", "b"]}}, "parameters": {key: {"dictionary": "ids"}}},
+        _path_with_body(body_schema),
+        version=version,
+        components={
+            "schemas": {"UniqueStrings": _UNIQUE_STRINGS, "Strings": {"type": "array", "items": {"type": "string"}}}
+        },
+    )
+    operation = schema["/items"]["POST"]
+    invalid = []
+    drawn = set()
+
+    @run_given(case=operation.as_strategy(), max_examples=10, derandomize=True)
+    def collect(case):
+        if not operation.body[0].is_valid(case.body):
+            invalid.append(case.body)
+        if case._meta is not None:
+            drawn.update(draw.value for draw in case._meta.dictionary_draws)
+
+    assert (invalid, drawn) == ([], {"a", "b"})
+
+
 @pytest.mark.hypothesis_nested
 def test_body_binding_skipped_when_path_does_not_resolve(ctx):
     schema = _load_schema_with_dictionaries(
