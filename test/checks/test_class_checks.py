@@ -60,7 +60,7 @@ def test_after_run_failures_are_distinct_per_check(ctx):
 
     schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
     run_checks = RunChecks.from_registry(schema.config.checks_config_for())
-    failures = collect_after_run_failures(schema.config, run_checks.for_run())
+    failures = collect_after_run_failures(schema.config, run_checks)
 
     assert len(failures) == 2
     assert len(set(failures)) == 2
@@ -84,7 +84,7 @@ def test_after_run_receives_run_settings(ctx, headers, expected_headers):
     schema.config.update(headers=headers, basic_auth=("user", "pass"))
     run_checks = RunChecks.from_registry(schema.config.checks_config_for())
 
-    assert collect_after_run_failures(schema.config, run_checks.for_run(), transport_kwargs={"timeout": 5}) == []
+    assert collect_after_run_failures(schema.config, run_checks, transport_kwargs={"timeout": 5}) == []
     assert received == [(("user", "pass"), expected_headers, {"timeout": 5})]
 
 
@@ -101,7 +101,7 @@ def test_after_run_errors_become_failures(ctx):
 
     schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
     run_checks = RunChecks.from_registry(schema.config.checks_config_for())
-    failures = collect_after_run_failures(schema.config, run_checks.for_run())
+    failures = collect_after_run_failures(schema.config, run_checks)
 
     assert [(failure.operation, failure.title, failure.message, type(failure.exception)) for failure in failures] == [
         (None, "Check `Broken` raised an unexpected error", "ValueError: boom", ValueError),

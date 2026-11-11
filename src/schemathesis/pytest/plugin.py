@@ -920,15 +920,8 @@ def _format_after_run_failures(config: pytest.Config) -> list[str]:
     return [
         format_failures(case_id=None, response=None, failures=failures, curl=None, config=schema.config.output)
         for schema in config.stash.get(_PYTEST_SCHEMAS_KEY, {}).values()
-        if (failures := _fire_after_run(schema))
+        if (failures := collect_after_run_failures(schema.config, run_checks_for(schema)))
     ]
-
-
-def _fire_after_run(schema: BaseSchema) -> list:
-    checks = run_checks_for(schema).for_run()
-    if not checks:
-        return []
-    return collect_after_run_failures(schema.config, checks)
 
 
 def _report_after_run_failures(session: pytest.Session, outputs: list[str]) -> None:
