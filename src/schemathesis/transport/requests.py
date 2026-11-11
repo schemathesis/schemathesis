@@ -113,6 +113,18 @@ def prepare_query(case: Case) -> dict[str, Any] | str | None:
     return params
 
 
+def _keeps_authorization_over_netrc(
+    case: Case, data: dict[str, Any], headers: Mapping[str, Any] | None, session: requests.Session | None
+) -> bool:
+    """Whether the outgoing `Authorization` is set explicitly, by the caller or in config, and must survive netrc."""
+    if data.get("auth") is not None or (session is not None and session.auth) or "Authorization" not in data["headers"]:
+        return False
+    if case._has_explicit_auth:
+        return True
+    configured = case.operation.schema.config.headers_for(operation=case.operation)
+    return any(name.lower() == "authorization" for source in (headers or {}, configured) for name in source)
+
+
 def merge_params_override(data: dict[str, Any], key: str, params_override: Any) -> None:
     """Merge explicitly passed query parameters into the serialized query stored under `key`."""
     if isinstance(data.get(key), str) or isinstance(params_override, str):
@@ -213,12 +225,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         if proxies is not None:
             data.setdefault("proxies", proxies)
         # A request without auth gets netrc credentials for its host, which would replace the configured ones.
-        if (
-            case._has_explicit_auth
-            and data.get("auth") is None
-            and (session is None or not session.auth)
-            and "Authorization" in data["headers"]
-        ):
+        if _keeps_authorization_over_netrc(case, data, kwargs.get("headers"), session):
             data["auth"] = lambda request: request
         return data
 
