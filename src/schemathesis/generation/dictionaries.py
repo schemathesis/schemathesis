@@ -20,10 +20,11 @@ from schemathesis.config._dictionaries import (
     parse_body_path,
 )
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
-from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import split_body_path
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.value import GeneratedValue, prune_overwritten_constants
 from schemathesis.resources import PoolDraw, SemanticDraw
 
@@ -268,6 +269,8 @@ class _ResolvedBodyBinding:
     probability: float
     entries: tuple[tuple[int, EntryValue], ...]
     leaf_schema: JsonSchema
+    # One flag per `*` in `pointer`: whether that array declares `uniqueItems`.
+    unique_items: tuple[bool, ...]
 
 
 def resolve_body_bindings(
@@ -297,9 +300,10 @@ def resolve_body_bindings(
                 continue
             seen.add(key)
             pointer = parse_body_path(key)
-            leaf_schema = resolve_body_leaf_schema(body_schema, pointer)
-            if leaf_schema is None:
+            found = _resolve_body_path(body_schema, pointer)
+            if found is None:
                 continue
+            leaf_schema, unique_items = found
             dictionary = dictionaries[binding.dictionary]
             entries = tuple((entry.index, entry.value) for entry in dictionary.entries)
             resolved.append(
@@ -309,27 +313,40 @@ def resolve_body_bindings(
                     probability=binding.probability,
                     entries=entries,
                     leaf_schema=leaf_schema,
+                    unique_items=unique_items,
                 )
             )
     return resolved
 
 
 def resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | None:
+    found = _resolve_body_path(schema, pointer)
+    return None if found is None else found[0]
+
+
+def _resolve_body_path(schema: JsonSchema, pointer: str) -> tuple[JsonSchema, tuple[bool, ...]] | None:
     # `pointer` always comes from `parse_body_path`, so it is `/`-prefixed and non-empty.
     bundled = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema, dict) else None
     if not isinstance(bundled, dict):
         bundled = {}
-    leaf = _walk_leaf_schema(schema, split_body_path(pointer), bundled, ())
-    if leaf is None:
+    found = _walk_leaf_schema(schema, split_body_path(pointer), bundled, ())
+    if found is None:
         return None
+    leaf, unique_items = found
     # The leaf may reference other bundled definitions, so keep them reachable for validation.
-    return schema_with_bundle(leaf, schema)
+    return schema_with_bundle(leaf, schema), unique_items
 
 
 def _walk_leaf_schema(
-    current: JsonSchema, segments: list[str], bundled: dict[str, JsonSchema], visited: tuple[str, ...]
-) -> JsonSchema | None:
+    current: JsonSchema,
+    segments: list[str],
+    bundled: dict[str, JsonSchema],
+    visited: tuple[str, ...],
+    unique: bool = False,
+) -> tuple[JsonSchema, tuple[bool, ...]] | None:
+    # `unique` tells whether a schema met so far at this position declares `uniqueItems`.
     if isinstance(current, dict):
+        unique = unique or _declares_unique_items(current)
         reference = current.get("$ref")
         if isinstance(reference, str):
             if reference in visited:
@@ -337,9 +354,9 @@ def _walk_leaf_schema(
             target = bundled.get(reference.rsplit("/", 1)[-1])
             if target is None:
                 return None
-            return _walk_leaf_schema(target, segments, bundled, (*visited, reference))
+            return _walk_leaf_schema(target, segments, bundled, (*visited, reference), unique)
     if not segments:
-        return current if isinstance(current, (dict, bool)) else None
+        return (current, ()) if isinstance(current, (dict, bool)) else None
     if not isinstance(current, dict):
         return None
     segment, *rest = segments
@@ -349,7 +366,8 @@ def _walk_leaf_schema(
         if isinstance(items, (dict, bool)):
             found = _walk_leaf_schema(items, rest, bundled, ())
             if found is not None:
-                return found
+                leaf, unique_items = found
+                return leaf, (unique, *unique_items)
     else:
         properties = current.get("properties")
         if isinstance(properties, dict) and segment in properties:
@@ -361,10 +379,17 @@ def _walk_leaf_schema(
         branches = current.get(keyword)
         if isinstance(branches, list):
             for branch in branches:
-                found = _walk_leaf_schema(branch, segments, bundled, visited)
+                found = _walk_leaf_schema(branch, segments, bundled, visited, unique)
                 if found is not None:
                     return found
     return None
+
+
+def _declares_unique_items(schema: JsonSchemaObject) -> bool:
+    # Every `allOf` branch applies to the same array, so `uniqueItems` in a sibling branch binds it too.
+    all_of = schema.get("allOf")
+    branches = all_of if isinstance(all_of, list) else []
+    return any(isinstance(part, dict) and part.get("uniqueItems") is True for part in (schema, *branches))
 
 
 def build_body_dictionary_overlay_strategy(
@@ -376,11 +401,16 @@ def build_body_dictionary_overlay_strategy(
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
-    eligible_per_binding: list[tuple[_ResolvedBodyBinding, tuple[tuple[int, EntryValue, bool], ...]]] = []
+    eligible_per_binding: list[
+        tuple[_ResolvedBodyBinding, tuple[tuple[int, EntryValue, bool], ...], dict[object, list[int]]]
+    ] = []
     for binding in bindings:
         classified = _classify_entries(binding.entries, binding.leaf_schema, validator_cls, generation_mode)
         if classified:
-            eligible_per_binding.append((binding, classified))
+            positions: dict[object, list[int]] = {}
+            for position, (_, entry_value, _) in enumerate(classified):
+                positions.setdefault(json_identity(entry_value), []).append(position)
+            eligible_per_binding.append((binding, classified, positions))
 
     if not eligible_per_binding:
         return inner
@@ -405,18 +435,22 @@ def build_body_dictionary_overlay_strategy(
 
         random = draw(st.randoms())
         new_draws: list[DictionaryDraw] = []
-        for binding, eligible in eligible_per_binding:
-            value = walk_substitute(
+        for binding, eligible, positions in eligible_per_binding:
+            value = _substitute_entries(
                 value,
                 split_body_path(binding.pointer),
+                binding.unique_items,
                 _make_replacement(
                     draw=draw,
                     random=random,
                     binding=binding,
                     eligible=eligible,
+                    positions=positions,
                     operation_label=operation_label,
                     new_draws=new_draws,
                 ),
+                set(),
+                new_draws,
             )
 
         if not new_draws and not isinstance(produced, GeneratedValue):
@@ -467,13 +501,27 @@ def _make_replacement(
     random: random.Random,
     binding: _ResolvedBodyBinding,
     eligible: tuple[tuple[int, EntryValue, bool], ...],
+    positions: dict[object, list[int]],
     operation_label: str,
     new_draws: list[DictionaryDraw],
-) -> Callable[[JsonValue], JsonValue]:
-    def replace(current: JsonValue) -> JsonValue:
+) -> Callable[[JsonValue, set[object]], JsonValue]:
+    def replace(current: JsonValue, exclude: set[object]) -> JsonValue:
         if random.random() >= binding.probability:
             return current
-        entry_index, entry_value, matches_schema = draw(st.sampled_from(eligible))
+        skipped = sorted(position for identity in exclude for position in positions.get(identity, ()))
+        if not skipped:
+            entry = draw(st.sampled_from(eligible))
+        elif len(skipped) < len(eligible):
+            # Draw among the entries left and step over the skipped ones, so large dictionaries are not scanned.
+            index = draw(st.integers(0, len(eligible) - len(skipped) - 1))
+            for position in skipped:
+                if position > index:
+                    break
+                index += 1
+            entry = eligible[index]
+        else:
+            return current
+        entry_index, entry_value, matches_schema = entry
         new_draws.append(
             DictionaryDraw(
                 dictionary=binding.dictionary.name,
@@ -491,6 +539,48 @@ def _make_replacement(
         return entry_value
 
     return replace
+
+
+def _substitute_entries(
+    target: JsonValue,
+    segments: list[str],
+    unique_items: tuple[bool, ...],
+    replace: Callable[[JsonValue, set[object]], JsonValue],
+    exclude: set[object],
+    new_draws: list[DictionaryDraw],
+) -> JsonValue:
+    # `exclude` holds the entries the leaves under the nearest `uniqueItems` array must not take.
+    if not segments:
+        return replace(target, exclude)
+    head, *rest = segments
+    if head != "*":
+        if not isinstance(target, dict) or head not in target:
+            return target
+        return {**target, head: _substitute_entries(target[head], rest, unique_items, replace, exclude, new_draws)}
+    if not isinstance(target, list):
+        return target
+    is_unique, rest_unique = unique_items[0], unique_items[1:]
+    if not is_unique:
+        return [_substitute_entries(item, rest, rest_unique, replace, exclude, new_draws) for item in target]
+    # Each entry goes to one item at most; an item that would still equal another keeps its generated value.
+    originals = [json_identity(item) for item in target]
+    taken = set(originals)
+    used: set[object] = set()
+    items = []
+    for item, original in zip(target, originals, strict=True):
+        taken.discard(original)
+        mark = len(new_draws)
+        # An item that is the leaf itself avoids the other items' values up front.
+        new_item = _substitute_entries(item, rest, rest_unique, replace, used if rest else taken, new_draws)
+        identity = json_identity(new_item)
+        if identity in taken:
+            del new_draws[mark:]
+            new_item, identity = item, original
+        else:
+            used.update(json_identity(draw_.value) for draw_ in new_draws[mark:])
+        taken.add(identity)
+        items.append(new_item)
+    return items
 
 
 def walk_substitute(
