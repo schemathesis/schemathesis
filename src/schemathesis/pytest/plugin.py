@@ -64,6 +64,7 @@ from schemathesis.python._constants.orchestrator import make_constants_value_sou
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
+    from _pytest._code import TracebackEntry
     from _pytest.fixtures import FuncFixtureInfo
     from _pytest.terminal import TerminalReporter
 
@@ -396,44 +397,48 @@ def pytest_report_teststatus(
                     break
 
 
+def _strip_hypothesis_notes(excinfo: pytest.ExceptionInfo[BaseException], report: pytest.TestReport) -> None:
+    if issubclass(excinfo.type, SchemathesisError) and hasattr(excinfo.value, "__notes__"):
+        # Hypothesis adds quite a lot of additional debug information which is not that helpful in Schemathesis
+        excinfo.value.__notes__.clear()
+        report.longrepr = "".join(format_exception(excinfo.value))
+
+
+def _dedupe_exception_group(excinfo: pytest.ExceptionInfo[BaseException], report: pytest.TestReport) -> None:
+    if not isinstance(excinfo.value, BaseExceptionGroup):
+        return
+    # Use exception origin (type + traceback + context) as deduplication key
+    origins: dict[tuple, BaseException] = {}
+    for exc in excinfo.value.exceptions:
+        origin = get_origin(exc)
+        if origin not in origins:
+            origins[origin] = exc
+
+    if len(origins) < len(excinfo.value.exceptions):
+        deduplicated = list(origins.values())
+        message = excinfo.value.message.replace(
+            f"{len(excinfo.value.exceptions)} distinct failures",
+            f"{len(deduplicated)} distinct failures",
+        )
+        group = BaseExceptionGroup(message, deduplicated)
+        report.longrepr = "".join(format_exception(group, with_traceback=True))
+
+
+def _caller_frame_index(entries: Sequence[TracebackEntry]) -> int:
+    # Keep internal Schemathesis frames + one extra one from the caller
+    for index in range(len(entries) - 1, -1, -1):
+        if not str(entries[index].path).endswith("schemathesis/generation/case.py"):
+            return index
+    return 0
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pytest.TestReport) -> None:
     if call.excinfo:
-        if issubclass(call.excinfo.type, SchemathesisError) and hasattr(call.excinfo.value, "__notes__"):
-            # Hypothesis adds quite a lot of additional debug information which is not that helpful in Schemathesis
-            call.excinfo.value.__notes__.clear()
-            report.longrepr = "".join(format_exception(call.excinfo.value))
-        # Deduplicate identical exceptions in exception groups
-        if isinstance(call.excinfo.value, BaseExceptionGroup):
-            # Use exception origin (type + traceback + context) as deduplication key
-            origins: dict[tuple, BaseException] = {}
-            for exc in call.excinfo.value.exceptions:
-                origin = get_origin(exc)
-                if origin not in origins:
-                    origins[origin] = exc
-
-            if len(origins) < len(call.excinfo.value.exceptions):
-                deduplicated = list(origins.values())
-                message = call.excinfo.value.message.replace(
-                    f"{len(call.excinfo.value.exceptions)} distinct failures",
-                    f"{len(deduplicated)} distinct failures",
-                )
-                group = BaseExceptionGroup(message, deduplicated)
-                report.longrepr = "".join(format_exception(group, with_traceback=True))
-
+        _strip_hypothesis_notes(call.excinfo, report)
+        _dedupe_exception_group(call.excinfo, report)
         if issubclass(call.excinfo.type, FailureGroup):
-            tb_entries = list(call.excinfo.traceback)
-            total_frames = len(tb_entries)
-
-            # Keep internal Schemathesis frames + one extra one from the caller
-            skip_frames = 0
-            for i in range(total_frames - 1, -1, -1):
-                entry = tb_entries[i]
-
-                if not str(entry.path).endswith("schemathesis/generation/case.py"):
-                    skip_frames = i
-                    break
-
+            skip_frames = _caller_frame_index(call.excinfo.traceback)
             report.longrepr = "".join(
                 format_exception(call.excinfo.value, with_traceback=True, skip_frames=skip_frames)
             )
