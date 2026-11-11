@@ -586,10 +586,13 @@ def validate(
 
 def collect_after_run_failures(
     config: ProjectConfig,
-    checks: list[tuple[str, RunCheck]],
+    run_checks: RunChecks,
     transport_kwargs: dict[str, Any] | None = None,
 ) -> list[Failure]:
     """Run each class-based check's `after_run` once the run has completed and collect their failures."""
+    checks = run_checks.for_run()
+    if not checks:
+        return []
     from requests.structures import CaseInsensitiveDict
 
     headers = config.headers_for()
