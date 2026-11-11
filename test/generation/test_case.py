@@ -492,8 +492,7 @@ def test_response_from_requests(ctx, app_runner):
         response.set_cookie("baz", "spam")
         return response
 
-    port = app_runner.run_flask_app(app)
-    response = requests.get(f"http://127.0.0.1:{port}/api/cookies", timeout=10)
+    response = requests.get(app_runner.openapi_url(app, path="/api/cookies"), timeout=10)
     serialized = Response.from_requests(response, True)
     assert serialized.content == b""
     assert serialized.status_code == 200

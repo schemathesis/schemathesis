@@ -114,8 +114,7 @@ def test_uri_loader_transport_from_config(app_runner, tmp_path, app, path, loade
 )
 # The schema URL refuses connections, so loading succeeds only through the proxy, which answers as the API itself.
 def test_uri_loader_proxy_from_config(app_runner, app, path, loader):
-    proxy = f"http://127.0.0.1:{app_runner.run_flask_app(app().server)}"
-    config = schemathesis.Config.from_dict({"proxy": proxy})
+    config = schemathesis.Config.from_dict({"proxy": app_runner.openapi_url(app().server, path="")})
     with refusing_url() as url:
         loader(f"{url}{path}", config=config)
 

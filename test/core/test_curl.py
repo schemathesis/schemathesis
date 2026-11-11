@@ -78,7 +78,7 @@ def loose_schema(ctx, app_runner):
     schema = ctx.openapi.load_schema(paths, version="2.0")
     # A live server answers every generated command, so only a malformed one can make curl fail.
     app = make_permissive_flask_app(ctx.openapi.build_schema(paths, version="2.0"))
-    schema.config.update(base_url=f"http://127.0.0.1:{app_runner.run_flask_app(app)}/api")
+    schema.config.update(base_url=app_runner.openapi_url(app, path="/api"))
     return schema
 
 

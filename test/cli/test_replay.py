@@ -32,6 +32,7 @@ from schemathesis.reporting.crashes import MANIFEST_FILENAME, CrashCheck, CrashF
 from schemathesis.schemas import BaseSchema
 from test.apps.catalog.graphql import bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.catalog.openapi import stateful
 from test.apps.catalog.openapi.modifiers.stateful import IndependentInternalError
 from test.apps.catalog.openapi.modifiers.under_declared_security import (
     DeclareSecurity,
@@ -783,9 +784,7 @@ def test_replay_graphql_sends_recorded_id_without_json_response(cli, ctx, app_ru
             return "unavailable"
         return jsonify({"data": None, "errors": [{"message": "planted", "path": ["user"]}]})
 
-    port = app_runner.run_flask_app(elsewhere)
-
-    result = cli.main("replay", f"--url=http://127.0.0.1:{port}/graphql", "--keep")
+    result = cli.main("replay", f"--url={app_runner.openapi_url(elsewhere, path='/graphql')}", "--keep")
 
     assert re.findall(r'^ +2  POST  /graphql  200  ~  (\w+) = "[^"]+" \((.+)\)$', result.stdout, re.MULTILINE) == [
         ("authorId", "recorded, not re-extracted"),
@@ -1681,7 +1680,7 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
 @pytest.mark.parametrize("consumer", ["path", "body"])
 @pytest.mark.parametrize("fresh_ids", [[1, 2], [3, 4]], ids=["recorded-match", "first-match"])
 def test_replay_inferred_list_link_uses_live_wildcard_match(cli, ctx, tmp_path, fresh_ids, consumer):
-    api = ctx.openapi.apps.replay_inferred_list_link(item_ids=[1, 2], failing=True, consumer=consumer)
+    api = ctx.openapi.serve(stateful.replay_inferred_list_link(item_ids=[1, 2], failing=True, consumer=consumer))
     cli.run(api.schema_url, "--phases=stateful", "--max-examples=10", "--seed=1")
     crash_dir = crash_cache_dir(tmp_path)
     [crash_file] = _list_crash_files(crash_dir)
@@ -1693,7 +1692,7 @@ def test_replay_inferred_list_link_uses_live_wildcard_match(cli, ctx, tmp_path, 
         if consumer == "path"
         else target["case_body"]["value"]["lines"][0]["itemId"]
     )
-    fresh = ctx.openapi.apps.replay_inferred_list_link(item_ids=fresh_ids, failing=False, consumer=consumer)
+    fresh = ctx.openapi.serve(stateful.replay_inferred_list_link(item_ids=fresh_ids, failing=False, consumer=consumer))
 
     result = cli.main("replay", f"--url={fresh.base_url}")
 

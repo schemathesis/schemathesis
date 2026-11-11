@@ -196,7 +196,7 @@ def test_pytest_stateful_discovers_bug_with_dependency_inference(testdir, app_ru
 
         return jsonify({"detail": "Customer does not exist"}), 404
 
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
 
     testdir.make_test(
         f"""
@@ -204,7 +204,7 @@ schema.config.generation.modes = [GenerationMode.POSITIVE]
 
 class APIWorkflow(schema.as_state_machine()):
     def get_call_kwargs(self, case):
-        return {{"base_url": "http://127.0.0.1:{port}"}}
+        return {{"base_url": "{base_url}"}}
 
 TestAPI = APIWorkflow.TestCase
 """,

@@ -372,7 +372,7 @@ def test_wfc_asgi_login_applies_token():
 
 def test_wfc_http_login_goes_through_configured_proxy(ctx, app_runner):
     schema = ctx.openapi.load_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema.config.proxy = f"http://127.0.0.1:{app_runner.run_flask_app(wfc_apps.wfc_login().server)}"
+    schema.config.proxy = app_runner.openapi_url(wfc_apps.wfc_login().server, path="")
     operation = schema["/api/protected"]["GET"]
     provider = _provider_for(_login(token=_token()))
     context = AuthContext(operation=operation, app=None)
