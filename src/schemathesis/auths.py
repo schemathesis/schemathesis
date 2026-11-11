@@ -768,12 +768,17 @@ def _iter_caching_providers(case: Case) -> Iterator[CachingAuthProvider]:
     yield from _caching_providers_in(GLOBAL_AUTH_STORAGE)
 
 
+def apply_configured_auth(case: Case) -> None:
+    """Set the credentials a run would send for `case`: auth providers, configured auth or the schema's security."""
+    set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), None)
+
+
 def refresh_auth(case: Case) -> None:
     """Invalidate cached auth for `case` and re-apply it, so the next request carries a fresh token."""
     # Concurrent callers coalesce onto one refetch via CachingAuthProvider.get's lock; invalidate only clears.
     for provider in _iter_caching_providers(case):
         provider.invalidate()
-    set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), None)
+    apply_configured_auth(case)
 
 
 @dataclass(slots=True)
