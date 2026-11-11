@@ -22,6 +22,8 @@
 - `ignored_auth` sending two extra requests per authenticated success in pytest and `call_and_validate()`.
 - Custom `encoding` ignored for form fields declared in `allOf` branches.
 - False positive `negative_data_rejection` for scalar values sent to form body array fields.
+- False positive and internal error in `negative_data_rejection` for `deepObject` members under `$ref`. [#6025](https://github.com/schemathesis/schemathesis/issues/6025) [#6028](https://github.com/schemathesis/schemathesis/issues/6028)
+- False positive `positive_data_acceptance` when a `body.*` override sets a field sharing its `$ref` with others. [#6026](https://github.com/schemathesis/schemathesis/issues/6026)
 - Coverage phase sending no valid body when `oneOf` branches overlap, e.g. `integer` and `number`.
 - Dictionary bindings on `[*]` paths repeating entries in `uniqueItems` arrays. [#6027](https://github.com/schemathesis/schemathesis/issues/6027)
 - Missing pytest warnings for unresolvable references, unsupported regex patterns and other schema problems.
